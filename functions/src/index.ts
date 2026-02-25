@@ -162,11 +162,10 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
         throw new functions.https.HttpsError("invalid-argument", "A valid invite code is required.");
     }
     
-    // Use the code as the document ID for a direct lookup.
     const inviteCodeRef = db.doc(`inviteCodes/${code}`);
 
     try {
-        await db.runTransaction(async (transaction) => {
+        const result = await db.runTransaction(async (transaction) => {
             const inviteCodeDoc = await transaction.get(inviteCodeRef);
 
             if (!inviteCodeDoc.exists) {
@@ -176,18 +175,18 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
             const inviteCodeData = inviteCodeDoc.data()!;
             const centerId = inviteCodeData.centerId;
 
+            // --- Start Validation ---
             if (!centerId) {
-                throw new functions.https.HttpsError('internal', 'Invite code is missing centerId.');
+                throw new functions.https.HttpsError('internal', 'Invite code is corrupt and is missing a centerId.');
             }
-
             if (inviteCodeData.usedCount >= inviteCodeData.maxUses) {
                 throw new functions.https.HttpsError('resource-exhausted', 'This invite code has reached its maximum number of uses.');
             }
-
             const now = new Date();
             if (inviteCodeData.expiresAt && inviteCodeData.expiresAt.toDate() < now) {
                 throw new functions.https.HttpsError('deadline-exceeded', 'This invite code has expired.');
             }
+            // --- End Validation ---
 
             const timestamp = admin.firestore.FieldValue.serverTimestamp();
             const role = inviteCodeData.intendedRole || 'student';
@@ -240,29 +239,22 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                     role: role,
                 },
             });
-        });
 
-        const inviteCodeData = (await inviteCodeRef.get()).data();
-        return { ok: true, message: `Successfully joined center ${inviteCodeData?.centerId} as ${inviteCodeData?.intendedRole}.` };
+            return { ok: true, message: `Successfully joined center ${centerId} as ${role}.` };
+        });
+        
+        return result;
 
     } catch (error: any) {
         console.error("redeemInviteCode failed:", error);
+        // If it's an error we threw intentionally, rethrow it
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        
-        let errorMessage = error.message || "Server error during invite redemption.";
-        // Specific error for FAILED_PRECONDITION which can indicate a missing index, though less likely now.
-        if (error.code === 'FAILED_PRECONDITION' || (error.code === 9)) {
-            errorMessage = "A database index might be required. Please check the Firebase console logs for an index creation link.";
-        } else if (error.code === 'PERMISSION_DENIED' || (error.code === 7)) {
-            errorMessage = `Permission denied. Ensure the invite code '${code}' exists and is active.`;
-        }
-
+        // For all other errors, return a generic internal error
         throw new functions.https.HttpsError(
             "internal",
-            errorMessage
+            error.message || "An unknown server error occurred during invite redemption."
         );
     }
 });
-    
