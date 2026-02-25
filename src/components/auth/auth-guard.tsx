@@ -1,9 +1,9 @@
 'use client';
 
-import { useUser, useCollection } from '@/firebase';
+import { useUser } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { CenterMembership, useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
@@ -23,6 +23,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (pathname !== '/login' && pathname !== '/signup') {
         router.push('/login');
       }
+      setIsCheckingMembership(false);
       return;
     }
 
@@ -52,7 +53,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             setActiveMembership(activeMemberships[0]);
 
             // If user is on a non-app page but has membership, redirect to app
-            if (pathname === '/connection-test') {
+            if (pathname === '/connection-test' || pathname === '/app' || pathname === '/') {
                 router.push('/dashboard');
             }
         } else {
@@ -64,6 +65,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error("Failed to check membership", e);
         // Maybe redirect to an error page or show a toast
+        if (pathname !== '/connection-test') {
+            router.push('/connection-test');
+        }
       } finally {
         setIsCheckingMembership(false);
       }

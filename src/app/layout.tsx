@@ -4,6 +4,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { AppProvider } from '@/contexts/app-context';
+import { AuthGuard } from '@/components/auth/auth-guard';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,7 +33,9 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}
       >
         <FirebaseClientProvider>
-          {children}
+          <AppProvider>
+            <AuthGuard>{children}</AuthGuard>
+          </AppProvider>
           <Toaster />
           <FirebaseErrorListener />
         </FirebaseClientProvider>

@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import {
   BookOpen,
@@ -6,9 +8,10 @@ import {
   Settings,
   Trophy,
   Users,
-  BarChart3
+  BarChart3,
+  Loader2,
 } from 'lucide-react';
-import { mockUser } from '@/lib/data';
+import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 
@@ -31,7 +34,7 @@ const navItems = {
     { href: '/dashboard/attendance', label: '출석', icon: Users },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
-  admin: [
+  centerAdmin: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/attendance', label: '출석', icon: Users },
     { href: '/dashboard/analytics', label: '센터 분석', icon: BarChart3 },
@@ -40,7 +43,18 @@ const navItems = {
 };
 
 export function MainNav({ isMobile = false }: MainNavProps) {
-  const userNavItems = navItems[mockUser.role] || [];
+  const { activeMembership } = useAppContext();
+  
+  if (!activeMembership) {
+      return (
+      <div className="flex flex-1 items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    )
+  }
+
+  const userRole = activeMembership.role;
+  const userNavItems = navItems[userRole] || [];
   
   const navClass = cn(
     'flex-1 items-start px-2 text-sm font-medium',
