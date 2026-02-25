@@ -160,7 +160,7 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
         throw new functions.https.HttpsError("invalid-argument", "A valid invite code is required.");
     }
 
-    const inviteCodeQuery = db.collectionGroup('inviteCodes').where('code', '==', code).limit(1);
+    const inviteCodeQuery = db.collection('inviteCodes').where('code', '==', code).limit(1);
 
     try {
         const inviteCodeSnapshot = await inviteCodeQuery.get();
@@ -251,10 +251,10 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
             throw error;
         }
         let errorMessage = error.message || "Server error during invite redemption.";
-        if (error.code === 9) { // PERMISSION_DENIED from index error
+        if (error.code === 9) { // FAILED_PRECONDITION from index error
             errorMessage = "A database index is required for this operation. Please check the Firebase console logs for a link to create it.";
         } else if (error.code === 7) { // PERMISSION_DENIED from security rules
-            errorMessage = `Permission denied. Ensure the invite code '${code}' exists and is active in Firestore at /centers/${centerId}/inviteCodes/{inviteCodeId}.`;
+            errorMessage = `Permission denied. Ensure the invite code '${code}' exists and is active in Firestore at /inviteCodes/{inviteCodeId}.`;
         }
 
 

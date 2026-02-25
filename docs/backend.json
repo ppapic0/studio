@@ -1061,18 +1061,14 @@
         }
       },
       {
-        "path": "/centers/{centerId}/inviteCodes/{inviteCodeId}",
+        "path": "/inviteCodes/{inviteCodeId}",
         "definition": {
           "entityName": "InviteCode",
           "schema": {
             "$ref": "#/backend/entities/InviteCode"
           },
-          "description": "Stores invite codes for new member onboarding to a specific center. Includes denormalized 'centerId' and 'intendedRole' for robust rule validation and atomic operations.",
+          "description": "Stores invite codes for new member onboarding. Each code has a denormalized 'centerId' for querying and rule validation.",
           "params": [
-            {
-              "name": "centerId",
-              "description": "The unique identifier of the study center."
-            },
             {
               "name": "inviteCodeId",
               "description": "The unique identifier of the invite code."

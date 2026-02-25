@@ -110,6 +110,28 @@ service cloud.firestore {
     }
 
     /**
+     * @description Manages invite codes for onboarding new members.
+     * @path /inviteCodes/{inviteCodeId}
+     */
+    match /inviteCodes/{inviteCodeId} {
+      // Allow reading a specific code if you are a staff member of that center.
+      // Redemption is server-side, but this supports client-side display/validation.
+      allow get: if isCenterStaff(resource.data.centerId);
+      
+      // Allow listing codes only if the query is filtered by a centerId where the user is staff.
+      allow list: if request.query.centerId != null && isCenterStaff(request.query.centerId);
+
+      // Allow creation if the user is staff of the center the code is for,
+      // and the provided centerId matches the user's active center.
+      allow create: if request.resource.data.centerId != null && 
+                       isCenterStaff(request.resource.data.centerId) &&
+                       request.resource.data.createdByUserId == request.auth.uid;
+                       
+      // Allow update/delete if the user is staff of the center the code belongs to.
+      allow update, delete: if isCenterStaff(resource.data.centerId);
+    }
+
+    /**
      * @description Defines a study center and its top-level settings.
      * @path /centers/{centerId}
      */
@@ -135,18 +157,6 @@ service cloud.firestore {
         allow update: if isCenterAdmin(centerId) && resource != null;
         // Deletion should be a soft-delete via status change, handled by admins.
         allow delete: if false;
-      }
-
-      /**
-       * @description Manages invite codes for onboarding new members.
-       * @path /centers/{centerId}/inviteCodes/{inviteCodeId}
-       */
-      match /inviteCodes/{inviteCodeId} {
-        allow get: if isSignedIn();
-        allow list: if isCenterStaff(centerId);
-        allow create: if isCenterStaff(centerId);
-        allow update: if isCenterStaff(centerId) && resource != null;
-        allow delete: if isCenterStaff(centerId) && resource != null;
       }
       
       /**

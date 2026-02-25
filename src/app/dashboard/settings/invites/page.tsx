@@ -21,7 +21,7 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { InviteCode } from '@/lib/types';
 import { format } from 'date-fns';
 import {
@@ -58,7 +58,7 @@ export default function InviteCodesPage() {
 
   const inviteCodesQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'inviteCodes');
+    return query(collection(firestore, 'inviteCodes'), where('centerId', '==', activeMembership.id));
   }, [firestore, activeMembership]);
 
   const { data: inviteCodes, isLoading } = useCollection<InviteCode>(inviteCodesQuery);
@@ -81,7 +81,7 @@ export default function InviteCodesPage() {
     expiresAt.setDate(expiresAt.getDate() + newCode.expiresInDays);
 
     try {
-        await addDoc(collection(firestore, 'centers', activeMembership.id, 'inviteCodes'), {
+        await addDoc(collection(firestore, 'inviteCodes'), {
             code: newCode.code.trim(),
             intendedRole: newCode.role,
             maxUses: Number(newCode.maxUses),
