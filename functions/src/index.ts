@@ -1,3 +1,8 @@
+'use server';
+/**
+ * @fileOverview This file contains the core Cloud Functions for the application,
+ * including development utilities and user-facing actions like redeeming invite codes.
+ */
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { format, getISOWeek } from "date-fns";
@@ -10,6 +15,11 @@ const db = admin.firestore();
 // firebase functions:config:set dev.secret="YOUR_SUPER_SECRET_KEY"
 const DEV_SECRET = functions.config().dev?.secret;
 
+/**
+ * @description A development-only function to allow a user to join a center with a specific role.
+ * It automatically creates the center with default data if it doesn't exist, making it
+ * a crucial bootstrapping tool for new development environments.
+ */
 export const devJoinCenter = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -37,16 +47,42 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", `Invalid role. Must be one of: ${allowedRoles.join(", ")}`);
   }
 
+  // Add fallbacks for robustness, e.g., if token has no displayName.
+  const finalDisplayName = displayName || (email ? email.split('@')[0] : "새 사용자");
+  const finalEmail = email || `${uid}@example.com`;
+
   try {
+    const centerRef = db.doc(`centers/${centerId}`);
     const batch = db.batch();
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+    // CRITICAL FIX: Check if the center document exists. If not, create it.
+    // This prevents errors when trying to write to subcollections of a non-existent document.
+    const centerDoc = await centerRef.get();
+    if (!centerDoc.exists) {
+        const subscriptionExpires = new Date();
+        subscriptionExpires.setDate(subscriptionExpires.getDate() + 30);
+        batch.set(centerRef, {
+            name: `센터 ${centerId}`,
+            description: "개발용으로 자동 생성된 센터입니다.",
+            subscriptionTier: "Pro",
+            maxStudents: 150,
+            maxTeachers: 10,
+            aiUsageQuotaWeekly: 1000,
+            dataRetentionPeriodDays: 365,
+            billingStatus: 'active',
+            subscriptionExpiresAt: admin.firestore.Timestamp.fromDate(subscriptionExpires),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        });
+    }
 
     // 1. Create/Update User Profile for all roles
     const userProfileRef = db.doc(`users/${uid}`);
      batch.set(userProfileRef, {
       id: uid,
-      displayName: displayName,
-      email: email,
+      displayName: finalDisplayName,
+      email: finalEmail,
       createdAt: timestamp,
       updatedAt: timestamp
     }, { merge: true });
@@ -57,8 +93,8 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       role: role,
       status: "active",
       joinedAt: timestamp,
-      email,
-      displayName,
+      email: finalEmail,
+      displayName: finalDisplayName,
     };
     if (role === "parent" && linkedStudentId) {
       memberData.linkedStudentIds = [linkedStudentId];
@@ -145,7 +181,10 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
   }
 });
 
-
+/**
+ * @description Redeems an invite code, creating the necessary user profile,
+ * center membership, and audit logs in a single transaction.
+ */
 export const redeemInviteCode = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError(
@@ -190,13 +229,15 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
 
             const timestamp = admin.firestore.FieldValue.serverTimestamp();
             const role = inviteCodeData.intendedRole || 'student';
+            const finalDisplayName = displayName || (email ? email.split('@')[0] : "New User");
+            const finalEmail = email || `${uid}@example.com`;
 
             // 1. Create/update the main user profile
             const userProfileRef = db.doc(`users/${uid}`);
             transaction.set(userProfileRef, {
                 id: uid,
-                displayName: displayName,
-                email: email,
+                displayName: finalDisplayName,
+                email: finalEmail,
                 createdAt: timestamp,
                 updatedAt: timestamp,
             }, { merge: true });
@@ -207,8 +248,8 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 role: role,
                 status: "active",
                 joinedAt: timestamp,
-                email,
-                displayName,
+                email: finalEmail,
+                displayName: finalDisplayName,
                 invitedByInviteCodeId: inviteCodeDoc.id,
             });
 
@@ -240,7 +281,7 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 },
             });
 
-            return { ok: true, message: `Successfully joined center ${centerId} as ${role}.` };
+            return { ok: true, centerId: centerId, message: `Successfully joined center ${centerId} as ${role}.` };
         });
         
         return result;
