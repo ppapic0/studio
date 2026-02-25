@@ -14,12 +14,13 @@ import {
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { usePathname } from 'next/navigation';
 
 type MainNavProps = {
   isMobile?: boolean;
 };
 
-const navItems = {
+const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
   student: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/plan', label: '나의 학습 계획', icon: ClipboardCheck },
@@ -44,6 +45,7 @@ const navItems = {
 
 export function MainNav({ isMobile = false }: MainNavProps) {
   const { activeMembership } = useAppContext();
+  const pathname = usePathname();
   
   if (!activeMembership) {
       return (
@@ -78,7 +80,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         <span>LEARNING-LAB</span>
       </Link>
       {userNavItems.map((item) => (
-        <Link key={item.href} href={item.href} className={cn(linkClass, item.href === '/dashboard' ? activeLinkClass : '')}>
+        <Link key={item.href} href={item.href} className={cn(linkClass, pathname === item.href ? activeLinkClass : '')}>
           <item.icon className="h-4 w-4" />
           {item.label}
         </Link>
