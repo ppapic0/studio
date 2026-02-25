@@ -14,6 +14,10 @@ import { FirestorePermissionError } from '@/firebase/errors';
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
 
+export interface UseDocOptions {
+  enabled?: boolean;
+}
+
 /**
  * Interface for the return value of the useDoc hook.
  * @template T Type of the document data.
@@ -27,7 +31,7 @@ export interface UseDocResult<T> {
 /**
  * React hook to subscribe to a single Firestore document in real-time.
  * Handles nullable references.
- * 
+ *
  * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
  * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
  * references
@@ -36,10 +40,12 @@ export interface UseDocResult<T> {
  * @template T Optional type for document data. Defaults to any.
  * @param {DocumentReference<DocumentData> | null | undefined} docRef -
  * The Firestore DocumentReference. Waits if null/undefined.
+ * @param {UseDocOptions} [options] - Options for the hook, e.g., { enabled: boolean }.
  * @returns {UseDocResult<T>} Object with data, isLoading, error.
  */
 export function useDoc<T = any>(
   memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
+  options?: UseDocOptions,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
 
@@ -47,8 +53,10 @@ export function useDoc<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  const enabled = options?.enabled ?? true;
+
   useEffect(() => {
-    if (!memoizedDocRef) {
+    if (!memoizedDocRef || !enabled) {
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -57,7 +65,6 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,
@@ -81,13 +88,12 @@ export function useDoc<T = any>(
         setData(null)
         setIsLoading(false)
 
-        // trigger global error propagation
         errorEmitter.emit('permission-error', contextualError);
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+  }, [memoizedDocRef, enabled]);
 
   return { data, isLoading, error };
 }

@@ -58,7 +58,7 @@ function StatCard({ title, icon: Icon, value, evolution, isLoading, children }: 
   );
 }
 
-export function StudentDashboard() {
+export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -75,13 +75,13 @@ export function StudentDashboard() {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', user.uid);
   }, [firestore, activeMembership, user, todayKey]);
-  const { data: dailyStat, isLoading: dailyStatLoading } = useDoc<DailyStudentStat>(dailyStatRef);
+  const { data: dailyStat, isLoading: dailyStatLoading } = useDoc<DailyStudentStat>(dailyStatRef, { enabled: isActive });
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
   }, [firestore, activeMembership, user, todayKey]);
-  const { data: studyLog, isLoading: studyLogLoading } = useDoc<StudyLogDay>(studyLogRef);
+  const { data: studyLog, isLoading: studyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const planItemsRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -91,7 +91,7 @@ export function StudentDashboard() {
       limit(5)
     );
   }, [firestore, activeMembership, user, weekKey]);
-  const { data: planItems, isLoading: planItemsLoading } = useCollection<StudyPlanItem>(planItemsRef);
+  const { data: planItems, isLoading: planItemsLoading } = useCollection<StudyPlanItem>(planItemsRef, { enabled: isActive });
 
   const aiCoachRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -102,7 +102,7 @@ export function StudentDashboard() {
         limit(1)
     );
   }, [firestore, activeMembership, user]);
-  const { data: aiCoachData, isLoading: aiCoachLoading } = useCollection<AIOutput>(aiCoachRef);
+  const { data: aiCoachData, isLoading: aiCoachLoading } = useCollection<AIOutput>(aiCoachRef, { enabled: isActive });
   
   // --- Effects ---
   useEffect(() => {
@@ -134,7 +134,7 @@ export function StudentDashboard() {
     
     setIsSavingMinutes(true);
     try {
-      await setDoc(studyLogRef, {
+      await setDoc(studyLogRef!, {
         totalMinutes: newMinutes,
         uid: user.uid,
         centerId: activeMembership.id,
@@ -150,11 +150,16 @@ export function StudentDashboard() {
     }
   };
 
+  if (!isActive) {
+    return null;
+  }
+
   const aiCoachMessage = aiCoachData?.[0];
 
   const growthRate = dailyStat?.studyTimeGrowthRate ?? 0;
   const growthSign = growthRate >= 0 ? '+' : '';
   const growthEvolution = `지난 7일 대비`;
+  const isLoading = dailyStatLoading || studyLogLoading || planItemsLoading || aiCoachLoading;
 
   return (
     <>
@@ -268,4 +273,3 @@ export function StudentDashboard() {
     </>
   );
 }
-    

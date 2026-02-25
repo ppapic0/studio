@@ -26,7 +26,7 @@ const chartData = [
   { name: '4주차', completion: 82, attendance: 100 },
 ];
 
-export function ParentDashboard() {
+export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
@@ -43,15 +43,16 @@ export function ParentDashboard() {
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', studentId);
   }, [firestore, activeMembership, studentId]);
 
-  const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef);
+  const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef, { enabled: isActive && !!studentId });
 
   useEffect(() => {
+    if (!isActive) return;
+
     const fetchSummary = async () => {
-      if (studentStat) {
+      if (studentStat && firestore && activeMembership) {
         setSummaryLoading(true);
         try {
-          const studentMember = doc(firestore, `centers/${activeMembership?.id}/members/${studentId}`);
-          // In a real app, you'd fetch the student's name
+          // In a real app, you'd fetch the student's name from the /users collection
           const studentName = '자녀';
 
           const input: ParentSummaryInput = {
@@ -79,8 +80,11 @@ export function ParentDashboard() {
     } else if (!studentStatLoading) {
         setSummaryLoading(false);
     }
-  }, [studentStat, studentStatLoading, firestore, activeMembership, studentId]);
+  }, [studentStat, studentStatLoading, firestore, activeMembership, studentId, isActive]);
 
+  if (!isActive) {
+    return null;
+  }
 
   if (!studentId) {
     return <Card><CardHeader><CardTitle>학생 연결 필요</CardTitle></CardHeader><CardContent><p>학부모 계정에 연결된 학생이 없습니다. 센터 관리자에게 문의하여 학생을 연결해주세요.</p></CardContent></Card>;

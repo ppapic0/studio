@@ -8,32 +8,10 @@ import { useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
 
-function renderDashboard(role?: 'student' | 'teacher' | 'parent' | 'centerAdmin') {
-  switch (role) {
-    case 'student':
-      return <StudentDashboard />;
-    case 'parent':
-      return <ParentDashboard />;
-    case 'teacher':
-      return <TeacherDashboard />;
-    case 'centerAdmin':
-      return <AdminDashboard />;
-    default:
-      // 역할이 아직 정해지지 않았을 때 로더를 보여줍니다.
-      return (
-        <div className="flex h-64 w-full items-center justify-center rounded-lg border">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      );
-  }
-}
-
 export default function DashboardPage() {
   const { user } = useUser();
   const { activeMembership } = useAppContext();
   
-  // AuthGuard가 주 로딩을 처리하지만, 역할이 확정될 때까지의
-  // 순간적인 로딩 상태를 대비합니다.
   const userRole = activeMembership?.role;
 
   return (
@@ -43,7 +21,15 @@ export default function DashboardPage() {
       </h1>
       <p className="text-muted-foreground">오늘의 맞춤 개요입니다.</p>
       <div className="mt-4 flex flex-col gap-4">
-        {renderDashboard(userRole)}
+        {!userRole && (
+            <div className="flex h-64 w-full items-center justify-center rounded-lg border">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        )}
+        <StudentDashboard isActive={userRole === 'student'} />
+        <ParentDashboard isActive={userRole === 'parent'} />
+        <TeacherDashboard isActive={userRole === 'teacher'} />
+        <AdminDashboard isActive={userRole === 'centerAdmin'} />
       </div>
     </>
   );

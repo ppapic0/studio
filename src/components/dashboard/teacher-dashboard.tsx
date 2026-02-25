@@ -29,7 +29,7 @@ import { format } from 'date-fns';
 import { type AIOutput, type WithId, type CenterMembership, type AttendanceRecord } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
-export function TeacherDashboard() {
+export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
@@ -44,7 +44,7 @@ export function TeacherDashboard() {
       where('status', '==', 'active')
     );
   }, [firestore, activeMembership]);
-  const { data: students, isLoading: studentsLoading } = useCollection<CenterMembership>(studentsQuery);
+  const { data: students, isLoading: studentsLoading } = useCollection<CenterMembership>(studentsQuery, { enabled: isActive });
   const studentCount = students?.length ?? 0;
 
   const atRiskQuery = useMemoFirebase(() => {
@@ -56,7 +56,7 @@ export function TeacherDashboard() {
       limit(5)
     );
   }, [firestore, activeMembership]);
-  const { data: atRiskStudents, isLoading: atRiskLoading } = useCollection<AIOutput & { studentName?: string }>(atRiskQuery);
+  const { data: atRiskStudents, isLoading: atRiskLoading } = useCollection<AIOutput & { studentName?: string }>(atRiskQuery, { enabled: isActive });
 
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -65,7 +65,11 @@ export function TeacherDashboard() {
       where('status', '!=', 'confirmed_present')
     );
   }, [firestore, activeMembership, todayKey]);
-  const { data: missingAttendance, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
+  const { data: missingAttendance, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery, { enabled: isActive });
+
+  if (!isActive) {
+    return null;
+  }
 
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">

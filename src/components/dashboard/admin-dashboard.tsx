@@ -19,7 +19,11 @@ const monthlyStatsData = [
     { month: '6월', attendance: 93, completion: 87 },
 ];
 
-export function AdminDashboard() {
+export function AdminDashboard({ isActive }: { isActive: boolean }) {
+  if (!isActive) {
+    return null;
+  }
+  
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
