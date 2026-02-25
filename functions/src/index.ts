@@ -40,10 +40,18 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
   try {
     const batch = db.batch();
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
-    // 1. Create the primary membership document
+    // 1. Create/Update User Profile for all roles
+    const userProfileRef = db.doc(`users/${uid}`);
+     batch.set(userProfileRef, {
+      id: uid,
+      displayName: displayName,
+      email: email,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }, { merge: true });
+
+    // 2. Create the primary membership document
     const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
     const memberData: any = {
       role: role,
@@ -57,7 +65,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     }
     batch.set(memberRef, memberData);
 
-    // 2. Create the reverse-index for the user
+    // 3. Create the reverse-index for the user
     const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
     batch.set(userCenterRef, {
       role: role,
@@ -65,16 +73,10 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       joinedAt: timestamp,
     });
 
-    // 3. If student, create a profile and seed initial data
+    // 4. If student, seed initial data
     if (role === "student") {
-      // Student profile in /users
-      const userProfileRef = db.doc(`users/${uid}`);
-       batch.set(userProfileRef, {
-        displayName: displayName,
-        email: email,
-        createdAt: timestamp,
-        updatedAt: timestamp
-      }, { merge: true });
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
       // Initial Daily Stat
       const dailyStatRef = db.doc(`centers/${centerId}/dailyStudentStats/${todayKey}/students/${uid}`);
@@ -119,7 +121,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       });
     }
 
-    // 4. Create an audit log
+    // 5. Create an audit log
     const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
     batch.set(auditLogRef, {
       timestamp: timestamp,
@@ -190,6 +192,17 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
             const timestamp = admin.firestore.FieldValue.serverTimestamp();
             const role = inviteCodeData.intendedRole || 'student';
 
+            // 1. Create/update the main user profile
+            const userProfileRef = db.doc(`users/${uid}`);
+            transaction.set(userProfileRef, {
+                id: uid,
+                displayName: displayName,
+                email: email,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            }, { merge: true });
+
+            // 2. Create the center membership document
             const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
             transaction.set(memberRef, {
                 role: role,
@@ -200,28 +213,21 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 invitedByInviteCodeId: inviteCodeDoc.id,
             });
 
+            // 3. Create the reverse-index for the user
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
             transaction.set(userCenterRef, {
                 role: role,
                 status: "active",
                 joinedAt: timestamp,
             });
-
-            if (role === "student") {
-                const userProfileRef = db.doc(`users/${uid}`);
-                transaction.set(userProfileRef, {
-                    displayName: displayName,
-                    email: email,
-                    createdAt: timestamp,
-                    updatedAt: timestamp,
-                }, { merge: true });
-            }
             
+            // 4. Update invite code usage
             transaction.update(inviteCodeRef, {
                 usedCount: admin.firestore.FieldValue.increment(1),
                 updatedAt: timestamp,
             });
 
+            // 5. Create an audit log
             const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
             transaction.set(auditLogRef, {
                 timestamp: timestamp,

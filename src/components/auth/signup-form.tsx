@@ -15,14 +15,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, useFirestore, useFunctions } from '@/firebase';
+import { useAuth, useFunctions } from '@/firebase';
 import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 const formSchema = z.object({
@@ -43,7 +42,6 @@ const formSchema = z.object({
 export function SignupForm() {
   const router = useRouter();
   const auth = useAuth();
-  const firestore = useFirestore();
   const functions = useFunctions();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -59,10 +57,10 @@ export function SignupForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth || !firestore || !functions) return;
+    if (!auth || !functions) return;
     setIsLoading(true);
     try {
-      // 1. Create User
+      // 1. Create User in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
@@ -73,16 +71,9 @@ export function SignupForm() {
       // 2. Update Firebase Auth profile
       await updateProfile(user, { displayName: values.displayName });
 
-      // 3. Create user profile in Firestore
-      await setDoc(doc(firestore, 'users', user.uid), {
-        id: user.uid,
-        displayName: values.displayName,
-        email: user.email,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // 4. Redeem invite code via Cloud Function
+      // 3. Redeem invite code via Cloud Function.
+      // The function now handles creating the user profile in Firestore,
+      // the center membership, and all other necessary documents.
       const redeemInviteCode = httpsCallable(functions, 'redeemInviteCode');
       await redeemInviteCode({ code: values.inviteCode });
 
@@ -105,7 +96,6 @@ export function SignupForm() {
       } else if (error.message) {
         description = error.message;
       }
-
 
       toast({
         variant: 'destructive',
