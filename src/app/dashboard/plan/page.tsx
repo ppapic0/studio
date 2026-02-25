@@ -34,7 +34,7 @@ export default function StudyPlanPage() {
   const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
   const planItemsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !activeMembership || !isStudent) return null;
+    if (!firestore || !user || !activeMembership) return null;
     return query(
       collection(
         firestore,
@@ -48,9 +48,9 @@ export default function StudyPlanPage() {
       ),
       orderBy('createdAt', 'asc')
     );
-  }, [firestore, user, activeMembership, weekKey, isStudent]);
+  }, [firestore, user, activeMembership, weekKey]);
 
-  const { data: studyPlan, isLoading } = useCollection<StudyPlanItem>(planItemsQuery);
+  const { data: studyPlan, isLoading } = useCollection<StudyPlanItem>(planItemsQuery, { enabled: isStudent });
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !isStudent) return;
@@ -94,7 +94,7 @@ export default function StudyPlanPage() {
         weight: 1,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        studyPlanWeekId: weekKey,
+        studyPlanWeekId: weekKey, // This is redundant if path contains it, but good for security rules
         centerId: activeMembership.id,
         uid: user.uid,
       });
@@ -174,4 +174,3 @@ export default function StudyPlanPage() {
     </div>
   );
 }
-    
