@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Card,
   CardContent,
@@ -14,57 +16,102 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { mockAtRiskStudents, mockAttendance } from '@/lib/data';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import Link from 'next/link';
-import { ArrowUpRight, UserCheck, UserX } from 'lucide-react';
+import { ArrowUpRight, UserCheck, UserX, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useAppContext } from '@/contexts/app-context';
+import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { collection, query, where, limit, orderBy, collectionGroup } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { type AIOutput, type WithId, type CenterMembership, type AttendanceRecord } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
 
 export function TeacherDashboard() {
-  const missingAttendance = mockAttendance.filter(a => a.status === '결석' || a.status === '지각').slice(0, 3);
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { activeMembership } = useAppContext();
+
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  const studentsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership]);
+  const { data: students, isLoading: studentsLoading } = useCollection<CenterMembership>(studentsQuery);
+  const studentCount = students?.length ?? 0;
+
+  const atRiskQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collectionGroup(firestore, 'records'),
+      where('centerId', '==', activeMembership.id),
+      where('type', '==', 'riskFlag'),
+      limit(5)
+    );
+  }, [firestore, activeMembership]);
+  const { data: atRiskStudents, isLoading: atRiskLoading } = useCollection<AIOutput & { studentName?: string }>(atRiskQuery);
+
+  const attendanceQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceRecords', todayKey, 'students'),
+      where('status', '!=', 'confirmed_present')
+    );
+  }, [firestore, activeMembership, todayKey]);
+  const { data: missingAttendance, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
+
   return (
     <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>총 학생 수</CardDescription>
-            <CardTitle className="text-4xl">125</CardTitle>
+            {studentsLoading ? <Skeleton className="h-10 w-16" /> : <CardTitle className="text-4xl">{studentCount}</CardTitle>}
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground">
-              지난달 이후 +5
-            </div>
+            {studentsLoading ? <Skeleton className="h-4 w-24" /> : <div className="text-xs text-muted-foreground">활성 멤버 기준</div>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>주의 학생</CardDescription>
-            <CardTitle className="text-4xl text-destructive-foreground dark:text-destructive">
-              {mockAtRiskStudents.length}
-            </CardTitle>
+            {atRiskLoading ? <Skeleton className="h-10 w-12" /> : 
+              <CardTitle className="text-4xl text-destructive-foreground dark:text-destructive">
+                {atRiskStudents?.length ?? 0}
+              </CardTitle>
+            }
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground">
-              지난주 대비 -1
-            </div>
+             {atRiskLoading ? <Skeleton className="h-4 w-24" /> : <div className="text-xs text-muted-foreground">AI 식별됨</div>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>오늘 출석률</CardDescription>
-            <CardTitle className="text-4xl">96%</CardTitle>
+             {attendanceLoading || studentsLoading ? <Skeleton className="h-10 w-20" /> : 
+              <CardTitle className="text-4xl">
+                {studentCount > 0 ? Math.round(((studentCount - (missingAttendance?.length ?? 0)) / studentCount) * 100) : 100}%
+              </CardTitle>
+            }
           </CardHeader>
           <CardContent>
+            {attendanceLoading ? <Skeleton className="h-4 w-28" /> : 
             <div className="text-xs text-muted-foreground">
-              결석/지각 {mockAttendance.filter(a => a.status !== '출석').length}명
-            </div>
+              결석/지각 {missingAttendance?.length ?? 0}명
+            </div>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>개입</CardDescription>
-            <CardTitle className="text-4xl">5</CardTitle>
+            <CardTitle className="text-4xl">0</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xs text-muted-foreground">
@@ -90,36 +137,27 @@ export function TeacherDashboard() {
             </Button>
         </CardHeader>
         <CardContent>
+          {atRiskLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto"/> :
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>학생</TableHead>
                 <TableHead>위험 요인</TableHead>
-                <TableHead className="hidden md:table-cell">사유</TableHead>
                 <TableHead>
                   <span className="sr-only">작업</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockAtRiskStudents.map(({ student, risk, reason }) => (
-                <TableRow key={student.id}>
+              {atRiskStudents?.map((risk) => (
+                <TableRow key={risk.id}>
                   <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="hidden h-9 w-9 sm:flex">
-                        <AvatarImage src={student.avatarUrl} alt="Avatar" />
-                        <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{student.name}</div>
-                    </div>
+                    <div className="font-medium">{students?.find(s => s.id === risk.studentId)?.displayName ?? risk.studentId}</div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="border-destructive text-destructive-foreground dark:text-destructive">
-                      {risk}
+                      {JSON.parse(risk.basedOnMetricsSnapshot).riskReasons?.[0] || '위험 감지'}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {reason}
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm">
@@ -130,6 +168,7 @@ export function TeacherDashboard() {
               ))}
             </TableBody>
           </Table>
+        }
         </CardContent>
       </Card>
       
@@ -150,14 +189,15 @@ export function TeacherDashboard() {
                 </Button>
             </CardHeader>
             <CardContent>
-                {missingAttendance.map(student => (
+                {attendanceLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto"/> :
+                 missingAttendance?.map(student => (
                     <div key={student.id} className="flex items-center gap-4 mb-4">
                         <Avatar className="hidden h-9 w-9 sm:flex">
-                        <AvatarImage src={student.avatarUrl} alt="Avatar" />
-                        <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                        {/* <AvatarImage src={student.avatarUrl} alt="Avatar" /> */}
+                        <AvatarFallback>{student.studentName?.charAt(0) ?? '?'}</AvatarFallback>
                       </Avatar>
                         <div className="grid gap-1">
-                            <p className="text-sm font-medium leading-none">{student.name}</p>
+                            <p className="text-sm font-medium leading-none">{student.studentName ?? student.id}</p>
                             <p className="text-sm text-muted-foreground">{student.status}</p>
                         </div>
                         <div className="ml-auto font-medium">

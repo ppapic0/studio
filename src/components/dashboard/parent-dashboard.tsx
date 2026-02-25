@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -7,10 +8,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { mockParentSummary } from '@/lib/data';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { BarChart, FileText, TrendingUp, CheckCircle } from 'lucide-react';
+import { FileText, CheckCircle, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, Bar, XAxis, YAxis, Tooltip, BarChart as RechartsBarChart } from 'recharts';
+import { useUser, useFirestore, useDoc } from '@/firebase';
+import { useAppContext } from '@/contexts/app-context';
+import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { doc } from 'firebase/firestore';
+import { type DailyStudentStat } from '@/lib/types';
+import { generateParentSummary, type ParentSummaryOutput, type ParentSummaryInput } from '@/ai/flows/parent-receives-weekly-summary';
+import { Skeleton } from '../ui/skeleton';
 
 const chartData = [
   { name: '1주차', completion: 75, attendance: 95 },
@@ -20,24 +27,90 @@ const chartData = [
 ];
 
 export function ParentDashboard() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { activeMembership } = useAppContext();
+
+  const [summary, setSummary] = useState<ParentSummaryOutput | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+
+  const studentId = activeMembership?.linkedStudentIds?.[0];
+
+  const studentStatRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !studentId) return null;
+    // Assuming we check the latest daily stat for simplicity
+    const todayKey = new Date().toISOString().split('T')[0];
+    return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', studentId);
+  }, [firestore, activeMembership, studentId]);
+
+  const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      if (studentStat) {
+        setSummaryLoading(true);
+        try {
+          const studentMember = doc(firestore, `centers/${activeMembership?.id}/members/${studentId}`);
+          // In a real app, you'd fetch the student's name
+          const studentName = '자녀';
+
+          const input: ParentSummaryInput = {
+            studentName: studentName,
+            completionRate: studentStat.weeklyPlanCompletionRate * 100,
+            completionRateTrend: 0, // Placeholder
+            attendanceRate: 100, // Placeholder
+            attendanceTrend: 0, // Placeholder
+            studyTimeGrowth: studentStat.studyTimeGrowthRate,
+            recentAchievements: [], // Placeholder
+            potentialRisks: studentStat.riskDetected ? ['AI에 의해 위험이 감지되었습니다.'] : [],
+          };
+          const result = await generateParentSummary(input);
+          setSummary(result);
+        } catch (error) {
+          console.error("Error generating parent summary:", error);
+        } finally {
+          setSummaryLoading(false);
+        }
+      }
+    };
+
+    if (studentStat) {
+      fetchSummary();
+    } else if (!studentStatLoading) {
+        setSummaryLoading(false);
+    }
+  }, [studentStat, studentStatLoading, firestore, activeMembership, studentId]);
+
+
+  if (!studentId) {
+    return <Card><CardHeader><CardTitle>학생 연결 필요</CardTitle></CardHeader><CardContent><p>학부모 계정에 연결된 학생이 없습니다. 센터 관리자에게 문의하여 학생을 연결해주세요.</p></CardContent></Card>;
+  }
+
+
+  const isLoading = studentStatLoading || summaryLoading;
+
   return (
     <>
       <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">벤 카터의 주간 요약</CardTitle>
+            <CardTitle className="font-headline">자녀의 주간 요약</CardTitle>
             <CardDescription>
               이번 주 자녀의 학습 진행 상황에 대한 AI 요약입니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Alert className="bg-secondary">
-              <FileText className="h-4 w-4" />
-              <AlertTitle className="font-semibold">AI 요약</AlertTitle>
-              <AlertDescription>{mockParentSummary.message}</AlertDescription>
-            </Alert>
+            {isLoading ? <Skeleton className="h-24 w-full" /> : summary ? (
+              <Alert className="bg-secondary">
+                <FileText className="h-4 w-4" />
+                <AlertTitle className="font-semibold">AI 요약</AlertTitle>
+                <AlertDescription>{summary.message}</AlertDescription>
+              </Alert>
+            ) : <p>주간 요약을 생성할 수 없습니다.</p>}
+            
             <div className="grid gap-4 sm:grid-cols-3">
-              {mockParentSummary.keyMetrics.map((metric) => (
+              {isLoading ? [...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 w-full" />) :
+               summary?.keyMetrics.map((metric) => (
                 <Card key={metric.name}>
                   <CardHeader className="pb-2">
                     <CardDescription>{metric.name}</CardDescription>
@@ -51,17 +124,20 @@ export function ParentDashboard() {
                 </Card>
               ))}
             </div>
+
+            {isLoading ? <Skeleton className="h-24 w-full" /> : summary && (
              <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertTitle className="font-semibold">추천 사항</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc pl-5 space-y-1 mt-2">
-                    {mockParentSummary.recommendations.map((rec, index) => (
+                    {summary.recommendations.map((rec, index) => (
                         <li key={index}>{rec}</li>
                     ))}
                 </ul>
               </AlertDescription>
             </Alert>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -72,6 +148,7 @@ export function ParentDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+             {isLoading ? <div className="flex h-[300px] w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin"/></div> :
             <ResponsiveContainer width="100%" height={300}>
               <RechartsBarChart data={chartData}>
                 <XAxis
@@ -99,6 +176,7 @@ export function ParentDashboard() {
                 <Bar dataKey="attendance" name="출석률" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
               </RechartsBarChart>
             </ResponsiveContainer>
+            }
           </CardContent>
         </Card>
       </div>

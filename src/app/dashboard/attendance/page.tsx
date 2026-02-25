@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -14,7 +17,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { mockAttendance } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -24,81 +26,146 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { format } from 'date-fns';
+import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useAppContext } from '@/contexts/app-context';
+import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
+import { AttendanceRecord, WithId, CenterMembership } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AttendancePage() {
-  const today = format(new Date(), 'yyyy년 MM월 dd일');
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { activeMembership } = useAppContext();
+  
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const dateKey = format(selectedDate, 'yyyy-MM-dd');
+
+  // 1. Fetch all students in the center
+  const studentsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'members');
+  }, [firestore, activeMembership]);
+  const { data: members, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery);
+  const students = members?.filter(m => m.role === 'student');
+
+
+  // 2. Fetch attendance records for the selected date
+  const attendanceQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students');
+  }, [firestore, activeMembership, dateKey]);
+  const { data: attendanceRecords, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
 
   const getBadgeVariant = (status: string) => {
     switch (status) {
-      case '출석':
+      case 'confirmed_present':
         return 'default';
-      case '결석':
+      case 'confirmed_absent':
         return 'destructive';
-      case '지각':
+      case 'confirmed_late':
         return 'secondary';
       default:
         return 'outline';
     }
   };
 
+  const handleStatusChange = async (studentId: string, status: AttendanceRecord['status']) => {
+      if (!firestore || !user || !activeMembership) return;
+      
+      const recordRef = doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students', studentId);
+      const studentData = students?.find(s => s.id === studentId);
+
+      const recordData: Partial<AttendanceRecord> = {
+          status,
+          updatedAt: serverTimestamp() as any,
+          confirmedByUserId: user.uid,
+          centerId: activeMembership.id,
+          studentId: studentId,
+          dateKey: dateKey,
+          studentName: studentData?.displayName,
+      };
+
+      await setDoc(recordRef, recordData, { merge: true });
+  }
+
+  const isLoading = membersLoading || attendanceLoading;
+
+  const attendanceMap = new Map(attendanceRecords?.map(r => [r.studentId, r]));
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>학생 출석</CardTitle>
-        <CardDescription>
-          {today}의 출석을 관리하고 검토합니다.
-        </CardDescription>
+        <div className='flex justify-between items-start'>
+          <div>
+            <CardTitle>학생 출석</CardTitle>
+            <CardDescription>
+              {format(selectedDate, 'yyyy년 MM월 dd일')}의 출석을 관리하고 검토합니다.
+            </CardDescription>
+          </div>
+          <Input 
+            type="date" 
+            value={format(selectedDate, 'yyyy-MM-dd')}
+            onChange={(e) => setSelectedDate(new Date(e.target.value))}
+            className="w-[180px]"
+          />
+        </div>
       </CardHeader>
       <CardContent>
+        {isLoading ? <div className='flex justify-center p-8'><Loader2 className="h-8 w-8 animate-spin"/></div> :
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>학생</TableHead>
               <TableHead>상태</TableHead>
-              <TableHead className="hidden md:table-cell">출석 시간</TableHead>
+              <TableHead className="hidden md:table-cell">확인 시간</TableHead>
               <TableHead>
                 <span className="sr-only">작업</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockAttendance.map((student) => (
+            {students?.map((student) => {
+              const record = attendanceMap.get(student.id);
+              const status = record?.status || 'requested';
+              return (
               <TableRow key={student.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="hidden h-9 w-9 sm:flex">
-                      <AvatarImage src={student.avatarUrl} alt="Avatar" />
-                      <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                      {/* <AvatarImage src={student.avatarUrl} alt="Avatar" /> */}
+                      <AvatarFallback>{student.displayName?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div className="font-medium">{student.name}</div>
+                    <div className="font-medium">{student.displayName}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getBadgeVariant(student.status) as any}>
-                    {student.status}
+                  <Badge variant={getBadgeVariant(status) as any}>
+                    {status.split('_')[1] || status}
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {student.status === '출석' || student.status === '지각'
-                    ? '9:05 AM'
-                    : 'N/A'}
+                  {record?.updatedAt ? format((record.updatedAt as any).toDate(), 'p') : 'N/A'}
                 </TableCell>
                 <TableCell>
-                  <Select defaultValue={student.status}>
+                  <Select value={status} onValueChange={(newStatus) => handleStatusChange(student.id, newStatus as any)}>
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="상태 설정" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="출석">출석</SelectItem>
-                      <SelectItem value="지각">지각</SelectItem>
-                      <SelectItem value="결석">결석</SelectItem>
+                      <SelectItem value="confirmed_present">출석</SelectItem>
+                      <SelectItem value="confirmed_late">지각</SelectItem>
+                      <SelectItem value="confirmed_absent">결석</SelectItem>
+                      <SelectItem value="excused_absent">사유결석</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
+        }
       </CardContent>
     </Card>
   );

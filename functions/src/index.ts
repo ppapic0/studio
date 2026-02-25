@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { format } from "date-fns";
 
 admin.initializeApp();
 
@@ -39,6 +40,9 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
   try {
     const batch = db.batch();
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const weekKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
+    const monthKey = format(new Date(), 'yyyy-MM');
 
     // 1. Create the primary membership document
     const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
@@ -62,8 +66,9 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       joinedAt: timestamp,
     });
 
-    // 3. If student, create a student profile
+    // 3. If student, create a profile and seed initial data
     if (role === "student") {
+      // Student profile
       const studentRef = db.doc(`centers/${centerId}/students/${uid}`);
       batch.set(studentRef, {
         uid: uid,
@@ -71,6 +76,48 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
         email: email,
         createdAt: timestamp,
       }, { merge: true });
+
+      // Initial Daily Stat
+      const dailyStatRef = db.doc(`centers/${centerId}/dailyStudentStats/${todayKey}/students/${uid}`);
+      batch.set(dailyStatRef, {
+        centerId: centerId,
+        studentId: uid,
+        dateKey: todayKey,
+        todayPlanCompletionRate: 0,
+        totalStudyMinutes: 0,
+        attendanceStreakDays: 0,
+        weeklyPlanCompletionRate: 0,
+        studyTimeGrowthRate: 0,
+        riskDetected: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      // Initial Study Plan Week
+      const studyPlanWeekRef = db.doc(`centers/${centerId}/students/${uid}/studyPlanWeeks/${weekKey}`);
+      batch.set(studyPlanWeekRef, {
+          centerId: centerId,
+          studentId: uid,
+          weekKey: weekKey,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+      });
+
+      // Initial enrollment record
+      const enrollmentRef = db.collection(`centers/${centerId}/enrollments`).doc();
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3);
+      batch.set(enrollmentRef, {
+        centerId: centerId,
+        studentId: uid,
+        startAt: admin.firestore.Timestamp.fromDate(startDate),
+        endAt: admin.firestore.Timestamp.fromDate(endDate),
+        status: 'active',
+        renewalIntent: 'N/A',
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
     }
 
     // 4. Create an audit log
