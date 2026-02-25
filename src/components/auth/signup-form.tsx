@@ -15,6 +15,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth, useFirestore } from '@/firebase';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { doc, setDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   fullName: z.string().min(2, {
@@ -26,27 +34,59 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: '비밀번호는 8자 이상이어야 합니다.',
   }),
-  inviteCode: z.string().min(6, {
-    message: '초대 코드가 필요합니다.',
-  }),
 });
 
 export function SignupForm() {
   const router = useRouter();
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       fullName: '',
       email: '',
       password: '',
-      inviteCode: '',
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    // TODO: Implement actual signup logic
-    router.push('/dashboard');
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!auth || !firestore) return;
+    setIsLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
+      const user = userCredential.user;
+
+      await updateProfile(user, { displayName: values.fullName });
+
+      // Create a user profile document in Firestore
+      await setDoc(doc(firestore, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        displayName: values.fullName,
+        createdAt: new Date(),
+      });
+
+      router.push('/app');
+    } catch (error: any) {
+      console.error('Signup failed:', error);
+      toast({
+        variant: 'destructive',
+        title: '가입 실패',
+        description:
+          error.code === 'auth/email-already-in-use'
+            ? '이미 사용 중인 이메일입니다.'
+            : '오류가 발생했습니다. 다시 시도해 주세요.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -91,21 +131,12 @@ export function SignupForm() {
             </FormItem>
           )}
         />
-         <FormField
-          control={form.control}
-          name="inviteCode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>초대 코드</FormLabel>
-              <FormControl>
-                <Input placeholder="초대 코드를 입력하세요" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
-          계정 만들기
+        <Button
+          type="submit"
+          className="w-full bg-accent hover:bg-accent/90"
+          disabled={isLoading}
+        >
+          {isLoading ? '계정 생성 중...' : '계정 만들기'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">

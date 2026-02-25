@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "A user's public profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Center": {
+      "title": "Center",
+      "description": "Represents a single study center location or organization.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "CenterMember": {
+      "title": "Center Member",
+      "description": "Defines a user's role and status within a specific center.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["student", "parent", "teacher", "centerAdmin"] },
+        "status": { "type": "string", "enum": ["active", "pending", "inactive"] },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "linkedStudentIds": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["role", "status"]
+    },
+    "InviteCode": {
+        "title": "Invite Code",
+        "description": "An invite code for joining a center with a specific role.",
+        "type": "object",
+        "properties": {
+            "role": { "type": "string", "enum": ["student", "parent", "teacher"] },
+            "status": { "type": "string", "enum": ["active", "expired", "depleted"] }
+        },
+        "required": ["role", "status"]
+    },
+    "StudentProfile": {
+        "title": "Student Profile",
+        "description": "A detailed profile for a student within a center.",
+        "type": "object",
+        "properties": {
+            "displayName": { "type": "string" },
+            "email": { "type": "string", "format": "email" }
+        },
+        "required": ["displayName"]
+    },
+    "StudyPlanItem": {
+        "title": "Study Plan Item",
+        "description": "A single task or item within a student's weekly study plan.",
+        "type": "object",
+        "properties": {
+            "title": { "type": "string" },
+            "done": { "type": "boolean" },
+            "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["title", "done"]
+    },
+    "StudyLogDay": {
+        "title": "Study Log Day",
+        "description": "A log of total study time for a student on a specific day.",
+        "type": "object",
+        "properties": {
+            "minutes": { "type": "number" },
+            "notes": { "type": "string" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["minutes"]
+    },
+    "AttendanceRecord": {
+        "title": "Attendance Record",
+        "description": "A record of a student's attendance on a specific day.",
+        "type": "object",
+        "properties": {
+            "status": { "type": "string", "enum": ["present", "absent", "late"] },
+            "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["status"]
+    },
+    "Seat": { "title": "Seat", "type": "object", "properties": {} },
+    "SeatAssignment": { "title": "Seat Assignment", "type": "object", "properties": {} },
+    "Enrollment": { "title": "Enrollment", "type": "object", "properties": {} },
+    "NotificationPrefs": { "title": "Notification Preferences", "type": "object", "properties": {} },
+    "AuditLog": {
+        "title": "Audit Log",
+        "description": "A log of important actions within a center.",
+        "type": "object",
+        "properties": {
+            "timestamp": { "type": "string", "format": "date-time" },
+            "actorUid": { "type": "string" },
+            "action": { "type": "string" },
+            "details": { "type": "object" }
+        },
+        "required": ["timestamp", "actorUid", "action"]
+    },
+    "UserCenter": {
+      "title": "User Center Entry",
+      "description": "An entry in the reverse index mapping users to their centers.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["student", "parent", "teacher", "centerAdmin"] },
+        "status": { "type": "string", "enum": ["active", "pending", "inactive"] }
+      },
+      "required": ["role", "status"]
+    }
+  },
+  "auth": {
+    "providers": ["email"]
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": { "$ref": "#/entities/UserProfile" }, "description": "Global user profiles." },
+    "/userCenters/{uid}/centers/{centerId}": { "schema": { "$ref": "#/entities/UserCenter" }, "description": "Reverse index for user memberships." },
+    "/centers/{centerId}": { "schema": { "$ref": "#/entities/Center" }, "description": "Root document for a center." },
+    "/centers/{centerId}/members/{uid}": { "schema": { "$ref": "#/entities/CenterMember" }, "description": "Membership and role information." },
+    "/centers/{centerId}/inviteCodes/{code}": { "schema": { "$ref": "#/entities/InviteCode" }, "description": "Invite codes for joining." },
+    "/centers/{centerId}/students/{studentId}": { "schema": { "$ref": "#/entities/StudentProfile" }, "description": "Student profiles." },
+    "/centers/{centerId}/plans/{studentId}/weeks/{weekKey}/items/{itemId}": { "schema": { "$ref": "#/entities/StudyPlanItem" }, "description": "Individual items in a student's plan." },
+    "/centers/{centerId}/studyLogs/{studentId}/days/{dateKey}": { "schema": { "$ref": "#/entities/StudyLogDay" }, "description": "Daily study logs." },
+    "/centers/{centerId}/attendance/{dateKey}/records/{studentId}": { "schema": { "$ref": "#/entities/AttendanceRecord" }, "description": "Daily attendance records." },
+    "/centers/{centerId}/seats/{seatId}": { "schema": { "$ref": "#/entities/Seat" }, "description": "Seat information." },
+    "/centers/{centerId}/seatAssignments/{periodKey}/{studentId}": { "schema": { "$ref": "#/entities/SeatAssignment" }, "description": "Seat assignments." },
+    "/centers/{centerId}/enrollments/{studentId}": { "schema": { "$ref": "#/entities/Enrollment" }, "description": "Student enrollments." },
+    "/centers/{centerId}/notificationPrefs/{uid}": { "schema": { "$ref": "#/entities/NotificationPrefs" }, "description": "User notification preferences." },
+    "/centers/{centerId}/auditLogs/{logId}": { "schema": { "$ref": "#/entities/AuditLog" }, "description": "Audit logs for administrative actions." }
+  }
+}

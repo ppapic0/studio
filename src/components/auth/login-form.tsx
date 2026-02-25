@@ -15,6 +15,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -27,6 +31,10 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter();
+  const auth = useAuth();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -35,10 +43,25 @@ export function LoginForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    // TODO: Implement actual login logic
-    router.push('/dashboard');
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!auth) return;
+    setIsLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      router.push('/app');
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      toast({
+        variant: 'destructive',
+        title: '로그인 실패',
+        description:
+          error.code === 'auth/invalid-credential'
+            ? '이메일 또는 비밀번호가 올바르지 않습니다.'
+            : '오류가 발생했습니다. 다시 시도해 주세요.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -78,8 +101,8 @@ export function LoginForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
-          로그인
+        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoading}>
+          {isLoading ? '로그인 중...' : '로그인'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">

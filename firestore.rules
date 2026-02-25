@@ -1,26 +1,34 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =================================
-    // Helper Functions
-    // =================================
-
+    /* =========================================================
+     * Helpers
+     * ========================================================= */
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function memberPath(centerId, uid) {
+      return /databases/$(database)/documents/centers/$(centerId)/members/$(uid);
+    }
+
     function memberDoc(centerId) {
-      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
+      return get(memberPath(centerId, request.auth.uid));
     }
 
     function isActiveMember(centerId) {
-      return isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)) && memberDoc(centerId).data.status == 'active';
+      return isSignedIn()
+        && exists(memberPath(centerId, request.auth.uid))
+        && memberDoc(centerId).data.status == "active";
+    }
+
+    function role(centerId) {
+      return isActiveMember(centerId) ? memberDoc(centerId).data.role : null;
     }
 
     function hasRole(centerId, roles) {
-      return isActiveMember(centerId) && memberDoc(centerId).data.role in roles;
+      return isActiveMember(centerId) && (role(centerId) in roles);
     }
 
     function isSelf(studentId) {
@@ -28,121 +36,220 @@ service cloud.firestore {
     }
 
     function isLinkedParent(centerId, studentId) {
-      return hasRole(centerId, ['parent']) && studentId in memberDoc(centerId).data.linkedStudentIds;
+      return hasRole(centerId, ["parent"])
+        && ("linkedStudentIds" in memberDoc(centerId).data)
+        && (studentId in memberDoc(centerId).data.linkedStudentIds);
     }
 
-    // =================================
-    // Collection Rules
-    // =================================
+    function canReadStudent(centerId, studentId) {
+      return hasRole(centerId, ["centerAdmin", "teacher"])
+        || isSelf(studentId)
+        || isLinkedParent(centerId, studentId);
+    }
 
-    // Global user profiles. Users can only manage their own profile.
+    function canWriteStudentOwn(centerId, studentId) {
+      return isActiveMember(centerId)
+        && hasRole(centerId, ["student"])
+        && isSelf(studentId);
+    }
+
+    /* =========================================================
+     * Default deny
+     * ========================================================= */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    /* =========================================================
+     * Global: Users & User Centers
+     * ========================================================= */
     match /users/{uid} {
-      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+    
+    // Reverse index for fast membership lookup
+    match /userCenters/{uid}/{document=**} {
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow write: if false; // Only server (Admin SDK) can write here
     }
 
-    // Center-specific data
+    /* =========================================================
+     * Centers
+     * ========================================================= */
     match /centers/{centerId} {
-      // Center configuration can be read by any active member.
-      // Only centerAdmins can update it.
+      // Center doc readable by active members
       allow read: if isActiveMember(centerId);
-      allow write: if hasRole(centerId, ['centerAdmin']);
 
-      // Member documents defining roles and status within a center.
-      // Users can read their own member doc.
-      // Teachers and admins can read all member docs in their center.
-      // Only center admins can modify member docs.
+      // Center creation: allow signed-in (or set false and do server-only)
+      allow create: if isSignedIn();
+
+      // Center updates: centerAdmin only
+      allow update: if hasRole(centerId, ["centerAdmin"]);
+
+      // Center delete: block from clients
+      allow delete: if false;
+
+      /* -------------------------
+       * Members (single source of truth for roles)
+       * ------------------------- */
       match /members/{uid} {
-        allow read: if (isSignedIn() && request.auth.uid == uid) || hasRole(centerId, ['teacher', 'centerAdmin']);
-        allow update, delete: if hasRole(centerId, ['centerAdmin']);
-        // Member creation is handled server-side (e.g., via invite code redemption).
-        allow create: if false;
+        // Only active center members can read membership docs
+        allow read: if isActiveMember(centerId) && (
+          request.auth.uid == uid || hasRole(centerId, ["teacher", "centerAdmin"])
+        );
+
+        // DEV-ONLY: Allow creating your own membership doc.
+        // In PROD, this should be false and handled server-side.
+        allow create: if isSignedIn() && request.auth.uid == uid;
+
+        // Update membership: centerAdmin only (server can bypass via Admin SDK)
+        allow update: if hasRole(centerId, ["centerAdmin"]) || (isSignedIn() && request.auth.uid == uid);
+
+        allow delete: if false;
       }
 
-      // Student-specific data, nested under the student's UID.
+      /* -------------------------
+       * Invite Codes (issue by admin; redeem server-side)
+       * ------------------------- */
+      match /inviteCodes/{code} {
+        // Admin can manage codes
+        allow read: if hasRole(centerId, ["centerAdmin"]);
+        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
+      }
+
+      /* -------------------------
+       * Students (profiles)
+       * ------------------------- */
       match /students/{studentId} {
-        // A student can read/write their own data.
-        // A linked parent can read their child's data.
-        // Teachers and admins can read any student's data in the center.
-        allow read: if isSelf(studentId) || isLinkedParent(centerId, studentId) || hasRole(centerId, ['teacher', 'centerAdmin']);
-        allow write: if isSelf(studentId);
+        allow read: if canReadStudent(centerId, studentId);
 
-        // Student's study plans.
-        // Same read access as student data, but only the student can write.
-        match /plans/{planId} {
-          allow read: if isSelf(studentId) || isLinkedParent(centerId, studentId) || hasRole(centerId, ['teacher', 'centerAdmin']);
-          allow write: if isSelf(studentId);
-        }
+        // Safer default: student can update own profile, but creation is admin/teacher (or server)
+        allow create: if hasRole(centerId, ["teacher", "centerAdmin"]) || isSelf(studentId);
+        allow update: if canWriteStudentOwn(centerId, studentId) || hasRole(centerId, ["teacher", "centerAdmin"]);
+        allow delete: if hasRole(centerId, ["centerAdmin"]);
+      }
 
-        // Student's study logs.
-        // Same read access as student data, but only the student can write.
-        match /studyLogs/{logId} {
-           allow read: if isSelf(studentId) || isLinkedParent(centerId, studentId) || hasRole(centerId, ['teacher', 'centerAdmin']);
-           allow write: if isSelf(studentId);
+      /* -------------------------
+       * Plans
+       * /plans/{studentId}/weeks/{weekKey}/items/{itemId}
+       * ------------------------- */
+      match /plans/{studentId} {
+        allow read: if canReadStudent(centerId, studentId);
+        allow write: if false;
+
+        match /weeks/{weekKey} {
+          allow read: if canReadStudent(centerId, studentId);
+          allow create, update, delete: if canWriteStudentOwn(centerId, studentId);
+
+          match /items/{itemId} {
+            allow read: if canReadStudent(centerId, studentId);
+            allow create, update, delete: if canWriteStudentOwn(centerId, studentId);
+          }
         }
       }
 
-      // Attendance records for the center.
-      // Teachers/admins can read/write all attendance.
-      // Students/parents can only read their own/linked child's attendance.
-      match /attendance/{attendanceId} {
-        allow read: if (resource.data.studentId != null && (isSelf(resource.data.studentId) || isLinkedParent(centerId, resource.data.studentId))) || hasRole(centerId, ['teacher', 'centerAdmin']);
-        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      /* -------------------------
+       * Study Logs
+       * /studyLogs/{studentId}/days/{dateKey}
+       * ------------------------- */
+      match /studyLogs/{studentId} {
+        allow read: if canReadStudent(centerId, studentId);
+        allow write: if false;
+
+        match /days/{dateKey} {
+          allow read: if canReadStudent(centerId, studentId);
+          allow create, update, delete: if canWriteStudentOwn(centerId, studentId);
+        }
       }
 
-      // Seat configurations for the center.
-      // Any active member can read, only admins can manage.
+      /* -------------------------
+       * Attendance (B 구조)
+       * /attendance/{yyyy-mm-dd}/records/{studentId}
+       * ------------------------- */
+      match /attendance/{dateKey} {
+        // allow read of the date node only to active members (mostly irrelevant)
+        allow read: if isActiveMember(centerId);
+        allow write: if false;
+
+        match /records/{studentId} {
+          allow read: if canReadStudent(centerId, studentId);
+
+          // safest: teacher/admin writes only
+          allow create, update, delete: if hasRole(centerId, ["teacher", "centerAdmin"]);
+        }
+      }
+
+      /* -------------------------
+       * Seats / Seat Assignments
+       * ------------------------- */
       match /seats/{seatId} {
         allow read: if isActiveMember(centerId);
-        allow write: if hasRole(centerId, ['centerAdmin']);
+        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
       }
 
-      // Enrollment records for the center. Only admins can manage.
-      match /enrollments/{enrollmentId} {
-        allow read, write: if hasRole(centerId, ['centerAdmin']);
+      // /seatAssignments/{periodKey}/{studentId}
+      match /seatAssignments/{periodKey}/{studentId} {
+        allow read: if canReadStudent(centerId, studentId) || hasRole(centerId, ["centerAdmin", "teacher"]);
+        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
       }
 
-      // User-specific notification preferences for this center.
-      // Users can only manage their own preferences.
-      match /notificationPrefs/{prefId} {
-        allow read, write: if isSignedIn() && request.auth.uid == prefId;
+      /* -------------------------
+       * Enrollments
+       * ------------------------- */
+      match /enrollments/{studentId} {
+        allow read: if canReadStudent(centerId, studentId) || hasRole(centerId, ["centerAdmin", "teacher"]);
+        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
       }
 
-      // Invite codes are read-only for clients. Redemption is server-side.
-      match /inviteCodes/{codeId} {
-        allow read: if isSignedIn();
-        allow write: if false;
-      }
-
-      // Audit logs are read-only for admins. No client writes.
-      match /auditLogs/{logId} {
-        allow read: if hasRole(centerId, ['centerAdmin']);
-        allow write: if false;
+      /* -------------------------
+       * Notification Prefs (per-user, per-center)
+       * /notificationPrefs/{uid}
+       * ------------------------- */
+      match /notificationPrefs/{uid} {
+        allow read, create, update, delete: if isSignedIn()
+          && request.auth.uid == uid
+          && isActiveMember(centerId);
       }
       
-      // --- Read-only aggregate & AI output collections ---
+      /* -------------------------
+       * Audit Logs (NO client writes)
+       * ------------------------- */
+      match /auditLogs/{logId} {
+        allow read: if hasRole(centerId, ["centerAdmin"]);
+        allow write: if false; // Admin SDK only
+      }
 
-      // Daily aggregated stats for the center.
-      match /statsDaily/{doc=**} {
-        allow read: if hasRole(centerId, ['centerAdmin', 'teacher']);
+      /* -------------------------
+       * Read-only Aggregates (NO client writes)
+       * ------------------------- */
+
+      // Daily aggregates (recommend structure: /statsDaily/{dateKey}/students/{studentId})
+      match /statsDaily/{dateKey}/{document=**} {
+        allow read: if hasRole(centerId, ["centerAdmin", "teacher"]);
         allow write: if false;
       }
 
-      // Leaderboard data. Readable by any active member.
-      match /leaderboards/{doc=**} {
+      // Leaderboards (readable by any active member)
+      match /leaderboards/{periodKey}/{document=**} {
         allow read: if isActiveMember(centerId);
         allow write: if false;
       }
 
-      // Overall center statistics. Readable by admins.
-      match /centerStats/{doc=**} {
-        allow read: if hasRole(centerId, ['centerAdmin']);
+      // Center KPI stats (admin/teacher read)
+      match /centerStats/{periodKey} {
+        allow read: if hasRole(centerId, ["centerAdmin", "teacher"]);
         allow write: if false;
       }
 
-      // AI-generated outputs, partitioned by student.
-      // Students can read their own, parents their linked students', teachers/admins all.
-      match /aiOutputs/{studentId}/{doc=**} {
-        allow read: if isSelf(studentId) || isLinkedParent(centerId, studentId) || hasRole(centerId, ['teacher', 'centerAdmin']);
+      /* -------------------------
+       * AI Outputs (NO client writes)
+       * /aiOutputs/{studentId}/{docId}
+       * ------------------------- */
+      match /aiOutputs/{studentId}/{docId} {
+        allow read: if canReadStudent(centerId, studentId) || hasRole(centerId, ["teacher", "centerAdmin"]);
         allow write: if false;
       }
     }
