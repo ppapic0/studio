@@ -99,6 +99,16 @@ service cloud.firestore {
         allow delete: if isExistingOwner(userId);
       }
     }
+    
+    /**
+     * @description Manages the reverse index of a user's center memberships for quick lookups.
+     * @path /userCenters/{uid}/centers/{centerId}
+     */
+    match /userCenters/{uid}/centers/{centerId} {
+      allow get, list: if isOwner(uid);
+      // Writes are only allowed from backend/functions
+      allow write: if false;
+    }
 
     /**
      * @description Defines a study center and its top-level settings.
@@ -305,4 +315,3 @@ service cloud.firestore {
     }
   }
 }
-    
