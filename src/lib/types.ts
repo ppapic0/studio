@@ -110,7 +110,7 @@ export interface AIOutput {
 }
 
 export interface InviteCode {
-    code: string;
+    // The 'code' field is removed. The document ID is the code.
     centerId: string;
     intendedRole: 'student' | 'teacher' | 'parent' | 'admin';
     expiresAt: Timestamp;

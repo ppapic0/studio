@@ -21,7 +21,7 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { InviteCode } from '@/lib/types';
 import { format } from 'date-fns';
 import {
@@ -80,9 +80,11 @@ export default function InviteCodesPage() {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + newCode.expiresInDays);
 
+    const codeId = newCode.code.trim();
+    const codeRef = doc(firestore, 'inviteCodes', codeId);
+
     try {
-        await addDoc(collection(firestore, 'inviteCodes'), {
-            code: newCode.code.trim(),
+        await setDoc(codeRef, {
             intendedRole: newCode.role,
             maxUses: Number(newCode.maxUses),
             usedCount: 0,
@@ -93,6 +95,12 @@ export default function InviteCodesPage() {
             centerId: activeMembership.id,
         });
         setIsDialogOpen(false);
+        setNewCode({
+          code: '',
+          role: 'student',
+          maxUses: 100,
+          expiresInDays: 30,
+        });
     } catch(e) {
         console.error("Failed to create invite code", e);
     } finally {
@@ -139,7 +147,7 @@ export default function InviteCodesPage() {
                   const status = getStatus(invite);
                   return (
                     <TableRow key={invite.id}>
-                      <TableCell className="font-mono">{invite.code}</TableCell>
+                      <TableCell className="font-mono">{invite.id}</TableCell>
                       <TableCell>{invite.intendedRole}</TableCell>
                       <TableCell>{`${invite.usedCount}/${invite.maxUses}`}</TableCell>
                       <TableCell>{format((invite.expiresAt as any).toDate(), 'yyyy-MM-dd')}</TableCell>
@@ -160,7 +168,7 @@ export default function InviteCodesPage() {
         <DialogHeader>
           <DialogTitle>새 초대 코드 생성</DialogTitle>
           <DialogDescription>
-            초대 코드의 세부 정보를 입력하세요.
+            초대 코드의 세부 정보를 입력하세요. 이 코드가 문서 ID가 됩니다.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

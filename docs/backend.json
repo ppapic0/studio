@@ -173,19 +173,15 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "InviteCode",
       "type": "object",
-      "description": "Represents an invite code used for onboarding new members to a center.",
+      "description": "Represents an invite code used for onboarding new members to a center. The document ID is the code itself.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the InviteCode entity."
+          "description": "Unique identifier for the InviteCode entity. This is the actual code string."
         },
         "centerId": {
           "type": "string",
           "description": "Reference to Center where this invite code is valid. (Relationship: Center 1:N InviteCode)"
-        },
-        "code": {
-          "type": "string",
-          "description": "The actual invite code string."
         },
         "intendedRole": {
           "type": "string",
@@ -222,7 +218,6 @@
       "required": [
         "id",
         "centerId",
-        "code",
         "intendedRole",
         "expiresAt",
         "maxUses",
@@ -1067,11 +1062,11 @@
           "schema": {
             "$ref": "#/backend/entities/InviteCode"
           },
-          "description": "Stores invite codes for new member onboarding. Each code has a denormalized 'centerId' for querying and rule validation.",
+          "description": "Stores invite codes for new member onboarding. Each code has a denormalized 'centerId' for querying and rule validation. The document ID is the code itself.",
           "params": [
             {
               "name": "inviteCodeId",
-              "description": "The unique identifier of the invite code."
+              "description": "The unique identifier of the invite code, which is the code string itself."
             }
           ]
         }
