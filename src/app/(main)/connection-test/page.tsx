@@ -159,7 +159,7 @@ export default function ConnectionTestPage() {
           <CardHeader>
             <CardTitle>3-A. 수동으로 멤버십 확인</CardTitle>
             <CardDescription>
-              테스트를 위해 Firestore에서 직접 `/centers/{centerId}/members/{uid}` 문서를 생성한 경우, 아래에서 센터 ID를 입력하여 멤버십을 활성화하세요.
+              {'테스트를 위해 Firestore에서 직접 `/centers/{centerId}/members/{uid}` 문서를 생성한 경우, 아래에서 센터 ID를 입력하여 멤버십을 활성화하세요.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
