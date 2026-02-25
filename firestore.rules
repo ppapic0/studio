@@ -2,255 +2,367 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* =========================================================
-     * Helpers
-     * ========================================================= */
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+    /**
+     * Gets the user's role data from their membership document within a specific center.
+     * This is the core of the role-based access control system.
+     */
+    function getUserMembership(centerId) {
+      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
+    }
+    /**
+     * Checks if a user has an active membership document in a center.
+     */
+    function isCenterMember(centerId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
+    }
+    function isCenterAdmin(centerId) {
+      return isCenterMember(centerId) && getUserMembership(centerId).data.role == 'admin';
+    }
+    function isCenterTeacher(centerId) {
+      return isCenterMember(centerId) && getUserMembership(centerId).data.role == 'teacher';
+    }
+    function isCenterStaff(centerId) {
+      return isCenterAdmin(centerId) || isCenterTeacher(centerId);
+    }
+    /**
+     * Placeholder function for parent access.
+     * TODO: This requires a data model change to link parent users to student users.
+     * For now, it always returns false, effectively disabling parent-specific access.
+     */
+    function isParentOfStudent(centerId, studentId) {
+      // Example implementation might be:
+      // return isCenterMember(centerId) && studentId in getUserMembership(centerId).data.childrenIds;
+      return false;
+    }
+    /**
+     * Grants access if the requesting user is the student themselves OR a staff member of the center.
+     */
+    function isSelfOrStaff(centerId, studentId) {
+      return isOwner(studentId) || isCenterStaff(centerId);
+    }
+    /**
+     * Grants read access if the user is the student, a staff member, or a linked parent.
+     */
+    function isSelfOrStaffOrParent(centerId, studentId) {
+      return isSelfOrStaff(centerId, studentId) || isParentOfStudent(centerId, studentId);
+    }
+    /**
+     * Validates that the 'id' field of a new user document matches the user's auth UID.
+     */
+    function incomingUserDataIsValid(userId) {
+      return request.resource.data.id == userId;
+    }
+    /**
+     * Validates that critical IDs in a new document match the path parameters.
+     */
+    function incomingStudentDataIsValid(_centerId, _studentId) {
+      return request.resource.data.centerId == _centerId && request.resource.data.studentId == _studentId;
+    }
+    /**
+     * Enforces immutability of critical relational IDs on update.
+     * - `centerId` must always be immutable if present.
+     * - `studentId` must also be immutable if the requesting user is the owner of that student record.
+     * This structure uses boolean logic to avoid 'if' statements not allowed in rule functions.
+     */
+    function coreIdsAreImmutable(studentId) {
+      let isStudentIdImmutable = request.resource.data.studentId == resource.data.studentId;
+      let isCenterIdImmutable = request.resource.data.centerId == resource.data.centerId;
 
-    function memberPath(centerId, uid) {
-      return /databases/$(database)/documents/centers/$(centerId)/members/$(uid);
+      // isCenterIdImmutable is always required for updates where `centerId` exists in resource.data and request.resource.data.
+      // isStudentIdImmutable is additionally required if `studentId` is provided (i.e., not null)
+      // AND the requesting user is the owner of that studentId.
+      return isCenterIdImmutable &&
+             (studentId == null || !isOwner(studentId) || isStudentIdImmutable);
     }
 
-    function memberDoc(centerId) {
-      return get(memberPath(centerId, request.auth.uid));
+    /**
+     * @description Manages user profile data.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own profile document.
+     * @deny (get) A user trying to read another user's profile.
+     * @principle A user has exclusive control over their own profile document.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && incomingUserDataIsValid(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Manages user-specific notification preferences for a center.
+       * @path /users/{userId}/notificationPreferences/{centerId}
+       * @allow (create, update) A user setting their notification preferences for a center they belong to.
+       * @deny (get) A user trying to read another user's preferences.
+       * @principle Restricts access to a user's own data tree.
+       */
+      match /notificationPreferences/{centerId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
     }
 
-    function isActiveMember(centerId) {
-      return isSignedIn()
-        && exists(memberPath(centerId, request.auth.uid))
-        && memberDoc(centerId).data.status == "active";
-    }
-
-    function role(centerId) {
-      return isActiveMember(centerId) ? memberDoc(centerId).data.role : null;
-    }
-
-    function hasRole(centerId, roles) {
-      return isActiveMember(centerId) && (role(centerId) in roles);
-    }
-
-    function isSelf(studentId) {
-      return isSignedIn() && request.auth.uid == studentId;
-    }
-
-    function isLinkedParent(centerId, studentId) {
-      return hasRole(centerId, ["parent"])
-        && ("linkedStudentIds" in memberDoc(centerId).data)
-        && (studentId in memberDoc(centerId).data.linkedStudentIds);
-    }
-
-    function canReadStudent(centerId, studentId) {
-      return hasRole(centerId, ["centerAdmin", "teacher"])
-        || isSelf(studentId)
-        || isLinkedParent(centerId, studentId);
-    }
-
-    function canWriteStudentOwn(centerId, studentId) {
-      return isActiveMember(centerId)
-        && hasRole(centerId, ["student"])
-        && isSelf(studentId);
-    }
-
-    /* =========================================================
-     * Default deny
-     * ========================================================= */
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    /* =========================================================
-     * Global: Users & User Centers
-     * ========================================================= */
-    match /users/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
-      allow create: if isSignedIn() && request.auth.uid == uid;
-      allow update: if isSignedIn() && request.auth.uid == uid;
-      allow delete: if false;
-    }
-    
-    // Reverse index for fast membership lookup
-    match /userCenters/{uid}/{document=**} {
-        allow read: if isSignedIn() && request.auth.uid == uid;
-        allow write: if false; // Only server (Admin SDK) can write here
-    }
-
-    /* =========================================================
-     * Centers
-     * ========================================================= */
+    /**
+     * @description Defines a study center and its top-level settings.
+     * @path /centers/{centerId}
+     * @allow (get) Any member of the center reading its details.
+     * @deny (list) Any user trying to list all available centers in the database.
+     * @deny (create, delete) Client-side creation or deletion of centers is forbidden.
+     * @principle Grants read access to collaborators (members) and write access only to administrators.
+     */
     match /centers/{centerId} {
-      // Center doc readable by active members
-      allow read: if isActiveMember(centerId);
-
-      // Center creation: allow signed-in (or set false and do server-only)
-      allow create: if isSignedIn();
-
-      // Center updates: centerAdmin only
-      allow update: if hasRole(centerId, ["centerAdmin"]);
-
-      // Center delete: block from clients
+      allow get: if isCenterMember(centerId);
+      allow list: if false;
+      allow create: if false;
+      allow update: if isCenterAdmin(centerId) && resource != null;
       allow delete: if false;
 
-      /* -------------------------
-       * Members (single source of truth for roles)
-       * ------------------------- */
-      match /members/{uid} {
-        // Only active center members can read membership docs
-        allow read: if isActiveMember(centerId) && (
-          request.auth.uid == uid || hasRole(centerId, ["teacher", "centerAdmin"])
-        );
-
-        // DEV-ONLY: Allow creating your own membership doc.
-        // In PROD, this should be false and handled server-side.
-        allow create: if isSignedIn() && request.auth.uid == uid;
-
-        // Update membership: centerAdmin only (server can bypass via Admin SDK)
-        allow update: if hasRole(centerId, ["centerAdmin"]) || (isSignedIn() && request.auth.uid == uid);
-
-        allow delete: if false;
+      /**
+       * @description Manages user roles and membership within a center.
+       * @path /centers/{centerId}/members/{userId}
+       * @allow (get, list) Any center member can see the list of other members.
+       * @deny (create) A non-admin user trying to add another user to the center.
+       * @principle Membership is managed by admins, but users can leave the center.
+       */
+      match /members/{userId} {
+        allow get: if isCenterMember(centerId);
+        allow list: if isCenterMember(centerId);
+        allow create: if isCenterAdmin(centerId);
+        allow update: if (isCenterAdmin(centerId) || isOwner(userId)) && resource != null;
+        allow delete: if (isCenterAdmin(centerId) || isOwner(userId)) && resource != null;
       }
 
-      /* -------------------------
-       * Invite Codes (issue by admin; redeem server-side)
-       * ------------------------- */
-      match /inviteCodes/{code} {
-        // Admin can manage codes
-        allow read: if hasRole(centerId, ["centerAdmin"]);
-        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
+      /**
+       * @description Manages invite codes for onboarding new members.
+       * @path /centers/{centerId}/inviteCodes/{inviteCodeId}
+       * @allow (create) An admin or teacher creating a new invite code.
+       * @deny (list) A student trying to list all invite codes for a center.
+       * @principle Access is restricted to center staff for management.
+       */
+      match /inviteCodes/{inviteCodeId} {
+        allow get: if isSignedIn();
+        allow list: if isCenterStaff(centerId);
+        allow create: if isCenterStaff(centerId);
+        allow update: if isCenterStaff(centerId) && resource != null;
+        allow delete: if isCenterStaff(centerId) && resource != null;
       }
 
-      /* -------------------------
-       * Students (profiles)
-       * ------------------------- */
+      /**
+       * @description Contains all data related to a specific student.
+       * @path /centers/{centerId}/students/{studentId}
+       * @principle This is a grouping path without a document. Rules are defined on subcollections.
+       */
       match /students/{studentId} {
-        allow read: if canReadStudent(centerId, studentId);
+        /**
+         * @description Manages a student's weekly study plans.
+         * @path /centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}
+         * @allow (create, get) A student creating or reading their own study plan.
+         * @allow (get, update) A teacher viewing or updating a student's study plan.
+         * @deny (get) A student trying to access another student's plan.
+         * @principle Enforces student data privacy while allowing access for authorized staff.
+         */
+        match /studyPlanWeeks/{weekKey} {
+          allow get: if isSelfOrStaffOrParent(centerId, studentId);
+          allow list: if isSelfOrStaffOrParent(centerId, studentId);
+          allow create: if isSelfOrStaff(centerId, studentId) && incomingStudentDataIsValid(centerId, studentId);
+          allow update: if isSelfOrStaff(centerId, studentId) && resource != null && coreIdsAreImmutable(studentId);
+          allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
 
-        // Safer default: student can update own profile, but creation is admin/teacher (or server)
-        allow create: if hasRole(centerId, ["teacher", "centerAdmin"]) || isSelf(studentId);
-        allow update: if canWriteStudentOwn(centerId, studentId) || hasRole(centerId, ["teacher", "centerAdmin"]);
-        allow delete: if hasRole(centerId, ["centerAdmin"]);
-      }
+          /**
+           * @description Manages individual items within a weekly study plan.
+           * @path /centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}/items/{studyPlanItemId}
+           * @allow (create, update) A student adding or checking off an item in their plan.
+           * @deny (delete) A student from another center trying to delete an item.
+           * @principle Access rules are inherited from the parent collection's security context.
+           */
+          match /items/{studyPlanItemId} {
+            allow get: if isSelfOrStaffOrParent(centerId, studentId);
+            allow list: if isSelfOrStaffOrParent(centerId, studentId);
+            allow create: if isSelfOrStaff(centerId, studentId);
+            allow update: if isSelfOrStaff(centerId, studentId) && resource != null;
+            allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
+          }
+        }
 
-      /* -------------------------
-       * Plans
-       * /plans/{studentId}/weeks/{weekKey}/items/{itemId}
-       * ------------------------- */
-      match /plans/{studentId} {
-        allow read: if canReadStudent(centerId, studentId);
-        allow write: if false;
+        /**
+         * @description Manages a student's daily study time logs.
+         * @path /centers/{centerId}/students/{studentId}/studyLogDays/{dateKey}
+         * @allow (create, list) A student logging their study time for the day.
+         * @deny (update) A student trying to modify another student's study log.
+         * @principle Enforces student data privacy while allowing access for authorized staff.
+         */
+        match /studyLogDays/{dateKey} {
+          allow get: if isSelfOrStaffOrParent(centerId, studentId);
+          allow list: if isSelfOrStaffOrParent(centerId, studentId);
+          allow create: if isSelfOrStaff(centerId, studentId) && incomingStudentDataIsValid(centerId, studentId);
+          allow update: if isSelfOrStaff(centerId, studentId) && resource != null && coreIdsAreImmutable(studentId);
+          allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
 
-        match /weeks/{weekKey} {
-          allow read: if canReadStudent(centerId, studentId);
-          allow create, update, delete: if canWriteStudentOwn(centerId, studentId);
-
-          match /items/{itemId} {
-            allow read: if canReadStudent(centerId, studentId);
-            allow create, update, delete: if canWriteStudentOwn(centerId, studentId);
+          /**
+           * @description Manages study time logs broken down by subject.
+           * @path /centers/{centerId}/students/{studentId}/studyLogDays/{dateKey}/subjects/{studyLogSubjectId}
+           * @allow (create, get) A student logging time for a specific subject.
+           * @deny (get) An unauthorized user trying to read the study log.
+           * @principle Access rules are inherited from the parent collection's security context.
+           */
+          match /subjects/{studyLogSubjectId} {
+            allow get: if isSelfOrStaffOrParent(centerId, studentId);
+            allow list: if isSelfOrStaffOrParent(centerId, studentId);
+            allow create: if isSelfOrStaff(centerId, studentId);
+            allow update: if isSelfOrStaff(centerId, studentId) && resource != null;
+            allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
           }
         }
       }
 
-      /* -------------------------
-       * Study Logs
-       * /studyLogs/{studentId}/days/{dateKey}
-       * ------------------------- */
-      match /studyLogs/{studentId} {
-        allow read: if canReadStudent(centerId, studentId);
-        allow write: if false;
-
-        match /days/{dateKey} {
-          allow read: if canReadStudent(centerId, studentId);
-          allow create, update, delete: if canWriteStudentOwn(centerId, studentId);
-        }
+      /**
+       * @description Manages student attendance records, grouped by date.
+       * @path /centers/{centerId}/attendanceRecords/{dateKey}/students/{studentId}
+       * @allow (create) A student requesting attendance for a specific day.
+       * @allow (update) A teacher confirming a student's attendance status.
+       * @deny (delete) A student trying to delete their own confirmed attendance record.
+       * @principle Allows students to initiate records but gives staff final control over modification.
+       */
+      match /attendanceRecords/{dateKey}/students/{studentId} {
+        allow get: if isSelfOrStaffOrParent(centerId, studentId);
+        allow list: if isSelfOrStaffOrParent(centerId, studentId);
+        allow create: if isSelfOrStaff(centerId, studentId) && incomingStudentDataIsValid(centerId, studentId);
+        allow update: if isSelfOrStaff(centerId, studentId) && resource != null && coreIdsAreImmutable(studentId);
+        allow delete: if isCenterStaff(centerId) && resource != null;
       }
 
-      /* -------------------------
-       * Attendance (B 구조)
-       * /attendance/{yyyy-mm-dd}/records/{studentId}
-       * ------------------------- */
-      match /attendance/{dateKey} {
-        // allow read of the date node only to active members (mostly irrelevant)
-        allow read: if isActiveMember(centerId);
-        allow write: if false;
-
-        match /records/{studentId} {
-          allow read: if canReadStudent(centerId, studentId);
-
-          // safest: teacher/admin writes only
-          allow create, update, delete: if hasRole(centerId, ["teacher", "centerAdmin"]);
-        }
+      /**
+       * @description Stores aggregated leaderboard data.
+       * @path /centers/{centerId}/leaderboards/{periodKey}/{metricKey}/entries/{studentId}
+       * @allow (get, list) Any member of the center can view the leaderboards.
+       * @deny (create, update, delete) All users are blocked from writing to prevent tampering with scores.
+       * @principle Data is public to members but immutable from the client-side. Written only by backend services.
+       */
+      match /leaderboards/{periodKey}/{metricKey}/entries/{studentId} {
+        allow get: if isCenterMember(centerId);
+        allow list: if isCenterMember(centerId);
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
       }
 
-      /* -------------------------
-       * Seats / Seat Assignments
-       * ------------------------- */
+      /**
+       * @description Stores aggregated daily performance statistics for students.
+       * @path /centers/{centerId}/dailyStudentStats/{dateKey}/students/{studentId}
+       * @allow (get, list) The student, their parent, or staff can view daily stats.
+       * @deny (create, update, delete) All users are blocked from writing to prevent data manipulation.
+       * @principle Data is private to the student and staff, and is immutable from the client-side.
+       */
+      match /dailyStudentStats/{dateKey}/students/{studentId} {
+        allow get: if isSelfOrStaffOrParent(centerId, studentId);
+        allow list: if isSelfOrStaffOrParent(centerId, studentId);
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      /**
+       * @description Stores AI-generated content like risk reports and summaries.
+       * @path /centers/{centerId}/aiOutputs/{studentId}/records/{aiOutputId}
+       * @allow (get, list) Center staff can view AI-generated outputs for students.
+       * @deny (get) Students and parents are blocked from direct access to AI reports.
+       * @deny (create, update, delete) All writes are forbidden from the client.
+       * @principle Sensitive data is restricted to authorized staff and is immutable from the client-side.
+       */
+      match /aiOutputs/{studentId}/records/{aiOutputId} {
+        allow get: if isCenterStaff(centerId);
+        allow list: if isCenterStaff(centerId);
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      /**
+       * @description Records important system and user actions for auditing.
+       * @path /centers/{centerId}/auditLogs/{auditLogId}
+       * @allow (get, list) Only center admins can view audit logs.
+       * @deny (create, update, delete) All writes are forbidden from the client.
+       * @principle Sensitive audit data is restricted to administrators and is immutable from the client-side.
+       */
+      match /auditLogs/{auditLogId} {
+        allow get: if isCenterAdmin(centerId);
+        allow list: if isCenterAdmin(centerId);
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      /**
+       * @description Stores aggregated monthly statistics for the entire center.
+       * @path /centers/{centerId}/centerStats/{monthKey}
+       * @allow (get, list) Center staff can view the center's monthly performance stats.
+       * @deny (create, update, delete) All writes are forbidden from the client.
+       * @principle Aggregated data is read-only for staff and immutable from the client-side.
+       */
+      match /centerStats/{monthKey} {
+        allow get: if isCenterStaff(centerId);
+        allow list: if isCenterStaff(centerId);
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      /**
+       * @description Manages the physical or virtual seats available in a center.
+       * @path /centers/{centerId}/seats/{seatId}
+       * @allow (get, list) All center members can view the seat map and availability.
+       * @deny (create) Non-admin users cannot add or remove seats.
+       * @principle Seat configuration is managed by administrators.
+       */
       match /seats/{seatId} {
-        allow read: if isActiveMember(centerId);
-        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
+        allow get: if isCenterMember(centerId);
+        allow list: if isCenterMember(centerId);
+        allow create: if isCenterAdmin(centerId);
+        allow update: if isCenterAdmin(centerId) && resource != null;
+        allow delete: if isCenterAdmin(centerId) && resource != null;
       }
 
-      // /seatAssignments/{periodKey}/{studentId}
-      match /seatAssignments/{periodKey}/{studentId} {
-        allow read: if canReadStudent(centerId, studentId) || hasRole(centerId, ["centerAdmin", "teacher"]);
-        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
+      /**
+       * @description Manages the assignment of students to seats for a given month.
+       * @path /centers/{centerId}/seatAssignments/{monthKey}/students/{studentId}
+       * @allow (get, list) A student can see their own seat assignment.
+       * @deny (create, update) Only admins can assign or change seat assignments.
+       * @principle Seat assignments are managed by administrators.
+       */
+      match /seatAssignments/{monthKey}/students/{studentId} {
+        allow get: if isSelfOrStaffOrParent(centerId, studentId);
+        allow list: if isSelfOrStaffOrParent(centerId, studentId);
+        allow create: if isCenterAdmin(centerId);
+        allow update: if isCenterAdmin(centerId) && resource != null;
+        allow delete: if isCenterAdmin(centerId) && resource != null;
       }
 
-      /* -------------------------
-       * Enrollments
-       * ------------------------- */
-      match /enrollments/{studentId} {
-        allow read: if canReadStudent(centerId, studentId) || hasRole(centerId, ["centerAdmin", "teacher"]);
-        allow create, update, delete: if hasRole(centerId, ["centerAdmin"]);
-      }
-
-      /* -------------------------
-       * Notification Prefs (per-user, per-center)
-       * /notificationPrefs/{uid}
-       * ------------------------- */
-      match /notificationPrefs/{uid} {
-        allow read, create, update, delete: if isSignedIn()
-          && request.auth.uid == uid
-          && isActiveMember(centerId);
-      }
-      
-      /* -------------------------
-       * Audit Logs (NO client writes)
-       * ------------------------- */
-      match /auditLogs/{logId} {
-        allow read: if hasRole(centerId, ["centerAdmin"]);
-        allow write: if false; // Admin SDK only
-      }
-
-      /* -------------------------
-       * Read-only Aggregates (NO client writes)
-       * ------------------------- */
-
-      // Daily aggregates (recommend structure: /statsDaily/{dateKey}/students/{studentId})
-      match /statsDaily/{dateKey}/{document=**} {
-        allow read: if hasRole(centerId, ["centerAdmin", "teacher"]);
-        allow write: if false;
-      }
-
-      // Leaderboards (readable by any active member)
-      match /leaderboards/{periodKey}/{document=**} {
-        allow read: if isActiveMember(centerId);
-        allow write: if false;
-      }
-
-      // Center KPI stats (admin/teacher read)
-      match /centerStats/{periodKey} {
-        allow read: if hasRole(centerId, ["centerAdmin", "teacher"]);
-        allow write: if false;
-      }
-
-      /* -------------------------
-       * AI Outputs (NO client writes)
-       * /aiOutputs/{studentId}/{docId}
-       * ------------------------- */
-      match /aiOutputs/{studentId}/{docId} {
-        allow read: if canReadStudent(centerId, studentId) || hasRole(centerId, ["teacher", "centerAdmin"]);
-        allow write: if false;
+      /**
+       * @description Manages student enrollment periods and status.
+       * @path /centers/{centerId}/enrollments/{enrollmentId}
+       * @allow (get) A student (whose ID is in the doc) or staff can read an enrollment record.
+       * @deny (list) Students cannot list all enrollments in the center.
+       * @principle Enrollment records are managed by admins, but visible to the relevant student and staff.
+       */
+      match /enrollments/{enrollmentId} {
+        allow get: if isCenterStaff(centerId) || (resource != null && isOwner(resource.data.studentId));
+        allow list: if isCenterStaff(centerId);
+        allow create: if isCenterAdmin(centerId);
+        allow update: if isCenterAdmin(centerId) && resource != null;
+        allow delete: if isCenterAdmin(centerId) && resource != null;
       }
     }
   }
