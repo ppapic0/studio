@@ -10,7 +10,8 @@ import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
-import { useUser, useFunctions, useToast } from '@/firebase';
+import { useUser, useFunctions } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
 import {
