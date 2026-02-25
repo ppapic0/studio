@@ -51,14 +51,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             // A real app might have a center selector.
             setActiveMembership(activeMemberships[0]);
 
-            // If user is on dev-join page but has membership, redirect to app
-            if (pathname === '/dev-join') {
-                router.push('/app');
+            // If user is on a non-app page but has membership, redirect to app
+            if (pathname === '/connection-test') {
+                router.push('/dashboard');
             }
         } else {
             // No active memberships, redirect to join page
-            if (pathname !== '/dev-join') {
-                router.push('/dev-join');
+            if (pathname !== '/connection-test') {
+                router.push('/connection-test');
             }
         }
       } catch (e) {
@@ -80,7 +80,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Allow access to login/signup pages if not authenticated
+  // Allow access to public pages if not authenticated
   if (!user && (pathname === '/login' || pathname === '/signup')) {
     return <>{children}</>;
   }

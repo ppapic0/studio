@@ -3,12 +3,14 @@
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
+import type { Functions } from 'firebase/functions';
 import React, { createContext, useContext } from 'react';
 
 type FirebaseContextValue = {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
+  functions: Functions;
 };
 
 const FirebaseContext = createContext<FirebaseContextValue | undefined>(
@@ -20,6 +22,7 @@ export function FirebaseProvider(props: {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
+  functions: Functions;
 }) {
   const { children, ...rest } = props;
   return (
@@ -45,4 +48,8 @@ export function useFirestore() {
 
 export function useAuth() {
   return useFirebase().auth;
+}
+
+export function useFunctions() {
+  return useFirebase().functions;
 }

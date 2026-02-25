@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: '집중 학습과 성장을 위한 플랫폼입니다.',
 };
 
-const { firebaseApp, firestore, auth } = initializeFirebase();
+const { firebaseApp, firestore, auth, functions } = initializeFirebase();
 
 export default function RootLayout({
   children,
@@ -37,6 +37,7 @@ export default function RootLayout({
           firebaseApp={firebaseApp}
           firestore={firestore}
           auth={auth}
+          functions={functions}
         >
           {children}
           <Toaster />

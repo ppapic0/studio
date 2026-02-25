@@ -3,6 +3,7 @@
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
+import type { Functions } from 'firebase/functions';
 import { FirebaseProvider } from '@/firebase/provider';
 import React, { useEffect, useState } from 'react';
 
@@ -14,6 +15,7 @@ export function FirebaseClientProvider(props: {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
+  functions: Functions;
 }) {
   const { children, ...rest } = props;
   const [hydrated, setHydrated] = useState(false);
