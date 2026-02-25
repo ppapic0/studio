@@ -96,3 +96,124 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+
+export const redeemInviteCode = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "The function must be called while authenticated."
+        );
+    }
+
+    const { code } = data;
+    const uid = context.auth.uid;
+    const { email, name: displayName } = context.auth.token;
+
+    if (!code || typeof code !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "A valid invite code is required.");
+    }
+
+    const inviteCodeQuery = db.collectionGroup('inviteCodes').where('code', '==', code).limit(1);
+    const inviteCodeSnapshot = await inviteCodeQuery.get();
+
+    if (inviteCodeSnapshot.empty) {
+        throw new functions.https.HttpsError('not-found', 'Invalid invite code.');
+    }
+
+    const inviteCodeDoc = inviteCodeSnapshot.docs[0];
+    const inviteCodeData = inviteCodeDoc.data();
+    const centerId = inviteCodeData.centerId;
+
+    if (!centerId) {
+         throw new functions.https.HttpsError('internal', 'Invite code is missing centerId.');
+    }
+
+    // Run as transaction
+    try {
+        await db.runTransaction(async (transaction) => {
+            const freshInviteCodeDoc = await transaction.get(inviteCodeDoc.ref);
+            const freshInviteCodeData = freshInviteCodeDoc.data();
+
+            if (!freshInviteCodeData) {
+                throw new functions.https.HttpsError('not-found', 'Invite code no longer exists.');
+            }
+
+            // Validation inside transaction
+            if (freshInviteCodeData.usedCount >= freshInviteCodeData.maxUses) {
+                throw new functions.https.HttpsError('resource-exhausted', 'This invite code has reached its maximum number of uses.');
+            }
+
+            const now = new Date();
+            if (freshInviteCodeData.expiresAt && new Date(freshInviteCodeData.expiresAt) < now) {
+                throw new functions.https.HttpsError('deadline-exceeded', 'This invite code has expired.');
+            }
+
+            const timestamp = admin.firestore.FieldValue.serverTimestamp();
+            const role = freshInviteCodeData.intendedRole || 'student';
+
+            // 1. Create the primary membership document
+            const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
+            const memberData: any = {
+                role: role,
+                status: "active",
+                joinedAt: timestamp,
+                email,
+                displayName,
+                invitedByInviteCodeId: freshInviteCodeDoc.id,
+            };
+            transaction.set(memberRef, memberData);
+
+            // 2. Create the reverse-index for the user
+            const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
+            transaction.set(userCenterRef, {
+                role: role,
+                status: "active",
+                joinedAt: timestamp,
+            });
+
+            // 3. If student, create a student profile
+            if (role === "student") {
+                const studentRef = db.doc(`centers/${centerId}/students/${uid}`);
+                transaction.set(studentRef, {
+                    uid: uid,
+                    displayName: displayName,
+                    email: email,
+                    createdAt: timestamp,
+                }, { merge: true });
+            }
+            
+            // 4. Update invite code usage
+            transaction.update(inviteCodeDoc.ref, {
+                usedCount: admin.firestore.FieldValue.increment(1),
+                updatedAt: timestamp,
+            });
+
+            // 5. Create an audit log
+            const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
+            transaction.set(auditLogRef, {
+                timestamp: timestamp,
+                actorId: uid,
+                action: "invite_code_redeemed",
+                targetId: uid,
+                targetType: 'CenterMembership',
+                details: {
+                    inviteCode: code,
+                    role: role,
+                },
+            });
+        });
+
+        return { ok: true, message: `Successfully joined center ${centerId} as ${inviteCodeData.intendedRole}.` };
+
+    } catch (error: any) {
+        console.error("redeemInviteCode failed:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError(
+            "internal",
+            error.message || "Server error during invite redemption."
+        );
+    }
+});

@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useFunctions } from '@/firebase';
 import {
   createUserWithEmailAndPassword,
   updateProfile,
@@ -23,6 +23,7 @@ import {
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 const formSchema = z.object({
   displayName: z.string().min(2, {
@@ -34,12 +35,16 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: '비밀번호는 8자 이상이어야 합니다.',
   }),
+  inviteCode: z.string().min(4, {
+    message: '초대 코드는 4자 이상이어야 합니다.',
+  }),
 });
 
 export function SignupForm() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -49,13 +54,15 @@ export function SignupForm() {
       displayName: '',
       email: '',
       password: '',
+      inviteCode: '',
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth || !firestore) return;
+    if (!auth || !firestore || !functions) return;
     setIsLoading(true);
     try {
+      // 1. Create User
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
@@ -63,9 +70,10 @@ export function SignupForm() {
       );
       const user = userCredential.user;
 
+      // 2. Update Firebase Auth profile
       await updateProfile(user, { displayName: values.displayName });
 
-      // Create a user profile document in Firestore
+      // 3. Create user profile in Firestore
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         displayName: values.displayName,
@@ -74,16 +82,32 @@ export function SignupForm() {
         updatedAt: serverTimestamp(),
       });
 
+      // 4. Redeem invite code via Cloud Function
+      const redeemInviteCode = httpsCallable(functions, 'redeemInviteCode');
+      await redeemInviteCode({ code: values.inviteCode });
+
+      toast({
+        title: '회원가입 성공!',
+        description: '센터에 오신 것을 환영합니다. 대시보드로 이동합니다.',
+      });
+
       router.push('/app');
     } catch (error: any) {
       console.error('Signup failed:', error);
+
+      let description = '오류가 발생했습니다. 다시 시도해 주세요.';
+      if (error.code === 'auth/email-already-in-use') {
+        description = '이미 사용 중인 이메일입니다.';
+      } else if (error.code === 'functions/not-found' || (error.details && error.details.message === 'Invalid invite code.')) {
+        description = '초대 코드가 유효하지 않습니다.';
+      } else if (error.message) {
+        description = error.message;
+      }
+
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description:
-          error.code === 'auth/email-already-in-use'
-            ? '이미 사용 중인 이메일입니다.'
-            : '오류가 발생했습니다. 다시 시도해 주세요.',
+        description: description,
       });
     } finally {
       setIsLoading(false);
@@ -132,12 +156,25 @@ export function SignupForm() {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="inviteCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>초대 코드</FormLabel>
+              <FormControl>
+                <Input placeholder="센터 초대 코드를 입력하세요" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <Button
           type="submit"
           className="w-full bg-accent hover:bg-accent/90"
           disabled={isLoading}
         >
-          {isLoading ? '계정 생성 중...' : '계정 만들기'}
+          {isLoading ? '계정 생성 중...' : '가입 및 센터 참여'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">
