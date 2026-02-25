@@ -18,8 +18,9 @@ import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, serverTimestamp, query, orderBy, addDoc, updateDoc, doc } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, getISOWeek } from 'date-fns';
 import { type StudyPlanItem, type WithId } from '@/lib/types';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function StudyPlanPage() {
   const { user } = useUser();
@@ -29,36 +30,37 @@ export default function StudyPlanPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const weekKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
+  const isStudent = activeMembership?.role === 'student';
+  const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
   const planItemsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !activeMembership) return null;
+    if (!firestore || !user || !activeMembership || !isStudent) return null;
     return query(
       collection(
         firestore,
         'centers',
         activeMembership.id,
-        'students',
+        'plans',
         user.uid,
-        'studyPlanWeeks',
+        'weeks',
         weekKey,
         'items'
       ),
       orderBy('createdAt', 'asc')
     );
-  }, [firestore, user, activeMembership, weekKey]);
+  }, [firestore, user, activeMembership, weekKey, isStudent]);
 
   const { data: studyPlan, isLoading } = useCollection<StudyPlanItem>(planItemsQuery);
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (!firestore || !user || !activeMembership) return;
+    if (!firestore || !user || !activeMembership || !isStudent) return;
     const itemRef = doc(
       firestore,
       'centers',
       activeMembership.id,
-      'students',
+      'plans',
       user.uid,
-      'studyPlanWeeks',
+      'weeks',
       weekKey,
       'items',
       item.id
@@ -71,16 +73,16 @@ export default function StudyPlanPage() {
   };
 
   const handleAddTask = async () => {
-    if (!firestore || !user || !activeMembership || !newTaskTitle.trim()) return;
+    if (!firestore || !user || !activeMembership || !newTaskTitle.trim() || !isStudent) return;
     
     setIsSubmitting(true);
     const itemsCollectionRef = collection(
       firestore,
       'centers',
       activeMembership.id,
-      'students',
+      'plans',
       user.uid,
-      'studyPlanWeeks',
+      'weeks',
       weekKey,
       'items'
     );
@@ -94,7 +96,7 @@ export default function StudyPlanPage() {
         updatedAt: serverTimestamp(),
         studyPlanWeekId: weekKey,
         centerId: activeMembership.id,
-        studentId: user.uid,
+        uid: user.uid,
       });
       setNewTaskTitle('');
     } catch (error) {
@@ -115,6 +117,14 @@ export default function StudyPlanPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {!isStudent ? (
+             <Alert>
+              <AlertTitle>학생 전용</AlertTitle>
+              <AlertDescription>
+                학생 계정으로 로그인하면 계획을 기록하고 관리할 수 있습니다.
+              </AlertDescription>
+            </Alert>
+          ) : (
           <div className="grid gap-6">
             {isLoading && (
               <div className="flex items-center justify-center p-8">
@@ -158,8 +168,10 @@ export default function StudyPlanPage() {
                 </Button>
               </div>
           </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+    

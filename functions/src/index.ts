@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { format } from "date-fns";
+import { format, getISOWeek } from "date-fns";
 
 admin.initializeApp();
 
@@ -41,8 +41,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     const batch = db.batch();
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const weekKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
-    const monthKey = format(new Date(), 'yyyy-MM');
+    const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
     // 1. Create the primary membership document
     const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
@@ -68,13 +67,13 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
 
     // 3. If student, create a profile and seed initial data
     if (role === "student") {
-      // Student profile
-      const studentRef = db.doc(`centers/${centerId}/students/${uid}`);
-      batch.set(studentRef, {
-        uid: uid,
+      // Student profile in /users
+      const userProfileRef = db.doc(`users/${uid}`);
+       batch.set(userProfileRef, {
         displayName: displayName,
         email: email,
         createdAt: timestamp,
+        updatedAt: timestamp
       }, { merge: true });
 
       // Initial Daily Stat
@@ -94,10 +93,10 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       });
 
       // Initial Study Plan Week
-      const studyPlanWeekRef = db.doc(`centers/${centerId}/students/${uid}/studyPlanWeeks/${weekKey}`);
+      const studyPlanWeekRef = db.doc(`centers/${centerId}/plans/${uid}/weeks/${weekKey}`);
       batch.set(studyPlanWeekRef, {
           centerId: centerId,
-          studentId: uid,
+          uid: uid,
           weekKey: weekKey,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -191,7 +190,6 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
             }
 
             const now = new Date();
-            // FIX: Convert Firestore Timestamp to JS Date for comparison
             if (freshInviteCodeData.expiresAt && freshInviteCodeData.expiresAt.toDate() < now) {
                 throw new functions.https.HttpsError('deadline-exceeded', 'This invite code has expired.');
             }
@@ -217,12 +215,12 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
             });
 
             if (role === "student") {
-                const studentRef = db.doc(`centers/${centerId}/students/${uid}`);
-                transaction.set(studentRef, {
-                    uid: uid,
+                const userProfileRef = db.doc(`users/${uid}`);
+                transaction.set(userProfileRef, {
                     displayName: displayName,
                     email: email,
                     createdAt: timestamp,
+                    updatedAt: timestamp,
                 }, { merge: true });
             }
             
@@ -252,11 +250,13 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        // Firestore security rule errors (like missing index) often manifest as 'INTERNAL' here.
         let errorMessage = error.message || "Server error during invite redemption.";
         if (error.code === 9) { // PERMISSION_DENIED from index error
             errorMessage = "A database index is required for this operation. Please check the Firebase console logs for a link to create it.";
+        } else if (error.code === 7) { // PERMISSION_DENIED from security rules
+            errorMessage = `Permission denied. Ensure the invite code '${code}' exists and is active in Firestore at /centers/${centerId}/inviteCodes/{inviteCodeId}.`;
         }
+
 
         throw new functions.https.HttpsError(
             "internal",
@@ -264,3 +264,4 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
         );
     }
 });
+    

@@ -246,7 +246,7 @@
           "type": "string",
           "description": "Reference to Center where this study plan is created. (Relationship: Center 1:N StudyPlanWeek)"
         },
-        "studentId": {
+        "uid": {
           "type": "string",
           "description": "Reference to the Student user for whom this plan is created. (Relationship: User 1:N StudyPlanWeek)"
         },
@@ -267,7 +267,7 @@
       "required": [
         "id",
         "centerId",
-        "studentId",
+        "uid",
         "weekKey",
         "createdAt",
         "updatedAt"
@@ -338,7 +338,7 @@
           "type": "string",
           "description": "Reference to Center where this study log belongs. (Relationship: Center 1:N StudyLogDay)"
         },
-        "studentId": {
+        "uid": {
           "type": "string",
           "description": "Reference to the Student user whose study time is logged. (Relationship: User 1:N StudyLogDay)"
         },
@@ -363,7 +363,7 @@
       "required": [
         "id",
         "centerId",
-        "studentId",
+        "uid",
         "dateKey",
         "totalMinutes",
         "createdAt",
@@ -1081,20 +1081,20 @@
         }
       },
       {
-        "path": "/centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}",
+        "path": "/centers/{centerId}/plans/{uid}/weeks/{weekKey}",
         "definition": {
           "entityName": "StudyPlanWeek",
           "schema": {
             "$ref": "#/backend/entities/StudyPlanWeek"
           },
-          "description": "Stores a student's weekly study plan within a specific center. The 'centerId' and 'studentId' are part of the path, ensuring clear ownership and efficient querying. Includes denormalized 'centerId' and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Stores a student's weekly study plan within a specific center. The 'centerId' and 'uid' are part of the path, ensuring clear ownership and efficient querying.",
           "params": [
             {
               "name": "centerId",
               "description": "The unique identifier of the study center."
             },
             {
-              "name": "studentId",
+              "name": "uid",
               "description": "The unique identifier of the student user."
             },
             {
@@ -1105,20 +1105,20 @@
         }
       },
       {
-        "path": "/centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}/items/{studyPlanItemId}",
+        "path": "/centers/{centerId}/plans/{uid}/weeks/{weekKey}/items/{itemId}",
         "definition": {
           "entityName": "StudyPlanItem",
           "schema": {
             "$ref": "#/backend/entities/StudyPlanItem"
           },
-          "description": "Individual tasks or items within a student's weekly study plan. The full hierarchical path provides strong ownership context. Includes denormalized 'centerId', 'studentId', and 'weekKey' for authorization independence and simplified security rules.",
+          "description": "Individual tasks or items within a student's weekly study plan. The full hierarchical path provides strong ownership context.",
           "params": [
             {
               "name": "centerId",
               "description": "The unique identifier of the study center."
             },
             {
-              "name": "studentId",
+              "name": "uid",
               "description": "The unique identifier of the student user."
             },
             {
@@ -1126,27 +1126,27 @@
               "description": "The week identifier in 'YYYY-WW' format (e.g., '2023-W40')."
             },
             {
-              "name": "studyPlanItemId",
+              "name": "itemId",
               "description": "The unique identifier of the study plan item."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/students/{studentId}/studyLogDays/{dateKey}",
+        "path": "/centers/{centerId}/studyLogs/{uid}/days/{dateKey}",
         "definition": {
           "entityName": "StudyLogDay",
           "schema": {
             "$ref": "#/backend/entities/StudyLogDay"
           },
-          "description": "Aggregates a student's total study time for a specific day within a center. 'centerId' and 'studentId' are part of the path for clear context. Includes denormalized 'centerId' and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Aggregates a student's total study time for a specific day within a center. 'centerId' and 'uid' are part of the path for clear context.",
           "params": [
             {
               "name": "centerId",
               "description": "The unique identifier of the study center."
             },
             {
-              "name": "studentId",
+              "name": "uid",
               "description": "The unique identifier of the student user."
             },
             {
@@ -1157,20 +1157,20 @@
         }
       },
       {
-        "path": "/centers/{centerId}/students/{studentId}/studyLogDays/{dateKey}/subjects/{studyLogSubjectId}",
+        "path": "/centers/{centerId}/studyLogs/{uid}/days/{dateKey}/subjects/{studyLogSubjectId}",
         "definition": {
           "entityName": "StudyLogSubject",
           "schema": {
             "$ref": "#/backend/entities/StudyLogSubject"
           },
-          "description": "Details study time spent on specific subjects for a given day. The hierarchical path provides full context. Includes denormalized 'centerId', 'studentId', and 'dateKey' for authorization independence and simplified security rules.",
+          "description": "Details study time spent on specific subjects for a given day. The hierarchical path provides full context.",
           "params": [
             {
               "name": "centerId",
               "description": "The unique identifier of the study center."
             },
             {
-              "name": "studentId",
+              "name": "uid",
               "description": "The unique identifier of the student user."
             },
             {
@@ -1409,6 +1409,7 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure for LEARNING-LAB prioritizes robust security, scalability, and debuggability by strictly adhering to the mandated design principles.\n\n**Authorization Independence (CRITICAL):**\nThis design achieves authorization independence primarily by: \n1.  **Path-Based Context:** For most center-specific data, the `centerId` and `studentId` (or `userId`) are embedded directly into the collection paths (e.g., `/centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}`). This makes the immediate authorization context available directly from the request path parameters.\n2.  **Denormalized Authorization Context in Documents:** Critical identifiers like `centerId`, `studentId`, `userId`, and relevant date/period keys (`dateKey`, `weekKey`, `monthKey`, `periodKey`, `metricKey`) are explicitly included as fields within documents, even when they are part of the path. This ensures that security rules can evaluate access without relying on `get()` calls to parent documents to retrieve these core identifiers. For example, a `StudyPlanWeek` document explicitly contains `centerId` and `studentId` in its data, allowing rules to verify the `centerId` matches the path and the `studentId` matches the authenticated user (or a student accessible by an authorized teacher).\n3.  **Controlled Use of `get()` for User's Own Role:** The core of center-specific authorization relies on a user's role, stored in `/centers/{centerId}/members/{userId}`. Security rules will use a `get(/centers/$(centerId)/members/$(request.auth.uid))` call to retrieve the *current user's own role* for the specific center. This is a deliberate and accepted deviation from avoiding *all* `get()` calls, as it's retrieving the authenticated user's *personal authorization context* rather than arbitrary data from a parent document or another entity. This ensures DBAC (Database-Backed Access Control) without introducing complex hierarchical dependencies on other data documents.\n\n**QAPs (Rules are not Filters):**\nThe structure ensures that security rules are not used as filters, but rather to enforce access control on explicitly defined paths, enabling secure and efficient `list` operations:\n1.  **Structural Segregation (Homogeneous Security Posture):** Collections are designed so that all documents within them share the same security requirements. For example, all `LeaderboardEntry` documents under `/centers/{centerId}/leaderboards/{periodKey}/{metricKey}/entries` are designed to be read-only for clients, simplifying `list` rules. Similarly, student-specific data (e.g., `StudyPlanWeek`) is deeply nested under `/centers/{centerId}/students/{studentId}/...`, allowing rules to easily restrict a student to only `list` their own data (where `studentId == request.auth.uid`).\n2.  **Explicit Path-Based Access Control:** For `list` operations, the collection paths themselves often serve as implicit filters. For instance, a student can perform a `list` on `/centers/{centerId}/students/$(request.auth.uid)/studyPlanWeeks`, and the rules can strictly enforce that `studentId` in the path must match `request.auth.uid`. For teachers or administrators, `list` access to subcollections like `/centers/{centerId}/students/{studentId}/studyPlanWeeks` will be granted based on their `centerId` role, allowing them to query across all students they are authorized to manage, while still respecting the QAP principle (i.e., they are given access to the *entire subcollection* for authorized `studentId`s, not filtering a broader collection).\n3.  **Read-Only Aggregates:** Key performance indicators and AI outputs (`LeaderboardEntry`, `DailyStudentStat`, `CenterStat`, `AIOutput`) are explicitly designed as aggregated, read-only collections for clients. This simplifies `list` rules to basic role checks, as there's no client-side modification possible, reducing complexity and attack surface."
+    "reasoning": "The Firestore structure for LEARNING-LAB prioritizes robust security, scalability, and debuggability by strictly adhering to the mandated design principles.\n\n**Authorization Independence (CRITICAL):**\nThis design achieves authorization independence primarily by: \n1.  **Path-Based Context:** For most center-specific data, the `centerId` and `studentId` (or `userId`) are embedded directly into the collection paths (e.g., `/centers/{centerId}/plans/{uid}/weeks/{weekKey}`). This makes the immediate authorization context available directly from the request path parameters.\n2.  **Denormalized Authorization Context in Documents:** Critical identifiers like `centerId`, `uid`, and relevant date/period keys (`dateKey`, `weekKey`) are explicitly included as fields within documents, even when they are part of the path. This ensures that security rules can evaluate access without relying on `get()` calls to parent documents to retrieve these core identifiers. For example, a `StudyPlanWeek` document explicitly contains `centerId` and `uid` in its data, allowing rules to verify the `centerId` matches the path and the `uid` matches the authenticated user (or a student accessible by an authorized teacher).\n3.  **Controlled Use of `get()` for User's Own Role:** The core of center-specific authorization relies on a user's role, stored in `/centers/{centerId}/members/{userId}`. Security rules will use a `get(/centers/$(centerId)/members/$(request.auth.uid))` call to retrieve the *current user's own role* for the specific center. This is a deliberate and accepted deviation from avoiding *all* `get()` calls, as it's retrieving the authenticated user's *personal authorization context* rather than arbitrary data from a parent document or another entity. This ensures DBAC (Database-Backed Access Control) without introducing complex hierarchical dependencies on other data documents.\n\n**QAPs (Rules are not Filters):**\nThe structure ensures that security rules are not used as filters, but rather to enforce access control on explicitly defined paths, enabling secure and efficient `list` operations:\n1.  **Structural Segregation (Homogeneous Security Posture):** Collections are designed so that all documents within them share the same security requirements. For example, all `LeaderboardEntry` documents under `/centers/{centerId}/leaderboards/{periodKey}/{metricKey}/entries` are designed to be read-only for clients, simplifying `list` rules. Similarly, student-specific data (e.g., `StudyPlanWeek`) is deeply nested under `/centers/{centerId}/plans/{uid}/...`, allowing rules to easily restrict a student to only `list` their own data (where `uid == request.auth.uid`).\n2.  **Explicit Path-Based Access Control:** For `list` operations, the collection paths themselves often serve as implicit filters. For instance, a student can perform a `list` on `/centers/{centerId}/plans/$(request.auth.uid)/weeks`, and the rules can strictly enforce that `uid` in the path must match `request.auth.uid`. For teachers or administrators, `list` access to subcollections like `/centers/{centerId}/plans/{uid}/weeks` will be granted based on their `centerId` role, allowing them to query across all students they are authorized to manage, while still respecting the QAP principle (i.e., they are given access to the *entire subcollection* for authorized `uid`s, not filtering a broader collection).\n3.  **Read-Only Aggregates:** Key performance indicators and AI outputs (`LeaderboardEntry`, `DailyStudentStat`, `CenterStat`, `AIOutput`) are explicitly designed as aggregated, read-only collections for clients. This simplifies `list` rules to basic role checks, as there's no client-side modification possible, reducing complexity and attack surface."
   }
 }
+    

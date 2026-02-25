@@ -62,25 +62,16 @@ service cloud.firestore {
     function incomingUserDataIsValid(userId) {
       return request.resource.data.id == userId;
     }
-    /**
-     * Validates that critical IDs in a new document match the path parameters.
-     */
-    function incomingStudentDataIsValid(_centerId, _studentId) {
-      return request.resource.data.centerId == _centerId && request.resource.data.studentId == _studentId;
+    
+    function incomingStudentDataIsValid(centerId, studentId) {
+      return request.resource.data.centerId == centerId &&
+             (request.resource.data.studentId == studentId || request.resource.data.uid == studentId);
     }
-    /**
-     * Enforces immutability of critical relational IDs on update.
-     * - `centerId` must always be immutable if present.
-     * - `studentId` must also be immutable if the requesting user is the owner of that student record.
-     * This structure uses boolean logic to avoid 'if' statements not allowed in rule functions.
-     */
+
     function coreIdsAreImmutable(studentId) {
-      let isStudentIdImmutable = request.resource.data.studentId == resource.data.studentId;
+      let isStudentIdImmutable = request.resource.data.studentId == resource.data.studentId || request.resource.data.uid == resource.data.uid;
       let isCenterIdImmutable = request.resource.data.centerId == resource.data.centerId;
 
-      // isCenterIdImmutable is always required for updates where `centerId` exists in resource.data and request.resource.data.
-      // isStudentIdImmutable is additionally required if `studentId` is provided (i.e., not null)
-      // AND the requesting user is the owner of that studentId.
       return isCenterIdImmutable &&
              (studentId == null || !isOwner(studentId) || isStudentIdImmutable);
     }
@@ -88,9 +79,6 @@ service cloud.firestore {
     /**
      * @description Manages user profile data.
      * @path /users/{userId}
-     * @allow (create) An authenticated user creating their own profile document.
-     * @deny (get) A user trying to read another user's profile.
-     * @principle A user has exclusive control over their own profile document.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
@@ -102,9 +90,6 @@ service cloud.firestore {
       /**
        * @description Manages user-specific notification preferences for a center.
        * @path /users/{userId}/notificationPreferences/{centerId}
-       * @allow (create, update) A user setting their notification preferences for a center they belong to.
-       * @deny (get) A user trying to read another user's preferences.
-       * @principle Restricts access to a user's own data tree.
        */
       match /notificationPreferences/{centerId} {
         allow get: if isOwner(userId);
@@ -118,10 +103,6 @@ service cloud.firestore {
     /**
      * @description Defines a study center and its top-level settings.
      * @path /centers/{centerId}
-     * @allow (get) Any member of the center reading its details.
-     * @deny (list) Any user trying to list all available centers in the database.
-     * @deny (create, delete) Client-side creation or deletion of centers is forbidden.
-     * @principle Grants read access to collaborators (members) and write access only to administrators.
      */
     match /centers/{centerId} {
       allow get: if isCenterMember(centerId);
@@ -133,9 +114,6 @@ service cloud.firestore {
       /**
        * @description Manages user roles and membership within a center.
        * @path /centers/{centerId}/members/{userId}
-       * @allow (get, list) Any center member can see the list of other members.
-       * @deny (create) A non-admin user trying to add another user to the center.
-       * @principle Membership is managed by admins, but users can leave the center.
        */
       match /members/{userId} {
         allow get: if isCenterMember(centerId);
@@ -148,9 +126,6 @@ service cloud.firestore {
       /**
        * @description Manages invite codes for onboarding new members.
        * @path /centers/{centerId}/inviteCodes/{inviteCodeId}
-       * @allow (create) An admin or teacher creating a new invite code.
-       * @deny (list) A student trying to list all invite codes for a center.
-       * @principle Access is restricted to center staff for management.
        */
       match /inviteCodes/{inviteCodeId} {
         allow get: if isSignedIn();
@@ -159,71 +134,63 @@ service cloud.firestore {
         allow update: if isCenterStaff(centerId) && resource != null;
         allow delete: if isCenterStaff(centerId) && resource != null;
       }
-
+      
       /**
-       * @description Contains all data related to a specific student.
-       * @path /centers/{centerId}/students/{studentId}
-       * @principle This is a grouping path without a document. Rules are defined on subcollections.
+       * @description Student-specific study plans, keyed by user UID.
+       * @path /centers/{centerId}/plans/{uid}
        */
-      match /students/{studentId} {
+      match /plans/{uid} {
         /**
          * @description Manages a student's weekly study plans.
-         * @path /centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}
-         * @allow (create, get) A student creating or reading their own study plan.
-         * @allow (get, update) A teacher viewing or updating a student's study plan.
-         * @deny (get) A student trying to access another student's plan.
-         * @principle Enforces student data privacy while allowing access for authorized staff.
+         * @path /centers/{centerId}/plans/{uid}/weeks/{weekKey}
          */
-        match /studyPlanWeeks/{weekKey} {
-          allow get: if isSelfOrStaffOrParent(centerId, studentId);
-          allow list: if isSelfOrStaffOrParent(centerId, studentId);
-          allow create: if isSelfOrStaff(centerId, studentId) && incomingStudentDataIsValid(centerId, studentId);
-          allow update: if isSelfOrStaff(centerId, studentId) && resource != null && coreIdsAreImmutable(studentId);
-          allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
+        match /weeks/{weekKey} {
+          allow get: if isSelfOrStaffOrParent(centerId, uid);
+          allow list: if isSelfOrStaffOrParent(centerId, uid);
+          allow create: if isSelfOrStaff(centerId, uid) && incomingStudentDataIsValid(centerId, uid);
+          allow update: if isSelfOrStaff(centerId, uid) && resource != null && coreIdsAreImmutable(uid);
+          allow delete: if isSelfOrStaff(centerId, uid) && resource != null;
 
           /**
            * @description Manages individual items within a weekly study plan.
-           * @path /centers/{centerId}/students/{studentId}/studyPlanWeeks/{weekKey}/items/{studyPlanItemId}
-           * @allow (create, update) A student adding or checking off an item in their plan.
-           * @deny (delete) A student from another center trying to delete an item.
-           * @principle Access rules are inherited from the parent collection's security context.
+           * @path /centers/{centerId}/plans/{uid}/weeks/{weekKey}/items/{itemId}
            */
-          match /items/{studyPlanItemId} {
-            allow get: if isSelfOrStaffOrParent(centerId, studentId);
-            allow list: if isSelfOrStaffOrParent(centerId, studentId);
-            allow create: if isSelfOrStaff(centerId, studentId);
-            allow update: if isSelfOrStaff(centerId, studentId) && resource != null;
-            allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
+          match /items/{itemId} {
+            allow get: if isSelfOrStaffOrParent(centerId, uid);
+            allow list: if isSelfOrStaffOrParent(centerId, uid);
+            allow create: if isSelfOrStaff(centerId, uid);
+            allow update: if isSelfOrStaff(centerId, uid) && resource != null;
+            allow delete: if isSelfOrStaff(centerId, uid) && resource != null;
           }
         }
-
+      }
+      
+      /**
+       * @description Student-specific study logs, keyed by user UID.
+       * @path /centers/{centerId}/studyLogs/{uid}
+       */
+      match /studyLogs/{uid} {
         /**
          * @description Manages a student's daily study time logs.
-         * @path /centers/{centerId}/students/{studentId}/studyLogDays/{dateKey}
-         * @allow (create, list) A student logging their study time for the day.
-         * @deny (update) A student trying to modify another student's study log.
-         * @principle Enforces student data privacy while allowing access for authorized staff.
+         * @path /centers/{centerId}/studyLogs/{uid}/days/{dateKey}
          */
-        match /studyLogDays/{dateKey} {
-          allow get: if isSelfOrStaffOrParent(centerId, studentId);
-          allow list: if isSelfOrStaffOrParent(centerId, studentId);
-          allow create: if isSelfOrStaff(centerId, studentId) && incomingStudentDataIsValid(centerId, studentId);
-          allow update: if isSelfOrStaff(centerId, studentId) && resource != null && coreIdsAreImmutable(studentId);
-          allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
+        match /days/{dateKey} {
+          allow get: if isSelfOrStaffOrParent(centerId, uid);
+          allow list: if isSelfOrStaffOrParent(centerId, uid);
+          allow create: if isSelfOrStaff(centerId, uid) && incomingStudentDataIsValid(centerId, uid);
+          allow update: if isSelfOrStaff(centerId, uid) && resource != null && coreIdsAreImmutable(uid);
+          allow delete: if isSelfOrStaff(centerId, uid) && resource != null;
 
           /**
            * @description Manages study time logs broken down by subject.
-           * @path /centers/{centerId}/students/{studentId}/studyLogDays/{dateKey}/subjects/{studyLogSubjectId}
-           * @allow (create, get) A student logging time for a specific subject.
-           * @deny (get) An unauthorized user trying to read the study log.
-           * @principle Access rules are inherited from the parent collection's security context.
+           * @path /centers/{centerId}/studyLogs/{uid}/days/{dateKey}/subjects/{studyLogSubjectId}
            */
           match /subjects/{studyLogSubjectId} {
-            allow get: if isSelfOrStaffOrParent(centerId, studentId);
-            allow list: if isSelfOrStaffOrParent(centerId, studentId);
-            allow create: if isSelfOrStaff(centerId, studentId);
-            allow update: if isSelfOrStaff(centerId, studentId) && resource != null;
-            allow delete: if isSelfOrStaff(centerId, studentId) && resource != null;
+            allow get: if isSelfOrStaffOrParent(centerId, uid);
+            allow list: if isSelfOrStaffOrParent(centerId, uid);
+            allow create: if isSelfOrStaff(centerId, uid);
+            allow update: if isSelfOrStaff(centerId, uid) && resource != null;
+            allow delete: if isSelfOrStaff(centerId, uid) && resource != null;
           }
         }
       }
@@ -231,10 +198,6 @@ service cloud.firestore {
       /**
        * @description Manages student attendance records, grouped by date.
        * @path /centers/{centerId}/attendanceRecords/{dateKey}/students/{studentId}
-       * @allow (create) A student requesting attendance for a specific day.
-       * @allow (update) A teacher confirming a student's attendance status.
-       * @deny (delete) A student trying to delete their own confirmed attendance record.
-       * @principle Allows students to initiate records but gives staff final control over modification.
        */
       match /attendanceRecords/{dateKey}/students/{studentId} {
         allow get: if isSelfOrStaffOrParent(centerId, studentId);
@@ -247,9 +210,6 @@ service cloud.firestore {
       /**
        * @description Stores aggregated leaderboard data.
        * @path /centers/{centerId}/leaderboards/{periodKey}/{metricKey}/entries/{studentId}
-       * @allow (get, list) Any member of the center can view the leaderboards.
-       * @deny (create, update, delete) All users are blocked from writing to prevent tampering with scores.
-       * @principle Data is public to members but immutable from the client-side. Written only by backend services.
        */
       match /leaderboards/{periodKey}/{metricKey}/entries/{studentId} {
         allow get: if isCenterMember(centerId);
@@ -262,9 +222,6 @@ service cloud.firestore {
       /**
        * @description Stores aggregated daily performance statistics for students.
        * @path /centers/{centerId}/dailyStudentStats/{dateKey}/students/{studentId}
-       * @allow (get, list) The student, their parent, or staff can view daily stats.
-       * @deny (create, update, delete) All users are blocked from writing to prevent data manipulation.
-       * @principle Data is private to the student and staff, and is immutable from the client-side.
        */
       match /dailyStudentStats/{dateKey}/students/{studentId} {
         allow get: if isSelfOrStaffOrParent(centerId, studentId);
@@ -277,10 +234,6 @@ service cloud.firestore {
       /**
        * @description Stores AI-generated content like risk reports and summaries.
        * @path /centers/{centerId}/aiOutputs/{studentId}/records/{aiOutputId}
-       * @allow (get, list) Center staff can view AI-generated outputs for students.
-       * @deny (get) Students and parents are blocked from direct access to AI reports.
-       * @deny (create, update, delete) All writes are forbidden from the client.
-       * @principle Sensitive data is restricted to authorized staff and is immutable from the client-side.
        */
       match /aiOutputs/{studentId}/records/{aiOutputId} {
         allow get: if isCenterStaff(centerId);
@@ -293,9 +246,6 @@ service cloud.firestore {
       /**
        * @description Records important system and user actions for auditing.
        * @path /centers/{centerId}/auditLogs/{auditLogId}
-       * @allow (get, list) Only center admins can view audit logs.
-       * @deny (create, update, delete) All writes are forbidden from the client.
-       * @principle Sensitive audit data is restricted to administrators and is immutable from the client-side.
        */
       match /auditLogs/{auditLogId} {
         allow get: if isCenterAdmin(centerId);
@@ -308,9 +258,6 @@ service cloud.firestore {
       /**
        * @description Stores aggregated monthly statistics for the entire center.
        * @path /centers/{centerId}/centerStats/{monthKey}
-       * @allow (get, list) Center staff can view the center's monthly performance stats.
-       * @deny (create, update, delete) All writes are forbidden from the client.
-       * @principle Aggregated data is read-only for staff and immutable from the client-side.
        */
       match /centerStats/{monthKey} {
         allow get: if isCenterStaff(centerId);
@@ -323,9 +270,6 @@ service cloud.firestore {
       /**
        * @description Manages the physical or virtual seats available in a center.
        * @path /centers/{centerId}/seats/{seatId}
-       * @allow (get, list) All center members can view the seat map and availability.
-       * @deny (create) Non-admin users cannot add or remove seats.
-       * @principle Seat configuration is managed by administrators.
        */
       match /seats/{seatId} {
         allow get: if isCenterMember(centerId);
@@ -338,9 +282,6 @@ service cloud.firestore {
       /**
        * @description Manages the assignment of students to seats for a given month.
        * @path /centers/{centerId}/seatAssignments/{monthKey}/students/{studentId}
-       * @allow (get, list) A student can see their own seat assignment.
-       * @deny (create, update) Only admins can assign or change seat assignments.
-       * @principle Seat assignments are managed by administrators.
        */
       match /seatAssignments/{monthKey}/students/{studentId} {
         allow get: if isSelfOrStaffOrParent(centerId, studentId);
@@ -353,9 +294,6 @@ service cloud.firestore {
       /**
        * @description Manages student enrollment periods and status.
        * @path /centers/{centerId}/enrollments/{enrollmentId}
-       * @allow (get) A student (whose ID is in the doc) or staff can read an enrollment record.
-       * @deny (list) Students cannot list all enrollments in the center.
-       * @principle Enrollment records are managed by admins, but visible to the relevant student and staff.
        */
       match /enrollments/{enrollmentId} {
         allow get: if isCenterStaff(centerId) || (resource != null && isOwner(resource.data.studentId));
@@ -367,3 +305,4 @@ service cloud.firestore {
     }
   }
 }
+    

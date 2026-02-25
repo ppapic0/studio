@@ -14,6 +14,7 @@ import {
   Clock,
   TrendingUp,
   Loader2,
+  Save,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -23,12 +24,15 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, AIOutput, WithId } from '@/lib/types';
-import { doc, collection, query, where, limit, orderBy, updateDoc } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { DailyStudentStat, StudyPlanItem, AIOutput, WithId, StudyLogDay } from '@/lib/types';
+import { doc, collection, query, where, limit, orderBy, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { format, getISOWeek } from 'date-fns';
 import { Skeleton } from '../ui/skeleton';
+import { useEffect, useState } from 'react';
+import { Input } from '../ui/input';
+import { useToast } from '@/hooks/use-toast';
 
-function StatCard({ title, icon: Icon, value, evolution, isLoading }: { title: string, icon: React.ElementType, value: string, evolution: string, isLoading: boolean }) {
+function StatCard({ title, icon: Icon, value, evolution, isLoading, children }: { title: string, icon: React.ElementType, value?: string, evolution?: string, isLoading: boolean, children?: React.ReactNode }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -41,6 +45,8 @@ function StatCard({ title, icon: Icon, value, evolution, isLoading }: { title: s
             <Skeleton className="h-8 w-24 mt-1" />
             <Skeleton className="h-4 w-32 mt-2" />
           </>
+        ) : children ? (
+          children
         ) : (
           <>
             <div className="text-2xl font-bold">{value}</div>
@@ -55,21 +61,32 @@ function StatCard({ title, icon: Icon, value, evolution, isLoading }: { title: s
 export function StudentDashboard() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
   const { activeMembership } = useAppContext();
   
   const todayKey = format(new Date(), 'yyyy-MM-dd');
-  const weekKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
+  const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
+  const [minutesInput, setMinutesInput] = useState('');
+  const [isSavingMinutes, setIsSavingMinutes] = useState(false);
+
+  // --- Data Fetching ---
   const dailyStatRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', user.uid);
   }, [firestore, activeMembership, user, todayKey]);
   const { data: dailyStat, isLoading: dailyStatLoading } = useDoc<DailyStudentStat>(dailyStatRef);
 
+  const studyLogRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
+  }, [firestore, activeMembership, user, todayKey]);
+  const { data: studyLog, isLoading: studyLogLoading } = useDoc<StudyLogDay>(studyLogRef);
+
   const planItemsRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'students', user.uid, 'studyPlanWeeks', weekKey, 'items'),
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
       where('done', '==', false),
       limit(5)
     );
@@ -87,22 +104,50 @@ export function StudentDashboard() {
   }, [firestore, activeMembership, user]);
   const { data: aiCoachData, isLoading: aiCoachLoading } = useCollection<AIOutput>(aiCoachRef);
   
+  // --- Effects ---
+  useEffect(() => {
+    if (studyLog) {
+      setMinutesInput(String(studyLog.totalMinutes));
+    } else {
+      setMinutesInput('0');
+    }
+  }, [studyLog]);
+  
+  // --- Event Handlers ---
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership) return;
-    const itemRef = doc(
-      firestore,
-      'centers',
-      activeMembership.id,
-      'students',
-      user.uid,
-      'studyPlanWeeks',
-      weekKey,
-      'items',
-      item.id
-    );
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     await updateDoc(itemRef, {
       done: !item.done,
+      updatedAt: serverTimestamp(),
     });
+  };
+
+  const handleSetMinutes = async () => {
+    if (!firestore || !user || !activeMembership) return;
+    
+    const newMinutes = parseInt(minutesInput, 10);
+    if (isNaN(newMinutes) || newMinutes < 0) {
+      toast({ variant: 'destructive', title: '유효하지 않은 값', description: '0 이상의 숫자를 입력해주세요.' });
+      return;
+    }
+    
+    setIsSavingMinutes(true);
+    try {
+      await setDoc(studyLogRef, {
+        totalMinutes: newMinutes,
+        uid: user.uid,
+        centerId: activeMembership.id,
+        dateKey: todayKey,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      toast({ title: '저장 완료', description: `오늘의 학습 시간이 ${newMinutes}분으로 기록되었습니다.` });
+    } catch (error) {
+      console.error("Failed to save study minutes:", error);
+      toast({ variant: 'destructive', title: '저장 실패', description: '학습 시간을 저장하는 중 오류가 발생했습니다.' });
+    } finally {
+      setIsSavingMinutes(false);
+    }
   };
 
   const aiCoachMessage = aiCoachData?.[0];
@@ -117,10 +162,23 @@ export function StudentDashboard() {
         <StatCard 
           title="오늘의 학습 시간"
           icon={Clock}
-          value={`${dailyStat?.totalStudyMinutes ?? 0} 분`}
-          evolution={`어제보다 ${growthSign}${Math.round(growthRate * 100)}%`}
-          isLoading={dailyStatLoading}
-        />
+          isLoading={studyLogLoading}
+        >
+          <div className="flex items-end gap-2">
+            <Input 
+              type="number" 
+              className="text-2xl font-bold h-10 p-1 border-0 shadow-none focus-visible:ring-0" 
+              value={minutesInput}
+              onChange={(e) => setMinutesInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSetMinutes()}
+            />
+            <Button size="sm" onClick={handleSetMinutes} disabled={isSavingMinutes}>
+              {isSavingMinutes ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
+              <span className="sr-only">Save</span>
+            </Button>
+          </div>
+          {studyLog?.updatedAt && <p className="text-xs text-muted-foreground">마지막 저장: {format(studyLog.updatedAt.toDate(), 'p')}</p>}
+        </StatCard>
         <StatCard 
           title="주간 완수율"
           icon={ClipboardCheck}
@@ -210,3 +268,4 @@ export function StudentDashboard() {
     </>
   );
 }
+    
