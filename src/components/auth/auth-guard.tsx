@@ -3,7 +3,7 @@
 import { useUser } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { CenterMembership, useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
@@ -30,6 +30,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
     
+    // If we already have an active membership from a previous check, we are done.
     if (activeMembership) {
        setIsCheckingInitial(false);
        setMembershipsLoading(false);
@@ -44,38 +45,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       setMembershipsLoading(true);
 
       try {
+        // The source of truth for a user's memberships is the /userCenters collection,
+        // which is a reverse index populated by the Cloud Functions.
         const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
         const querySnapshot = await getDocs(userCentersRef);
-        let fetchedMemberships = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CenterMembership));
+        const fetchedMemberships = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CenterMembership));
 
-        let active = fetchedMemberships.find(m => m.status === 'active');
-
-        if (!active && fetchedMemberships.length === 0) {
-            // Development-only fallback: check center-1
-            console.log("No memberships in /userCenters. Dev fallback: checking /centers/center-1/members...");
-            const devMemberRef = doc(firestore, 'centers', 'center-1', 'members', user.uid);
-            const devMemberSnap = await getDoc(devMemberRef);
-            if (devMemberSnap.exists()) {
-                const memberData = devMemberSnap.data();
-                 if (memberData.status === 'active') {
-                    console.log("Found active membership in center-1. Creating reverse index and setting active membership.");
-                    const newMembership: CenterMembership = { id: 'center-1', ...memberData } as CenterMembership;
-                    
-                    // Create reverse index
-                    const userCenterDocRef = doc(firestore, 'userCenters', user.uid, 'centers', 'center-1');
-                    await setDoc(userCenterDocRef, {
-                        role: memberData.role,
-                        status: memberData.status,
-                        joinedAt: memberData.joinedAt || serverTimestamp(),
-                    });
-                    
-                    fetchedMemberships = [newMembership];
-                    active = newMembership;
-                }
-            }
-        }
-        
         setMemberships(fetchedMemberships);
+        const active = fetchedMemberships.find(m => m.status === 'active');
         
         if (active) {
           setActiveMembership(active);
@@ -84,13 +61,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           }
         } else {
           setActiveMembership(null);
-          // NO REDIRECT TO /connection-test
+          // Do not redirect. The dashboard page will handle the UI for users without a membership.
         }
       } catch (e) {
         console.error('AuthGuard: Failed to check membership.', e);
         setActiveMembership(null);
         setMemberships([]);
-        // NO REDIRECT TO /connection-test
       } finally {
         setIsCheckingInitial(false);
         setMembershipsLoading(false);
