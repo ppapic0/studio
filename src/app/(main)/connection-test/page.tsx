@@ -10,51 +10,39 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/contexts/app-context';
+import { useRouter } from 'next/navigation';
 
 export default function ConnectionTestPage() {
   const { user } = useUser();
   const functions = useFunctions();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
+  const { memberships, setActiveMembership } = useAppContext();
 
   const [results, setResults] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingManually, setIsCheckingManually] = useState(false);
 
+  // Form states for devJoinCenter
   const [centerId, setCenterId] = useState('center-1');
   const [role, setRole] = useState<'student' | 'teacher' | 'parent' | 'centerAdmin'>('student');
   const [linkedStudentId, setLinkedStudentId] = useState('');
   const [devSecret, setDevSecret] = useState('');
 
+  // Form state for manual check
+  const [manualCenterId, setManualCenterId] = useState('');
+
   const addResult = (text: string) => {
     setResults(prev => [`[${new Date().toLocaleTimeString()}] ${text}`, ...prev]);
   };
 
-  const handleReadProfile = async () => {
-    if (!firestore || !user) {
-      addResult('❌ Firestore or user not available.');
-      return;
-    }
-    setIsLoading(true);
-    addResult('🔄 Firestore 읽기 테스트 시작: /users/{uid}...');
-    try {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      const docSnap = await getDoc(userDocRef);
-      if (docSnap.exists()) {
-        addResult(`✅ 성공: 사용자 프로필 읽기 완료. 데이터: ${JSON.stringify(docSnap.data())}`);
-      } else {
-        addResult('⚠️ 경고: 사용자 프로필 문서가 존재하지 않습니다. 회원가입 시 생성되어야 합니다.');
-      }
-    } catch (error: any) {
-      addResult(`❌ 실패: Firestore 읽기 중 오류 발생. ${error.message}`);
-    }
-    setIsLoading(false);
-  };
-
   const handleJoinCenter = async () => {
-    if (!functions) {
-      addResult('❌ Firebase Functions not available.');
+    if (!functions || !user) {
+      addResult('❌ Firebase Functions or user not available.');
       return;
     }
     setIsLoading(true);
@@ -73,7 +61,8 @@ export default function ConnectionTestPage() {
         description: '센터에 가입되었습니다. 페이지를 새로고침하여 대시보드로 이동합니다.',
       });
       setTimeout(() => window.location.reload(), 2000);
-    } catch (error: any) {
+    } catch (error: any)
+      {
       addResult(`❌ 실패: Cloud Function 호출 중 오류 발생. ${error.code} - ${error.message}`);
       toast({
         variant: 'destructive',
@@ -83,40 +72,111 @@ export default function ConnectionTestPage() {
     }
     setIsLoading(false);
   };
+  
+  const handleManualCheck = async () => {
+    if (!firestore || !user || !manualCenterId) {
+      addResult('❌ Firestore, 사용자 또는 센터 ID를 사용할 수 없습니다.');
+      return;
+    }
+    setIsCheckingManually(true);
+    addResult(`🔄 수동 확인 시작: /centers/${manualCenterId}/members/${user.uid}`);
+    try {
+      const memberDocRef = doc(firestore, 'centers', manualCenterId, 'members', user.uid);
+      const memberDocSnap = await getDoc(memberDocRef);
+
+      if (memberDocSnap.exists()) {
+        const memberData = memberDocSnap.data();
+        addResult(`✅ 멤버십 문서 찾음. 상태: ${memberData.status}, 역할: ${memberData.role}`);
+
+        if (memberData.status === 'active') {
+          addResult('✅ 활성 멤버십 확인. 리버스 인덱스 생성 및 리디렉션 시도 중...');
+          
+          const userCenterDocRef = doc(firestore, 'userCenters', user.uid, 'centers', manualCenterId);
+          
+          await setDoc(userCenterDocRef, {
+            role: memberData.role,
+            status: memberData.status,
+            joinedAt: memberData.joinedAt || serverTimestamp(),
+          });
+          
+          addResult(`✅ 리버스 인덱스 문서 생성 완료: /userCenters/${user.uid}/centers/${manualCenterId}`);
+          
+          setActiveMembership({ id: manualCenterId, ...memberData } as any);
+          
+          toast({
+            title: '멤버십 확인됨!',
+            description: '대시보드로 이동합니다.',
+          });
+          // Use router push to navigate instead of full reload
+          router.push('/dashboard');
+
+        } else {
+          addResult(`⚠️ 멤버십이 활성 상태가 아닙니다 (상태: ${memberData.status}).`);
+        }
+      } else {
+        addResult('❌ 해당 센터에서 멤버십을 찾을 수 없습니다.');
+      }
+    } catch (error: any) {
+      addResult(`❌ 수동 확인 중 오류 발생: ${error.message}`);
+    }
+    setIsCheckingManually(false);
+  };
 
   return (
     <div className="flex flex-col min-h-screen items-center justify-center p-4 bg-background">
       <div className="w-full max-w-4xl space-y-6">
-        <h1 className="text-3xl font-headline font-bold text-center">Firebase 연결 테스트</h1>
+        <h1 className="text-3xl font-headline font-bold text-center">Firebase 연결 및 멤버십</h1>
         
         <Card>
           <CardHeader>
-            <CardTitle>1. Firebase 구성</CardTitle>
-            <CardDescription>앱에 로드된 Firebase 프로젝트 구성 정보입니다.</CardDescription>
+            <CardTitle>1. Firebase 연결 상태</CardTitle>
+            <CardDescription>앱의 Firebase 프로젝트 연결 및 인증 상태입니다.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
-            <p><strong>프로젝트 ID:</strong> {firebaseConfig.projectId || 'Not Loaded'}</p>
-            <p><strong>인증 도메인:</strong> {firebaseConfig.authDomain || 'Not Loaded'}</p>
+            <p><strong>프로젝트 ID:</strong> {firebaseConfig.projectId || '로드되지 않음'}</p>
+            <p><strong>인증 상태:</strong> {user ? `로그인됨 (UID: ${user.uid})` : '로그아웃됨'}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>2. Firebase 인증</CardTitle>
-            <CardDescription>현재 인증된 사용자 정보입니다.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm space-y-1">
-            <p><strong>상태:</strong> {user ? '로그인됨' : '로그아웃됨'}</p>
-            <p><strong>UID:</strong> {user?.uid || 'N/A'}</p>
-            <p><strong>이메일:</strong> {user?.email || 'N/A'}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>3. Firestore 및 Cloud Functions 테스트</CardTitle>
+            <CardTitle>2. 멤버십 상태</CardTitle>
             <CardDescription>
-              아직 센터 멤버십이 없는 경우, 아래 양식을 사용하여 개발용으로 센터에 가입하세요.
+              `userCenters` 컬렉션에서 조회된 당신의 멤버십 정보입니다. 멤버십이 없다면 아래 방법 중 하나를 사용하여 센터에 가입하세요.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm space-y-1">
+             <p><strong>`/userCenters`에서 찾은 멤버십 수:</strong> {memberships?.length ?? 0}</p>
+             {memberships && memberships.length > 0 && (
+                <ul className="list-disc pl-5">
+                    {memberships.map(m => <li key={m.id}>센터 ID: {m.id}, 역할: {m.role}</li>)}
+                </ul>
+             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>3-A. 수동으로 멤버십 확인</CardTitle>
+            <CardDescription>
+              테스트를 위해 Firestore에서 직접 `/centers/{centerId}/members/{uid}` 문서를 생성한 경우, 아래에서 센터 ID를 입력하여 멤버십을 활성화하세요.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className="flex gap-2">
+                <Input id="manualCenterId" value={manualCenterId} onChange={(e) => setManualCenterId(e.target.value)} placeholder="센터 ID 입력 (예: center-1)" />
+                <Button onClick={handleManualCheck} disabled={isCheckingManually || !manualCenterId}>
+                    {isCheckingManually ? '확인 중...' : '멤버십 확인'}
+                </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>3-B. (개발용) 테스트 센터에 가입</CardTitle>
+            <CardDescription>
+              아직 센터 멤버십이 없는 경우, `devJoinCenter` Cloud Function을 호출하여 테스트용 멤버십을 생성할 수 있습니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -151,9 +211,6 @@ export default function ConnectionTestPage() {
               </div>
             </div>
              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleReadProfile} disabled={isLoading || !user} variant="outline">
-                Firestore 읽기 테스트
-                </Button>
                 <Button onClick={handleJoinCenter} disabled={isLoading || !user}>
                 {isLoading ? '처리 중...' : 'devJoinCenter 기능 호출'}
                 </Button>
@@ -163,7 +220,7 @@ export default function ConnectionTestPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>테스트 결과</CardTitle>
+            <CardTitle>결과 로그</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
