@@ -14,6 +14,8 @@ interface AppContextType {
   setMemberships: (memberships: CenterMembership[]) => void;
   activeMembership: CenterMembership | null;
   setActiveMembership: (membership: CenterMembership | null) => void;
+  membershipsLoading: boolean;
+  setMembershipsLoading: (loading: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -21,6 +23,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
+  const [membershipsLoading, setMembershipsLoading] = useState(true);
 
   return (
     <AppContext.Provider
@@ -29,6 +32,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setMemberships,
         activeMembership,
         setActiveMembership,
+        membershipsLoading,
+        setMembershipsLoading,
       }}
     >
       {children}

@@ -3,7 +3,7 @@
 import { useUser } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { CenterMembership, useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
@@ -13,107 +13,100 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
-  const { activeMembership, setMemberships, setActiveMembership } = useAppContext();
-  const [isCheckingMembership, setIsCheckingMembership] = useState(true);
+  const { activeMembership, setMemberships, setActiveMembership, setMembershipsLoading } = useAppContext();
+  const [isCheckingInitial, setIsCheckingInitial] = useState(true);
 
   useEffect(() => {
     if (userLoading) {
-      return; // Wait until user state is resolved
+      return; 
     }
 
-    // 1. Handle unauthenticated users
     if (!user) {
       if (pathname !== '/login' && pathname !== '/signup') {
         router.push('/login');
       }
-      setIsCheckingMembership(false);
+      setIsCheckingInitial(false);
+      setMembershipsLoading(false);
       return;
     }
-
-    // 2. User is authenticated. Check for membership if we don't have one already.
-    // If we already have an active membership, we are good.
+    
     if (activeMembership) {
-      setIsCheckingMembership(false);
-      // If user with membership is on a non-app page, redirect them.
-      if (
-        pathname === '/connection-test' ||
-        pathname === '/login' ||
-        pathname === '/signup'
-      ) {
+       setIsCheckingInitial(false);
+       setMembershipsLoading(false);
+       if (pathname === '/login' || pathname === '/signup') {
         router.push('/dashboard');
       }
       return;
     }
 
-    // 3. No active membership in context, check Firestore.
     const checkMembership = async () => {
       if (!firestore) return;
-      setIsCheckingMembership(true);
+      setMembershipsLoading(true);
 
       try {
-        const userCentersRef = collection(
-          firestore,
-          'userCenters',
-          user.uid,
-          'centers'
-        );
+        const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
         const querySnapshot = await getDocs(userCentersRef);
-        const fetchedMemberships = querySnapshot.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() } as CenterMembership)
-        );
+        let fetchedMemberships = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CenterMembership));
 
+        let active = fetchedMemberships.find(m => m.status === 'active');
+
+        if (!active && fetchedMemberships.length === 0) {
+            // Development-only fallback: check center-1
+            console.log("No memberships in /userCenters. Dev fallback: checking /centers/center-1/members...");
+            const devMemberRef = doc(firestore, 'centers', 'center-1', 'members', user.uid);
+            const devMemberSnap = await getDoc(devMemberRef);
+            if (devMemberSnap.exists()) {
+                const memberData = devMemberSnap.data();
+                 if (memberData.status === 'active') {
+                    console.log("Found active membership in center-1. Creating reverse index and setting active membership.");
+                    const newMembership: CenterMembership = { id: 'center-1', ...memberData } as CenterMembership;
+                    
+                    // Create reverse index
+                    const userCenterDocRef = doc(firestore, 'userCenters', user.uid, 'centers', 'center-1');
+                    await setDoc(userCenterDocRef, {
+                        role: memberData.role,
+                        status: memberData.status,
+                        joinedAt: memberData.joinedAt || serverTimestamp(),
+                    });
+                    
+                    fetchedMemberships = [newMembership];
+                    active = newMembership;
+                }
+            }
+        }
+        
         setMemberships(fetchedMemberships);
-        const active = fetchedMemberships.find((m) => m.status === 'active');
-
+        
         if (active) {
           setActiveMembership(active);
-          // Just found a membership, if they were on a connection page, move to dashboard
-          if (pathname === '/connection-test') {
+          if (pathname === '/login' || pathname === '/signup') {
             router.push('/dashboard');
           }
         } else {
-          // No active memberships found. Set to null.
-          // IMPORTANT: We no longer redirect to /connection-test here.
-          // The UI components should handle the state where activeMembership is null.
           setActiveMembership(null);
-           if (fetchedMemberships.length === 0 && pathname !== '/connection-test') {
-            router.push('/connection-test');
-          }
+          // NO REDIRECT TO /connection-test
         }
       } catch (e) {
         console.error('AuthGuard: Failed to check membership.', e);
         setActiveMembership(null);
         setMemberships([]);
-         if (pathname !== '/connection-test') {
-            router.push('/connection-test');
-          }
+        // NO REDIRECT TO /connection-test
       } finally {
-        setIsCheckingMembership(false);
+        setIsCheckingInitial(false);
+        setMembershipsLoading(false);
       }
     };
 
     checkMembership();
-  }, [
-    user,
-    userLoading,
-    firestore,
-    router,
-    pathname,
-    setMemberships,
-    setActiveMembership,
-    activeMembership,
-  ]);
+  }, [user, userLoading, firestore, router, pathname, setMemberships, setActiveMembership, setMembershipsLoading, activeMembership]);
 
-  if (userLoading || isCheckingMembership) {
+  if (isCheckingInitial) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
-
-  // If we are finished loading, render the children.
-  // The app will now show the dashboard page, but components inside will
-  // react to `activeMembership` being null if no active membership was found.
+  
   return <>{children}</>;
 }
