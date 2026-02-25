@@ -3,14 +3,7 @@
 import { useUser } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import {
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { CenterMembership, useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
@@ -20,12 +13,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
-  const { setMemberships, setActiveMembership } = useAppContext();
+  const { activeMembership, setMemberships, setActiveMembership } = useAppContext();
   const [isCheckingMembership, setIsCheckingMembership] = useState(true);
 
   useEffect(() => {
-    if (userLoading) return;
+    if (userLoading) {
+      return; // Wait until user state is resolved
+    }
 
+    // 1. Handle unauthenticated users
     if (!user) {
       if (pathname !== '/login' && pathname !== '/signup') {
         router.push('/login');
@@ -34,10 +30,26 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // User is logged in, check for center memberships
+    // 2. User is authenticated. Check for membership if we don't have one already.
+    // If we already have an active membership, we are good.
+    if (activeMembership) {
+      setIsCheckingMembership(false);
+      // If user with membership is on a non-app page, redirect them.
+      if (
+        pathname === '/connection-test' ||
+        pathname === '/login' ||
+        pathname === '/signup'
+      ) {
+        router.push('/dashboard');
+      }
+      return;
+    }
+
+    // 3. No active membership in context, check Firestore.
     const checkMembership = async () => {
-      if (!firestore || !user) return;
+      if (!firestore) return;
       setIsCheckingMembership(true);
+
       try {
         const userCentersRef = collection(
           firestore,
@@ -46,77 +58,51 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           'centers'
         );
         const querySnapshot = await getDocs(userCentersRef);
-        let memberships = querySnapshot.docs.map(
+        const fetchedMemberships = querySnapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as CenterMembership)
         );
 
-        // DEV FALLBACK: If no memberships in userCenters, check a default center.
-        // This helps during development if only /centers/{c}/members/{u} exists.
-        if (memberships.length === 0 && process.env.NODE_ENV === 'development') {
-          const defaultCenterId = 'center-1';
-          try {
-            const memberDocRef = doc(firestore, 'centers', defaultCenterId, 'members', user.uid);
-            const memberDocSnap = await getDoc(memberDocRef);
+        setMemberships(fetchedMemberships);
+        const active = fetchedMemberships.find((m) => m.status === 'active');
 
-            if (memberDocSnap.exists()) {
-              console.log(`[AuthGuard Dev] Found membership in fallback center '${defaultCenterId}'. Creating reverse-index and proceeding.`);
-              const memberData = memberDocSnap.data();
-              const fallbackMembership = { id: defaultCenterId, ...memberData } as CenterMembership;
-              
-              // Create the reverse index doc so this fallback isn't needed on next load
-              const userCenterDocRef = doc(firestore, 'userCenters', user.uid, 'centers', defaultCenterId);
-              await setDoc(userCenterDocRef, {
-                  role: memberData.role,
-                  status: memberData.status,
-                  joinedAt: memberData.joinedAt || serverTimestamp(),
-              });
-
-              memberships.push(fallbackMembership);
-            }
-          } catch (e) {
-            console.error(`[AuthGuard Dev] Error during fallback check for center '${defaultCenterId}':`, e);
-          }
-        }
-
-
-        const activeMemberships = memberships.filter(
-          (m) => m.status === 'active'
-        );
-
-        setMemberships(memberships);
-
-        if (activeMemberships.length > 0) {
-          // For now, just pick the first active one.
-          // A real app might have a center selector.
-          setActiveMembership(activeMemberships[0]);
-
-          // If user is on a non-app page but has membership, redirect to app
-          if (
-            pathname === '/connection-test' ||
-            pathname === '/app' ||
-            pathname === '/'
-          ) {
+        if (active) {
+          setActiveMembership(active);
+          // Just found a membership, if they were on a connection page, move to dashboard
+          if (pathname === '/connection-test') {
             router.push('/dashboard');
           }
         } else {
-          // No active memberships, redirect to join page
-          if (pathname !== '/connection-test') {
+          // No active memberships found. Set to null.
+          // IMPORTANT: We no longer redirect to /connection-test here.
+          // The UI components should handle the state where activeMembership is null.
+          setActiveMembership(null);
+           if (fetchedMemberships.length === 0 && pathname !== '/connection-test') {
             router.push('/connection-test');
           }
         }
       } catch (e) {
-        console.error('Failed to check membership', e);
-        // Maybe redirect to an error page or show a toast
-        if (pathname !== '/connection-test') {
-          router.push('/connection-test');
-        }
+        console.error('AuthGuard: Failed to check membership.', e);
+        setActiveMembership(null);
+        setMemberships([]);
+         if (pathname !== '/connection-test') {
+            router.push('/connection-test');
+          }
       } finally {
         setIsCheckingMembership(false);
       }
     };
 
     checkMembership();
-  }, [user, userLoading, firestore, router, pathname, setMemberships, setActiveMembership]);
+  }, [
+    user,
+    userLoading,
+    firestore,
+    router,
+    pathname,
+    setMemberships,
+    setActiveMembership,
+    activeMembership,
+  ]);
 
   if (userLoading || isCheckingMembership) {
     return (
@@ -126,15 +112,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Allow access to public pages if not authenticated
-  if (!user && (pathname === '/login' || pathname === '/signup')) {
-    return <>{children}</>;
-  }
-
-  // If user is logged in and check is complete, render children
-  if (user) {
-    return <>{children}</>;
-  }
-
-  return null;
+  // If we are finished loading, render the children.
+  // The app will now show the dashboard page, but components inside will
+  // react to `activeMembership` being null if no active membership was found.
+  return <>{children}</>;
 }
