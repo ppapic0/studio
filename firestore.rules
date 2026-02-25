@@ -125,11 +125,16 @@ service cloud.firestore {
        * @path /centers/{centerId}/members/{userId}
        */
       match /members/{userId} {
-        allow get: if isCenterMember(centerId);
-        allow list: if isCenterMember(centerId);
-        allow create: if isCenterAdmin(centerId);
-        allow update: if (isCenterAdmin(centerId) || isOwner(userId)) && resource != null;
-        allow delete: if (isCenterAdmin(centerId) || isOwner(userId)) && resource != null;
+        // User can read their own doc to check status (e.g., 'invited'). Staff can read any member doc.
+        allow get: if isOwner(userId) || isCenterStaff(centerId);
+        // Only staff can list all members.
+        allow list: if isCenterStaff(centerId);
+        // Creation is handled by server-side functions (e.g., invite redemption).
+        allow create: if false;
+        // Only admins can change member details (e.g., role).
+        allow update: if isCenterAdmin(centerId) && resource != null;
+        // Deletion should be a soft-delete via status change, handled by admins.
+        allow delete: if false;
       }
 
       /**
