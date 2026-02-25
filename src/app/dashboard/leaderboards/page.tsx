@@ -27,34 +27,18 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { LeaderboardEntry } from '@/lib/types';
+import { LeaderboardEntry, WithId } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type LeaderboardTabProps = {
   title: string;
   description: string;
-  metricKey: string;
+  entries: WithId<LeaderboardEntry>[] | null;
+  isLoading: boolean;
 };
 
-function LeaderboardTab({ title, description, metricKey }: LeaderboardTabProps) {
-  const firestore = useFirestore();
-  const { activeMembership } = useAppContext();
-  
-  // Example period key, you can make this dynamic
-  const periodKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
-
-  const leaderboardQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, metricKey, 'entries'),
-      orderBy('rank', 'asc'),
-      limit(10)
-    );
-  }, [firestore, activeMembership, periodKey, metricKey]);
-
-  const { data: entries, isLoading } = useCollection<LeaderboardEntry>(leaderboardQuery);
-
+function LeaderboardTab({ title, description, entries, isLoading }: LeaderboardTabProps) {
   return (
     <Card>
       <CardHeader>
@@ -104,6 +88,43 @@ function LeaderboardTab({ title, description, metricKey }: LeaderboardTabProps) 
 }
 
 export default function LeaderboardsPage() {
+  const firestore = useFirestore();
+  const { activeMembership } = useAppContext();
+  
+  // Example period key, you can make this dynamic
+  const periodKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
+
+  const completionQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, 'completionMaster', 'entries'),
+      orderBy('rank', 'asc'),
+      limit(10)
+    );
+  }, [firestore, activeMembership, periodKey]);
+  const { data: completionEntries, isLoading: completionLoading } = useCollection<LeaderboardEntry>(completionQuery);
+
+  const consistencyQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, 'consistencyLeader', 'entries'),
+      orderBy('rank', 'asc'),
+      limit(10)
+    );
+  }, [firestore, activeMembership, periodKey]);
+  const { data: consistencyEntries, isLoading: consistencyLoading } = useCollection<LeaderboardEntry>(consistencyQuery);
+
+  const growthQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, 'growthChampion', 'entries'),
+      orderBy('rank', 'asc'),
+      limit(10)
+    );
+  }, [firestore, activeMembership, periodKey]);
+  const { data: growthEntries, isLoading: growthLoading } = useCollection<LeaderboardEntry>(growthQuery);
+
+
   return (
     <Tabs defaultValue="completion">
       <div className="flex items-center">
@@ -117,21 +138,24 @@ export default function LeaderboardsPage() {
         <LeaderboardTab
           title="계획 완수 마스터"
           description="가중치가 적용된 학습 계획 완수율에 따른 순위입니다."
-          metricKey="completionMaster"
+          entries={completionEntries}
+          isLoading={completionLoading}
         />
       </TabsContent>
       <TabsContent value="consistency">
         <LeaderboardTab
           title="꾸준함 리더"
           description="연속 출석일수에 따른 순위입니다."
-          metricKey="consistencyLeader"
+          entries={consistencyEntries}
+          isLoading={consistencyLoading}
         />
       </TabsContent>
       <TabsContent value="growth">
         <LeaderboardTab
           title="성장 챔피언"
           description="학습 시간 증가율에 따른 순위입니다."
-          metricKey="growthChampion"
+          entries={growthEntries}
+          isLoading={growthLoading}
         />
       </TabsContent>
     </Tabs>
