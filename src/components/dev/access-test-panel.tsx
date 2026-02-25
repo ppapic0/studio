@@ -5,9 +5,11 @@ import { useAppContext } from '@/contexts/app-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Textarea } from '../ui/textarea';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export function AccessTestPanel() {
   const { user } = useUser();
@@ -21,50 +23,107 @@ export function AccessTestPanel() {
 
   const handleStudentWritePlan = async () => {
     if (!firestore || !user || !activeMembership) return;
+    addResult(`🔄 학생 계획 항목 쓰기 시도...`);
     try {
-      const weekKey = `2024-W${format(new Date(), 'WW')}`;
-      const planItemsRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
-      await addDoc(planItemsRef, {
+      const weekKey = `2024-W${format(new Date(), 'ww')}`;
+      const planItemsRef = collection(firestore, 'centers', activeMembership.id, 'students', user.uid, 'studyPlanWeeks', weekKey, 'items');
+      
+      const data = {
         title: '새로운 테스트 계획 항목',
         done: false,
-        createdAt: new Date(),
-      });
-      addResult('✅ 성공: 학생 계획 항목 생성');
+        weight: 1,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        studyPlanWeekId: weekKey,
+      };
+
+      await addDoc(planItemsRef, data)
+        .then(() => {
+            addResult('✅ 성공: 학생 계획 항목 생성');
+        })
+        .catch(serverError => {
+            const contextualError = new FirestorePermissionError({
+                path: `${planItemsRef.path}/{newItemId}`,
+                operation: 'create',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', contextualError);
+            addResult(`❌ 실패 (학생 계획): ${contextualError.message}`);
+        });
+
     } catch(e: any) {
-      addResult(`❌ 실패 (학생 계획): ${e.message}`);
+      addResult(`❌ 실패 (학생 계획 - 예외): ${e.message}`);
     }
   }
   
   const handleStudentWriteLog = async () => {
     if (!firestore || !user || !activeMembership) return;
+    addResult(`🔄 학생 학습 로그 쓰기 시도...`);
     try {
         const dateKey = format(new Date(), 'yyyy-MM-dd');
-        const dayLogRef = doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', dateKey);
-        await setDoc(dayLogRef, {
-            minutes: 60,
-            notes: '테스트 학습 로그',
-            updatedAt: new Date()
-        }, { merge: true });
-        addResult('✅ 성공: 학생 학습 로그 생성/업데이트');
+        const dayLogRef = doc(firestore, 'centers', activeMembership.id, 'students', user.uid, 'studyLogDays', dateKey);
+        
+        const data = {
+            totalMinutes: 60,
+            centerId: activeMembership.id,
+            studentId: user.uid,
+            dateKey: dateKey,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        };
+
+        setDoc(dayLogRef, data, { merge: true })
+            .then(() => {
+                addResult('✅ 성공: 학생 학습 로그 생성/업데이트');
+            })
+            .catch(serverError => {
+                const contextualError = new FirestorePermissionError({
+                    path: dayLogRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', contextualError);
+                addResult(`❌ 실패 (학습 로그): ${contextualError.message}`);
+            });
+            
     } catch (e: any) {
-        addResult(`❌ 실패 (학습 로그): ${e.message}`);
+        addResult(`❌ 실패 (학습 로그 - 예외): ${e.message}`);
     }
   }
 
   const handleTeacherWriteAttendance = async () => {
     if (!firestore || !user || !activeMembership) return;
     const someStudentId = 'student-test-uid'; // A fake student UID for testing
+    addResult(`🔄 교사 출석 기록 쓰기 시도 (대상 학생: ${someStudentId})...`);
+
     try {
         const dateKey = format(new Date(), 'yyyy-MM-dd');
-        const attendanceRef = doc(firestore, 'centers', activeMembership.id, 'attendance', dateKey, 'records', someStudentId);
-        await setDoc(attendanceRef, {
-            status: 'present',
-            timestamp: new Date(),
-            updatedBy: user.uid,
-        });
-        addResult('✅ 성공: 교사 출석 기록 생성');
+        const attendanceRef = doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students', someStudentId);
+        
+        const data = {
+            status: 'confirmed_present',
+            centerId: activeMembership.id,
+            studentId: someStudentId,
+            dateKey: dateKey,
+            updatedAt: serverTimestamp(),
+            confirmedByUserId: user.uid,
+        };
+        
+        setDoc(attendanceRef, data, { merge: true })
+            .then(() => {
+                addResult('✅ 성공: 교사 출석 기록 생성');
+            })
+            .catch(serverError => {
+                const contextualError = new FirestorePermissionError({
+                    path: attendanceRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', contextualError);
+                addResult(`❌ 실패 (교사 출석): ${contextualError.message}`);
+            });
     } catch(e: any) {
-        addResult(`❌ 실패 (교사 출석): ${e.message}`);
+        addResult(`❌ 실패 (교사 출석 - 예외): ${e.message}`);
     }
   }
   

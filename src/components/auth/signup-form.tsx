@@ -22,10 +22,10 @@ import {
 } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const formSchema = z.object({
-  fullName: z.string().min(2, {
+  displayName: z.string().min(2, {
     message: '이름은 2자 이상이어야 합니다.',
   }),
   email: z.string().email({
@@ -46,7 +46,7 @@ export function SignupForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullName: '',
+      displayName: '',
       email: '',
       password: '',
     },
@@ -63,14 +63,15 @@ export function SignupForm() {
       );
       const user = userCredential.user;
 
-      await updateProfile(user, { displayName: values.fullName });
+      await updateProfile(user, { displayName: values.displayName });
 
       // Create a user profile document in Firestore
       await setDoc(doc(firestore, 'users', user.uid), {
-        uid: user.uid,
+        id: user.uid,
+        displayName: values.displayName,
         email: user.email,
-        displayName: values.fullName,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       router.push('/app');
@@ -94,7 +95,7 @@ export function SignupForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
         <FormField
           control={form.control}
-          name="fullName"
+          name="displayName"
           render={({ field }) => (
             <FormItem>
               <FormLabel>이름</FormLabel>
