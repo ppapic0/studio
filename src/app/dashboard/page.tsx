@@ -40,11 +40,24 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const inviteCodeFormSchema = z.object({
   inviteCode: z.string().min(4, {
     message: '초대 코드는 4자 이상이어야 합니다.',
   }),
+});
+
+const devJoinFormSchema = z.object({
+  centerId: z.string().min(1, '센터 ID가 필요합니다.'),
+  role: z.enum(['student', 'teacher', 'parent', 'centerAdmin']),
+  devSecret: z.string().min(1, '개발용 비밀 키가 필요합니다.'),
 });
 
 export default function DashboardPage() {
@@ -53,15 +66,25 @@ export default function DashboardPage() {
   const functions = useFunctions();
   const { toast } = useToast();
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isDevJoinDialogOpen, setIsDevJoinDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userRole = activeMembership?.role;
 
-  const form = useForm<z.infer<typeof inviteCodeFormSchema>>({
+  const inviteForm = useForm<z.infer<typeof inviteCodeFormSchema>>({
     resolver: zodResolver(inviteCodeFormSchema),
     defaultValues: {
       inviteCode: '',
+    },
+  });
+
+  const devJoinForm = useForm<z.infer<typeof devJoinFormSchema>>({
+    resolver: zodResolver(devJoinFormSchema),
+    defaultValues: {
+      centerId: 'center-1',
+      role: 'centerAdmin',
+      devSecret: '',
     },
   });
 
@@ -77,7 +100,6 @@ export default function DashboardPage() {
         description: '센터에 오신 것을 환영합니다. 페이지를 새로고침합니다.',
       });
 
-      // Reload to force AppContext and AuthGuard to re-evaluate membership
       window.location.reload();
     } catch (error: any) {
       console.error('Invite code redemption failed:', error);
@@ -89,7 +111,32 @@ export default function DashboardPage() {
       });
     } finally {
       setIsSubmitting(false);
-      setIsDialogOpen(false);
+      setIsInviteDialogOpen(false);
+    }
+  }
+
+  async function onDevJoinSubmit(values: z.infer<typeof devJoinFormSchema>) {
+    if (!functions) return;
+    setIsSubmitting(true);
+    try {
+      const devJoinCenter = httpsCallable(functions, 'devJoinCenter');
+      await devJoinCenter(values);
+      toast({
+        title: '개발자 가입 성공!',
+        description:
+          `${values.centerId} 센터에 ${values.role} 역할로 가입했습니다.`,
+      });
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Dev join failed:', error);
+      toast({
+        variant: 'destructive',
+        title: '개발자 가입 실패',
+        description: error.message || '오류가 발생했습니다.',
+      });
+    } finally {
+      setIsSubmitting(false);
+      setIsDevJoinDialogOpen(false);
     }
   }
 
@@ -104,65 +151,150 @@ export default function DashboardPage() {
 
     if (!activeMembership) {
       return (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <Card>
-            <CardHeader>
-              <CardTitle>센터에 오신 것을 환영합니다!</CardTitle>
-              <CardDescription>
-                학습을 시작하려면 먼저 센터에 가입해야 합니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-muted-foreground">
-                아직 센터의 멤버가 아닙니다. 센터 관리자에게 받은 초대 코드가
-                필요합니다.
-              </p>
+        <Card>
+          <CardHeader>
+            <CardTitle>센터에 오신 것을 환영합니다!</CardTitle>
+            <CardDescription>
+              학습을 시작하려면 먼저 센터에 가입해야 합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex gap-4">
+            <Dialog
+              open={isInviteDialogOpen}
+              onOpenChange={setIsInviteDialogOpen}
+            >
               <DialogTrigger asChild>
                 <Button>초대 코드로 가입하기</Button>
               </DialogTrigger>
-            </CardContent>
-          </Card>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>초대 코드로 가입하기</DialogTitle>
-              <DialogDescription>
-                센터 관리자에게 받은 초대 코드를 입력하세요.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onInviteSubmit)}
-                className="grid gap-4 py-4"
-              >
-                <FormField
-                  control={form.control}
-                  name="inviteCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel htmlFor="inviteCode">초대 코드</FormLabel>
-                      <FormControl>
-                        <Input
-                          id="inviteCode"
-                          placeholder="초대 코드를 입력하세요"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    가입하기
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>초대 코드로 가입하기</DialogTitle>
+                  <DialogDescription>
+                    센터 관리자에게 받은 초대 코드를 입력하세요.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...inviteForm}>
+                  <form
+                    onSubmit={inviteForm.handleSubmit(onInviteSubmit)}
+                    className="grid gap-4 py-4"
+                  >
+                    <FormField
+                      control={inviteForm.control}
+                      name="inviteCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel htmlFor="inviteCode">초대 코드</FormLabel>
+                          <FormControl>
+                            <Input
+                              id="inviteCode"
+                              placeholder="초대 코드를 입력하세요"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        가입하기
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={isDevJoinDialogOpen}
+              onOpenChange={setIsDevJoinDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button variant="secondary">개발자용 가입</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>개발자용 센터 가입</DialogTitle>
+                  <DialogDescription>
+                    테스트를 위해 특정 역할로 센터에 가입합니다.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...devJoinForm}>
+                  <form
+                    onSubmit={devJoinForm.handleSubmit(onDevJoinSubmit)}
+                    className="grid gap-4 py-4"
+                  >
+                    <FormField
+                      control={devJoinForm.control}
+                      name="centerId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>센터 ID</FormLabel>
+                          <FormControl>
+                            <Input placeholder="center-1" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={devJoinForm.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>역할</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="역할 선택" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="student">학생</SelectItem>
+                              <SelectItem value="teacher">교사</SelectItem>
+                              <SelectItem value="parent">학부모</SelectItem>
+                              <SelectItem value="centerAdmin">
+                                센터 관리자
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={devJoinForm.control}
+                      name="devSecret"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>개발용 비밀 키</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        강제 가입
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
       );
     }
 
