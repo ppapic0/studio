@@ -27,9 +27,8 @@ const chartData = [
 ];
 
 export function ParentDashboard({ isActive }: { isActive: boolean }) {
-  const { user } = useUser();
-  const firestore = useFirestore();
   const { activeMembership } = useAppContext();
+  const firestore = useFirestore();
 
   const [summary, setSummary] = useState<ParentSummaryOutput | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -45,24 +44,28 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef, { enabled: isActive && !!studentId });
 
   useEffect(() => {
+    // Only run if the dashboard is active and we have a studentId
     if (!isActive || !studentId) {
-      setSummaryLoading(false);
-      setSummary(null);
-      return;
+        setSummaryLoading(false);
+        return;
+    }
+    
+    // Can only run if we have the student's stats
+    if (!studentStat || studentStatLoading) {
+        return;
     }
 
     const fetchSummary = async () => {
-      if (studentStat && firestore) {
         setSummaryLoading(true);
         try {
-          const studentName = '자녀';
+          const studentName = '자녀'; // In a real app, you'd fetch the student's name
 
           const input: ParentSummaryInput = {
             studentName: studentName,
             completionRate: studentStat.weeklyPlanCompletionRate * 100,
-            completionRateTrend: 0,
-            attendanceRate: 100,
-            attendanceTrend: 0,
+            completionRateTrend: 0, // Placeholder
+            attendanceRate: 100, // Placeholder
+            attendanceTrend: 0, // Placeholder
             studyTimeGrowth: studentStat.studyTimeGrowthRate,
             recentAchievements: [],
             potentialRisks: studentStat.riskDetected ? ['AI에 의해 위험이 감지되었습니다.'] : [],
@@ -75,21 +78,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         } finally {
           setSummaryLoading(false);
         }
-      } else if (!studentStatLoading) {
-        setSummaryLoading(false);
-        setSummary(null);
-      }
     };
     
     fetchSummary();
-  }, [isActive, studentId, studentStat, studentStatLoading, firestore]);
+  }, [isActive, studentId, studentStat, studentStatLoading]);
 
   if (!isActive) {
     return null;
   }
   
-  const isLoading = studentStatLoading || summaryLoading;
-
   if (!studentId) {
     return (
       <Card>
@@ -98,6 +95,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       </Card>
     );
   }
+  
+  const isLoading = studentStatLoading || summaryLoading;
 
   return (
     <div className="grid gap-6">

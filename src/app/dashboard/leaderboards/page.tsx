@@ -21,15 +21,15 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, getISOWeek } from 'date-fns';
 import { LeaderboardEntry, WithId } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type LeaderboardTabProps = {
   title: string;
@@ -50,6 +50,10 @@ function LeaderboardTab({ title, description, entries, isLoading }: LeaderboardT
           <div className="flex justify-center p-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : !entries || entries.length === 0 ? (
+          <div className="text-center text-muted-foreground p-8">
+            이번 주 리더보드 데이터가 아직 없습니다.
+          </div>
         ) : (
         <Table>
           <TableHeader>
@@ -68,14 +72,13 @@ function LeaderboardTab({ title, description, entries, isLoading }: LeaderboardT
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="hidden h-9 w-9 sm:flex">
-                      {/* <AvatarImage src={entry.avatarUrl} alt="Avatar" /> */}
                       <AvatarFallback>{entry.displayNameSnapshot.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="font-medium">{entry.displayNameSnapshot}</div>
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-semibold">
-                  {entry.value}
+                  {entry.value.toLocaleString()}
                 </TableCell>
               </TableRow>
             ))}
@@ -91,8 +94,8 @@ export default function LeaderboardsPage() {
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
   
-  // Example period key, you can make this dynamic
-  const periodKey = `${format(new Date(), 'yyyy')}-W${format(new Date(), 'ww')}`;
+  const isMember = !!activeMembership;
+  const periodKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
   const completionQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -102,7 +105,7 @@ export default function LeaderboardsPage() {
       limit(10)
     );
   }, [firestore, activeMembership, periodKey]);
-  const { data: completionEntries, isLoading: completionLoading } = useCollection<LeaderboardEntry>(completionQuery);
+  const { data: completionEntries, isLoading: completionLoading } = useCollection<LeaderboardEntry>(completionQuery, { enabled: isMember });
 
   const consistencyQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -112,7 +115,7 @@ export default function LeaderboardsPage() {
       limit(10)
     );
   }, [firestore, activeMembership, periodKey]);
-  const { data: consistencyEntries, isLoading: consistencyLoading } = useCollection<LeaderboardEntry>(consistencyQuery);
+  const { data: consistencyEntries, isLoading: consistencyLoading } = useCollection<LeaderboardEntry>(consistencyQuery, { enabled: isMember });
 
   const growthQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -122,8 +125,18 @@ export default function LeaderboardsPage() {
       limit(10)
     );
   }, [firestore, activeMembership, periodKey]);
-  const { data: growthEntries, isLoading: growthLoading } = useCollection<LeaderboardEntry>(growthQuery);
+  const { data: growthEntries, isLoading: growthLoading } = useCollection<LeaderboardEntry>(growthQuery, { enabled: isMember });
 
+  if (!isMember) {
+    return (
+        <Alert>
+          <AlertTitle>멤버십 필요</AlertTitle>
+          <AlertDescription>
+            리더보드를 보려면 센터에 가입해야 합니다.
+          </AlertDescription>
+        </Alert>
+    )
+  }
 
   return (
     <Tabs defaultValue="completion">

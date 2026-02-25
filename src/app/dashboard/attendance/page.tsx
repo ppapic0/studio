@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -25,14 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc, query, where } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { AttendanceRecord, WithId, CenterMembership } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AttendancePage() {
   const { user } = useUser();
@@ -42,21 +43,24 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
+  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+
   // 1. Fetch all students in the center
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'members');
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student')
+    );
   }, [firestore, activeMembership]);
-  const { data: members, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery);
-  const students = members?.filter(m => m.role === 'student');
-
+  const { data: students, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery, { enabled: isTeacherOrAdmin });
 
   // 2. Fetch attendance records for the selected date
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students');
   }, [firestore, activeMembership, dateKey]);
-  const { data: attendanceRecords, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
+  const { data: attendanceRecords, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
   const getBadgeVariant = (status: string) => {
     switch (status) {
@@ -84,15 +88,29 @@ export default function AttendancePage() {
           centerId: activeMembership.id,
           studentId: studentId,
           dateKey: dateKey,
-          studentName: studentData?.displayName,
       };
+
+      if (studentData) {
+        recordData.studentName = studentData.displayName;
+      }
 
       await setDoc(recordRef, recordData, { merge: true });
   }
 
   const isLoading = membersLoading || attendanceLoading;
 
-  const attendanceMap = new Map(attendanceRecords?.map(r => [r.studentId, r]));
+  const attendanceMap = new Map(attendanceRecords?.map(r => [r.id, r]));
+
+  if (!isTeacherOrAdmin) {
+    return (
+      <Alert>
+        <AlertTitle>권한 없음</AlertTitle>
+        <AlertDescription>
+          교사 또는 관리자 계정으로 로그인해야 출석을 관리할 수 있습니다.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <Card>
@@ -134,7 +152,6 @@ export default function AttendancePage() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="hidden h-9 w-9 sm:flex">
-                      {/* <AvatarImage src={student.avatarUrl} alt="Avatar" /> */}
                       <AvatarFallback>{student.displayName?.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="font-medium">{student.displayName}</div>
@@ -142,7 +159,7 @@ export default function AttendancePage() {
                 </TableCell>
                 <TableCell>
                   <Badge variant={getBadgeVariant(status) as any}>
-                    {status.split('_')[1] || status}
+                    {status.replace('confirmed_', '').replace('requested', '요청됨')}
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
