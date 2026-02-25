@@ -1,9 +1,8 @@
 export const firebaseConfig = {
-  "projectId": "learning-lab-12563",
-  "appId": "1:25472857022:web:a62372f7f259021b6ac654",
-  "storageBucket": "learning-lab-12563.appspot.com",
-  "apiKey": "AIzaSyA_7iLh7s4xK4Yp-B411s8_G2f4Z3cZq3c",
-  "authDomain": "learning-lab-12563.firebaseapp.com",
-  "messagingSenderId": "25472857022",
-  "measurementId": "G-L3B12B2Z1E"
+  "projectId": "studio-2815552762-86e0f",
+  "appId": "1:394993340600:web:6668f31ff0b2a9b07d244d",
+  "apiKey": "AIzaSyBo4AXXLWvbk8QPddolzBvNqQLF5mpBHWk",
+  "authDomain": "studio-2815552762-86e0f.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "394993340600"
 };
