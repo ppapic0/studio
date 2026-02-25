@@ -100,9 +100,12 @@ export function SignupForm() {
         description = '이미 사용 중인 이메일입니다.';
       } else if (error.code === 'functions/not-found' || (error.details && error.details.message === 'Invalid invite code.')) {
         description = '초대 코드가 유효하지 않습니다.';
+      } else if (error.code === 'functions/internal') {
+        description = '서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도하거나, Firestore 콘솔에서 필요한 색인이 생성되었는지 확인해주세요.';
       } else if (error.message) {
         description = error.message;
       }
+
 
       toast({
         variant: 'destructive',

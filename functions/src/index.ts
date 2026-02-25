@@ -115,22 +115,22 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
     }
 
     const inviteCodeQuery = db.collectionGroup('inviteCodes').where('code', '==', code).limit(1);
-    const inviteCodeSnapshot = await inviteCodeQuery.get();
 
-    if (inviteCodeSnapshot.empty) {
-        throw new functions.https.HttpsError('not-found', 'Invalid invite code.');
-    }
-
-    const inviteCodeDoc = inviteCodeSnapshot.docs[0];
-    const inviteCodeData = inviteCodeDoc.data();
-    const centerId = inviteCodeData.centerId;
-
-    if (!centerId) {
-         throw new functions.https.HttpsError('internal', 'Invite code is missing centerId.');
-    }
-
-    // Run as transaction
     try {
+        const inviteCodeSnapshot = await inviteCodeQuery.get();
+
+        if (inviteCodeSnapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Invalid invite code.');
+        }
+
+        const inviteCodeDoc = inviteCodeSnapshot.docs[0];
+        const inviteCodeData = inviteCodeDoc.data();
+        const centerId = inviteCodeData.centerId;
+
+        if (!centerId) {
+            throw new functions.https.HttpsError('internal', 'Invite code is missing centerId.');
+        }
+
         await db.runTransaction(async (transaction) => {
             const freshInviteCodeDoc = await transaction.get(inviteCodeDoc.ref);
             const freshInviteCodeData = freshInviteCodeDoc.data();
@@ -139,32 +139,29 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 throw new functions.https.HttpsError('not-found', 'Invite code no longer exists.');
             }
 
-            // Validation inside transaction
             if (freshInviteCodeData.usedCount >= freshInviteCodeData.maxUses) {
                 throw new functions.https.HttpsError('resource-exhausted', 'This invite code has reached its maximum number of uses.');
             }
 
             const now = new Date();
-            if (freshInviteCodeData.expiresAt && new Date(freshInviteCodeData.expiresAt) < now) {
+            // FIX: Convert Firestore Timestamp to JS Date for comparison
+            if (freshInviteCodeData.expiresAt && freshInviteCodeData.expiresAt.toDate() < now) {
                 throw new functions.https.HttpsError('deadline-exceeded', 'This invite code has expired.');
             }
 
             const timestamp = admin.firestore.FieldValue.serverTimestamp();
             const role = freshInviteCodeData.intendedRole || 'student';
 
-            // 1. Create the primary membership document
             const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
-            const memberData: any = {
+            transaction.set(memberRef, {
                 role: role,
                 status: "active",
                 joinedAt: timestamp,
                 email,
                 displayName,
                 invitedByInviteCodeId: freshInviteCodeDoc.id,
-            };
-            transaction.set(memberRef, memberData);
+            });
 
-            // 2. Create the reverse-index for the user
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
             transaction.set(userCenterRef, {
                 role: role,
@@ -172,7 +169,6 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 joinedAt: timestamp,
             });
 
-            // 3. If student, create a student profile
             if (role === "student") {
                 const studentRef = db.doc(`centers/${centerId}/students/${uid}`);
                 transaction.set(studentRef, {
@@ -183,13 +179,11 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 }, { merge: true });
             }
             
-            // 4. Update invite code usage
             transaction.update(inviteCodeDoc.ref, {
                 usedCount: admin.firestore.FieldValue.increment(1),
                 updatedAt: timestamp,
             });
 
-            // 5. Create an audit log
             const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
             transaction.set(auditLogRef, {
                 timestamp: timestamp,
@@ -211,9 +205,15 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
+        // Firestore security rule errors (like missing index) often manifest as 'INTERNAL' here.
+        let errorMessage = error.message || "Server error during invite redemption.";
+        if (error.code === 9) { // PERMISSION_DENIED from index error
+            errorMessage = "A database index is required for this operation. Please check the Firebase console logs for a link to create it.";
+        }
+
         throw new functions.https.HttpsError(
             "internal",
-            error.message || "Server error during invite redemption."
+            errorMessage
         );
     }
 });
