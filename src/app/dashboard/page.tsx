@@ -26,9 +26,9 @@ export default function DashboardPage() {
   return (
     <>
       <h1 className="text-3xl font-headline font-bold tracking-tight">
-        Welcome back, {mockUser.name}!
+        {mockUser.name}님, 다시 오신 것을 환영합니다!
       </h1>
-      <p className="text-muted-foreground">Here&apos;s your personalized overview for today.</p>
+      <p className="text-muted-foreground">오늘의 맞춤 개요입니다.</p>
       <div className="mt-4 flex flex-col gap-4">
         {renderDashboard(userRole)}
       </div>

@@ -15,7 +15,7 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: 'LEARNING-LAB',
-  description: 'A platform for focused learning and growth.',
+  description: '집중 학습과 성장을 위한 플랫폼입니다.',
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}
       >

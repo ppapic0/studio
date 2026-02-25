@@ -26,15 +26,15 @@ import {
 import { format } from 'date-fns';
 
 export default function AttendancePage() {
-  const today = format(new Date(), 'MMMM dd, yyyy');
+  const today = format(new Date(), 'yyyy년 MM월 dd일');
 
   const getBadgeVariant = (status: string) => {
     switch (status) {
-      case 'Present':
+      case '출석':
         return 'default';
-      case 'Absent':
+      case '결석':
         return 'destructive';
-      case 'Late':
+      case '지각':
         return 'secondary';
       default:
         return 'outline';
@@ -44,20 +44,20 @@ export default function AttendancePage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Student Attendance</CardTitle>
+        <CardTitle>학생 출석</CardTitle>
         <CardDescription>
-          Manage and review attendance for {today}.
+          {today}의 출석을 관리하고 검토합니다.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Student</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden md:table-cell">Check-in Time</TableHead>
+              <TableHead>학생</TableHead>
+              <TableHead>상태</TableHead>
+              <TableHead className="hidden md:table-cell">출석 시간</TableHead>
               <TableHead>
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">작업</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -79,19 +79,19 @@ export default function AttendancePage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {student.status === 'Present' || student.status === 'Late'
+                  {student.status === '출석' || student.status === '지각'
                     ? '9:05 AM'
                     : 'N/A'}
                 </TableCell>
                 <TableCell>
                   <Select defaultValue={student.status}>
                     <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="Set status" />
+                      <SelectValue placeholder="상태 설정" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Present">Present</SelectItem>
-                      <SelectItem value="Late">Late</SelectItem>
-                      <SelectItem value="Absent">Absent</SelectItem>
+                      <SelectItem value="출석">출석</SelectItem>
+                      <SelectItem value="지각">지각</SelectItem>
+                      <SelectItem value="결석">결석</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>

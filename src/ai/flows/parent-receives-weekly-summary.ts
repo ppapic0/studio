@@ -11,29 +11,29 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const ParentSummaryInputSchema = z.object({
-  studentName: z.string().describe('The name of the student.'),
-  completionRate: z.number().min(0).max(100).describe('Weighted average of completed plan items for the week (0-100%).'),
-  completionRateTrend: z.number().min(-100).max(100).describe('Change in completion rate from the previous week (-100 to 100%).'),
-  attendanceRate: z.number().min(0).max(100).describe('Overall attendance rate for the week (0-100%).'),
-  attendanceTrend: z.number().min(-100).max(100).describe('Change in attendance rate from the previous week (-100 to 100%).'),
-  studyTimeGrowth: z.number().min(-0.8).max(3.0).describe('Growth in study time from the previous 7 days compared to the prior 7 days (-0.8 to 3.0).'),
-  recentAchievements: z.array(z.string()).describe('A list of recent positive achievements or observations for the student.'),
-  potentialRisks: z.array(z.string()).describe('A list of potential risks or areas needing attention for the student.'),
-  parentFeedbackContext: z.string().optional().describe('Any specific feedback or context provided by the parent or teacher for inclusion in the summary.'),
+  studentName: z.string().describe('학생의 이름.'),
+  completionRate: z.number().min(0).max(100).describe('주간 가중 평균 계획 완수율 (0-100%).'),
+  completionRateTrend: z.number().min(-100).max(100).describe('이전 주 대비 계획 완수율 변화 (-100 ~ 100%).'),
+  attendanceRate: z.number().min(0).max(100).describe('주간 전체 출석률 (0-100%).'),
+  attendanceTrend: z.number().min(-100).max(100).describe('이전 주 대비 출석률 변화 (-100 ~ 100%).'),
+  studyTimeGrowth: z.number().min(-0.8).max(3.0).describe('이전 7일 대비 최근 7일간의 학습 시간 성장률 (-0.8 ~ 3.0).'),
+  recentAchievements: z.array(z.string()).describe('학생의 최근 긍정적인 성취 또는 관찰 사항 목록.'),
+  potentialRisks: z.array(z.string()).describe('학생의 잠재적 위험 또는 주의가 필요한 영역 목록.'),
+  parentFeedbackContext: z.string().optional().describe('요약에 포함할 학부모 또는 교사가 제공한 특정 피드백 또는 맥락.'),
 });
 export type ParentSummaryInput = z.infer<typeof ParentSummaryInputSchema>;
 
 const ParentSummaryOutputSchema = z.object({
-  message: z.string().describe('The AI-generated weekly summary message for the parent, concise and encouraging.'),
+  message: z.string().describe('학부모를 위한 AI 생성 주간 요약 메시지. 간결하고 격려적이어야 합니다.'),
   keyMetrics: z.array(
     z.object({
-      name: z.string().describe('Name of the metric (e.g., "Plan Completion").'),
-      value: z.string().describe('Formatted value of the metric (e.g., "85%").'),
-      trend: z.string().optional().describe('Brief description of the trend (e.g., "Up 5% from last week").'),
+      name: z.string().describe('지표 이름 (예: "계획 완수율").'),
+      value: z.string().describe('지표의 형식화된 값 (예: "85%").'),
+      trend: z.string().optional().describe('추세에 대한 간략한 설명 (예: "지난주보다 5% 상승").'),
     })
-  ).describe('3-5 key performance indicators with their values and trends, suitable for quick review.'),
-  recommendations: z.array(z.string()).describe('Actionable recommendations or insights for the parent to support their child, focusing on positive reinforcement and engagement.'),
-  safetyScore: z.number().min(0).max(100).describe('An internal score indicating the safety and appropriateness of the generated content (0-100, 100 being perfectly safe).'),
+  ).describe('빠른 검토에 적합한 3-5개의 주요 성과 지표와 그 값 및 추세.'),
+  recommendations: z.array(z.string()).describe('학부모가 자녀를 지원하기 위한 실행 가능한 권장 사항 또는 통찰력, 긍정적 강화와 참여에 중점.'),
+  safetyScore: z.number().min(0).max(100).describe('생성된 콘텐츠의 안전성과 적절성을 나타내는 내부 점수 (0-100, 100은 완벽하게 안전함을 의미).'),
 });
 export type ParentSummaryOutput = z.infer<typeof ParentSummaryOutputSchema>;
 
@@ -45,50 +45,50 @@ const parentSummaryPrompt = ai.definePrompt({
   name: 'parentSummaryPrompt',
   input: { schema: ParentSummaryInputSchema },
   output: { schema: ParentSummaryOutputSchema },
-  prompt: `You are an empathetic and supportive AI assistant designed to provide weekly academic progress summaries to parents.
-Your goal is to inform parents about their child's performance trends in a clear, constructive, and encouraging manner.
-Focus on observations and factual trends, avoiding blame, definitive statements about student abilities, or medical/diagnosis/treatment advice.
+  prompt: `당신은 학부모에게 주간 학업 성취도 요약을 제공하도록 설계된 공감하고 지지하는 AI 조수입니다.
+당신의 목표는 학부모에게 자녀의 성과 동향을 명확하고 건설적이며 격려하는 방식으로 알리는 것입니다.
+비난, 학생 능력에 대한 단정적인 진술, 또는 의료/진단/치료 조언을 피하고 관찰과 사실적 경향에 초점을 맞추세요.
 
-Generate a weekly summary based on the following student data:
+다음 학생 데이터를 기반으로 주간 요약을 생성하세요:
 
-Student Name: {{{studentName}}}
+학생 이름: {{{studentName}}}
 
-Performance Indicators for the Week:
-- Plan Completion Rate: {{{completionRate}}}%
-- Plan Completion Rate Trend (vs. last week): {{#if completionRateTrend}}{{{completionRateTrend}}}% {{#if (gt completionRateTrend 0)}}Up{{else if (lt completionRateTrend 0)}}Down{{else}}No Change{{/if}}{{else}}N/A{{/if}}
-- Attendance Rate: {{{attendanceRate}}}%
-- Attendance Rate Trend (vs. last week): {{#if attendanceTrend}}{{{attendanceTrend}}}% {{#if (gt attendanceTrend 0)}}Up{{else if (lt attendanceTrend 0)}}Down{{else}}No Change{{/if}}{{else}}N/A{{/if}}
-- Study Time Growth (vs. previous period): {{#if studyTimeGrowth}}x{{{studyTimeGrowth}}}{{#if (gt studyTimeGrowth 0)}} (Growth){{else if (lt studyTimeGrowth 0)}} (Decrease){{else}} (Stable){{/if}}{{else}}N/A{{/if}}
+주간 성과 지표:
+- 계획 완수율: {{{completionRate}}}%
+- 계획 완수율 추세 (지난주 대비): {{#if completionRateTrend}}{{{completionRateTrend}}}% {{#if (gt completionRateTrend 0)}}상승{{else if (lt completionRateTrend 0)}}하락{{else}}변동 없음{{/if}}{{else}}해당 없음{{/if}}
+- 출석률: {{{attendanceRate}}}%
+- 출석률 추세 (지난주 대비): {{#if attendanceTrend}}{{{attendanceTrend}}}% {{#if (gt attendanceTrend 0)}}상승{{else if (lt attendanceTrend 0)}}하락{{else}}변동 없음{{/if}}{{else}}해당 없음{{/if}}
+- 학습 시간 성장률 (이전 기간 대비): {{#if studyTimeGrowth}}x{{{studyTimeGrowth}}}{{#if (gt studyTimeGrowth 0)}} (성장){{else if (lt studyTimeGrowth 0)}} (감소){{else}} (안정){{/if}}{{else}}해당 없음{{/if}}
 
-Recent Achievements/Positive Observations:
+최근 성취/긍정적 관찰:
 {{#if recentAchievements}}
 {{#each recentAchievements}}- {{{this}}}
 {{/each}}
-{{else}}- No specific achievements noted this week.
+{{else}}- 이번 주에 특별히 기록된 성취가 없습니다.
 {{/if}}
 
-Potential Risks/Areas for Attention:
+잠재적 위험/주의 영역:
 {{#if potentialRisks}}
 {{#each potentialRisks}}- {{{this}}}
 {{/each}}
-{{else}}- No significant risks identified this week.
+{{else}}- 이번 주에 확인된 중요한 위험이 없습니다.
 {{/if}}
 
 {{#if parentFeedbackContext}}
-Additional Context/Feedback: {{{parentFeedbackContext}}}
+추가 맥락/피드백: {{{parentFeedbackContext}}}
 {{/if}}
 
-Based on the above data, please generate a summary for the parent. The summary should include:
-1.  A main 'message' (a concise, encouraging paragraph).
-2.  An array of 3-5 'keyMetrics' objects, each with 'name', 'value', and 'trend' fields, highlighting the most important statistics.
-3.  An array of 'recommendations' (1-3 actionable, positive suggestions for the parent).
-4.  A 'safetyScore' (an integer from 0-100, where 100 indicates the content is perfectly safe and appropriate for parents).
+위의 데이터를 바탕으로 학부모를 위한 요약을 생성해 주세요. 요약에는 다음이 포함되어야 합니다:
+1. 주요 '메시지' (간결하고 격려적인 단락).
+2. 'name', 'value', 'trend' 필드를 포함하는 3-5개의 'keyMetrics' 객체 배열로, 가장 중요한 통계를 강조합니다.
+3. 'recommendations' 배열 (학부모를 위한 1-3개의 실행 가능하고 긍정적인 제안).
+4. 'safetyScore' (0에서 100까지의 정수, 100은 콘텐츠가 학부모에게 완벽하게 안전하고 적절함을 나타냄).
 
-Ensure the tone is warm, supportive, and data-driven. Focus on progress and potential for improvement.
+어조는 따뜻하고 지지적이며 데이터에 기반해야 합니다. 발전과 개선 가능성에 초점을 맞추세요.
 `,
   config: {
     safetySettings: [
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }, // Allow more flexibility if content is related to student performance, but still monitored.
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }, // 학생 성과와 관련된 내용이라면 더 많은 유연성을 허용하지만, 여전히 모니터링됩니다.
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },

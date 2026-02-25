@@ -18,24 +18,24 @@ type MainNavProps = {
 
 const navItems = {
   student: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/plan', label: 'My Plan', icon: ClipboardCheck },
-    { href: '/dashboard/leaderboards', label: 'Leaderboards', icon: Trophy },
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/plan', label: '나의 학습 계획', icon: ClipboardCheck },
+    { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   parent: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/leaderboards', label: 'Leaderboards', icon: Trophy },
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   teacher: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/attendance', label: 'Attendance', icon: Users },
-    { href: '/dashboard/leaderboards', label: 'Leaderboards', icon: Trophy },
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/attendance', label: '출석', icon: Users },
+    { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   admin: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/attendance', label: 'Attendance', icon: Users },
-    { href: '/dashboard/analytics', label: 'Center Analytics', icon: BarChart3 },
-    { href: '/dashboard/settings/invites', label: 'Invite Codes', icon: Settings },
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/attendance', label: '출석', icon: Users },
+    { href: '/dashboard/analytics', label: '센터 분석', icon: BarChart3 },
+    { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
   ],
 };
 

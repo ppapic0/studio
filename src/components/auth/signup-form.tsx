@@ -18,16 +18,16 @@ import Link from 'next/link';
 
 const formSchema = z.object({
   fullName: z.string().min(2, {
-    message: 'Full name must be at least 2 characters.',
+    message: '이름은 2자 이상이어야 합니다.',
   }),
   email: z.string().email({
-    message: 'Please enter a valid email address.',
+    message: '유효한 이메일 주소를 입력해주세요.',
   }),
   password: z.string().min(8, {
-    message: 'Password must be at least 8 characters.',
+    message: '비밀번호는 8자 이상이어야 합니다.',
   }),
   inviteCode: z.string().min(6, {
-    message: 'Invite code is required.',
+    message: '초대 코드가 필요합니다.',
   }),
 });
 
@@ -57,9 +57,9 @@ export function SignupForm() {
           name="fullName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Name</FormLabel>
+              <FormLabel>이름</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input placeholder="홍길동" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -70,7 +70,7 @@ export function SignupForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>이메일</FormLabel>
               <FormControl>
                 <Input placeholder="name@example.com" {...field} />
               </FormControl>
@@ -83,7 +83,7 @@ export function SignupForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>비밀번호</FormLabel>
               <FormControl>
                 <Input type="password" {...field} />
               </FormControl>
@@ -96,22 +96,22 @@ export function SignupForm() {
           name="inviteCode"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Invite Code</FormLabel>
+              <FormLabel>초대 코드</FormLabel>
               <FormControl>
-                <Input placeholder="Enter your invite code" {...field} />
+                <Input placeholder="초대 코드를 입력하세요" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
-          Create an account
+          계정 만들기
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">
-        Already have an account?{' '}
+        이미 계정이 있으신가요?{' '}
         <Link href="/login" className="underline">
-          Log in
+          로그인
         </Link>
       </div>
     </Form>

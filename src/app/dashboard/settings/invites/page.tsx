@@ -21,11 +21,11 @@ import { PlusCircle } from 'lucide-react';
 export default function InviteCodesPage() {
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'Active':
+      case '활성':
         return 'default';
-      case 'Expired':
+      case '만료됨':
         return 'destructive';
-      case 'Exhausted':
+      case '소진됨':
         return 'secondary';
       default:
         return 'outline';
@@ -36,25 +36,25 @@ export default function InviteCodesPage() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Invite Codes</CardTitle>
+          <CardTitle>초대 코드</CardTitle>
           <CardDescription>
-            Manage invite codes for onboarding new members.
+            신규 회원 등록을 위한 초대 코드를 관리합니다.
           </CardDescription>
         </div>
         <Button size="sm" className="gap-1">
           <PlusCircle className="h-4 w-4" />
-          Generate New Code
+          새 코드 생성
         </Button>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Uses</TableHead>
-              <TableHead>Expires At</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>코드</TableHead>
+              <TableHead>역할</TableHead>
+              <TableHead>사용 횟수</TableHead>
+              <TableHead>만료일</TableHead>
+              <TableHead>상태</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

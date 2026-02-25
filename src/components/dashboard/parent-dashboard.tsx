@@ -11,10 +11,10 @@ import { BarChart, FileText, TrendingUp, CheckCircle } from 'lucide-react';
 import { ResponsiveContainer, Bar, XAxis, YAxis, Tooltip, BarChart as RechartsBarChart } from 'recharts';
 
 const chartData = [
-  { name: 'Week 1', completion: 75, attendance: 95 },
-  { name: 'Week 2', completion: 80, attendance: 100 },
-  { name: 'Week 3', completion: 78, attendance: 100 },
-  { name: 'Week 4', completion: 82, attendance: 100 },
+  { name: '1주차', completion: 75, attendance: 95 },
+  { name: '2주차', completion: 80, attendance: 100 },
+  { name: '3주차', completion: 78, attendance: 100 },
+  { name: '4주차', completion: 82, attendance: 100 },
 ];
 
 export function ParentDashboard() {
@@ -23,15 +23,15 @@ export function ParentDashboard() {
       <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Ben Carter&apos;s Weekly Summary</CardTitle>
+            <CardTitle className="font-headline">벤 카터의 주간 요약</CardTitle>
             <CardDescription>
-              An AI-powered summary of your child&apos;s progress this week.
+              이번 주 자녀의 학습 진행 상황에 대한 AI 요약입니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <Alert className="bg-secondary">
               <FileText className="h-4 w-4" />
-              <AlertTitle className="font-semibold">Summary from AI</AlertTitle>
+              <AlertTitle className="font-semibold">AI 요약</AlertTitle>
               <AlertDescription>{mockParentSummary.message}</AlertDescription>
             </Alert>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -51,7 +51,7 @@ export function ParentDashboard() {
             </div>
              <Alert>
               <CheckCircle className="h-4 w-4" />
-              <AlertTitle className="font-semibold">Recommendations</AlertTitle>
+              <AlertTitle className="font-semibold">추천 사항</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc pl-5 space-y-1 mt-2">
                     {mockParentSummary.recommendations.map((rec, index) => (
@@ -64,9 +64,9 @@ export function ParentDashboard() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Performance Trends</CardTitle>
+            <CardTitle>성과 추이</CardTitle>
             <CardDescription>
-              Plan completion and attendance over the last 4 weeks.
+              지난 4주간의 계획 완수율 및 출석률입니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -93,8 +93,8 @@ export function ParentDashboard() {
                     borderColor: 'hsl(var(--border))'
                   }}
                 />
-                <Bar dataKey="completion" name="Completion" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="attendance" name="Attendance" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completion" name="완수율" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="attendance" name="출석률" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
               </RechartsBarChart>
             </ResponsiveContainer>
           </CardContent>

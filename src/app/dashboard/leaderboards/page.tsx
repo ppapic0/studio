@@ -39,9 +39,9 @@ function LeaderboardTab({ title, description, data }: LeaderboardTabProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[80px]">Rank</TableHead>
-              <TableHead>Student</TableHead>
-              <TableHead className="text-right">Value</TableHead>
+              <TableHead className="w-[80px]">순위</TableHead>
+              <TableHead>학생</TableHead>
+              <TableHead className="text-right">값</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -76,29 +76,29 @@ export default function LeaderboardsPage() {
     <Tabs defaultValue="completion">
       <div className="flex items-center">
         <TabsList>
-          <TabsTrigger value="completion">Completion Master</TabsTrigger>
-          <TabsTrigger value="consistency">Consistency Leader</TabsTrigger>
-          <TabsTrigger value="growth">Growth Champion</TabsTrigger>
+          <TabsTrigger value="completion">계획 완수 마스터</TabsTrigger>
+          <TabsTrigger value="consistency">꾸준함 리더</TabsTrigger>
+          <TabsTrigger value="growth">성장 챔피언</TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="completion">
         <LeaderboardTab
-          title="Completion Master"
-          description="Ranking based on weighted completion of study plans."
+          title="계획 완수 마스터"
+          description="가중치가 적용된 학습 계획 완수율에 따른 순위입니다."
           data={mockLeaderboards.completionMaster}
         />
       </TabsContent>
       <TabsContent value="consistency">
         <LeaderboardTab
-          title="Consistency Leader"
-          description="Ranking based on attendance streaks."
+          title="꾸준함 리더"
+          description="연속 출석일수에 따른 순위입니다."
           data={mockLeaderboards.consistencyLeader}
         />
       </TabsContent>
       <TabsContent value="growth">
         <LeaderboardTab
-          title="Growth Champion"
-          description="Ranking based on the growth of study time."
+          title="성장 챔피언"
+          description="학습 시간 증가율에 따른 순위입니다."
           data={mockLeaderboards.growthChampion}
         />
       </TabsContent>

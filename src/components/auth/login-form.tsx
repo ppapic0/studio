@@ -18,10 +18,10 @@ import Link from 'next/link';
 
 const formSchema = z.object({
   email: z.string().email({
-    message: 'Please enter a valid email address.',
+    message: '유효한 이메일 주소를 입력해주세요.',
   }),
   password: z.string().min(6, {
-    message: 'Password must be at least 6 characters.',
+    message: '비밀번호는 6자 이상이어야 합니다.',
   }),
 });
 
@@ -49,7 +49,7 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>이메일</FormLabel>
               <FormControl>
                 <Input placeholder="name@example.com" {...field} />
               </FormControl>
@@ -63,12 +63,12 @@ export function LoginForm() {
           render={({ field }) => (
             <FormItem>
               <div className="flex items-center">
-                <FormLabel>Password</FormLabel>
+                <FormLabel>비밀번호</FormLabel>
                 <Link
                   href="#"
                   className="ml-auto inline-block text-sm underline"
                 >
-                  Forgot your password?
+                  비밀번호를 잊으셨나요?
                 </Link>
               </div>
               <FormControl>
@@ -79,13 +79,13 @@ export function LoginForm() {
           )}
         />
         <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
-          Login
+          로그인
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">
-        Don&apos;t have an account?{' '}
+        계정이 없으신가요?{' '}
         <Link href="/signup" className="underline">
-          Sign up
+          가입하기
         </Link>
       </div>
     </Form>

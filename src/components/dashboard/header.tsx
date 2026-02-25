@@ -40,7 +40,7 @@ export function DashboardHeader() {
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden">
             <PanelLeft className="h-5 w-5" />
-            <span className="sr-only">Toggle Menu</span>
+            <span className="sr-only">메뉴 열기</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
@@ -51,12 +51,12 @@ export function DashboardHeader() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="#">Dashboard</Link>
+              <Link href="#">대시보드</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Overview</BreadcrumbPage>
+            <BreadcrumbPage>개요</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -64,13 +64,13 @@ export function DashboardHeader() {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Search..."
+          placeholder="검색..."
           className="w-full rounded-lg bg-secondary pl-8 md:w-[200px] lg:w-[336px]"
         />
       </div>
        <Button variant="ghost" size="icon" className="ml-auto rounded-full">
             <Bell className="h-5 w-5" />
-            <span className="sr-only">Toggle notifications</span>
+            <span className="sr-only">알림 열기</span>
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -86,12 +86,12 @@ export function DashboardHeader() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuLabel>내 계정</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Settings</DropdownMenuItem>
-          <DropdownMenuItem>Support</DropdownMenuItem>
+          <DropdownMenuItem>설정</DropdownMenuItem>
+          <DropdownMenuItem>지원</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Logout</DropdownMenuItem>
+          <DropdownMenuItem>로그아웃</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

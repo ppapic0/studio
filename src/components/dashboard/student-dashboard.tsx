@@ -25,42 +25,42 @@ export function StudentDashboard() {
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Study Time Today</CardTitle>
+            <CardTitle className="text-sm font-medium">오늘의 학습 시간</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">180 mins</div>
-            <p className="text-xs text-muted-foreground">+20% from yesterday</p>
+            <div className="text-2xl font-bold">180 분</div>
+            <p className="text-xs text-muted-foreground">어제보다 +20%</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Weekly Completion</CardTitle>
+            <CardTitle className="text-sm font-medium">주간 완수율</CardTitle>
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">85%</div>
-            <p className="text-xs text-muted-foreground">+5% from last week</p>
+            <p className="text-xs text-muted-foreground">지난주보다 +5%</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Attendance Streak</CardTitle>
+            <CardTitle className="text-sm font-medium">연속 출석</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">22 days</div>
-            <p className="text-xs text-muted-foreground">Keep it up!</p>
+            <div className="text-2xl font-bold">22 일</div>
+            <p className="text-xs text-muted-foreground">계속 화이팅!</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Growth Index</CardTitle>
+            <CardTitle className="text-sm font-medium">성장 지수</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">+12%</div>
-            <p className="text-xs text-muted-foreground">vs. previous 7 days</p>
+            <p className="text-xs text-muted-foreground">지난 7일 대비</p>
           </CardContent>
         </Card>
       </div>
@@ -68,14 +68,14 @@ export function StudentDashboard() {
         <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center">
             <div className="grid gap-2">
-              <CardTitle>Today&apos;s Study Plan</CardTitle>
+              <CardTitle>오늘의 학습 계획</CardTitle>
               <CardDescription>
-                Check off tasks as you complete them.
+                완료한 과제를 체크하세요.
               </CardDescription>
             </div>
             <Button asChild size="sm" className="ml-auto gap-1 bg-accent hover:bg-accent/90">
               <Link href="/dashboard/plan">
-                View All
+                전체 보기
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -98,15 +98,15 @@ export function StudentDashboard() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>AI Coach</CardTitle>
+            <CardTitle>AI 코치</CardTitle>
             <CardDescription>
-              Personalized tips to help you grow.
+              성장을 돕는 맞춤 팁입니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
              <Alert className="bg-background">
                 <Activity className="h-4 w-4" />
-                <AlertTitle className="font-headline">Weekly Tip</AlertTitle>
+                <AlertTitle className="font-headline">주간 팁</AlertTitle>
                 <AlertDescription>
                   {mockAiCoachMessage.message}
                 </AlertDescription>

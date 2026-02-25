@@ -12,22 +12,22 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const InterventionInputSchema = z.object({
-  centerId: z.string().describe('ID of the study center.'),
-  studentId: z.string().describe('ID of the student.'),
-  studentDisplayName: z.string().describe("The student's display name for personalization."),
-  planCompletionRateLastTwoWeeks: z.number().min(0).max(1).describe('Plan completion rate over the last two weeks (0-1).'),
-  consecutiveDaysAbsent: z.number().min(0).describe('Number of consecutive days the student has been absent.'),
-  studyTimeGrowthRate: z.number().describe('Growth rate of study time compared to the previous period (e.g., -0.30 for 30% decrease).'),
-  consecutiveDaysNoPlan: z.number().min(0).describe('Number of consecutive days the student has not submitted a plan.'),
-  weeklyCompletionRate: z.number().min(0).max(1).describe('Overall weekly plan completion rate (0-1).'),
+  centerId: z.string().describe('스터디 센터의 ID.'),
+  studentId: z.string().describe('학생의 ID.'),
+  studentDisplayName: z.string().describe("개인화를 위한 학생의 표시 이름."),
+  planCompletionRateLastTwoWeeks: z.number().min(0).max(1).describe('지난 2주간의 계획 완수율 (0-1).'),
+  consecutiveDaysAbsent: z.number().min(0).describe('학생의 연속 결석 일수.'),
+  studyTimeGrowthRate: z.number().describe('이전 기간 대비 학습 시간 성장률 (예: -0.30은 30% 감소).'),
+  consecutiveDaysNoPlan: z.number().min(0).describe('학생이 계획을 제출하지 않은 연속 일수.'),
+  weeklyCompletionRate: z.number().min(0).max(1).describe('주간 전체 계획 완수율 (0-1).'),
 });
 export type InterventionInput = z.infer<typeof InterventionInputSchema>;
 
 const InterventionOutputSchema = z.object({
-  type: z.literal('intervention').describe('The type of AI output, always "intervention".'),
-  message: z.string().describe('The personalized intervention message and study recommendations.'),
-  basedOn: InterventionInputSchema.omit({ centerId: true, studentId: true, studentDisplayName: true }).describe('A snapshot of the performance metrics used for this intervention.'),
-  model: z.string().describe('The AI model used for generating the intervention.'),
+  type: z.literal('intervention').describe('AI 출력 유형, 항상 "intervention".'),
+  message: z.string().describe('개인화된 개입 메시지 및 학습 권장 사항.'),
+  basedOn: InterventionInputSchema.omit({ centerId: true, studentId: true, studentDisplayName: true }).describe('이 개입에 사용된 성과 지표의 스냅샷.'),
+  model: z.string().describe('개입 생성에 사용된 AI 모델.'),
 });
 export type InterventionOutput = z.infer<typeof InterventionOutputSchema>;
 
@@ -39,40 +39,40 @@ const interventionPrompt = ai.definePrompt({
   name: 'interventionPrompt',
   input: { schema: InterventionInputSchema },
   output: { schema: InterventionOutputSchema },
-  prompt: `You are an AI-powered academic coach providing personalized study recommendations and intervention strategies to students.
-Your goal is to help students improve their learning habits and overcome challenges in a supportive and action-oriented manner.
-You must adhere to the following guardrails:
-- Do NOT provide medical, diagnosis, or treatment advice.
-- Focus on actionable suggestions and observations based on the provided data.
-- Avoid sensitive topics like sleep or mental health.
-- Avoid blame or definitive statements, focus on positive reinforcement and constructive advice.
+  prompt: `당신은 학생들에게 개인화된 학습 권장 사항 및 개입 전략을 제공하는 AI 기반 학업 코치입니다.
+당신의 목표는 학생들이 학습 습관을 개선하고 어려움을 극복하도록 지지적이고 행동 지향적인 방식으로 돕는 것입니다.
+다음 가이드라인을 반드시 준수해야 합니다:
+- 의료, 진단 또는 치료 조언을 제공하지 마십시오.
+- 제공된 데이터를 기반으로 실행 가능한 제안과 관찰에 초점을 맞추십시오.
+- 수면이나 정신 건강과 같은 민감한 주제는 피하십시오.
+- 비난이나 단정적인 진술을 피하고 긍정적인 강화와 건설적인 조언에 중점을 두십시오.
 
-Based on the following performance indicators for student {{{studentDisplayName}}}:
-- Plan Completion Rate (last 2 weeks): {{planCompletionRateLastTwoWeeks}} (where 1.0 is 100%)
-- Consecutive Days Absent: {{consecutiveDaysAbsent}}
-- Study Time Growth Rate: {{studyTimeGrowthRate}} (e.g., -0.30 means a 30% decrease)
-- Consecutive Days No Plan: {{consecutiveDaysNoPlan}}
-- Overall Weekly Completion Rate: {{weeklyCompletionRate}} (where 1.0 is 100%)
+학생 {{{studentDisplayName}}}의 다음 성과 지표를 기반으로 합니다:
+- 계획 완수율 (지난 2주): {{planCompletionRateLastTwoWeeks}} (1.0은 100%)
+- 연속 결석 일수: {{consecutiveDaysAbsent}}
+- 학습 시간 성장률: {{studyTimeGrowthRate}} (예: -0.30은 30% 감소)
+- 연속 무계획 일수: {{consecutiveDaysNoPlan}}
+- 주간 전체 완수율: {{weeklyCompletionRate}} (1.0은 100%)
 
-Generate a concise, personalized intervention message and study recommendation.
-Identify areas for improvement and offer clear, actionable strategies.
+간결하고 개인화된 개입 메시지와 학습 권장 사항을 생성하십시오.
+개선 영역을 식별하고 명확하고 실행 가능한 전략을 제공하십시오.
 
-Here are some guidelines based on common scenarios:
-- If 'planCompletionRateLastTwoWeeks' is less than 0.5 (50%), suggest reviewing their plan for realism and simplifying it if needed.
-- If 'studyTimeGrowthRate' is negative (e.g., -0.30), suggest reallocating study time or identifying distractions.
-- If 'consecutiveDaysAbsent' is 3 or more, gently inquire about challenges and emphasize the importance of consistency.
-- If 'consecutiveDaysNoPlan' is 3 or more, remind them of the benefits of planning and offer tips for getting started.
-- If 'weeklyCompletionRate' is high (e.g., above 0.8), offer positive reinforcement for their consistency and effort.
+일반적인 시나리오에 따른 몇 가지 지침은 다음과 같습니다:
+- 'planCompletionRateLastTwoWeeks'가 0.5 (50%) 미만인 경우, 계획이 현실적인지 검토하고 필요한 경우 단순화하도록 제안하십시오.
+- 'studyTimeGrowthRate'가 음수(예: -0.30)인 경우, 학습 시간을 재분배하거나 방해 요소를 식별하도록 제안하십시오.
+- 'consecutiveDaysAbsent'가 3일 이상인 경우, 어려움에 대해 부드럽게 질문하고 일관성의 중요성을 강조하십시오.
+- 'consecutiveDaysNoPlan'이 3일 이상인 경우, 계획의 이점을 상기시키고 시작을 위한 팁을 제공하십시오.
+- 'weeklyCompletionRate'가 높은 경우(예: 0.8 이상), 그들의 꾸준함과 노력에 대해 긍정적인 강화를 제공하십시오.
 
-Your output message should be encouraging and focus on next steps.
-Format your response as a JSON object matching the InterventionOutputSchema.
-For the 'basedOn' field, include a snapshot of only the performance metrics provided (planCompletionRateLastTwoWeeks, consecutiveDaysAbsent, studyTimeGrowthRate, consecutiveDaysNoPlan, weeklyCompletionRate).
-Set 'type' to 'intervention' and 'model' to 'googleai/gemini-2.5-flash'.
+출력 메시지는 격려적이어야 하며 다음 단계에 초점을 맞춰야 합니다.
+InterventionOutputSchema와 일치하는 JSON 객체 형식으로 응답을 작성하십시오.
+'basedOn' 필드에는 제공된 성과 지표(planCompletionRateLastTwoWeeks, consecutiveDaysAbsent, studyTimeGrowthRate, consecutiveDaysNoPlan, weeklyCompletionRate)의 스냅샷만 포함하십시오.
+'type'을 'intervention'으로, 'model'을 'googleai/gemini-2.5-flash'로 설정하십시오.
 
-Example output structure:
+예시 출력 구조:
 {
   "type": "intervention",
-  "message": "Hi [Student Name], it looks like you've been doing great with X, but Y could use some attention. Try Z.",
+  "message": "[학생 이름]님, X는 잘하고 계신 것 같지만 Y는 좀 더 신경 써야 할 것 같아요. Z를 시도해 보세요.",
   "basedOn": {
     "planCompletionRateLastTwoWeeks": 0.45,
     "consecutiveDaysAbsent": 0,
@@ -95,7 +95,7 @@ const interventionFlow = ai.defineFlow(
     const { output } = await interventionPrompt(input);
 
     if (!output) {
-      throw new Error('AI did not return an output for intervention.');
+      throw new Error('AI가 개입에 대한 출력을 반환하지 않았습니다.');
     }
 
     return output;
