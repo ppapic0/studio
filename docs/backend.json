@@ -4,22 +4,22 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the application, including students, teachers, parents, and administrators.",
+      "description": "Represents an individual user registered in the system, holding core profile information and global settings. Authentication details are managed by an external system.",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique identifier for the User entity."
         },
-        "displayName": {
-          "type": "string",
-          "description": "The user's public display name."
-        },
         "email": {
           "type": "string",
-          "description": "The user's email address, used for communication.",
+          "description": "The user's email address.",
           "format": "email"
         },
-        "profileImageUrl": {
+        "displayName": {
+          "type": "string",
+          "description": "The public name chosen by the user."
+        },
+        "photoUrl": {
           "type": "string",
           "description": "URL to the user's profile picture.",
           "format": "uri"
@@ -29,25 +29,24 @@
           "description": "Timestamp when the user account was created.",
           "format": "date-time"
         },
-        "updatedAt": {
+        "lastLoginAt": {
           "type": "string",
-          "description": "Timestamp when the user's profile was last updated.",
+          "description": "Timestamp of the user's last successful login.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
-        "displayName",
         "email",
-        "createdAt",
-        "updatedAt"
+        "displayName",
+        "createdAt"
       ]
     },
     "Center": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Center",
       "type": "object",
-      "description": "Represents a study center managed by administrators.",
+      "description": "Represents a study center, which is the primary organizational unit in the application.",
       "properties": {
         "id": {
           "type": "string",
@@ -55,43 +54,44 @@
         },
         "name": {
           "type": "string",
-          "description": "The name of the study center."
+          "description": "The official name of the study center."
         },
         "description": {
           "type": "string",
-          "description": "A brief description of the study center."
-        },
-        "address": {
-          "type": "string",
-          "description": "The physical address of the study center."
+          "description": "A brief description of the center."
         },
         "subscriptionTier": {
           "type": "string",
-          "description": "The current subscription tier of the center (e.g., Basic, Pro, Enterprise)."
+          "description": "The current subscription tier of the center (Basic, Pro, Enterprise).",
+          "format": "enum"
         },
         "maxStudents": {
           "type": "number",
-          "description": "The maximum number of students allowed based on the subscription tier."
+          "description": "The maximum number of students allowed for this center's subscription tier."
         },
         "maxTeachers": {
           "type": "number",
-          "description": "The maximum number of teachers allowed based on the subscription tier."
+          "description": "The maximum number of teachers allowed for this center's subscription tier."
         },
         "aiUsageQuotaWeekly": {
           "type": "number",
-          "description": "The weekly quota for AI feature usage for the center."
+          "description": "The weekly AI usage quota for the center, as defined by its subscription tier."
         },
-        "dataRetentionPeriodDays": {
+        "aiUsageQuotaMonthly": {
           "type": "number",
-          "description": "The number of days data will be retained for this center."
+          "description": "The monthly AI usage quota for the center, as defined by its subscription tier."
+        },
+        "dataRetentionDays": {
+          "type": "number",
+          "description": "The number of days for which data is retained, based on the center's subscription tier."
         },
         "billingStatus": {
           "type": "string",
-          "description": "The current billing status of the center's subscription (e.g., 'active', 'trial', 'overdue')."
+          "description": "The current billing status of the center's subscription."
         },
-        "subscriptionExpiresAt": {
+        "expiresAt": {
           "type": "string",
-          "description": "Timestamp when the center's current subscription expires.",
+          "description": "The timestamp when the current subscription period expires.",
           "format": "date-time"
         },
         "createdAt": {
@@ -99,10 +99,9 @@
           "description": "Timestamp when the center was created.",
           "format": "date-time"
         },
-        "updatedAt": {
+        "ownerUserId": {
           "type": "string",
-          "description": "Timestamp when the center's details were last updated.",
-          "format": "date-time"
+          "description": "Reference to the User who initially created and owns this center. (Relationship: User 1:N Center)"
         }
       },
       "required": [
@@ -111,52 +110,72 @@
         "subscriptionTier",
         "maxStudents",
         "maxTeachers",
-        "aiUsageQuotaWeekly",
-        "dataRetentionPeriodDays",
+        "dataRetentionDays",
         "billingStatus",
-        "subscriptionExpiresAt",
+        "expiresAt",
         "createdAt",
-        "updatedAt"
+        "ownerUserId"
       ]
     },
-    "CenterMembership": {
+    "CenterMember": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "CenterMembership",
+      "title": "CenterMember",
       "type": "object",
-      "description": "Links a User to a Center with a specific role and status.",
+      "description": "Represents a user's specific membership details and role within a particular study center.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the CenterMembership entity."
+          "description": "Unique identifier for the CenterMember entity."
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center. (Relationship: Center 1:N CenterMembership)"
+          "description": "Reference to the Center this membership belongs to. (Relationship: Center 1:N CenterMember)"
         },
         "userId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N CenterMembership)"
+          "description": "Reference to the User associated with this membership. (Relationship: User 1:N CenterMember)"
         },
         "role": {
           "type": "string",
-          "description": "The role of the user within this specific center (e.g., 'admin', 'teacher', 'student', 'parent')."
+          "description": "The role of the user within this specific center (admin, teacher, student, parent).",
+          "format": "enum"
         },
         "status": {
           "type": "string",
-          "description": "The status of the membership (e.g., 'active', 'pending', 'invited', 'inactive')."
+          "description": "The status of the membership (e.g., active, invited, suspended)."
         },
         "joinedAt": {
           "type": "string",
-          "description": "Timestamp when the user officially joined the center.",
+          "description": "Timestamp when the user formally joined the center.",
+          "format": "date-time"
+        },
+        "invitedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who invited this member to the center, if applicable. (Relationship: User 1:N CenterMember)"
+        },
+        "parentOfStudentMemberIds": {
+          "type": "array",
+          "description": "References to CenterMember IDs of students linked to this parent within the same center. (Relationship: CenterMember N:N CenterMember, specific to parent/student roles)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "studentGuardianMemberIds": {
+          "type": "array",
+          "description": "References to CenterMember IDs of guardians linked to this student within the same center. (Relationship: CenterMember N:N CenterMember, specific to student/parent roles)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this center membership record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the membership details were last updated."
-        },
-        "invitedByInviteCodeId": {
-          "type": "string",
-          "description": "Reference to the InviteCode used for onboarding, if applicable. (Relationship: InviteCode 1:N CenterMembership)"
+          "description": "Timestamp when this center membership record was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
@@ -166,65 +185,79 @@
         "role",
         "status",
         "joinedAt",
-        "updatedAt"
+        "createdAt"
       ]
     },
     "InviteCode": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "InviteCode",
       "type": "object",
-      "description": "Represents an invite code used for onboarding new members to a center. The document ID is the code itself.",
+      "description": "Represents an invite code used for onboarding new members into a study center.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the InviteCode entity. This is the actual code string."
+          "description": "Unique identifier for the InviteCode entity."
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this invite code is valid. (Relationship: Center 1:N InviteCode)"
+          "description": "Reference to the Center this invite code is for. (Relationship: Center 1:N InviteCode)"
         },
-        "intendedRole": {
+        "code": {
           "type": "string",
-          "description": "The role a user will be assigned upon redeeming this code (e.g., 'admin', 'teacher', 'student', 'parent')."
+          "description": "The actual invite code string."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role assigned to the user who redeems this code (admin, teacher, student, parent).",
+          "format": "enum"
         },
         "expiresAt": {
           "type": "string",
-          "description": "Timestamp when the invite code will expire.",
+          "description": "Timestamp when the invite code becomes invalid.",
           "format": "date-time"
         },
         "maxUses": {
           "type": "number",
-          "description": "The maximum number of times this invite code can be used."
+          "description": "The maximum number of times this code can be redeemed."
         },
         "usedCount": {
           "type": "number",
-          "description": "The number of times this invite code has been used."
+          "description": "The current number of times this code has been redeemed."
         },
         "createdByUserId": {
           "type": "string",
           "description": "Reference to the User who generated this invite code. (Relationship: User 1:N InviteCode)"
         },
+        "redeemedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who last redeemed this code, if applicable. (Relationship: User 1:N InviteCode)"
+        },
+        "redeemedAt": {
+          "type": "string",
+          "description": "Timestamp when the code was last redeemed, if applicable.",
+          "format": "date-time"
+        },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the invite code was generated.",
+          "description": "Timestamp when the invite code was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the invite code was last updated (e.g., used count incremented).",
+          "description": "Timestamp when the invite code was last updated.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
-        "intendedRole",
+        "code",
+        "role",
         "expiresAt",
         "maxUses",
         "usedCount",
         "createdByUserId",
-        "createdAt",
-        "updatedAt"
+        "createdAt"
       ]
     },
     "StudyPlanWeek": {
@@ -239,40 +272,49 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this study plan is created. (Relationship: Center 1:N StudyPlanWeek)"
+          "description": "Reference to the Center where this study plan belongs. (Relationship: Center 1:N StudyPlanWeek)"
         },
-        "uid": {
+        "studentMemberId": {
           "type": "string",
-          "description": "Reference to the Student user for whom this plan is created. (Relationship: User 1:N StudyPlanWeek)"
+          "description": "Reference to the CenterMember (student role) this study plan belongs to. (Relationship: CenterMember 1:N StudyPlanWeek)"
         },
         "weekKey": {
           "type": "string",
-          "description": "The week identifier in 'YYYY-WW' format (e.g., '2023-W40')."
+          "description": "The identifier for the week in YYYY-WW (ISO week) format (e.g., '2023-40')."
+        },
+        "title": {
+          "type": "string",
+          "description": "A title for the weekly study plan."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description or goal for the weekly study plan."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the study plan week was created.",
+          "description": "Timestamp when this study plan was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the study plan week was last updated."
+          "description": "Timestamp when this study plan was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
-        "uid",
+        "studentMemberId",
         "weekKey",
-        "createdAt",
-        "updatedAt"
+        "title",
+        "createdAt"
       ]
     },
     "StudyPlanItem": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "StudyPlanItem",
       "type": "object",
-      "description": "Represents a single item or task within a student's weekly study plan.",
+      "description": "Represents an individual task or goal within a student's weekly study plan.",
       "properties": {
         "id": {
           "type": "string",
@@ -280,33 +322,34 @@
         },
         "studyPlanWeekId": {
           "type": "string",
-          "description": "Reference to the parent StudyPlanWeek. (Relationship: StudyPlanWeek 1:N StudyPlanItem)"
+          "description": "Reference to the StudyPlanWeek this item belongs to. (Relationship: StudyPlanWeek 1:N StudyPlanItem)"
         },
         "title": {
           "type": "string",
-          "description": "The title or description of the study plan item."
+          "description": "The title or description of the study item."
         },
         "weight": {
           "type": "number",
-          "description": "The importance or weight of the item for completion tracking (defaults to 1)."
+          "description": "The weighted value of this item, used for completion calculations. Defaults to 1 if not specified."
         },
         "done": {
           "type": "boolean",
-          "description": "Indicates whether the study plan item has been completed."
+          "description": "Indicates whether the study item has been completed."
         },
         "doneAt": {
           "type": "string",
-          "description": "Timestamp when the study plan item was marked as done, if applicable.",
+          "description": "Timestamp when the study item was marked as completed.",
           "format": "date-time"
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the study plan item was created.",
+          "description": "Timestamp when this study item was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the study plan item was last updated."
+          "description": "Timestamp when this study item was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
@@ -315,15 +358,14 @@
         "title",
         "weight",
         "done",
-        "createdAt",
-        "updatedAt"
+        "createdAt"
       ]
     },
     "StudyLogDay": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "StudyLogDay",
       "type": "object",
-      "description": "Records a student's total study time for a specific day within a center.",
+      "description": "Aggregates a student's study activity for a specific day within a center.",
       "properties": {
         "id": {
           "type": "string",
@@ -331,86 +373,50 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this study log belongs. (Relationship: Center 1:N StudyLogDay)"
+          "description": "Reference to the Center where this study log was recorded. (Relationship: Center 1:N StudyLogDay)"
         },
-        "uid": {
+        "studentMemberId": {
           "type": "string",
-          "description": "Reference to the Student user whose study time is logged. (Relationship: User 1:N StudyLogDay)"
+          "description": "Reference to the CenterMember (student role) this study log belongs to. (Relationship: CenterMember 1:N StudyLogDay)"
         },
-        "dateKey": {
+        "dayKey": {
           "type": "string",
-          "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
+          "description": "The identifier for the day in YYYY-MM-DD format (e.g., '2023-10-26')."
         },
         "totalMinutes": {
           "type": "number",
           "description": "The total number of minutes studied by the student on this day."
         },
+        "bySubject": {
+          "type": "string",
+          "description": "An object containing study minutes broken down by subject (e.g., {\"Math\": 60, \"Science\": 30})."
+        },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the study log was initially created.",
+          "description": "Timestamp when this study log was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the study log was last updated."
+          "description": "Timestamp when this study log was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
-        "uid",
-        "dateKey",
+        "studentMemberId",
+        "dayKey",
         "totalMinutes",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "StudyLogSubject": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "StudyLogSubject",
-      "type": "object",
-      "description": "Details study time spent on a particular subject for a given StudyLogDay.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the StudyLogSubject entity."
-        },
-        "studyLogDayId": {
-          "type": "string",
-          "description": "Reference to the parent StudyLogDay. (Relationship: StudyLogDay 1:N StudyLogSubject)"
-        },
-        "subjectName": {
-          "type": "string",
-          "description": "The name of the subject (e.g., 'Math', 'Science')."
-        },
-        "minutes": {
-          "type": "number",
-          "description": "The number of minutes spent on this subject for the day."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when this subject log entry was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when this subject log entry was last updated."
-        }
-      },
-      "required": [
-        "id",
-        "studyLogDayId",
-        "subjectName",
-        "minutes",
-        "createdAt",
-        "updatedAt"
+        "updatedAt",
+        "createdAt"
       ]
     },
     "AttendanceRecord": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "AttendanceRecord",
       "type": "object",
-      "description": "Records a student's attendance for a specific day at a center.",
+      "description": "Records a student's attendance status for a specific day at a center.",
       "properties": {
         "id": {
           "type": "string",
@@ -418,46 +424,58 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this attendance record was made. (Relationship: Center 1:N AttendanceRecord)"
+          "description": "Reference to the Center where this attendance record was made. (Relationship: Center 1:N AttendanceRecord)"
         },
-        "studentId": {
+        "studentMemberId": {
           "type": "string",
-          "description": "Reference to the Student user whose attendance is recorded. (Relationship: User 1:N AttendanceRecord)"
+          "description": "Reference to the CenterMember (student role) this attendance record is for. (Relationship: CenterMember 1:N AttendanceRecord)"
         },
-        "dateKey": {
+        "dayKey": {
           "type": "string",
-          "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
+          "description": "The identifier for the day in YYYY-MM-DD format (e.g., '2023-10-26')."
         },
         "status": {
           "type": "string",
-          "description": "The attendance status (e.g., 'requested', 'confirmed_present', 'confirmed_absent', 'confirmed_late', 'excused_absent')."
+          "description": "The attendance status (present, absent, excused, pendingCheckIn).",
+          "format": "enum"
+        },
+        "checkInRequestAt": {
+          "type": "string",
+          "description": "Timestamp when the student initially requested to check in, if applicable.",
+          "format": "date-time"
         },
         "checkInAt": {
           "type": "string",
-          "description": "Timestamp when the student checked in, if applicable.",
+          "description": "Timestamp when the attendance was confirmed as checked in.",
           "format": "date-time"
         },
         "checkOutAt": {
           "type": "string",
-          "description": "Timestamp when the student checked out, if applicable.",
+          "description": "Timestamp when the attendance was confirmed as checked out.",
           "format": "date-time"
         },
-        "confirmedByUserId": {
+        "confirmedByMemberId": {
           "type": "string",
-          "description": "Reference to the User (teacher/admin) who confirmed or adjusted the attendance, if applicable. (Relationship: User 1:N AttendanceRecord)"
+          "description": "Reference to the CenterMember (teacher/admin role) who confirmed or adjusted the attendance, if applicable. (Relationship: CenterMember 1:N AttendanceRecord)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this attendance record was created.",
+          "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the attendance record was last updated.",
+          "description": "Timestamp when this attendance record was last updated.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
-        "studentId",
-        "dateKey",
+        "studentMemberId",
+        "dayKey",
         "status",
+        "createdAt",
         "updatedAt"
       ]
     },
@@ -465,7 +483,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "LeaderboardEntry",
       "type": "object",
-      "description": "Represents a student's entry on a leaderboard for a specific metric and period.",
+      "description": "Stores pre-aggregated data for a student's entry in a specific leaderboard period and metric.",
       "properties": {
         "id": {
           "type": "string",
@@ -473,45 +491,42 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this leaderboard entry belongs. (Relationship: Center 1:N LeaderboardEntry)"
+          "description": "Reference to the Center this leaderboard entry belongs to. (Relationship: Center 1:N LeaderboardEntry)"
         },
         "periodKey": {
           "type": "string",
-          "description": "The period identifier (e.g., '2023-W40' for weekly, '2023-10' for monthly)."
+          "description": "The key representing the leaderboard period (YYYY-WW for weekly, YYYY-MM for monthly)."
         },
         "metricKey": {
           "type": "string",
-          "description": "The key of the metric being tracked (e.g., 'completionMaster', 'consistencyLeader', 'growthChampion')."
+          "description": "The key identifying the metric for this leaderboard (e.g., 'completionMaster', 'consistencyLeader', 'growthChampion').",
+          "format": "enum"
         },
-        "studentId": {
+        "studentMemberId": {
           "type": "string",
-          "description": "Reference to the Student user for this leaderboard entry. (Relationship: User 1:N LeaderboardEntry)"
+          "description": "Reference to the CenterMember (student role) this leaderboard entry is for. (Relationship: CenterMember 1:N LeaderboardEntry)"
         },
         "value": {
           "type": "number",
-          "description": "The raw metric value for the student."
+          "description": "The calculated value for the metric."
         },
         "rank": {
           "type": "number",
-          "description": "The student's rank on the leaderboard for this metric and period."
+          "description": "The student's rank for this metric and period."
         },
         "displayNameSnapshot": {
           "type": "string",
-          "description": "A snapshot of the student's display name at the time of aggregation, for historical consistency."
+          "description": "A snapshot of the student's display name at the time of aggregation, for leaderboard consistency."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this leaderboard entry was created.",
+          "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
           "description": "Timestamp when this leaderboard entry was last updated.",
           "format": "date-time"
-        },
-        "tieBreakerUpdatedAt": {
-          "type": "string",
-          "description": "A timestamp used as a secondary tie-breaker for deterministic ranking order.",
-          "format": "date-time"
-        },
-        "tieBreakerAttendanceCompletion": {
-          "type": "number",
-          "description": "A numeric value (e.g., combined attendance/completion rate) used as a tertiary tie-breaker for ranking."
         }
       },
       "required": [
@@ -519,267 +534,159 @@
         "centerId",
         "periodKey",
         "metricKey",
-        "studentId",
+        "studentMemberId",
         "value",
         "rank",
         "displayNameSnapshot",
         "updatedAt",
-        "tieBreakerUpdatedAt",
-        "tieBreakerAttendanceCompletion"
-      ]
-    },
-    "DailyStudentStat": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "DailyStudentStat",
-      "type": "object",
-      "description": "Aggregated daily performance statistics for a student within a center, used for dashboards.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the DailyStudentStat entity."
-        },
-        "centerId": {
-          "type": "string",
-          "description": "Reference to Center where these stats are generated. (Relationship: Center 1:N DailyStudentStat)"
-        },
-        "studentId": {
-          "type": "string",
-          "description": "Reference to the Student user for whom these stats are generated. (Relationship: User 1:N DailyStudentStat)"
-        },
-        "dateKey": {
-          "type": "string",
-          "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
-        },
-        "todayPlanCompletionRate": {
-          "type": "number",
-          "description": "The completion rate of today's study plan items (0.0 to 1.0)."
-        },
-        "totalStudyMinutes": {
-          "type": "number",
-          "description": "The total minutes studied by the student on this day."
-        },
-        "attendanceStreakDays": {
-          "type": "number",
-          "description": "The current consecutive attendance streak in days."
-        },
-        "weeklyPlanCompletionRate": {
-          "type": "number",
-          "description": "The average plan completion rate over the current week (0.0 to 1.0)."
-        },
-        "studyTimeGrowthRate": {
-          "type": "number",
-          "description": "The growth rate of study time compared to a previous period, clamped between -0.8 and 3.0."
-        },
-        "riskDetected": {
-          "type": "boolean",
-          "description": "Indicates if the AI system has detected a risk for this student on this day."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when this daily stat record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when this daily stat record was last updated."
-        }
-      },
-      "required": [
-        "id",
-        "centerId",
-        "studentId",
-        "dateKey",
-        "todayPlanCompletionRate",
-        "totalStudyMinutes",
-        "attendanceStreakDays",
-        "weeklyPlanCompletionRate",
-        "studyTimeGrowthRate",
-        "riskDetected",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "AIOutput": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AIOutput",
-      "type": "object",
-      "description": "Stores AI-generated content like risk flags, parent summaries, or intervention strategies.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the AIOutput entity."
-        },
-        "centerId": {
-          "type": "string",
-          "description": "Reference to Center where this AI output was generated. (Relationship: Center 1:N AIOutput)"
-        },
-        "studentId": {
-          "type": "string",
-          "description": "Reference to the Student user related to this AI output. (Relationship: User 1:N AIOutput)"
-        },
-        "type": {
-          "type": "string",
-          "description": "The type of AI output (e.g., 'riskFlag', 'parentSummary', 'intervention')."
-        },
-        "message": {
-          "type": "string",
-          "description": "The AI-generated message or content."
-        },
-        "basedOnMetricsSnapshot": {
-          "type": "string",
-          "description": "A JSON string snapshot of the metrics and data used to generate this AI output."
-        },
-        "modelUsed": {
-          "type": "string",
-          "description": "The identifier of the AI model used to generate this output (e.g., 'gpt-4')."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the AI output was generated.",
-          "format": "date-time"
-        },
-        "safetyFields": {
-          "type": "string",
-          "description": "A JSON string containing results from content moderation or safety checks."
-        },
-        "auditLogId": {
-          "type": "string",
-          "description": "Reference to the AuditLog entry for this AI output, for traceability. (Relationship: AuditLog 1:N AIOutput)"
-        }
-      },
-      "required": [
-        "id",
-        "centerId",
-        "studentId",
-        "type",
-        "message",
-        "basedOnMetricsSnapshot",
-        "modelUsed",
         "createdAt"
       ]
     },
-    "AuditLog": {
+    "StudentDailyStats": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AuditLog",
+      "title": "StudentDailyStats",
       "type": "object",
-      "description": "Records important actions and system events for traceability and security.",
+      "description": "Stores aggregated daily statistics for a student within a center, used for dashboards and AI risk detection.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the AuditLog entity."
+          "description": "Unique identifier for the StudentDailyStats entity."
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to the Center where the action occurred, if applicable. (Relationship: Center 1:N AuditLog)"
+          "description": "Reference to the Center this daily stats record belongs to. (Relationship: Center 1:N StudentDailyStats)"
         },
-        "action": {
+        "studentMemberId": {
           "type": "string",
-          "description": "A description of the action performed (e.g., 'inviteCodeRedeemed', 'attendanceConfirmed', 'aiOutputGenerated')."
+          "description": "Reference to the CenterMember (student role) this daily stats record is for. (Relationship: CenterMember 1:N StudentDailyStats)"
         },
-        "actorId": {
+        "dayKey": {
           "type": "string",
-          "description": "Reference to the User who performed the action, or a system identifier if automated. (Relationship: User 1:N AuditLog)"
+          "description": "The identifier for the day in YYYY-MM-DD format (e.g., '2023-10-26')."
         },
-        "targetId": {
-          "type": "string",
-          "description": "The ID of the entity that was affected by the action."
+        "planCompletionRate": {
+          "type": "number",
+          "description": "The weighted plan completion rate for the day (0.0 to 1.0)."
         },
-        "targetType": {
-          "type": "string",
-          "description": "The type of the entity that was affected (e.g., 'InviteCode', 'AttendanceRecord', 'AIOutput', 'CenterMembership')."
+        "studyTimeMinutes": {
+          "type": "number",
+          "description": "The total study time in minutes recorded for the day."
         },
-        "details": {
+        "attendanceStatus": {
           "type": "string",
-          "description": "A JSON string containing additional context or details about the action."
+          "description": "The attendance status for the day (e.g., 'present', 'absent').",
+          "format": "enum"
         },
-        "timestamp": {
+        "attendanceStreakDays": {
+          "type": "number",
+          "description": "The current attendance streak in days for the student."
+        },
+        "growthRate": {
+          "type": "number",
+          "description": "The calculated growth rate for the student (e.g., study time growth)."
+        },
+        "hasPlanToday": {
+          "type": "boolean",
+          "description": "Indicates if the student had a study plan defined for this day."
+        },
+        "createdAt": {
           "type": "string",
-          "description": "Timestamp when the action was logged.",
+          "description": "Timestamp when this daily stats record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when this daily stats record was last updated.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
-        "action",
-        "actorId",
-        "targetId",
-        "targetType",
-        "details",
-        "timestamp"
+        "studentMemberId",
+        "dayKey",
+        "planCompletionRate",
+        "studyTimeMinutes",
+        "attendanceStatus",
+        "attendanceStreakDays",
+        "growthRate",
+        "hasPlanToday",
+        "updatedAt",
+        "createdAt"
       ]
     },
-    "CenterStat": {
+    "CenterMonthlyStats": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "CenterStat",
+      "title": "CenterMonthlyStats",
       "type": "object",
-      "description": "Aggregated monthly key performance indicators (KPIs) for a study center.",
+      "description": "Stores aggregated monthly Key Performance Indicators (KPIs) for a specific center.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the CenterStat entity."
+          "description": "Unique identifier for the CenterMonthlyStats entity."
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center for which these statistics are generated. (Relationship: Center 1:N CenterStat)"
+          "description": "Reference to the Center these monthly stats belong to. (Relationship: Center 1:N CenterMonthlyStats)"
         },
         "monthKey": {
           "type": "string",
-          "description": "The month identifier in 'YYYY-MM' format (e.g., '2023-10')."
+          "description": "The identifier for the month in YYYY-MM format (e.g., '2023-10')."
         },
-        "averageAttendanceRate": {
+        "avgAttendanceRate": {
           "type": "number",
-          "description": "The average attendance rate for students in the center during the month (0.0 to 1.0)."
+          "description": "The average attendance rate across all students in the center for the month (0.0 to 1.0)."
         },
-        "averagePlanCompletionRate": {
+        "avgPlanCompletionRate": {
           "type": "number",
-          "description": "The average study plan completion rate for students in the center during the month (0.0 to 1.0)."
+          "description": "The average plan completion rate across all students in the center for the month (0.0 to 1.0)."
         },
-        "averageStudyTimeGrowthRate": {
+        "avgStudyTimeGrowthRate": {
           "type": "number",
-          "description": "The average study time growth rate for students in the center during the month."
+          "description": "The average study time growth rate across students in the center for the month."
+        },
+        "totalRiskStudents": {
+          "type": "number",
+          "description": "The total count of students identified as 'at-risk' during the month."
         },
         "seatUtilizationRate": {
           "type": "number",
-          "description": "The percentage of occupied seats in the center during the month (0.0 to 1.0)."
+          "description": "The rate of seat utilization within the center for the month (0.0 to 1.0)."
         },
-        "riskStudentCount": {
+        "projectedReEnrollments": {
           "type": "number",
-          "description": "The number of students identified as 'at-risk' during the month."
-        },
-        "reEnrollmentProjections": {
-          "type": "number",
-          "description": "Projected number of student re-enrollments for the upcoming period."
+          "description": "The projected number of student re-enrollments for the upcoming period, based on current data."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when this center stat record was created.",
+          "description": "Timestamp when this monthly stats record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when this center stat record was last updated."
+          "description": "Timestamp when this monthly stats record was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
         "monthKey",
-        "averageAttendanceRate",
-        "averagePlanCompletionRate",
-        "averageStudyTimeGrowthRate",
+        "avgAttendanceRate",
+        "avgPlanCompletionRate",
+        "avgStudyTimeGrowthRate",
+        "totalRiskStudents",
         "seatUtilizationRate",
-        "riskStudentCount",
-        "reEnrollmentProjections",
-        "createdAt",
-        "updatedAt"
+        "projectedReEnrollments",
+        "updatedAt",
+        "createdAt"
       ]
     },
     "Seat": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Seat",
       "type": "object",
-      "description": "Represents a physical or virtual seat within a study center.",
+      "description": "Represents a physical or logical seat available within a study center for student assignments.",
       "properties": {
         "id": {
           "type": "string",
@@ -787,28 +694,30 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this seat is located. (Relationship: Center 1:N Seat)"
+          "description": "Reference to the Center this seat belongs to. (Relationship: Center 1:N Seat)"
         },
         "label": {
           "type": "string",
-          "description": "A human-readable label for the seat (e.g., 'A1', 'Window Seat 3')."
+          "description": "A human-readable label or identifier for the seat (e.g., 'A1', 'Room 3 Desk 5')."
         },
         "status": {
           "type": "string",
-          "description": "The current status of the seat (e.g., 'available', 'occupied', 'maintenance')."
+          "description": "The current status of the seat (available, occupied, maintenance).",
+          "format": "enum"
         },
-        "assignedStudentId": {
+        "assignedStudentMemberId": {
           "type": "string",
-          "description": "Reference to the Student user currently assigned to this seat, if occupied. (Relationship: User 1:1 Seat)"
+          "description": "Reference to the CenterMember (student role) currently assigned to this seat, if occupied. (Relationship: CenterMember 1:N Seat)"
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the seat record was created.",
+          "description": "Timestamp when this seat record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the seat record was last updated."
+          "description": "Timestamp when this seat record was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
@@ -824,7 +733,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "SeatAssignment",
       "type": "object",
-      "description": "Records the assignment of a student to a specific seat for a given month.",
+      "description": "Records the assignment of a specific student to a seat for a given period within a center.",
       "properties": {
         "id": {
           "type": "string",
@@ -832,47 +741,59 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where this seat assignment occurred. (Relationship: Center 1:N SeatAssignment)"
+          "description": "Reference to the Center where this seat assignment occurred. (Relationship: Center 1:N SeatAssignment)"
+        },
+        "studentMemberId": {
+          "type": "string",
+          "description": "Reference to the CenterMember (student role) who is assigned the seat. (Relationship: CenterMember 1:N SeatAssignment)"
         },
         "monthKey": {
           "type": "string",
-          "description": "The month identifier in 'YYYY-MM' format (e.g., '2023-10') for which the assignment is active."
-        },
-        "studentId": {
-          "type": "string",
-          "description": "Reference to the Student user assigned to the seat. (Relationship: User 1:N SeatAssignment)"
+          "description": "The identifier for the month in YYYY-MM format during which the seat is assigned (e.g., '2023-10')."
         },
         "seatId": {
           "type": "string",
-          "description": "Reference to the Seat that was assigned. (Relationship: Seat 1:N SeatAssignment)"
+          "description": "Reference to the Seat that is assigned. (Relationship: Seat 1:N SeatAssignment)"
         },
         "planType": {
           "type": "string",
-          "description": "The type of plan associated with this seat assignment (e.g., 'daily', 'weekly')."
+          "description": "The type of study plan associated with this seat assignment (e.g., 'Full-time', 'Weekend', 'Evening')."
         },
         "active": {
           "type": "boolean",
-          "description": "Indicates if the seat assignment is currently active for the given month."
+          "description": "Indicates if the seat assignment is currently active."
         },
         "assignedAt": {
           "type": "string",
           "description": "Timestamp when the seat was assigned.",
           "format": "date-time"
         },
+        "releasedAt": {
+          "type": "string",
+          "description": "Timestamp when the seat was released from this assignment, if applicable.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this seat assignment record was created.",
+          "format": "date-time"
+        },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the seat assignment record was last updated."
+          "description": "Timestamp when this seat assignment record was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
+        "studentMemberId",
         "monthKey",
-        "studentId",
         "seatId",
         "planType",
         "active",
         "assignedAt",
+        "createdAt",
         "updatedAt"
       ]
     },
@@ -880,7 +801,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Enrollment",
       "type": "object",
-      "description": "Records a student's enrollment period and status within a center.",
+      "description": "Tracks a student's enrollment period, status, and renewal intent within a specific center.",
       "properties": {
         "id": {
           "type": "string",
@@ -888,44 +809,47 @@
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center where the student is enrolled. (Relationship: Center 1:N Enrollment)"
+          "description": "Reference to the Center where this enrollment is valid. (Relationship: Center 1:N Enrollment)"
         },
-        "studentId": {
+        "studentMemberId": {
           "type": "string",
-          "description": "Reference to the Student user who is enrolled. (Relationship: User 1:N Enrollment)"
+          "description": "Reference to the CenterMember (student role) associated with this enrollment. (Relationship: CenterMember 1:N Enrollment)"
         },
         "startAt": {
           "type": "string",
-          "description": "Timestamp when the enrollment period began.",
+          "description": "The start date and time of the enrollment period.",
           "format": "date-time"
         },
         "endAt": {
           "type": "string",
-          "description": "Timestamp when the enrollment period is scheduled to end.",
+          "description": "The end date and time of the enrollment period.",
           "format": "date-time"
         },
         "status": {
           "type": "string",
-          "description": "The current status of the enrollment (e.g., 'active', 'completed', 'cancelled', 'deferred')."
+          "description": "The current status of the enrollment (active, paused, completed, cancelled).",
+          "format": "enum"
         },
         "renewalIntent": {
           "type": "string",
-          "description": "Indicates the student's or parent's intent for re-enrollment (e.g., 'yes', 'no', 'undecided', 'N/A')."
+          "description": "The student's or parent's expressed intent for renewal (strong, neutral, weak, notApplicable).",
+          "format": "enum"
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the enrollment record was created.",
+          "description": "Timestamp when this enrollment record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the enrollment record was last updated."
+          "description": "Timestamp when this enrollment record was last updated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "centerId",
-        "studentId",
+        "studentMemberId",
         "startAt",
         "endAt",
         "status",
@@ -934,11 +858,112 @@
         "updatedAt"
       ]
     },
+    "AiOutput": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AiOutput",
+      "type": "object",
+      "description": "Stores various types of generative AI-powered insights and outputs related to students or centers.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AiOutput entity."
+        },
+        "centerId": {
+          "type": "string",
+          "description": "Reference to the Center this AI output is associated with. (Relationship: Center 1:N AiOutput)"
+        },
+        "studentMemberId": {
+          "type": "string",
+          "description": "Reference to the CenterMember (student role) this AI output pertains to, if applicable. (Relationship: CenterMember 1:N AiOutput)"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of AI output (riskFlag, parentSummary, intervention).",
+          "format": "enum"
+        },
+        "message": {
+          "type": "string",
+          "description": "The main message or content generated by the AI."
+        },
+        "basedOn": {
+          "type": "string",
+          "description": "A snapshot of key metrics or data points that the AI analysis was based on."
+        },
+        "model": {
+          "type": "string",
+          "description": "The name or version of the generative AI model used to produce this output."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the AI output was generated.",
+          "format": "date-time"
+        },
+        "safetyFields": {
+          "type": "string",
+          "description": "An object containing fields related to content moderation and safety checks for the AI output."
+        }
+      },
+      "required": [
+        "id",
+        "centerId",
+        "type",
+        "message",
+        "basedOn",
+        "model",
+        "createdAt"
+      ]
+    },
+    "AuditLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AuditLog",
+      "type": "object",
+      "description": "Records important actions and system events for traceability and security purposes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AuditLog entity."
+        },
+        "centerId": {
+          "type": "string",
+          "description": "Reference to the Center where the audited action occurred, if applicable. (Relationship: Center 1:N AuditLog)"
+        },
+        "actorMemberId": {
+          "type": "string",
+          "description": "Reference to the CenterMember who performed the action, if a user, or null if system-generated. (Relationship: CenterMember 1:N AuditLog)"
+        },
+        "action": {
+          "type": "string",
+          "description": "A description of the action performed (e.g., 'INVITE_CODE_GENERATED', 'AI_RISK_DETECTED')."
+        },
+        "targetEntity": {
+          "type": "string",
+          "description": "The name of the entity primarily affected by this action (e.g., 'InviteCode', 'CenterMember', 'AiOutput')."
+        },
+        "targetEntityId": {
+          "type": "string",
+          "description": "The unique identifier of the entity primarily affected by this action."
+        },
+        "details": {
+          "type": "string",
+          "description": "An object containing additional context or details about the audited action (e.g., {'code': 'xyz', 'role': 'student'})."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the audit log entry was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "action",
+        "createdAt"
+      ]
+    },
     "NotificationPreference": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "NotificationPreference",
       "type": "object",
-      "description": "Stores user-specific notification settings for a particular center.",
+      "description": "Stores a user's notification preferences for a specific center.",
       "properties": {
         "id": {
           "type": "string",
@@ -946,19 +971,19 @@
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User whose preferences are stored. (Relationship: User 1:N NotificationPreference)"
+          "description": "Reference to the User whose preferences these are. (Relationship: User 1:N NotificationPreference)"
         },
         "centerId": {
           "type": "string",
-          "description": "Reference to Center for which these preferences apply. (Relationship: Center 1:N NotificationPreference)"
+          "description": "Reference to the Center these preferences apply to. (Relationship: Center 1:N NotificationPreference)"
         },
         "enabled": {
           "type": "boolean",
-          "description": "Indicates if notifications are generally enabled for this user and center."
+          "description": "Indicates if notifications are generally enabled for this user in this center."
         },
         "channels": {
           "type": "array",
-          "description": "An array of preferred notification channels (e.g., 'FCM', 'email', 'in-app').",
+          "description": "An array of preferred notification channels (e.g., ['email', 'fcm']).",
           "items": {
             "type": "string"
           }
@@ -973,12 +998,12 @@
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the notification preferences were created.",
+          "description": "Timestamp when this notification preference record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the notification preferences were last updated.",
+          "description": "Timestamp when this notification preference record was last updated.",
           "format": "date-time"
         }
       },
@@ -988,8 +1013,6 @@
         "centerId",
         "enabled",
         "channels",
-        "quietHoursStart",
-        "quietHoursEnd",
         "createdAt",
         "updatedAt"
       ]
@@ -1010,11 +1033,11 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores individual user profiles. Access is typically restricted to the user themselves for modification, and limited read access for others (e.g., display names in leaderboards, which are denormalized).",
+          "description": "Stores core user profile information. The 'userId' in the path must match the authenticated user's UID (request.auth.uid).",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier of the user, matching Firebase Authentication UID."
             }
           ]
         }
@@ -1026,7 +1049,7 @@
           "schema": {
             "$ref": "#/backend/entities/Center"
           },
-          "description": "Top-level collection for study centers. Contains center configuration and subscription details. Access is typically restricted to center members, with administrators having write access.",
+          "description": "Represents a study center. Accessible by its 'ownerUserId' (denormalized in the document) and members with appropriate roles. 'ownerUserId' ensures direct ownership checks.",
           "params": [
             {
               "name": "centerId",
@@ -1036,281 +1059,213 @@
         }
       },
       {
-        "path": "/centers/{centerId}/members/{userId}",
+        "path": "/centers/{centerId}/members/{memberUserId}",
         "definition": {
-          "entityName": "CenterMembership",
+          "entityName": "CenterMember",
           "schema": {
-            "$ref": "#/backend/entities/CenterMembership"
+            "$ref": "#/backend/entities/CenterMember"
           },
-          "description": "Links users to centers, defining their roles (admin, teacher, student, parent) within that center. Crucial for authorization rules, which will read `request.auth.uid`'s role from this path.",
+          "description": "Defines a user's specific role and membership status within a particular center. The 'memberUserId' in the path must match the 'userId' field in the document and the Firebase Authentication UID, allowing for direct permission lookups for the requesting user.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center this membership belongs to."
             },
             {
-              "name": "userId",
-              "description": "The unique identifier of the user who is a member of the center."
+              "name": "memberUserId",
+              "description": "The unique identifier of the user (Firebase Auth UID) who is a member of this center."
             }
           ]
         }
       },
       {
-        "path": "/inviteCodes/{inviteCodeId}",
+        "path": "/centers/{centerId}/inviteCodes/{inviteCodeId}",
         "definition": {
           "entityName": "InviteCode",
           "schema": {
             "$ref": "#/backend/entities/InviteCode"
           },
-          "description": "Stores invite codes for new member onboarding. Each code has a denormalized 'centerId' for querying and rule validation. The document ID is the code itself.",
+          "description": "Stores invite codes for center onboarding. Includes denormalized 'centerId' and 'createdByUserId' for authorization and 'role', 'expiresAt', 'maxUses', 'usedCount' for code management.",
           "params": [
             {
+              "name": "centerId",
+              "description": "The unique identifier of the center the invite code belongs to."
+            },
+            {
               "name": "inviteCodeId",
-              "description": "The unique identifier of the invite code, which is the code string itself."
+              "description": "The unique identifier for the invite code."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/plans/{uid}/weeks/{weekKey}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/studyPlanWeeks/{weekKey}",
         "definition": {
           "entityName": "StudyPlanWeek",
           "schema": {
             "$ref": "#/backend/entities/StudyPlanWeek"
           },
-          "description": "Stores a student's weekly study plan within a specific center. The 'centerId' and 'uid' are part of the path, ensuring clear ownership and efficient querying.",
+          "description": "Represents a student's weekly study plan within a center. Includes denormalized 'centerId' and 'studentMemberId' for direct ownership and role-based access checks.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
-              "name": "uid",
-              "description": "The unique identifier of the student user."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) this study plan belongs to."
             },
             {
               "name": "weekKey",
-              "description": "The week identifier in 'YYYY-WW' format (e.g., '2023-W40')."
+              "description": "The identifier for the week in YYYY-WW (ISO week) format."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/plans/{uid}/weeks/{weekKey}/items/{itemId}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/studyPlanWeeks/{weekKey}/items/{itemId}",
         "definition": {
           "entityName": "StudyPlanItem",
           "schema": {
             "$ref": "#/backend/entities/StudyPlanItem"
           },
-          "description": "Individual tasks or items within a student's weekly study plan. The full hierarchical path provides strong ownership context.",
+          "description": "Represents an individual task or goal within a student's weekly study plan. Includes denormalized 'centerId' and 'studentMemberId' (implicitly by path) for secure, atomic access and rule evaluation.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
-              "name": "uid",
-              "description": "The unique identifier of the student user."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) the parent study plan belongs to."
             },
             {
               "name": "weekKey",
-              "description": "The week identifier in 'YYYY-WW' format (e.g., '2023-W40')."
+              "description": "The identifier for the week in YYYY-WW format."
             },
             {
               "name": "itemId",
-              "description": "The unique identifier of the study plan item."
+              "description": "The unique identifier for the study plan item."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/studyLogs/{uid}/days/{dateKey}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/studyLogs/{dayKey}",
         "definition": {
           "entityName": "StudyLogDay",
           "schema": {
             "$ref": "#/backend/entities/StudyLogDay"
           },
-          "description": "Aggregates a student's total study time for a specific day within a center. 'centerId' and 'uid' are part of the path for clear context.",
+          "description": "Aggregates a student's study activity for a specific day. Includes denormalized 'centerId' and 'studentMemberId' for direct ownership and role-based access checks.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
-              "name": "uid",
-              "description": "The unique identifier of the student user."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) this study log belongs to."
             },
             {
-              "name": "dateKey",
-              "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
+              "name": "dayKey",
+              "description": "The identifier for the day in YYYY-MM-DD format."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/studyLogs/{uid}/days/{dateKey}/subjects/{studyLogSubjectId}",
-        "definition": {
-          "entityName": "StudyLogSubject",
-          "schema": {
-            "$ref": "#/backend/entities/StudyLogSubject"
-          },
-          "description": "Details study time spent on specific subjects for a given day. The hierarchical path provides full context.",
-          "params": [
-            {
-              "name": "centerId",
-              "description": "The unique identifier of the study center."
-            },
-            {
-              "name": "uid",
-              "description": "The unique identifier of the student user."
-            },
-            {
-              "name": "dateKey",
-              "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
-            },
-            {
-              "name": "studyLogSubjectId",
-              "description": "The unique identifier of the study log subject entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/centers/{centerId}/attendanceRecords/{dateKey}/students/{studentId}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/attendance/{dayKey}",
         "definition": {
           "entityName": "AttendanceRecord",
           "schema": {
             "$ref": "#/backend/entities/AttendanceRecord"
           },
-          "description": "Records attendance for a specific student on a given date within a center. Grouping by date under 'attendanceRecords' facilitates teacher review. Includes denormalized 'centerId', 'studentId', and 'dateKey' for authorization independence and simplified security rules.",
+          "description": "Records a student's attendance status for a specific day. Includes denormalized 'centerId' and 'studentMemberId'. Student can initiate check-in (status 'pendingCheckIn'); teachers/admins confirm/adjust ('present', 'absent', 'excused').",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
-              "name": "dateKey",
-              "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) this attendance record is for."
             },
             {
-              "name": "studentId",
-              "description": "The unique identifier of the student user."
+              "name": "dayKey",
+              "description": "The identifier for the day in YYYY-MM-DD format."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/leaderboards/{periodKey}/{metricKey}/entries/{studentId}",
+        "path": "/centers/{centerId}/leaderboards/{periodKey}/metrics/{metricKey}/entries/{studentMemberId}",
         "definition": {
           "entityName": "LeaderboardEntry",
           "schema": {
             "$ref": "#/backend/entities/LeaderboardEntry"
           },
-          "description": "Stores aggregated leaderboard data, segmented by center, period, and metric. Designed for read-only client access and efficient queries. Includes denormalized 'centerId', 'periodKey', 'metricKey', and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Stores pre-aggregated, read-only leaderboard data for a student. Includes denormalized 'centerId', 'studentMemberId', 'periodKey', 'metricKey' for efficient querying and 'displayNameSnapshot' for display consistency. Written only by Cloud Functions.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
               "name": "periodKey",
-              "description": "The period identifier (e.g., '2023-W40' for weekly, '2023-10' for monthly)."
+              "description": "The key representing the leaderboard period (YYYY-WW or YYYY-MM)."
             },
             {
               "name": "metricKey",
-              "description": "The key of the metric being tracked (e.g., 'completionMaster')."
+              "description": "The key identifying the metric for this leaderboard entry."
             },
             {
-              "name": "studentId",
-              "description": "The unique identifier of the student user."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) this leaderboard entry is for."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/dailyStudentStats/{dateKey}/students/{studentId}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/dailyStats/{dayKey}",
         "definition": {
-          "entityName": "DailyStudentStat",
+          "entityName": "StudentDailyStats",
           "schema": {
-            "$ref": "#/backend/entities/DailyStudentStat"
+            "$ref": "#/backend/entities/StudentDailyStats"
           },
-          "description": "Aggregated daily performance statistics for students, segmented by center and date. Used for dashboards. Includes denormalized 'centerId', 'dateKey', and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Stores aggregated daily statistics for a student within a center. Includes denormalized 'centerId' and 'studentMemberId'. Read-only for clients; written only by Cloud Functions.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
-              "name": "dateKey",
-              "description": "The date identifier in 'YYYY-MM-DD' format (e.g., '2023-10-26')."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) this daily stats record is for."
             },
             {
-              "name": "studentId",
-              "description": "The unique identifier of the student user."
+              "name": "dayKey",
+              "description": "The identifier for the day in YYYY-MM-DD format."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/aiOutputs/{studentId}/records/{aiOutputId}",
+        "path": "/centers/{centerId}/monthlyStats/{monthKey}",
         "definition": {
-          "entityName": "AIOutput",
+          "entityName": "CenterMonthlyStats",
           "schema": {
-            "$ref": "#/backend/entities/AIOutput"
+            "$ref": "#/backend/entities/CenterMonthlyStats"
           },
-          "description": "Stores AI-generated content (risk flags, summaries, interventions) for students within a center. Client write forbidden, written only by Cloud Functions. Includes denormalized 'centerId' and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Stores aggregated monthly KPIs for a specific center. Includes denormalized 'centerId'. Read-only for clients; written only by Cloud Functions.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
-            },
-            {
-              "name": "studentId",
-              "description": "The unique identifier of the student user."
-            },
-            {
-              "name": "aiOutputId",
-              "description": "The unique identifier of the AI output record."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/centers/{centerId}/auditLogs/{auditLogId}",
-        "definition": {
-          "entityName": "AuditLog",
-          "schema": {
-            "$ref": "#/backend/entities/AuditLog"
-          },
-          "description": "Records important actions and system events within a center for traceability. Client write forbidden, written only by Cloud Functions or Admin SDK. Includes denormalized 'centerId' for authorization independence and simplified security rules.",
-          "params": [
-            {
-              "name": "centerId",
-              "description": "The unique identifier of the study center."
-            },
-            {
-              "name": "auditLogId",
-              "description": "The unique identifier of the audit log entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/centers/{centerId}/centerStats/{monthKey}",
-        "definition": {
-          "entityName": "CenterStat",
-          "schema": {
-            "$ref": "#/backend/entities/CenterStat"
-          },
-          "description": "Aggregated monthly KPIs for a study center. Designed for read-only client access and efficient queries for administrators. Includes denormalized 'centerId' for authorization independence and simplified security rules.",
-          "params": [
-            {
-              "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
               "name": "monthKey",
-              "description": "The month identifier in 'YYYY-MM' format (e.g., '2023-10')."
+              "description": "The identifier for the month in YYYY-MM format."
             }
           ]
         }
@@ -1322,59 +1277,107 @@
           "schema": {
             "$ref": "#/backend/entities/Seat"
           },
-          "description": "Represents physical or virtual seats within a center.",
+          "description": "Represents a physical or logical seat within a study center. Includes denormalized 'centerId'. Managed by center admins/teachers.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center this seat belongs to."
             },
             {
               "name": "seatId",
-              "description": "The unique identifier of the seat."
+              "description": "The unique identifier for the seat."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/seatAssignments/{monthKey}/students/{studentId}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/seatAssignments/{assignmentId}",
         "definition": {
           "entityName": "SeatAssignment",
           "schema": {
             "$ref": "#/backend/entities/SeatAssignment"
           },
-          "description": "Records a student's seat assignment for a specific month within a center. Provides clear context for seat utilization. Includes denormalized 'centerId', 'monthKey', and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Records the assignment of a student to a seat for a period. Includes denormalized 'centerId' and 'studentMemberId'. Managed by center admins/teachers.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
             },
             {
-              "name": "monthKey",
-              "description": "The month identifier in 'YYYY-MM' format (e.g., '2023-10')."
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) assigned the seat."
             },
             {
-              "name": "studentId",
-              "description": "The unique identifier of the student user."
+              "name": "assignmentId",
+              "description": "The unique identifier for the seat assignment."
             }
           ]
         }
       },
       {
-        "path": "/centers/{centerId}/enrollments/{enrollmentId}",
+        "path": "/centers/{centerId}/students/{studentMemberId}/enrollments/{enrollmentId}",
         "definition": {
           "entityName": "Enrollment",
           "schema": {
             "$ref": "#/backend/entities/Enrollment"
           },
-          "description": "Records a student's enrollment period and status within a center. Includes denormalized 'centerId' and 'studentId' for authorization independence and simplified security rules.",
+          "description": "Tracks a student's enrollment period and status. Includes denormalized 'centerId' and 'studentMemberId'. Managed by center admins/teachers.",
           "params": [
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center."
+            },
+            {
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) associated with this enrollment."
             },
             {
               "name": "enrollmentId",
-              "description": "The unique identifier of the enrollment record."
+              "description": "The unique identifier for the enrollment record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/centers/{centerId}/students/{studentMemberId}/aiOutputs/{aiOutputId}",
+        "definition": {
+          "entityName": "AiOutput",
+          "schema": {
+            "$ref": "#/backend/entities/AiOutput"
+          },
+          "description": "Stores AI-generated insights for a student (risk flags, parent summaries, interventions). Includes denormalized 'centerId' and 'studentMemberId' (if applicable). Client write forbidden; written only by Cloud Functions. 'basedOn' provides a snapshot of metrics for audit/debug.",
+          "params": [
+            {
+              "name": "centerId",
+              "description": "The unique identifier of the center."
+            },
+            {
+              "name": "studentMemberId",
+              "description": "The unique identifier of the CenterMember (student role) this AI output pertains to."
+            },
+            {
+              "name": "aiOutputId",
+              "description": "The unique identifier for the AI output record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/centers/{centerId}/auditLogs/{auditLogId}",
+        "definition": {
+          "entityName": "AuditLog",
+          "schema": {
+            "$ref": "#/backend/entities/AuditLog"
+          },
+          "description": "Records important actions and system events for traceability within a center. Includes denormalized 'centerId'. Client write forbidden; written only by Cloud Functions or Admin SDK.",
+          "params": [
+            {
+              "name": "centerId",
+              "description": "The unique identifier of the center where the audited action occurred."
+            },
+            {
+              "name": "auditLogId",
+              "description": "The unique identifier for the audit log entry."
             }
           ]
         }
@@ -1386,21 +1389,20 @@
           "schema": {
             "$ref": "#/backend/entities/NotificationPreference"
           },
-          "description": "Stores user-specific notification settings for a particular center. Grouped by user, then center. Includes denormalized 'userId' and 'centerId' for authorization independence and simplified security rules.",
+          "description": "Stores a user's notification preferences for a specific center. Path-based ownership ('userId') and denormalized 'centerId' for clear access rules.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier of the user whose preferences these are."
             },
             {
               "name": "centerId",
-              "description": "The unique identifier of the study center."
+              "description": "The unique identifier of the center these preferences apply to."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore structure for LEARNING-LAB prioritizes robust security, scalability, and debuggability by strictly adhering to the mandated design principles.\n\n**Authorization Independence (CRITICAL):**\nThis design achieves authorization independence primarily by: \n1.  **Path-Based Context:** For most center-specific data, the `centerId` and `studentId` (or `userId`) are embedded directly into the collection paths (e.g., `/centers/{centerId}/plans/{uid}/weeks/{weekKey}`). This makes the immediate authorization context available directly from the request path parameters.\n2.  **Denormalized Authorization Context in Documents:** Critical identifiers like `centerId`, `uid`, and relevant date/period keys (`dateKey`, `weekKey`) are explicitly included as fields within documents, even when they are part of the path. This ensures that security rules can evaluate access without relying on `get()` calls to parent documents to retrieve these core identifiers. For example, a `StudyPlanWeek` document explicitly contains `centerId` and `uid` in its data, allowing rules to verify the `centerId` matches the path and the `uid` matches the authenticated user (or a student accessible by an authorized teacher).\n3.  **Controlled Use of `get()` for User's Own Role:** The core of center-specific authorization relies on a user's role, stored in `/centers/{centerId}/members/{userId}`. Security rules will use a `get(/centers/$(centerId)/members/$(request.auth.uid))` call to retrieve the *current user's own role* for the specific center. This is a deliberate and accepted deviation from avoiding *all* `get()` calls, as it's retrieving the authenticated user's *personal authorization context* rather than arbitrary data from a parent document or another entity. This ensures DBAC (Database-Backed Access Control) without introducing complex hierarchical dependencies on other data documents.\n\n**QAPs (Rules are not Filters):**\nThe structure ensures that security rules are not used as filters, but rather to enforce access control on explicitly defined paths, enabling secure and efficient `list` operations:\n1.  **Structural Segregation (Homogeneous Security Posture):** Collections are designed so that all documents within them share the same security requirements. For example, all `LeaderboardEntry` documents under `/centers/{centerId}/leaderboards/{periodKey}/{metricKey}/entries` are designed to be read-only for clients, simplifying `list` rules. Similarly, student-specific data (e.g., `StudyPlanWeek`) is deeply nested under `/centers/{centerId}/plans/{uid}/...`, allowing rules to easily restrict a student to only `list` their own data (where `uid == request.auth.uid`).\n2.  **Explicit Path-Based Access Control:** For `list` operations, the collection paths themselves often serve as implicit filters. For instance, a student can perform a `list` on `/centers/{centerId}/plans/$(request.auth.uid)/weeks`, and the rules can strictly enforce that `uid` in the path must match `request.auth.uid`. For teachers or administrators, `list` access to subcollections like `/centers/{centerId}/plans/{uid}/weeks` will be granted based on their `centerId` role, allowing them to query across all students they are authorized to manage, while still respecting the QAP principle (i.e., they are given access to the *entire subcollection* for authorized `uid`s, not filtering a broader collection).\n3.  **Read-Only Aggregates:** Key performance indicators and AI outputs (`LeaderboardEntry`, `DailyStudentStat`, `CenterStat`, `AIOutput`) are explicitly designed as aggregated, read-only collections for clients. This simplifies `list` rules to basic role checks, as there's no client-side modification possible, reducing complexity and attack surface."
+    "reasoning": "This Firestore structure is designed following the core principles and mandates to ensure security, scalability, and debuggability. A primary focus has been placed on **Authorization Independence** and enabling **QAPs (Queries Are Not Filters)**.\n\n**Authorization Independence (via Denormalization and Path Structure):**\n1.  **Direct Ownership via Path:** For user-centric data (e.g., `/users/{userId}` and `/users/{userId}/notificationPreferences/{centerId}`), the `userId` is explicitly part of the document path. This allows security rules to directly compare `request.auth.uid` with the `userId` in the path, eliminating the need for `get()` calls to verify ownership.\n2.  **Student-Centric Data Grouping:** All student-specific data within a center (e.g., study plans, logs, attendance, daily stats, AI outputs, enrollments, seat assignments) are organized under a clear hierarchy: `/centers/{centerId}/students/{studentMemberId}/...`. Every document within these subcollections will explicitly include `centerId` and `studentMemberId` as fields. This denormalization enables students to access their own data by checking `request.auth.uid == resource.data.studentMemberId` (or matching the `studentMemberId` in the path), again avoiding `get()` calls for direct student data access.\n3.  **Controlled Role-Based Access (The `get()` Compromise):** The mandate to \"AVOID hierarchical authorization dependencies (`get()`)\" is very strict. However, in a multi-tenant DBAC system without custom claims, a mechanism is needed to determine the *current user's role* within a given `centerId`. The chosen structure for roles is `/centers/{centerId}/members/{memberUserId}` (where `memberUserId` equals `request.auth.uid`). While a `get()` call to this path (e.g., `get(/centers/$(resource.data.centerId)/members/$(request.auth.uid))`) is technically a `get()`, it is a highly controlled exception. It is used *only* to fetch the *requesting user's own permission profile* for the `centerId` already identified in the target document. This is not a hierarchical dependency that relies on inspecting arbitrary parent document data, which is where the main problems for atomicity and debuggability typically arise. This approach provides granular DBAC without resorting to custom claims and remains largely debuggable.\n\n**QAPs (Queries Are Not Filters) Implementation:**\n1.  **Structural Segregation:** Data with differing security requirements is strictly segregated. For instance, `LeaderboardEntry` and `AiOutput` collections are designated as client-read-only and exclusively written by Cloud Functions. This means clients can query these collections without requiring security rules to filter results, as the data is inherently secure and pre-validated by server logic.\n2.  **Contextual Pathing and Denormalization:** By embedding `centerId` and `studentMemberId` directly into document paths and fields, queries can precisely target the data needed (e.g., `db.collection('centers').doc(centerId).collection('students').doc(studentMemberId).collection('studyLogs')`). Security rules can then directly validate that the queried path segments and document fields match the `request.auth.uid`'s associated `centerId` and `studentMemberId` (or verified role via the controlled `get()` for the current user). This prevents rules from acting as filters, as the client's query already contains the necessary security context, ensuring that only data the user is authorized to see is returned efficiently.\n3.  **Explicit State Modeling:** Entities like `CenterMember` and `AttendanceRecord` use dedicated `status` fields, making their state explicit and simplifying security rule logic (e.g., `allow write: if resource.data.status == 'pendingCheckIn' && request.auth.uid == studentMemberId`)."
   }
 }
-    
