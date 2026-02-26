@@ -57,7 +57,6 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
     // CRITICAL FIX: Check if the center document exists. If not, create it.
-    // This prevents errors when trying to write to subcollections of a non-existent document.
     const centerDoc = await centerRef.get();
     if (!centerDoc.exists) {
         const subscriptionExpires = new Date();
@@ -161,12 +160,14 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
     batch.set(auditLogRef, {
       timestamp: timestamp,
-      actorUid: uid,
+      actorId: uid,
       action: "dev_join_center",
-      details: {
-        targetUid: uid,
+      targetId: uid,
+      targetType: "CenterMembership",
+      details: JSON.stringify({
         role: role,
-      },
+        centerId: centerId
+      }),
     });
 
     await batch.commit();
@@ -184,6 +185,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
 /**
  * @description Redeems an invite code, creating the necessary user profile,
  * center membership, and audit logs in a single transaction.
+ * It also bootstraps the center document if it doesn't exist.
  */
 export const redeemInviteCode = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
@@ -205,34 +207,60 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
 
     try {
         const result = await db.runTransaction(async (transaction) => {
+            // 1. READ: Get Invite Code
             const inviteCodeDoc = await transaction.get(inviteCodeRef);
-
             if (!inviteCodeDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'Invalid invite code.');
+                throw new functions.https.HttpsError('not-found', '존재하지 않거나 유효하지 않은 초대 코드입니다.');
             }
             
             const inviteCodeData = inviteCodeDoc.data()!;
             const centerId = inviteCodeData.centerId;
 
-            // --- Start Validation ---
             if (!centerId) {
-                throw new functions.https.HttpsError('internal', 'Invite code is corrupt and is missing a centerId.');
+                throw new functions.https.HttpsError('internal', '초대 코드 정보가 올바르지 않습니다 (centerId 누락).');
             }
+
+            // 2. READ: Get Center Doc (Bootstrap check)
+            const centerRef = db.doc(`centers/${centerId}`);
+            const centerDoc = await transaction.get(centerRef);
+
+            // --- Validation ---
             if (inviteCodeData.usedCount >= inviteCodeData.maxUses) {
-                throw new functions.https.HttpsError('resource-exhausted', 'This invite code has reached its maximum number of uses.');
+                throw new functions.https.HttpsError('resource-exhausted', '이 초대 코드는 이미 최대 사용 횟수에 도달했습니다.');
             }
             const now = new Date();
             if (inviteCodeData.expiresAt && inviteCodeData.expiresAt.toDate() < now) {
-                throw new functions.https.HttpsError('deadline-exceeded', 'This invite code has expired.');
+                throw new functions.https.HttpsError('deadline-exceeded', '만료된 초대 코드입니다.');
             }
-            // --- End Validation ---
 
+            // --- Preparation ---
             const timestamp = admin.firestore.FieldValue.serverTimestamp();
             const role = inviteCodeData.intendedRole || 'student';
-            const finalDisplayName = displayName || (email ? email.split('@')[0] : "New User");
+            const finalDisplayName = displayName || (email ? email.split('@')[0] : "새 사용자");
             const finalEmail = email || `${uid}@example.com`;
 
-            // 1. Create/update the main user profile
+            // --- WRITES ---
+            
+            // A. Bootstrap Center if missing
+            if (!centerDoc.exists) {
+                const subscriptionExpires = new Date();
+                subscriptionExpires.setDate(subscriptionExpires.getDate() + 30);
+                transaction.set(centerRef, {
+                    name: `공부트랙관리형독서실 (${centerId})`,
+                    description: "초대 코드를 통해 자동 생성된 센터입니다.",
+                    subscriptionTier: "Pro",
+                    maxStudents: 150,
+                    maxTeachers: 10,
+                    aiUsageQuotaWeekly: 1000,
+                    dataRetentionPeriodDays: 365,
+                    billingStatus: 'active',
+                    subscriptionExpiresAt: admin.firestore.Timestamp.fromDate(subscriptionExpires),
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                });
+            }
+
+            // B. Create/update the main user profile
             const userProfileRef = db.doc(`users/${uid}`);
             transaction.set(userProfileRef, {
                 id: uid,
@@ -242,7 +270,7 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 updatedAt: timestamp,
             }, { merge: true });
 
-            // 2. Create the center membership document
+            // C. Create the center membership document
             const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
             transaction.set(memberRef, {
                 role: role,
@@ -253,7 +281,7 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 invitedByInviteCodeId: inviteCodeDoc.id,
             });
 
-            // 3. Create the reverse-index for the user
+            // D. Create the reverse-index for the user
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
             transaction.set(userCenterRef, {
                 role: role,
@@ -261,13 +289,13 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 joinedAt: timestamp,
             });
             
-            // 4. Update invite code usage
+            // E. Update invite code usage
             transaction.update(inviteCodeRef, {
                 usedCount: admin.firestore.FieldValue.increment(1),
                 updatedAt: timestamp,
             });
 
-            // 5. Create an audit log
+            // F. Create an audit log
             const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
             transaction.set(auditLogRef, {
                 timestamp: timestamp,
@@ -275,10 +303,10 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
                 action: "invite_code_redeemed",
                 targetId: uid,
                 targetType: 'CenterMembership',
-                details: {
+                details: JSON.stringify({
                     inviteCode: code,
                     role: role,
-                },
+                }),
             });
 
             return { ok: true, centerId: centerId, message: `Successfully joined center ${centerId} as ${role}.` };
@@ -288,14 +316,12 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
 
     } catch (error: any) {
         console.error("redeemInviteCode failed:", error);
-        // If it's an error we threw intentionally, rethrow it
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        // For all other errors, return a generic internal error
         throw new functions.https.HttpsError(
             "internal",
-            error.message || "An unknown server error occurred during invite redemption."
+            error.message || "초대 코드 처리 중 서버 오류가 발생했습니다."
         );
     }
 });
