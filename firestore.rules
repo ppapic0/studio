@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,6 +9,11 @@ service cloud.firestore {
     function hasRole(centerId, roles) {
       let memberPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
       return isSignedIn() && exists(memberPath) && (get(memberPath).data.role in roles);
+    }
+
+    function isParentOf(centerId, studentId) {
+      let parentPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
+      return isSignedIn() && hasRole(centerId, ['parent']) && studentId in get(parentPath).data.linkedStudentIds;
     }
 
     match /users/{userId} {
@@ -22,12 +28,44 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 성장 및 통계 데이터 규칙
+      // 상담 예약 규칙
+      match /appointments/{appointmentId} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == resource.data.studentId || 
+          isParentOf(centerId, resource.data.studentId) ||
+          hasRole(centerId, ['centerAdmin', 'teacher'])
+        );
+        allow create: if isSignedIn() && (
+          (request.resource.data.studentId == request.auth.uid && hasRole(centerId, ['student'])) ||
+          isParentOf(centerId, request.resource.data.studentId) ||
+          hasRole(centerId, ['centerAdmin', 'teacher'])
+        );
+        allow update: if isSignedIn() && (
+          // 학생은 본인 예약 취소만 가능
+          (request.auth.uid == resource.data.studentId && 
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+           request.resource.data.status == 'cancelled') ||
+          // 교사/관리자는 담당 예약 수정 가능
+          (hasRole(centerId, ['centerAdmin', 'teacher']) && 
+           (resource.data.teacherId == request.auth.uid || hasRole(centerId, ['centerAdmin'])))
+        );
+      }
+
+      // 상담일지 규칙
+      match /counselingNotes/{noteId} {
+        allow read: if isSignedIn() && (
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          (resource.data.visibility == 'student_and_parent' && 
+           (request.auth.uid == resource.data.studentId || isParentOf(centerId, resource.data.studentId)))
+        );
+        allow write: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
+      }
+
       match /growthProgress/{userId} {
         allow read: if isSignedIn() && (
           request.auth.uid == userId || 
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          (hasRole(centerId, ['parent']) && userId in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
+          isParentOf(centerId, userId)
         );
         allow write: if false; 
       }
@@ -36,26 +74,8 @@ service cloud.firestore {
         allow read: if isSignedIn() && (
           request.auth.uid == studentId || 
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          (hasRole(centerId, ['parent']) && studentId in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
+          isParentOf(centerId, studentId)
         );
-      }
-
-      match /studyLogs/{userId}/days/{date} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == userId || 
-          hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          (hasRole(centerId, ['parent']) && userId in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
-        );
-        allow write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /leaderboards/{period}/{metric}/entries/{entryId} {
-        allow read: if isSignedIn();
-      }
-
-      match /config/growthTree {
-        allow read: if isSignedIn();
-        allow write: if hasRole(centerId, ['centerAdmin']);
       }
 
       match /attendanceRecords/{date}/students/{studentId} {
@@ -67,10 +87,6 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
-
-      match /records/{recordId} {
-        allow read: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
-      }
     }
 
     match /inviteCodes/{code} {
@@ -79,11 +95,6 @@ service cloud.firestore {
 
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Collection Group rules for Teacher Dashboard
-    match /{path=**}/records/{recordId} {
-      allow read: if isSignedIn() && hasRole(resource.data.centerId, ['centerAdmin', 'teacher']);
     }
   }
 }

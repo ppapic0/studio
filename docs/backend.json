@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -37,6 +38,32 @@
       },
       "required": ["role", "status", "joinedAt"]
     },
+    "Appointment": {
+      "title": "Appointment",
+      "type": "object",
+      "description": "상담 예약 정보",
+      "properties": {
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "startAt": { "type": "string", "format": "date-time" },
+        "endAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["requested", "confirmed", "cancelled", "completed", "no_show"] },
+        "createdByRole": { "type": "string" },
+        "teacherNote": { "type": "string" }
+      }
+    },
+    "CounselingNote": {
+      "title": "CounselingNote",
+      "type": "object",
+      "description": "상담 완료 후 작성되는 상세 일지",
+      "properties": {
+        "appointmentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "content": { "type": "string" },
+        "visibility": { "type": "string", "enum": ["student_and_parent", "teacher_only"] }
+      }
+    },
     "StudyPlanItem": {
       "title": "StudyPlanItem",
       "type": "object",
@@ -62,41 +89,6 @@
         "studyTimeGrowthRate": { "type": "number" },
         "riskDetected": { "type": "boolean" }
       }
-    },
-    "StudyLogDay": {
-      "title": "StudyLogDay",
-      "type": "object",
-      "description": "일일 학습 시간 기록",
-      "properties": {
-        "totalMinutes": { "type": "number" },
-        "dateKey": { "type": "string" },
-        "studentId": { "type": "string" }
-      }
-    },
-    "GrowthProgress": {
-      "title": "GrowthProgress",
-      "type": "object",
-      "description": "성장 트리 진행 상태",
-      "properties": {
-        "level": { "type": "number" },
-        "currentXp": { "type": "number" },
-        "nextLevelXp": { "type": "number" },
-        "stats": { "type": "object" },
-        "skills": { "type": "object" }
-      }
-    },
-    "InviteCode": {
-      "title": "InviteCode",
-      "type": "object",
-      "description": "가입용 초대 코드",
-      "properties": {
-        "centerId": { "type": "string" },
-        "intendedRole": { "type": "string" },
-        "maxUses": { "type": "number" },
-        "usedCount": { "type": "number" },
-        "expiresAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["centerId", "intendedRole", "maxUses", "usedCount"]
     }
   },
   "auth": {
@@ -105,75 +97,19 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}",
+        "path": "/centers/{centerId}/appointments/{appointmentId}",
         "definition": {
-          "entityName": "User",
-          "schema": { "$ref": "#/backend/entities/User" },
-          "description": "사용자 프로필"
+          "entityName": "Appointment",
+          "schema": { "$ref": "#/backend/entities/Appointment" },
+          "description": "센터별 상담 예약 리스트"
         }
       },
       {
-        "path": "/centers/{centerId}",
+        "path": "/centers/{centerId}/counselingNotes/{noteId}",
         "definition": {
-          "entityName": "Center",
-          "schema": { "$ref": "#/backend/entities/Center" },
-          "description": "센터 정보"
-        }
-      },
-      {
-        "path": "/centers/{centerId}/members/{userId}",
-        "definition": {
-          "entityName": "CenterMember",
-          "schema": { "$ref": "#/backend/entities/CenterMember" },
-          "description": "센터 멤버십"
-        }
-      },
-      {
-        "path": "/centers/{centerId}/plans/{studentId}/weeks/{week}/items/{itemId}",
-        "definition": {
-          "entityName": "StudyPlanItem",
-          "schema": { "$ref": "#/backend/entities/StudyPlanItem" },
-          "description": "학습 계획 항목"
-        }
-      },
-      {
-        "path": "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}",
-        "definition": {
-          "entityName": "DailyStudentStat",
-          "schema": { "$ref": "#/backend/entities/DailyStudentStat" },
-          "description": "일일 통계 데이터"
-        }
-      },
-      {
-        "path": "/centers/{centerId}/studyLogs/{userId}/days/{date}",
-        "definition": {
-          "entityName": "StudyLogDay",
-          "schema": { "$ref": "#/backend/entities/StudyLogDay" },
-          "description": "일일 학습 시간 로그"
-        }
-      },
-      {
-        "path": "/centers/{centerId}/growthProgress/{userId}",
-        "definition": {
-          "entityName": "GrowthProgress",
-          "schema": { "$ref": "#/backend/entities/GrowthProgress" },
-          "description": "성장 트리 진행 상태"
-        }
-      },
-      {
-        "path": "/inviteCodes/{code}",
-        "definition": {
-          "entityName": "InviteCode",
-          "schema": { "$ref": "#/backend/entities/InviteCode" },
-          "description": "글로벌 초대 코드"
-        }
-      },
-      {
-        "path": "/userCenters/{userId}/centers/{centerId}",
-        "definition": {
-          "entityName": "CenterMember",
-          "schema": { "$ref": "#/backend/entities/CenterMember" },
-          "description": "사용자별 가입 센터 역인덱스"
+          "entityName": "CounselingNote",
+          "schema": { "$ref": "#/backend/entities/CounselingNote" },
+          "description": "상담 완료 후 기록되는 상세 로그"
         }
       }
     ]

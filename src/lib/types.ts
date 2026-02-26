@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
@@ -20,6 +21,32 @@ export interface CenterMembership {
   linkedStudentIds?: string[];
 }
 
+export interface Appointment {
+  centerId: string;
+  studentId: string;
+  studentName?: string;
+  teacherId?: string;
+  teacherName?: string;
+  startAt: Timestamp;
+  endAt: Timestamp;
+  status: 'requested' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  createdByRole: 'student' | 'parent' | 'teacher' | 'centerAdmin';
+  teacherNote?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CounselingNote {
+  centerId: string;
+  appointmentId: string;
+  studentId: string;
+  teacherId: string;
+  content: string;
+  visibility: 'student_and_parent' | 'teacher_only';
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface GrowthProgress {
   level: number;
   currentXp: number;
@@ -37,22 +64,6 @@ export interface GrowthProgress {
   updatedAt: Timestamp;
 }
 
-export interface SkillNode {
-  id: string;
-  branch: 'focus' | 'consistency' | 'achievement' | 'resilience';
-  name: string;
-  description: string;
-  maxLevel: number;
-  prerequisites: string[];
-  unlockCondition: {
-    stat?: keyof GrowthProgress['stats'];
-    value?: number;
-    customRule?: string;
-  };
-  effects: Record<string, any>;
-  iconKey: string;
-}
-
 export interface StudyPlanItem {
   studyPlanWeekId: string;
   centerId: string;
@@ -65,27 +76,6 @@ export interface StudyPlanItem {
   category?: 'schedule' | 'personal' | 'study';
   createdAt: Timestamp;
   updatedAt: Timestamp;
-}
-
-export interface StudyLogDay {
-    centerId: string;
-    studentId: string;
-    dateKey: string;
-    totalMinutes: number;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-}
-
-export interface AttendanceRecord {
-    centerId: string;
-    studentId: string;
-    dateKey: string;
-    status: 'requested' | 'confirmed_present' | 'confirmed_absent' | 'confirmed_late' | 'excused_absent';
-    checkInAt?: Timestamp;
-    checkOutAt?: Timestamp;
-    confirmedByUserId?: string;
-    updatedAt: Timestamp;
-    studentName?: string;
 }
 
 export interface DailyStudentStat {
