@@ -34,8 +34,8 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: '비밀번호는 8자 이상이어야 합니다.',
   }),
-  inviteCode: z.string().min(4, {
-    message: '초대 코드는 4자 이상이어야 합니다.',
+  inviteCode: z.string().min(1, {
+    message: '초대 코드를 입력해주세요.',
   }),
 });
 
@@ -60,47 +60,31 @@ export function SignupForm() {
     if (!auth || !functions) return;
     setIsLoading(true);
     try {
-      // 1. Create User in Firebase Auth
+      // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
         values.password
       );
-      const user = userCredential.user;
+      await updateProfile(userCredential.user, { displayName: values.displayName });
 
-      // 2. Update Firebase Auth profile
-      await updateProfile(user, { displayName: values.displayName });
-
-      // 3. Redeem invite code via Cloud Function.
-      // The function now handles creating the user profile in Firestore,
-      // the center membership, and all other necessary documents.
+      // 2. Redeem Invite Code (This bootstraps the center if it's missing)
       const redeemInviteCode = httpsCallable(functions, 'redeemInviteCode');
-      await redeemInviteCode({ code: values.inviteCode });
+      const result: any = await redeemInviteCode({ code: values.inviteCode });
 
-      toast({
-        title: '회원가입 성공!',
-        description: '센터에 오신 것을 환영합니다. 대시보드로 이동합니다.',
-      });
-
-      router.push('/app');
+      if (result.data.ok) {
+        toast({
+          title: '회원가입 및 가입 성공!',
+          description: result.data.message,
+        });
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       console.error('Signup failed:', error);
-
-      let description = '오류가 발생했습니다. 다시 시도해 주세요.';
-      if (error.code === 'auth/email-already-in-use') {
-        description = '이미 사용 중인 이메일입니다.';
-      } else if (error.code === 'functions/not-found' || (error.details && error.details.message === 'Invalid invite code.')) {
-        description = '초대 코드가 유효하지 않습니다.';
-      } else if (error.code === 'functions/internal') {
-        description = '서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도하거나, Firestore 콘솔에서 필요한 색인이 생성되었는지 확인해주세요.';
-      } else if (error.message) {
-        description = error.message;
-      }
-
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description: description,
+        description: error.message || '초대 코드가 유효하지 않거나 서버 오류가 발생했습니다.',
       });
     } finally {
       setIsLoading(false);
@@ -116,9 +100,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>이름</FormLabel>
-              <FormControl>
-                <Input placeholder="홍길동" {...field} />
-              </FormControl>
+              <FormControl><Input placeholder="홍길동" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -129,9 +111,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>이메일</FormLabel>
-              <FormControl>
-                <Input placeholder="name@example.com" {...field} />
-              </FormControl>
+              <FormControl><Input placeholder="name@example.com" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -142,9 +122,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>비밀번호</FormLabel>
-              <FormControl>
-                <Input type="password" {...field} />
-              </FormControl>
+              <FormControl><Input type="password" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -155,26 +133,17 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>초대 코드</FormLabel>
-              <FormControl>
-                <Input placeholder="센터 초대 코드를 입력하세요" {...field} />
-              </FormControl>
+              <FormControl><Input placeholder="0313" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button
-          type="submit"
-          className="w-full bg-accent hover:bg-accent/90"
-          disabled={isLoading}
-        >
-          {isLoading ? '계정 생성 중...' : '가입 및 센터 참여'}
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading ? '처리 중...' : '가입 및 센터 참여'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">
-        이미 계정이 있으신가요?{' '}
-        <Link href="/login" className="underline">
-          로그인
-        </Link>
+        이미 계정이 있으신가요? <Link href="/login" className="underline">로그인</Link>
       </div>
     </Form>
   );

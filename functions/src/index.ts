@@ -17,14 +17,13 @@ const DEV_SECRET = functions.config().dev?.secret;
 
 /**
  * @description A development-only function to allow a user to join a center with a specific role.
- * It automatically creates the center with default data if it doesn't exist, making it
- * a crucial bootstrapping tool for new development environments.
+ * It automatically creates the center with default data if it doesn't exist.
  */
 export const devJoinCenter = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
-      "The function must be called while authenticated."
+      "인증된 사용자만 호출할 수 있습니다."
     );
   }
 
@@ -36,34 +35,30 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
   if (process.env.FUNCTIONS_EMULATOR !== 'true' && devSecret !== DEV_SECRET) {
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Invalid DEV_SECRET. Access denied."
+      "개발용 비밀 키가 올바르지 않습니다."
     );
   }
   if (!centerId || typeof centerId !== "string") {
-    throw new functions.https.HttpsError("invalid-argument", "centerId is required.");
-  }
-  const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
-  if (!role || !allowedRoles.includes(role)) {
-    throw new functions.https.HttpsError("invalid-argument", `Invalid role. Must be one of: ${allowedRoles.join(", ")}`);
+    throw new functions.https.HttpsError("invalid-argument", "centerId가 필요합니다.");
   }
 
-  // Add fallbacks for robustness, e.g., if token has no displayName.
   const finalDisplayName = displayName || (email ? email.split('@')[0] : "새 사용자");
   const finalEmail = email || `${uid}@example.com`;
+  const centerName = centerId === 'learning-lab-dongbaek' ? "공부트랙 동백센터" : `센터 ${centerId}`;
 
   try {
-    const centerRef = db.doc(`centers/${centerId}`);
     const batch = db.batch();
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
-    // CRITICAL FIX: Check if the center document exists. If not, create it.
+    // 1. Bootstrap Center if missing
+    const centerRef = db.doc(`centers/${centerId}`);
     const centerDoc = await centerRef.get();
     if (!centerDoc.exists) {
         const subscriptionExpires = new Date();
         subscriptionExpires.setDate(subscriptionExpires.getDate() + 30);
         batch.set(centerRef, {
-            name: `센터 ${centerId}`,
-            description: "개발용으로 자동 생성된 센터입니다.",
+            name: centerName,
+            description: "자동 생성된 센터입니다.",
             subscriptionTier: "Pro",
             maxStudents: 150,
             maxTeachers: 10,
@@ -76,9 +71,9 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
         });
     }
 
-    // 1. Create/Update User Profile for all roles
+    // 2. Create/Update User Profile
     const userProfileRef = db.doc(`users/${uid}`);
-     batch.set(userProfileRef, {
+    batch.set(userProfileRef, {
       id: uid,
       displayName: finalDisplayName,
       email: finalEmail,
@@ -86,7 +81,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       updatedAt: timestamp
     }, { merge: true });
 
-    // 2. Create the primary membership document
+    // 3. Create Center Membership
     const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
     const memberData: any = {
       role: role,
@@ -100,7 +95,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     }
     batch.set(memberRef, memberData);
 
-    // 3. Create the reverse-index for the user
+    // 4. Create Reverse-Index
     const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
     batch.set(userCenterRef, {
       role: role,
@@ -108,220 +103,135 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
       joinedAt: timestamp,
     });
 
-    // 4. If student, seed initial data
+    // 5. Seed initial data for students
     if (role === "student") {
       const todayKey = format(new Date(), 'yyyy-MM-dd');
       const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
 
-      // Initial Daily Stat
       const dailyStatRef = db.doc(`centers/${centerId}/dailyStudentStats/${todayKey}/students/${uid}`);
       batch.set(dailyStatRef, {
-        centerId: centerId,
-        studentId: uid,
-        dateKey: todayKey,
-        todayPlanCompletionRate: 0,
-        totalStudyMinutes: 0,
-        attendanceStreakDays: 0,
-        weeklyPlanCompletionRate: 0,
-        studyTimeGrowthRate: 0,
-        riskDetected: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        centerId, studentId: uid, dateKey: todayKey,
+        todayPlanCompletionRate: 0, totalStudyMinutes: 0, attendanceStreakDays: 0,
+        weeklyPlanCompletionRate: 0, studyTimeGrowthRate: 0, riskDetected: false,
+        createdAt: timestamp, updatedAt: timestamp,
       });
 
-      // Initial Study Plan Week
       const studyPlanWeekRef = db.doc(`centers/${centerId}/plans/${uid}/weeks/${weekKey}`);
-      batch.set(studyPlanWeekRef, {
-          centerId: centerId,
-          uid: uid,
-          weekKey: weekKey,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-      });
-
-      // Initial enrollment record
-      const enrollmentRef = db.collection(`centers/${centerId}/enrollments`).doc();
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 3);
-      batch.set(enrollmentRef, {
-        centerId: centerId,
-        studentId: uid,
-        startAt: admin.firestore.Timestamp.fromDate(startDate),
-        endAt: admin.firestore.Timestamp.fromDate(endDate),
-        status: 'active',
-        renewalIntent: 'N/A',
-        createdAt: timestamp,
-        updatedAt: timestamp
-      });
+      batch.set(studyPlanWeekRef, { centerId, uid, weekKey, createdAt: timestamp, updatedAt: timestamp });
     }
 
-    // 5. Create an audit log
+    // 6. Audit Log
     const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
     batch.set(auditLogRef, {
-      timestamp: timestamp,
-      actorId: uid,
-      action: "dev_join_center",
-      targetId: uid,
-      targetType: "CenterMembership",
-      details: JSON.stringify({
-        role: role,
-        centerId: centerId
-      }),
+      timestamp, actorId: uid, action: "dev_join_center",
+      targetId: uid, targetType: "CenterMembership",
+      details: JSON.stringify({ role, centerId })
     });
 
     await batch.commit();
-
-    return { ok: true, message: `Successfully joined center ${centerId} as ${role}.` };
+    return { ok: true, message: `${centerName}에 ${role} 역할로 가입되었습니다.` };
   } catch (error: any) {
     console.error("devJoinCenter failed:", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      error.message || "Server error during join process."
-    );
+    throw new functions.https.HttpsError("internal", error.message || "서버 오류가 발생했습니다.");
   }
 });
 
 /**
- * @description Redeems an invite code, creating the necessary user profile,
- * center membership, and audit logs in a single transaction.
- * It also bootstraps the center document if it doesn't exist.
+ * @description Redeems an invite code, creating all necessary documents.
+ * Bootstraps the center if it doesn't exist.
  */
 export const redeemInviteCode = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
-        throw new functions.https.HttpsError(
-            "unauthenticated",
-            "The function must be called while authenticated."
-        );
+        throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
     }
 
     const { code } = data;
     const uid = context.auth.uid;
     const { email, name: displayName } = context.auth.token;
 
-    if (!code || typeof code !== "string") {
-        throw new functions.https.HttpsError("invalid-argument", "A valid invite code is required.");
-    }
+    if (!code) throw new functions.https.HttpsError("invalid-argument", "코드가 필요합니다.");
     
     const inviteCodeRef = db.doc(`inviteCodes/${code}`);
 
     try {
-        const result = await db.runTransaction(async (transaction) => {
-            // 1. READ: Get Invite Code
+        return await db.runTransaction(async (transaction) => {
             const inviteCodeDoc = await transaction.get(inviteCodeRef);
             if (!inviteCodeDoc.exists) {
-                throw new functions.https.HttpsError('not-found', '존재하지 않거나 유효하지 않은 초대 코드입니다.');
+                throw new functions.https.HttpsError('not-found', '유효하지 않은 초대 코드입니다.');
             }
             
             const inviteCodeData = inviteCodeDoc.data()!;
             const centerId = inviteCodeData.centerId;
+            if (!centerId) throw new functions.https.HttpsError('internal', '초대 코드 정보 오류 (centerId 누락).');
 
-            if (!centerId) {
-                throw new functions.https.HttpsError('internal', '초대 코드 정보가 올바르지 않습니다 (centerId 누락).');
-            }
-
-            // 2. READ: Get Center Doc (Bootstrap check)
             const centerRef = db.doc(`centers/${centerId}`);
             const centerDoc = await transaction.get(centerRef);
 
-            // --- Validation ---
+            // Validation
             if (inviteCodeData.usedCount >= inviteCodeData.maxUses) {
-                throw new functions.https.HttpsError('resource-exhausted', '이 초대 코드는 이미 최대 사용 횟수에 도달했습니다.');
+                throw new functions.https.HttpsError('resource-exhausted', '사용 횟수가 초과된 코드입니다.');
             }
-            const now = new Date();
-            if (inviteCodeData.expiresAt && inviteCodeData.expiresAt.toDate() < now) {
-                throw new functions.https.HttpsError('deadline-exceeded', '만료된 초대 코드입니다.');
+            if (inviteCodeData.expiresAt && inviteCodeData.expiresAt.toDate() < new Date()) {
+                throw new functions.https.HttpsError('deadline-exceeded', '만료된 코드입니다.');
             }
 
-            // --- Preparation ---
             const timestamp = admin.firestore.FieldValue.serverTimestamp();
             const role = inviteCodeData.intendedRole || 'student';
             const finalDisplayName = displayName || (email ? email.split('@')[0] : "새 사용자");
             const finalEmail = email || `${uid}@example.com`;
+            const centerName = centerId === 'learning-lab-dongbaek' ? "공부트랙 동백센터" : `센터 (${centerId})`;
 
-            // --- WRITES ---
-            
-            // A. Bootstrap Center if missing
+            // Bootstrapping Center
             if (!centerDoc.exists) {
                 const subscriptionExpires = new Date();
                 subscriptionExpires.setDate(subscriptionExpires.getDate() + 30);
                 transaction.set(centerRef, {
-                    name: `공부트랙관리형독서실 (${centerId})`,
-                    description: "초대 코드를 통해 자동 생성된 센터입니다.",
+                    name: centerName,
+                    description: "초대 코드로 자동 생성된 센터입니다.",
                     subscriptionTier: "Pro",
-                    maxStudents: 150,
-                    maxTeachers: 10,
-                    aiUsageQuotaWeekly: 1000,
-                    dataRetentionPeriodDays: 365,
-                    billingStatus: 'active',
+                    maxStudents: 150, maxTeachers: 10, aiUsageQuotaWeekly: 1000,
+                    dataRetentionPeriodDays: 365, billingStatus: 'active',
                     subscriptionExpiresAt: admin.firestore.Timestamp.fromDate(subscriptionExpires),
-                    createdAt: timestamp,
-                    updatedAt: timestamp,
+                    createdAt: timestamp, updatedAt: timestamp,
                 });
             }
 
-            // B. Create/update the main user profile
-            const userProfileRef = db.doc(`users/${uid}`);
-            transaction.set(userProfileRef, {
-                id: uid,
-                displayName: finalDisplayName,
-                email: finalEmail,
-                createdAt: timestamp,
-                updatedAt: timestamp,
+            // User Profile
+            transaction.set(db.doc(`users/${uid}`), {
+                id: uid, displayName: finalDisplayName, email: finalEmail,
+                createdAt: timestamp, updatedAt: timestamp,
             }, { merge: true });
 
-            // C. Create the center membership document
-            const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
-            transaction.set(memberRef, {
-                role: role,
-                status: "active",
-                joinedAt: timestamp,
-                email: finalEmail,
-                displayName: finalDisplayName,
+            // Membership
+            transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
+                role, status: "active", joinedAt: timestamp,
+                email: finalEmail, displayName: finalDisplayName,
                 invitedByInviteCodeId: inviteCodeDoc.id,
             });
 
-            // D. Create the reverse-index for the user
-            const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
-            transaction.set(userCenterRef, {
-                role: role,
-                status: "active",
-                joinedAt: timestamp,
+            // Reverse Index
+            transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
+                role, status: "active", joinedAt: timestamp,
             });
             
-            // E. Update invite code usage
+            // Usage Update
             transaction.update(inviteCodeRef, {
                 usedCount: admin.firestore.FieldValue.increment(1),
                 updatedAt: timestamp,
             });
 
-            // F. Create an audit log
-            const auditLogRef = db.collection(`centers/${centerId}/auditLogs`).doc();
-            transaction.set(auditLogRef, {
-                timestamp: timestamp,
-                actorId: uid,
-                action: "invite_code_redeemed",
-                targetId: uid,
-                targetType: 'CenterMembership',
-                details: JSON.stringify({
-                    inviteCode: code,
-                    role: role,
-                }),
+            // Audit
+            transaction.set(db.collection(`centers/${centerId}/auditLogs`).doc(), {
+                timestamp, actorId: uid, action: "invite_code_redeemed",
+                targetId: uid, targetType: 'CenterMembership',
+                details: JSON.stringify({ inviteCode: code, role })
             });
 
-            return { ok: true, centerId: centerId, message: `Successfully joined center ${centerId} as ${role}.` };
+            return { ok: true, centerId, message: `${centerName} 가입 성공!` };
         });
-        
-        return result;
-
     } catch (error: any) {
         console.error("redeemInviteCode failed:", error);
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        }
-        throw new functions.https.HttpsError(
-            "internal",
-            error.message || "초대 코드 처리 중 서버 오류가 발생했습니다."
-        );
+        if (error instanceof functions.https.HttpsError) throw error;
+        throw new functions.https.HttpsError("internal", "서버 처리 중 오류가 발생했습니다.");
     }
 });
