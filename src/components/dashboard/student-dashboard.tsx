@@ -55,7 +55,7 @@ import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
-import { doc, collection, query, where, limit, updateDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { format, startOfMonth, differenceInDays, addMonths } from 'date-fns';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -411,6 +411,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    
+    // 1. To-do 완료 업데이트
     updateDoc(itemRef, {
       done: !item.done,
       updatedAt: serverTimestamp(),
@@ -421,6 +423,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         requestResourceData: { done: !item.done }
       }));
     });
+
+    // 2. 할 일을 마쳤을 때 '목표달성' 스탯 1점 및 10XP 추가
+    if (!item.done) {
+      const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+      setDoc(progressRef, {
+        stats: { achievement: increment(1) },
+        currentXp: increment(10),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
   };
 
   const handleStudyEndAutomatically = () => {
@@ -440,6 +452,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const sessionMinutes = Math.floor(secondsElapsed / 60);
     if (sessionMinutes <= 0) return;
 
+    // 1. 학습 시간 기록
     const data = {
       totalMinutes: increment(sessionMinutes),
       uid: user.uid,
@@ -458,6 +471,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           requestResourceData: data
         }));
       });
+
+    // 2. 성장 스탯 업데이트 (집중력, 꾸준함, 회복력)
+    const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+    const focusGain = (sessionMinutes / 30); // 30분당 1점
+    
+    setDoc(progressRef, {
+      stats: {
+        focus: increment(Number(focusGain.toFixed(2))),
+        consistency: increment(0.5), // 세션 완료 보너스
+        resilience: sessionMinutes >= 60 ? increment(1) : increment(0) // 1시간 이상 몰입 시 회복력 보너스
+      },
+      currentXp: increment(sessionMinutes), // 1분당 1XP
+      updatedAt: serverTimestamp()
+    }, { merge: true });
   };
 
   const handleStudyStartStop = () => {
@@ -738,7 +765,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <Checkbox 
                       id={task.id} 
                       checked={task.done} 
-                      onCheckedChange={() => handleToggleTask(task)} 
+                      onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
                       className="h-6 w-6 rounded-lg border-2"
                     />
                   </div>

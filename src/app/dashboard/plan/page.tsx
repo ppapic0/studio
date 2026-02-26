@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -49,7 +50,9 @@ import {
   doc, 
   deleteDoc, 
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  setDoc,
+  increment
 } from 'firebase/firestore';
 import { 
   format, 
@@ -241,11 +244,23 @@ export default function StudyPlanPage() {
       'items',
       item.id
     );
-    await updateDoc(itemRef, {
+    
+    // 1. 상태 업데이트
+    updateDoc(itemRef, {
       done: !item.done,
       doneAt: !item.done ? serverTimestamp() : null,
       updatedAt: serverTimestamp(),
     });
+
+    // 2. 할 일을 마쳤을 때 '목표달성' 스탯 1점 추가
+    if (!item.done) {
+      const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+      setDoc(progressRef, {
+        stats: { achievement: increment(1) },
+        currentXp: increment(10),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
