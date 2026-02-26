@@ -28,17 +28,19 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { LeaderboardEntry, WithId } from '@/lib/types';
-import { Loader2, Trophy } from 'lucide-react';
+import { Loader2, Trophy, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 type LeaderboardTabProps = {
   title: string;
   description: string;
   entries: WithId<LeaderboardEntry>[] | null;
   isLoading: boolean;
+  metricType: 'completion' | 'attendance' | 'growth';
 };
 
-function LeaderboardTab({ title, description, entries, isLoading }: LeaderboardTabProps) {
+function LeaderboardTab({ title, description, entries, isLoading, metricType }: LeaderboardTabProps) {
   return (
     <Card>
       <CardHeader>
@@ -47,6 +49,12 @@ function LeaderboardTab({ title, description, entries, isLoading }: LeaderboardT
           {title}
         </CardTitle>
         <CardDescription>{description}</CardDescription>
+        {metricType === 'attendance' && (
+          <div className="mt-2 text-[11px] text-destructive flex items-center gap-1 bg-destructive/5 p-2 rounded border border-destructive/10">
+            <AlertCircle className="h-3 w-3" />
+            일일 학습 3시간(180분) 이상 달성 시에만 출석 일수로 인정됩니다.
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -88,7 +96,7 @@ function LeaderboardTab({ title, description, entries, isLoading }: LeaderboardT
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono font-bold text-primary">
-                  {entry.value.toLocaleString()}
+                  {entry.value.toLocaleString()}{metricType === 'attendance' ? '일' : metricType === 'growth' ? '%' : '%'}
                 </TableCell>
               </TableRow>
             ))}
@@ -168,14 +176,16 @@ export default function LeaderboardsPage() {
             description="이번 시즌 학습 계획 완수율이 가장 높은 학생들입니다."
             entries={completionEntries}
             isLoading={completionLoading}
+            metricType="completion"
           />
         </TabsContent>
         <TabsContent value="consistency" className="mt-4">
           <LeaderboardTab
-            title="월간 출석 킹"
-            description="이번 시즌 가장 성실하게 등원한 학생들입니다."
+            title="월간 출석 킹 (3h+)"
+            description="이번 시즌 3시간 이상 학습한 날이 가장 많은 학생들입니다."
             entries={consistencyEntries}
             isLoading={consistencyLoading}
+            metricType="attendance"
           />
         </TabsContent>
         <TabsContent value="growth" className="mt-4">
@@ -184,6 +194,7 @@ export default function LeaderboardsPage() {
             description="지난 달 대비 학습 능력이 가장 비약적으로 상승한 학생들입니다."
             entries={growthEntries}
             isLoading={growthLoading}
+            metricType="growth"
           />
         </TabsContent>
       </Tabs>

@@ -25,6 +25,7 @@ import {
   Info,
   ChevronRight,
   CalendarClock,
+  AlertCircle,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -50,6 +51,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 // --- 월간 시즌 등급 정의 ---
 const RANKS = [
@@ -68,7 +70,7 @@ type MetricType = 'completion' | 'attendance' | 'growth';
 // 월간 기준 깐깐한 임계치 (매달 1일 리셋)
 const RANK_THRESHOLDS: Record<MetricType, number[]> = {
   completion: [98, 95, 92, 88, 84, 75, 60, 0], // 월간 완수율 (%)
-  attendance: [26, 24, 22, 20, 18, 15, 10, 0], // 월간 출석 일수 (일)
+  attendance: [26, 24, 22, 20, 18, 15, 10, 0], // 월간 '유효' 출석 일수 (일) - 3시간 이상 학습 기준
   growth: [50, 40, 30, 20, 10, 5, 0, -50],    // 월간 성장 지수 (%)
 };
 
@@ -170,6 +172,16 @@ function GamifiedStatCard({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
+          {type === 'attendance' && (
+            <Alert className="bg-destructive/10 border-destructive/20 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="text-xs font-bold uppercase tracking-tight">엄격한 출석 기준 (3시간 룰)</AlertTitle>
+              <AlertDescription className="text-[11px] leading-relaxed">
+                출석 등급은 단순히 등원한 날이 아닌, **일일 3시간(180분) 이상 학습을 완료한 날**만 카운트됩니다. 몰입의 시간을 확보하세요!
+              </AlertDescription>
+            </Alert>
+          )}
+
           {rankData.next && (
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-medium">
@@ -182,7 +194,7 @@ function GamifiedStatCard({
               />
               <p className="text-[11px] text-muted-foreground text-center italic">
                 {type === 'completion' && `월간 완수율을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 더 올리면 승급합니다!`}
-                {type === 'attendance' && `이번 달 출석 ${rankData.nextThreshold - rankData.currentValue}일만 더 채우면 다음 단계로!`}
+                {type === 'attendance' && `3시간 이상 학습한 날을 ${Math.ceil(rankData.nextThreshold - rankData.currentValue)}일 더 채우면 다음 단계로!`}
                 {type === 'growth' && `성장 지수를 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 높여 능력을 증명하세요!`}
               </p>
             </div>
@@ -219,7 +231,7 @@ function GamifiedStatCard({
           
           <div className="text-center text-[11px] text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-dashed">
             💡 매달 1일 00:00에 시즌 등급과 랭킹이 초기화됩니다. <br/>
-            한 달 동안의 꾸준함으로 당신의 실력을 증명하세요!
+            {type === 'attendance' ? "하루 3시간 이상의 '진짜 공부'만이 출석으로 인정됩니다." : "한 달 동안의 꾸준함으로 당신의 실력을 증명하세요!"}
           </div>
         </div>
       </DialogContent>
@@ -396,8 +408,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const growthRate = (dailyStat?.studyTimeGrowthRate ?? 0) * 100;
   const growthSign = growthRate >= 0 ? '+' : '';
-  const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100; // 실제로는 월간 통계에서 가져오도록 백엔드 구성 필요
-  const attendanceDays = dailyStat?.attendanceStreakDays ?? 0; // 실제로는 월간 누적 출석일
+  const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
+  const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
@@ -511,11 +523,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
         
         <GamifiedStatCard 
-          title="월간 출석"
+          title="월간 출석 (3h+)"
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}
-          evolution="성실함의 척도"
+          evolution="3시간 학습일 기준"
           isLoading={dailyStatLoading}
           type="attendance"
           gameTitle="출석 킹"
