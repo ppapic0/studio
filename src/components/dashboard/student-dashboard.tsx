@@ -24,8 +24,8 @@ import {
   CalendarClock,
   AlertCircle,
   ChevronRight,
-  Coffee,
-  School,
+  CheckCircle2,
+  CircleDot,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -113,6 +113,8 @@ function GamifiedStatCard({
   icon: Icon, 
   value, 
   numericValue,
+  dailyValue,
+  dailyUnit = '%',
   evolution, 
   isLoading, 
   type,
@@ -122,6 +124,8 @@ function GamifiedStatCard({
   icon: React.ElementType, 
   value?: string, 
   numericValue: number,
+  dailyValue: number,
+  dailyUnit?: string,
   evolution?: string, 
   isLoading: boolean,
   type: MetricType,
@@ -132,10 +136,12 @@ function GamifiedStatCard({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] border border-border/50 bg-card/80 backdrop-blur-sm">
+        <Card className="cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] border border-border/50 bg-card/80 backdrop-blur-sm rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium transition-colors group-hover:text-primary">{title}</CardTitle>
-            <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all duration-300" />
+            <CardTitle className="text-sm font-bold transition-colors group-hover:text-primary">{title}</CardTitle>
+            <div className="bg-primary/5 p-1.5 rounded-lg group-hover:bg-primary/10 transition-colors">
+              <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all duration-300" />
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -145,84 +151,111 @@ function GamifiedStatCard({
               </div>
             ) : (
               <>
-                <div className="text-2xl font-bold tracking-tight">{value}</div>
+                <div className="text-2xl font-black tracking-tight">{value}</div>
                 <div className="flex items-center gap-1.5 mt-2">
-                   <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full transition-transform group-hover:scale-110", rankData.current.bg, rankData.current.color)}>
+                   <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full transition-transform group-hover:scale-110", rankData.current.bg, rankData.current.color)}>
                      {rankData.current.name}
                    </span>
-                   <p className="text-[10px] text-muted-foreground">{evolution}</p>
+                   <p className="text-[10px] font-bold text-muted-foreground/70">{evolution}</p>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto rounded-3xl">
-        <DialogHeader>
-          <div className="mx-auto bg-primary/10 p-5 rounded-full mb-3 animate-float">
-            <Trophy className={cn("h-14 w-14", rankData.current.color)} />
-          </div>
-          <DialogTitle className="text-center text-3xl font-bold tracking-tight">{gameTitle}</DialogTitle>
-          <DialogDescription className="text-center text-lg mt-2 font-medium">
-            이번 시즌 티어: <span className={cn("font-bold", rankData.current.color)}>{rankData.current.name}</span>
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-6 py-4">
-          {type === 'attendance' && (
-            <Alert className="bg-destructive/5 border-destructive/20 text-destructive rounded-2xl">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="text-xs font-bold uppercase tracking-wider">엄격한 출석 기준 (3시간 룰)</AlertTitle>
-              <AlertDescription className="text-[11px] leading-relaxed font-medium">
-                출석 등급은 단순히 등원한 날이 아닌, **일일 3시간(180분) 이상 학습을 완료한 날**만 카운트됩니다. 몰입의 시간을 확보하세요!
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {rankData.next && (
-            <div className="space-y-3">
-              <div className="flex justify-between text-xs font-semibold">
-                <span>다음 목표: {rankData.next.name}</span>
-                <span className="font-mono">{rankData.currentValue.toFixed(1)} / {rankData.nextThreshold}</span>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto rounded-[2.5rem] border-none shadow-2xl p-0">
+        <div className="relative p-6 sm:p-8">
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent -z-10" />
+          
+          <DialogHeader className="items-center text-center">
+            <div className={cn("mx-auto p-5 rounded-3xl mb-4 animate-float shadow-xl bg-white", rankData.current.border)}>
+              <Trophy className={cn("h-16 w-16", rankData.current.color)} />
+            </div>
+            <DialogTitle className="text-3xl font-black tracking-tighter">{gameTitle}</DialogTitle>
+            <DialogDescription className="text-lg mt-2 font-bold">
+              이번 시즌 티어: <span className={cn("font-black underline underline-offset-4 decoration-2", rankData.current.color)}>{rankData.current.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-8 py-6">
+            {/* 오늘의 현황 섹션 */}
+            <div className="rounded-3xl bg-secondary/30 p-6 border border-secondary shadow-inner space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="bg-primary/10 p-1.5 rounded-lg">
+                    <Activity className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest text-primary/70">오늘의 실시간 현황</span>
+                </div>
+                <span className="text-xl font-black text-primary font-mono">{dailyValue.toFixed(0)}{dailyUnit}</span>
               </div>
-              <Progress 
-                value={Math.min(100, (rankData.currentValue / rankData.nextThreshold) * 100)} 
-                className="h-2.5 rounded-full overflow-hidden bg-secondary" 
-              />
-              <p className="text-[11px] text-muted-foreground text-center italic font-medium">
-                {type === 'completion' && `월간 완수율을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 더 올리면 승급합니다!`}
-                {type === 'attendance' && `3시간 이상 학습한 날을 ${Math.ceil(rankData.nextThreshold - rankData.currentValue)}일 더 채우면 다음 단계로!`}
-                {type === 'growth' && `성장 지수를 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 높여 능력을 증명하세요!`}
+              <div className="space-y-2">
+                <Progress 
+                  value={type === 'attendance' ? Math.min(100, (dailyValue / 180) * 100) : dailyValue} 
+                  className="h-3 rounded-full bg-white/50" 
+                />
+                <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                  <span>START</span>
+                  <span>{type === 'attendance' ? '목표 180분' : '목표 100%'}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-center font-bold text-primary/60 italic">
+                {type === 'completion' && (dailyValue >= 100 ? "🎉 오늘 계획 마스터! 완벽합니다." : `오늘 남은 계획을 마쳐서 ${dailyValue.toFixed(0)}%를 채우세요!`)}
+                {type === 'attendance' && (dailyValue >= 180 ? "⚡ 3시간 몰입 성공! 출석 인정되었습니다." : `앞으로 ${(180 - dailyValue).toFixed(0)}분만 더 공부하면 출석이 인정돼요!`)}
+                {type === 'growth' && (dailyValue > 0 ? "📈 어제보다 더 성장하고 있습니다. 페이스를 유지하세요!" : "오늘의 학습을 시작하여 성장 지수를 높여보세요!")}
               </p>
             </div>
-          )}
 
-          <div className="rounded-2xl border border-border/50 bg-muted/20 overflow-hidden shadow-inner">
-            <div className="bg-muted/40 px-5 py-4 border-b flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary/70">
-                <Info className="h-4 w-4" />
-                <span>시즌 등급 달성 조건</span>
-              </div>
-              <span className="text-[10px] font-bold text-muted-foreground">단위: {type === 'attendance' ? '일' : '%'}</span>
-            </div>
-            <div className="p-2 space-y-1.5">
-              {RANKS.map((r, idx) => (
-                <div key={r.name} className={cn(
-                  "flex items-center justify-between px-4 py-2.5 rounded-xl text-xs transition-all duration-300",
-                  rankData.current.name === r.name 
-                    ? cn("bg-white shadow-lg ring-1 scale-[1.03] z-10", r.border) 
-                    : "opacity-40 grayscale-[0.3] scale-[0.98]"
-                )}>
-                  <div className="flex items-center gap-3">
-                    <div className={cn("h-2.5 w-2.5 rounded-full shadow-sm", r.bg.replace('bg-', 'bg-opacity-100 bg-'))} />
-                    <span className={cn("font-bold tracking-tight", r.color)}>{r.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1 font-mono font-bold">
-                    <span className="text-muted-foreground text-[10px] mr-1 font-medium">이상</span>
-                    {RANK_THRESHOLDS[type][idx]}
-                  </div>
+            {type === 'attendance' && (
+              <Alert className="bg-destructive/5 border-destructive/20 text-destructive rounded-2xl py-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle className="text-[10px] font-black uppercase tracking-widest">엄격한 출석 인정 기준 (3시간 룰)</AlertTitle>
+                <AlertDescription className="text-[11px] leading-relaxed font-bold mt-1">
+                  출석 등급은 일일 **3시간(180분) 이상** 학습을 완료한 날만 카운트됩니다.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {rankData.next && (
+              <div className="space-y-4 px-2">
+                <div className="flex justify-between text-xs font-black">
+                  <span className="text-muted-foreground">다음 목표: {rankData.next.name}</span>
+                  <span className="font-mono text-primary">{rankData.currentValue.toFixed(1)} / {rankData.nextThreshold}</span>
                 </div>
-              ))}
+                <Progress 
+                  value={Math.min(100, (rankData.currentValue / rankData.nextThreshold) * 100)} 
+                  className="h-3 rounded-full bg-secondary" 
+                />
+              </div>
+            )}
+
+            <div className="rounded-3xl border border-border/50 bg-muted/20 overflow-hidden">
+              <div className="bg-muted/40 px-6 py-4 border-b flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-primary/70">
+                  <Info className="h-4 w-4" />
+                  <span>시즌 등급 달성 조건</span>
+                </div>
+                <span className="text-[10px] font-black text-muted-foreground/60">단위: {type === 'attendance' ? '일' : '%'}</span>
+              </div>
+              <div className="p-3 space-y-1.5">
+                {RANKS.map((r, idx) => (
+                  <div key={r.name} className={cn(
+                    "flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs transition-all duration-300",
+                    rankData.current.name === r.name 
+                      ? cn("bg-white shadow-lg ring-1 scale-[1.03] z-10", r.border) 
+                      : "opacity-40 grayscale-[0.2]"
+                  )}>
+                    <div className="flex items-center gap-3">
+                      <div className={cn("h-2.5 w-2.5 rounded-full shadow-sm", r.bg.replace('bg-', 'bg-opacity-100 bg-'))} />
+                      <span className={cn("font-black tracking-tight", r.color)}>{r.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 font-mono font-black">
+                      <span className="text-muted-foreground text-[10px] mr-1 font-bold">이상</span>
+                      {RANK_THRESHOLDS[type][idx]}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -275,6 +308,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
+
+  // 실시간 일일 완수율 계산
+  const todayCompletionRate = useMemo(() => {
+    if (!studyTasks || studyTasks.length === 0) return 0;
+    const doneCount = studyTasks.filter(t => t.done).length;
+    return (doneCount / studyTasks.length) * 100;
+  }, [studyTasks]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -385,28 +425,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm shadow-sm">
+      <div className="bg-primary/5 border border-primary/10 rounded-3xl p-4 flex items-center justify-between backdrop-blur-sm shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-xl">
+          <div className="bg-primary/10 p-2 rounded-2xl">
             <CalendarClock className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-sm font-medium">
-            <span className="font-bold text-primary text-base">{format(today, 'M월')} 시즌</span> 진행 중
+          <div className="text-sm font-bold">
+            <span className="font-black text-primary text-base">{format(today, 'M월')} 시즌</span> 진행 중
           </div>
         </div>
-        <div className="text-[11px] font-bold text-muted-foreground bg-white/50 px-3 py-1.5 rounded-full border border-border/50">
+        <div className="text-[11px] font-black text-muted-foreground bg-white/50 px-4 py-2 rounded-2xl border border-border/50">
           시즌 종료까지 <span className="text-primary font-black">{daysUntilReset}일</span>
         </div>
       </div>
 
-      <section className="group relative overflow-hidden rounded-[2rem] bg-primary p-6 sm:p-8 text-primary-foreground shadow-xl transition-all duration-500 hover:shadow-primary/20">
+      <section className="group relative overflow-hidden rounded-[2.5rem] bg-primary p-6 sm:p-8 text-primary-foreground shadow-2xl transition-all duration-500 hover:shadow-primary/20">
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-accent opacity-20 transition-opacity group-hover:opacity-40" />
         <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:justify-between md:text-left">
           <div className="space-y-3">
-            <h2 className="text-2xl font-black tracking-tight sm:text-3xl leading-tight">
+            <h2 className="text-2xl font-black tracking-tighter sm:text-3xl leading-tight">
               {isTimerActive ? "몰입의 즐거움을\n경험하세요!" : "오늘의 성장을\n지금 시작할까요?"}
             </h2>
-            <p className="flex items-center gap-2 text-primary-foreground/70 font-bold bg-white/10 w-fit px-3 py-1.5 rounded-xl backdrop-blur-sm border border-white/10 text-xs">
+            <p className="flex items-center gap-2 text-primary-foreground/70 font-black bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-sm border border-white/10 text-[11px]">
               <MapPin className="h-3 w-3 text-accent animate-pulse" />
               {locationStatus === 'checking' && "위치 확인 중..."}
               {locationStatus === 'inside' && "동백센터 구역 내"}
@@ -417,12 +457,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             {isTimerActive && (
-              <div className="flex flex-col items-center gap-0.5 bg-white/10 backdrop-blur-xl px-6 py-3 rounded-2xl border border-white/20 shadow-inner animate-pulse-soft">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest opacity-70">
+              <div className="flex flex-col items-center gap-0.5 bg-white/10 backdrop-blur-xl px-7 py-4 rounded-3xl border border-white/20 shadow-inner animate-pulse-soft">
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest opacity-70">
                   <Timer className="h-3 w-3" />
                   <span>진행 시간</span>
                 </div>
-                <span className="text-3xl font-mono font-black tracking-tighter">
+                <span className="text-4xl font-mono font-black tracking-tighter">
                   {formatTime(secondsElapsed)}
                 </span>
               </div>
@@ -431,7 +471,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Button 
               size="lg" 
               className={cn(
-                "h-16 w-full rounded-2xl px-8 text-xl font-black transition-all md:w-auto shadow-xl active:scale-95",
+                "h-16 w-full rounded-[1.5rem] px-10 text-xl font-black transition-all md:w-auto shadow-xl active:scale-95",
                 isTimerActive 
                   ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" 
                   : locationStatus === 'inside' 
@@ -458,14 +498,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {scheduleItems.length > 0 && (
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
           {scheduleItems.map((item) => {
             const [title, time] = item.title.split(': ');
             return (
-              <Card key={item.id} className="bg-card/50 backdrop-blur-sm border-dashed rounded-2xl transition-transform hover:scale-105">
-                <CardContent className="p-3 flex flex-col items-center justify-center gap-1 text-center">
-                  <span className="text-[10px] font-black text-primary/50 uppercase tracking-widest">{title}</span>
-                  <span className="text-base font-black text-primary">{time || '-'}</span>
+              <Card key={item.id} className="bg-card/50 backdrop-blur-sm border-dashed rounded-3xl transition-all hover:scale-105 hover:border-primary/50 group">
+                <CardContent className="p-4 flex flex-col items-center justify-center gap-1 text-center">
+                  <span className="text-[10px] font-black text-muted-foreground/50 group-hover:text-primary/50 uppercase tracking-widest transition-colors">{title}</span>
+                  <span className="text-lg font-black text-primary">{time || '-'}</span>
                 </CardContent>
               </Card>
             );
@@ -473,11 +513,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       )}
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/dashboard/study-history">
-          <Card className="cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.98] group h-full border border-border/50 bg-card/80 backdrop-blur-sm rounded-2xl">
+          <Card className="cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-[1.03] active:scale-[0.98] group h-full border border-border/50 bg-card/80 backdrop-blur-sm rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">오늘의 학습 시간</CardTitle>
+              <CardTitle className="text-sm font-black text-muted-foreground group-hover:text-primary transition-colors">오늘의 학습 시간</CardTitle>
               <div className="bg-primary/5 p-1.5 rounded-lg group-hover:bg-primary/10 transition-colors">
                 <Clock className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all" />
               </div>
@@ -488,15 +528,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               ) : (
                 <div className="flex items-center gap-1 justify-between">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black tracking-tight">{todayStudyLog?.totalMinutes || 0}</span>
-                    <span className="text-xs font-bold text-muted-foreground">분</span>
+                    <span className="text-3xl font-black tracking-tighter">{todayStudyLog?.totalMinutes || 0}</span>
+                    <span className="text-xs font-black text-muted-foreground">분</span>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                 </div>
               )}
-              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-[9px] font-bold text-primary opacity-60 uppercase tracking-wider">
-                 <Activity className="h-2.5 w-2.5" />
-                 <span>히스토리 확인</span>
+              <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2 text-[10px] font-black text-primary/60 uppercase tracking-widest">
+                 <Activity className="h-3 w-3" />
+                 <span>학습 히스토리</span>
               </div>
             </CardContent>
           </Card>
@@ -507,6 +547,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={ClipboardCheck}
           value={`${Math.round(completionRate)}%`}
           numericValue={completionRate}
+          dailyValue={todayCompletionRate}
           evolution="시즌 마스터리 도전"
           isLoading={dailyStatLoading}
           type="completion"
@@ -518,6 +559,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}
+          dailyValue={todayStudyLog?.totalMinutes || 0}
+          dailyUnit="분"
           evolution="몰입 시간 달성"
           isLoading={dailyStatLoading}
           type="attendance"
@@ -529,6 +572,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={TrendingUp}
           value={`${growthSign}${Math.round(growthRate)}%`}
           numericValue={growthRate}
+          dailyValue={growthRate}
           evolution="능력치 상승 중"
           isLoading={dailyStatLoading}
           type="growth"
@@ -536,54 +580,58 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
       </div>
 
-      <Card className="w-full rounded-[2rem] border border-border/50 bg-card/50 backdrop-blur-xl shadow-lg overflow-hidden">
-        <CardHeader className="flex flex-row items-center p-6 bg-muted/20">
+      <Card className="w-full rounded-[2.5rem] border border-border/50 bg-card/50 backdrop-blur-xl shadow-xl overflow-hidden">
+        <CardHeader className="flex flex-row items-center p-8 bg-muted/20">
           <div className="grid gap-1">
-            <CardTitle className="text-xl font-black tracking-tight">오늘의 자습 계획</CardTitle>
-            <CardDescription className="font-bold text-muted-foreground text-xs">성취를 위한 마지막 한 걸음</CardDescription>
+            <CardTitle className="text-2xl font-black tracking-tighter">오늘의 자습 계획</CardTitle>
+            <CardDescription className="font-bold text-muted-foreground/70 text-xs">성취를 위한 마지막 한 걸음</CardDescription>
           </div>
-          <Button asChild size="sm" variant="outline" className="ml-auto gap-1.5 rounded-xl border-2 font-bold transition-all hover:bg-primary hover:text-white h-9">
+          <Button asChild size="sm" variant="outline" className="ml-auto gap-2 rounded-2xl border-2 font-black transition-all hover:bg-primary hover:text-white h-10 px-5">
             <Link href="/dashboard/plan">
-              관리
+              계획 관리
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </Button>
         </CardHeader>
-        <CardContent className="p-6 grid gap-3">
+        <CardContent className="p-8 grid gap-4">
           {plansLoading ? (
-            <div className="space-y-3">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
             </div>
           ) : studyTasks.length > 0 ? (
               studyTasks.map((task) => (
-                <div key={task.id} className="group flex items-center space-x-3 rounded-2xl border border-border/50 p-4 hover:bg-white hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300">
+                <div key={task.id} className="group flex items-center space-x-4 rounded-[1.5rem] border border-border/50 p-5 bg-white/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] transition-all duration-300">
                   <div className="relative flex items-center">
                     <Checkbox 
                       id={task.id} 
                       checked={task.done} 
                       onCheckedChange={() => handleToggleTask(task)} 
-                      className="h-5 w-5 rounded-md border-2"
+                      className="h-6 w-6 rounded-lg border-2"
                     />
                   </div>
                   <Label
                     htmlFor={task.id}
                     className={cn(
-                      "flex-1 text-sm font-bold leading-none cursor-pointer transition-all",
+                      "flex-1 text-base font-bold leading-none cursor-pointer transition-all",
                       task.done ? "line-through text-muted-foreground opacity-50" : "text-foreground group-hover:text-primary"
                     )}
                   >
                     {task.title}
                   </Label>
+                  {task.done && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
                 </div>
               ))
           ) : (
-              <div className="text-center text-muted-foreground py-12 flex flex-col items-center gap-3">
-                <div className="bg-muted/50 p-3 rounded-full">
-                  <Info className="h-8 w-8 opacity-30" />
+              <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4">
+                <div className="bg-muted/50 p-4 rounded-full">
+                  <CircleDot className="h-10 w-10 opacity-30" />
                 </div>
-                <p className="text-base font-bold">오늘 세워진 자습 계획이 없어요.</p>
+                <div className="grid gap-1">
+                  <p className="text-lg font-black">오늘 세워진 자습 계획이 없어요.</p>
+                  <p className="text-xs font-bold opacity-60">미리 계획을 세우면 더 높은 완수율을 달성할 수 있습니다.</p>
+                </div>
                 <Link href="/dashboard/plan">
-                   <Button variant="link" className="font-black text-primary text-sm p-0">지금 계획하러 가기 →</Button>
+                   <Button variant="link" className="font-black text-primary text-base p-0 mt-2">지금 계획하러 가기 →</Button>
                 </Link>
               </div>
           )}
