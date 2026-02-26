@@ -17,8 +17,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['Pretendard', 'var(--font-inter)', 'sans-serif'],
-        headline: ['var(--font-space-grotesk)', 'sans-serif'],
+        body: ['Pretendard', 'sans-serif'],
+        headline: ['Pretendard', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',
