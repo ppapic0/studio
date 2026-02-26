@@ -67,7 +67,7 @@ async function bootstrapUserToCenter(
  */
 const region = "asia-northeast3";
 
-export const redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
+export const redeemInviteCode = functions.region(region).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
   
   const { code } = data;
@@ -120,7 +120,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
   }
 });
 
-export const devJoinCenter = functions.region(region).https.onCall(async (data, context) => {
+export const devJoinCenter = functions.region(region).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   
   const { centerId, role, devSecret } = data;
