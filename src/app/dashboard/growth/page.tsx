@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -38,7 +37,6 @@ import {
   TrendingUp,
   CalendarDays,
   Sparkles,
-  BookOpen,
   ArrowUpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -204,7 +202,7 @@ export default function GrowthPage() {
           <h1 className="text-3xl font-black tracking-tighter">성장 로드맵</h1>
         </div>
         <div className="flex items-center gap-2 ml-1">
-          <Badge variant="outline" className="border-primary/20 text-primary font-bold px-2 py-0">CORE ROADMAP</Badge>
+          <Badge variant="outline" className="border-primary/20 text-primary font-bold px-2 py-0">핵심 로드맵</Badge>
           <p className="text-sm font-bold text-muted-foreground">최종 목표인 Lv.30 마스터를 향한 300일의 험난한 여정입니다.</p>
         </div>
       </header>
@@ -224,8 +222,8 @@ export default function GrowthPage() {
                   <Icon className={cn("h-5 w-5 opacity-20 group-hover:opacity-100 transition-all group-hover:scale-110", config.color)} />
                 </div>
                 <div className="flex items-baseline gap-1 pt-2">
-                  <span className="text-3xl font-black tabular-nums">{val.toFixed(1)}</span>
-                  <span className="text-xs font-bold text-muted-foreground">/ 100점</span>
+                  <span className="text-3xl font-black tabular-nums">{val.toFixed(1)}점</span>
+                  <span className="text-xs font-bold text-muted-foreground">/ 목표 100</span>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -236,9 +234,9 @@ export default function GrowthPage() {
                   />
                 </div>
                 <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
-                  <span>정교한 숙련도</span>
+                  <span>숙련도 측정 중</span>
                   <span className="flex items-center gap-1">
-                    난이도 <span className="text-destructive">HARD</span>
+                    난이도 <span className="text-destructive">어려움</span>
                   </span>
                 </div>
               </CardContent>
@@ -292,7 +290,7 @@ export default function GrowthPage() {
             </div>
             <div className="mt-6 p-4 bg-black/20 rounded-2xl border border-white/5">
               <p className="text-xs font-bold leading-relaxed opacity-90">
-                ⚠️ <span className="text-amber-400">Warning:</span> 현재 스탯 획득 가중치가 매우 정교하게 설정되어 있습니다. **하루 6시간 공부와 플래너 완성을 300일간 지속**해야만 Lv.30 마스터리에 도달할 수 있습니다. 쉬운 길은 없습니다.
+                ⚠️ <span className="text-amber-400">주의:</span> 현재 스탯 획득 가중치가 매우 정교하게 설정되어 있습니다. **하루 6시간 공부와 플래너 완성을 300일간 지속**해야만 Lv.30 마스터리에 도달할 수 있습니다. 쉬운 길은 없습니다.
               </p>
             </div>
           </CardContent>
@@ -338,7 +336,7 @@ export default function GrowthPage() {
           <div>
             <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2">
               마스터리 진행 상태
-              <Badge variant="secondary" className="bg-primary text-white border-none font-black px-3">CORE ROADMAP</Badge>
+              <Badge variant="secondary" className="bg-primary text-white border-none font-black px-3">핵심 로드맵</Badge>
             </h2>
             <p className="text-sm font-bold text-muted-foreground mt-1">Lv.30은 상위 0.1%의 증거입니다. 당신의 한계에 도전하세요.</p>
           </div>
@@ -358,14 +356,14 @@ export default function GrowthPage() {
             </div>
             <div className="flex-1 flex flex-col gap-1.5">
               <div className="flex justify-between items-end">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Mastery</span>
+                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">마스터리 숙련도</span>
                 <span className="text-[10px] font-bold">{progress?.currentXp || 0} / {progress?.nextLevelXp || 1000} XP</span>
               </div>
               <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) * 100} className="h-2.5 rounded-full shadow-inner" />
               <div className="flex justify-between items-center mt-0.5">
-                <span className="text-[9px] font-black text-primary/60">GOAL: Lv.{MAX_LEVEL}</span>
+                <span className="text-[9px] font-black text-primary/60">목표: Lv.{MAX_LEVEL}</span>
                 <span className="text-[9px] font-black text-muted-foreground flex items-center gap-1">
-                  <Star className="h-2 w-2 fill-current" /> Master Rank
+                  <Star className="h-2 w-2 fill-current" /> 마스터 랭크
                 </span>
               </div>
             </div>
@@ -422,7 +420,7 @@ export default function GrowthPage() {
                         <div className="grid gap-0.5">
                           <CardTitle className="text-base font-black leading-tight">{skill.name}</CardTitle>
                           <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground/60">
-                            {isUnlocked ? `MASTERY LV.${progress?.skills?.[skill.id].level}` : canUnlock ? "해금 가능" : "Locked"}
+                            {isUnlocked ? `마스터리 LV.${progress?.skills?.[skill.id].level}` : canUnlock ? "해금 가능" : "잠김"}
                           </span>
                         </div>
                         {isUnlocked && <Star className="ml-auto h-4 w-4 text-amber-400 fill-current animate-bounce" />}
@@ -448,7 +446,7 @@ export default function GrowthPage() {
                   </CardHeader>
                   <CardContent className="p-8 space-y-8">
                     <div className="space-y-4">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Unlock Requirement</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">해금 조건</h4>
                       <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
                           <div className="bg-white/20 p-2 rounded-lg">
@@ -458,7 +456,7 @@ export default function GrowthPage() {
                         </div>
                         {stats[activeBranch] >= (selectedSkill.unlockCondition.value || 0) ? (
                           <div className="flex items-center gap-1.5 text-emerald-400">
-                            <span className="text-[10px] font-black uppercase">Cleared</span>
+                            <span className="text-[10px] font-black uppercase">달성 완료</span>
                             <CheckCircle2 className="h-5 w-5 fill-current" />
                           </div>
                         ) : (
@@ -468,14 +466,14 @@ export default function GrowthPage() {
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Mastery Effects</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">마스터리 효과</h4>
                       <div className="grid gap-3">
                         {Object.entries(selectedSkill.effects).map(([key, val]) => (
                           <div key={key} className="flex items-center justify-between group">
-                            <span className="text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity">XP Multiplier</span>
+                            <span className="text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity">경험치 획득 배율</span>
                             <span className="text-sm font-black text-emerald-400 flex items-center gap-1">
                               <ArrowUpCircle className="h-3 w-3" />
-                              x{Number(val).toFixed(2)} Bonus
+                              x{Number(val).toFixed(2)} 보너스
                             </span>
                           </div>
                         ))}
@@ -504,11 +502,11 @@ export default function GrowthPage() {
                       ) : (
                         <Button disabled className="w-full h-14 rounded-2xl bg-white/10 text-white/40 font-black text-base border border-white/5 gap-2">
                           <Lock className="h-5 w-5" />
-                          Requirement Not Met
+                          조건 미충족
                         </Button>
                       )}
                       <p className="text-[9px] text-center mt-2 font-bold opacity-50 uppercase tracking-[0.2em]">
-                        Ultimate Mastery Journey: Lv.{MAX_LEVEL}
+                        궁극의 마스터리 여정: Lv.{MAX_LEVEL}
                       </p>
                     </div>
                   </CardContent>
