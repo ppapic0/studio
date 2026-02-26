@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,27 +17,17 @@ import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFunctions } from '@/firebase';
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  displayName: z.string().min(2, {
-    message: '이름은 2자 이상이어야 합니다.',
-  }),
-  email: z.string().email({
-    message: '유효한 이메일 주소를 입력해주세요.',
-  }),
-  password: z.string().min(8, {
-    message: '비밀번호는 8자 이상이어야 합니다.',
-  }),
-  inviteCode: z.string().min(1, {
-    message: '초대 코드를 입력해주세요.',
-  }),
+  displayName: z.string().min(2, '이름은 2자 이상이어야 합니다.'),
+  email: z.string().email('유효한 이메일을 입력해주세요.'),
+  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
+  inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
 });
 
 export function SignupForm() {
@@ -48,43 +39,31 @@ export function SignupForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      displayName: '',
-      email: '',
-      password: '',
-      inviteCode: '',
-    },
+    defaultValues: { displayName: '', email: '', password: '', inviteCode: '' },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !functions) return;
     setIsLoading(true);
     try {
-      // 1. Create Auth User
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
-      );
+      // 1. 계정 생성
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
-      // 2. Redeem Invite Code (This bootstraps the center if it's missing)
+      // 2. 서버를 통해 초대 코드 사용 및 센터 가입
       const redeemInviteCode = httpsCallable(functions, 'redeemInviteCode');
       const result: any = await redeemInviteCode({ code: values.inviteCode });
 
       if (result.data.ok) {
-        toast({
-          title: '회원가입 및 가입 성공!',
-          description: result.data.message,
-        });
+        toast({ title: '가입 성공', description: result.data.message });
         router.push('/dashboard');
       }
     } catch (error: any) {
-      console.error('Signup failed:', error);
+      console.error('Signup Error:', error);
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description: error.message || '초대 코드가 유효하지 않거나 서버 오류가 발생했습니다.',
+        description: error.message || '오류가 발생했습니다. 초대 코드를 확인해 주세요.',
       });
     } finally {
       setIsLoading(false);
@@ -132,14 +111,15 @@ export function SignupForm() {
           name="inviteCode"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>초대 코드</FormLabel>
+              <FormLabel>초대 코드 (동백센터: 0313)</FormLabel>
               <FormControl><Input placeholder="0313" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? '처리 중...' : '가입 및 센터 참여'}
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading ? '가입 중...' : '가입 및 센터 참여'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">

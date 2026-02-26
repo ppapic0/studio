@@ -1,227 +1,38 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
 
-    /**
-     * CORE PHILOSOPHY:
-     * This ruleset implements a robust multi-tenant authorization model for a Study Center management system.
-     * It prioritizes "Authorization Independence" by using denormalized fields (like centerId and studentMemberId)
-     * and path-based ownership to minimize slow, recursive lookups.
-     * 
-     * DATA STRUCTURE:
-     * 1. /users/{userId}: Private user profiles.
-     * 2. /centers/{centerId}: Study center definitions owned by a User.
-     * 3. /centers/{centerId}/members/{memberUserId}: Role-based access control mapping users to roles within a center.
-     * 4. /centers/{centerId}/students/{studentMemberId}/...: Scoped data for specific students (plans, logs, attendance).
-     * 
-     * KEY SECURITY DECISIONS:
-     * - Role-Based Access: For administrative tasks, we perform a single controlled get() to /members/{uid} 
-     *   to verify if the requesting user is an 'admin' or 'teacher' in that specific center.
-     * - Ownership: Users always have full control over their own /users and notification preference documents.
-     * - System-Only Writes: Aggregated stats, AI insights, and audit logs are read-only for clients and 
-     *   restricted for writing to system-level processes (Cloud Functions/Admin SDK).
-     * - Prototyping Mode: We enforce who can write but remain flexible on the specific schema of the data fields
-     *   to allow for rapid development.
-     */
-
-    // --- Global Helper Functions ---
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
-    // Retrieves the member document for the current user in a specific center
-    function getMemberData(centerId) {
-      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data;
-    }
-
-    function hasCenterRole(centerId, role) {
-      return isSignedIn() && getMemberData(centerId).role == role;
-    }
-
-    function isCenterAdmin(centerId) {
-      return hasCenterRole(centerId, 'admin');
-    }
-
-    function isCenterTeacher(centerId) {
-      return hasCenterRole(centerId, 'teacher');
-    }
-
-    // --- Collection Rules ---
-
-    /**
-     * @description Rules for user profile documents. Ensures users can only manage their own profile.
-     * @path /users/{userId}
-     * @allow (create) if auth.uid == "user_123"
-     * @deny (update) if auth.uid != userId
-     * @principle Enforces path-based ownership for root user identity.
-     */
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
 
-      /**
-       * @description User-specific notification preferences for a center.
-       * @path /users/{userId}/notificationPreferences/{centerId}
-       * @allow (get) if auth.uid == userId
-       * @principle Combines user ownership with center-scoped preferences.
-       */
-      match /notificationPreferences/{centerId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.userId == userId && request.resource.data.centerId == centerId;
-        allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
+    match /centers/{centerId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Cloud Functions 전용
+      
+      match /members/{userId} {
+        allow read: if isOwner(userId) || (get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role in ['admin', 'teacher']);
+        allow write: if false;
       }
     }
 
-    /**
-     * @description Rules for Center documents. Owners have full control; members can read.
-     * @path /centers/{centerId}
-     * @allow (update) if auth.uid == resource.data.ownerUserId
-     * @deny (create) if auth.uid == null
-     * @principle Uses denormalized ownerUserId for direct ownership check.
-     */
-    match /centers/{centerId} {
+    match /inviteCodes/{code} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.ownerUserId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.ownerUserId == request.auth.uid && request.resource.data.ownerUserId == resource.data.ownerUserId;
-      allow delete: if isSignedIn() && resource.data.ownerUserId == request.auth.uid;
+      allow list, write: if false;
+    }
 
-      // Helper function specific to center context (staff roles)
-      function isStaff() {
-        return isCenterAdmin(centerId) || isCenterTeacher(centerId);
-      }
-
-      /**
-       * @description Center membership records. Admins manage all; users can read their own.
-       * @path /centers/{centerId}/members/{memberUserId}
-       * @allow (get) if auth.uid == memberUserId
-       * @principle Enables DBAC (Database-Based Access Control) by storing roles in a predictable path.
-       */
-      match /members/{memberUserId} {
-        allow get: if isOwner(memberUserId) || isCenterAdmin(centerId);
-        allow list: if isCenterAdmin(centerId) || isCenterTeacher(centerId);
-        allow create: if isCenterAdmin(centerId) || (isOwner(memberUserId));
-        allow update, delete: if isCenterAdmin(centerId);
-      }
-
-      /**
-       * @description Invite codes for onboarding. Restricted to center staff.
-       * @path /centers/{centerId}/inviteCodes/{inviteCodeId}
-       * @allow (get) if isSignedIn()
-       * @principle Only staff can manage codes; anyone signed in can potentially 'get' a code to redeem it.
-       */
-      match /inviteCodes/{inviteCodeId} {
-        allow get: if isSignedIn();
-        allow list: if isCenterAdmin(centerId) || isCenterTeacher(centerId);
-        allow create, update, delete: if isCenterAdmin(centerId) || isCenterTeacher(centerId);
-      }
-
-      /**
-       * @description Student-scoped data tree. Access shared by the student themselves and center staff.
-       */
-      match /students/{studentMemberId} {
-        
-        // Helper function specific to student context
-        function isAuthorizedStudent() {
-          return isOwner(studentMemberId) || isCenterAdmin(centerId) || isCenterTeacher(centerId);
-        }
-
-        /**
-         * @description Weekly study plans and their individual items.
-         * @path /centers/{centerId}/students/{studentMemberId}/studyPlanWeeks/{weekKey}
-         * @principle Staff manages plans; students can read and update completion (items).
-         */
-        match /studyPlanWeeks/{weekKey} {
-          allow get, list: if isAuthorizedStudent();
-          allow create, update, delete: if isStaff();
-
-          match /items/{itemId} {
-            allow get, list: if isAuthorizedStudent();
-            allow create, delete: if isStaff();
-            allow update: if isAuthorizedStudent();
-          }
-        }
-
-        /**
-         * @description Daily study logs. Students record their activity; staff reviews.
-         * @path /centers/{centerId}/students/{studentMemberId}/studyLogs/{dayKey}
-         */
-        match /studyLogs/{dayKey} {
-          allow get, list: if isAuthorizedStudent();
-          allow create, update: if isOwner(studentMemberId) || isStaff();
-          allow delete: if isStaff();
-        }
-
-        /**
-         * @description Attendance records. Students can request check-in; staff must confirm.
-         * @path /centers/{centerId}/students/{studentMemberId}/attendance/{dayKey}
-         */
-        match /attendance/{dayKey} {
-          allow get, list: if isAuthorizedStudent();
-          allow create: if isOwner(studentMemberId) && request.resource.data.status == 'pendingCheckIn';
-          allow update: if isStaff();
-          allow delete: if isCenterAdmin(centerId);
-        }
-
-        /**
-         * @description System-generated records: Stats, AI Outputs, Enrollments, Seats.
-         * @principle Client-read-only for sensitive or aggregated data.
-         */
-        match /dailyStats/{dayKey} {
-          allow get, list: if isAuthorizedStudent();
-          allow write: if false; 
-        }
-
-        match /aiOutputs/{aiOutputId} {
-          allow get, list: if isStaff(); // Only staff see AI risk flags/interventions
-          allow write: if false;
-        }
-
-        match /seatAssignments/{assignmentId} {
-          allow get, list: if isAuthorizedStudent();
-          allow create, update, delete: if isStaff();
-        }
-
-        match /enrollments/{enrollmentId} {
-          allow get, list: if isAuthorizedStudent();
-          allow create, update, delete: if isStaff();
-        }
-      }
-
-      /**
-       * @description Center-wide administrative collections.
-       */
-      match /leaderboards/{periodKey}/metrics/{metricKey}/entries/{studentMemberId} {
-        allow get, list: if isSignedIn();
-        allow write: if false; // Managed by Cloud Functions
-      }
-
-      match /monthlyStats/{monthKey} {
-        allow get, list: if isCenterAdmin(centerId) || isCenterTeacher(centerId);
-        allow write: if false;
-      }
-
-      match /seats/{seatId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isStaff();
-      }
-
-      match /auditLogs/{auditLogId} {
-        allow get, list: if isCenterAdmin(centerId);
-        allow write: if false;
-      }
+    match /userCenters/{userId}/centers/{centerId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+    
+    // 기존 데이터 구조 호환을 위한 임시 규칙 (필요 시 제거 가능)
+    match /centers/{centerId}/inviteCodes/{code} {
+      allow get: if isSignedIn();
     }
   }
 }
