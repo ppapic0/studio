@@ -384,45 +384,45 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
-      <div className="bg-primary/5 border border-primary/10 rounded-3xl p-5 flex items-center justify-between backdrop-blur-sm shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="bg-primary/10 p-2.5 rounded-2xl">
-            <CalendarClock className="h-6 w-6 text-primary" />
+    <div className="flex flex-col gap-6 pb-10">
+      <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-2 rounded-xl">
+            <CalendarClock className="h-5 w-5 text-primary" />
           </div>
           <div className="text-sm font-medium">
             <span className="font-bold text-primary text-base">{format(today, 'M월')} 시즌</span> 진행 중
           </div>
         </div>
-        <div className="text-xs font-bold text-muted-foreground bg-white/50 px-4 py-2 rounded-full border border-border/50">
+        <div className="text-[11px] font-bold text-muted-foreground bg-white/50 px-3 py-1.5 rounded-full border border-border/50">
           시즌 종료까지 <span className="text-primary font-black">{daysUntilReset}일</span>
         </div>
       </div>
 
-      <section className="group relative overflow-hidden rounded-[2.5rem] bg-primary p-10 text-primary-foreground shadow-2xl transition-all duration-500 hover:shadow-primary/20">
+      <section className="group relative overflow-hidden rounded-[2rem] bg-primary p-6 sm:p-8 text-primary-foreground shadow-xl transition-all duration-500 hover:shadow-primary/20">
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-accent opacity-20 transition-opacity group-hover:opacity-40" />
-        <div className="relative z-10 flex flex-col items-center gap-8 text-center md:flex-row md:justify-between md:text-left">
-          <div className="space-y-4">
-            <h2 className="text-4xl font-black tracking-tight sm:text-5xl leading-tight">
+        <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:justify-between md:text-left">
+          <div className="space-y-3">
+            <h2 className="text-2xl font-black tracking-tight sm:text-3xl leading-tight">
               {isTimerActive ? "몰입의 즐거움을\n경험하세요!" : "오늘의 성장을\n지금 시작할까요?"}
             </h2>
-            <p className="flex items-center gap-2.5 text-primary-foreground/70 font-semibold bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-sm border border-white/10">
-              <MapPin className="h-4 w-4 text-accent animate-pulse" />
-              {locationStatus === 'checking' && "위치 정보를 확인 중..."}
-              {locationStatus === 'inside' && "동백센터 학습 구역 내 확인"}
-              {locationStatus === 'outside' && `학습 구역 밖 (${distance?.toFixed(1)}km)`}
-              {locationStatus === 'error' && "위치 권한 확인 필요"}
+            <p className="flex items-center gap-2 text-primary-foreground/70 font-bold bg-white/10 w-fit px-3 py-1.5 rounded-xl backdrop-blur-sm border border-white/10 text-xs">
+              <MapPin className="h-3 w-3 text-accent animate-pulse" />
+              {locationStatus === 'checking' && "위치 확인 중..."}
+              {locationStatus === 'inside' && "동백센터 구역 내"}
+              {locationStatus === 'outside' && `구역 밖 (${distance?.toFixed(1)}km)`}
+              {locationStatus === 'error' && "위치 권한 필요"}
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             {isTimerActive && (
-              <div className="flex flex-col items-center gap-1 bg-white/10 backdrop-blur-xl px-8 py-5 rounded-[2rem] border border-white/20 shadow-inner animate-pulse-soft">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
-                  <Timer className="h-4 w-4" />
+              <div className="flex flex-col items-center gap-0.5 bg-white/10 backdrop-blur-xl px-6 py-3 rounded-2xl border border-white/20 shadow-inner animate-pulse-soft">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest opacity-70">
+                  <Timer className="h-3 w-3" />
                   <span>진행 시간</span>
                 </div>
-                <span className="text-5xl font-mono font-black tracking-tighter">
+                <span className="text-3xl font-mono font-black tracking-tighter">
                   {formatTime(secondsElapsed)}
                 </span>
               </div>
@@ -431,11 +431,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Button 
               size="lg" 
               className={cn(
-                "h-24 w-full rounded-[2rem] px-10 text-2xl font-black transition-all md:w-auto shadow-2xl active:scale-95",
+                "h-16 w-full rounded-2xl px-8 text-xl font-black transition-all md:w-auto shadow-xl active:scale-95",
                 isTimerActive 
                   ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" 
                   : locationStatus === 'inside' 
-                    ? "bg-accent text-accent-foreground hover:scale-110 hover:shadow-accent/40 hover:bg-accent/90" 
+                    ? "bg-accent text-accent-foreground hover:scale-105 hover:shadow-accent/40 hover:bg-accent/90" 
                     : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
               )}
               disabled={!isTimerActive && locationStatus !== 'inside'}
@@ -443,12 +443,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             >
               {isTimerActive ? (
                 <>
-                  <Square className="mr-3 h-8 w-8 fill-current" />
+                  <Square className="mr-2 h-6 w-6 fill-current" />
                   학습 마침
                 </>
               ) : (
                 <>
-                  <Play className="mr-4 h-10 w-10 fill-current" />
+                  <Play className="mr-3 h-7 w-7 fill-current" />
                   학습 시작
                 </>
               )}
@@ -458,14 +458,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {scheduleItems.length > 0 && (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
           {scheduleItems.map((item) => {
             const [title, time] = item.title.split(': ');
             return (
-              <Card key={item.id} className="bg-card/50 backdrop-blur-sm border-dashed rounded-3xl transition-transform hover:scale-105">
-                <CardContent className="p-4 flex flex-col items-center justify-center gap-2 text-center">
-                  <span className="text-[11px] font-black text-primary/50 uppercase tracking-widest">{title}</span>
-                  <span className="text-lg font-black text-primary">{time || '-'}</span>
+              <Card key={item.id} className="bg-card/50 backdrop-blur-sm border-dashed rounded-2xl transition-transform hover:scale-105">
+                <CardContent className="p-3 flex flex-col items-center justify-center gap-1 text-center">
+                  <span className="text-[10px] font-black text-primary/50 uppercase tracking-widest">{title}</span>
+                  <span className="text-base font-black text-primary">{time || '-'}</span>
                 </CardContent>
               </Card>
             );
@@ -473,30 +473,30 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       )}
 
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/dashboard/study-history">
-          <Card className="cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] active:scale-[0.98] group h-full border border-border/50 bg-card/80 backdrop-blur-sm rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <Card className="cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.98] group h-full border border-border/50 bg-card/80 backdrop-blur-sm rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">오늘의 학습 시간</CardTitle>
-              <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary/10 transition-colors">
-                <Clock className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all" />
+              <div className="bg-primary/5 p-1.5 rounded-lg group-hover:bg-primary/10 transition-colors">
+                <Clock className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all" />
               </div>
             </CardHeader>
             <CardContent>
               {todayStudyLogLoading ? (
-                <Skeleton className="h-10 w-28 mt-1" />
+                <Skeleton className="h-8 w-24 mt-1" />
               ) : (
                 <div className="flex items-center gap-1 justify-between">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl font-black tracking-tight">{todayStudyLog?.totalMinutes || 0}</span>
-                    <span className="text-sm font-bold text-muted-foreground">분</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black tracking-tight">{todayStudyLog?.totalMinutes || 0}</span>
+                    <span className="text-xs font-bold text-muted-foreground">분</span>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-2 transition-transform" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                 </div>
               )}
-              <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2 text-[10px] font-bold text-primary opacity-60">
-                 <Activity className="h-3 w-3" />
-                 <span>전체 히스토리 확인하기</span>
+              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 text-[9px] font-bold text-primary opacity-60 uppercase tracking-wider">
+                 <Activity className="h-2.5 w-2.5" />
+                 <span>히스토리 확인</span>
               </div>
             </CardContent>
           </Card>
@@ -507,7 +507,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={ClipboardCheck}
           value={`${Math.round(completionRate)}%`}
           numericValue={completionRate}
-          evolution="시즌 마스터리 도전 중"
+          evolution="시즌 마스터리 도전"
           isLoading={dailyStatLoading}
           type="completion"
           gameTitle="완수 마스터"
@@ -518,7 +518,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}
-          evolution="몰입 시간 달성 기준"
+          evolution="몰입 시간 달성"
           isLoading={dailyStatLoading}
           type="attendance"
           gameTitle="출석 킹"
@@ -529,46 +529,46 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={TrendingUp}
           value={`${growthSign}${Math.round(growthRate)}%`}
           numericValue={growthRate}
-          evolution="능력치 비약적 상승"
+          evolution="능력치 상승 중"
           isLoading={dailyStatLoading}
           type="growth"
           gameTitle="성장 챔피언"
         />
       </div>
 
-      <Card className="w-full rounded-[2.5rem] border border-border/50 bg-card/50 backdrop-blur-xl shadow-xl overflow-hidden">
-        <CardHeader className="flex flex-row items-center p-8 bg-muted/20">
-          <div className="grid gap-2">
-            <CardTitle className="text-2xl font-black tracking-tight">오늘의 자습 계획</CardTitle>
-            <CardDescription className="font-bold text-muted-foreground">성취를 위한 마지막 한 걸음</CardDescription>
+      <Card className="w-full rounded-[2rem] border border-border/50 bg-card/50 backdrop-blur-xl shadow-lg overflow-hidden">
+        <CardHeader className="flex flex-row items-center p-6 bg-muted/20">
+          <div className="grid gap-1">
+            <CardTitle className="text-xl font-black tracking-tight">오늘의 자습 계획</CardTitle>
+            <CardDescription className="font-bold text-muted-foreground text-xs">성취를 위한 마지막 한 걸음</CardDescription>
           </div>
-          <Button asChild size="lg" variant="outline" className="ml-auto gap-2 rounded-2xl border-2 font-bold transition-all hover:bg-primary hover:text-white">
+          <Button asChild size="sm" variant="outline" className="ml-auto gap-1.5 rounded-xl border-2 font-bold transition-all hover:bg-primary hover:text-white h-9">
             <Link href="/dashboard/plan">
               관리
-              <ArrowUpRight className="h-5 w-5" />
+              <ArrowUpRight className="h-4 w-4" />
             </Link>
           </Button>
         </CardHeader>
-        <CardContent className="p-8 grid gap-4">
+        <CardContent className="p-6 grid gap-3">
           {plansLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
             </div>
           ) : studyTasks.length > 0 ? (
               studyTasks.map((task) => (
-                <div key={task.id} className="group flex items-center space-x-4 rounded-3xl border border-border/50 p-6 hover:bg-white hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] transition-all duration-300">
+                <div key={task.id} className="group flex items-center space-x-3 rounded-2xl border border-border/50 p-4 hover:bg-white hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300">
                   <div className="relative flex items-center">
                     <Checkbox 
                       id={task.id} 
                       checked={task.done} 
                       onCheckedChange={() => handleToggleTask(task)} 
-                      className="h-6 w-6 rounded-lg border-2"
+                      className="h-5 w-5 rounded-md border-2"
                     />
                   </div>
                   <Label
                     htmlFor={task.id}
                     className={cn(
-                      "flex-1 text-base font-bold leading-none cursor-pointer transition-all",
+                      "flex-1 text-sm font-bold leading-none cursor-pointer transition-all",
                       task.done ? "line-through text-muted-foreground opacity-50" : "text-foreground group-hover:text-primary"
                     )}
                   >
@@ -577,13 +577,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               ))
           ) : (
-              <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4">
-                <div className="bg-muted/50 p-4 rounded-full">
-                  <Info className="h-10 w-10 opacity-30" />
+              <div className="text-center text-muted-foreground py-12 flex flex-col items-center gap-3">
+                <div className="bg-muted/50 p-3 rounded-full">
+                  <Info className="h-8 w-8 opacity-30" />
                 </div>
-                <p className="text-lg font-bold">오늘 세워진 자습 계획이 없어요.</p>
+                <p className="text-base font-bold">오늘 세워진 자습 계획이 없어요.</p>
                 <Link href="/dashboard/plan">
-                   <Button variant="link" className="font-black text-primary text-base">지금 계획하러 가기 →</Button>
+                   <Button variant="link" className="font-black text-primary text-sm p-0">지금 계획하러 가기 →</Button>
                 </Link>
               </div>
           )}
