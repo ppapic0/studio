@@ -48,6 +48,7 @@ export interface StudyPlanItem {
   weight: number;
   done: boolean;
   doneAt?: Timestamp;
+  dateKey?: string; // YYYY-MM-DD (Added for daily planning)
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -110,7 +111,6 @@ export interface AIOutput {
 }
 
 export interface InviteCode {
-    // The 'code' field is removed. The document ID is the code.
     centerId: string;
     intendedRole: 'student' | 'teacher' | 'parent' | 'admin';
     expiresAt: Timestamp;
