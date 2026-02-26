@@ -12,6 +12,7 @@ const DEV_SECRET = functions.config().dev?.secret;
 
 /**
  * 센터가 없으면 생성하고 사용자를 등록하는 부트스트랩 로직
+ * 트랜잭션 내에서 실행되어야 함
  */
 async function bootstrapUserToCenter(
   transaction: admin.firestore.Transaction,
@@ -27,9 +28,8 @@ async function bootstrapUserToCenter(
   const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
   const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
 
-  const centerSnap = await transaction.get(centerRef);
-  
   // 1. 센터 자동 생성 (동백센터 정보 우선)
+  const centerSnap = await transaction.get(centerRef);
   if (!centerSnap.exists) {
     transaction.set(centerRef, {
       id: centerId,
@@ -49,7 +49,7 @@ async function bootstrapUserToCenter(
     createdAt: timestamp,
   }, { merge: true });
 
-  // 3. 멤버십 등록
+  // 3. 센터 내 멤버십 등록
   transaction.set(memberRef, {
     role,
     status: "active",
@@ -57,7 +57,7 @@ async function bootstrapUserToCenter(
     displayName,
   });
 
-  // 4. 역인덱스 등록 (AuthGuard용)
+  // 4. 사용자별 가입 센터 역인덱스 등록 (앱 진입 시 권한 확인용)
   transaction.set(userCenterRef, {
     role,
     status: "active",
@@ -65,6 +65,9 @@ async function bootstrapUserToCenter(
   });
 }
 
+/**
+ * 초대 코드를 사용하여 센터에 가입
+ */
 export const redeemInviteCode = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
   
@@ -75,25 +78,24 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
 
   try {
     return await db.runTransaction(async (transaction) => {
-      // 1. 초대 코드 검색 (최상위 -> 센터 서브컬렉션 순서)
-      let inviteRef = db.doc(`inviteCodes/${code}`);
-      let inviteSnap = await transaction.get(inviteRef);
+      // 1. 초대 코드 검색 (최상위 inviteCodes 컬렉션에서 ID로 직접 조회)
+      const inviteRef = db.doc(`inviteCodes/${code}`);
+      const inviteSnap = await transaction.get(inviteRef);
 
       if (!inviteSnap.exists) {
-        // 호환성을 위해 동백센터 서브컬렉션도 확인
-        inviteRef = db.doc(`centers/learning-lab-dongbaek/inviteCodes/${code}`);
-        inviteSnap = await transaction.get(inviteRef);
-      }
-
-      if (!inviteSnap.exists) {
-        throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다.");
+        throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다. (ID를 확인해 주세요)");
       }
 
       const inviteData = inviteSnap.data()!;
       const centerId = inviteData.centerId || 'learning-lab-dongbaek';
       const role = inviteData.intendedRole || 'student';
 
-      // 2. 부트스트랩 및 가입 처리
+      // 사용 횟수 제한 확인
+      if (inviteData.maxUses && inviteData.usedCount >= inviteData.maxUses) {
+        throw new functions.https.HttpsError("resource-exhausted", "이 초대 코드는 더 이상 사용할 수 없습니다.");
+      }
+
+      // 2. 데이터 생성 및 부트스트랩
       await bootstrapUserToCenter(transaction, uid, email, displayName, centerId, role);
 
       // 3. 초대 코드 사용 횟수 증가
@@ -102,7 +104,7 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      return { ok: true, message: "센터 가입이 완료되었습니다!" };
+      return { ok: true, message: "공부트랙 동백센터 가입이 완료되었습니다!" };
     });
   } catch (error: any) {
     console.error("Redeem Error:", error);
@@ -111,11 +113,15 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
   }
 });
 
+/**
+ * 개발자용 강제 가입 함수
+ */
 export const devJoinCenter = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   
   const { centerId, role, devSecret } = data;
-  if (devSecret !== DEV_SECRET && process.env.FUNCTIONS_EMULATOR !== 'true') {
+  // 에뮬레이터 환경이 아니면 시크릿 키 검증
+  if (process.env.FUNCTIONS_EMULATOR !== 'true' && devSecret !== DEV_SECRET) {
     throw new functions.https.HttpsError("permission-denied", "비밀 키가 올바르지 않습니다.");
   }
 
@@ -129,6 +135,7 @@ export const devJoinCenter = functions.https.onCall(async (data, context) => {
     });
     return { ok: true, message: "강제 가입 성공!" };
   } catch (error: any) {
+    console.error("Dev Join Error:", error);
     throw new functions.https.HttpsError("internal", error.message);
   }
 });
