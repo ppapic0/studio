@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -79,26 +80,27 @@ export default function AppointmentsPage() {
   const isAdmin = activeMembership?.role === 'centerAdmin';
   const isParent = activeMembership?.role === 'parent';
 
-  // 1. 상담 데이터 쿼리 설정
+  // 1. 상담 데이터 쿼리 설정 - 역할별 명시적 필터링
   const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !user || !activeMembership.role) return null;
     
-    let baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
+    const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
     } else if (isParent) {
       const studentIds = activeMembership.linkedStudentIds || [];
       if (studentIds.length === 0) return null;
-      // 부모는 연결된 학생의 것만 (단일 학생 가정하여 첫 번째 학생 기준)
+      // 부모는 첫 번째 연결된 학생의 내역 조회 (MVP 기준)
       return query(baseRef, where('studentId', '==', studentIds[0]), orderBy('startAt', 'desc'));
     } else if (isTeacher) {
       return query(baseRef, where('teacherId', '==', user.uid), orderBy('startAt', 'desc'));
-    } else {
-      // 관리자는 전체
+    } else if (isAdmin) {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
-  }, [firestore, activeMembership, user]);
+    
+    return null;
+  }, [firestore, activeMembership, user, isStudent, isParent, isTeacher, isAdmin]);
 
   const { data: appointments, isLoading } = useCollection<Appointment>(appointmentsQuery);
 
@@ -328,7 +330,7 @@ export default function AppointmentsPage() {
               <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 space-y-2">
                 <p className="text-xs font-bold leading-relaxed">
                   • 모든 상담은 기본 30분간 진행됩니다.<br/>
-                  • 일정이 확정되면 카카오톡 알림이 발송됩니다.<br/>
+                  • 일정이 확정되면 알림이 발송됩니다.<br/>
                   • 당일 취소는 선생님께 미리 말씀해주세요.
                 </p>
               </div>
@@ -348,7 +350,7 @@ export default function AppointmentsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground font-bold leading-relaxed">
-                상담이 완료된 후 선생님이 작성하신 상세 일지를 여기서 확인할 수 있습니다. (공개 설정된 일지에 한함)
+                상담이 완료된 후 선생님이 작성하신 상세 일지를 여기서 확인할 수 있습니다.
               </p>
               <div className="p-10 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-center gap-2 opacity-40">
                 <XCircle className="h-8 w-8 text-muted-foreground" />
