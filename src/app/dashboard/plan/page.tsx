@@ -45,9 +45,7 @@ import {
   doc, 
   deleteDoc, 
   serverTimestamp,
-  writeBatch,
-  startOfMonth,
-  endOfMonth
+  writeBatch
 } from 'firebase/firestore';
 import { 
   format, 
@@ -55,7 +53,9 @@ import {
   startOfWeek, 
   isSameDay, 
   getDay,
-  eachDayOfInterval
+  eachDayOfInterval,
+  startOfMonth,
+  endOfMonth
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { type StudyPlanItem, type WithId } from '@/lib/types';
@@ -492,7 +492,7 @@ export default function StudyPlanPage() {
       <div className="flex flex-wrap gap-4 items-center px-4 py-3 bg-muted/30 rounded-lg text-[11px] text-muted-foreground">
          <div className="flex items-center gap-1.5">
            <CalendarDays className="h-3 w-3 text-primary" />
-           <span>모든 계획은 선생님 및 센터 관리자와 공유됩니다.</span>
+           <span>모든 계획은 센터 관리자와 공유됩니다.</span>
          </div>
       </div>
     </div>
