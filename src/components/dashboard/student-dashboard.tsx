@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -26,6 +27,7 @@ import {
   ChevronRight,
   CheckCircle2,
   CircleDot,
+  History,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -39,6 +41,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -51,6 +62,8 @@ import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const RANKS = [
   { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' },
@@ -70,6 +83,9 @@ const RANK_THRESHOLDS: Record<MetricType, number[]> = {
   attendance: [26, 24, 22, 20, 18, 15, 10, 0],
   growth: [50, 40, 30, 20, 10, 5, 0, -50],
 };
+
+const AUTO_TERMINATE_SECONDS = 7200; // 2시간
+const GRACE_PERIOD_SECONDS = 60; // 1분
 
 function getRankData(value: number, type: MetricType) {
   const thresholds = RANK_THRESHOLDS[type];
@@ -138,7 +154,7 @@ function GamifiedStatCard({
       <DialogTrigger asChild>
         <Card className="cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] border border-border/50 bg-card/80 backdrop-blur-sm rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold transition-colors group-hover:text-primary">{title}</CardTitle>
+            <CardTitle className="text-sm font-black transition-colors group-hover:text-primary">{title}</CardTitle>
             <div className="bg-primary/5 p-1.5 rounded-lg group-hover:bg-primary/10 transition-colors">
               <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all duration-300" />
             </div>
@@ -178,7 +194,6 @@ function GamifiedStatCard({
           </DialogHeader>
           
           <div className="space-y-8 py-6">
-            {/* 오늘의 현황 섹션 */}
             <div className="rounded-3xl bg-secondary/30 p-6 border border-secondary shadow-inner space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -280,6 +295,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
+  // 세션 자동 종료 관련 상태
+  const [showSessionAlert, setShowSessionAlert] = useState(false);
+  const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
+
   const daysUntilReset = useMemo(() => {
     const nextMonth = startOfMonth(addMonths(today, 1));
     return differenceInDays(nextMonth, today);
@@ -309,22 +328,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
 
-  // 실시간 일일 완수율 계산
   const todayCompletionRate = useMemo(() => {
     if (!studyTasks || studyTasks.length === 0) return 0;
     const doneCount = studyTasks.filter(t => t.done).length;
     return (doneCount / studyTasks.length) * 100;
   }, [studyTasks]);
 
+  // 메인 타이머 및 자동 종료 체크
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive) {
       interval = setInterval(() => {
-        setSecondsElapsed((prev) => prev + 1);
+        setSecondsElapsed((prev) => {
+          const next = prev + 1;
+          // 2시간 경과 시 세션 확인 팝업 노출
+          if (next === AUTO_TERMINATE_SECONDS) {
+            setShowSessionAlert(true);
+            setGracePeriod(GRACE_PERIOD_SECONDS);
+          }
+          return next;
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
   }, [isTimerActive]);
+
+  // 유예 기간(Grace Period) 카운트다운
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (showSessionAlert && gracePeriod > 0) {
+      interval = setInterval(() => {
+        setGracePeriod(prev => prev - 1);
+      }, 1000);
+    } else if (showSessionAlert && gracePeriod === 0) {
+      // 유예 기간 종료 시 자동 학습 종료
+      handleStudyEndAutomatically();
+    }
+    return () => clearInterval(interval);
+  }, [showSessionAlert, gracePeriod]);
 
   const checkLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -365,39 +406,67 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
-    await updateDoc(itemRef, {
+    updateDoc(itemRef, {
       done: !item.done,
       updatedAt: serverTimestamp(),
+    }).catch(e => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: itemRef.path,
+        operation: 'update',
+        requestResourceData: { done: !item.done }
+      }));
     });
   };
 
-  const handleStudyStart = async () => {
+  const handleStudyEndAutomatically = () => {
+    if (!isTimerActive) return;
+    saveStudyTime();
+    setIsTimerActive(false);
+    setShowSessionAlert(false);
+    toast({
+      title: "장시간 미응답으로 자동 종료",
+      description: "2시간 세션이 만료되어 학습 시간이 저장되었습니다.",
+    });
+  };
+
+  const saveStudyTime = () => {
+    if (!firestore || !user || !activeMembership || !studyLogRef) return;
+    
+    const sessionMinutes = Math.floor(secondsElapsed / 60);
+    if (sessionMinutes <= 0) return;
+
+    const data = {
+      totalMinutes: increment(sessionMinutes),
+      uid: user.uid,
+      centerId: activeMembership.id,
+      dateKey: todayKey,
+      updatedAt: serverTimestamp(),
+      studentId: user.uid,
+      createdAt: serverTimestamp(),
+    };
+
+    setDoc(studyLogRef, data, { merge: true })
+      .catch((e) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: studyLogRef.path,
+          operation: 'write',
+          requestResourceData: data
+        }));
+      });
+  };
+
+  const handleStudyStartStop = () => {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
     if (isTimerActive) {
-      setIsTimerActive(false);
       const sessionMinutes = Math.floor(secondsElapsed / 60);
-      
-      try {
-        await setDoc(studyLogRef, {
-          totalMinutes: increment(sessionMinutes),
-          uid: user.uid,
-          centerId: activeMembership.id,
-          dateKey: todayKey,
-          updatedAt: serverTimestamp(),
-          studentId: user.uid,
-          createdAt: serverTimestamp(),
-        }, { merge: true });
-
-        toast({
-          title: "공부 종료 및 기록 완료",
-          description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
-        });
-      } catch (error) {
-        console.error("Failed to update study minutes:", error);
-        toast({ variant: 'destructive', title: '기록 실패', description: '학습 시간을 저장하지 못했습니다.' });
-      }
+      saveStudyTime();
+      setIsTimerActive(false);
       setSecondsElapsed(0);
+      toast({
+        title: "공부 종료 및 기록 완료",
+        description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
+      });
     } else {
       setIsTimerActive(true);
       setSecondsElapsed(0);
@@ -406,6 +475,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         description: "동백센터 학습 구역에 입장하셨습니다. 집중력을 발휘해 보세요!",
       });
     }
+  };
+
+  const handleMaintainSession = () => {
+    setShowSessionAlert(false);
+    // secondsElapsed는 그대로 유지되어 계속 카운트업됨
+    toast({
+      title: "학습 세션 유지",
+      description: "집중을 계속 이어가세요! 화이팅!",
+    });
   };
 
   const formatTime = (seconds: number) => {
@@ -425,6 +503,32 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
+      {/* 세션 유지 확인 AlertDialog */}
+      <AlertDialog open={showSessionAlert} onOpenChange={setShowSessionAlert}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black flex items-center gap-2">
+              <History className="h-6 w-6 text-primary animate-spin-slow" />
+              학습 세션을 유지할까요?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base font-bold text-muted-foreground pt-2">
+              어느덧 2시간이 지났습니다! 아직 집중하고 계신가요?<br />
+              <span className="text-destructive font-black">
+                {gracePeriod}초
+              </span> 후 응답이 없으면 학습이 자동으로 저장되고 종료됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="pt-4">
+            <AlertDialogAction 
+              onClick={handleMaintainSession}
+              className="bg-primary text-primary-foreground font-black px-8 h-12 rounded-2xl hover:scale-105 transition-all"
+            >
+              학습세션 유지
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="bg-primary/5 border border-primary/10 rounded-3xl p-4 flex items-center justify-between backdrop-blur-sm shadow-sm">
         <div className="flex items-center gap-3">
           <div className="bg-primary/10 p-2 rounded-2xl">
@@ -479,7 +583,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
               )}
               disabled={!isTimerActive && locationStatus !== 'inside'}
-              onClick={handleStudyStart}
+              onClick={handleStudyStartStop}
             >
               {isTimerActive ? (
                 <>
