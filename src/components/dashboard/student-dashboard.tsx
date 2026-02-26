@@ -232,7 +232,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <CardContent className="grid gap-3">
             {planItemsLoading ? (
               <div className="space-y-3">
-                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+                {[...Array(3)].map((_, i) => <Skeleton className="h-14 w-full" />)}
               </div>
             ) : planItems && planItems.length > 0 ? (
                 planItems.map((task) => (

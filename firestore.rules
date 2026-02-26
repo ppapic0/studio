@@ -56,11 +56,15 @@ service cloud.firestore {
       }
 
       // AI 코칭/분석 결과
-      match /aiOutputs/{userId}/records/{recordId} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == userId || 
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
+      match /aiOutputs/{userId} {
+        allow read: if isSignedIn() && (request.auth.uid == userId || hasRole(centerId, ['centerAdmin', 'teacher']));
+        
+        match /records/{recordId} {
+          allow read: if isSignedIn() && (
+            request.auth.uid == userId || 
+            hasRole(centerId, ['centerAdmin', 'teacher'])
+          );
+        }
       }
     }
 
@@ -72,6 +76,14 @@ service cloud.firestore {
     // 사용자별 가입 센터 인덱스
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 컬렉션 그룹 규칙 (교사/관리자용 전체 조회)
+    match /{path=**}/records/{recordId} {
+      allow read: if isSignedIn() && (
+        (resource != null && resource.data.studentId == request.auth.uid) ||
+        (resource != null && hasRole(resource.data.centerId, ['centerAdmin', 'teacher']))
+      );
     }
   }
 }
