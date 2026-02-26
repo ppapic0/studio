@@ -86,16 +86,37 @@ export default function AppointmentsPage() {
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
+    // 학생: 본인 데이터만 필터링 (보안 규칙 준수)
     if (isStudent) {
-      return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
-    } else if (isParent) {
+      return query(
+        baseRef, 
+        where('studentId', '==', user.uid), 
+        orderBy('startAt', 'desc')
+      );
+    } 
+    
+    // 학부모: 연결된 자녀 데이터 필터링
+    if (isParent) {
       const studentIds = activeMembership.linkedStudentIds || [];
       if (studentIds.length === 0) return null;
-      // 부모는 첫 번째 연결된 학생의 내역 조회 (MVP 기준)
-      return query(baseRef, where('studentId', '==', studentIds[0]), orderBy('startAt', 'desc'));
-    } else if (isTeacher) {
-      return query(baseRef, where('teacherId', '==', user.uid), orderBy('startAt', 'desc'));
-    } else if (isAdmin) {
+      return query(
+        baseRef, 
+        where('studentId', 'in', studentIds), 
+        orderBy('startAt', 'desc')
+      );
+    } 
+    
+    // 교사: 본인 담당 필터링
+    if (isTeacher) {
+      return query(
+        baseRef, 
+        where('teacherId', '==', user.uid), 
+        orderBy('startAt', 'desc')
+      );
+    } 
+    
+    // 관리자: 전체 조회
+    if (isAdmin) {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
     
@@ -110,7 +131,7 @@ export default function AppointmentsPage() {
     setIsSubmitting(true);
     try {
       const startAt = new Date(`${requestData.date}T${requestData.time}`);
-      const endAt = new Date(startAt.getTime() + 30 * 60000); // 기본 30분 상담
+      const endAt = new Date(startAt.getTime() + 30 * 60000); 
 
       const data = {
         centerId: activeMembership.id,

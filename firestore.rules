@@ -13,11 +13,11 @@ service cloud.firestore {
     }
 
     function isParentOf(centerId, studentId) {
-      let parentPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
+      let memberPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
       return isSignedIn() && 
-             exists(parentPath) && 
-             get(parentPath).data.role == 'parent' && 
-             studentId in get(parentPath).data.get('linkedStudentIds', []);
+             exists(memberPath) && 
+             get(memberPath).data.role == 'parent' && 
+             studentId in get(memberPath).data.get('linkedStudentIds', []);
     }
 
     // --- 컬렉션 규칙 ---
@@ -28,36 +28,43 @@ service cloud.firestore {
     }
 
     match /centers/{centerId} {
+      // 센터 기본 정보는 인증된 사용자라면 누구나 읽기 가능
       allow read: if isSignedIn();
 
       match /members/{memberId} {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 상담 예약
+      // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
+        // 읽기 권한: 본인, 부모, 또는 센터 관리자/교사
         allow read: if isSignedIn() && (
-          request.auth.uid == resource.data.studentId || 
+          (resource == null) || 
+          (resource.data.studentId == request.auth.uid) || 
+          (resource.data.teacherId == request.auth.uid) ||
           isParentOf(centerId, resource.data.studentId) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
+        
+        // 생성 권한: 학생 본인, 부모, 또는 관리자/교사
         allow create: if isSignedIn() && (
           (request.resource.data.studentId == request.auth.uid && hasRole(centerId, ['student'])) ||
           isParentOf(centerId, request.resource.data.studentId) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
+        
+        // 수정 권한: 상태 변경 및 관리
         allow update: if isSignedIn() && (
-          // 학생은 본인 예약 취소만 가능
-          (request.auth.uid == resource.data.studentId && 
+          // 학생은 본인 예약의 상태를 'cancelled'로만 변경 가능
+          (resource.data.studentId == request.auth.uid && 
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
            request.resource.data.status == 'cancelled') ||
           // 교사/관리자는 담당 예약 수정 가능
-          (hasRole(centerId, ['centerAdmin', 'teacher']) && 
-           (resource.data.teacherId == request.auth.uid || hasRole(centerId, ['centerAdmin'])))
+          (hasRole(centerId, ['centerAdmin', 'teacher']))
         );
       }
 
-      // 상담일지
+      // 상담일지 (Counseling Notes)
       match /counselingNotes/{noteId} {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
@@ -135,6 +142,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // 컬렉션 그룹 쿼리 지원
     match /{path=**}/records/{recordId} {
       allow read: if isSignedIn() && (
         hasRole(resource.data.centerId, ['centerAdmin', 'teacher']) ||
