@@ -12,6 +12,7 @@ import {
   Loader2,
   CalendarDays,
   Zap,
+  MessageCircle,
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -24,24 +25,28 @@ type MainNavProps = {
 const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
   student: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-    { href: '/dashboard/growth', label: '성장 트리', icon: Zap },
+    { href: '/dashboard/growth', label: '성장 로드맵', icon: Zap },
     { href: '/dashboard/study-history', label: '학습 기록', icon: CalendarDays },
     { href: '/dashboard/plan', label: '나의 학습 계획', icon: ClipboardCheck },
+    { href: '/dashboard/appointments', label: '상담 예약', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   parent: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/growth', label: '자녀 성장', icon: Zap },
+    { href: '/dashboard/appointments', label: '자녀 상담', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   teacher: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-    { href: '/dashboard/attendance', label: '출석', icon: Users },
+    { href: '/dashboard/attendance', label: '출석 관리', icon: Users },
+    { href: '/dashboard/appointments', label: '상담 관리', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   centerAdmin: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-    { href: '/dashboard/attendance', label: '출석', icon: Users },
+    { href: '/dashboard/attendance', label: '출석 현황', icon: Users },
+    { href: '/dashboard/appointments', label: '상담 현황', icon: MessageCircle },
     { href: '/dashboard/analytics', label: '센터 분석', icon: BarChart3 },
     { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
   ],
