@@ -8,8 +8,10 @@ service cloud.firestore {
     
     // 센터 내 역할 확인 함수
     function getRole(centerId) {
+      // 해당 센터의 멤버 문서가 존재할 때만 역할을 가져옴
       return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role;
     }
+    
     function hasCenterRole(centerId, roles) {
       return isSignedIn() && getRole(centerId) in roles;
     }
@@ -23,7 +25,7 @@ service cloud.firestore {
     // 센터 정보
     match /centers/{centerId} {
       allow read: if isSignedIn();
-      allow write: if false; // 서버 액션/Admin 전용
+      allow write: if false; // 서버 액션(admin) 전용
       
       // 센터 멤버십
       match /members/{userId} {
@@ -40,25 +42,26 @@ service cloud.firestore {
       // 학습 계획
       match /plans/{userId}/weeks/{weekKey}/items/{itemId} {
         allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher']);
-        allow write: if isOwner(userId) && hasCenterRole(centerId, ['student']);
+        allow write: if isOwner(userId);
       }
 
       // 학습 로그 (공부 시간)
       match /studyLogs/{userId}/days/{dateKey} {
         allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher']);
-        allow write: if isOwner(userId) && hasCenterRole(centerId, ['student']);
+        allow write: if isOwner(userId);
       }
 
-      // 학생 일일 통계 (AI 생성 포함)
+      // 학생 일일 통계
       match /dailyStudentStats/{dateKey}/students/{userId} {
         allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher', 'parent']);
-        allow write: if false; // 시스템 전용
+        allow write: if false;
       }
 
-      // AI 코칭/분석 결과
+      // AI 코칭/분석 결과 (Subcollection)
       match /aiOutputs/{userId}/records/{recordId} {
+        // 본인이거나, 센터 관리자/선생님/부모님인 경우 읽기 허용
         allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher', 'parent']);
-        allow write: if false; // 시스템 전용
+        allow write: if false;
       }
     }
 
@@ -68,13 +71,13 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
-    // 사용자 가입 센터 인덱스 (로그인 시 필요)
+    // 사용자 가입 센터 인덱스 (로그인/로그인 유지 시 필요)
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isOwner(userId);
       allow write: if false;
     }
     
-    // 컬렉션 그룹 규칙 (교사 대시보드에서 AI 위험 알림 조회용)
+    // 컬렉션 그룹 규칙 (교사 대시보드 등에서 여러 학생의 위험 알림을 한꺼번에 조회할 때 필요)
     match /{path=**}/records/{recordId} {
       allow read: if isSignedIn() && (
         resource.data.studentId == request.auth.uid || 
