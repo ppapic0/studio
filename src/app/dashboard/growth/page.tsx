@@ -67,6 +67,7 @@ export default function GrowthPage() {
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+  const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
   return (
     <div className="flex flex-col gap-8 pb-20">
@@ -84,6 +85,7 @@ export default function GrowthPage() {
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Object.entries(STAT_CONFIG).map(([key, config]) => {
           const val = stats[key as keyof typeof stats] || 0;
+          const Icon = config.icon;
           return (
             <Card key={key} className="premium-card border-none bg-white shadow-sm overflow-hidden group">
               <CardHeader className="pb-3 space-y-1">
@@ -92,7 +94,7 @@ export default function GrowthPage() {
                     <span className="text-xs font-black text-muted-foreground/60 leading-none mb-1">{config.sub}</span>
                     <span className={cn("text-base font-black tracking-tight", config.color)}>{config.label}</span>
                   </div>
-                  <config.icon className={cn("h-5 w-5 opacity-20 group-hover:opacity-100 transition-all group-hover:scale-110", config.color)} />
+                  <Icon className={cn("h-5 w-5 opacity-20 group-hover:opacity-100 transition-all group-hover:scale-110", config.color)} />
                 </div>
                 <div className="flex items-baseline gap-1 pt-2">
                   <span className="text-3xl font-black tabular-nums">{Math.round(val)}</span>
@@ -232,7 +234,7 @@ export default function GrowthPage() {
                       <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl border border-white/10">
                         <div className="flex items-center gap-3">
                           <div className="bg-white/20 p-2 rounded-lg">
-                            {STAT_CONFIG[activeBranch].icon && <STAT_CONFIG[activeBranch].icon className="h-4 w-4" />}
+                            {SelectedBranchIcon && <SelectedBranchIcon className="h-4 w-4" />}
                           </div>
                           <span className="text-sm font-bold">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점 달성</span>
                         </div>
