@@ -7,7 +7,9 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { format, getISOWeek } from "date-fns";
 
-admin.initializeApp();
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
 
 const db = admin.firestore();
 
@@ -151,24 +153,32 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
 
     if (!code) throw new functions.https.HttpsError("invalid-argument", "코드가 필요합니다.");
     
-    const inviteCodeRef = db.doc(`inviteCodes/${code}`);
-
     try {
         return await db.runTransaction(async (transaction) => {
-            const inviteCodeDoc = await transaction.get(inviteCodeRef);
+            // 1. Try to find the code in the root collection (Standard)
+            let inviteCodeRef = db.doc(`inviteCodes/${code}`);
+            let inviteCodeDoc = await transaction.get(inviteCodeRef);
+
+            // 2. If not found, try to find it in the Dongbaek center subcollection (Fallback for user's specific setup)
+            if (!inviteCodeDoc.exists) {
+                inviteCodeRef = db.doc(`centers/learning-lab-dongbaek/inviteCodes/${code}`);
+                inviteCodeDoc = await transaction.get(inviteCodeRef);
+            }
+
             if (!inviteCodeDoc.exists) {
                 throw new functions.https.HttpsError('not-found', '유효하지 않은 초대 코드입니다.');
             }
             
             const inviteCodeData = inviteCodeDoc.data()!;
-            const centerId = inviteCodeData.centerId;
-            if (!centerId) throw new functions.https.HttpsError('internal', '초대 코드 정보 오류 (centerId 누락).');
-
+            const centerId = inviteCodeData.centerId || 'learning-lab-dongbaek'; // Fallback to Dongbaek if missing
+            
             const centerRef = db.doc(`centers/${centerId}`);
             const centerDoc = await transaction.get(centerRef);
 
             // Validation
-            if (inviteCodeData.usedCount >= inviteCodeData.maxUses) {
+            const maxUses = inviteCodeData.maxUses || 999;
+            const usedCount = inviteCodeData.usedCount || 0;
+            if (usedCount >= maxUses) {
                 throw new functions.https.HttpsError('resource-exhausted', '사용 횟수가 초과된 코드입니다.');
             }
             if (inviteCodeData.expiresAt && inviteCodeData.expiresAt.toDate() < new Date()) {
@@ -181,7 +191,7 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
             const finalEmail = email || `${uid}@example.com`;
             const centerName = centerId === 'learning-lab-dongbaek' ? "공부트랙 동백센터" : `센터 (${centerId})`;
 
-            // Bootstrapping Center
+            // Bootstrapping Center if it doesn't exist
             if (!centerDoc.exists) {
                 const subscriptionExpires = new Date();
                 subscriptionExpires.setDate(subscriptionExpires.getDate() + 30);
@@ -232,6 +242,6 @@ export const redeemInviteCode = functions.https.onCall(async (data, context) => 
     } catch (error: any) {
         console.error("redeemInviteCode failed:", error);
         if (error instanceof functions.https.HttpsError) throw error;
-        throw new functions.https.HttpsError("internal", "서버 처리 중 오류가 발생했습니다.");
+        throw new functions.https.HttpsError("internal", error.message || "서버 처리 중 오류가 발생했습니다.");
     }
 });
