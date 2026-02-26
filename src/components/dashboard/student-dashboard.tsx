@@ -20,12 +20,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, AIOutput, WithId, StudyLogDay } from '@/lib/types';
-import { doc, collection, query, where, limit, orderBy, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
+import { doc, collection, query, where, limit, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { format, getISOWeek } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { Input } from '../ui/input';
@@ -92,17 +91,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, activeMembership, user, weekKey]);
   const { data: planItems, isLoading: planItemsLoading } = useCollection<StudyPlanItem>(planItemsRef, { enabled: isActive });
-
-  const aiCoachRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(
-        collection(firestore, 'centers', activeMembership.id, 'aiOutputs', user.uid, 'records'),
-        where('studentId', '==', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(1)
-    );
-  }, [firestore, activeMembership, user]);
-  const { data: aiCoachData, isLoading: aiCoachLoading } = useCollection<AIOutput>(aiCoachRef, { enabled: isActive });
   
   // --- Effects ---
   useEffect(() => {
@@ -155,15 +143,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return null;
   }
 
-  const aiCoachMessage = aiCoachData?.[0];
-
   const growthRate = dailyStat?.studyTimeGrowthRate ?? 0;
   const growthSign = growthRate >= 0 ? '+' : '';
   const growthEvolution = `지난 7일 대비`;
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      {/* Stats Grid - 1 col on mobile, 2 cols on tablet, 4 cols on desktop */}
+      {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           title="오늘의 학습 시간"
@@ -211,10 +197,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
       </div>
 
-      {/* Main Content Grid - Stacked on mobile/tablet, 2:1 on large desktop */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Plan */}
-        <Card className="lg:col-span-2">
+      {/* Main Content Grid - Plan Card takes full width or remains centered */}
+      <div className="grid gap-6">
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center space-y-0">
             <div className="grid gap-1">
               <CardTitle className="text-xl">오늘의 학습 계획</CardTitle>
@@ -251,31 +236,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             ) : (
                 <div className="text-center text-muted-foreground py-10 text-sm">오늘 남은 계획이 없습니다!</div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Right Column: AI Coach */}
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="text-xl">AI 코치</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              성장을 돕는 맞춤 팁입니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-             <Alert className="bg-secondary/50 border-none">
-                <Activity className="h-4 w-4 text-accent" />
-                <AlertTitle className="font-headline text-accent font-semibold">주간 팁</AlertTitle>
-                <AlertDescription className="mt-2 text-sm leading-relaxed text-foreground/80">
-                  {aiCoachLoading ? (
-                     <Skeleton className="h-20 w-full" />
-                  ) : aiCoachMessage ? (
-                     aiCoachMessage.message
-                  ) : (
-                    "오늘의 학습 기록을 채워보세요! AI가 분석을 시작합니다."
-                  )}
-                </AlertDescription>
-            </Alert>
           </CardContent>
         </Card>
       </div>
