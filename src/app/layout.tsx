@@ -18,7 +18,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'LEARNING-LAB',
+  title: '공부트랙관리형독서실',
   description: '집중 학습과 성장을 위한 플랫폼입니다.',
 };
 

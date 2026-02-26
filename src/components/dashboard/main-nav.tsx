@@ -77,7 +77,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         className="flex items-center gap-2 text-lg font-headline font-semibold text-primary mb-4"
       >
         <BookOpen className="h-6 w-6" />
-        <span>LEARNING-LAB</span>
+        <span>공부트랙관리형독서실</span>
       </Link>
       {userNavItems.map((item) => (
         <Link key={item.href} href={item.href} className={cn(linkClass, pathname === item.href ? activeLinkClass : '')}>

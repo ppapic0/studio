@@ -21,7 +21,7 @@ export function AuthFormWrapper({
       <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-[380px] gap-6">
           <div className="grid gap-2 text-center">
-            <h1 className="text-3xl font-headline font-bold text-primary">LEARNING-LAB</h1>
+            <h1 className="text-3xl font-headline font-bold text-primary">공부트랙관리형독서실</h1>
             <h2 className="text-3xl font-headline font-bold">{title}</h2>
             <p className="text-balance text-muted-foreground">{subtitle}</p>
           </div>
