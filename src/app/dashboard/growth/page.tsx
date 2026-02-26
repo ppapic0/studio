@@ -26,13 +26,16 @@ import {
   Crown,
   Flame,
   Medal,
-  ArrowRight
+  ArrowRight,
+  TrendingUp,
+  CalendarDays,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-// 확장된 20개 스킬 로드맵 (페이지 이동 링크 포함)
+// 확장된 20개 스킬 로드맵
 const MOCK_SKILLS: (SkillNode & { link: string })[] = [
   // --- FOCUS BRANCH ---
   { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { xp: 1.03 }, iconKey: 'Target', link: '/dashboard' },
@@ -92,7 +95,6 @@ export default function GrowthPage() {
     MOCK_SKILLS.find(s => s.id === selectedSkillId) || MOCK_SKILLS.find(s => s.branch === activeBranch),
   [selectedSkillId, activeBranch]);
 
-  // 자동 선택 로직: 브랜치 변경 시 해당 브랜치의 첫 번째 스킬 선택
   useEffect(() => {
     const firstSkill = MOCK_SKILLS.find(s => s.branch === activeBranch);
     if (firstSkill) setSelectedSkillId(firstSkill.id);
@@ -103,6 +105,10 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
+  // 예상 진행 가이드 계산
+  const daysSpent = progress?.level ? Math.floor(progress.level * 10) : 0; // 단순 예시
+  const estimatedDaysToMax = 300 - daysSpent;
+
   return (
     <div className="flex flex-col gap-8 pb-20">
       <header className="flex flex-col gap-2">
@@ -112,7 +118,10 @@ export default function GrowthPage() {
           </div>
           <h1 className="text-3xl font-black tracking-tighter">성장 로드맵</h1>
         </div>
-        <p className="text-sm font-bold text-muted-foreground ml-1">입시 트랙의 끝, Lv.30 마스터를 향한 당신의 여정입니다.</p>
+        <div className="flex items-center gap-2 ml-1">
+          <Badge variant="outline" className="border-primary/20 text-primary font-bold px-2 py-0">CORE ROADMAP</Badge>
+          <p className="text-sm font-bold text-muted-foreground">최종 목표인 Lv.30 마스터를 향한 300일의 여정입니다.</p>
+        </div>
       </header>
 
       {/* 1. 고대비 스탯 카드 섹션 */}
@@ -154,7 +163,92 @@ export default function GrowthPage() {
         })}
       </section>
 
-      {/* 2. 스킬 트리 메인 영역 */}
+      {/* 2. 성장 분석 및 예상 타임라인 (신규 섹션) */}
+      <section className="grid gap-6 md:grid-cols-3">
+        <Card className="md:col-span-2 border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-xl rounded-[2rem] overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <TrendingUp className="h-40 w-40" />
+          </div>
+          <CardHeader className="pb-2 relative z-10">
+            <CardTitle className="text-xl font-black flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-amber-400 fill-current" />
+              성장 페이스 분석
+            </CardTitle>
+            <CardDescription className="text-primary-foreground/60 font-bold">현재 학습 데이터를 기반으로 한 예상 타임라인입니다.</CardDescription>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <p className="text-[10px] font-black uppercase opacity-60 mb-1">진행 일수</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black">{daysSpent}</span>
+                  <span className="text-xs opacity-60">일차</span>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <p className="text-[10px] font-black uppercase opacity-60 mb-1">평균 몰입</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black">6.2</span>
+                  <span className="text-xs opacity-60">시간/일</span>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <p className="text-[10px] font-black uppercase opacity-60 mb-1">남은 여정</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-amber-400">{estimatedDaysToMax > 0 ? estimatedDaysToMax : '-'}</span>
+                  <span className="text-xs opacity-60">일 예상</span>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <p className="text-[10px] font-black uppercase opacity-60 mb-1">마스터리 보너스</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-emerald-400">x1.15</span>
+                  <span className="text-xs opacity-60">획득</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 p-4 bg-black/20 rounded-2xl border border-white/5">
+              <p className="text-xs font-bold leading-relaxed opacity-90">
+                💡 <span className="text-amber-400">Tip:</span> 하루 6시간 공부와 플래너 완성을 지속할 경우, **Lv.30 마스터리 도달까지 약 {estimatedDaysToMax}일**이 소요될 것으로 예측됩니다. 지금의 페이스는 상위 5%의 매우 우수한 속도입니다!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden flex flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-black flex items-center gap-2">
+              <Medal className="h-5 w-5 text-primary" />
+              오늘의 성장 가이드
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 group hover:bg-primary/5 transition-colors cursor-pointer">
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <Target className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs font-black">집중력 강화 필요</p>
+                <p className="text-[10px] font-bold text-muted-foreground">다음 노드 '방해 금지'까지 5점이 더 필요합니다.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 group hover:bg-primary/5 transition-colors cursor-pointer">
+              <div className="bg-emerald-100 p-2 rounded-lg">
+                <RefreshCw className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs font-black">연속 달성 유지 중</p>
+                <p className="text-[10px] font-bold text-muted-foreground">오늘 공부 완료 시 '일주일의 기적' 스킬이 해금됩니다!</p>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full mt-2 rounded-xl text-xs font-black border-dashed border-2 h-10">
+              전체 퀘스트 확인하기
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* 3. 스킬 트리 메인 영역 */}
       <section className="bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
           <div>
@@ -165,7 +259,6 @@ export default function GrowthPage() {
             <p className="text-sm font-bold text-muted-foreground mt-1">지속적인 학습으로 30레벨 궁극의 마스터리에 도달하세요.</p>
           </div>
           
-          {/* 레벨/XP 통합 박스 */}
           <div className="bg-white p-4 rounded-3xl flex items-center gap-5 border border-border/50 shadow-sm min-w-[260px]">
             <div className="relative flex items-center justify-center">
               <svg className="h-16 w-14 transform -rotate-90">
@@ -210,7 +303,6 @@ export default function GrowthPage() {
           </TabsList>
 
           <div className="grid lg:grid-cols-12 gap-8 items-start">
-            {/* 왼쪽: 노드 그리드 - 세로형 트리 구조 */}
             <div className="lg:col-span-7 flex flex-col gap-10">
               {MOCK_SKILLS.filter(s => s.branch === activeBranch).map((skill, idx) => {
                 const isUnlocked = !!progress?.skills?.[skill.id];
@@ -219,7 +311,6 @@ export default function GrowthPage() {
                 
                 return (
                   <div key={skill.id} className="relative flex flex-col items-center">
-                    {/* 트리 연결선 */}
                     {idx < 4 && (
                       <div className={cn(
                         "absolute top-full w-0.5 h-10 border-l-2 border-dashed transition-colors",
@@ -256,7 +347,6 @@ export default function GrowthPage() {
               })}
             </div>
 
-            {/* 오른쪽: 상세 패널 */}
             <div className="lg:col-span-5 h-full">
               {selectedSkill ? (
                 <Card className="sticky top-24 border-none bg-primary text-primary-foreground shadow-2xl rounded-[2.5rem] overflow-hidden">
@@ -303,7 +393,6 @@ export default function GrowthPage() {
                     </div>
 
                     <div className="pt-4 flex flex-col gap-3">
-                      {/* 퀘스트 수행하기 버튼 (수행 가능한 페이지로 이동) */}
                       <Button asChild className="w-full h-14 rounded-2xl bg-white text-primary hover:bg-white/90 font-black text-base shadow-xl gap-2 active:scale-95 transition-all">
                         <Link href={selectedSkill.link}>
                           <Zap className="h-5 w-5 fill-current" />
@@ -345,7 +434,6 @@ export default function GrowthPage() {
         </Tabs>
       </section>
 
-      {/* 하단 안내 가이드 */}
       <footer className="grid sm:grid-cols-3 gap-6">
         <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start">
           <div className="bg-white p-2 rounded-xl border border-border/50 shadow-sm">
@@ -358,11 +446,11 @@ export default function GrowthPage() {
         </div>
         <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start">
           <div className="bg-white p-2 rounded-xl border border-border/50 shadow-sm">
-            <Zap className="h-5 w-5 text-amber-500" />
+            <CalendarDays className="h-5 w-5 text-amber-500" />
           </div>
           <div>
             <h5 className="font-black text-sm mb-1">장기 성장의 가치</h5>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed">이 트리는 시즌이 바뀌어도 초기화되지 않습니다. 당신이 쌓아온 모든 노력은 데이터로 보존됩니다.</p>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed">성장 트리는 초기화되지 않습니다. 약 300일간의 꾸준한 노력이 데이터로 보존됩니다.</p>
           </div>
         </div>
         <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start">
