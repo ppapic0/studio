@@ -58,13 +58,13 @@ import {
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Appointment, WithId } from '@/lib/types';
+import { Appointment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AppointmentsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, membershipsLoading } = useAppContext();
   const { toast } = useToast();
 
   const [isRequestOpen, setIsRequestOpen] = useState(false);
@@ -82,7 +82,8 @@ export default function AppointmentsPage() {
 
   // 1. 상담 데이터 쿼리 설정 - 보안 규칙과 필터가 완벽히 일치해야 함
   const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !activeMembership.role) return null;
+    // 필수 정보가 로드될 때까지 기다림
+    if (!firestore || membershipsLoading || !activeMembership || !user || !activeMembership.role) return null;
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
@@ -121,9 +122,9 @@ export default function AppointmentsPage() {
     }
     
     return null;
-  }, [firestore, activeMembership, user, isStudent, isParent, isTeacher, isAdmin]);
+  }, [firestore, membershipsLoading, activeMembership, user, isStudent, isParent, isTeacher, isAdmin]);
 
-  const { data: appointments, isLoading } = useCollection<Appointment>(appointmentsQuery);
+  const { data: appointments, isLoading: isQueryLoading } = useCollection<Appointment>(appointmentsQuery);
 
   const handleRequestSubmit = async () => {
     if (!firestore || !user || !activeMembership) return;
@@ -176,6 +177,8 @@ export default function AppointmentsPage() {
       default: return <Badge variant="outline">기타</Badge>;
     }
   };
+
+  const isLoading = membershipsLoading || isQueryLoading;
 
   return (
     <div className="flex flex-col gap-6">

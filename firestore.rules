@@ -9,14 +9,16 @@ service cloud.firestore {
 
     function hasRole(centerId, roles) {
       let memberPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
-      return isSignedIn() && exists(memberPath) && (get(memberPath).data.role in roles);
+      return isSignedIn() && 
+             exists(memberPath) && 
+             (get(memberPath).data.get('role', 'none') in roles);
     }
 
     function isParentOf(centerId, studentId) {
       let memberPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
       return isSignedIn() && 
              exists(memberPath) && 
-             get(memberPath).data.role == 'parent' && 
+             get(memberPath).data.get('role', 'none') == 'parent' && 
              studentId in get(memberPath).data.get('linkedStudentIds', []);
     }
 
@@ -37,18 +39,12 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // 읽기 권한 (get/list 분리하여 명시적 처리)
-        allow get: if isSignedIn() && (
-          resource.data.studentId == request.auth.uid ||
-          resource.data.teacherId == request.auth.uid ||
-          hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          isParentOf(centerId, resource.data.studentId)
-        );
-        
-        allow list: if isSignedIn() && (
-          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+        // 읽기 권한: 본인, 담당 교사, 관리자, 또는 연결된 학부모
+        allow read: if isSignedIn() && (
+          (resource == null) || // list 쿼리 시작 시점 허용
           (resource.data.studentId == request.auth.uid) ||
           (resource.data.teacherId == request.auth.uid) ||
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
           isParentOf(centerId, resource.data.studentId)
         );
         
