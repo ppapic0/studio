@@ -22,15 +22,35 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 성장 데이터 규칙
+      // 성장 및 통계 데이터 규칙
       match /growthProgress/{userId} {
         allow read: if isSignedIn() && (
           request.auth.uid == userId || 
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          (hasRole(centerId, ['parent']) && request.auth.uid in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
+          (hasRole(centerId, ['parent']) && userId in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
         );
-        // 쓰기는 서버(Cloud Functions)에서만 수행하도록 권장하지만, MVP 단계에서 클라이언트 업데이트가 필요하다면 추가 조건 부여
         allow write: if false; 
+      }
+
+      match /dailyStudentStats/{date}/students/{studentId} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == studentId || 
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          (hasRole(centerId, ['parent']) && studentId in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
+        );
+      }
+
+      match /studyLogs/{userId}/days/{date} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == userId || 
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          (hasRole(centerId, ['parent']) && userId in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
+        );
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /leaderboards/{period}/{metric}/entries/{entryId} {
+        allow read: if isSignedIn();
       }
 
       match /config/growthTree {
@@ -47,6 +67,10 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
+
+      match /records/{recordId} {
+        allow read: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
+      }
     }
 
     match /inviteCodes/{code} {
@@ -55,6 +79,11 @@ service cloud.firestore {
 
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Collection Group rules for Teacher Dashboard
+    match /{path=**}/records/{recordId} {
+      allow read: if isSignedIn() && hasRole(resource.data.centerId, ['centerAdmin', 'teacher']);
     }
   }
 }

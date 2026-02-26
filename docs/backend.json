@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -30,11 +29,61 @@
       "type": "object",
       "description": "센터 내 사용자 역할 및 멤버십",
       "properties": {
-        "role": { "type": "string", "enum": ["admin", "teacher", "student", "parent"] },
+        "role": { "type": "string", "enum": ["centerAdmin", "teacher", "student", "parent"] },
         "status": { "type": "string" },
-        "joinedAt": { "type": "string", "format": "date-time" }
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "displayName": { "type": "string" },
+        "linkedStudentIds": { "type": "array", "items": { "type": "string" }, "description": "학부모 계정에 연결된 학생 UID 목록" }
       },
       "required": ["role", "status", "joinedAt"]
+    },
+    "StudyPlanItem": {
+      "title": "StudyPlanItem",
+      "type": "object",
+      "description": "일일 학습 계획 항목",
+      "properties": {
+        "title": { "type": "string" },
+        "done": { "type": "boolean" },
+        "weight": { "type": "number" },
+        "dateKey": { "type": "string", "description": "YYYY-MM-DD" },
+        "category": { "type": "string", "enum": ["study", "personal", "schedule"] },
+        "studentId": { "type": "string" }
+      }
+    },
+    "DailyStudentStat": {
+      "title": "DailyStudentStat",
+      "type": "object",
+      "description": "일일 성과 통계",
+      "properties": {
+        "todayPlanCompletionRate": { "type": "number" },
+        "totalStudyMinutes": { "type": "number" },
+        "attendanceStreakDays": { "type": "number" },
+        "weeklyPlanCompletionRate": { "type": "number" },
+        "studyTimeGrowthRate": { "type": "number" },
+        "riskDetected": { "type": "boolean" }
+      }
+    },
+    "StudyLogDay": {
+      "title": "StudyLogDay",
+      "type": "object",
+      "description": "일일 학습 시간 기록",
+      "properties": {
+        "totalMinutes": { "type": "number" },
+        "dateKey": { "type": "string" },
+        "studentId": { "type": "string" }
+      }
+    },
+    "GrowthProgress": {
+      "title": "GrowthProgress",
+      "type": "object",
+      "description": "성장 트리 진행 상태",
+      "properties": {
+        "level": { "type": "number" },
+        "currentXp": { "type": "number" },
+        "nextLevelXp": { "type": "number" },
+        "stats": { "type": "object" },
+        "skills": { "type": "object" }
+      }
     },
     "InviteCode": {
       "title": "InviteCode",
@@ -77,6 +126,38 @@
           "entityName": "CenterMember",
           "schema": { "$ref": "#/backend/entities/CenterMember" },
           "description": "센터 멤버십"
+        }
+      },
+      {
+        "path": "/centers/{centerId}/plans/{studentId}/weeks/{week}/items/{itemId}",
+        "definition": {
+          "entityName": "StudyPlanItem",
+          "schema": { "$ref": "#/backend/entities/StudyPlanItem" },
+          "description": "학습 계획 항목"
+        }
+      },
+      {
+        "path": "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}",
+        "definition": {
+          "entityName": "DailyStudentStat",
+          "schema": { "$ref": "#/backend/entities/DailyStudentStat" },
+          "description": "일일 통계 데이터"
+        }
+      },
+      {
+        "path": "/centers/{centerId}/studyLogs/{userId}/days/{date}",
+        "definition": {
+          "entityName": "StudyLogDay",
+          "schema": { "$ref": "#/backend/entities/StudyLogDay" },
+          "description": "일일 학습 시간 로그"
+        }
+      },
+      {
+        "path": "/centers/{centerId}/growthProgress/{userId}",
+        "definition": {
+          "entityName": "GrowthProgress",
+          "schema": { "$ref": "#/backend/entities/GrowthProgress" },
+          "description": "성장 트리 진행 상태"
         }
       },
       {
