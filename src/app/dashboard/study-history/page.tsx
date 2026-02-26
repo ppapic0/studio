@@ -28,7 +28,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/dialog";
+} from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -64,6 +64,7 @@ export default function StudyHistoryPage() {
 
   const { data: logs, isLoading: logsLoading } = useCollection<StudyLogDay>(studyLogsQuery);
 
+  // Month-based week key for broader fetching if needed, but we rely on dateKey for dailies
   const monthKey = format(currentDate, "yyyy-'W'II");
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !user || !activeMembership) return null;
