@@ -80,7 +80,7 @@ export default function AppointmentsPage() {
   const isAdmin = activeMembership?.role === 'centerAdmin';
   const isParent = activeMembership?.role === 'parent';
 
-  // 1. 상담 데이터 쿼리 설정 - 역할별 명시적 필터링
+  // 1. 상담 데이터 쿼리 설정 - 보안 규칙과 필터가 완벽히 일치해야 함
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !activeMembership.role) return null;
     

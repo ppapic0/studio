@@ -37,18 +37,24 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // 읽기 권한: 본인, 부모, 또는 센터 관리자/교사
-        allow read: if isSignedIn() && (
-          (resource == null) || 
-          (resource.data.studentId == request.auth.uid) || 
+        // 읽기 권한 (get/list 분리하여 명시적 처리)
+        allow get: if isSignedIn() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.teacherId == request.auth.uid ||
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          isParentOf(centerId, resource.data.studentId)
+        );
+        
+        allow list: if isSignedIn() && (
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          (resource.data.studentId == request.auth.uid) ||
           (resource.data.teacherId == request.auth.uid) ||
-          isParentOf(centerId, resource.data.studentId) ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
+          isParentOf(centerId, resource.data.studentId)
         );
         
         // 생성 권한: 학생 본인, 부모, 또는 관리자/교사
         allow create: if isSignedIn() && (
-          (request.resource.data.studentId == request.auth.uid && hasRole(centerId, ['student'])) ||
+          (request.resource.data.studentId == request.auth.uid) ||
           isParentOf(centerId, request.resource.data.studentId) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
