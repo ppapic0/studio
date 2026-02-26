@@ -16,12 +16,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, useFunctions } from '@/firebase';
+import { useAuth } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { httpsCallable } from 'firebase/functions';
 import { Loader2 } from 'lucide-react';
+import { redeemInviteCodeAction } from '@/lib/membership-actions';
 
 const formSchema = z.object({
   displayName: z.string().min(2, '이름은 2자 이상이어야 합니다.'),
@@ -33,7 +33,6 @@ const formSchema = z.object({
 export function SignupForm() {
   const router = useRouter();
   const auth = useAuth();
-  const functions = useFunctions();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -43,19 +42,18 @@ export function SignupForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth || !functions) return;
+    if (!auth) return;
     setIsLoading(true);
     try {
-      // 1. 계정 생성
+      // 1. Firebase Auth 계정 생성
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
-      // 2. 서버를 통해 초대 코드 사용 및 센터 가입
-      const redeemInviteCode = httpsCallable(functions, 'redeemInviteCode');
-      const result: any = await redeemInviteCode({ code: values.inviteCode });
+      // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입
+      const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
-      if (result.data.ok) {
-        toast({ title: '가입 성공', description: result.data.message });
+      if (result.ok) {
+        toast({ title: '가입 성공', description: result.message });
         router.push('/dashboard');
       }
     } catch (error: any) {

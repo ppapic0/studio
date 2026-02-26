@@ -1,16 +1,16 @@
+
 'use client';
 
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { httpsCallable } from 'firebase/functions';
 
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
-import { useUser, useFunctions } from '@/firebase';
+import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { redeemInviteCodeAction, devJoinCenterAction } from '@/lib/membership-actions';
 
 const inviteCodeFormSchema = z.object({
   inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
@@ -61,7 +62,6 @@ const devJoinFormSchema = z.object({
 export default function DashboardPage() {
   const { user } = useUser();
   const { activeMembership, membershipsLoading } = useAppContext();
-  const functions = useFunctions();
   const { toast } = useToast();
 
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
@@ -83,13 +83,12 @@ export default function DashboardPage() {
   });
 
   async function onInviteSubmit(values: z.infer<typeof inviteCodeFormSchema>) {
-    if (!functions) return;
+    if (!user) return;
     setIsSubmitting(true);
     try {
-      const redeemInviteCode = httpsCallable(functions, 'redeemInviteCode');
-      const result: any = await redeemInviteCode({ code: values.inviteCode });
-      if (result.data.ok) {
-        toast({ title: '가입 성공', description: result.data.message });
+      const result = await redeemInviteCodeAction(user.uid, values.inviteCode, user.displayName || '사용자');
+      if (result.ok) {
+        toast({ title: '가입 성공', description: result.message });
         window.location.reload();
       }
     } catch (error: any) {
@@ -105,13 +104,12 @@ export default function DashboardPage() {
   }
 
   async function onDevJoinSubmit(values: z.infer<typeof devJoinFormSchema>) {
-    if (!functions) return;
+    if (!user) return;
     setIsSubmitting(true);
     try {
-      const devJoinCenter = httpsCallable(functions, 'devJoinCenter');
-      const result: any = await devJoinCenter(values);
-      if (result.data.ok) {
-        toast({ title: '강제 가입 성공', description: result.data.message });
+      const result = await devJoinCenterAction({ ...values, uid: user.uid });
+      if (result.ok) {
+        toast({ title: '강제 가입 성공', description: result.message });
         window.location.reload();
       }
     } catch (error: any) {
