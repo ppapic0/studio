@@ -48,7 +48,8 @@ export interface StudyPlanItem {
   weight: number;
   done: boolean;
   doneAt?: Timestamp;
-  dateKey?: string; // YYYY-MM-DD (Added for daily planning)
+  dateKey?: string; // YYYY-MM-DD
+  category?: 'schedule' | 'personal' | 'study'; // New field for systematic planning
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
