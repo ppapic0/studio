@@ -50,42 +50,44 @@ import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 
-// --- 등급 정의 및 계산 로직 ---
+// --- 등급 정의 및 세부 메커니즘 ---
 const RANKS = [
-  { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', threshold: 95 },
-  { name: '그랜드마스터', color: 'text-red-600', bg: 'bg-red-100', threshold: 90 },
-  { name: '다이아몬드', color: 'text-blue-600', bg: 'bg-blue-100', threshold: 85 },
-  { name: '에메랄드', color: 'text-emerald-600', bg: 'bg-emerald-100', threshold: 80 },
-  { name: '플래티넘', color: 'text-cyan-600', bg: 'bg-cyan-100', threshold: 70 },
-  { name: '골드', color: 'text-yellow-600', bg: 'bg-yellow-100', threshold: 60 },
-  { name: '실버', color: 'text-gray-500', bg: 'bg-gray-200', threshold: 50 },
-  { name: '브론즈', color: 'text-orange-700', bg: 'bg-orange-100', threshold: 0 },
+  { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' },
+  { name: '그랜드마스터', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-200' },
+  { name: '다이아몬드', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-200' },
+  { name: '에메랄드', color: 'text-emerald-600', bg: 'bg-emerald-100', border: 'border-emerald-200' },
+  { name: '플래티넘', color: 'text-cyan-600', bg: 'bg-cyan-100', border: 'border-cyan-200' },
+  { name: '골드', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-200' },
+  { name: '실버', color: 'text-gray-500', bg: 'bg-gray-200', border: 'border-gray-300' },
+  { name: '브론즈', color: 'text-orange-700', bg: 'bg-orange-100', border: 'border-orange-200' },
 ] as const;
 
 type MetricType = 'completion' | 'attendance' | 'growth';
 
+// 지표별 랭크 임계치 설정 (깐깐한 기준)
+const RANK_THRESHOLDS: Record<MetricType, number[]> = {
+  completion: [98, 95, 90, 85, 75, 65, 50, 0], // 완수율 (%)
+  attendance: [100, 60, 30, 21, 14, 7, 3, 0],   // 연속 출석 (일)
+  growth: [150, 100, 75, 50, 25, 10, 0, -100],  // 성장률 (%)
+};
+
 function getRankData(value: number, type: MetricType) {
-  // 출석일수는 다른 스케일 적용 (일수 기준)
-  let adjustedValue = value;
-  if (type === 'attendance') {
-    if (value >= 90) adjustedValue = 95;
-    else if (value >= 60) adjustedValue = 90;
-    else if (value >= 30) adjustedValue = 85;
-    else if (value >= 21) adjustedValue = 80;
-    else if (value >= 14) adjustedValue = 70;
-    else if (value >= 7) adjustedValue = 60;
-    else if (value >= 3) adjustedValue = 50;
-    else adjustedValue = 0;
-  } else if (type === 'growth') {
-    // 성장률은 -100 ~ +100 스케일을 0-100으로 매핑 (예시)
-    adjustedValue = Math.max(0, Math.min(100, (value + 0.2) * 200)); 
-  }
+  const thresholds = RANK_THRESHOLDS[type];
+  let rankIndex = thresholds.findIndex(t => value >= t);
+  if (rankIndex === -1) rankIndex = RANKS.length - 1;
 
-  const rank = RANKS.find(r => adjustedValue >= r.threshold) || RANKS[RANKS.length - 1];
-  const nextRankIndex = RANKS.findIndex(r => r.name === rank.name) - 1;
-  const nextRank = nextRankIndex >= 0 ? RANKS[nextRankIndex] : null;
+  const rank = RANKS[rankIndex];
+  const nextRank = rankIndex > 0 ? RANKS[rankIndex - 1] : null;
+  const nextThreshold = rankIndex > 0 ? thresholds[rankIndex - 1] : thresholds[0];
 
-  return { current: rank, next: nextRank, adjustedValue };
+  return { 
+    current: rank, 
+    next: nextRank, 
+    currentValue: value, 
+    nextThreshold,
+    rankIndex,
+    allThresholds: thresholds
+  };
 }
 
 const TARGET_LAT = 37.2762;
@@ -155,14 +157,14 @@ function GamifiedStatCard({
           </CardContent>
         </Card>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="mx-auto bg-primary/10 p-4 rounded-full mb-2">
             <Trophy className={cn("h-12 w-12 animate-bounce", rankData.current.color)} />
           </div>
           <DialogTitle className="text-center text-2xl font-headline">{gameTitle}</DialogTitle>
           <DialogDescription className="text-center text-lg mt-1">
-            현재 랭크: <span className={cn("font-extrabold", rankData.current.color)}>{rankData.current.name}</span>
+            현재 티어: <span className={cn("font-extrabold", rankData.current.color)}>{rankData.current.name}</span>
           </DialogDescription>
         </DialogHeader>
         
@@ -172,43 +174,53 @@ function GamifiedStatCard({
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-medium">
                 <span>다음 목표: {rankData.next.name}</span>
-                <span>{rankData.adjustedValue.toFixed(0)} / {rankData.next.threshold}</span>
+                <span>{rankData.currentValue.toFixed(1)} / {rankData.nextThreshold}</span>
               </div>
-              <Progress value={(rankData.adjustedValue / rankData.next.threshold) * 100} className="h-2" />
+              <Progress 
+                value={Math.min(100, (rankData.currentValue / rankData.nextThreshold) * 100)} 
+                className="h-2" 
+              />
               <p className="text-[11px] text-muted-foreground text-center italic">
-                {type === 'completion' && `완수율을 ${(rankData.next.threshold - rankData.adjustedValue).toFixed(0)}% 더 올리면 승급합니다!`}
-                {type === 'attendance' && `출석 일수를 조금 더 채워보세요!`}
-                {type === 'growth' && `학습 시간을 늘려 성장을 증명하세요!`}
+                {type === 'completion' && `완수율을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 더 올리면 승급합니다!`}
+                {type === 'attendance' && `출석 ${rankData.nextThreshold - rankData.currentValue}일만 더 채우면 다음 단계로!`}
+                {type === 'growth' && `성장률을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 높여 능력을 증명하세요!`}
               </p>
             </div>
           )}
 
-          {/* Rank Mechanism Table */}
-          <div className="rounded-xl border bg-muted/50 overflow-hidden">
-            <div className="bg-muted px-4 py-2 border-b flex items-center gap-2">
-              <Info className="h-3 w-3" />
-              <span className="text-[11px] font-bold uppercase tracking-wider">등급 달성 메커니즘</span>
+          {/* Full Rank Mechanism Table */}
+          <div className="rounded-xl border bg-muted/30 overflow-hidden shadow-sm">
+            <div className="bg-muted/80 px-4 py-3 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                <Info className="h-3.5 w-3.5 text-primary" />
+                <span>등급 달성 메커니즘</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground">단위: {type === 'attendance' ? '일' : '%'}</span>
             </div>
-            <div className="p-2 space-y-1">
-              {RANKS.slice(0, 5).map((r, idx) => (
+            <div className="p-1.5 space-y-1 bg-white/50">
+              {RANKS.map((r, idx) => (
                 <div key={r.name} className={cn(
-                  "flex items-center justify-between px-3 py-1.5 rounded-lg text-xs",
-                  rankData.current.name === r.name ? "bg-white shadow-sm ring-1 ring-black/5" : "opacity-60"
+                  "flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all",
+                  rankData.current.name === r.name 
+                    ? cn("bg-white shadow-md ring-1 scale-[1.02]", r.border) 
+                    : "opacity-40 grayscale-[0.5]"
                 )}>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className={cn("h-3 w-3", r.color)} />
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn("h-2 w-2 rounded-full", r.bg.replace('bg-', 'bg-opacity-100 bg-'))} />
                     <span className={cn("font-bold", r.color)}>{r.name}</span>
                   </div>
-                  <span className="text-muted-foreground font-mono">
-                    {type === 'attendance' ? `Lv.${5-idx}` : `${r.threshold}%+`}
-                  </span>
+                  <div className="flex items-center gap-1 font-mono font-semibold">
+                    <span className="text-muted-foreground text-[10px] mr-1">이상</span>
+                    {RANK_THRESHOLDS[type][idx]}
+                  </div>
                 </div>
               ))}
-              <div className="text-center py-1">
-                <ChevronRight className="h-3 w-3 mx-auto text-muted-foreground rotate-90" />
-              </div>
-              <div className="text-center text-[10px] text-muted-foreground">브론즈 ~ 골드 등급 생략</div>
             </div>
+          </div>
+          
+          <div className="text-center text-[11px] text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-dashed">
+            💡 등급은 매일 자정, 최신 학습 데이터를 바탕으로 갱신됩니다. <br/>
+            꾸준함이 챌린저를 만드는 가장 빠른 길입니다!
           </div>
         </div>
       </DialogContent>
@@ -375,7 +387,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return null;
   }
 
-  const growthRate = dailyStat?.studyTimeGrowthRate ?? 0;
+  const growthRate = (dailyStat?.studyTimeGrowthRate ?? 0) * 100;
   const growthSign = growthRate >= 0 ? '+' : '';
   const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
   const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
@@ -492,7 +504,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <GamifiedStatCard 
           title="성장 지수"
           icon={TrendingUp}
-          value={`${growthSign}${Math.round(growthRate * 100)}%`}
+          value={`${growthSign}${Math.round(growthRate)}%`}
           numericValue={growthRate}
           evolution="학습 시간 변화율"
           isLoading={dailyStatLoading}
