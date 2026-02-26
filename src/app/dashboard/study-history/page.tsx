@@ -17,7 +17,6 @@ import {
   updateDoc, 
   deleteDoc, 
   writeBatch,
-  getDocs
 } from 'firebase/firestore';
 import { StudyLogDay, StudyPlanItem, WithId } from '@/lib/types';
 import { 
@@ -31,7 +30,9 @@ import {
   endOfWeek, 
   addMonths, 
   subMonths,
-  getDay
+  getDay,
+  isBefore,
+  startOfDay
 } from 'date-fns';
 import { 
   ChevronLeft, 
@@ -47,7 +48,8 @@ import {
   School, 
   ClipboardList,
   Copy,
-  Check
+  Info,
+  CalendarX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -96,13 +98,14 @@ export default function StudyHistoryPage() {
 
   const { data: logs, isLoading: logsLoading } = useCollection<StudyLogDay>(studyLogsQuery);
 
-  const monthKey = format(currentDate, "yyyy-'W'II");
+  const weekKey = selectedDateForPlan ? format(selectedDateForPlan, "yyyy-'W'II") : format(currentDate, "yyyy-'W'II");
+  
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !user || !activeMembership) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', monthKey, 'items')
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items')
     );
-  }, [firestore, user, activeMembership, monthKey]);
+  }, [firestore, user, activeMembership, weekKey]);
   
   const { data: allPlans } = useCollection<StudyPlanItem>(plansQuery);
 
@@ -299,8 +302,6 @@ export default function StudyHistoryPage() {
           'items'
         );
 
-        // 기존 해당 날짜의 계획들 삭제 (옵션: 덮어쓰기 위해)
-        // 실제로는 더 복잡한 로직이 필요할 수 있지만, 여기서는 단순 복사를 구현
         dailyPlans.forEach(plan => {
           const newDocRef = doc(itemsCollectionRef);
           batch.set(newDocRef, {
@@ -341,6 +342,7 @@ export default function StudyHistoryPage() {
     return found.title.split(': ')[1] || '';
   };
 
+  const isPastOrToday = selectedDateForPlan ? isBefore(selectedDateForPlan, startOfDay(addMonths(new Date(), 1))) : false;
   const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
 
   return (
@@ -348,7 +350,7 @@ export default function StudyHistoryPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-headline font-bold">학습 기록</h1>
-          <p className="text-muted-foreground">날짜를 클릭하여 그날의 체계적인 학습 계획을 세워보세요.</p>
+          <p className="text-muted-foreground">날짜를 클릭하여 그날의 학습 현황을 확인하거나 새로운 계획을 세워보세요.</p>
         </div>
         <div className="flex items-center gap-4 bg-card p-1 rounded-xl border shadow-sm">
            <Button variant="ghost" size="icon" onClick={prevMonth}>
@@ -469,130 +471,177 @@ export default function StudyHistoryPage() {
           <DialogHeader className="p-6 bg-primary text-primary-foreground">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <ClipboardList className="h-6 w-6" />
-              {selectedDateForPlan && format(selectedDateForPlan, 'yyyy년 M월 d일')} 계획
+              {selectedDateForPlan && format(selectedDateForPlan, 'yyyy년 M월 d일')} 현황
             </DialogTitle>
             <DialogDescription className="text-primary-foreground/80 text-sm">
-              상세 학습 및 생활 계획을 체계적으로 관리하세요.
+              기록된 학습 및 생활 계획을 확인하세요.
             </DialogDescription>
           </DialogHeader>
           
-          <Tabs defaultValue="schedule" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 rounded-none bg-muted/50 p-0 h-12">
-              <TabsTrigger value="schedule" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">시간표</TabsTrigger>
-              <TabsTrigger value="study" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">자습 To-do</TabsTrigger>
-              <TabsTrigger value="personal" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">개인 일정</TabsTrigger>
-            </TabsList>
-
-            <div className="max-h-[50vh] overflow-y-auto p-6 space-y-6">
-              <TabsContent value="schedule" className="mt-0 space-y-4">
-                <div className="grid gap-4">
-                  {SCHEDULE_TEMPLATES.map((tpl) => (
-                    <div key={tpl.title} className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
-                      <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
-                        <tpl.icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
-                      <Input 
-                        placeholder="00:00"
-                        className="w-24 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
-                        defaultValue={getScheduleValue(tpl.title)}
-                        onBlur={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
-                      />
-                    </div>
-                  ))}
+          <div className="max-h-[60vh] overflow-y-auto bg-background">
+            {dailyPlans.length === 0 && selectedDateForPlan && isBefore(selectedDateForPlan, addMonths(startOfDay(new Date()), 0)) ? (
+              <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
+                <div className="bg-muted p-4 rounded-full">
+                  <CalendarX className="h-10 w-10 text-muted-foreground" />
                 </div>
-              </TabsContent>
+                <p className="text-lg font-medium text-muted-foreground">당일 작성한 계획이 없습니다.</p>
+                <p className="text-sm text-muted-foreground/60">학습 계획을 미리 세워 루틴을 관리해보세요.</p>
+                {!isPastOrToday && (
+                   <Button variant="outline" className="mt-4" onClick={() => {/* Future: add empty item to trigger edit mode */}}>
+                     계획 시작하기
+                   </Button>
+                )}
+              </div>
+            ) : (
+              <Tabs defaultValue="schedule" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 rounded-none bg-muted/50 p-0 h-12">
+                  <TabsTrigger value="schedule" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">시간표</TabsTrigger>
+                  <TabsTrigger value="study" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">자습 To-do</TabsTrigger>
+                  <TabsTrigger value="personal" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">개인 일정</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="study" className="mt-0 space-y-4">
-                <div className="space-y-3">
-                  {studyTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10 group hover:shadow-sm transition-all">
-                      <Checkbox 
-                        id={task.id} 
-                        checked={task.done} 
-                        onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                      />
-                      <Label 
-                        htmlFor={task.id}
-                        className={cn(
-                          "flex-1 text-sm font-medium cursor-pointer transition-all",
-                          task.done && "line-through text-muted-foreground opacity-60"
-                        )}
-                      >
-                        {task.title}
-                      </Label>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                <div className="p-6 space-y-6">
+                  <TabsContent value="schedule" className="mt-0 space-y-4">
+                    <div className="grid gap-4">
+                      {SCHEDULE_TEMPLATES.map((tpl) => {
+                        const val = getScheduleValue(tpl.title);
+                        if (!val && isPastOrToday) return null;
+                        return (
+                          <div key={tpl.title} className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
+                            <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
+                              <tpl.icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
+                            {isPastOrToday && val ? (
+                              <span className="font-mono font-bold text-primary">{val}</span>
+                            ) : (
+                              <Input 
+                                placeholder="00:00"
+                                className="w-24 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
+                                defaultValue={val}
+                                onBlur={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                      {isPastOrToday && scheduleItems.length === 0 && (
+                        <p className="text-center text-sm text-muted-foreground py-4">기록된 시간표가 없습니다.</p>
+                      )}
                     </div>
-                  ))}
-                  <div className="flex items-center gap-2 pt-2">
-                    <Input 
-                      placeholder="오늘 할 자습 과제 입력..." 
-                      value={newStudyTask}
-                      onChange={(e) => setNewStudyTask(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
-                      disabled={isSubmitting}
-                      className="rounded-xl border-dashed"
-                    />
-                    <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
+                  </TabsContent>
 
-              <TabsContent value="personal" className="mt-0 space-y-4">
-                 <div className="space-y-3">
-                  {personalTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-accent/5 group hover:shadow-sm transition-all">
-                      <Checkbox 
-                        id={task.id} 
-                        checked={task.done} 
-                        onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                      />
-                      <Label 
-                        htmlFor={task.id}
-                        className={cn(
-                          "flex-1 text-sm font-medium cursor-pointer",
-                          task.done && "line-through text-muted-foreground opacity-60"
-                        )}
-                      >
-                        {task.title}
-                      </Label>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <TabsContent value="study" className="mt-0 space-y-4">
+                    <div className="space-y-3">
+                      {studyTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10 group hover:shadow-sm transition-all">
+                          <Checkbox 
+                            id={task.id} 
+                            checked={task.done} 
+                            onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                            disabled={isPastOrToday && isBefore(selectedDateForPlan!, startOfDay(new Date()))}
+                          />
+                          <Label 
+                            htmlFor={task.id}
+                            className={cn(
+                              "flex-1 text-sm font-medium cursor-pointer transition-all",
+                              task.done && "line-through text-muted-foreground opacity-60"
+                            )}
+                          >
+                            {task.title}
+                          </Label>
+                          {!isPastOrToday && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      {!isPastOrToday && (
+                        <div className="flex items-center gap-2 pt-2">
+                          <Input 
+                            placeholder="오늘 할 자습 과제 입력..." 
+                            value={newStudyTask}
+                            onChange={(e) => setNewStudyTask(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
+                            disabled={isSubmitting}
+                            className="rounded-xl border-dashed"
+                          />
+                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {isPastOrToday && studyTasks.length === 0 && (
+                         <p className="text-center text-sm text-muted-foreground py-4">기록된 자습 내용이 없습니다.</p>
+                      )}
                     </div>
-                  ))}
-                  <div className="flex items-center gap-2 pt-2">
-                    <Input 
-                      placeholder="공부 외 개인 일정 입력..." 
-                      value={newPersonalTask}
-                      onChange={(e) => setNewPersonalTask(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
-                      disabled={isSubmitting}
-                      className="rounded-xl border-dashed"
-                    />
-                    <Button size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl" variant="outline">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  </TabsContent>
+
+                  <TabsContent value="personal" className="mt-0 space-y-4">
+                     <div className="space-y-3">
+                      {personalTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-accent/5 group hover:shadow-sm transition-all">
+                          <Checkbox 
+                            id={task.id} 
+                            checked={task.done} 
+                            onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                            disabled={isPastOrToday && isBefore(selectedDateForPlan!, startOfDay(new Date()))}
+                          />
+                          <Label 
+                            htmlFor={task.id}
+                            className={cn(
+                              "flex-1 text-sm font-medium cursor-pointer",
+                              task.done && "line-through text-muted-foreground opacity-60"
+                            )}
+                          >
+                            {task.title}
+                          </Label>
+                          {!isPastOrToday && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      {!isPastOrToday && (
+                        <div className="flex items-center gap-2 pt-2">
+                          <Input 
+                            placeholder="공부 외 개인 일정 입력..." 
+                            value={newPersonalTask}
+                            onChange={(e) => setNewPersonalTask(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
+                            disabled={isSubmitting}
+                            className="rounded-xl border-dashed"
+                          />
+                          <Button size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl" variant="outline">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {isPastOrToday && personalTasks.length === 0 && (
+                         <p className="text-center text-sm text-muted-foreground py-4">기록된 개인 일정이 없습니다.</p>
+                      )}
+                    </div>
+                  </TabsContent>
                 </div>
-              </TabsContent>
-            </div>
-          </Tabs>
+              </Tabs>
+            )}
+          </div>
           
           <DialogFooter className="p-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto gap-2 text-xs" 
-              onClick={handleApplyToAllWeekdays}
-              disabled={isSubmitting || dailyPlans.length === 0}
-            >
-              {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Copy className="h-3 w-3" />}
-              이 일정을 이번 달 모든 {weekdayName}에 복사
-            </Button>
+            {!isPastOrToday && dailyPlans.length > 0 && (
+              <Button 
+                variant="outline" 
+                className="w-full sm:w-auto gap-2 text-xs" 
+                onClick={handleApplyToAllWeekdays}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Copy className="h-3 w-3" />}
+                이 일정을 이번 달 모든 {weekdayName}에 복사
+              </Button>
+            )}
+            <Button variant="ghost" className="w-full sm:w-auto text-xs" onClick={() => setSelectedDateForPlan(null)}>닫기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -607,31 +656,10 @@ export default function StudyHistoryPage() {
            <span>학습 계획 수립됨</span>
          </div>
          <div className="ml-auto flex items-center gap-1">
-           <InfoIcon className="h-3 w-3" />
-           <span>날짜를 클릭하여 체계적인 일별 학습 계획을 관리하세요.</span>
+           <Info className="h-3 w-3" />
+           <span>날짜를 클릭하여 체계적인 일별 학습 현황을 관리하세요.</span>
          </div>
       </div>
     </div>
-  );
-}
-
-function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
   );
 }
