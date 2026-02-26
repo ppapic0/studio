@@ -20,6 +20,8 @@ import {
   Trophy,
   Sparkles,
   Zap,
+  Square,
+  Timer,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -145,6 +147,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
 
+  // 타이머 관련 상태
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
+
   // --- Data Fetching ---
   const dailyStatRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -168,6 +174,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership, user, weekKey]);
   const { data: planItems, isLoading: planItemsLoading } = useCollection<StudyPlanItem>(planItemsRef, { enabled: isActive });
   
+  // --- 타이머 Effect ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerActive) {
+      interval = setInterval(() => {
+        setSecondsElapsed((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerActive]);
+
   // --- 위치 확인 로직 ---
   const checkLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -252,11 +269,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleStudyStart = () => {
-    toast({
-      title: "공부 모드 시작!",
-      description: "동백센터 학습 구역에 입장하셨습니다. 집중력을 발휘해 보세요!",
-    });
-    // 향후 여기에 타이머 시작이나 출석 체크 로직을 추가할 수 있습니다.
+    if (isTimerActive) {
+      setIsTimerActive(false);
+      const minutes = Math.floor(secondsElapsed / 60);
+      toast({
+        title: "공부 종료",
+        description: `오늘 세션에서 ${minutes}분 동안 학습하셨습니다.`,
+      });
+      // Optionally update the study log here automatically
+    } else {
+      setIsTimerActive(true);
+      setSecondsElapsed(0);
+      toast({
+        title: "공부 모드 시작!",
+        description: "동백센터 학습 구역에 입장하셨습니다. 집중력을 발휘해 보세요!",
+      });
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (!isActive) {
@@ -268,11 +302,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      {/* Hero Section: Study Start Button */}
-      <section className="relative overflow-hidden rounded-3xl bg-primary p-8 text-primary-foreground shadow-2xl">
+      {/* Hero Section: Study Start Button & Timer */}
+      <section className="relative overflow-hidden rounded-3xl bg-primary p-8 text-primary-foreground shadow-2xl transition-all duration-500">
         <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:justify-between md:text-left">
-          <div className="space-y-2">
-            <h2 className="text-3xl font-headline font-bold sm:text-4xl">오늘의 성장을 시작할까요?</h2>
+          <div className="space-y-3">
+            <h2 className="text-3xl font-headline font-bold sm:text-4xl">
+              {isTimerActive ? "집중하고 계신 모습이 멋져요!" : "오늘의 성장을 시작할까요?"}
+            </h2>
             <p className="flex items-center gap-2 text-primary-foreground/80">
               <MapPin className="h-4 w-4" />
               {locationStatus === 'checking' && "위치 정보를 확인하고 있습니다..."}
@@ -281,20 +317,43 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               {locationStatus === 'error' && "위치 권한이 필요합니다."}
             </p>
           </div>
-          <Button 
-            size="lg" 
-            className={cn(
-              "h-20 w-full rounded-2xl px-8 text-2xl font-bold transition-all md:w-auto shadow-lg",
-              locationStatus === 'inside' 
-                ? "bg-accent text-accent-foreground hover:scale-105 hover:bg-accent/90" 
-                : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+          
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            {isTimerActive && (
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20 animate-pulse">
+                <Timer className="h-6 w-6 text-accent" />
+                <span className="text-4xl font-mono font-bold tracking-tighter">
+                  {formatTime(secondsElapsed)}
+                </span>
+              </div>
             )}
-            disabled={locationStatus !== 'inside'}
-            onClick={handleStudyStart}
-          >
-            <Play className="mr-3 h-8 w-8 fill-current" />
-            공부 시작하기
-          </Button>
+            
+            <Button 
+              size="lg" 
+              className={cn(
+                "h-20 w-full rounded-2xl px-8 text-2xl font-bold transition-all md:w-auto shadow-lg",
+                isTimerActive 
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" 
+                  : locationStatus === 'inside' 
+                    ? "bg-accent text-accent-foreground hover:scale-105 hover:bg-accent/90" 
+                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+              )}
+              disabled={!isTimerActive && locationStatus !== 'inside'}
+              onClick={handleStudyStart}
+            >
+              {isTimerActive ? (
+                <>
+                  <Square className="mr-3 h-6 w-6 fill-current" />
+                  공부 중단하기
+                </>
+              ) : (
+                <>
+                  <Play className="mr-3 h-8 w-8 fill-current" />
+                  공부 시작하기
+                </>
+              )}
+            </Button>
+          </div>
         </div>
         {/* Background Decorative Elements */}
         <div className="absolute -bottom-12 -right-12 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
