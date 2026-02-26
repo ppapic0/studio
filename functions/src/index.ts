@@ -1,5 +1,3 @@
-
-'use server';
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
@@ -27,7 +25,7 @@ async function bootstrapUserToCenter(
   const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
   const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
 
-  // 1. 센터 자동 생성
+  // 1. 센터 자동 생성 (동백센터 전용 이름 설정)
   const centerSnap = await transaction.get(centerRef);
   if (!centerSnap.exists) {
     transaction.set(centerRef, {
@@ -56,7 +54,7 @@ async function bootstrapUserToCenter(
     displayName,
   });
 
-  // 4. 사용자 센터 인덱스
+  // 4. 사용자 센터 인덱스 (역인덱스)
   transaction.set(userCenterRef, {
     role,
     status: "active",
@@ -83,12 +81,13 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
 
   try {
     return await db.runTransaction(async (transaction) => {
+      // 1. 최상위 /inviteCodes 에서 검색 (문서 ID가 코드인 경우)
       const inviteRef = db.doc(`inviteCodes/${code}`);
       const inviteSnap = await transaction.get(inviteRef);
 
       if (!inviteSnap.exists) {
         console.error(`Invite code not found: ${code}`);
-        throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다. (ID: 0313 인지 확인해 주세요)");
+        throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다.");
       }
 
       const inviteData = inviteSnap.data()!;
@@ -103,8 +102,10 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
         throw new functions.https.HttpsError("resource-exhausted", "이 초대 코드는 더 이상 사용할 수 없습니다.");
       }
 
+      // 부트스트랩 및 가입 처리
       await bootstrapUserToCenter(transaction, uid, email, displayName, centerId, role);
 
+      // 코드 사용 횟수 업데이트
       transaction.update(inviteRef, {
         usedCount: admin.firestore.FieldValue.increment(1),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
