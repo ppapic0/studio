@@ -14,18 +14,16 @@ import {
   Clock,
   TrendingUp,
   Loader2,
-  Save,
   MapPin,
   Play,
   Trophy,
-  Sparkles,
   Zap,
   Square,
   Timer,
   Info,
-  ChevronRight,
   CalendarClock,
   AlertCircle,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -43,15 +41,15 @@ import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
-import { doc, collection, query, where, limit, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { format, startOfMonth, endOfMonth, differenceInDays, addMonths } from 'date-fns';
+import { doc, collection, query, where, limit, updateDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { format, startOfMonth, differenceInDays, addMonths, isSameDay } from 'date-fns';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Input } from '../ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Calendar } from '../ui/calendar';
 
 // --- 월간 시즌 등급 정의 ---
 const RANKS = [
@@ -67,11 +65,10 @@ const RANKS = [
 
 type MetricType = 'completion' | 'attendance' | 'growth';
 
-// 월간 기준 깐깐한 임계치 (매달 1일 리셋)
 const RANK_THRESHOLDS: Record<MetricType, number[]> = {
-  completion: [98, 95, 92, 88, 84, 75, 60, 0], // 월간 완수율 (%)
-  attendance: [26, 24, 22, 20, 18, 15, 10, 0], // 월간 '유효' 출석 일수 (일) - 3시간 이상 학습 기준
-  growth: [50, 40, 30, 20, 10, 5, 0, -50],    // 월간 성장 지수 (%)
+  completion: [98, 95, 92, 88, 84, 75, 60, 0],
+  attendance: [26, 24, 22, 20, 18, 15, 10, 0],
+  growth: [50, 40, 30, 20, 10, 5, 0, -50],
 };
 
 function getRankData(value: number, type: MetricType) {
@@ -228,11 +225,6 @@ function GamifiedStatCard({
               ))}
             </div>
           </div>
-          
-          <div className="text-center text-[11px] text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-dashed">
-            💡 매달 1일 00:00에 시즌 등급과 랭킹이 초기화됩니다. <br/>
-            {type === 'attendance' ? "하루 3시간 이상의 '진짜 공부'만이 출석으로 인정됩니다." : "한 달 동안의 꾸준함으로 당신의 실력을 증명하세요!"}
-          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -247,17 +239,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const today = useMemo(() => new Date(), []);
   const todayKey = format(today, 'yyyy-MM-dd');
-  const monthKey = format(today, 'yyyy-MM');
   const weekKey = format(today, "yyyy-'W'II");
 
-  const [minutesInput, setMinutesInput] = useState('');
-  const [isSavingMinutes, setIsSavingMinutes] = useState(false);
-  
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
 
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
 
   // 시즌 종료 카운트다운
   const daysUntilReset = useMemo(() => {
@@ -275,7 +264,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
   }, [firestore, activeMembership, user, todayKey]);
-  const { data: studyLog, isLoading: studyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
+  const { data: todayStudyLog, isLoading: todayStudyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
+
+  const allStudyLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days')
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: allStudyLogs } = useCollection<StudyLogDay>(allStudyLogsQuery, { enabled: isActive });
 
   const planItemsRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -332,14 +329,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       checkLocation();
     }
   }, [isActive, checkLocation]);
-
-  useEffect(() => {
-    if (studyLog) {
-      setMinutesInput(String(studyLog.totalMinutes));
-    } else {
-      setMinutesInput('0');
-    }
-  }, [studyLog]);
   
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership) return;
@@ -350,42 +339,33 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     });
   };
 
-  const handleSetMinutes = async () => {
+  const handleStudyStart = async () => {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
-    
-    const newMinutes = parseInt(minutesInput, 10);
-    if (isNaN(newMinutes) || newMinutes < 0) {
-      toast({ variant: 'destructive', title: '유효하지 않은 값', description: '0 이상의 숫자를 입력해주세요.' });
-      return;
-    }
-    
-    setIsSavingMinutes(true);
-    try {
-      await setDoc(studyLogRef, {
-        totalMinutes: newMinutes,
-        uid: user.uid,
-        centerId: activeMembership.id,
-        dateKey: todayKey,
-        updatedAt: serverTimestamp(),
-        studentId: user.uid,
-      }, { merge: true });
-      toast({ title: '저장 완료', description: `오늘의 학습 시간이 ${newMinutes}분으로 기록되었습니다.` });
-    } catch (error) {
-      console.error("Failed to save study minutes:", error);
-      toast({ variant: 'destructive', title: '저장 실패', description: '학습 시간을 저장하는 중 오류가 발생했습니다.' });
-    } finally {
-      setIsSavingMinutes(false);
-    }
-  };
 
-  const handleStudyStart = () => {
     if (isTimerActive) {
       setIsTimerActive(false);
-      const minutes = Math.floor(secondsElapsed / 60);
-      toast({
-        title: "공부 종료",
-        description: `오늘 세션에서 ${minutes}분 동안 학습하셨습니다.`,
-      });
+      const sessionMinutes = Math.floor(secondsElapsed / 60);
+      
+      try {
+        await setDoc(studyLogRef, {
+          totalMinutes: increment(sessionMinutes),
+          uid: user.uid,
+          centerId: activeMembership.id,
+          dateKey: todayKey,
+          updatedAt: serverTimestamp(),
+          studentId: user.uid,
+          createdAt: serverTimestamp(), // Only set on create by setDoc with merge
+        }, { merge: true });
+
+        toast({
+          title: "공부 종료 및 기록 완료",
+          description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
+        });
+      } catch (error) {
+        console.error("Failed to update study minutes:", error);
+        toast({ variant: 'destructive', title: '기록 실패', description: '학습 시간을 저장하지 못했습니다.' });
+      }
+      setSecondsElapsed(0);
     } else {
       setIsTimerActive(true);
       setSecondsElapsed(0);
@@ -401,6 +381,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const selectedLog = useMemo(() => {
+    if (!selectedCalendarDate || !allStudyLogs) return null;
+    const dateKey = format(selectedCalendarDate, 'yyyy-MM-dd');
+    return allStudyLogs.find(log => log.dateKey === dateKey);
+  }, [selectedCalendarDate, allStudyLogs]);
 
   if (!isActive) {
     return null;
@@ -478,38 +464,68 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </Button>
           </div>
         </div>
-        <div className="absolute -bottom-12 -right-12 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute -top-12 -left-12 h-48 w-48 rounded-full bg-accent/20 blur-3xl" />
       </section>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-muted/30">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">오늘의 학습 시간</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {studyLogLoading ? (
-              <Skeleton className="h-8 w-24 mt-1" />
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="flex items-baseline gap-1">
-                  <Input 
-                    type="number" 
-                    className="text-2xl font-bold h-10 w-16 p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent" 
-                    value={minutesInput}
-                    onChange={(e) => setMinutesInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSetMinutes()}
-                  />
-                  <span className="text-sm text-muted-foreground">분</span>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-md group">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">오늘의 학습 시간</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </CardHeader>
+              <CardContent>
+                {todayStudyLogLoading ? (
+                  <Skeleton className="h-8 w-24 mt-1" />
+                ) : (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold">{todayStudyLog?.totalMinutes || 0}</span>
+                    <span className="text-sm text-muted-foreground">분</span>
+                    <CalendarIcon className="h-3 w-3 ml-auto text-muted-foreground opacity-50" />
+                  </div>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1 italic">클릭하여 학습 기록 보기</p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>학습 히스토리</DialogTitle>
+              <DialogDescription>날짜별 학습 시간을 확인하세요.</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-4">
+              <Calendar
+                mode="single"
+                selected={selectedCalendarDate}
+                onSelect={setSelectedCalendarDate}
+                className="rounded-md border shadow"
+                modifiers={{
+                  hasData: (date) => allStudyLogs?.some(log => isSameDay(new Date(log.dateKey), date)) || false,
+                }}
+                modifiersStyles={{
+                  hasData: { fontWeight: 'bold', textDecoration: 'underline', color: 'hsl(var(--primary))' }
+                }}
+              />
+              <div className="w-full bg-muted/50 p-4 rounded-xl border">
+                <p className="text-sm font-medium mb-1">
+                  {selectedCalendarDate ? format(selectedCalendarDate, 'yyyy년 MM월 dd일') : '날짜를 선택하세요'}
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-primary">
+                    {selectedLog ? selectedLog.totalMinutes : 0}
+                  </span>
+                  <span className="text-sm text-muted-foreground">분 학습함</span>
                 </div>
-                <Button size="sm" variant="ghost" onClick={handleSetMinutes} disabled={isSavingMinutes} className="h-8 w-8 p-0 ml-auto">
-                  {isSavingMinutes ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
-                </Button>
+                {selectedLog && selectedLog.totalMinutes >= 180 && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600 font-bold">
+                    <Zap className="h-3 w-3" />
+                    3시간 달성! 출석 인정 완료
+                  </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <GamifiedStatCard 
           title="월간 완수율"
