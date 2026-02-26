@@ -27,14 +27,14 @@
     --accent: 30 31% 48%;
     --accent-foreground: 40 25% 98%;
 
-    --destructive: 33 29% 65%; /* Soft Warning Border */
+    --destructive: 33 29% 65%;
     --destructive-foreground: 0 0% 18%;
 
     --border: 36 17% 87%;
     --input: 36 17% 87%;
     --ring: 30 31% 48%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
     --chart-1: 27 25% 28%;
     --chart-2: 30 31% 48%;
@@ -85,15 +85,20 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-body transition-colors duration-300;
   }
 }
 
 @layer components {
-  .alert-warning {
-    @apply border-destructive bg-[#FBF6F0] text-destructive-foreground;
+  .premium-card {
+    @apply bg-card text-card-foreground shadow-sm hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 ease-out border border-border/50;
   }
-  .alert-warning > svg {
-    @apply text-destructive;
+  
+  .glass-panel {
+    @apply bg-white/40 backdrop-blur-md border border-white/20 shadow-lg;
+  }
+  
+  .interactive-button {
+    @apply active:scale-95 hover:scale-105 transition-all duration-200 ease-in-out;
   }
 }

@@ -7,8 +7,8 @@ import { AppProvider } from '@/contexts/app-context';
 import { AuthGuard } from '@/components/auth/auth-guard';
 
 export const metadata: Metadata = {
-  title: '공부트랙관리형독서실',
-  description: '집중 학습과 성장을 위한 플랫폼입니다.',
+  title: '공부트랙 | 관리형 독서실',
+  description: '집중 학습과 성장을 위한 프리미엄 플랫폼입니다.',
 };
 
 export default function RootLayout({
@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className="font-body antialiased"
+        className="font-body antialiased selection:bg-primary selection:text-white"
       >
         <FirebaseClientProvider>
           <AppProvider>

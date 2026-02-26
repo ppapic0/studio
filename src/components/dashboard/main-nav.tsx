@@ -60,30 +60,36 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   const userNavItems = navItems[userRole] || [];
   
   const navClass = cn(
-    'flex-1 items-start px-2 text-sm font-medium',
-    isMobile ? 'grid gap-6 text-lg' : 'flex flex-col gap-1'
+    'flex-1 items-start px-4 text-sm font-medium pt-8',
+    isMobile ? 'grid gap-6 text-lg' : 'flex flex-col gap-2'
   );
   
   const linkClass = cn(
-    'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+    'flex items-center gap-4 rounded-2xl px-4 py-3 text-muted-foreground transition-all duration-300 hover:text-primary hover:bg-primary/5 active:scale-95 group',
     isMobile ? 'text-lg' : ''
   );
   
-  const activeLinkClass = 'bg-muted text-primary';
+  const activeLinkClass = 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground shadow-lg shadow-primary/20';
 
   return (
     <nav className={navClass}>
       <Link
         href="/dashboard"
-        className="flex items-center gap-2 text-lg font-headline font-semibold text-primary mb-4"
+        className="flex items-center gap-3 text-2xl font-black text-primary mb-10 px-2 tracking-tighter"
       >
-        <BookOpen className="h-6 w-6" />
-        <span>공부트랙관리형독서실</span>
+        <div className="bg-primary p-2 rounded-xl">
+          <BookOpen className="h-6 w-6 text-white" />
+        </div>
+        <span>공부트랙</span>
       </Link>
       {userNavItems.map((item) => (
-        <Link key={item.href} href={item.href} className={cn(linkClass, pathname === item.href ? activeLinkClass : '')}>
-          <item.icon className="h-4 w-4" />
-          {item.label}
+        <Link 
+          key={item.href} 
+          href={item.href} 
+          className={cn(linkClass, pathname === item.href ? activeLinkClass : '')}
+        >
+          <item.icon className={cn("h-5 w-5 transition-transform duration-300 group-hover:scale-110", pathname === item.href ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
+          <span className="font-bold">{item.label}</span>
         </Link>
       ))}
     </nav>
