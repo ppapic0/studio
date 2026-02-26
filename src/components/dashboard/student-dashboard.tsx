@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   CircleDot,
   History,
+  RefreshCw,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -294,6 +295,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [timeSinceCheck, setTimeSinceCheck] = useState(0);
 
   // 세션 자동 종료 관련 상태
   const [showSessionAlert, setShowSessionAlert] = useState(false);
@@ -339,16 +341,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     let interval: NodeJS.Timeout;
     if (isTimerActive) {
       interval = setInterval(() => {
-        setSecondsElapsed((prev) => {
-          const next = prev + 1;
+        setSecondsElapsed(s => s + 1);
+        setTimeSinceCheck(t => {
+          const next = t + 1;
           // 2시간 경과 시 세션 확인 팝업 노출
-          if (next === AUTO_TERMINATE_SECONDS) {
+          if (next >= AUTO_TERMINATE_SECONDS) {
             setShowSessionAlert(true);
             setGracePeriod(GRACE_PERIOD_SECONDS);
           }
           return next;
         });
       }, 1000);
+    } else {
+      setTimeSinceCheck(0);
     }
     return () => clearInterval(interval);
   }, [isTimerActive]);
@@ -463,6 +468,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       saveStudyTime();
       setIsTimerActive(false);
       setSecondsElapsed(0);
+      setTimeSinceCheck(0);
       toast({
         title: "공부 종료 및 기록 완료",
         description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
@@ -470,6 +476,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     } else {
       setIsTimerActive(true);
       setSecondsElapsed(0);
+      setTimeSinceCheck(0);
       toast({
         title: "공부 모드 시작!",
         description: "동백센터 학습 구역에 입장하셨습니다. 집중력을 발휘해 보세요!",
@@ -479,12 +486,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleMaintainSession = () => {
     setShowSessionAlert(false);
-    // secondsElapsed는 그대로 유지되어 계속 카운트업됨
+    setTimeSinceCheck(0);
     toast({
       title: "학습 세션 유지",
       description: "집중을 계속 이어가세요! 화이팅!",
     });
   };
+
+  const handleManualSessionReset = () => {
+    setTimeSinceCheck(0);
+    toast({
+      title: "세션 연장 완료",
+      description: "2시간이 다시 충전되었습니다.",
+    });
+  }
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -550,18 +565,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <h2 className="text-2xl font-black tracking-tighter sm:text-3xl leading-tight">
               {isTimerActive ? "몰입의 즐거움을\n경험하세요!" : "오늘의 성장을\n지금 시작할까요?"}
             </h2>
-            <p className="flex items-center gap-2 text-primary-foreground/70 font-black bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-sm border border-white/10 text-[11px]">
-              <MapPin className="h-3 w-3 text-accent animate-pulse" />
-              {locationStatus === 'checking' && "위치 확인 중..."}
-              {locationStatus === 'inside' && "동백센터 구역 내"}
-              {locationStatus === 'outside' && `구역 밖 (${distance?.toFixed(1)}km)`}
-              {locationStatus === 'error' && "위치 권한 필요"}
-            </p>
+            <div className="flex flex-col gap-2">
+              <p className="flex items-center gap-2 text-primary-foreground/70 font-black bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-sm border border-white/10 text-[11px]">
+                <MapPin className="h-3 w-3 text-accent animate-pulse" />
+                {locationStatus === 'checking' && "위치 확인 중..."}
+                {locationStatus === 'inside' && "동백센터 구역 내"}
+                {locationStatus === 'outside' && `구역 밖 (${distance?.toFixed(1)}km)`}
+                {locationStatus === 'error' && "위치 권한 필요"}
+              </p>
+              <p className="text-[10px] text-primary-foreground/50 font-bold ml-1">
+                ※ 2시간 미응답 시 세션 자동 종료 (중간 연장 가능)
+              </p>
+            </div>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             {isTimerActive && (
-              <div className="flex flex-col items-center gap-0.5 bg-white/10 backdrop-blur-xl px-7 py-4 rounded-3xl border border-white/20 shadow-inner animate-pulse-soft">
+              <div className="flex flex-col items-center gap-0.5 bg-white/10 backdrop-blur-xl px-7 py-4 rounded-3xl border border-white/20 shadow-inner animate-pulse-soft relative group/timer">
                 <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest opacity-70">
                   <Timer className="h-3 w-3" />
                   <span>진행 시간</span>
@@ -569,6 +589,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-4xl font-mono font-black tracking-tighter">
                   {formatTime(secondsElapsed)}
                 </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleManualSessionReset}
+                  className="mt-2 h-7 rounded-xl bg-white/10 text-[10px] font-black hover:bg-white/20 hover:text-white border-white/10"
+                >
+                  <RefreshCw className="mr-1.5 h-3 w-3" />
+                  세션 연장
+                </Button>
               </div>
             )}
             
