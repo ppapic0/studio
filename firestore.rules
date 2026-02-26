@@ -2,37 +2,84 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 공통 함수
     function isSignedIn() { return request.auth != null; }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    
+    // 센터 내 역할 확인 함수
+    function getRole(centerId) {
+      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role;
+    }
+    function hasCenterRole(centerId, roles) {
+      return isSignedIn() && getRole(centerId) in roles;
+    }
 
+    // 사용자 프로필
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isOwner(userId);
     }
 
+    // 센터 정보
     match /centers/{centerId} {
       allow read: if isSignedIn();
-      allow write: if false; // Cloud Functions 전용
+      allow write: if false; // 서버 액션/Admin 전용
       
+      // 센터 멤버십
       match /members/{userId} {
-        allow read: if isOwner(userId) || (get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role in ['admin', 'teacher']);
+        allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher']);
         allow write: if false;
+      }
+
+      // 출석 기록
+      match /attendanceRecords/{dateKey}/students/{userId} {
+        allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher']);
+        allow write: if hasCenterRole(centerId, ['centerAdmin', 'teacher']);
+      }
+
+      // 학습 계획
+      match /plans/{userId}/weeks/{weekKey}/items/{itemId} {
+        allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher']);
+        allow write: if isOwner(userId) && hasCenterRole(centerId, ['student']);
+      }
+
+      // 학습 로그 (공부 시간)
+      match /studyLogs/{userId}/days/{dateKey} {
+        allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher']);
+        allow write: if isOwner(userId) && hasCenterRole(centerId, ['student']);
+      }
+
+      // 학생 일일 통계 (AI 생성 포함)
+      match /dailyStudentStats/{dateKey}/students/{userId} {
+        allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher', 'parent']);
+        allow write: if false; // 시스템 전용
+      }
+
+      // AI 코칭/분석 결과
+      match /aiOutputs/{userId}/records/{recordId} {
+        allow read: if isOwner(userId) || hasCenterRole(centerId, ['centerAdmin', 'teacher', 'parent']);
+        allow write: if false; // 시스템 전용
       }
     }
 
+    // 초대 코드
     match /inviteCodes/{code} {
       allow get: if isSignedIn();
       allow list, write: if false;
     }
 
+    // 사용자 가입 센터 인덱스 (로그인 시 필요)
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isOwner(userId);
       allow write: if false;
     }
     
-    // 기존 데이터 구조 호환을 위한 임시 규칙 (필요 시 제거 가능)
-    match /centers/{centerId}/inviteCodes/{code} {
-      allow get: if isSignedIn();
+    // 컬렉션 그룹 규칙 (교사 대시보드에서 AI 위험 알림 조회용)
+    match /{path=**}/records/{recordId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid || 
+        get(/databases/$(database)/documents/centers/$(resource.data.centerId)/members/$(request.auth.uid)).data.role in ['centerAdmin', 'teacher']
+      );
     }
   }
 }
