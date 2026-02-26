@@ -374,11 +374,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const from24h = (time24h: string) => {
+    if (!time24h || !time24h.includes(':')) return { time: '', period: '오전' as const };
+    let [hours, mins] = time24h.split(':').map(Number);
+    if (isNaN(hours) || isNaN(mins)) return { time: '', period: '오전' as const };
+
+    const period = hours >= 12 ? '오후' : '오전';
+    let hours12 = hours % 12;
+    if (hours12 === 0) hours12 = 12;
+    
+    return { 
+      time: `${hours12.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`, 
+      period 
+    };
+  };
+
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr || !timeStr.includes(':')) return '-';
-    const hour = parseInt(timeStr.split(':')[0], 10);
-    const period = hour < 12 ? '오전' : '오후';
-    return `${period} ${timeStr}`;
+    const { time, period } = from24h(timeStr);
+    return `${period} ${time}`;
   };
 
   if (!isActive) {
@@ -461,12 +475,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       {scheduleItems.length > 0 && (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
           {scheduleItems.map((item) => {
-            const [title, time] = item.title.split(': ');
+            const [title, time24h] = item.title.split(': ');
             return (
               <Card key={item.id} className="bg-muted/30 border-dashed">
                 <CardContent className="p-3 flex flex-col items-center justify-center gap-1">
                   <span className="text-[10px] font-bold text-muted-foreground">{title}</span>
-                  <span className="text-sm font-bold">{formatDisplayTime(time)}</span>
+                  <span className="text-sm font-bold">{formatDisplayTime(time24h)}</span>
                 </CardContent>
               </Card>
             );

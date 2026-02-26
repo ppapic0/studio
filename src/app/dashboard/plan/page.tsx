@@ -19,6 +19,13 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { 
   Loader2, 
   Plus, 
   Trash2, 
@@ -114,17 +121,36 @@ export default function StudyPlanPage() {
   const personalTasks = dailyPlans?.filter(p => p.category === 'personal') || [];
   const studyTasks = dailyPlans?.filter(p => p.category === 'study' || !p.category) || [];
 
-  const getPeriod = (timeStr: string) => {
-    if (!timeStr || !timeStr.includes(':')) return '';
-    const hour = parseInt(timeStr.split(':')[0], 10);
-    if (isNaN(hour)) return '';
-    return hour < 12 ? '오전' : '오후';
+  const to24h = (time12h: string, period: '오전' | '오후') => {
+    if (!time12h || !time12h.includes(':')) return time12h;
+    let [hours, mins] = time12h.split(':').map(Number);
+    if (isNaN(hours) || isNaN(mins)) return time12h;
+    
+    if (period === '오후' && hours < 12) hours += 12;
+    if (period === '오전' && hours === 12) hours = 0;
+    
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  };
+
+  const from24h = (time24h: string) => {
+    if (!time24h || !time24h.includes(':')) return { time: '', period: '오전' as const };
+    let [hours, mins] = time24h.split(':').map(Number);
+    if (isNaN(hours) || isNaN(mins)) return { time: '', period: '오전' as const };
+
+    const period = hours >= 12 ? '오후' : '오전';
+    let hours12 = hours % 12;
+    if (hours12 === 0) hours12 = 12;
+    
+    return { 
+      time: `${hours12.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`, 
+      period 
+    };
   };
 
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr || !timeStr.includes(':')) return '-';
-    const period = getPeriod(timeStr);
-    return `${period} ${timeStr}`;
+    const { time, period } = from24h(timeStr);
+    return `${period} ${time}`;
   };
 
   const handleAddTask = async (title: string, category: 'study' | 'personal') => {
@@ -164,9 +190,10 @@ export default function StudyPlanPage() {
     }
   };
 
-  const handleUpdateSchedule = async (title: string, value: string) => {
+  const handleUpdateSchedule = async (title: string, timeValue: string, periodValue: '오전' | '오후') => {
     if (isPast || !firestore || !user || !activeMembership || !isStudent) return;
     
+    const formattedTime = to24h(timeValue, periodValue);
     const existing = scheduleItems.find(p => p.title.startsWith(title));
     const itemsCollectionRef = collection(
       firestore,
@@ -182,12 +209,12 @@ export default function StudyPlanPage() {
     if (existing) {
       const docRef = doc(itemsCollectionRef, existing.id);
       await updateDoc(docRef, {
-        title: `${title}: ${value}`,
+        title: `${title}: ${formattedTime}`,
         updatedAt: serverTimestamp(),
       });
     } else {
       await addDoc(itemsCollectionRef, {
-        title: `${title}: ${value}`,
+        title: `${title}: ${formattedTime}`,
         done: false,
         weight: 0,
         dateKey: selectedDateKey,
@@ -295,10 +322,10 @@ export default function StudyPlanPage() {
     }
   };
 
-  const getScheduleValue = (title: string) => {
+  const getScheduleParts = (title: string) => {
     const found = scheduleItems.find(p => p.title.startsWith(title));
-    if (!found) return '';
-    return found.title.split(': ')[1] || '';
+    const time24h = found ? found.title.split(': ')[1] : '';
+    return from24h(time24h);
   };
 
   if (!isStudent) {
@@ -360,8 +387,7 @@ export default function StudyPlanPage() {
           </CardHeader>
           <CardContent className="p-4 sm:p-6 space-y-4">
             {SCHEDULE_TEMPLATES.map((tpl) => {
-              const val = getScheduleValue(tpl.title);
-              const period = getPeriod(val);
+              const { time, period } = getScheduleParts(tpl.title);
               return (
               <div key={tpl.title} className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
                 <div className="flex items-center gap-3">
@@ -370,15 +396,26 @@ export default function StudyPlanPage() {
                   </div>
                   <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
                   {isPast ? (
-                    <span className="font-mono font-bold text-primary">{formatDisplayTime(val)}</span>
+                    <span className="font-mono font-bold text-primary">{formatDisplayTime(to24h(time, period))}</span>
                   ) : (
                     <div className="flex items-center gap-2">
-                       {period && <span className="text-[10px] font-bold text-accent">{period}</span>}
+                       <Select 
+                        value={period} 
+                        onValueChange={(val: any) => handleUpdateSchedule(tpl.title, time, val)}
+                       >
+                         <SelectTrigger className="w-[70px] h-9 text-xs border-none bg-transparent font-bold">
+                           <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="오전">오전</SelectItem>
+                           <SelectItem value="오후">오후</SelectItem>
+                         </SelectContent>
+                       </Select>
                        <Input 
                         placeholder="00:00"
-                        className="w-20 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0"
-                        value={val}
-                        onChange={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
+                        className="w-16 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold"
+                        value={time}
+                        onChange={(e) => handleUpdateSchedule(tpl.title, e.target.value, period)}
                       />
                     </div>
                   )}
