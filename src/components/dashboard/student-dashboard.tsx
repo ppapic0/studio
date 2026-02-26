@@ -27,10 +27,10 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, AIOutput, WithId, StudyLogDay } from '@/lib/types';
 import { doc, collection, query, where, limit, orderBy, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { format, getISOWeek } from 'date-fns';
-import { Skeleton } from '../ui/skeleton';
 import { useEffect, useState } from 'react';
 import { Input } from '../ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '../ui/skeleton';
 
 function StatCard({ title, icon: Icon, value, evolution, isLoading, children }: { title: string, icon: React.ElementType, value?: string, evolution?: string, isLoading: boolean, children?: React.ReactNode }) {
   return (
@@ -41,10 +41,10 @@ function StatCard({ title, icon: Icon, value, evolution, isLoading, children }: 
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <>
+          <div className="space-y-2">
             <Skeleton className="h-8 w-24 mt-1" />
             <Skeleton className="h-4 w-32 mt-2" />
-          </>
+          </div>
         ) : children ? (
           children
         ) : (
@@ -97,6 +97,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !activeMembership || !user) return null;
     return query(
         collection(firestore, 'centers', activeMembership.id, 'aiOutputs', user.uid, 'records'),
+        where('studentId', '==', user.uid), // 보안 규칙을 위해 필터 명시
         where('type', '==', 'intervention'),
         orderBy('createdAt', 'desc'),
         limit(1)
@@ -124,7 +125,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleSetMinutes = async () => {
-    if (!firestore || !user || !activeMembership) return;
+    if (!firestore || !user || !activeMembership || !studyLogRef) return;
     
     const newMinutes = parseInt(minutesInput, 10);
     if (isNaN(newMinutes) || newMinutes < 0) {
@@ -134,7 +135,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     
     setIsSavingMinutes(true);
     try {
-      await setDoc(studyLogRef!, {
+      await setDoc(studyLogRef, {
         totalMinutes: newMinutes,
         uid: user.uid,
         centerId: activeMembership.id,
@@ -159,7 +160,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const growthRate = dailyStat?.studyTimeGrowthRate ?? 0;
   const growthSign = growthRate >= 0 ? '+' : '';
   const growthEvolution = `지난 7일 대비`;
-  const isLoading = dailyStatLoading || studyLogLoading || planItemsLoading || aiCoachLoading;
 
   return (
     <>
@@ -179,10 +179,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             />
             <Button size="sm" onClick={handleSetMinutes} disabled={isSavingMinutes}>
               {isSavingMinutes ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
-              <span className="sr-only">Save</span>
+              <span className="sr-only">저장</span>
             </Button>
           </div>
-          {studyLog?.updatedAt && <p className="text-xs text-muted-foreground">마지막 저장: {format(studyLog.updatedAt.toDate(), 'p')}</p>}
+          {studyLog?.updatedAt && <p className="text-xs text-muted-foreground mt-1">마지막 저장: {format(studyLog.updatedAt.toDate(), 'p')}</p>}
         </StatCard>
         <StatCard 
           title="주간 완수율"
@@ -206,7 +206,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           isLoading={dailyStatLoading}
         />
       </div>
-      <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3 mt-8">
         <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center">
             <div className="grid gap-2">
@@ -257,7 +257,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
              <Alert className="bg-background">
                 <Activity className="h-4 w-4" />
                 <AlertTitle className="font-headline">주간 팁</AlertTitle>
-                <AlertDescription>
+                <AlertDescription className="mt-2">
                   {aiCoachLoading ? (
                      <Skeleton className="h-16 w-full" />
                   ) : aiCoachMessage ? (

@@ -1,11 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 공통 함수
+    // 공통 유틸리티 함수
     function isSignedIn() { return request.auth != null; }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     
-    // 센터 내 역할 확인 함수
+    // 센터 내 역할 확인 함수 (안전하게 exists() 체크 추가)
     function getRole(centerId) {
       let path = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
       return exists(path) ? get(path).data.role : null;
@@ -69,17 +69,18 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
-    // 사용자 가입 센터 인덱스 (로그인/로그인 유지 시 필요)
+    // 사용자 가입 센터 인덱스
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isOwner(userId);
       allow write: if false;
     }
     
-    // 컬렉션 그룹 규칙
+    // 컬렉션 그룹 규칙 (교사용 위험 탐지 등)
+    // resource.data 사용 시 쿼리에 해당 필터가 반드시 포함되어야 함
     match /{path=**}/records/{recordId} {
       allow read: if isSignedIn() && (
-        resource.data.studentId == request.auth.uid || 
-        hasCenterRole(resource.data.centerId, ['centerAdmin', 'teacher'])
+        (resource != null && resource.data.studentId == request.auth.uid) ||
+        (resource != null && hasCenterRole(resource.data.centerId, ['centerAdmin', 'teacher']))
       );
     }
   }
