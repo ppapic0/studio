@@ -22,6 +22,8 @@ import {
   Zap,
   Square,
   Timer,
+  Info,
+  ChevronRight,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -46,14 +48,52 @@ import { Input } from '../ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Progress } from '../ui/progress';
 
-// 동백 이마트 좌표 (용인시 기흥구 동백죽전대로 433)
+// --- 등급 정의 및 계산 로직 ---
+const RANKS = [
+  { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', threshold: 95 },
+  { name: '그랜드마스터', color: 'text-red-600', bg: 'bg-red-100', threshold: 90 },
+  { name: '다이아몬드', color: 'text-blue-600', bg: 'bg-blue-100', threshold: 85 },
+  { name: '에메랄드', color: 'text-emerald-600', bg: 'bg-emerald-100', threshold: 80 },
+  { name: '플래티넘', color: 'text-cyan-600', bg: 'bg-cyan-100', threshold: 70 },
+  { name: '골드', color: 'text-yellow-600', bg: 'bg-yellow-100', threshold: 60 },
+  { name: '실버', color: 'text-gray-500', bg: 'bg-gray-200', threshold: 50 },
+  { name: '브론즈', color: 'text-orange-700', bg: 'bg-orange-100', threshold: 0 },
+] as const;
+
+type MetricType = 'completion' | 'attendance' | 'growth';
+
+function getRankData(value: number, type: MetricType) {
+  // 출석일수는 다른 스케일 적용 (일수 기준)
+  let adjustedValue = value;
+  if (type === 'attendance') {
+    if (value >= 90) adjustedValue = 95;
+    else if (value >= 60) adjustedValue = 90;
+    else if (value >= 30) adjustedValue = 85;
+    else if (value >= 21) adjustedValue = 80;
+    else if (value >= 14) adjustedValue = 70;
+    else if (value >= 7) adjustedValue = 60;
+    else if (value >= 3) adjustedValue = 50;
+    else adjustedValue = 0;
+  } else if (type === 'growth') {
+    // 성장률은 -100 ~ +100 스케일을 0-100으로 매핑 (예시)
+    adjustedValue = Math.max(0, Math.min(100, (value + 0.2) * 200)); 
+  }
+
+  const rank = RANKS.find(r => adjustedValue >= r.threshold) || RANKS[RANKS.length - 1];
+  const nextRankIndex = RANKS.findIndex(r => r.name === rank.name) - 1;
+  const nextRank = nextRankIndex >= 0 ? RANKS[nextRankIndex] : null;
+
+  return { current: rank, next: nextRank, adjustedValue };
+}
+
 const TARGET_LAT = 37.2762;
 const TARGET_LON = 127.1522;
 const DISTANCE_THRESHOLD_KM = 1.0;
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // 지구 반지름 (km)
+  const R = 6371; 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
@@ -70,25 +110,27 @@ function GamifiedStatCard({
   title, 
   icon: Icon, 
   value, 
+  numericValue,
   evolution, 
   isLoading, 
-  gameTitle, 
-  gameMessage,
-  level = "브론즈"
+  type,
+  gameTitle,
 }: { 
   title: string, 
   icon: React.ElementType, 
   value?: string, 
+  numericValue: number,
   evolution?: string, 
   isLoading: boolean,
+  type: MetricType,
   gameTitle: string,
-  gameMessage: string,
-  level?: string
 }) {
+  const rankData = getRankData(numericValue, type);
+  
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-md group">
+        <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-md group relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -102,7 +144,12 @@ function GamifiedStatCard({
             ) : (
               <>
                 <div className="text-2xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground">{evolution}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                   <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full", rankData.current.bg, rankData.current.color)}>
+                     {rankData.current.name}
+                   </span>
+                   <p className="text-[10px] text-muted-foreground">{evolution}</p>
+                </div>
               </>
             )}
           </CardContent>
@@ -110,20 +157,58 @@ function GamifiedStatCard({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="mx-auto bg-primary/10 p-3 rounded-full mb-4">
-            <Trophy className="h-12 w-12 text-primary animate-bounce" />
+          <div className="mx-auto bg-primary/10 p-4 rounded-full mb-2">
+            <Trophy className={cn("h-12 w-12 animate-bounce", rankData.current.color)} />
           </div>
           <DialogTitle className="text-center text-2xl font-headline">{gameTitle}</DialogTitle>
-          <DialogDescription className="text-center text-lg mt-2">
-            현재 등급: <span className="font-bold text-primary">{level}</span>
+          <DialogDescription className="text-center text-lg mt-1">
+            현재 랭크: <span className={cn("font-extrabold", rankData.current.color)}>{rankData.current.name}</span>
           </DialogDescription>
         </DialogHeader>
-        <div className="bg-muted p-4 rounded-xl text-center space-y-2">
-          <p className="font-medium">{gameMessage}</p>
-          <div className="flex justify-center gap-1">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Sparkles key={s} className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-            ))}
+        
+        <div className="space-y-6 py-4">
+          {/* Progress Section */}
+          {rankData.next && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-medium">
+                <span>다음 목표: {rankData.next.name}</span>
+                <span>{rankData.adjustedValue.toFixed(0)} / {rankData.next.threshold}</span>
+              </div>
+              <Progress value={(rankData.adjustedValue / rankData.next.threshold) * 100} className="h-2" />
+              <p className="text-[11px] text-muted-foreground text-center italic">
+                {type === 'completion' && `완수율을 ${(rankData.next.threshold - rankData.adjustedValue).toFixed(0)}% 더 올리면 승급합니다!`}
+                {type === 'attendance' && `출석 일수를 조금 더 채워보세요!`}
+                {type === 'growth' && `학습 시간을 늘려 성장을 증명하세요!`}
+              </p>
+            </div>
+          )}
+
+          {/* Rank Mechanism Table */}
+          <div className="rounded-xl border bg-muted/50 overflow-hidden">
+            <div className="bg-muted px-4 py-2 border-b flex items-center gap-2">
+              <Info className="h-3 w-3" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">등급 달성 메커니즘</span>
+            </div>
+            <div className="p-2 space-y-1">
+              {RANKS.slice(0, 5).map((r, idx) => (
+                <div key={r.name} className={cn(
+                  "flex items-center justify-between px-3 py-1.5 rounded-lg text-xs",
+                  rankData.current.name === r.name ? "bg-white shadow-sm ring-1 ring-black/5" : "opacity-60"
+                )}>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className={cn("h-3 w-3", r.color)} />
+                    <span className={cn("font-bold", r.color)}>{r.name}</span>
+                  </div>
+                  <span className="text-muted-foreground font-mono">
+                    {type === 'attendance' ? `Lv.${5-idx}` : `${r.threshold}%+`}
+                  </span>
+                </div>
+              ))}
+              <div className="text-center py-1">
+                <ChevronRight className="h-3 w-3 mx-auto text-muted-foreground rotate-90" />
+              </div>
+              <div className="text-center text-[10px] text-muted-foreground">브론즈 ~ 골드 등급 생략</div>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -143,15 +228,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [minutesInput, setMinutesInput] = useState('');
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
   
-  // 위치 관련 상태
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
 
-  // 타이머 관련 상태
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
-  // --- Data Fetching ---
   const dailyStatRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', user.uid);
@@ -174,7 +256,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership, user, weekKey]);
   const { data: planItems, isLoading: planItemsLoading } = useCollection<StudyPlanItem>(planItemsRef, { enabled: isActive });
   
-  // --- 타이머 Effect ---
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive) {
@@ -185,7 +266,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive]);
 
-  // --- 위치 확인 로직 ---
   const checkLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setLocationStatus('error');
@@ -230,7 +310,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   }, [studyLog]);
   
-  // --- Event Handlers ---
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
@@ -276,7 +355,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         title: "공부 종료",
         description: `오늘 세션에서 ${minutes}분 동안 학습하셨습니다.`,
       });
-      // Optionally update the study log here automatically
     } else {
       setIsTimerActive(true);
       setSecondsElapsed(0);
@@ -299,10 +377,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const growthRate = dailyStat?.studyTimeGrowthRate ?? 0;
   const growthSign = growthRate >= 0 ? '+' : '';
+  const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
+  const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      {/* Hero Section: Study Start Button & Timer */}
       <section className="relative overflow-hidden rounded-3xl bg-primary p-8 text-primary-foreground shadow-2xl transition-all duration-500">
         <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:justify-between md:text-left">
           <div className="space-y-3">
@@ -355,12 +434,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </Button>
           </div>
         </div>
-        {/* Background Decorative Elements */}
         <div className="absolute -bottom-12 -right-12 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
         <div className="absolute -top-12 -left-12 h-48 w-48 rounded-full bg-accent/20 blur-3xl" />
       </section>
 
-      {/* Stats Grid with Gamification */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-muted/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -393,38 +470,37 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <GamifiedStatCard 
           title="주간 완수율"
           icon={ClipboardCheck}
-          value={`${Math.round((dailyStat?.weeklyPlanCompletionRate ?? 0) * 100)}%`}
-          evolution="지난주보다 +5%"
+          value={`${Math.round(completionRate)}%`}
+          numericValue={completionRate}
+          evolution="계획 달성 점수"
           isLoading={dailyStatLoading}
+          type="completion"
           gameTitle="완수 마스터"
-          gameMessage="계획을 완벽하게 지키고 계시군요! 다이아몬드 등급이 머지않았습니다."
-          level="골드"
         />
         
         <GamifiedStatCard 
           title="연속 출석"
           icon={Zap}
-          value={`${dailyStat?.attendanceStreakDays ?? 0} 일`}
-          evolution="꾸준함이 최고의 재능!"
+          value={`${attendanceDays} 일`}
+          numericValue={attendanceDays}
+          evolution="꾸준함의 기록"
           isLoading={dailyStatLoading}
+          type="attendance"
           gameTitle="출석 킹"
-          gameMessage="매일매일 출석하는 당신은 동백센터의 성실왕입니다!"
-          level="실버"
         />
 
         <GamifiedStatCard 
           title="성장 지수"
           icon={TrendingUp}
           value={`${growthSign}${Math.round(growthRate * 100)}%`}
-          evolution="지난 7일 대비"
+          numericValue={growthRate}
+          evolution="학습 시간 변화율"
           isLoading={dailyStatLoading}
+          type="growth"
           gameTitle="성장 챔피언"
-          gameMessage="학습 시간이 폭발적으로 늘어나고 있어요. 레벨업 축하드려요!"
-          level="플래티넘"
         />
       </div>
 
-      {/* Main Content Grid */}
       <Card className="w-full">
         <CardHeader className="flex flex-row items-center space-y-0">
           <div className="grid gap-1">
