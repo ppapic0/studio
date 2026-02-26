@@ -1,89 +1,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 공통 유틸리티 함수
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // 센터 내 사용자 역할 확인 함수
     function hasRole(centerId, roles) {
       let memberPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
       return isSignedIn() && exists(memberPath) && (get(memberPath).data.role in roles);
     }
 
-    // 사용자 프로필
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // 센터 데이터
     match /centers/{centerId} {
       allow read: if isSignedIn();
 
-      // 멤버십
       match /members/{memberId} {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 출석 기록
+      // 성장 데이터 규칙
+      match /growthProgress/{userId} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == userId || 
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          (hasRole(centerId, ['parent']) && request.auth.uid in get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.linkedStudentIds)
+        );
+        // 쓰기는 서버(Cloud Functions)에서만 수행하도록 권장하지만, MVP 단계에서 클라이언트 업데이트가 필요하다면 추가 조건 부여
+        allow write: if false; 
+      }
+
+      match /config/growthTree {
+        allow read: if isSignedIn();
+        allow write: if hasRole(centerId, ['centerAdmin']);
+      }
+
       match /attendanceRecords/{date}/students/{studentId} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
         allow write: if hasRole(centerId, ['centerAdmin', 'teacher']);
       }
 
-      // 학습 계획
       match /plans/{studentId}/weeks/{week}/items/{itemId} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
-
-      // 학습 로그
-      match /studyLogs/{studentId}/days/{date} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
-        allow write: if isSignedIn() && request.auth.uid == studentId;
-      }
-
-      // 학생 일일 통계
-      match /dailyStudentStats/{date}/students/{studentId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher', 'parent']));
-      }
-      
-      // 리더보드 (모든 센터 멤버 조회 가능)
-      match /leaderboards/{period}/metrics/{metric}/entries/{entryId} {
-        allow read: if isSignedIn();
-      }
-
-      // AI 코칭/분석 결과
-      match /aiOutputs/{userId} {
-        allow read: if isSignedIn() && (request.auth.uid == userId || hasRole(centerId, ['centerAdmin', 'teacher']));
-        
-        match /records/{recordId} {
-          allow read: if isSignedIn() && (
-            request.auth.uid == userId || 
-            hasRole(centerId, ['centerAdmin', 'teacher'])
-          );
-        }
-      }
     }
 
-    // 초대 코드
     match /inviteCodes/{code} {
       allow get: if isSignedIn();
     }
 
-    // 사용자별 가입 센터 인덱스
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    // 컬렉션 그룹 규칙 (교사/관리자용 전체 조회)
-    match /{path=**}/records/{recordId} {
-      allow read: if isSignedIn() && (
-        (resource != null && resource.data.studentId == request.auth.uid) ||
-        (resource != null && hasRole(resource.data.centerId, ['centerAdmin', 'teacher']))
-      );
     }
   }
 }

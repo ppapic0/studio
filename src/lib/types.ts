@@ -11,18 +11,6 @@ export interface User {
   updatedAt: Timestamp;
 }
 
-export interface Student {
-  id: string;
-  name: string;
-  avatarUrl: string;
-}
-
-export interface Center {
-  name: string;
-  description?: string;
-  subscriptionTier: string;
-}
-
 export interface CenterMembership {
   id: string; // This is the centerId
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
@@ -32,12 +20,37 @@ export interface CenterMembership {
   linkedStudentIds?: string[];
 }
 
-export interface StudyPlanWeek {
-  centerId: string;
-  studentId: string;
-  weekKey: string; // YYYY-Www
-  createdAt: Timestamp;
+export interface GrowthProgress {
+  level: number;
+  currentXp: number;
+  nextLevelXp: number;
+  stats: {
+    focus: number;
+    consistency: number;
+    achievement: number;
+    resilience: number;
+  };
+  skills: Record<string, {
+    level: number;
+    unlockedAt: Timestamp;
+  }>;
   updatedAt: Timestamp;
+}
+
+export interface SkillNode {
+  id: string;
+  branch: 'focus' | 'consistency' | 'achievement' | 'resilience';
+  name: string;
+  description: string;
+  maxLevel: number;
+  prerequisites: string[];
+  unlockCondition: {
+    stat?: keyof GrowthProgress['stats'];
+    value?: number;
+    customRule?: string;
+  };
+  effects: Record<string, any>;
+  iconKey: string;
 }
 
 export interface StudyPlanItem {
@@ -48,8 +61,8 @@ export interface StudyPlanItem {
   weight: number;
   done: boolean;
   doneAt?: Timestamp;
-  dateKey?: string; // YYYY-MM-DD
-  category?: 'schedule' | 'personal' | 'study'; // New field for systematic planning
+  dateKey?: string;
+  category?: 'schedule' | 'personal' | 'study';
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -57,7 +70,7 @@ export interface StudyPlanItem {
 export interface StudyLogDay {
     centerId: string;
     studentId: string;
-    dateKey: string; // YYYY-MM-DD
+    dateKey: string;
     totalMinutes: number;
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -72,52 +85,19 @@ export interface AttendanceRecord {
     checkOutAt?: Timestamp;
     confirmedByUserId?: string;
     updatedAt: Timestamp;
-    studentName?: string; // Denormalized for display
-    studentAvatar?: string; // Denormalized for display
-}
-
-export interface LeaderboardEntry {
-    centerId: string;
-    periodKey: string; // YYYY-Www or YYYY-MM
-    metricKey: string;
-    studentId: string;
-    value: number;
-    rank: number;
-    displayNameSnapshot: string;
-    updatedAt: Timestamp;
+    studentName?: string;
 }
 
 export interface DailyStudentStat {
     centerId: string;
     studentId: string;
-    dateKey: string; // YYYY-MM-DD
-    todayPlanCompletionRate: number; // 0.0 - 1.0
+    dateKey: string;
+    todayPlanCompletionRate: number;
     totalStudyMinutes: number;
     attendanceStreakDays: number;
-    weeklyPlanCompletionRate: number; // 0.0 - 1.0
-    studyTimeGrowthRate: number; // e.g., 0.2 for +20%
+    weeklyPlanCompletionRate: number;
+    studyTimeGrowthRate: number;
     riskDetected: boolean;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-}
-
-export interface AIOutput {
-    centerId: string;
-    studentId: string;
-    type: 'riskFlag' | 'parentSummary' | 'intervention';
-    message: string;
-    basedOnMetricsSnapshot: string; // JSON string
-    modelUsed: string;
-    createdAt: Timestamp;
-}
-
-export interface InviteCode {
-    centerId: string;
-    intendedRole: 'student' | 'teacher' | 'parent' | 'admin';
-    expiresAt: Timestamp;
-    maxUses: number;
-    usedCount: number;
-    createdByUserId: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
