@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -284,7 +283,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { activeMembership } = useAppContext();
+  const { 
+    activeMembership, 
+    isTimerActive, 
+    setIsTimerActive, 
+    secondsElapsed, 
+    setSecondsElapsed,
+    startTime,
+    setStartTime
+  } = useAppContext();
   
   const today = useMemo(() => new Date(), []);
   const todayKey = format(today, 'yyyy-MM-dd');
@@ -293,10 +300,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
 
-  const [isTimerActive, setIsTimerActive] = useState(false);
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  // local tracking for session check
   const [timeSinceCheck, setTimeSinceCheck] = useState(0);
-
   const [showSessionAlert, setShowSessionAlert] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
 
@@ -339,7 +344,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     let interval: NodeJS.Timeout;
     if (isTimerActive) {
       interval = setInterval(() => {
-        setSecondsElapsed(s => s + 1);
         setTimeSinceCheck(t => {
           const next = t + 1;
           if (next >= AUTO_TERMINATE_SECONDS) {
@@ -421,8 +425,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(0.2) }, // 하향 조정: 항목당 0.2점
-        currentXp: increment(20), // 항목당 20XP
+        stats: { achievement: increment(0.2) },
+        currentXp: increment(20),
         updatedAt: serverTimestamp()
       }, { merge: true });
     }
@@ -432,6 +436,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!isTimerActive) return;
     saveStudyTime();
     setIsTimerActive(false);
+    setStartTime(null);
     setShowSessionAlert(false);
     toast({
       title: "장시간 미응답으로 자동 종료",
@@ -465,16 +470,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
 
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-    // 밸런스 조정: 60분당 1점 (Focus), 3시간 이상 시 Resilience 보너스
     const focusGain = (sessionMinutes / 60); 
     
     setDoc(progressRef, {
       stats: {
         focus: increment(Number(focusGain.toFixed(2))),
-        consistency: increment(0.2), // 하향 조정: 세션당 0.2점
-        resilience: sessionMinutes >= 180 ? increment(1) : increment(0) // 3시간(180분) 이상 몰입 시만 회복력 1점
+        consistency: increment(0.2),
+        resilience: sessionMinutes >= 180 ? increment(1) : increment(0)
       },
-      currentXp: increment(sessionMinutes), // 1분당 1XP 유지
+      currentXp: increment(sessionMinutes),
       updatedAt: serverTimestamp()
     }, { merge: true });
   };
@@ -486,6 +490,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const sessionMinutes = Math.floor(secondsElapsed / 60);
       saveStudyTime();
       setIsTimerActive(false);
+      setStartTime(null);
       setSecondsElapsed(0);
       setTimeSinceCheck(0);
       toast({
@@ -493,6 +498,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
       });
     } else {
+      const now = Date.now();
+      setStartTime(now);
       setIsTimerActive(true);
       setSecondsElapsed(0);
       setTimeSinceCheck(0);
