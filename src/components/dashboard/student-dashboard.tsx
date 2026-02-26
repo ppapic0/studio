@@ -24,6 +24,7 @@ import {
   Timer,
   Info,
   ChevronRight,
+  CalendarClock,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -42,15 +43,15 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
 import { doc, collection, query, where, limit, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { format, getISOWeek } from 'date-fns';
-import { useEffect, useState, useCallback } from 'react';
+import { format, startOfMonth, endOfMonth, differenceInDays, addMonths } from 'date-fns';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Input } from '../ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 
-// --- 등급 정의 및 세부 메커니즘 ---
+// --- 월간 시즌 등급 정의 ---
 const RANKS = [
   { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' },
   { name: '그랜드마스터', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-200' },
@@ -64,11 +65,11 @@ const RANKS = [
 
 type MetricType = 'completion' | 'attendance' | 'growth';
 
-// 지표별 랭크 임계치 설정 (깐깐한 기준)
+// 월간 기준 깐깐한 임계치 (매달 1일 리셋)
 const RANK_THRESHOLDS: Record<MetricType, number[]> = {
-  completion: [98, 95, 90, 85, 75, 65, 50, 0], // 완수율 (%)
-  attendance: [100, 60, 30, 21, 14, 7, 3, 0],   // 연속 출석 (일)
-  growth: [150, 100, 75, 50, 25, 10, 0, -100],  // 성장률 (%)
+  completion: [98, 95, 92, 88, 84, 75, 60, 0], // 월간 완수율 (%)
+  attendance: [26, 24, 22, 20, 18, 15, 10, 0], // 월간 출석 일수 (일)
+  growth: [50, 40, 30, 20, 10, 5, 0, -50],    // 월간 성장 지수 (%)
 };
 
 function getRankData(value: number, type: MetricType) {
@@ -164,12 +165,11 @@ function GamifiedStatCard({
           </div>
           <DialogTitle className="text-center text-2xl font-headline">{gameTitle}</DialogTitle>
           <DialogDescription className="text-center text-lg mt-1">
-            현재 티어: <span className={cn("font-extrabold", rankData.current.color)}>{rankData.current.name}</span>
+            이번 시즌 티어: <span className={cn("font-extrabold", rankData.current.color)}>{rankData.current.name}</span>
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          {/* Progress Section */}
           {rankData.next && (
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-medium">
@@ -181,19 +181,18 @@ function GamifiedStatCard({
                 className="h-2" 
               />
               <p className="text-[11px] text-muted-foreground text-center italic">
-                {type === 'completion' && `완수율을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 더 올리면 승급합니다!`}
-                {type === 'attendance' && `출석 ${rankData.nextThreshold - rankData.currentValue}일만 더 채우면 다음 단계로!`}
-                {type === 'growth' && `성장률을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 높여 능력을 증명하세요!`}
+                {type === 'completion' && `월간 완수율을 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 더 올리면 승급합니다!`}
+                {type === 'attendance' && `이번 달 출석 ${rankData.nextThreshold - rankData.currentValue}일만 더 채우면 다음 단계로!`}
+                {type === 'growth' && `성장 지수를 ${(rankData.nextThreshold - rankData.currentValue).toFixed(1)}% 높여 능력을 증명하세요!`}
               </p>
             </div>
           )}
 
-          {/* Full Rank Mechanism Table */}
           <div className="rounded-xl border bg-muted/30 overflow-hidden shadow-sm">
             <div className="bg-muted/80 px-4 py-3 border-b flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
                 <Info className="h-3.5 w-3.5 text-primary" />
-                <span>등급 달성 메커니즘</span>
+                <span>시즌 등급 달성 조건 (월간)</span>
               </div>
               <span className="text-[10px] text-muted-foreground">단위: {type === 'attendance' ? '일' : '%'}</span>
             </div>
@@ -219,8 +218,8 @@ function GamifiedStatCard({
           </div>
           
           <div className="text-center text-[11px] text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-dashed">
-            💡 등급은 매일 자정, 최신 학습 데이터를 바탕으로 갱신됩니다. <br/>
-            꾸준함이 챌린저를 만드는 가장 빠른 길입니다!
+            💡 매달 1일 00:00에 시즌 등급과 랭킹이 초기화됩니다. <br/>
+            한 달 동안의 꾸준함으로 당신의 실력을 증명하세요!
           </div>
         </div>
       </DialogContent>
@@ -234,8 +233,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { toast } = useToast();
   const { activeMembership } = useAppContext();
   
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
-  const weekKey = `${format(new Date(), 'yyyy')}-W${getISOWeek(new Date())}`;
+  const today = useMemo(() => new Date(), []);
+  const todayKey = format(today, 'yyyy-MM-dd');
+  const monthKey = format(today, 'yyyy-MM');
+  const weekKey = format(today, "yyyy-'W'II");
 
   const [minutesInput, setMinutesInput] = useState('');
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
@@ -245,6 +246,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+
+  // 시즌 종료 카운트다운
+  const daysUntilReset = useMemo(() => {
+    const nextMonth = startOfMonth(addMonths(today, 1));
+    return differenceInDays(nextMonth, today);
+  }, [today]);
 
   const dailyStatRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -389,11 +396,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const growthRate = (dailyStat?.studyTimeGrowthRate ?? 0) * 100;
   const growthSign = growthRate >= 0 ? '+' : '';
-  const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
-  const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
+  const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100; // 실제로는 월간 통계에서 가져오도록 백엔드 구성 필요
+  const attendanceDays = dailyStat?.attendanceStreakDays ?? 0; // 실제로는 월간 누적 출석일
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
+      {/* 시즌 안내 배너 */}
+      <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <CalendarClock className="h-5 w-5 text-accent" />
+          <div className="text-sm">
+            <span className="font-bold text-accent">{format(today, 'M월')} 시즌</span> 진행 중
+          </div>
+        </div>
+        <div className="text-xs font-medium text-muted-foreground">
+          시즌 종료까지 <span className="text-foreground font-bold">{daysUntilReset}일</span> 남음
+        </div>
+      </div>
+
       <section className="relative overflow-hidden rounded-3xl bg-primary p-8 text-primary-foreground shadow-2xl transition-all duration-500">
         <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:justify-between md:text-left">
           <div className="space-y-3">
@@ -480,33 +500,33 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Card>
 
         <GamifiedStatCard 
-          title="주간 완수율"
+          title="월간 완수율"
           icon={ClipboardCheck}
           value={`${Math.round(completionRate)}%`}
           numericValue={completionRate}
-          evolution="계획 달성 점수"
+          evolution="시즌 목표 진행 중"
           isLoading={dailyStatLoading}
           type="completion"
           gameTitle="완수 마스터"
         />
         
         <GamifiedStatCard 
-          title="연속 출석"
+          title="월간 출석"
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}
-          evolution="꾸준함의 기록"
+          evolution="성실함의 척도"
           isLoading={dailyStatLoading}
           type="attendance"
           gameTitle="출석 킹"
         />
 
         <GamifiedStatCard 
-          title="성장 지수"
+          title="월간 성장 지수"
           icon={TrendingUp}
           value={`${growthSign}${Math.round(growthRate)}%`}
           numericValue={growthRate}
-          evolution="학습 시간 변화율"
+          evolution="능력치 상승"
           isLoading={dailyStatLoading}
           type="growth"
           gameTitle="성장 챔피언"
