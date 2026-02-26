@@ -84,7 +84,6 @@ export default function StudyPlanPage() {
   const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
   const weekKey = format(selectedDate, "yyyy-'W'II");
 
-  // 오늘 날짜의 시작 시점과 비교하여 과거 여부 판단 (오늘 포함 X)
   const isPast = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
 
   const weekDays = useMemo(() => {
@@ -114,6 +113,19 @@ export default function StudyPlanPage() {
   const scheduleItems = dailyPlans?.filter(p => p.category === 'schedule') || [];
   const personalTasks = dailyPlans?.filter(p => p.category === 'personal') || [];
   const studyTasks = dailyPlans?.filter(p => p.category === 'study' || !p.category) || [];
+
+  const getPeriod = (timeStr: string) => {
+    if (!timeStr || !timeStr.includes(':')) return '';
+    const hour = parseInt(timeStr.split(':')[0], 10);
+    if (isNaN(hour)) return '';
+    return hour < 12 ? '오전' : '오후';
+  };
+
+  const formatDisplayTime = (timeStr: string) => {
+    if (!timeStr || !timeStr.includes(':')) return '-';
+    const period = getPeriod(timeStr);
+    return `${period} ${timeStr}`;
+  };
 
   const handleAddTask = async (title: string, category: 'study' | 'personal') => {
     if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent) return;
@@ -278,11 +290,6 @@ export default function StudyPlanPage() {
       });
     } catch (error) {
       console.error("Error copying plans:", error);
-      toast({
-        variant: "destructive",
-        title: "복사 실패",
-        description: "일정을 복사하는 중 오류가 발생했습니다.",
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -352,24 +359,32 @@ export default function StudyPlanPage() {
             <CardDescription>{isPast ? '기록된 시간표입니다.' : '생활 루틴을 입력하세요.'}</CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 space-y-4">
-            {SCHEDULE_TEMPLATES.map((tpl) => (
-              <div key={tpl.title} className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
-                <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
-                  <tpl.icon className="h-4 w-4 text-primary" />
+            {SCHEDULE_TEMPLATES.map((tpl) => {
+              const val = getScheduleValue(tpl.title);
+              const period = getPeriod(val);
+              return (
+              <div key={tpl.title} className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
+                    <tpl.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
+                  {isPast ? (
+                    <span className="font-mono font-bold text-primary">{formatDisplayTime(val)}</span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                       {period && <span className="text-[10px] font-bold text-accent">{period}</span>}
+                       <Input 
+                        placeholder="00:00"
+                        className="w-20 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0"
+                        value={val}
+                        onChange={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
-                <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
-                {isPast ? (
-                  <span className="font-mono font-bold text-primary">{getScheduleValue(tpl.title) || '-'}</span>
-                ) : (
-                  <Input 
-                    placeholder="00:00"
-                    className="w-24 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
-                    value={getScheduleValue(tpl.title)}
-                    onChange={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
-                  />
-                )}
               </div>
-            ))}
+            )})}
           </CardContent>
         </Card>
 

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -119,6 +118,19 @@ export default function StudyHistoryPage() {
   const scheduleItems = dailyPlans.filter(p => p.category === 'schedule');
   const personalTasks = dailyPlans.filter(p => p.category === 'personal');
   const studyTasks = dailyPlans.filter(p => p.category === 'study' || !p.category);
+
+  const getPeriod = (timeStr: string) => {
+    if (!timeStr || !timeStr.includes(':')) return '';
+    const hour = parseInt(timeStr.split(':')[0], 10);
+    if (isNaN(hour)) return '';
+    return hour < 12 ? '오전' : '오후';
+  };
+
+  const formatDisplayTime = (timeStr: string) => {
+    if (!timeStr || !timeStr.includes(':')) return '-';
+    const period = getPeriod(timeStr);
+    return `${period} ${timeStr}`;
+  };
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -326,11 +338,6 @@ export default function StudyHistoryPage() {
       });
     } catch (error) {
       console.error("Error copying plans:", error);
-      toast({
-        variant: "destructive",
-        title: "복사 실패",
-        description: "일정을 복사하는 중 오류가 발생했습니다.",
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -343,6 +350,7 @@ export default function StudyHistoryPage() {
   };
 
   const isPastOrToday = selectedDateForPlan ? isBefore(selectedDateForPlan, startOfDay(addMonths(new Date(), 1))) : false;
+  const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
 
   return (
@@ -479,18 +487,13 @@ export default function StudyHistoryPage() {
           </DialogHeader>
           
           <div className="max-h-[60vh] overflow-y-auto bg-background">
-            {dailyPlans.length === 0 && selectedDateForPlan && isBefore(selectedDateForPlan, addMonths(startOfDay(new Date()), 0)) ? (
+            {dailyPlans.length === 0 && selectedDateForPlan && isBefore(selectedDateForPlan, startOfDay(new Date())) ? (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
                 <div className="bg-muted p-4 rounded-full">
                   <CalendarX className="h-10 w-10 text-muted-foreground" />
                 </div>
                 <p className="text-lg font-medium text-muted-foreground">당일 작성한 계획이 없습니다.</p>
                 <p className="text-sm text-muted-foreground/60">학습 계획을 미리 세워 루틴을 관리해보세요.</p>
-                {!isPastOrToday && (
-                   <Button variant="outline" className="mt-4" onClick={() => {/* Future: add empty item to trigger edit mode */}}>
-                     계획 시작하기
-                   </Button>
-                )}
               </div>
             ) : (
               <Tabs defaultValue="schedule" className="w-full">
@@ -505,27 +508,33 @@ export default function StudyHistoryPage() {
                     <div className="grid gap-4">
                       {SCHEDULE_TEMPLATES.map((tpl) => {
                         const val = getScheduleValue(tpl.title);
-                        if (!val && isPastOrToday) return null;
+                        const period = getPeriod(val);
+                        if (!val && isActuallyPast) return null;
                         return (
-                          <div key={tpl.title} className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
-                            <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
-                              <tpl.icon className="h-4 w-4 text-primary" />
+                          <div key={tpl.title} className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
+                                <tpl.icon className="h-4 w-4 text-primary" />
+                              </div>
+                              <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
+                              {isActuallyPast && val ? (
+                                <span className="font-mono font-bold text-primary">{formatDisplayTime(val)}</span>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  {period && <span className="text-[10px] font-bold text-accent">{period}</span>}
+                                  <Input 
+                                    placeholder="00:00"
+                                    className="w-20 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0"
+                                    defaultValue={val}
+                                    onBlur={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
+                                  />
+                                </div>
+                              )}
                             </div>
-                            <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
-                            {isPastOrToday && val ? (
-                              <span className="font-mono font-bold text-primary">{val}</span>
-                            ) : (
-                              <Input 
-                                placeholder="00:00"
-                                className="w-24 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
-                                defaultValue={val}
-                                onBlur={(e) => handleUpdateSchedule(tpl.title, e.target.value)}
-                              />
-                            )}
                           </div>
                         );
                       })}
-                      {isPastOrToday && scheduleItems.length === 0 && (
+                      {isActuallyPast && scheduleItems.length === 0 && (
                         <p className="text-center text-sm text-muted-foreground py-4">기록된 시간표가 없습니다.</p>
                       )}
                     </div>
@@ -539,7 +548,7 @@ export default function StudyHistoryPage() {
                             id={task.id} 
                             checked={task.done} 
                             onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                            disabled={isPastOrToday && isBefore(selectedDateForPlan!, startOfDay(new Date()))}
+                            disabled={isActuallyPast}
                           />
                           <Label 
                             htmlFor={task.id}
@@ -550,14 +559,14 @@ export default function StudyHistoryPage() {
                           >
                             {task.title}
                           </Label>
-                          {!isPastOrToday && (
+                          {!isActuallyPast && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
                       ))}
-                      {!isPastOrToday && (
+                      {!isActuallyPast && (
                         <div className="flex items-center gap-2 pt-2">
                           <Input 
                             placeholder="오늘 할 자습 과제 입력..." 
@@ -572,7 +581,7 @@ export default function StudyHistoryPage() {
                           </Button>
                         </div>
                       )}
-                      {isPastOrToday && studyTasks.length === 0 && (
+                      {isActuallyPast && studyTasks.length === 0 && (
                          <p className="text-center text-sm text-muted-foreground py-4">기록된 자습 내용이 없습니다.</p>
                       )}
                     </div>
@@ -586,7 +595,7 @@ export default function StudyHistoryPage() {
                             id={task.id} 
                             checked={task.done} 
                             onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                            disabled={isPastOrToday && isBefore(selectedDateForPlan!, startOfDay(new Date()))}
+                            disabled={isActuallyPast}
                           />
                           <Label 
                             htmlFor={task.id}
@@ -597,14 +606,14 @@ export default function StudyHistoryPage() {
                           >
                             {task.title}
                           </Label>
-                          {!isPastOrToday && (
+                          {!isActuallyPast && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
                       ))}
-                      {!isPastOrToday && (
+                      {!isActuallyPast && (
                         <div className="flex items-center gap-2 pt-2">
                           <Input 
                             placeholder="공부 외 개인 일정 입력..." 
@@ -619,7 +628,7 @@ export default function StudyHistoryPage() {
                           </Button>
                         </div>
                       )}
-                      {isPastOrToday && personalTasks.length === 0 && (
+                      {isActuallyPast && personalTasks.length === 0 && (
                          <p className="text-center text-sm text-muted-foreground py-4">기록된 개인 일정이 없습니다.</p>
                       )}
                     </div>
@@ -630,7 +639,7 @@ export default function StudyHistoryPage() {
           </div>
           
           <DialogFooter className="p-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
-            {!isPastOrToday && dailyPlans.length > 0 && (
+            {!isActuallyPast && dailyPlans.length > 0 && (
               <Button 
                 variant="outline" 
                 className="w-full sm:w-auto gap-2 text-xs" 

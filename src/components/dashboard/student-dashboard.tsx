@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -53,7 +52,6 @@ import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
-// --- 월간 시즌 등급 정의 ---
 const RANKS = [
   { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' },
   { name: '그랜드마스터', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-200' },
@@ -249,7 +247,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
-  // 시즌 종료 카운트다운
   const daysUntilReset = useMemo(() => {
     const nextMonth = startOfMonth(addMonths(today, 1));
     return differenceInDays(nextMonth, today);
@@ -377,6 +374,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatDisplayTime = (timeStr: string) => {
+    if (!timeStr || !timeStr.includes(':')) return '-';
+    const hour = parseInt(timeStr.split(':')[0], 10);
+    const period = hour < 12 ? '오전' : '오후';
+    return `${period} ${timeStr}`;
+  };
+
   if (!isActive) {
     return null;
   }
@@ -388,7 +392,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      {/* 시즌 안내 배너 */}
       <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <CalendarClock className="h-5 w-5 text-accent" />
@@ -455,7 +458,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 오늘의 시간표 요약 */}
       {scheduleItems.length > 0 && (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
           {scheduleItems.map((item) => {
@@ -464,7 +466,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <Card key={item.id} className="bg-muted/30 border-dashed">
                 <CardContent className="p-3 flex flex-col items-center justify-center gap-1">
                   <span className="text-[10px] font-bold text-muted-foreground">{title}</span>
-                  <span className="text-sm font-bold">{time || '--:--'}</span>
+                  <span className="text-sm font-bold">{formatDisplayTime(time)}</span>
                 </CardContent>
               </Card>
             );
