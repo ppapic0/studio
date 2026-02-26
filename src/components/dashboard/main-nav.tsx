@@ -10,10 +10,10 @@ import {
   Users,
   BarChart3,
   Loader2,
+  CalendarDays,
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
-import { Badge } from '../ui/badge';
 import { usePathname } from 'next/navigation';
 
 type MainNavProps = {
@@ -23,6 +23,7 @@ type MainNavProps = {
 const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
   student: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/study-history', label: '학습 기록', icon: CalendarDays },
     { href: '/dashboard/plan', label: '나의 학습 계획', icon: ClipboardCheck },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],

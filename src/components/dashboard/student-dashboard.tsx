@@ -23,7 +23,7 @@ import {
   Info,
   CalendarClock,
   AlertCircle,
-  Calendar as CalendarIcon,
+  ChevronRight,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -42,14 +42,13 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
 import { doc, collection, query, where, limit, updateDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
-import { format, startOfMonth, differenceInDays, addMonths, isSameDay } from 'date-fns';
+import { format, startOfMonth, differenceInDays, addMonths } from 'date-fns';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Calendar } from '../ui/calendar';
 
 // --- 월간 시즌 등급 정의 ---
 const RANKS = [
@@ -246,7 +245,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
 
   // 시즌 종료 카운트다운
   const daysUntilReset = useMemo(() => {
@@ -265,14 +263,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
   }, [firestore, activeMembership, user, todayKey]);
   const { data: todayStudyLog, isLoading: todayStudyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
-
-  const allStudyLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days')
-    );
-  }, [firestore, activeMembership, user]);
-  const { data: allStudyLogs } = useCollection<StudyLogDay>(allStudyLogsQuery, { enabled: isActive });
 
   const planItemsRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -354,7 +344,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           dateKey: todayKey,
           updatedAt: serverTimestamp(),
           studentId: user.uid,
-          createdAt: serverTimestamp(), // Only set on create by setDoc with merge
+          createdAt: serverTimestamp(),
         }, { merge: true });
 
         toast({
@@ -381,12 +371,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const selectedLog = useMemo(() => {
-    if (!selectedCalendarDate || !allStudyLogs) return null;
-    const dateKey = format(selectedCalendarDate, 'yyyy-MM-dd');
-    return allStudyLogs.find(log => log.dateKey === dateKey);
-  }, [selectedCalendarDate, allStudyLogs]);
 
   if (!isActive) {
     return null;
@@ -467,65 +451,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-md group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">오늘의 학습 시간</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              </CardHeader>
-              <CardContent>
-                {todayStudyLogLoading ? (
-                  <Skeleton className="h-8 w-24 mt-1" />
-                ) : (
+        <Link href="/dashboard/study-history">
+          <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-md group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">오늘의 학습 시간</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </CardHeader>
+            <CardContent>
+              {todayStudyLogLoading ? (
+                <Skeleton className="h-8 w-24 mt-1" />
+              ) : (
+                <div className="flex items-baseline gap-1 justify-between">
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-bold">{todayStudyLog?.totalMinutes || 0}</span>
                     <span className="text-sm text-muted-foreground">분</span>
-                    <CalendarIcon className="h-3 w-3 ml-auto text-muted-foreground opacity-50" />
                   </div>
-                )}
-                <p className="text-[10px] text-muted-foreground mt-1 italic">클릭하여 학습 기록 보기</p>
-              </CardContent>
-            </Card>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>학습 히스토리</DialogTitle>
-              <DialogDescription>날짜별 학습 시간을 확인하세요.</DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-4">
-              <Calendar
-                mode="single"
-                selected={selectedCalendarDate}
-                onSelect={setSelectedCalendarDate}
-                className="rounded-md border shadow"
-                modifiers={{
-                  hasData: (date) => allStudyLogs?.some(log => isSameDay(new Date(log.dateKey), date)) || false,
-                }}
-                modifiersStyles={{
-                  hasData: { fontWeight: 'bold', textDecoration: 'underline', color: 'hsl(var(--primary))' }
-                }}
-              />
-              <div className="w-full bg-muted/50 p-4 rounded-xl border">
-                <p className="text-sm font-medium mb-1">
-                  {selectedCalendarDate ? format(selectedCalendarDate, 'yyyy년 MM월 dd일') : '날짜를 선택하세요'}
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-primary">
-                    {selectedLog ? selectedLog.totalMinutes : 0}
-                  </span>
-                  <span className="text-sm text-muted-foreground">분 학습함</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                 </div>
-                {selectedLog && selectedLog.totalMinutes >= 180 && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600 font-bold">
-                    <Zap className="h-3 w-3" />
-                    3시간 달성! 출석 인정 완료
-                  </div>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1 italic">클릭하여 전체 히스토리 보기</p>
+            </CardContent>
+          </Card>
+        </Link>
 
         <GamifiedStatCard 
           title="월간 완수율"
