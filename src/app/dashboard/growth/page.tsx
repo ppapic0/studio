@@ -454,13 +454,13 @@ export default function GrowthPage() {
                           </div>
                           <span className="text-sm font-bold">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
                         </div>
-                        {stats[activeBranch] >= (selectedSkill.unlockCondition.value || 0) ? (
+                        {(stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
                           <div className="flex items-center gap-1.5 text-emerald-400">
                             <span className="text-[10px] font-black uppercase">달성 완료</span>
                             <CheckCircle2 className="h-5 w-5 fill-current" />
                           </div>
                         ) : (
-                          <span className="text-xs font-black opacity-60">{stats[activeBranch].toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
+                          <span className="text-xs font-black opacity-60">{(stats[activeBranch] || 0).toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
                         )}
                       </div>
                     </div>
@@ -494,7 +494,7 @@ export default function GrowthPage() {
                           <Star className="h-4 w-4 fill-current text-amber-400" />
                           마스터리 레벨업 (준비 중)
                         </Button>
-                      ) : stats[activeBranch] >= (selectedSkill.unlockCondition.value || 0) ? (
+                      ) : (stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
                         <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-base shadow-xl gap-2 animate-pulse-soft">
                           <Unlock className="h-5 w-5" />
                           지금 해금하기
