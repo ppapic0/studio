@@ -2,6 +2,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // --- 공통 헬퍼 함수 ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,8 +14,13 @@ service cloud.firestore {
 
     function isParentOf(centerId, studentId) {
       let parentPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
-      return isSignedIn() && hasRole(centerId, ['parent']) && studentId in get(parentPath).data.linkedStudentIds;
+      return isSignedIn() && 
+             exists(parentPath) && 
+             get(parentPath).data.role == 'parent' && 
+             studentId in get(parentPath).data.get('linkedStudentIds', []);
     }
+
+    // --- 컬렉션 규칙 ---
 
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -28,7 +34,7 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 상담 예약 규칙
+      // 상담 예약
       match /appointments/{appointmentId} {
         allow read: if isSignedIn() && (
           request.auth.uid == resource.data.studentId || 
@@ -51,7 +57,7 @@ service cloud.firestore {
         );
       }
 
-      // 상담일지 규칙
+      // 상담일지
       match /counselingNotes/{noteId} {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
@@ -61,15 +67,18 @@ service cloud.firestore {
         allow write: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
       }
 
+      // 성장 트리 진행도
       match /growthProgress/{userId} {
         allow read: if isSignedIn() && (
           request.auth.uid == userId || 
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
           isParentOf(centerId, userId)
         );
-        allow write: if false; 
+        // 타이머 마침 시 학생이 직접 업데이트 가능해야 하므로 write 허용 (단, 본인 것만)
+        allow write: if isSignedIn() && request.auth.uid == userId;
       }
 
+      // 일일 통계
       match /dailyStudentStats/{date}/students/{studentId} {
         allow read: if isSignedIn() && (
           request.auth.uid == studentId || 
@@ -78,14 +87,44 @@ service cloud.firestore {
         );
       }
 
+      // 학습 로그
+      match /studyLogs/{studentId}/days/{date} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == studentId || 
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          isParentOf(centerId, studentId)
+        );
+        allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
+      // 출석 기록
       match /attendanceRecords/{date}/students/{studentId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
+        allow read: if isSignedIn() && (
+          request.auth.uid == studentId || 
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          isParentOf(centerId, studentId)
+        );
         allow write: if hasRole(centerId, ['centerAdmin', 'teacher']);
       }
 
+      // 학습 계획
       match /plans/{studentId}/weeks/{week}/items/{itemId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['centerAdmin', 'teacher']));
+        allow read: if isSignedIn() && (
+          request.auth.uid == studentId || 
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          isParentOf(centerId, studentId)
+        );
         allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
+      // AI 및 기타 기록
+      match /records/{recordId} {
+        allow read: if isSignedIn() && (
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          resource.data.studentId == request.auth.uid ||
+          isParentOf(centerId, resource.data.studentId)
+        );
+        allow write: if false; // 서버 사이드 전용
       }
     }
 
@@ -95,6 +134,15 @@ service cloud.firestore {
 
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Collection Group 규칙 (센터 전체 AI 기록 조회용) ---
+    match /{path=**}/records/{recordId} {
+      allow read: if isSignedIn() && (
+        hasRole(resource.data.centerId, ['centerAdmin', 'teacher']) ||
+        resource.data.studentId == request.auth.uid ||
+        isParentOf(resource.data.centerId, resource.data.studentId)
+      );
     }
   }
 }
