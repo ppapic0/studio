@@ -23,15 +23,12 @@ import {
   Plus, 
   Trash2, 
   Copy, 
-  CalendarDays, 
   Clock, 
   MapPin, 
   Coffee, 
   School, 
-  ClipboardList,
-  ChevronLeft,
-  ChevronRight,
-  CalendarX
+  CalendarX,
+  CalendarDays
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -40,7 +37,6 @@ import {
   collection, 
   query, 
   where, 
-  orderBy, 
   addDoc, 
   updateDoc, 
   doc, 
@@ -88,7 +84,7 @@ export default function StudyPlanPage() {
   const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
   const weekKey = format(selectedDate, "yyyy-'W'II");
 
-  // 오늘 날짜의 시작 시점과 비교하여 과거 여부 판단
+  // 오늘 날짜의 시작 시점과 비교하여 과거 여부 판단 (오늘 포함 X)
   const isPast = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
 
   const weekDays = useMemo(() => {
@@ -322,7 +318,6 @@ export default function StudyPlanPage() {
         </div>
       </div>
 
-      {/* 주간 요일 선택기 */}
       <div className="grid grid-cols-7 gap-2">
         {weekDays.map((day) => {
           const isSelected = isSameDay(day, selectedDate);
@@ -348,7 +343,6 @@ export default function StudyPlanPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-12">
-        {/* 왼쪽: 시간표 관리 */}
         <Card className="md:col-span-5 shadow-sm overflow-hidden border-none sm:border">
           <CardHeader className="bg-muted/30 border-b">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -379,7 +373,6 @@ export default function StudyPlanPage() {
           </CardContent>
         </Card>
 
-        {/* 오른쪽: 자습 및 개인 일정 */}
         <div className="md:col-span-7 flex flex-col gap-6">
           <Tabs defaultValue="study" className="w-full">
             <Card className="shadow-sm border-none sm:border">
@@ -410,30 +403,31 @@ export default function StudyPlanPage() {
                         </div>
                       ) : (
                       studyTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10 group hover:shadow-sm transition-all">
-                        <Checkbox 
-                          id={task.id} 
-                          checked={task.done} 
-                          onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                          disabled={isPast}
-                        />
-                        <Label 
-                          htmlFor={task.id}
-                          className={cn(
-                            "flex-1 text-sm font-medium transition-all",
-                            !isPast && "cursor-pointer",
-                            task.done && "line-through text-muted-foreground opacity-60"
+                        <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10 group hover:shadow-sm transition-all">
+                          <Checkbox 
+                            id={task.id} 
+                            checked={task.done} 
+                            onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                            disabled={isPast}
+                          />
+                          <Label 
+                            htmlFor={task.id}
+                            className={cn(
+                              "flex-1 text-sm font-medium transition-all",
+                              !isPast && "cursor-pointer",
+                              task.done && "line-through text-muted-foreground opacity-60"
+                            )}
+                          >
+                            {task.title}
+                          </Label>
+                          {!isPast && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
-                        >
-                          {task.title}
-                        </Label>
-                        {!isPast && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      ))
+                    )}
                     {!isPast && (
                       <div className="flex items-center gap-2 pt-2">
                         <Input 
@@ -462,30 +456,31 @@ export default function StudyPlanPage() {
                         </div>
                       ) : (
                       personalTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-accent/5 group hover:shadow-sm transition-all">
-                        <Checkbox 
-                          id={task.id} 
-                          checked={task.done} 
-                          onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                          disabled={isPast}
-                        />
-                        <Label 
-                          htmlFor={task.id}
-                          className={cn(
-                            "flex-1 text-sm font-medium transition-all",
-                            !isPast && "cursor-pointer",
-                            task.done && "line-through text-muted-foreground opacity-60"
+                        <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-accent/5 group hover:shadow-sm transition-all">
+                          <Checkbox 
+                            id={task.id} 
+                            checked={task.done} 
+                            onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                            disabled={isPast}
+                          />
+                          <Label 
+                            htmlFor={task.id}
+                            className={cn(
+                              "flex-1 text-sm font-medium transition-all",
+                              !isPast && "cursor-pointer",
+                              task.done && "line-through text-muted-foreground opacity-60"
+                            )}
+                          >
+                            {task.title}
+                          </Label>
+                          {!isPast && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
-                        >
-                          {task.title}
-                        </Label>
-                        {!isPast && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      ))
+                    )}
                     {!isPast && (
                       <div className="flex items-center gap-2 pt-2">
                         <Input 
