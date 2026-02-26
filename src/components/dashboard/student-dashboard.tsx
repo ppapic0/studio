@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -24,6 +25,8 @@ import {
   CalendarClock,
   AlertCircle,
   ChevronRight,
+  Coffee,
+  School,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -264,16 +267,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership, user, todayKey]);
   const { data: todayStudyLog, isLoading: todayStudyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
-  const planItemsRef = useMemoFirebase(() => {
+  const allPlansRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
-      where('done', '==', false),
-      limit(5)
+      where('dateKey', '==', todayKey)
     );
-  }, [firestore, activeMembership, user, weekKey]);
-  const { data: planItems, isLoading: planItemsLoading } = useCollection<StudyPlanItem>(planItemsRef, { enabled: isActive });
+  }, [firestore, activeMembership, user, weekKey, todayKey]);
+  const { data: todayPlans, isLoading: plansLoading } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
   
+  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
+  const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive) {
@@ -450,6 +455,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
+      {/* 오늘의 시간표 요약 */}
+      {scheduleItems.length > 0 && (
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
+          {scheduleItems.map((item) => {
+            const [title, time] = item.title.split(': ');
+            return (
+              <Card key={item.id} className="bg-muted/30 border-dashed">
+                <CardContent className="p-3 flex flex-col items-center justify-center gap-1">
+                  <span className="text-[10px] font-bold text-muted-foreground">{title}</span>
+                  <span className="text-sm font-bold">{time || '--:--'}</span>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/dashboard/study-history">
           <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-md group h-full">
@@ -511,23 +533,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <Card className="w-full">
         <CardHeader className="flex flex-row items-center space-y-0">
           <div className="grid gap-1">
-            <CardTitle className="text-xl">오늘의 학습 계획</CardTitle>
+            <CardTitle className="text-xl">오늘의 자습 계획</CardTitle>
             <CardDescription>남은 목표를 달성해 보세요.</CardDescription>
           </div>
           <Button asChild size="sm" variant="outline" className="ml-auto gap-1">
-            <Link href="/dashboard/plan">
-              전체 보기
+            <Link href="/dashboard/study-history">
+              관리하기
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </Button>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {planItemsLoading ? (
+          {plansLoading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
             </div>
-          ) : planItems && planItems.length > 0 ? (
-              planItems.map((task) => (
+          ) : studyTasks.length > 0 ? (
+              studyTasks.map((task) => (
                 <div key={task.id} className="flex items-center space-x-3 rounded-xl border p-4 hover:bg-muted/50 transition-colors">
                   <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task)} />
                   <Label
@@ -542,7 +564,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               ))
           ) : (
-              <div className="text-center text-muted-foreground py-10 text-sm">오늘 남은 계획이 없습니다!</div>
+              <div className="text-center text-muted-foreground py-10 text-sm">오늘 기록된 자습 계획이 없습니다. 캘린더에서 계획을 세워보세요!</div>
           )}
         </CardContent>
       </Card>

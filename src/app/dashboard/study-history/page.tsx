@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -5,7 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, addDoc, serverTimestamp, doc, updateDoc, getISOWeek, deleteDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  addDoc, 
+  serverTimestamp, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  writeBatch,
+  getDocs
+} from 'firebase/firestore';
 import { StudyLogDay, StudyPlanItem, WithId } from '@/lib/types';
 import { 
   format, 
@@ -17,9 +30,25 @@ import {
   startOfWeek, 
   endOfWeek, 
   addMonths, 
-  subMonths 
+  subMonths,
+  getDay
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Loader2, Zap, Plus, CheckCircle2, Circle, CalendarPlus, Trash2, Clock, MapPin, Coffee, School, ClipboardList } from 'lucide-react';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Loader2, 
+  Zap, 
+  Plus, 
+  CalendarPlus, 
+  Trash2, 
+  Clock, 
+  MapPin, 
+  Coffee, 
+  School, 
+  ClipboardList,
+  Copy,
+  Check
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -28,11 +57,13 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 const SCHEDULE_TEMPLATES = [
   { title: '등원 시간', icon: MapPin },
@@ -46,6 +77,7 @@ export default function StudyHistoryPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
+  const { toast } = useToast();
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);
@@ -64,7 +96,6 @@ export default function StudyHistoryPage() {
 
   const { data: logs, isLoading: logsLoading } = useCollection<StudyLogDay>(studyLogsQuery);
 
-  // Month-based week key for broader fetching if needed, but we rely on dateKey for dailies
   const monthKey = format(currentDate, "yyyy-'W'II");
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !user || !activeMembership) return null;
@@ -239,11 +270,78 @@ export default function StudyHistoryPage() {
     await deleteDoc(itemRef);
   };
 
+  const handleApplyToAllWeekdays = async () => {
+    if (!selectedDateForPlan || !firestore || !user || !activeMembership || dailyPlans.length === 0) return;
+    
+    setIsSubmitting(true);
+    const weekday = getDay(selectedDateForPlan);
+    const monthDates = eachDayOfInterval({
+      start: startOfMonth(currentDate),
+      end: endOfMonth(currentDate)
+    });
+    
+    const targetDates = monthDates.filter(d => getDay(d) === weekday && !isSameDay(d, selectedDateForPlan));
+    const batch = writeBatch(firestore);
+
+    try {
+      for (const targetDate of targetDates) {
+        const targetDateKey = format(targetDate, 'yyyy-MM-dd');
+        const targetWeekKey = format(targetDate, "yyyy-'W'II");
+        
+        const itemsCollectionRef = collection(
+          firestore,
+          'centers',
+          activeMembership.id,
+          'plans',
+          user.uid,
+          'weeks',
+          targetWeekKey,
+          'items'
+        );
+
+        // 기존 해당 날짜의 계획들 삭제 (옵션: 덮어쓰기 위해)
+        // 실제로는 더 복잡한 로직이 필요할 수 있지만, 여기서는 단순 복사를 구현
+        dailyPlans.forEach(plan => {
+          const newDocRef = doc(itemsCollectionRef);
+          batch.set(newDocRef, {
+            title: plan.title,
+            done: false,
+            weight: plan.weight,
+            dateKey: targetDateKey,
+            category: plan.category || 'study',
+            studyPlanWeekId: targetWeekKey,
+            centerId: activeMembership.id,
+            studentId: user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        });
+      }
+
+      await batch.commit();
+      toast({
+        title: "일정 복사 완료",
+        description: `이번 달 모든 ${format(selectedDateForPlan, 'EEEE')}에 계획이 복사되었습니다.`,
+      });
+    } catch (error) {
+      console.error("Error copying plans:", error);
+      toast({
+        variant: "destructive",
+        title: "복사 실패",
+        description: "일정을 복사하는 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getScheduleValue = (title: string) => {
     const found = scheduleItems.find(p => p.title.startsWith(title));
     if (!found) return '';
     return found.title.split(': ')[1] || '';
   };
+
+  const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
@@ -385,7 +483,7 @@ export default function StudyHistoryPage() {
               <TabsTrigger value="personal" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">개인 일정</TabsTrigger>
             </TabsList>
 
-            <div className="max-h-[60vh] overflow-y-auto p-6 space-y-6">
+            <div className="max-h-[50vh] overflow-y-auto p-6 space-y-6">
               <TabsContent value="schedule" className="mt-0 space-y-4">
                 <div className="grid gap-4">
                   {SCHEDULE_TEMPLATES.map((tpl) => (
@@ -484,6 +582,18 @@ export default function StudyHistoryPage() {
               </TabsContent>
             </div>
           </Tabs>
+          
+          <DialogFooter className="p-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto gap-2 text-xs" 
+              onClick={handleApplyToAllWeekdays}
+              disabled={isSubmitting || dailyPlans.length === 0}
+            >
+              {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Copy className="h-3 w-3" />}
+              이 일정을 이번 달 모든 {weekdayName}에 복사
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
