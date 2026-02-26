@@ -12,6 +12,14 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { 
   Loader2, 
   Zap, 
   Lock, 
@@ -29,7 +37,9 @@ import {
   ArrowRight,
   TrendingUp,
   CalendarDays,
-  Sparkles
+  Sparkles,
+  BookOpen,
+  ArrowUpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -67,15 +77,88 @@ const MOCK_SKILLS: (SkillNode & { link: string })[] = [
 ];
 
 const STAT_CONFIG = {
-  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500' },
-  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500' },
-  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500' },
-  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500' },
+  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500' },
+  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500', bg: 'bg-emerald-500' },
+  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500', bg: 'bg-amber-500' },
+  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', bg: 'bg-rose-500' },
 };
 
 const MAX_LEVEL = 30;
-// 레벨 30 달성을 위한 총 필요 XP 상정 (300일 기준)
 const TOTAL_MASTER_XP = 150000; 
+
+function SystemGuideDialog() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full mt-2 rounded-xl text-xs font-black border-dashed border-2 h-10 hover:bg-primary/5 transition-colors">
+          성장 시스템 가이드 보기
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
+        <div className="bg-primary p-8 text-primary-foreground relative">
+          <Sparkles className="absolute top-4 right-4 h-12 w-12 opacity-20 animate-pulse" />
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tighter">성장 시스템 마스터 가이드</DialogTitle>
+            <DialogDescription className="text-primary-foreground/70 font-bold">
+              입시트랙의 성장은 단순한 시간이 아닌 '밀도'로 결정됩니다.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4">
+            <h4 className="flex items-center gap-2 font-black text-sm text-primary">
+              <ArrowUpCircle className="h-4 w-4" /> 4대 핵심 스탯 획득법
+            </h4>
+            <div className="grid gap-3">
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-blue-50 border border-blue-100">
+                <Target className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black text-blue-900">집중력 (Focus)</p>
+                  <p className="text-[10px] font-bold text-blue-700/70">학습 몰입 60분당 1점이 부여됩니다. 연속성이 중요합니다.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
+                <RefreshCw className="h-5 w-5 text-emerald-600 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black text-emerald-900">꾸준함 (Consistency)</p>
+                  <p className="text-[10px] font-bold text-emerald-700/70">세션을 완료하고 학습 기록을 남길 때마다 0.2점이 누적됩니다.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-100">
+                <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black text-amber-900">목표달성 (Achievement)</p>
+                  <p className="text-[10px] font-bold text-amber-700/70">플래너 To-do 항목을 하나 완료할 때마다 0.2점이 상승합니다.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-rose-50 border border-rose-100">
+                <ShieldCheck className="h-5 w-5 text-rose-600 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black text-rose-900">회복력 (Resilience)</p>
+                  <p className="text-[10px] font-bold text-rose-700/70">3시간(180분) 이상의 딥워크 세션을 성공하면 1점이 부여됩니다.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <h4 className="flex items-center gap-2 font-black text-sm text-primary">
+              <Zap className="h-4 w-4 fill-current" /> 경험치(XP)와 레벨업
+            </h4>
+            <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 text-[11px] font-bold leading-relaxed text-muted-foreground">
+              - 모든 학습 활동은 <span className="text-primary">1분당 1XP</span>를 기본으로 제공합니다.<br/>
+              - 스킬을 해금하면 <span className="text-emerald-600">XP 획득 배율(Multiplier)</span>이 영구적으로 상승합니다.<br/>
+              - Lv.30 달성은 상위 0.1%의 증거이며, 약 300일의 꾸준한 노력이 필요합니다.
+            </div>
+          </div>
+        </div>
+        <div className="p-6 bg-muted/30 border-t flex justify-end">
+          <Button onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()} className="rounded-xl font-black">확인했습니다</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function GrowthPage() {
   const { user } = useUser();
@@ -107,8 +190,6 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
-  // 현실적인 예상 진행 가이드 계산
-  // 하루 평균 500 XP를 획득한다고 가정할 때의 300일 로드맵
   const currentTotalXp = (progress?.level || 1) * (progress?.nextLevelXp || 1000) + (progress?.currentXp || 0); 
   const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_XP - currentTotalXp) / 500);
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
@@ -150,7 +231,7 @@ export default function GrowthPage() {
               <CardContent className="space-y-3">
                 <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden">
                   <div 
-                    className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)]", config.color.replace('text', 'bg'))}
+                    className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)]", config.bg)}
                     style={{ width: `${Math.min(100, val)}%` }}
                   />
                 </div>
@@ -243,15 +324,17 @@ export default function GrowthPage() {
                 <p className="text-[10px] font-bold text-muted-foreground">세션 완료 시마다 0.2점의 꾸준함 점수가 누적됩니다.</p>
               </div>
             </div>
-            <Button variant="outline" className="w-full mt-2 rounded-xl text-xs font-black border-dashed border-2 h-10">
-              성장 시스템 가이드 보기
-            </Button>
+            <SystemGuideDialog />
           </CardContent>
         </Card>
       </section>
 
-      <section className="bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+      <section className="bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+        {/* 장식용 배경 요소 */}
+        <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 relative z-10">
           <div>
             <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2">
               마스터리 진행 상태
@@ -260,45 +343,47 @@ export default function GrowthPage() {
             <p className="text-sm font-bold text-muted-foreground mt-1">Lv.30은 상위 0.1%의 증거입니다. 당신의 한계에 도전하세요.</p>
           </div>
           
-          <div className="bg-white p-4 rounded-3xl flex items-center gap-5 border border-border/50 shadow-sm min-w-[260px]">
+          <div className="bg-white p-4 rounded-[2rem] flex items-center gap-5 border border-border/50 shadow-xl min-w-[280px] hover:scale-105 transition-transform duration-500">
             <div className="relative flex items-center justify-center">
-              <svg className="h-16 w-14 transform -rotate-90">
-                <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted/30" />
-                <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" 
-                  style={{ strokeDasharray: 150.8, strokeDashoffset: 150.8 - (150.8 * (progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) }} 
+              <svg className="h-20 w-20 transform -rotate-90">
+                <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-muted/30" />
+                <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-primary" 
+                  style={{ strokeDasharray: 213.6, strokeDashoffset: 213.6 - (213.6 * (progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) }} 
                 />
               </svg>
               <div className="absolute flex flex-col items-center leading-none">
                 <span className="text-[10px] font-black text-muted-foreground">LV</span>
-                <span className="text-xl font-black text-primary">{progress?.level || 1}</span>
+                <span className="text-2xl font-black text-primary">{progress?.level || 1}</span>
               </div>
             </div>
             <div className="flex-1 flex flex-col gap-1.5">
               <div className="flex justify-between items-end">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Mastery Progress</span>
+                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Mastery</span>
                 <span className="text-[10px] font-bold">{progress?.currentXp || 0} / {progress?.nextLevelXp || 1000} XP</span>
               </div>
-              <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) * 100} className="h-2" />
+              <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) * 100} className="h-2.5 rounded-full shadow-inner" />
               <div className="flex justify-between items-center mt-0.5">
-                <span className="text-[9px] font-black text-primary/60">TARGET: Lv.{MAX_LEVEL}</span>
-                <span className="text-[9px] font-black text-muted-foreground">Master Rank</span>
+                <span className="text-[9px] font-black text-primary/60">GOAL: Lv.{MAX_LEVEL}</span>
+                <span className="text-[9px] font-black text-muted-foreground flex items-center gap-1">
+                  <Star className="h-2 w-2 fill-current" /> Master Rank
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        <Tabs defaultValue="focus" className="w-full" onValueChange={(val) => setActiveBranch(val as any)}>
-          <TabsList className="grid grid-cols-4 bg-muted/30 p-1.5 rounded-2xl h-16 mb-8 border border-border/50">
-            <TabsTrigger value="focus" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2">
+        <Tabs defaultValue="focus" className="w-full relative z-10" onValueChange={(val) => setActiveBranch(val as any)}>
+          <TabsList className="grid grid-cols-4 bg-muted/30 p-1.5 rounded-[1.5rem] h-16 mb-8 border border-border/50 shadow-inner">
+            <TabsTrigger value="focus" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2 data-[state=active]:text-blue-600">
               <Target className="h-4 w-4" /> <span className="hidden sm:inline">집중력</span>
             </TabsTrigger>
-            <TabsTrigger value="consistency" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2">
+            <TabsTrigger value="consistency" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2 data-[state=active]:text-emerald-600">
               <RefreshCw className="h-4 w-4" /> <span className="hidden sm:inline">꾸준함</span>
             </TabsTrigger>
-            <TabsTrigger value="achievement" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2">
+            <TabsTrigger value="achievement" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2 data-[state=active]:text-amber-600">
               <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">목표달성</span>
             </TabsTrigger>
-            <TabsTrigger value="resilience" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2">
+            <TabsTrigger value="resilience" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all gap-2 data-[state=active]:text-rose-600">
               <ShieldCheck className="h-4 w-4" /> <span className="hidden sm:inline">회복력</span>
             </TabsTrigger>
           </TabsList>
@@ -314,7 +399,7 @@ export default function GrowthPage() {
                   <div key={skill.id} className="relative flex flex-col items-center">
                     {idx < 4 && (
                       <div className={cn(
-                        "absolute top-full w-0.5 h-10 border-l-2 border-dashed transition-colors",
+                        "absolute top-full w-0.5 h-10 border-l-2 border-dashed transition-colors duration-500",
                         isUnlocked ? "border-primary/50" : "border-muted"
                       )} />
                     )}
@@ -322,14 +407,14 @@ export default function GrowthPage() {
                     <Card 
                       onClick={() => setSelectedSkillId(skill.id)}
                       className={cn(
-                        "relative overflow-hidden cursor-pointer transition-all duration-300 border-2 w-full max-w-[400px]",
-                        isSelected ? "border-primary ring-4 ring-primary/10 scale-105 z-10" : "border-border/50",
+                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full max-w-[400px] rounded-[1.5rem]",
+                        isSelected ? "border-primary ring-8 ring-primary/5 scale-105 z-10 shadow-2xl" : "border-border/50",
                         isUnlocked ? "bg-white shadow-xl" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60"
                       )}
                     >
                       <CardHeader className="flex flex-row items-center gap-4 p-5">
                         <div className={cn(
-                          "p-3 rounded-2xl transition-all duration-500",
+                          "p-3 rounded-2xl transition-all duration-700",
                           isUnlocked ? "bg-primary text-white shadow-lg rotate-[360deg]" : canUnlock ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                         )}>
                           {isUnlocked ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
@@ -337,10 +422,10 @@ export default function GrowthPage() {
                         <div className="grid gap-0.5">
                           <CardTitle className="text-base font-black leading-tight">{skill.name}</CardTitle>
                           <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground/60">
-                            {isUnlocked ? `MASTERY LEVEL ${progress?.skills?.[skill.id].level}` : canUnlock ? "해금 대기 중" : "잠겨있음"}
+                            {isUnlocked ? `MASTERY LV.${progress?.skills?.[skill.id].level}` : canUnlock ? "해금 가능" : "Locked"}
                           </span>
                         </div>
-                        {isUnlocked && <Star className="ml-auto h-4 w-4 text-amber-400 fill-current" />}
+                        {isUnlocked && <Star className="ml-auto h-4 w-4 text-amber-400 fill-current animate-bounce" />}
                       </CardHeader>
                     </Card>
                   </div>
@@ -350,12 +435,12 @@ export default function GrowthPage() {
 
             <div className="lg:col-span-5 h-full">
               {selectedSkill ? (
-                <Card className="sticky top-24 border-none bg-primary text-primary-foreground shadow-2xl rounded-[2.5rem] overflow-hidden">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                <Card className="sticky top-24 border-none bg-primary text-primary-foreground shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[2.5rem] overflow-hidden transform-gpu">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none animate-float">
                     <SelectedBranchIcon className="h-32 w-32" />
                   </div>
                   <CardHeader className="p-8 pb-4">
-                    <Badge className="w-fit mb-4 bg-white/20 hover:bg-white/30 text-white border-none font-black">
+                    <Badge className="w-fit mb-4 bg-white/20 hover:bg-white/30 text-white border-none font-black backdrop-blur-sm">
                       {STAT_CONFIG[activeBranch].label} 로드맵
                     </Badge>
                     <CardTitle className="text-3xl font-black tracking-tighter mb-2">{selectedSkill.name}</CardTitle>
@@ -363,16 +448,19 @@ export default function GrowthPage() {
                   </CardHeader>
                   <CardContent className="p-8 space-y-8">
                     <div className="space-y-4">
-                      <h4 className="text-xs font-black uppercase tracking-widest opacity-60">잠금 해제 조건</h4>
-                      <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl border border-white/10">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Unlock Requirement</h4>
+                      <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
                           <div className="bg-white/20 p-2 rounded-lg">
                             <SelectedBranchIcon className="h-4 w-4" />
                           </div>
-                          <span className="text-sm font-bold">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점 달성</span>
+                          <span className="text-sm font-bold">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
                         </div>
                         {stats[activeBranch] >= (selectedSkill.unlockCondition.value || 0) ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                          <div className="flex items-center gap-1.5 text-emerald-400">
+                            <span className="text-[10px] font-black uppercase">Cleared</span>
+                            <CheckCircle2 className="h-5 w-5 fill-current" />
+                          </div>
                         ) : (
                           <span className="text-xs font-black opacity-60">{stats[activeBranch].toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
                         )}
@@ -380,13 +468,14 @@ export default function GrowthPage() {
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="text-xs font-black uppercase tracking-widest opacity-60">마스터리 효과</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Mastery Effects</h4>
                       <div className="grid gap-3">
                         {Object.entries(selectedSkill.effects).map(([key, val]) => (
-                          <div key={key} className="flex items-center justify-between">
-                            <span className="text-sm font-medium opacity-80">학습 경험치(XP) 획득 배율</span>
-                            <span className="text-sm font-black text-emerald-400">
-                              x{Number(val).toFixed(2)} 보너스
+                          <div key={key} className="flex items-center justify-between group">
+                            <span className="text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity">XP Multiplier</span>
+                            <span className="text-sm font-black text-emerald-400 flex items-center gap-1">
+                              <ArrowUpCircle className="h-3 w-3" />
+                              x{Number(val).toFixed(2)} Bonus
                             </span>
                           </div>
                         ))}
@@ -403,23 +492,23 @@ export default function GrowthPage() {
                       </Button>
 
                       {!!progress?.skills?.[selectedSkill.id] ? (
-                        <Button variant="ghost" className="w-full h-12 rounded-xl text-white/60 font-black text-sm gap-2">
-                          <Star className="h-4 w-4 fill-current" />
+                        <Button variant="ghost" className="w-full h-12 rounded-xl text-white/60 font-black text-sm gap-2 hover:bg-white/10">
+                          <Star className="h-4 w-4 fill-current text-amber-400" />
                           마스터리 레벨업 (준비 중)
                         </Button>
                       ) : stats[activeBranch] >= (selectedSkill.unlockCondition.value || 0) ? (
-                        <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-base shadow-xl gap-2">
+                        <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-base shadow-xl gap-2 animate-pulse-soft">
                           <Unlock className="h-5 w-5" />
                           지금 해금하기
                         </Button>
                       ) : (
                         <Button disabled className="w-full h-14 rounded-2xl bg-white/10 text-white/40 font-black text-base border border-white/5 gap-2">
                           <Lock className="h-5 w-5" />
-                          성장하여 잠금 해제
+                          Requirement Not Met
                         </Button>
                       )}
-                      <p className="text-[10px] text-center mt-2 font-bold opacity-50 uppercase tracking-widest">
-                        Lv.{MAX_LEVEL} 궁극의 마스터리를 향해 전진하세요.
+                      <p className="text-[9px] text-center mt-2 font-bold opacity-50 uppercase tracking-[0.2em]">
+                        Ultimate Mastery Journey: Lv.{MAX_LEVEL}
                       </p>
                     </div>
                   </CardContent>
@@ -427,7 +516,7 @@ export default function GrowthPage() {
               ) : (
                 <div className="h-[400px] flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-[2.5rem] border border-dashed border-border/50">
                   <Trophy className="h-12 w-12 mb-4 opacity-20" />
-                  <p className="font-bold">노드를 선택하여 상세 정보를 확인하세요.</p>
+                  <p className="font-bold">노드를 선택하여 마스터리 정보를 확인하세요.</p>
                 </div>
               )}
             </div>
@@ -436,31 +525,31 @@ export default function GrowthPage() {
       </section>
 
       <footer className="grid sm:grid-cols-3 gap-6">
-        <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start">
+        <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start hover:bg-white transition-colors duration-300 shadow-sm">
           <div className="bg-white p-2 rounded-xl border border-border/50 shadow-sm">
             <Medal className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h5 className="font-black text-sm mb-1">궁극의 목표: 레벨 30</h5>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed">입시 트랙의 최종 목적지는 30레벨입니다. 약 300일간의 꾸준한 노력을 데이터로 증명하세요.</p>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed">입시 트랙의 최종 목적지는 30레벨입니다. 데이터로 당신의 노력을 증명하세요.</p>
           </div>
         </div>
-        <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start">
+        <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start hover:bg-white transition-colors duration-300 shadow-sm">
           <div className="bg-white p-2 rounded-xl border border-border/50 shadow-sm">
             <CalendarDays className="h-5 w-5 text-amber-500" />
           </div>
           <div>
             <h5 className="font-black text-sm mb-1">데이터 기반 성장</h5>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed">스탯 획득 가중치가 상향 조정되었습니다. 단순한 접속이 아닌 몰입의 질이 중요합니다.</p>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed">스탯 가중치는 엄격하게 관리됩니다. 단순한 접속이 아닌 몰입의 질이 핵심입니다.</p>
           </div>
         </div>
-        <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start">
+        <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start hover:bg-white transition-colors duration-300 shadow-sm">
           <div className="bg-white p-2 rounded-xl border border-border/50 shadow-sm">
             <Crown className="h-5 w-5 text-emerald-500" />
           </div>
           <div>
             <h5 className="font-black text-sm mb-1">마스터리 보너스</h5>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed">스킬 해금 시 XP 배율이 상승하여, 후반부의 거대한 요구량을 충족할 수 있게 됩니다.</p>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed">스킬 해금 시 XP 배율이 영구 상승하여, 후반부의 거대한 요구량을 충족할 수 있습니다.</p>
           </div>
         </div>
       </footer>
