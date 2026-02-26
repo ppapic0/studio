@@ -245,19 +245,17 @@ export default function StudyPlanPage() {
       item.id
     );
     
-    // 1. 상태 업데이트
     updateDoc(itemRef, {
       done: !item.done,
       doneAt: !item.done ? serverTimestamp() : null,
       updatedAt: serverTimestamp(),
     });
 
-    // 2. 할 일을 마쳤을 때 '목표달성' 스탯 1점 추가
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(1) },
-        currentXp: increment(10),
+        stats: { achievement: increment(0.2) }, // 밸런스: 항목당 0.2점
+        currentXp: increment(20), // 밸런스: 항목당 20XP
         updatedAt: serverTimestamp()
       }, { merge: true });
     }

@@ -297,7 +297,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [timeSinceCheck, setTimeSinceCheck] = useState(0);
 
-  // 세션 자동 종료 관련 상태
   const [showSessionAlert, setShowSessionAlert] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
 
@@ -336,7 +335,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return (doneCount / studyTasks.length) * 100;
   }, [studyTasks]);
 
-  // 메인 타이머 및 자동 종료 체크
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive) {
@@ -344,7 +342,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         setSecondsElapsed(s => s + 1);
         setTimeSinceCheck(t => {
           const next = t + 1;
-          // 2시간 경과 시 세션 확인 팝업 노출
           if (next >= AUTO_TERMINATE_SECONDS) {
             setShowSessionAlert(true);
             setGracePeriod(GRACE_PERIOD_SECONDS);
@@ -358,7 +355,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive]);
 
-  // 유예 기간(Grace Period) 카운트다운
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (showSessionAlert && gracePeriod > 0) {
@@ -366,7 +362,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         setGracePeriod(prev => prev - 1);
       }, 1000);
     } else if (showSessionAlert && gracePeriod === 0) {
-      // 유예 기간 종료 시 자동 학습 종료
       handleStudyEndAutomatically();
     }
     return () => clearInterval(interval);
@@ -412,7 +407,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     
-    // 1. To-do 완료 업데이트
     updateDoc(itemRef, {
       done: !item.done,
       updatedAt: serverTimestamp(),
@@ -424,12 +418,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       }));
     });
 
-    // 2. 할 일을 마쳤을 때 '목표달성' 스탯 1점 및 10XP 추가
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(1) },
-        currentXp: increment(10),
+        stats: { achievement: increment(0.2) }, // 하향 조정: 항목당 0.2점
+        currentXp: increment(20), // 항목당 20XP
         updatedAt: serverTimestamp()
       }, { merge: true });
     }
@@ -452,7 +445,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const sessionMinutes = Math.floor(secondsElapsed / 60);
     if (sessionMinutes <= 0) return;
 
-    // 1. 학습 시간 기록
     const data = {
       totalMinutes: increment(sessionMinutes),
       uid: user.uid,
@@ -472,17 +464,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }));
       });
 
-    // 2. 성장 스탯 업데이트 (집중력, 꾸준함, 회복력)
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-    const focusGain = (sessionMinutes / 30); // 30분당 1점
+    // 밸런스 조정: 60분당 1점 (Focus), 3시간 이상 시 Resilience 보너스
+    const focusGain = (sessionMinutes / 60); 
     
     setDoc(progressRef, {
       stats: {
         focus: increment(Number(focusGain.toFixed(2))),
-        consistency: increment(0.5), // 세션 완료 보너스
-        resilience: sessionMinutes >= 60 ? increment(1) : increment(0) // 1시간 이상 몰입 시 회복력 보너스
+        consistency: increment(0.2), // 하향 조정: 세션당 0.2점
+        resilience: sessionMinutes >= 180 ? increment(1) : increment(0) // 3시간(180분) 이상 몰입 시만 회복력 1점
       },
-      currentXp: increment(sessionMinutes), // 1분당 1XP
+      currentXp: increment(sessionMinutes), // 1분당 1XP 유지
       updatedAt: serverTimestamp()
     }, { merge: true });
   };
@@ -545,7 +537,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      {/* 세션 유지 확인 AlertDialog */}
       <AlertDialog open={showSessionAlert} onOpenChange={setShowSessionAlert}>
         <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
           <AlertDialogHeader>
