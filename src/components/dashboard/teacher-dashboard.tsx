@@ -15,18 +15,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import Link from 'next/link';
-import { ArrowUpRight, UserCheck, UserX, Loader2 } from 'lucide-react';
+import { ArrowUpRight, UserX, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, limit, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, limit, collectionGroup } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { type AIOutput, type WithId, type CenterMembership, type AttendanceRecord } from '@/lib/types';
+import { type AIOutput, type CenterMembership, type AttendanceRecord } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
@@ -72,171 +72,167 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }
 
   return (
-    <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+    <div className="flex flex-col gap-6 lg:gap-8">
+      {/* Stats Summary - Responsive columns */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>총 학생 수</CardDescription>
-            {studentsLoading ? <Skeleton className="h-10 w-16" /> : <CardTitle className="text-4xl">{studentCount}</CardTitle>}
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
+            <CardDescription className="text-xs sm:text-sm">총 학생 수</CardDescription>
+            {studentsLoading ? <Skeleton className="h-8 w-12" /> : <CardTitle className="text-2xl sm:text-3xl">{studentCount}</CardTitle>}
           </CardHeader>
-          <CardContent>
-            {studentsLoading ? <Skeleton className="h-4 w-24" /> : <div className="text-xs text-muted-foreground">활성 멤버 기준</div>}
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-[10px] sm:text-xs text-muted-foreground">활성 멤버 기준</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>주의 학생</CardDescription>
-            {atRiskLoading ? <Skeleton className="h-10 w-12" /> : 
-              <CardTitle className="text-4xl text-destructive-foreground dark:text-destructive">
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
+            <CardDescription className="text-xs sm:text-sm">주의 학생</CardDescription>
+            {atRiskLoading ? <Skeleton className="h-8 w-12" /> : 
+              <CardTitle className="text-2xl sm:text-3xl text-destructive">
                 {atRiskStudents?.length ?? 0}
               </CardTitle>
             }
           </CardHeader>
-          <CardContent>
-             {atRiskLoading ? <Skeleton className="h-4 w-24" /> : <div className="text-xs text-muted-foreground">AI 식별됨</div>}
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+             <div className="text-[10px] sm:text-xs text-muted-foreground">AI 식별됨</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>오늘 출석률</CardDescription>
-             {attendanceLoading || studentsLoading ? <Skeleton className="h-10 w-20" /> : 
-              <CardTitle className="text-4xl">
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
+            <CardDescription className="text-xs sm:text-sm">출석률</CardDescription>
+             {attendanceLoading || studentsLoading ? <Skeleton className="h-8 w-16" /> : 
+              <CardTitle className="text-2xl sm:text-3xl">
                 {studentCount > 0 ? Math.round(((studentCount - (missingAttendance?.length ?? 0)) / studentCount) * 100) : 100}%
               </CardTitle>
             }
           </CardHeader>
-          <CardContent>
-            {attendanceLoading ? <Skeleton className="h-4 w-28" /> : 
-            <div className="text-xs text-muted-foreground">
-              결석/지각 {missingAttendance?.length ?? 0}명
-            </div>}
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-[10px] sm:text-xs text-muted-foreground">
+              결/지 {missingAttendance?.length ?? 0}명
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>개입</CardDescription>
-            <CardTitle className="text-4xl">0</CardTitle>
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
+            <CardDescription className="text-xs sm:text-sm">검토 대기</CardDescription>
+            <CardTitle className="text-2xl sm:text-3xl">2</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">
-              검토 대기 중
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-[10px] sm:text-xs text-muted-foreground">
+              개입 대기 중
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center">
-            <div className="grid gap-2">
-                <CardTitle>AI가 식별한 주의 학생</CardTitle>
-                <CardDescription>
-                학업에 대한 관심 저하 또는 부진의 징후를 보이는 학생들입니다.
-                </CardDescription>
+      {/* Main Grid - Tablet optimized */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center">
+            <div className="grid gap-1">
+              <CardTitle className="text-lg sm:text-xl">AI 주의 학생 식별</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                학업 부진 징후 학생입니다.
+              </CardDescription>
             </div>
-            <Button asChild size="sm" className="ml-auto gap-1">
+            <Button asChild size="sm" variant="ghost" className="ml-auto h-8 px-2">
                 <Link href="#">
-                전체 보기
-                <ArrowUpRight className="h-4 w-4" />
+                  <ArrowUpRight className="h-4 w-4" />
                 </Link>
             </Button>
-        </CardHeader>
-        <CardContent>
-          {atRiskLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto"/> :
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>학생</TableHead>
-                <TableHead>위험 요인</TableHead>
-                <TableHead>
-                  <span className="sr-only">작업</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {atRiskStudents?.map((risk) => (
-                <TableRow key={risk.id}>
-                  <TableCell>
-                    <div className="font-medium">{students?.find(s => s.id === risk.studentId)?.displayName ?? risk.studentId}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="border-destructive text-destructive-foreground dark:text-destructive">
-                      {JSON.parse(risk.basedOnMetricsSnapshot).riskReasons?.[0] || '위험 감지'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm">
-                      개입하기
-                    </Button>
-                  </TableCell>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-x-auto">
+            {atRiskLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto my-10"/> :
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">학생</TableHead>
+                  <TableHead className="text-xs">요인</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        }
-        </CardContent>
-      </Card>
-      
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-            <CardHeader className="flex flex-row items-center">
-                <div className="grid gap-2">
-                    <CardTitle>출석 누락</CardTitle>
-                    <CardDescription>
-                    오늘 결석 또는 지각으로 표시된 학생들입니다.
-                    </CardDescription>
-                </div>
-                 <Button asChild size="sm" className="ml-auto gap-1">
-                    <Link href="/dashboard/attendance">
-                    출석부로 가기
-                    <ArrowUpRight className="h-4 w-4" />
-                    </Link>
-                </Button>
-            </CardHeader>
-            <CardContent>
-                {attendanceLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto"/> :
-                 missingAttendance?.map(student => (
-                    <div key={student.id} className="flex items-center gap-4 mb-4">
-                        <Avatar className="hidden h-9 w-9 sm:flex">
-                        {/* <AvatarImage src={student.avatarUrl} alt="Avatar" /> */}
-                        <AvatarFallback>{student.studentName?.charAt(0) ?? '?'}</AvatarFallback>
-                      </Avatar>
-                        <div className="grid gap-1">
-                            <p className="text-sm font-medium leading-none">{student.studentName ?? student.id}</p>
-                            <p className="text-sm text-muted-foreground">{student.status}</p>
-                        </div>
-                        <div className="ml-auto font-medium">
-                            <Button variant="outline" size="sm">조정</Button>
-                        </div>
-                    </div>
+              </TableHeader>
+              <TableBody>
+                {atRiskStudents?.map((risk) => (
+                  <TableRow key={risk.id}>
+                    <TableCell className="py-2 text-sm font-medium">
+                      {students?.find(s => s.id === risk.studentId)?.displayName ?? '학생'}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Badge variant="outline" className="text-[10px] border-destructive text-destructive whitespace-nowrap">
+                        {risk.message.split('.')[0] || '위험 감지'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-2 text-right">
+                      <Button variant="outline" size="xs" className="h-7 text-[10px] px-2">개입</Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-            </CardContent>
+              </TableBody>
+            </Table>
+            }
+          </CardContent>
         </Card>
-        <Card>
-             <CardHeader>
-                <CardTitle>개입 대기열</CardTitle>
-                <CardDescription>
-                AI가 제안한 개입이 검토를 기다리고 있습니다.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-                <Alert className="alert-warning">
-                    <UserX className="h-4 w-4" />
-                    <AlertTitle>낮은 완수율</AlertTitle>
-                    <AlertDescription>
-                        <strong>클로이 킴:</strong> 학습 계획을 단순화하도록 제안하세요.
-                    </AlertDescription>
-                </Alert>
-                 <Alert className="alert-warning">
-                    <UserX className="h-4 w-4" />
-                    <AlertTitle>잦은 결석</AlertTitle>
-                    <AlertDescription>
-                       <strong>레오 마르티네즈:</strong> 확인 대화를 권장합니다.
-                    </AlertDescription>
-                </Alert>
-            </CardContent>
+        
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center">
+            <div className="grid gap-1">
+              <CardTitle className="text-lg sm:text-xl">출석 누락 현황</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">오늘의 결석/지각 학생</CardDescription>
+            </div>
+            <Button asChild size="sm" variant="ghost" className="ml-auto h-8 px-2">
+                <Link href="/dashboard/attendance">
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="flex-1">
+            {attendanceLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto my-10"/> :
+              missingAttendance?.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground text-sm">현재 누락된 출석이 없습니다.</div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {missingAttendance?.slice(0, 4).map(student => (
+                      <div key={student.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-[10px]">{student.studentName?.charAt(0) ?? '?'}</AvatarFallback>
+                          </Avatar>
+                          <div className="grid gap-0.5">
+                              <p className="text-sm font-medium leading-none">{student.studentName ?? '알 수 없음'}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase">{student.status.replace('confirmed_', '')}</p>
+                          </div>
+                          <Button variant="ghost" size="sm" className="ml-auto h-7 text-[10px]">확인</Button>
+                      </div>
+                  ))}
+                </div>
+              )
+            }
+          </CardContent>
+        </Card>
+
+        {/* Intervention Queue - Full width on tablet, half on desktop */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg sm:text-xl">AI 개입 제안 대기열</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">검토 후 실행 가능한 맞춤형 조치입니다.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Alert className="bg-warning/30 border-warning">
+                <UserX className="h-4 w-4 text-accent" />
+                <AlertTitle className="text-sm font-semibold">학습 계획 조정 권고</AlertTitle>
+                <AlertDescription className="text-xs mt-1">
+                    <strong>김재윤:</strong> 최근 완수율 하락. 과제를 소분하도록 안내가 필요합니다.
+                </AlertDescription>
+            </Alert>
+            <Alert className="bg-warning/30 border-warning">
+                <UserX className="h-4 w-4 text-accent" />
+                <AlertTitle className="text-sm font-semibold">출석 패턴 이상</AlertTitle>
+                <AlertDescription className="text-xs mt-1">
+                    <strong>이소피아:</strong> 불규칙한 지각 빈도가 증가하고 있습니다. 면담을 권장합니다.
+                </AlertDescription>
+            </Alert>
+          </CardContent>
         </Card>
       </div>
-
     </div>
   );
 }

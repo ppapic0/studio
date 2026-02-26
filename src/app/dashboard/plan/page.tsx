@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -94,7 +93,7 @@ export default function StudyPlanPage() {
         weight: 1,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        studyPlanWeekId: weekKey, // This is redundant if path contains it, but good for security rules
+        studyPlanWeekId: weekKey,
         centerId: activeMembership.id,
         uid: user.uid,
       });
@@ -108,43 +107,44 @@ export default function StudyPlanPage() {
 
 
   return (
-    <div className="grid flex-1 items-start gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>나의 학습 계획</CardTitle>
-          <CardDescription>
-            주간 목표와 과제입니다. 집중하고 진행 상황을 추적하세요.
+    <div className="flex-1 w-full max-w-4xl mx-auto p-0 sm:p-2">
+      <Card className="border-none sm:border shadow-none sm:shadow-sm">
+        <CardHeader className="px-4 sm:px-6">
+          <CardTitle className="text-2xl font-bold">나의 학습 계획</CardTitle>
+          <CardDescription className="text-sm">
+            이번 주 목표와 과제입니다. 진행 상황을 체크해 보세요.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {!isStudent ? (
-             <Alert>
-              <AlertTitle>학생 전용</AlertTitle>
+             <Alert variant="warning">
+              <AlertTitle>학생 전용 페이지</AlertTitle>
               <AlertDescription>
-                학생 계정으로 로그인하면 계획을 기록하고 관리할 수 있습니다.
+                학생 계정으로 로그인해야 학습 계획을 관리할 수 있습니다.
               </AlertDescription>
             </Alert>
           ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6 mt-4">
             {isLoading && (
-              <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             )}
             {!isLoading && studyPlan?.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center space-x-4 rounded-md border p-4"
+                className="flex items-center space-x-4 rounded-xl border p-4 sm:p-5 hover:bg-muted/30 transition-all group"
               >
                 <Checkbox
                   id={task.id}
                   checked={task.done}
                   onCheckedChange={() => handleToggleTask(task)}
+                  className="h-5 w-5 rounded-md"
                 />
                 <Label
                   htmlFor={task.id}
-                  className={`flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                    task.done ? 'line-through text-muted-foreground' : ''
+                  className={`flex-1 text-base sm:text-lg font-medium cursor-pointer transition-colors ${
+                    task.done ? 'line-through text-muted-foreground' : 'text-foreground'
                   }`}
                 >
                   {task.title}
@@ -152,18 +152,18 @@ export default function StudyPlanPage() {
               </div>
             ))}
              <div
-                className="flex items-center space-x-4 rounded-md border border-dashed p-4"
+                className="flex items-center space-x-3 rounded-xl border border-dashed p-3 sm:p-4 bg-muted/20"
               >
-                <PlusCircle className="h-5 w-5 text-muted-foreground" />
+                <PlusCircle className="h-5 w-5 text-muted-foreground shrink-0" />
                 <Input 
-                  placeholder='계획에 새 과제 추가하기'
-                  className='border-0 shadow-none focus-visible:ring-0'
+                  placeholder='새 과제 추가 (엔터 키 입력)'
+                  className='border-0 shadow-none focus-visible:ring-0 text-sm sm:text-base bg-transparent px-0'
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
                   disabled={isSubmitting}
                 />
-                <Button onClick={handleAddTask} size="sm" disabled={isSubmitting || !newTaskTitle.trim()}>
+                <Button onClick={handleAddTask} size="sm" disabled={isSubmitting || !newTaskTitle.trim()} className="h-8">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : '추가'}
                 </Button>
               </div>

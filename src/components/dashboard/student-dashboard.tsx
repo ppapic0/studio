@@ -95,9 +95,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const aiCoachRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
-    // aiOutputs 하위 컬렉션 조회를 위해 경로와 필터를 정확히 설정합니다.
     return query(
         collection(firestore, 'centers', activeMembership.id, 'aiOutputs', user.uid, 'records'),
+        where('studentId', '==', user.uid),
         orderBy('createdAt', 'desc'),
         limit(1)
     );
@@ -140,6 +140,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         centerId: activeMembership.id,
         dateKey: todayKey,
         updatedAt: serverTimestamp(),
+        studentId: user.uid,
       }, { merge: true });
       toast({ title: '저장 완료', description: `오늘의 학습 시간이 ${newMinutes}분으로 기록되었습니다.` });
     } catch (error) {
@@ -161,28 +162,31 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const growthEvolution = `지난 7일 대비`;
 
   return (
-    <>
-      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+    <div className="flex flex-col gap-6 lg:gap-8">
+      {/* Stats Grid - 1 col on mobile, 2 cols on tablet, 4 cols on desktop */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           title="오늘의 학습 시간"
           icon={Clock}
           isLoading={studyLogLoading}
         >
-          <div className="flex items-end gap-2">
-            <Input 
-              type="number" 
-              className="text-2xl font-bold h-10 p-1 border-0 shadow-none focus-visible:ring-0" 
-              value={minutesInput}
-              onChange={(e) => setMinutesInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSetMinutes()}
-            />
-            <span className="text-sm text-muted-foreground pb-2">분</span>
-            <Button size="sm" onClick={handleSetMinutes} disabled={isSavingMinutes}>
+          <div className="flex items-center gap-2">
+            <div className="flex items-baseline gap-1">
+              <Input 
+                type="number" 
+                className="text-2xl font-bold h-10 w-16 p-0 border-0 shadow-none focus-visible:ring-0" 
+                value={minutesInput}
+                onChange={(e) => setMinutesInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSetMinutes()}
+              />
+              <span className="text-sm text-muted-foreground">분</span>
+            </div>
+            <Button size="sm" variant="ghost" onClick={handleSetMinutes} disabled={isSavingMinutes} className="h-8 w-8 p-0 ml-auto">
               {isSavingMinutes ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
               <span className="sr-only">저장</span>
             </Button>
           </div>
-          {studyLog?.updatedAt && <p className="text-xs text-muted-foreground mt-1">마지막 저장: {format(studyLog.updatedAt.toDate(), 'p')}</p>}
+          {studyLog?.updatedAt && <p className="text-[10px] text-muted-foreground mt-1">마지막 저장: {format(studyLog.updatedAt.toDate(), 'p')}</p>}
         </StatCard>
         <StatCard 
           title="주간 완수율"
@@ -206,34 +210,37 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           isLoading={dailyStatLoading}
         />
       </div>
-      <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3 mt-8">
-        <Card className="xl:col-span-2">
-          <CardHeader className="flex flex-row items-center">
-            <div className="grid gap-2">
-              <CardTitle>오늘의 학습 계획</CardTitle>
-              <CardDescription>
+
+      {/* Main Content Grid - Stacked on mobile/tablet, 2:1 on large desktop */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left Column: Plan */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center space-y-0">
+            <div className="grid gap-1">
+              <CardTitle className="text-xl">오늘의 학습 계획</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 완료할 남은 과제입니다.
               </CardDescription>
             </div>
-            <Button asChild size="sm" className="ml-auto gap-1 bg-accent hover:bg-accent/90">
+            <Button asChild size="sm" variant="outline" className="ml-auto gap-1 text-xs sm:text-sm h-8">
               <Link href="/dashboard/plan">
                 전체 보기
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </Button>
           </CardHeader>
-          <CardContent className="grid gap-4">
+          <CardContent className="grid gap-3">
             {planItemsLoading ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
               </div>
             ) : planItems && planItems.length > 0 ? (
                 planItems.map((task) => (
-                  <div key={task.id} className="flex items-center space-x-4 rounded-md border p-4">
+                  <div key={task.id} className="flex items-center space-x-3 rounded-md border p-3 sm:p-4 hover:bg-muted/50 transition-colors">
                     <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task)} />
                     <Label
                       htmlFor={task.id}
-                      className={`flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
+                      className={`flex-1 text-sm font-medium leading-none cursor-pointer ${
                         task.done ? 'line-through text-muted-foreground' : ''
                       }`}
                     >
@@ -242,34 +249,36 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 ))
             ) : (
-                <div className="text-center text-muted-foreground p-8">오늘 남은 계획이 없습니다!</div>
+                <div className="text-center text-muted-foreground py-10 text-sm">오늘 남은 계획이 없습니다!</div>
             )}
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Right Column: AI Coach */}
+        <Card className="h-fit">
           <CardHeader>
-            <CardTitle>AI 코치</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl">AI 코치</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               성장을 돕는 맞춤 팁입니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
-             <Alert className="bg-background">
-                <Activity className="h-4 w-4" />
-                <AlertTitle className="font-headline">주간 팁</AlertTitle>
-                <AlertDescription className="mt-2 text-sm leading-relaxed">
+             <Alert className="bg-secondary/50 border-none">
+                <Activity className="h-4 w-4 text-accent" />
+                <AlertTitle className="font-headline text-accent font-semibold">주간 팁</AlertTitle>
+                <AlertDescription className="mt-2 text-sm leading-relaxed text-foreground/80">
                   {aiCoachLoading ? (
-                     <Skeleton className="h-16 w-full" />
+                     <Skeleton className="h-20 w-full" />
                   ) : aiCoachMessage ? (
                      aiCoachMessage.message
                   ) : (
-                    "새로운 AI 코칭 메시지가 없습니다. 꾸준한 학습을 기록해 보세요!"
+                    "오늘의 학습 기록을 채워보세요! AI가 분석을 시작합니다."
                   )}
                 </AlertDescription>
             </Alert>
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }
