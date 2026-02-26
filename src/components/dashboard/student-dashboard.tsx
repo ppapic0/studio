@@ -95,10 +95,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const aiCoachRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
+    // aiOutputs 하위 컬렉션 조회를 위해 경로와 필터를 정확히 설정합니다.
     return query(
         collection(firestore, 'centers', activeMembership.id, 'aiOutputs', user.uid, 'records'),
-        where('studentId', '==', user.uid), // 보안 규칙을 위해 필터 명시
-        where('type', '==', 'intervention'),
         orderBy('createdAt', 'desc'),
         limit(1)
     );
@@ -177,6 +176,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               onChange={(e) => setMinutesInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSetMinutes()}
             />
+            <span className="text-sm text-muted-foreground pb-2">분</span>
             <Button size="sm" onClick={handleSetMinutes} disabled={isSavingMinutes}>
               {isSavingMinutes ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
               <span className="sr-only">저장</span>
@@ -233,7 +233,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task)} />
                     <Label
                       htmlFor={task.id}
-                      className={`flex-1 text-sm font-medium leading-none ${
+                      className={`flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
                         task.done ? 'line-through text-muted-foreground' : ''
                       }`}
                     >
@@ -257,13 +257,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
              <Alert className="bg-background">
                 <Activity className="h-4 w-4" />
                 <AlertTitle className="font-headline">주간 팁</AlertTitle>
-                <AlertDescription className="mt-2">
+                <AlertDescription className="mt-2 text-sm leading-relaxed">
                   {aiCoachLoading ? (
                      <Skeleton className="h-16 w-full" />
                   ) : aiCoachMessage ? (
                      aiCoachMessage.message
                   ) : (
-                    "새로운 AI 코칭 메시지가 없습니다."
+                    "새로운 AI 코칭 메시지가 없습니다. 꾸준한 학습을 기록해 보세요!"
                   )}
                 </AlertDescription>
             </Alert>
