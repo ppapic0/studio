@@ -376,7 +376,6 @@ export default function StudyHistoryPage() {
     return from24h(time24h);
   };
 
-  const isPastOrToday = selectedDateForPlan ? isBefore(selectedDateForPlan, startOfDay(addMonths(new Date(), 1))) : false;
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
 
@@ -563,7 +562,7 @@ export default function StudyHistoryPage() {
                                     placeholder="00:00"
                                     className="w-16 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold"
                                     value={time}
-                                    onBlur={(e) => handleUpdateSchedule(tpl.title, e.target.value, period)}
+                                    onChange={(e) => handleUpdateSchedule(tpl.title, e.target.value, period)}
                                   />
                                 </div>
                               )}
