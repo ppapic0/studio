@@ -25,40 +25,42 @@ import {
   Trophy,
   Crown,
   Flame,
-  Medal
+  Medal,
+  ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
-// 확장된 20개 스킬 로드맵 (레벨 30까지 고려)
-const MOCK_SKILLS: SkillNode[] = [
+// 확장된 20개 스킬 로드맵 (페이지 이동 링크 포함)
+const MOCK_SKILLS: (SkillNode & { link: string })[] = [
   // --- FOCUS BRANCH ---
-  { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { xp: 1.03 }, iconKey: 'Target' },
-  { id: 'f2', branch: 'focus', name: '방해 금지', description: '중단 없는 세션 5회 연속 달성 시 해금됩니다.', maxLevel: 1, prerequisites: ['f1'], unlockCondition: { stat: 'focus', value: 25 }, effects: { xp: 1.05 }, iconKey: 'Target' },
-  { id: 'f3', branch: 'focus', name: '몰입의 강도', description: '평균 집중도 90% 이상을 일주일간 유지하세요.', maxLevel: 3, prerequisites: ['f2'], unlockCondition: { stat: 'focus', value: 45 }, effects: { xp: 1.08 }, iconKey: 'Flame' },
-  { id: 'f4', branch: 'focus', name: '하이퍼 포커스', description: '3시간 이상의 초몰입 세션을 성공적으로 마쳤습니다.', maxLevel: 5, prerequisites: ['f3'], unlockCondition: { stat: 'focus', value: 70 }, effects: { xp: 1.12 }, iconKey: 'Zap' },
-  { id: 'f5', branch: 'focus', name: '몰입의 대가', description: '어떤 환경에서도 즉시 몰입 상태에 진입할 수 있습니다.', maxLevel: 1, prerequisites: ['f4'], unlockCondition: { stat: 'focus', value: 95 }, effects: { xp: 1.20 }, iconKey: 'Crown' },
+  { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { xp: 1.03 }, iconKey: 'Target', link: '/dashboard' },
+  { id: 'f2', branch: 'focus', name: '방해 금지', description: '중단 없는 세션 5회 연속 달성 시 해금됩니다.', maxLevel: 1, prerequisites: ['f1'], unlockCondition: { stat: 'focus', value: 25 }, effects: { xp: 1.05 }, iconKey: 'Target', link: '/dashboard' },
+  { id: 'f3', branch: 'focus', name: '몰입의 강도', description: '평균 집중도 90% 이상을 일주일간 유지하세요.', maxLevel: 3, prerequisites: ['f2'], unlockCondition: { stat: 'focus', value: 45 }, effects: { xp: 1.08 }, iconKey: 'Flame', link: '/dashboard' },
+  { id: 'f4', branch: 'focus', name: '하이퍼 포커스', description: '3시간 이상의 초몰입 세션을 성공적으로 마쳤습니다.', maxLevel: 5, prerequisites: ['f3'], unlockCondition: { stat: 'focus', value: 70 }, effects: { xp: 1.12 }, iconKey: 'Zap', link: '/dashboard' },
+  { id: 'f5', branch: 'focus', name: '몰입의 대가', description: '어떤 환경에서도 즉시 몰입 상태에 진입할 수 있습니다.', maxLevel: 1, prerequisites: ['f4'], unlockCondition: { stat: 'focus', value: 95 }, effects: { xp: 1.20 }, iconKey: 'Crown', link: '/dashboard' },
 
   // --- CONSISTENCY BRANCH ---
-  { id: 'c1', branch: 'consistency', name: '작심삼일 타파', description: '3일 동안 멈추지 않고 학습을 기록했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'consistency', value: 10 }, effects: { xp: 1.03 }, iconKey: 'RefreshCw' },
-  { id: 'c2', branch: 'consistency', name: '일주일의 기적', description: '7일 연속 출석 시 주간 보너스가 강화됩니다.', maxLevel: 1, prerequisites: ['c1'], unlockCondition: { stat: 'consistency', value: 25 }, effects: { xp: 1.07 }, iconKey: 'Medal' },
-  { id: 'c3', branch: 'consistency', name: '루틴 정착', description: '30일 중 25일 이상 학습을 완료하는 습관을 형성합니다.', maxLevel: 3, prerequisites: ['c2'], unlockCondition: { stat: 'consistency', value: 50 }, effects: { xp: 1.10 }, iconKey: 'RefreshCw' },
-  { id: 'c4', branch: 'consistency', name: '철의 의지', description: '100일 연속 학습이라는 경이로운 기록에 도전하세요.', maxLevel: 1, prerequisites: ['c3'], unlockCondition: { stat: 'consistency', value: 80 }, effects: { xp: 1.15 }, iconKey: 'Flame' },
-  { id: 'c5', branch: 'consistency', name: '습관의 화신', description: '학습이 일상의 숨쉬기처럼 자연스러운 단계입니다.', maxLevel: 1, prerequisites: ['c4'], unlockCondition: { stat: 'consistency', value: 98 }, effects: { xp: 1.25 }, iconKey: 'Crown' },
+  { id: 'c1', branch: 'consistency', name: '작심삼일 타파', description: '3일 동안 멈추지 않고 학습을 기록했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'consistency', value: 10 }, effects: { xp: 1.03 }, iconKey: 'RefreshCw', link: '/dashboard' },
+  { id: 'c2', branch: 'consistency', name: '일주일의 기적', description: '7일 연속 출석 시 주간 보너스가 강화됩니다.', maxLevel: 1, prerequisites: ['c1'], unlockCondition: { stat: 'consistency', value: 25 }, effects: { xp: 1.07 }, iconKey: 'Medal', link: '/dashboard' },
+  { id: 'c3', branch: 'consistency', name: '루틴 정착', description: '30일 중 25일 이상 학습을 완료하는 습관을 형성합니다.', maxLevel: 3, prerequisites: ['c2'], unlockCondition: { stat: 'consistency', value: 50 }, effects: { xp: 1.10 }, iconKey: 'RefreshCw', link: '/dashboard' },
+  { id: 'c4', branch: 'consistency', name: '철의 의지', description: '100일 연속 학습이라는 경이로운 기록에 도전하세요.', maxLevel: 1, prerequisites: ['c3'], unlockCondition: { stat: 'consistency', value: 80 }, effects: { xp: 1.15 }, iconKey: 'Flame', link: '/dashboard' },
+  { id: 'c5', branch: 'consistency', name: '습관의 화신', description: '학습이 일상의 숨쉬기처럼 자연스러운 단계입니다.', maxLevel: 1, prerequisites: ['c4'], unlockCondition: { stat: 'consistency', value: 98 }, effects: { xp: 1.25 }, iconKey: 'Crown', link: '/dashboard' },
 
   // --- ACHIEVEMENT BRANCH ---
-  { id: 'a1', branch: 'achievement', name: '오늘 완벽', description: '오늘 설정한 자습 To-do를 100% 달성했습니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'achievement', value: 15 }, effects: { xp: 1.05 }, iconKey: 'CheckCircle2' },
-  { id: 'a2', branch: 'achievement', name: '과목 밸런스', description: '3개 이상의 과목을 편식 없이 고르게 학습했습니다.', maxLevel: 1, prerequisites: ['a1'], unlockCondition: { stat: 'achievement', value: 30 }, effects: { xp: 1.08 }, iconKey: 'Target' },
-  { id: 'a3', branch: 'achievement', name: '주간 정복자', description: '한 주간 모든 목표 달성률 95% 이상을 기록하세요.', maxLevel: 3, prerequisites: ['a2'], unlockCondition: { stat: 'achievement', value: 55 }, effects: { xp: 1.12 }, iconKey: 'Trophy' },
-  { id: 'a4', branch: 'achievement', name: '전략적 플래너', description: '자신에게 딱 맞는 학습량을 스스로 설계하고 달성합니다.', maxLevel: 1, prerequisites: ['a3'], unlockCondition: { stat: 'achievement', value: 75 }, effects: { xp: 1.18 }, iconKey: 'Zap' },
-  { id: 'a5', branch: 'achievement', name: '성취의 정점', description: '설정한 모든 원대한 목표를 현실로 만들어냅니다.', maxLevel: 1, prerequisites: ['a4'], unlockCondition: { stat: 'achievement', value: 95 }, effects: { xp: 1.30 }, iconKey: 'Crown' },
+  { id: 'a1', branch: 'achievement', name: '오늘 완벽', description: '오늘 설정한 자습 To-do를 100% 달성했습니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'achievement', value: 15 }, effects: { xp: 1.05 }, iconKey: 'CheckCircle2', link: '/dashboard/plan' },
+  { id: 'a2', branch: 'achievement', name: '과목 밸런스', description: '3개 이상의 과목을 편식 없이 고르게 학습했습니다.', maxLevel: 1, prerequisites: ['a1'], unlockCondition: { stat: 'achievement', value: 30 }, effects: { xp: 1.08 }, iconKey: 'Target', link: '/dashboard/plan' },
+  { id: 'a3', branch: 'achievement', name: '주간 정복자', description: '한 주간 모든 목표 달성률 95% 이상을 기록하세요.', maxLevel: 3, prerequisites: ['a2'], unlockCondition: { stat: 'achievement', value: 55 }, effects: { xp: 1.12 }, iconKey: 'Trophy', link: '/dashboard/plan' },
+  { id: 'a4', branch: 'achievement', name: '전략적 플래너', description: '자신에게 딱 맞는 학습량을 스스로 설계하고 달성합니다.', maxLevel: 1, prerequisites: ['a3'], unlockCondition: { stat: 'achievement', value: 75 }, effects: { xp: 1.18 }, iconKey: 'Zap', link: '/dashboard/plan' },
+  { id: 'a5', branch: 'achievement', name: '성취의 정점', description: '설정한 모든 원대한 목표를 현실로 만들어냅니다.', maxLevel: 1, prerequisites: ['a4'], unlockCondition: { stat: 'achievement', value: 95 }, effects: { xp: 1.30 }, iconKey: 'Crown', link: '/dashboard/plan' },
 
   // --- RESILIENCE BRANCH ---
-  { id: 'r1', branch: 'resilience', name: '빠른 회복', description: '슬럼프 감지 후 2일 이내에 다시 학습을 시작했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'resilience', value: 15 }, effects: { xp: 1.05 }, iconKey: 'ShieldCheck' },
-  { id: 'r2', branch: 'resilience', name: '역전의 발판', description: '성적이 하락한 과목에 더 많은 시간을 투자하여 극복합니다.', maxLevel: 1, prerequisites: ['r1'], unlockCondition: { stat: 'resilience', value: 35 }, effects: { xp: 1.08 }, iconKey: 'RefreshCw' },
-  { id: 'r3', branch: 'resilience', name: '강철 멘탈', description: '어떤 외부 유혹에도 흔들리지 않고 자리를 지킵니다.', maxLevel: 3, prerequisites: ['r2'], unlockCondition: { stat: 'resilience', value: 60 }, effects: { xp: 1.12 }, iconKey: 'ShieldCheck' },
-  { id: 'r4', branch: 'resilience', name: '슬럼프 파괴자', description: '슬럼프를 성장의 기회로 바꾸는 능력을 갖췄습니다.', maxLevel: 1, prerequisites: ['r3'], unlockCondition: { stat: 'resilience', value: 85 }, effects: { xp: 1.20 }, iconKey: 'Zap' },
-  { id: 'r5', branch: 'resilience', name: '불굴의 마스터', description: '실패를 두려워하지 않으며 끊임없이 재도전합니다.', maxLevel: 1, prerequisites: ['r4'], unlockCondition: { stat: 'resilience', value: 98 }, effects: { xp: 1.30 }, iconKey: 'Crown' },
+  { id: 'r1', branch: 'resilience', name: '빠른 회복', description: '슬럼프 감지 후 2일 이내에 다시 학습을 시작했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'resilience', value: 15 }, effects: { xp: 1.05 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
+  { id: 'r2', branch: 'resilience', name: '역전의 발판', description: '성적이 하락한 과목에 더 많은 시간을 투자하여 극복합니다.', maxLevel: 1, prerequisites: ['r1'], unlockCondition: { stat: 'resilience', value: 35 }, effects: { xp: 1.08 }, iconKey: 'RefreshCw', link: '/dashboard/study-history' },
+  { id: 'r3', branch: 'resilience', name: '강철 멘탈', description: '어떤 외부 유혹에도 흔들리지 않고 자리를 지킵니다.', maxLevel: 3, prerequisites: ['r2'], unlockCondition: { stat: 'resilience', value: 60 }, effects: { xp: 1.12 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
+  { id: 'r4', branch: 'resilience', name: '슬럼프 파괴자', description: '슬럼프를 성장의 기회로 바꾸는 능력을 갖췄습니다.', maxLevel: 1, prerequisites: ['r3'], unlockCondition: { stat: 'resilience', value: 85 }, effects: { xp: 1.20 }, iconKey: 'Zap', link: '/dashboard/study-history' },
+  { id: 'r5', branch: 'resilience', name: '불굴의 마스터', description: '실패를 두려워하지 않으며 끊임없이 재도전합니다.', maxLevel: 1, prerequisites: ['r4'], unlockCondition: { stat: 'resilience', value: 98 }, effects: { xp: 1.30 }, iconKey: 'Crown', link: '/dashboard/study-history' },
 ];
 
 const STAT_CONFIG = {
@@ -300,10 +302,19 @@ export default function GrowthPage() {
                       </div>
                     </div>
 
-                    <div className="pt-4">
+                    <div className="pt-4 flex flex-col gap-3">
+                      {/* 퀘스트 수행하기 버튼 (수행 가능한 페이지로 이동) */}
+                      <Button asChild className="w-full h-14 rounded-2xl bg-white text-primary hover:bg-white/90 font-black text-base shadow-xl gap-2 active:scale-95 transition-all">
+                        <Link href={selectedSkill.link}>
+                          <Zap className="h-5 w-5 fill-current" />
+                          지금 수행하기
+                          <ArrowRight className="ml-auto h-5 w-5" />
+                        </Link>
+                      </Button>
+
                       {!!progress?.skills?.[selectedSkill.id] ? (
-                        <Button className="w-full h-14 rounded-2xl bg-white text-primary hover:bg-white/90 font-black text-base shadow-xl gap-2">
-                          <Star className="h-5 w-5 fill-current" />
+                        <Button variant="ghost" className="w-full h-12 rounded-xl text-white/60 font-black text-sm gap-2">
+                          <Star className="h-4 w-4 fill-current" />
                           마스터리 레벨업 (준비 중)
                         </Button>
                       ) : stats[activeBranch] >= (selectedSkill.unlockCondition.value || 0) ? (
@@ -317,7 +328,7 @@ export default function GrowthPage() {
                           성장하여 잠금 해제
                         </Button>
                       )}
-                      <p className="text-[10px] text-center mt-4 font-bold opacity-50 uppercase tracking-widest">
+                      <p className="text-[10px] text-center mt-2 font-bold opacity-50 uppercase tracking-widest">
                         Lv.{MAX_LEVEL} 궁극의 마스터리를 향해 전진하세요.
                       </p>
                     </div>
