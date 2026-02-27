@@ -38,9 +38,16 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // read는 get과 list를 모두 포함합니다.
-        // 쿼리(list) 요청 시 resource.data 조건이 쿼리의 where 조건과 일치해야 승인됩니다.
-        allow read: if isSignedIn() && (
+        // 단일 문서 조회
+        allow get: if isSignedIn() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.teacherId == request.auth.uid ||
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          isParentOf(centerId, resource.data.studentId)
+        );
+        
+        // 쿼리(list) 요청: 쿼리 필터가 규칙 조건 중 하나와 완벽히 일치해야 함
+        allow list: if isSignedIn() && (
           (resource.data.studentId == request.auth.uid) ||
           (resource.data.teacherId == request.auth.uid) ||
           hasRole(centerId, ['centerAdmin', 'teacher']) ||

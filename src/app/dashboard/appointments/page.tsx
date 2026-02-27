@@ -75,20 +75,18 @@ export default function AppointmentsPage() {
     note: '',
   });
 
-  const isStudent = activeMembership?.role === 'student';
-  const isTeacher = activeMembership?.role === 'teacher';
-  const isAdmin = activeMembership?.role === 'centerAdmin';
-  const isParent = activeMembership?.role === 'parent';
-
-  // 상담 데이터 쿼리 설정 - 보안 규칙과 필터가 완벽히 일치해야 함
+  // 상담 데이터 쿼리 설정
   const appointmentsQuery = useMemoFirebase(() => {
-    // 필수 정보가 로드될 때까지 기다림
-    if (!firestore || membershipsLoading || !activeMembership || !user || !activeMembership.role) return null;
+    // 필수 정보가 모두 존재하고, 로딩이 끝났을 때만 쿼리 생성
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !activeMembership.role) {
+      return null;
+    }
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
+    const role = activeMembership.role;
     
-    // 1. 학생: 반드시 studentId 필터 적용 (보안 규칙 준수)
-    if (isStudent) {
+    // 1. 학생: 본인 예약만 조회 ( studentId 필터 필수 )
+    if (role === 'student') {
       return query(
         baseRef, 
         where('studentId', '==', user.uid), 
@@ -96,8 +94,8 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 2. 학부모: 연결된 자녀 데이터 필터링
-    if (isParent) {
+    // 2. 학부모: 연결된 자녀 데이터 조회
+    if (role === 'parent') {
       const studentIds = activeMembership.linkedStudentIds || [];
       if (studentIds.length === 0) return null;
       return query(
@@ -107,8 +105,8 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 3. 교사: 본인 담당 필터링
-    if (isTeacher) {
+    // 3. 교사: 본인에게 배정된 상담 조회
+    if (role === 'teacher') {
       return query(
         baseRef, 
         where('teacherId', '==', user.uid), 
@@ -116,15 +114,20 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 4. 관리자: 전체 조회
-    if (isAdmin) {
+    // 4. 관리자: 센터 전체 조회
+    if (role === 'centerAdmin') {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
     
     return null;
-  }, [firestore, membershipsLoading, activeMembership, user, isStudent, isParent, isTeacher, isAdmin]);
+  }, [firestore, membershipsLoading, activeMembership?.id, activeMembership?.role, user?.uid, activeMembership?.linkedStudentIds]);
 
   const { data: appointments, isLoading: isQueryLoading } = useCollection<Appointment>(appointmentsQuery);
+
+  const isStudent = activeMembership?.role === 'student';
+  const isTeacher = activeMembership?.role === 'teacher';
+  const isAdmin = activeMembership?.role === 'centerAdmin';
+  const isParent = activeMembership?.role === 'parent';
 
   const handleRequestSubmit = async () => {
     if (!firestore || !user || !activeMembership) return;
