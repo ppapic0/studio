@@ -20,6 +20,7 @@ export interface CenterMembership {
 }
 
 export interface StudentProfile {
+  id: string;
   name: string;
   grade: string;
   seatNo: number;
@@ -29,10 +30,14 @@ export interface StudentProfile {
 }
 
 export interface AttendanceCurrent {
+  id: string;
   seatNo: number;
   status: "studying" | "away" | "break" | "absent";
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
+  gridX?: number; // X coordinate in layout grid
+  gridY?: number; // Y coordinate in layout grid
+  studentId?: string; // Currently occupied student
 }
 
 export interface StudyPlan {
