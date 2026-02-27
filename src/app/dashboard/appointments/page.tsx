@@ -99,7 +99,7 @@ export default function AppointmentsPage() {
 
   const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 (학부모 접근 제외) ---
+  // --- 상담 일지 쿼리 (부모님 접근 제외) ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
     
