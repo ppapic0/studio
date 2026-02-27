@@ -44,6 +44,7 @@ export function SignupForm() {
   const auth = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -60,20 +61,21 @@ export function SignupForm() {
     if (!auth) return;
     setIsLoading(true);
     try {
-      // 1. Firebase Auth 계정 생성
+      setLoadingStatus('계정 생성 중...');
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
-      // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입
-      // 가입 처리가 완료될 때까지 기다림
+      setLoadingStatus('센터 가입 처리 중...');
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
+        setLoadingStatus('대시보드 준비 중...');
         toast({ title: '가입 성공', description: result.message });
         
-        // 중요: window.location.href를 사용하여 앱 전체 상태를 리셋하고 리디렉션
-        // AuthGuard가 새로운 멤버십 정보를 처음부터 다시 읽도록 강제함
-        window.location.href = '/dashboard';
+        // 중요: Firestore 데이터 전파를 위해 아주 잠시 대기 후 리디렉션
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1500);
       }
     } catch (error: any) {
       console.error('Signup Error:', error);
@@ -83,6 +85,7 @@ export function SignupForm() {
         description: error.message || '오류가 발생했습니다. 초대 코드를 확인해 주세요.',
       });
       setIsLoading(false);
+      setLoadingStatus('');
     }
   }
 
@@ -177,7 +180,7 @@ export function SignupForm() {
 
         <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg mt-2 shadow-xl active:scale-95 transition-all" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-          {isLoading ? '처리 중...' : '가입 및 센터 참여'}
+          {isLoading ? (loadingStatus || '처리 중...') : '가입 및 센터 참여'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm font-bold text-muted-foreground">
