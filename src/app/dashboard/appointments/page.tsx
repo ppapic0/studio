@@ -77,22 +77,19 @@ export default function AppointmentsPage() {
   const isAdmin = activeMembership?.role === 'centerAdmin';
   const isParent = activeMembership?.role === 'parent';
 
-  // --- 상담 예약 쿼리 (보안 규칙과 완벽히 매칭) ---
+  // --- 상담 예약 쿼리 ---
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
-    // 1. 학생: 본인 데이터만 필터링
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
     }
-    // 2. 학부모: 연결된 자녀 데이터만 필터링
     if (isParent) {
       const children = activeMembership.linkedStudentIds || [];
       if (children.length === 0) return null;
       return query(baseRef, where('studentId', 'in', children), orderBy('startAt', 'desc'));
     }
-    // 3. 교사/관리자: 센터 전체 데이터
     if (isTeacher || isAdmin) {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
@@ -102,12 +99,11 @@ export default function AppointmentsPage() {
 
   const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 (Plan A: 센터 통합 관리) ---
+  // --- 상담 일지 쿼리 ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
     
-    // 1. 학생: 본인 + 공개된 것만
     if (isStudent) {
       return query(
         baseRef, 
@@ -116,7 +112,6 @@ export default function AppointmentsPage() {
         orderBy('createdAt', 'desc')
       );
     }
-    // 2. 학부모: 자녀 + 공개된 것만
     if (isParent) {
       const children = activeMembership.linkedStudentIds || [];
       if (children.length === 0) return null;
@@ -127,7 +122,6 @@ export default function AppointmentsPage() {
         orderBy('createdAt', 'desc')
       );
     }
-    // 3. 관리자/교사: 모든 일지
     if (isTeacher || isAdmin) {
       return query(baseRef, orderBy('createdAt', 'desc'));
     }
@@ -265,7 +259,7 @@ export default function AppointmentsPage() {
                 notes.map(note => (
                   <div key={note.id} className="p-4 rounded-2xl bg-muted/20 border border-border/50">
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-[10px] font-bold text-primary">{note.studentName} 학생</span>
+                      <span className="text-[10px] font-bold text-primary">{note.studentName || '학생'}</span>
                       <span className="text-[9px] text-muted-foreground">{note.createdAt ? format(note.createdAt.toDate(), 'yy.MM.dd') : ''}</span>
                     </div>
                     <p className="text-xs font-medium line-clamp-3 leading-relaxed">{note.content}</p>

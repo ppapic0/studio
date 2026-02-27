@@ -686,11 +686,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <Skeleton className="h-8 w-24 mt-1" />
               ) : (
                 <div className="flex items-center gap-1 justify-between">
-                  <div className="flex items-baseline gap-1">
+                  <div className="flex items-baseline">
                     <span className="text-3xl font-black tracking-tighter">{h}</span>
-                    <span className="text-[10px] font-black text-muted-foreground mr-1">시간</span>
+                    <span className="text-[11px] font-bold text-muted-foreground ml-0.5 mr-1">시간</span>
                     <span className="text-3xl font-black tracking-tighter">{m}</span>
-                    <span className="text-[10px] font-black text-muted-foreground">분</span>
+                    <span className="text-[11px] font-bold text-muted-foreground ml-0.5">분</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                 </div>
