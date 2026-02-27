@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -539,8 +538,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
   const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
-  // 학습 시간 포맷팅 (0시간 0분 스타일 고정)
-  const totalMinutes = todayStudyLog?.totalMinutes || 0;
+  // 학습 시간 합산
+  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.floor(secondsElapsed / 60);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
 
@@ -658,14 +657,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {scheduleItems.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-4 py-2">
           {scheduleItems.map((item) => {
             const [title, time] = item.title.split(': ');
             return (
-              <Card key={item.id} className="min-w-[140px] flex-1 sm:flex-none bg-white border-2 border-primary/10 rounded-3xl transition-all hover:scale-105 hover:border-primary/40 hover:shadow-md group">
-                <CardContent className="p-4 flex flex-col items-center justify-center gap-1 text-center">
-                  <span className="text-[11px] font-black text-primary/70 group-hover:text-primary uppercase tracking-widest transition-colors">{title}</span>
-                  <span className="text-xl font-black text-primary">{time || '-'}</span>
+              <Card key={item.id} className="min-w-[140px] flex-1 sm:flex-none bg-primary/[0.03] border-2 border-primary/20 rounded-3xl transition-all hover:scale-105 hover:border-primary/50 hover:bg-white hover:shadow-lg group">
+                <CardContent className="p-4 flex flex-col items-center justify-center gap-1.5 text-center">
+                  <span className="text-[11px] font-black text-primary/80 group-hover:text-primary uppercase tracking-[0.1em] transition-colors">{title}</span>
+                  <span className="text-2xl font-black text-primary tracking-tighter">{time || '-'}</span>
                 </CardContent>
               </Card>
             );
@@ -720,7 +719,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}
-          dailyValue={todayStudyLog?.totalMinutes || 0}
+          dailyValue={totalMinutes}
           dailyUnit="분"
           evolution="몰입 시간 달성"
           isLoading={dailyStatLoading}

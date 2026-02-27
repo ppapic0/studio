@@ -107,3 +107,135 @@ export async function devJoinCenterAction(data: { uid: string, centerId: string,
   await bootstrapUserToCenter(uid, centerId, role, "개발자");
   return { ok: true, message: "강제 가입 성공!" };
 }
+
+/**
+ * 테스트용 초기 데이터 시딩 액션
+ */
+export async function seedInitialData(uid: string, centerId: string) {
+  const timestamp = FieldValue.serverTimestamp();
+  const dateKey = new Date().toISOString().split('T')[0];
+  const weekId = `2024-W01`; // 예시 주차 ID
+
+  const batch = adminDb.batch();
+
+  // 1. users
+  batch.set(adminDb.doc(`users/${uid}`), {
+    id: uid,
+    displayName: "테스트 학생",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }, { merge: true });
+
+  // 2. centers & members
+  batch.set(adminDb.doc(`centers/${centerId}`), {
+    id: centerId,
+    name: "테스트 센터",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }, { merge: true });
+
+  batch.set(adminDb.doc(`centers/${centerId}/members/${uid}`), {
+    role: "student",
+    status: "active",
+    joinedAt: timestamp,
+    displayName: "테스트 학생",
+  });
+
+  // 3. appointments
+  const apt1 = adminDb.collection(`centers/${centerId}/appointments`).doc();
+  batch.set(apt1, {
+    studentId: uid,
+    studentName: "테스트 학생",
+    teacherId: "teacher_placeholder",
+    startAt: timestamp,
+    endAt: timestamp,
+    status: "confirmed",
+    createdByRole: "student",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  const apt2 = adminDb.collection(`centers/${centerId}/appointments`).doc();
+  batch.set(apt2, {
+    studentId: uid,
+    studentName: "테스트 학생",
+    teacherId: "teacher_placeholder",
+    startAt: timestamp,
+    endAt: timestamp,
+    status: "requested",
+    createdByRole: "student",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  // 4. counselingNotes
+  const note1 = adminDb.collection(`centers/${centerId}/counselingNotes`).doc();
+  batch.set(note1, {
+    studentId: uid,
+    studentName: "테스트 학생",
+    teacherId: "teacher_placeholder",
+    content: "학습 루틴 점검 및 목표 설정. 수학 미적분 위주로 학습 계획을 수립함.",
+    visibility: "student_and_parent",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  const note2 = adminDb.collection(`centers/${centerId}/counselingNotes`).doc();
+  batch.set(note2, {
+    studentId: uid,
+    studentName: "테스트 학생",
+    teacherId: "teacher_placeholder",
+    content: "시간관리 및 오답정리 피드백. 국어 독서 파트의 집중력 향상이 필요함.",
+    visibility: "student_and_parent",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  // 5. plans
+  const plan1 = adminDb.collection(`centers/${centerId}/plans/${uid}/weeks/${weekId}/items`).doc();
+  batch.set(plan1, {
+    title: "수학 미적분",
+    weight: 1,
+    done: false,
+    dateKey: dateKey,
+    studentId: uid,
+    centerId: centerId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  // 6. studyLogs
+  batch.set(adminDb.doc(`centers/${centerId}/studyLogs/${uid}/days/${dateKey}`), {
+    totalMinutes: 210,
+    dateKey: dateKey,
+    studentId: uid,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  // 7. dailyStudentStats
+  batch.set(adminDb.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${uid}`), {
+    totalMinutes: 210,
+    todayPlanCompletionRate: 0.5,
+    updatedAt: timestamp,
+  });
+
+  // 8. growthProgress
+  batch.set(adminDb.doc(`centers/${centerId}/growthProgress/${uid}`), {
+    level: 1,
+    currentXp: 150,
+    nextLevelXp: 1000,
+    stats: { focus: 15, consistency: 10, achievement: 5, resilience: 8 },
+    updatedAt: timestamp,
+  });
+
+  // 9. userCenters
+  batch.set(adminDb.doc(`userCenters/${uid}/centers/${centerId}`), {
+    role: "student",
+    status: "active",
+    joinedAt: timestamp,
+  });
+
+  await batch.commit();
+  return { ok: true };
+}
