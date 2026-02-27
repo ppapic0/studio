@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
@@ -42,7 +41,6 @@ const formSchema = z.object({
 });
 
 export function SignupForm() {
-  const router = useRouter();
   const auth = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -67,15 +65,16 @@ export function SignupForm() {
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
       // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입
+      // 이 작업이 완료될 때까지 기다려야 Guard가 올바른 데이터를 읽습니다.
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
         toast({ title: '가입 성공', description: result.message });
-        // 세션 갱신을 위해 잠시 대기 후 이동
-        setTimeout(() => {
-          router.push('/dashboard');
-          window.location.reload();
-        }, 800);
+        
+        // 중요: router.push 대신 window.location.href를 사용합니다.
+        // 이는 클라이언트 앱 상태(AppContext 등)를 완전히 초기화하고 
+        // AuthGuard가 새로운 유저 세션에서 멤버십을 처음부터 다시 조회하도록 강제합니다.
+        window.location.href = '/dashboard';
       }
     } catch (error: any) {
       console.error('Signup Error:', error);
