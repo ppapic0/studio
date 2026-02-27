@@ -96,7 +96,7 @@ export async function registerStudentAction(data: {
   displayName: string;
   schoolName: string;
   grade: string;
-  targetDailyMinutes: number;
+  targetDailyMinutes?: number;
   centerId: string;
 }) {
   try {
@@ -109,6 +109,7 @@ export async function registerStudentAction(data: {
 
     const uid = userRecord.uid;
     const timestamp = FieldValue.serverTimestamp();
+    const targetMin = data.targetDailyMinutes || 360; // 기본 목표 시간 360분 설정
 
     await adminDb.runTransaction(async (transaction) => {
       // 2. 기본 프로필 생성
@@ -147,7 +148,7 @@ export async function registerStudentAction(data: {
         schoolName: data.schoolName,
         grade: data.grade,
         seatNo: 0,
-        targetDailyMinutes: data.targetDailyMinutes,
+        targetDailyMinutes: targetMin,
         parentUids: [],
         createdAt: timestamp,
       });

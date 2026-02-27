@@ -23,6 +23,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { registerStudentAction } from '@/lib/membership-actions';
@@ -41,8 +48,7 @@ export default function StudentListPage() {
     email: '',
     password: '',
     schoolName: '',
-    grade: '고등학생',
-    targetMinutes: 360
+    grade: '1학년',
   });
 
   const centerId = activeMembership?.id;
@@ -89,14 +95,13 @@ export default function StudentListPage() {
         displayName: newStudent.name,
         schoolName: newStudent.schoolName,
         grade: newStudent.grade,
-        targetDailyMinutes: Number(newStudent.targetMinutes),
         centerId: centerId
       });
 
       if (result.ok) {
         toast({ title: "학생 등록 성공", description: `${newStudent.name} 학생의 계정이 생성되었습니다.` });
         setIsAddModalOpen(false);
-        setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '고등학생', targetMinutes: 360 });
+        setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
       }
     } catch (e: any) {
       toast({ variant: "destructive", title: "등록 실패", description: e.message });
@@ -158,15 +163,19 @@ export default function StudentListPage() {
                 <Input id="school" placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-11" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="grade" className="font-black text-xs uppercase text-primary/70">학년</Label>
-                  <Input id="grade" placeholder="예: 고3" value={newStudent.grade} onChange={(e) => setNewStudent({...newStudent, grade: e.target.value})} className="rounded-xl h-11" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="target" className="font-black text-xs uppercase text-primary/70">일일 목표 (분)</Label>
-                  <Input id="target" type="number" value={newStudent.targetMinutes} onChange={(e) => setNewStudent({...newStudent, targetMinutes: Number(e.target.value)})} className="rounded-xl h-11" />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="grade" className="font-black text-xs uppercase text-primary/70">학년</Label>
+                <Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}>
+                  <SelectTrigger className="rounded-xl h-11">
+                    <SelectValue placeholder="학년 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1학년">1학년</SelectItem>
+                    <SelectItem value="2학년">2학년</SelectItem>
+                    <SelectItem value="3학년">3학년</SelectItem>
+                    <SelectItem value="N수생">N수생</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter className="pt-4 border-t">
