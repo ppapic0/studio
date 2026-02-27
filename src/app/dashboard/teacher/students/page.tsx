@@ -9,8 +9,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, orderBy, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2 } from 'lucide-react';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2, Mail, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { registerStudentAction } from '@/lib/membership-actions';
 
 export default function StudentListPage() {
   const { activeMembership } = useAppContext();
@@ -37,6 +38,8 @@ export default function StudentListPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newStudent, setNewStudent] = useState({
     name: '',
+    email: '',
+    password: '',
     schoolName: '',
     grade: '고등학생',
     targetMinutes: 360
@@ -61,36 +64,42 @@ export default function StudentListPage() {
   const filteredStudents = students?.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     s.schoolName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.seatNo.toString().includes(searchTerm)
+    s.seatNo?.toString().includes(searchTerm)
   );
 
   const handleAddStudent = async () => {
-    if (!firestore || !centerId || !newStudent.name || !newStudent.schoolName) {
+    if (!centerId) return;
+    
+    // 필수 값 검증
+    if (!newStudent.name || !newStudent.email || !newStudent.password || !newStudent.schoolName) {
       toast({ variant: "destructive", title: "모든 정보를 입력해주세요." });
+      return;
+    }
+
+    if (newStudent.password.length < 8) {
+      toast({ variant: "destructive", title: "비밀번호는 8자 이상이어야 합니다." });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const studentId = `st_${Date.now()}`; // 고유 ID 생성 (Auth 계정과는 별도)
-      const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
-      
-      await setDoc(studentRef, {
-        id: studentId,
-        name: newStudent.name,
+      const result = await registerStudentAction({
+        email: newStudent.email,
+        password: newStudent.password,
+        displayName: newStudent.name,
         schoolName: newStudent.schoolName,
         grade: newStudent.grade,
-        seatNo: 0,
         targetDailyMinutes: Number(newStudent.targetMinutes),
-        parentUids: [],
-        createdAt: serverTimestamp()
+        centerId: centerId
       });
 
-      toast({ title: "학생이 등록되었습니다." });
-      setIsAddModalOpen(false);
-      setNewStudent({ name: '', schoolName: '', grade: '고등학생', targetMinutes: 360 });
-    } catch (e) {
-      toast({ variant: "destructive", title: "등록 실패" });
+      if (result.ok) {
+        toast({ title: "학생 등록 성공", description: `${newStudent.name} 학생의 계정이 생성되었습니다.` });
+        setIsAddModalOpen(false);
+        setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '고등학생', targetMinutes: 360 });
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "등록 실패", description: e.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -123,34 +132,46 @@ export default function StudentListPage() {
               <UserPlus className="h-5 w-5" /> 신규 학생 등록
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[2rem] sm:max-w-md">
+          <DialogContent className="rounded-[2rem] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 등록</DialogTitle>
-              <DialogDescription className="font-bold">시스템에 학생 프로필을 즉시 생성합니다.</DialogDescription>
+              <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 가입 및 등록</DialogTitle>
+              <DialogDescription className="font-bold">학생의 계정을 즉시 생성하고 센터에 배정합니다.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-5 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="name">이름</Label>
-                <Input id="name" placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl" />
+                <Label htmlFor="name" className="font-black text-xs uppercase text-primary/70">이름</Label>
+                <Input id="name" placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-11" />
               </div>
+              
               <div className="grid gap-2">
-                <Label htmlFor="school">소속 학교 (풀네임)</Label>
-                <Input id="school" placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl" />
+                <Label htmlFor="email" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Mail className="h-3 w-3" /> 이메일 (아이디)</Label>
+                <Input id="email" type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-11" />
               </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="pw" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Lock className="h-3 w-3" /> 비밀번호 (8자 이상)</Label>
+                <Input id="pw" type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-11" />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="school" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Building2 className="h-3 w-3" /> 소속 학교 (풀네임)</Label>
+                <Input id="school" placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-11" />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="grade">학년</Label>
-                  <Input id="grade" placeholder="예: 고3" value={newStudent.grade} onChange={(e) => setNewStudent({...newStudent, grade: e.target.value})} className="rounded-xl" />
+                  <Label htmlFor="grade" className="font-black text-xs uppercase text-primary/70">학년</Label>
+                  <Input id="grade" placeholder="예: 고3" value={newStudent.grade} onChange={(e) => setNewStudent({...newStudent, grade: e.target.value})} className="rounded-xl h-11" />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="target">일일 목표 (분)</Label>
-                  <Input id="target" type="number" value={newStudent.targetMinutes} onChange={(e) => setNewStudent({...newStudent, targetMinutes: Number(e.target.value)})} className="rounded-xl" />
+                  <Label htmlFor="target" className="font-black text-xs uppercase text-primary/70">일일 목표 (분)</Label>
+                  <Input id="target" type="number" value={newStudent.targetMinutes} onChange={(e) => setNewStudent({...newStudent, targetMinutes: Number(e.target.value)})} className="rounded-xl h-11" />
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : '즉시 가입/등록'}
+            <DialogFooter className="pt-4 border-t">
+              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">
+                {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '학생 계정 생성 및 등록'}
               </Button>
             </DialogFooter>
           </DialogContent>

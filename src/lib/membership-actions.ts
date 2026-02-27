@@ -1,11 +1,10 @@
 'use server';
 
-import { adminDb } from './firebase-admin';
+import { adminDb, adminAuth } from './firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * 초대 코드를 검증하고 센터 가입 처리를 수행합니다.
- * 트랜잭션을 사용하여 모든 필수 문서(Center, Member, UserCenter)를 원자적으로 생성합니다.
  */
 export async function redeemInviteCodeAction(uid: string, code: string, displayName: string) {
   if (!code) throw new Error("초대 코드가 필요합니다.");
@@ -14,7 +13,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
 
   try {
     return await adminDb.runTransaction(async (transaction) => {
-      // 1. 초대 코드 정보 결정
       let role: 'student' | 'teacher' = 'student';
 
       if (code === 'T0313') {
@@ -41,7 +39,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       const memberRef = adminDb.doc(`centers/${fixedCenterId}/members/${uid}`);
       const userCenterRef = adminDb.doc(`userCenters/${uid}/centers/${fixedCenterId}`);
 
-      // 2. 센터 정보 보장
       const centerSnap = await transaction.get(centerRef);
       if (!centerSnap.exists) {
         transaction.set(centerRef, {
@@ -53,9 +50,8 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         });
       }
 
-      // 3. 멤버십 문서 생성 (보안 규칙 필수 참조 경로)
       transaction.set(memberRef, {
-        id: uid, // Member ID는 사용자의 UID여야 함
+        id: uid,
         centerId: fixedCenterId,
         role,
         status: "active",
@@ -63,7 +59,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         displayName,
       });
 
-      // 4. 사용자 센터 역인덱스 생성 (AuthGuard 리스너 경로)
       transaction.set(userCenterRef, {
         id: fixedCenterId,
         centerId: fixedCenterId,
@@ -72,7 +67,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         joinedAt: timestamp,
       });
 
-      // 5. 학생일 경우 추가 초기 데이터 설정
       if (role === 'student') {
         const progressRef = adminDb.doc(`centers/${fixedCenterId}/growthProgress/${uid}`);
         transaction.set(progressRef, {
@@ -90,6 +84,89 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
   } catch (error: any) {
     console.error("Redeem Transaction Error:", error);
     throw new Error(error.message || "가입 처리 중 오류가 발생했습니다.");
+  }
+}
+
+/**
+ * 선생님이 학생 계정을 직접 생성하고 센터에 등록합니다. (회원가입 프로세스 대행)
+ */
+export async function registerStudentAction(data: {
+  email: string;
+  password: string;
+  displayName: string;
+  schoolName: string;
+  grade: string;
+  targetDailyMinutes: number;
+  centerId: string;
+}) {
+  try {
+    // 1. Auth 계정 생성
+    const userRecord = await adminAuth.createUser({
+      email: data.email,
+      password: data.password,
+      displayName: data.displayName,
+    });
+
+    const uid = userRecord.uid;
+    const timestamp = FieldValue.serverTimestamp();
+
+    await adminDb.runTransaction(async (transaction) => {
+      // 2. 기본 프로필 생성
+      transaction.set(adminDb.doc(`users/${uid}`), {
+        id: uid,
+        email: data.email,
+        displayName: data.displayName,
+        schoolName: data.schoolName,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      // 3. 센터 멤버십 설정
+      transaction.set(adminDb.doc(`centers/${data.centerId}/members/${uid}`), {
+        id: uid,
+        centerId: data.centerId,
+        role: 'student',
+        status: "active",
+        joinedAt: timestamp,
+        displayName: data.displayName,
+      });
+
+      // 4. 사용자 센터 역인덱스 (AuthGuard용)
+      transaction.set(adminDb.doc(`userCenters/${uid}/centers/${data.centerId}`), {
+        id: data.centerId,
+        centerId: data.centerId,
+        role: 'student',
+        status: "active",
+        joinedAt: timestamp,
+      });
+
+      // 5. 학생 상세 프로필
+      transaction.set(adminDb.doc(`centers/${data.centerId}/students/${uid}`), {
+        id: uid,
+        name: data.displayName,
+        schoolName: data.schoolName,
+        grade: data.grade,
+        seatNo: 0,
+        targetDailyMinutes: data.targetDailyMinutes,
+        parentUids: [],
+        createdAt: timestamp,
+      });
+
+      // 6. 성장 로드맵 초기화
+      transaction.set(adminDb.doc(`centers/${data.centerId}/growthProgress/${uid}`), {
+        level: 1,
+        currentXp: 0,
+        nextLevelXp: 1000,
+        stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+        skills: {},
+        updatedAt: timestamp,
+      });
+    });
+
+    return { ok: true, message: "학생 계정 생성 및 등록이 완료되었습니다." };
+  } catch (error: any) {
+    console.error("Register Student Error:", error);
+    throw new Error(error.message || "학생 등록 중 오류가 발생했습니다.");
   }
 }
 
