@@ -479,23 +479,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    // 가변형 레벨업 체크
+    // 가변형 레벨업 체크 (절대값 기반으로 동기화 강화)
     const snap = await getDoc(progressRef);
     if (snap.exists()) {
       const p = snap.data() as GrowthProgress;
-      const threshold = getNextLevelXp(p.level);
-      if (p.currentXp >= threshold) {
-        const overflow = p.currentXp - threshold;
-        const newLevel = p.level + 1;
-        const newThreshold = getNextLevelXp(newLevel);
+      const currentThreshold = getNextLevelXp(Number(p.level) || 1);
+      
+      if (p.currentXp >= currentThreshold) {
+        const overflow = p.currentXp - currentThreshold;
+        const nextLevel = (Number(p.level) || 1) + 1;
+        const nextThreshold = getNextLevelXp(nextLevel);
         
         updateDoc(progressRef, {
-          level: increment(1),
+          level: nextLevel,
           currentXp: overflow,
-          nextLevelXp: newThreshold,
+          nextLevelXp: nextThreshold,
           updatedAt: serverTimestamp()
         });
-        toast({ title: "🎉 레벨 업!", description: `축하합니다! 마스터리 Lv.${newLevel}에 도달하셨습니다!` });
+        toast({ title: "🎉 레벨 업!", description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다!` });
       }
     }
   };

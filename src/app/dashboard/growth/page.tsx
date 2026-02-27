@@ -37,7 +37,8 @@ import {
   TrendingUp,
   CalendarDays,
   Sparkles,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Flame
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -183,29 +184,29 @@ export default function GrowthPage() {
   // 현재 레벨에 따른 목표 경험치 실시간 계산
   const currentLevelThreshold = useMemo(() => {
     if (!progress) return 1000;
-    return getNextLevelXp(progress.level);
+    return getNextLevelXp(Number(progress.level) || 1);
   }, [progress?.level]);
 
-  // 자동 레벨업 로직
+  // 자동 레벨업 로직 (안정적인 절대값 업데이트 방식)
   useEffect(() => {
     if (progress && progressRef && progress.currentXp >= currentLevelThreshold) {
       const overflowXp = progress.currentXp - currentLevelThreshold;
-      const newLevel = progress.level + 1;
-      const newNextXp = getNextLevelXp(newLevel);
+      const nextLevel = (Number(progress.level) || 1) + 1;
+      const nextThreshold = getNextLevelXp(nextLevel);
 
       updateDoc(progressRef, {
-        level: increment(1),
+        level: nextLevel,
         currentXp: overflowXp,
-        nextLevelXp: newNextXp,
+        nextLevelXp: nextThreshold,
         updatedAt: serverTimestamp()
       }).then(() => {
         toast({
           title: "🎉 레벨 업!",
-          description: `축하합니다! 마스터리 Lv.${newLevel}에 도달하셨습니다.`,
+          description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다.`,
         });
       });
     }
-  }, [progress, progressRef, currentLevelThreshold, toast]);
+  }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold, toast]);
 
   // 실시간 마스터리 보너스 계산
   const totalMultiplier = useMemo(() => {
@@ -267,7 +268,7 @@ export default function GrowthPage() {
     for(let i=1; i<lvl; i++) sum += getNextLevelXp(i);
     return sum;
   };
-  const currentTotalXp = calculateTotalXpSpent(progress?.level || 1) + (progress?.currentXp || 0); 
+  const currentTotalXp = calculateTotalXpSpent(Number(progress?.level) || 1) + (progress?.currentXp || 0); 
   const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_XP - currentTotalXp) / 500); 
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
 
