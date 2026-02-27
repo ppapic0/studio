@@ -20,7 +20,8 @@ import {
   Zap, 
   ChevronRight, 
   Wrench,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -33,12 +34,10 @@ import {
   Timestamp, 
   writeBatch, 
   doc, 
-  serverTimestamp,
-  startOfDay,
-  endOfDay
+  serverTimestamp 
 } from 'firebase/firestore';
 import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
