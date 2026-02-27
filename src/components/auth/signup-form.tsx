@@ -24,7 +24,7 @@ import {
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, collection, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -70,7 +70,6 @@ export function SignupForm() {
       const centerId = 'learning-lab-dongbaek'; 
       const timestamp = serverTimestamp();
 
-      // 클라이언트에서 모든 필수 문서 즉시 생성 (서버 지연 방지)
       setLoadingStatus('멤버십 정보를 설정하고 있습니다...');
       
       const batch = writeBatch(firestore);
@@ -84,7 +83,7 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 2. 센터 (존재 여부 상관없이 덮어쓰기 방지를 위해 개별 체크는 생략하거나 setDoc merge 사용)
+      // 2. 센터 정보 (Merge)
       batch.set(doc(firestore, 'centers', centerId), {
         id: centerId,
         name: "공부트랙 동백센터",
@@ -93,7 +92,7 @@ export function SignupForm() {
         updatedAt: timestamp,
       }, { merge: true });
 
-      // 3. 멤버십 (보안 규칙 필수 경로)
+      // 3. 멤버십 정보
       batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), {
         id: user.uid,
         centerId: centerId,
@@ -112,7 +111,7 @@ export function SignupForm() {
         joinedAt: timestamp,
       });
 
-      // 5. 학생 전용 데이터
+      // 5. 성장 로드맵 초기화 (학생 전용)
       if (values.role === 'student') {
         batch.set(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
           level: 1,
@@ -129,10 +128,8 @@ export function SignupForm() {
       setLoadingStatus('완료! 대시보드로 이동합니다.');
       toast({ title: '가입 성공', description: '잠시 후 대시보드가 열립니다.' });
       
-      // 강제 새로고침 리디렉션으로 상태 동기화 보장
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1500);
+      // 즉시 새로고침 리디렉션
+      window.location.href = '/dashboard';
 
     } catch (error: any) {
       console.error('Signup Error:', error);

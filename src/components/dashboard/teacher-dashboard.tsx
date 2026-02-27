@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -10,19 +11,43 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowUpRight, Armchair, MessageSquare, TrendingUp, Users, Loader2, Zap, ChevronRight, AlertCircle } from 'lucide-react';
+import { 
+  Armchair, 
+  MessageSquare, 
+  TrendingUp, 
+  Users, 
+  Loader2, 
+  Zap, 
+  ChevronRight, 
+  Wrench,
+  CheckCircle2
+} from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, Timestamp } from 'firebase/firestore';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  Timestamp, 
+  writeBatch, 
+  doc, 
+  serverTimestamp,
+  startOfDay,
+  endOfDay
+} from 'firebase/firestore';
 import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
+import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
+  const { toast } = useToast();
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const centerId = activeMembership?.id;
 
@@ -53,6 +78,32 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId]);
   const { data: reservations, isLoading: resLoading } = useCollection<any>(reservationsQuery, { enabled: isActive });
+
+  // 좌석 초기화 헬퍼 함수
+  const initializeSeats = async () => {
+    if (!firestore || !centerId) return;
+    setIsInitializing(true);
+    try {
+      const batch = writeBatch(firestore);
+      // 기본 20개 좌석 생성
+      for (let i = 1; i <= 20; i++) {
+        const seatId = `seat_${i.toString().padStart(2, '0')}`;
+        const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId);
+        batch.set(seatRef, {
+          seatNo: i,
+          status: 'absent',
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      }
+      await batch.commit();
+      toast({ title: "좌석 초기화 완료", description: "20개의 좌석이 생성되었습니다." });
+    } catch (e) {
+      console.error(e);
+      toast({ variant: "destructive", title: "초기화 실패" });
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   if (!isActive) return null;
 
@@ -119,9 +170,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </CardTitle>
                 <CardDescription className="font-bold mt-1 text-sm text-muted-foreground">좌석을 클릭하면 학생의 상세 학습 데이터를 확인합니다.</CardDescription>
               </div>
-              <Button asChild variant="outline" className="rounded-2xl font-black border-2 h-12 px-6">
-                <Link href="/dashboard/teacher/students">학생 전체 목록</Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="rounded-2xl font-black border-dashed border-2 h-12 px-4 gap-2"
+                  onClick={initializeSeats}
+                  disabled={isInitializing}
+                >
+                  {isInitializing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                  좌석 초기화
+                </Button>
+                <Button asChild variant="default" className="rounded-2xl font-black h-12 px-6">
+                  <Link href="/dashboard/teacher/students">학생 관리</Link>
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-8">
@@ -129,26 +191,36 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
                 {[...Array(16)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-2xl" />)}
               </div>
+            ) : !attendanceList || attendanceList.length === 0 ? (
+              <div className="py-20 text-center flex flex-col items-center gap-4 bg-muted/10 rounded-[2rem] border-2 border-dashed">
+                <Armchair className="h-12 w-12 text-muted-foreground opacity-20" />
+                <div className="grid gap-1">
+                  <p className="font-black text-muted-foreground">등록된 좌석이 없습니다.</p>
+                  <p className="text-xs font-bold text-muted-foreground/60">상단의 '좌석 초기화' 버튼을 눌러보세요.</p>
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-                {students?.map((student) => {
-                  const status = attendanceList?.find(a => a.id === student.id)?.status || 'absent';
+                {attendanceList.map((seat) => {
+                  const occupant = students?.find(s => s.seatNo === seat.seatNo);
                   return (
-                    <Link key={student.id} href={`/dashboard/teacher/students/${student.id}`}>
+                    <div key={seat.id} className="relative">
                       <div className={cn(
-                        "aspect-square rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all duration-300 hover:scale-110 active:scale-95 group relative shadow-sm",
-                        status === 'studying' ? "bg-emerald-50 border-emerald-400 text-emerald-700" : 
-                        status === 'away' ? "bg-amber-50 border-amber-400 text-amber-700" :
-                        status === 'break' ? "bg-blue-50 border-blue-400 text-blue-700" :
+                        "aspect-square rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all duration-300 hover:scale-110 active:scale-95 group relative shadow-sm cursor-pointer",
+                        seat.status === 'studying' ? "bg-emerald-50 border-emerald-400 text-emerald-700" : 
+                        seat.status === 'away' ? "bg-amber-50 border-amber-400 text-amber-700" :
+                        seat.status === 'break' ? "bg-blue-50 border-blue-400 text-blue-700" :
                         "bg-muted/10 border-dashed border-muted text-muted-foreground"
                       )}>
-                        <span className="text-[10px] font-black opacity-50">{student.seatNo}</span>
-                        <span className="text-xs font-black">{student.name}</span>
-                        {status === 'studying' && (
+                        <span className="text-[10px] font-black opacity-50">{seat.seatNo}</span>
+                        <span className="text-xs font-black truncate px-1 w-full text-center">
+                          {occupant ? occupant.name : '빈 좌석'}
+                        </span>
+                        {seat.status === 'studying' && (
                           <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
                         )}
                       </div>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -194,19 +266,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <Zap className="h-5 w-5 text-white fill-white" />
               </div>
               <CardTitle className="text-2xl font-black tracking-tighter">AI 학습 분석</CardTitle>
-              <CardDescription className="text-white/70 font-bold mt-1">오늘 집중 관리가 필요한 학생</CardDescription>
+              <CardDescription className="text-white/70 font-bold mt-1">집중 관리가 필요한 학생</CardDescription>
             </CardHeader>
             <CardContent className="px-8 pb-8">
               <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 mb-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="h-2 w-2 rounded-full bg-red-400 animate-ping" />
-                  <span className="text-xs font-black">몰입 시간 급감 감지</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                  <span className="text-xs font-black">데이터 분석 완료</span>
                 </div>
                 <p className="text-sm font-bold leading-relaxed">
-                  일부 학생의 이번 주 집중도가 지난주 평균 대비 <span className="text-red-300">15% 하락</span>했습니다.
+                  현재 특이사항이 발견된 학생이 없습니다. 전반적으로 양호한 학습 태도를 유지하고 있습니다.
                 </p>
               </div>
-              <Button className="w-full h-12 bg-white text-accent hover:bg-white/90 rounded-2xl font-black text-sm shadow-lg">전체 리포트 확인</Button>
+              <Button variant="secondary" className="w-full h-12 bg-white text-accent hover:bg-white/90 rounded-2xl font-black text-sm shadow-lg">전체 리포트 확인</Button>
             </CardContent>
           </Card>
         </div>
