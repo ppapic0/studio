@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -280,19 +281,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "w-[50px] h-[50px] sm:w-[65px] sm:h-[65px] rounded-xl sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-md cursor-pointer group",
+                          "w-[50px] h-[50px] sm:w-[65px] sm:h-[65px] rounded-xl sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-md cursor-pointer group border-solid",
                           seat.status === 'studying' ? "bg-emerald-50 border-emerald-500 text-emerald-700 ring-4 ring-emerald-500/10" : 
                           seat.status === 'away' ? "bg-amber-50 border-amber-500 text-amber-700" :
                           seat.status === 'break' ? "bg-blue-50 border-blue-500 text-blue-700" : 
-                          occupant ? "bg-white border-primary/60 text-primary hover:border-primary" : "bg-white border-dashed border-border text-muted-foreground/20 hover:border-primary/30"
+                          occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/40 text-muted-foreground/30 hover:border-primary"
                         )}
                       >
-                        <span className="text-[9px] sm:text-[11px] font-black opacity-30 group-hover:opacity-100 transition-opacity absolute top-1.5 left-2">{seat.seatNo}</span>
+                        <span className={cn(
+                          "text-[9px] sm:text-[11px] font-black absolute top-1.5 left-2 transition-opacity",
+                          occupant ? "opacity-40" : "opacity-60 group-hover:opacity-100"
+                        )}>{seat.seatNo}</span>
+                        
                         <span className="text-[10px] sm:text-[13px] font-black truncate px-1 w-full text-center mt-1">
                           {occupant ? occupant.name : ''}
                         </span>
+                        
                         {seat.status === 'studying' && <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm animate-pulse" />}
-                        {!occupant && <Plus className="absolute inset-0 m-auto h-4 w-4 opacity-0 group-hover:opacity-40 text-primary transition-all" />}
+                        {!occupant && <Plus className="absolute inset-0 m-auto h-4 w-4 opacity-0 group-hover:opacity-60 text-primary transition-all" />}
                       </div>
                     );
                   })}
@@ -375,8 +381,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   const seat = tempLayout.find(s => s.x === x && s.y === y);
                   return (
                     <div key={idx} onClick={() => handleGridClick(x, y)} className={cn(
-                      "w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group relative",
-                      seat ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-white/50 border-dashed border-border/40 hover:border-primary/30"
+                      "w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group relative border-solid",
+                      seat ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-white/50 border-primary/20 hover:border-primary/60"
                     )}>
                       {seat ? <span className="text-[10px] sm:text-xs font-black">{seat.seatNo}</span> : <Plus className="h-4 w-4 opacity-0 group-hover:opacity-100 text-primary transition-opacity" />}
                     </div>
