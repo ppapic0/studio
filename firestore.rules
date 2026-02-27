@@ -78,10 +78,12 @@ service cloud.firestore {
       }
     }
 
-    // 사용자 멤버십 역인덱스 (AuthGuard용)
-    match /userCenters/{userId}/centers/{centerId} {
+    // 사용자 멤버십 역인덱스 (AuthGuard용) - list 권한 추가
+    match /userCenters/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      match /centers/{centerId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // 초대 코드

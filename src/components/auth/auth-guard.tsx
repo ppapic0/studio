@@ -37,7 +37,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     setMembershipsLoading(true);
 
     // 사용자의 가입 센터 목록을 실시간으로 감시합니다.
-    // 이를 통해 가입 처리(Server Action)가 완료되는 즉시 UI가 반응합니다.
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
     
     const unsubscribe = onSnapshot(userCentersRef, (snapshot) => {
@@ -63,6 +62,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       setIsCheckingInitial(false);
     }, (error) => {
       console.error('AuthGuard: Membership listener error', error);
+      // 권한 에러 등이 발생해도 무한 로딩 방지를 위해 로딩은 해제
       setMembershipsLoading(false);
       setIsCheckingInitial(false);
     });
