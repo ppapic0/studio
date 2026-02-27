@@ -9,11 +9,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2, Mail, Lock } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, AttendanceCurrent } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -54,25 +54,42 @@ export default function StudentListPage() {
 
   const centerId = activeMembership?.id;
 
-  // 1. 학생 전체 목록 조회
+  // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회 (멤버십 기반으로 신뢰도 향상)
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'members'), 
+      where('role', '==', 'student'),
+      orderBy('displayName', 'asc')
+    );
+  }, [firestore, centerId]);
+  const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery);
+
+  // 2. 학생 상세 프로필 조회 (학교, 학년 등 추가 정보용)
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
+    return collection(firestore, 'centers', centerId, 'students');
   }, [firestore, centerId]);
-  const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery);
+  const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery);
 
-  // 2. 실시간 출결 상태 조회
+  // 3. 실시간 출결 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
 
-  const filteredStudents = students?.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.schoolName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.seatNo?.toString().includes(searchTerm)
-  );
+  // 데이터 통합 및 필터링
+  const filteredStudents = studentMembers?.filter(member => {
+    const profile = studentsProfiles?.find(p => p.id === member.id);
+    const search = searchTerm.toLowerCase();
+    
+    return (
+      member.displayName?.toLowerCase().includes(search) || 
+      profile?.schoolName?.toLowerCase().includes(search) ||
+      profile?.seatNo?.toString().includes(search)
+    );
+  });
 
   const handleAddStudent = async () => {
     if (!centerId || !functions) {
@@ -80,20 +97,13 @@ export default function StudentListPage() {
       return;
     }
     
-    // 필수 값 검증
     if (!newStudent.name || !newStudent.email || !newStudent.password || !newStudent.schoolName) {
       toast({ variant: "destructive", title: "정보 미입력", description: "모든 필수 정보를 입력해 주세요." });
       return;
     }
 
-    if (newStudent.password.length < 8) {
-      toast({ variant: "destructive", title: "비밀번호 취약", description: "비밀번호는 최소 8자 이상이어야 합니다." });
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      // Cloud Functions 호출 (Asia-Northeast3 리전 명시)
       const registerStudentFn = httpsCallable(functions, 'registerStudent');
       const result: any = await registerStudentFn({
         email: newStudent.email,
@@ -105,31 +115,15 @@ export default function StudentListPage() {
       });
 
       if (result.data?.ok) {
-        toast({ title: "등록 완료", description: `${newStudent.name} 학생의 계정이 생성되어 ${centerId} 센터에 배정되었습니다.` });
+        toast({ title: "등록 완료", description: `${newStudent.name} 학생의 계정이 생성되었습니다.` });
         setIsAddModalOpen(false);
         setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
-      } else {
-        throw new Error(result.data?.message || "알 수 없는 응답 형식이 반환되었습니다.");
       }
     } catch (e: any) {
-      console.error("Add Student Function Error:", e);
-      // 구체적인 오류 메시지 추출 (코드 기반)
-      let errorMsg = "서버와의 통신 중 오류가 발생했습니다.";
-      
-      if (e.code === 'already-exists' || e.message?.includes('already-exists')) {
-        errorMsg = "이미 등록된 이메일 주소입니다.";
-      } else if (e.code === 'permission-denied' || e.message?.includes('permission-denied')) {
-        errorMsg = "학생을 등록할 권한이 없습니다.";
-      } else if (e.code === 'invalid-argument' || e.message?.includes('invalid-argument')) {
-        errorMsg = "입력한 정보가 올바르지 않습니다.";
-      } else if (e.message) {
-        errorMsg = e.message;
-      }
-      
       toast({ 
         variant: "destructive", 
         title: "등록 실패", 
-        description: errorMsg
+        description: e.message || "학생 등록 중 오류가 발생했습니다."
       });
     } finally {
       setIsSubmitting(false);
@@ -138,10 +132,9 @@ export default function StudentListPage() {
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
-      case 'studying': return <Badge className="bg-emerald-500 hover:bg-emerald-600">공부중</Badge>;
+      case 'studying': return <Badge className="bg-emerald-500">공부중</Badge>;
       case 'away': return <Badge variant="outline" className="text-amber-500 border-amber-500">외출중</Badge>;
       case 'break': return <Badge variant="secondary">휴식중</Badge>;
-      case 'absent': return <Badge variant="destructive">결석</Badge>;
       default: return <Badge variant="outline">미입실</Badge>;
     }
   };
@@ -166,7 +159,7 @@ export default function StudentListPage() {
           <DialogContent className="rounded-[2rem] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 가입 및 등록</DialogTitle>
-              <DialogDescription className="font-bold text-muted-foreground">선생님의 소속 센터({centerId})로 학생 계정을 즉시 생성합니다.</DialogDescription>
+              <DialogDescription className="font-bold text-muted-foreground">선생님의 소속 센터({centerId})로 학생 계정을 생성합니다.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-5 py-4">
               <div className="grid gap-2">
@@ -185,7 +178,7 @@ export default function StudentListPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="school" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Building2 className="h-3 w-3" /> 소속 학교 (풀네임)</Label>
+                <Label htmlFor="school" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Building2 className="h-3 w-3" /> 소속 학교</Label>
                 <Input id="school" placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-11" />
               </div>
 
@@ -225,7 +218,7 @@ export default function StudentListPage() {
         </div>
       </div>
 
-      {studentsLoading ? (
+      {membersLoading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="font-bold text-muted-foreground">학생 데이터를 불러오고 있습니다...</p>
@@ -236,32 +229,34 @@ export default function StudentListPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredStudents.map((student) => {
-            const currentStatus = attendanceList?.find(a => a.studentId === student.id);
+          {filteredStudents.map((member) => {
+            const profile = studentsProfiles?.find(p => p.id === member.id);
+            const attendance = attendanceList?.find(a => a.studentId === member.id);
+            
             return (
-              <Link key={student.id} href={`/dashboard/teacher/students/${student.id}`}>
+              <Link key={member.id} href={`/dashboard/teacher/students/${member.id}`}>
                 <Card className="rounded-3xl border-none shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden bg-white">
                   <div className={cn(
                     "h-2 w-full transition-colors",
-                    currentStatus?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
+                    attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
                   )} />
                   <CardContent className="p-6">
                     <div className="flex items-center gap-4">
                       <Avatar className="h-14 w-14 border-2 border-primary/10">
                         <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
-                          {student.name.charAt(0)}
+                          {member.displayName?.charAt(0) || 'S'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-black truncate">{student.name}</h3>
-                          {getStatusBadge(currentStatus?.status)}
+                          <h3 className="text-lg font-black truncate">{member.displayName}</h3>
+                          {getStatusBadge(attendance?.status)}
                         </div>
                         <div className="flex flex-col text-sm text-muted-foreground font-bold">
                           <span className="flex items-center gap-1 text-[11px] text-primary/70">
-                            <Building2 className="h-3 w-3" /> {student.schoolName || '학교 정보 없음'}
+                            <Building2 className="h-3 w-3" /> {profile?.schoolName || '학교 정보 없음'}
                           </span>
-                          <span>{student.grade}</span>
+                          <span>{profile?.grade || '정보 없음'}</span>
                         </div>
                       </div>
                       <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
@@ -271,7 +266,7 @@ export default function StudentListPage() {
                       <div className="flex items-center gap-2">
                         <Armchair className="h-4 w-4 text-primary/60" />
                         <span className="text-sm font-black text-primary/80">
-                          {student.seatNo > 0 ? `${student.seatNo}번 좌석` : '좌석 미지정'}
+                          {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
                         </span>
                       </div>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">관리 페이지 이동</span>
