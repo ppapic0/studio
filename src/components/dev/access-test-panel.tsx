@@ -25,16 +25,20 @@ export function AccessTestPanel() {
     if (!firestore || !user || !activeMembership) return;
     addResult(`🔄 학생 계획 항목 쓰기 시도...`);
     try {
-      const weekKey = `2024-W${format(new Date(), 'ww')}`;
-      const planItemsRef = collection(firestore, 'centers', activeMembership.id, 'students', user.uid, 'studyPlanWeeks', weekKey, 'items');
+      const weekKey = format(new Date(), "yyyy-'W'II");
+      // 데이터 구조에 맞는 정확한 경로 사용: centers/{centerId}/plans/{studentId}/weeks/{weekId}/items
+      const planItemsRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
       
       const data = {
         title: '새로운 테스트 계획 항목',
         done: false,
         weight: 1,
+        dateKey: format(new Date(), 'yyyy-MM-dd'),
+        centerId: activeMembership.id,
+        studentId: user.uid,
+        studyPlanWeekId: weekKey,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        studyPlanWeekId: weekKey,
       };
 
       await addDoc(planItemsRef, data)
@@ -61,7 +65,8 @@ export function AccessTestPanel() {
     addResult(`🔄 학생 학습 로그 쓰기 시도...`);
     try {
         const dateKey = format(new Date(), 'yyyy-MM-dd');
-        const dayLogRef = doc(firestore, 'centers', activeMembership.id, 'students', user.uid, 'studyLogDays', dateKey);
+        // 데이터 구조에 맞는 정확한 경로 사용: centers/{centerId}/studyLogs/{studentId}/days/{date}
+        const dayLogRef = doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', dateKey);
         
         const data = {
             totalMinutes: 60,
@@ -93,11 +98,12 @@ export function AccessTestPanel() {
 
   const handleTeacherWriteAttendance = async () => {
     if (!firestore || !user || !activeMembership) return;
-    const someStudentId = 'student-test-uid'; // A fake student UID for testing
+    const someStudentId = 'student-test-uid'; // 테스트를 위한 가상 학생 UID
     addResult(`🔄 교사 출석 기록 쓰기 시도 (대상 학생: ${someStudentId})...`);
 
     try {
         const dateKey = format(new Date(), 'yyyy-MM-dd');
+        // 정확한 경로 사용
         const attendanceRef = doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students', someStudentId);
         
         const data = {

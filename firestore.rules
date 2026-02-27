@@ -6,10 +6,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getMemberData(centerId) {
-      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data;
-    }
-
     function hasRole(centerId, roles) {
       let memberPath = /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
       return isSignedIn() && 
@@ -39,34 +35,28 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 상담 예약 (Appointments) - 역할별 명시적 분리 (중요!)
+      // 상담 예약 (Appointments) - 쿼리 최적화된 통합 규칙
       match /appointments/{appointmentId} {
-        // 단일 문서 조회
-        allow get: if isSignedIn() && (
-          resource.data.studentId == request.auth.uid ||
-          resource.data.teacherId == request.auth.uid ||
+        // 단일 문서 및 쿼리 조회 통합
+        allow read: if isSignedIn() && (
+          // 1. 학생 본인 데이터
+          resource.data.get('studentId', '') == request.auth.uid ||
+          // 2. 교사 본인에게 배정된 데이터
+          resource.data.get('teacherId', '') == request.auth.uid ||
+          // 3. 관리자/교사 전체 조회 권한 (가장 강력한 조건)
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          isParentOf(centerId, resource.data.studentId)
+          // 4. 학부모의 연결된 자녀 데이터
+          isParentOf(centerId, resource.data.get('studentId', ''))
         );
         
-        // 쿼리 조회 (List) - 각각의 allow 문이 쿼리 필터와 1:1로 매칭되어야 함
-        // 1. 학생 전용 규칙
-        allow list: if isSignedIn() && resource.data.studentId == request.auth.uid;
-        // 2. 교사 전용 규칙
-        allow list: if isSignedIn() && resource.data.teacherId == request.auth.uid;
-        // 3. 관리자/교사(전체조회) 규칙
-        allow list: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
-        // 4. 학부모 전용 규칙
-        allow list: if isSignedIn() && isParentOf(centerId, resource.data.studentId);
-        
         allow create: if isSignedIn() && (
-          (request.resource.data.studentId == request.auth.uid) ||
-          isParentOf(centerId, request.resource.data.studentId) ||
+          (request.resource.data.get('studentId', '') == request.auth.uid) ||
+          isParentOf(centerId, request.resource.data.get('studentId', '')) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
         
         allow update: if isSignedIn() && (
-          (resource.data.studentId == request.auth.uid && 
+          (resource.data.get('studentId', '') == request.auth.uid && 
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
            request.resource.data.status == 'cancelled') ||
           (hasRole(centerId, ['centerAdmin', 'teacher']))
@@ -78,7 +68,7 @@ service cloud.firestore {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
           (resource.data.get('visibility', 'student_and_parent') == 'student_and_parent' && 
-           (request.auth.uid == resource.data.studentId || isParentOf(centerId, resource.data.studentId)))
+           (request.auth.uid == resource.data.get('studentId', '') || isParentOf(centerId, resource.data.get('studentId', ''))))
         );
         allow write: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
       }
@@ -122,8 +112,8 @@ service cloud.firestore {
       match /records/{recordId} {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          resource.data.studentId == request.auth.uid ||
-          isParentOf(centerId, resource.data.studentId)
+          resource.data.get('studentId', '') == request.auth.uid ||
+          isParentOf(centerId, resource.data.get('studentId', ''))
         );
       }
     }
@@ -138,9 +128,9 @@ service cloud.firestore {
 
     match /{path=**}/records/{recordId} {
       allow read: if isSignedIn() && (
-        hasRole(resource.data.centerId, ['centerAdmin', 'teacher']) ||
-        resource.data.studentId == request.auth.uid ||
-        isParentOf(resource.data.centerId, resource.data.studentId)
+        hasRole(resource.data.get('centerId', ''), ['centerAdmin', 'teacher']) ||
+        resource.data.get('studentId', '') == request.auth.uid ||
+        isParentOf(resource.data.get('centerId', ''), resource.data.get('studentId', ''))
       );
     }
   }
