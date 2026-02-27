@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Zap,
   MessageCircle,
+  GraduationCap
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -32,7 +33,8 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   teacher: [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/teacher', label: '센터 홈', icon: LayoutDashboard },
+    { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
     { href: '/dashboard/attendance', label: '출석 관리', icon: Users },
     { href: '/dashboard/appointments', label: '상담 관리', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },

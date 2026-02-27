@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,18 +7,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function memberPath(centerId, uid) {
-      return /databases/$(database)/documents/centers/$(centerId)/members/$(uid);
-    }
-
-    // 멤버 문서에서 역할 가져오기 (실시간 검증)
-    function getRole(centerId, uid) {
-      let memberDoc = get(memberPath(centerId, uid));
-      return memberDoc != null ? memberDoc.data.role : null;
+    function getMember(centerId, uid) {
+      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(uid)).data;
     }
 
     function hasRole(centerId, roles) {
-      return isSignedIn() && getRole(centerId, request.auth.uid) in roles;
+      return isSignedIn() && getMember(centerId, request.auth.uid).role in roles;
     }
 
     // --- 컬렉션 규칙 ---
@@ -32,85 +25,62 @@ service cloud.firestore {
     match /centers/{centerId} {
       allow read: if isSignedIn();
 
+      // 멤버 정보
       match /members/{memberId} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == memberId ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
+        allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow write: if hasRole(centerId, ['centerAdmin']);
       }
 
-      // 상담 예약 (Appointments)
+      // 학생 프로필 (Teacher 전용)
+      match /students/{studentId} {
+        allow read, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
+
+      // 현재 출결/좌석 상태 (Teacher 전용)
+      match /attendanceCurrent/{studentId} {
+        allow read, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
+
+      // 공부 계획 (Teacher/Admin 관리)
+      match /studyPlans/{planId} {
+        allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow create: if hasRole(centerId, ['teacher', 'centerAdmin']);
+        allow update: if hasRole(centerId, ['teacher', 'centerAdmin']) && (resource.data.teacherId == request.auth.uid || hasRole(centerId, ['centerAdmin']));
+      }
+
+      // 상담 일지
+      match /counselingLogs/{logId} {
+        allow read: if hasRole(centerId, ['teacher', 'centerAdmin']);
+        allow create: if hasRole(centerId, ['teacher', 'centerAdmin']);
+        allow update: if hasRole(centerId, ['teacher', 'centerAdmin']) && (resource.data.teacherId == request.auth.uid || hasRole(centerId, ['centerAdmin']));
+      }
+
+      // 학부모 피드백 초안
+      match /parentFeedbackDrafts/{draftId} {
+        allow read, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
+
+      // 기존 하위 호환성 유지용 규칙들
       match /appointments/{appointmentId} {
-        // 읽기: 본인 데이터거나 스태프인 경우
-        allow read: if isSignedIn() && (
-          (resource == null || resource.data.studentId == request.auth.uid) ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-
-        allow create: if isSignedIn() && (
-          request.resource.data.studentId == request.auth.uid ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-
-        allow update: if isSignedIn() && (
-          (resource.data.studentId == request.auth.uid &&
-           request.resource.data.status == 'cancelled') ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-
-        allow delete: if hasRole(centerId, ['centerAdmin', 'teacher']);
+        allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow update: if isSignedIn() && ((resource.data.studentId == request.auth.uid && request.resource.data.status == 'cancelled') || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow delete: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
-      // 상담일지 (Counseling Notes)
-      match /counselingNotes/{noteId} {
-        // 읽기: 공개된 본인 일지거나 스태프인 경우
-        allow read: if isSignedIn() && (
-          (resource == null || (resource.data.studentId == request.auth.uid && resource.data.visibility == 'student_and_parent')) ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-
-        allow create, update, delete: if hasRole(centerId, ['centerAdmin', 'teacher']);
-      }
-
-      // 학습 계획 및 기록들
       match /plans/{studentId}/weeks/{weekId}/items/{itemId} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == studentId ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
+        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      match /dailyStudentStats/{date}/students/{studentId} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == studentId ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-      }
-
       match /studyLogs/{studentId}/days/{date} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == studentId ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
+        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
       match /growthProgress/{userId} {
-        allow read: if isSignedIn() && (
-          userId == request.auth.uid ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
+        allow read: if isSignedIn() && (userId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow write: if isSignedIn() && userId == request.auth.uid;
-      }
-
-      match /attendanceRecords/{date}/students/{studentId} {
-        allow read: if isSignedIn() && (
-          request.auth.uid == studentId ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-        allow write: if hasRole(centerId, ['centerAdmin', 'teacher']);
       }
     }
 
@@ -120,6 +90,13 @@ service cloud.firestore {
 
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 메시지 큐 (서버 전송용)
+    match /messageQueue/{messageId} {
+      allow read: if hasRole(request.resource.data.centerId, ['teacher', 'centerAdmin']);
+      allow create: if isSignedIn() && hasRole(request.resource.data.centerId, ['teacher', 'centerAdmin']);
+      allow update: if false; // 서버(Admin SDK)에서만 업데이트 권장
     }
   }
 }

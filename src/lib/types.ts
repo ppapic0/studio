@@ -13,10 +13,56 @@ export interface User {
 
 export interface CenterMembership {
   id: string; // This is the centerId
-  role: 'student' | 'teacher' | 'centerAdmin';
+  role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
   status: 'active' | 'pending' | 'inactive';
   joinedAt: Timestamp;
   displayName?: string;
+}
+
+export interface StudentProfile {
+  name: string;
+  grade: string;
+  seatNo: number;
+  targetDailyMinutes: number;
+  parentUids: string[];
+  createdAt: Timestamp;
+}
+
+export interface AttendanceCurrent {
+  seatNo: number;
+  status: "studying" | "away" | "break" | "absent";
+  updatedAt: Timestamp;
+  lastCheckInAt?: Timestamp;
+}
+
+export interface StudyPlan {
+  studentId: string;
+  subject: string;
+  targetMinutes: number;
+  completedMinutes: number;
+  startDate: Timestamp;
+  endDate: Timestamp;
+  status: "active" | "completed";
+  teacherId: string;
+}
+
+export interface CounselingLog {
+  studentId: string;
+  teacherId: string;
+  type: "academic" | "life" | "career";
+  content: string;
+  improvement: string;
+  attachedStudySummary?: { yyyymmdd: string, totalMinutes: number };
+  createdAt: Timestamp;
+}
+
+export interface ParentFeedbackDraft {
+  studentId: string;
+  teacherId: string;
+  yyyymmdd: string;
+  contentDraft: string;
+  status: "draft" | "final";
+  updatedAt: Timestamp;
 }
 
 export interface Appointment {
@@ -30,18 +76,6 @@ export interface Appointment {
   status: 'requested' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
   createdByRole: 'student' | 'teacher' | 'centerAdmin';
   teacherNote?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface CounselingNote {
-  centerId: string;
-  appointmentId: string;
-  studentId: string;
-  teacherId: string;
-  studentName?: string;
-  content: string;
-  visibility: 'student_and_parent' | 'teacher_only';
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
