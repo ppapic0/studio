@@ -66,6 +66,20 @@
         "visibility": { "type": "string", "enum": ["student_and_parent", "teacher_only"] }
       }
     },
+    "StudyPlanItem": {
+      "title": "StudyPlanItem",
+      "type": "object",
+      "description": "학생의 학습 계획 항목 (To-do)",
+      "properties": {
+        "title": { "type": "string" },
+        "done": { "type": "boolean" },
+        "weight": { "type": "number" },
+        "dateKey": { "type": "string" },
+        "category": { "type": "string", "enum": ["schedule", "personal", "study"] },
+        "studentId": { "type": "string" },
+        "centerId": { "type": "string" }
+      }
+    },
     "StudyLogDay": {
       "title": "StudyLogDay",
       "type": "object",
@@ -137,6 +151,10 @@
       {
         "path": "/centers/{centerId}/counselingNotes/{noteId}",
         "definition": { "entityName": "CounselingNote", "description": "상담일지" }
+      },
+      {
+        "path": "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}",
+        "definition": { "entityName": "StudyPlanItem", "description": "주간/일간 학습 계획 상세 항목" }
       },
       {
         "path": "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}",
