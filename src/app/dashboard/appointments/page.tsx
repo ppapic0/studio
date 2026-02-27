@@ -76,7 +76,7 @@ export default function AppointmentsPage() {
 
   // 상담 데이터 쿼리 설정 - 보안 규칙과 1:1 매칭되도록 필터 강화
   const appointmentsQuery = useMemoFirebase(() => {
-    // 필수 정보가 모두 존재하고, 로딩이 끝났을 때만 쿼리 생성
+    // 필수 정보가 로딩 중이거나 누락된 경우 null 반환 (불필요한 요청 방지)
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !activeMembership.role) {
       return null;
     }
@@ -94,11 +94,10 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 2. 학부모: 연결된 자녀 데이터 조회 ( isParentOf 규칙 대응 )
+    // 2. 학부모: 연결된 자녀 데이터 조회
     if (role === 'parent') {
       const studentIds = activeMembership.linkedStudentIds || [];
       if (studentIds.length === 0) return null;
-      // Note: 'in' query supports up to 10 IDs.
       return query(
         baseRef, 
         where('studentId', 'in', studentIds), 
