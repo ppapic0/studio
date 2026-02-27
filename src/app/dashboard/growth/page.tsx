@@ -175,6 +175,19 @@ export default function GrowthPage() {
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
 
+  // 실시간 마스터리 보너스 계산
+  const totalMultiplier = useMemo(() => {
+    if (!progress?.skills) return 1.0;
+    let multiplier = 1.0;
+    Object.keys(progress.skills).forEach(skillId => {
+      const skill = MOCK_SKILLS.find(s => s.id === skillId);
+      if (skill && skill.effects && skill.effects.xp) {
+        multiplier *= skill.effects.xp;
+      }
+    });
+    return multiplier;
+  }, [progress?.skills]);
+
   const selectedSkill = useMemo(() => 
     MOCK_SKILLS.find(s => s.id === selectedSkillId) || MOCK_SKILLS.find(s => s.branch === activeBranch),
   [selectedSkillId, activeBranch]);
@@ -188,11 +201,9 @@ export default function GrowthPage() {
     if (!progressRef || !user) return;
     
     const updateData = {
-      skills: {
-        [skillId]: {
-          level: 1,
-          unlockedAt: serverTimestamp()
-        }
+      [`skills.${skillId}`]: {
+        level: 1,
+        unlockedAt: serverTimestamp()
       },
       updatedAt: serverTimestamp()
     };
@@ -201,7 +212,7 @@ export default function GrowthPage() {
       .then(() => {
         toast({
           title: "스킬 해금 완료!",
-          description: "새로운 마스터리 능력이 활성화되었습니다.",
+          description: `마스터리 보너스가 x${totalMultiplier.toFixed(2)}로 강화되었습니다.`,
         });
       })
       .catch(async (serverError) => {
@@ -313,8 +324,8 @@ export default function GrowthPage() {
               <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                 <p className="text-[10px] font-black uppercase opacity-60 mb-1">마스터리 보너스</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black text-emerald-400">x1.00</span>
-                  <span className="text-xs opacity-60">기본</span>
+                  <span className="text-2xl font-black text-emerald-400">x{totalMultiplier.toFixed(2)}</span>
+                  <span className="text-xs opacity-60">합산</span>
                 </div>
               </div>
             </div>
