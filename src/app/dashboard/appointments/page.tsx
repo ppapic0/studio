@@ -80,23 +80,33 @@ export default function AppointmentsPage() {
   const isAdmin = activeMembership?.role === 'centerAdmin';
   const isParent = activeMembership?.role === 'parent';
 
-  // --- 상담 예약 쿼리 ---
+  // --- 상담 예약 쿼리 (보안 규칙과 완벽히 매칭) ---
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
-    if (isStudent) return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
-    if (isParent) return query(baseRef, where('studentId', 'in', activeMembership.linkedStudentIds || []), orderBy('startAt', 'desc'));
+    // 학생: 본인 데이터만 필터링
+    if (isStudent) {
+      return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
+    }
+    // 학부모: 연결된 자녀 데이터만 필터링 (IN 쿼리 사용)
+    if (isParent) {
+      const children = activeMembership.linkedStudentIds || [];
+      if (children.length === 0) return null; // 자녀가 없으면 쿼리 안함
+      return query(baseRef, where('studentId', 'in', children), orderBy('startAt', 'desc'));
+    }
+    // 교사/관리자: 센터 전체 데이터
     return query(baseRef, orderBy('startAt', 'desc'));
-  }, [firestore, membershipsLoading, activeMembership, user?.uid]);
+  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isParent]);
 
   const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 (보안 규칙 준수) ---
+  // --- 상담 일지 쿼리 (Plan A: 센터 통합 관리) ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
     
+    // 학생: 본인 + 공개된 것만
     if (isStudent) {
       return query(
         baseRef, 
@@ -105,17 +115,20 @@ export default function AppointmentsPage() {
         orderBy('createdAt', 'desc')
       );
     }
+    // 학부모: 자녀 + 공개된 것만
     if (isParent) {
+      const children = activeMembership.linkedStudentIds || [];
+      if (children.length === 0) return null;
       return query(
         baseRef, 
-        where('studentId', 'in', activeMembership.linkedStudentIds || []), 
+        where('studentId', 'in', children), 
         where('visibility', '==', 'student_and_parent'),
         orderBy('createdAt', 'desc')
       );
     }
-    // 관리자/교사
+    // 관리자/교사: 모든 일지
     return query(baseRef, orderBy('createdAt', 'desc'));
-  }, [firestore, membershipsLoading, activeMembership, user?.uid]);
+  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isParent]);
 
   const { data: notes, isLoading: notesLoading } = useCollection<CounselingNote>(notesQuery);
 
@@ -233,7 +246,7 @@ export default function AppointmentsPage() {
           </CardContent>
         </Card>
 
-        {/* 상담 일지 리스트 */}
+        {/* 상담 일지 리스트 (Plan A 기반) */}
         <div className="flex flex-col gap-6">
           <Card className="border-none shadow-lg rounded-[2rem] bg-white overflow-hidden">
             <CardHeader><CardTitle className="text-lg font-black flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> 최근 상담일지</CardTitle></CardHeader>

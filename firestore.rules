@@ -39,18 +39,21 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // 단일 조회
+        // 단일 조회 (Get)
         allow get: if isSignedIn() && (
           resource.data.studentId == request.auth.uid ||
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
           isParentOf(centerId, resource.data.studentId)
         );
 
-        // 목록 조회 (Query) - 클라이언트 필터와 일치해야 함
+        // 목록 조회 (List) - 클라이언트 쿼리 필터와 규칙이 1:1로 매칭되어야 함
         allow list: if isSignedIn() && (
-          (request.query.filters.studentId == request.auth.uid) ||
+          // 1. 학생: 본인 예약만 조회
+          (resource.data.studentId == request.auth.uid) ||
+          // 2. 관리자/교사: 센터 전체 조회
           (hasRole(centerId, ['centerAdmin', 'teacher'])) ||
-          (isParentOf(centerId, request.query.filters.studentId))
+          // 3. 학부모: 연결된 자녀 예약만 조회
+          (isParentOf(centerId, resource.data.studentId))
         );
         
         allow create: if isSignedIn() && (
@@ -73,14 +76,16 @@ service cloud.firestore {
         allow get: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
           (resource.data.visibility == 'student_and_parent' && 
-           (request.auth.uid == resource.data.studentId || isParentOf(centerId, resource.data.studentId)))
+           (resource.data.studentId == request.auth.uid || isParentOf(centerId, resource.data.studentId)))
         );
 
-        // 목록 조회 (List) - 반드시 studentId 필터링 필요 (학생/학부모인 경우)
+        // 목록 조회 (List)
         allow list: if isSignedIn() && (
+          // 교사/관리자는 모든 일지 조회 가능
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          (request.query.filters.visibility == 'student_and_parent' && 
-           (request.query.filters.studentId == request.auth.uid || isParentOf(centerId, request.query.filters.studentId)))
+          // 학생/학부모는 반드시 'visibility'와 'studentId' 필터가 쿼리에 포함되어야 함
+          (resource.data.visibility == 'student_and_parent' && 
+           (resource.data.studentId == request.auth.uid || isParentOf(centerId, resource.data.studentId)))
         );
 
         allow create, update, delete: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
@@ -111,6 +116,15 @@ service cloud.firestore {
           isParentOf(centerId, studentId)
         );
         allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
+      match /growthProgress/{userId} {
+        allow read: if isSignedIn() && (
+          userId == request.auth.uid ||
+          hasRole(centerId, ['centerAdmin', 'teacher']) ||
+          isParentOf(centerId, userId)
+        );
+        allow write: if isSignedIn() && userId == request.auth.uid;
       }
     }
 

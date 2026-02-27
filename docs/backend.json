@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -56,14 +55,15 @@
     "CounselingNote": {
       "title": "CounselingNote",
       "type": "object",
-      "description": "상담 완료 후 작성되는 상세 일지",
+      "description": "상담 완료 후 작성되는 상세 일지 (Plan A: 센터 통합 관리)",
       "properties": {
         "centerId": { "type": "string" },
         "appointmentId": { "type": "string" },
         "studentId": { "type": "string" },
         "teacherId": { "type": "string" },
         "content": { "type": "string" },
-        "visibility": { "type": "string", "enum": ["student_and_parent", "teacher_only"] }
+        "visibility": { "type": "string", "enum": ["student_and_parent", "teacher_only"] },
+        "createdAt": { "type": "string", "format": "date-time" }
       }
     },
     "StudyPlanItem": {
@@ -78,56 +78,6 @@
         "category": { "type": "string", "enum": ["schedule", "personal", "study"] },
         "studentId": { "type": "string" },
         "centerId": { "type": "string" }
-      }
-    },
-    "StudyLogDay": {
-      "title": "StudyLogDay",
-      "type": "object",
-      "description": "일별 누적 학습 시간 로그",
-      "properties": {
-        "studentId": { "type": "string" },
-        "centerId": { "type": "string" },
-        "dateKey": { "type": "string" },
-        "totalMinutes": { "type": "number" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "DailyStudentStat": {
-      "title": "DailyStudentStat",
-      "type": "object",
-      "description": "일일 성과 통계",
-      "properties": {
-        "studentId": { "type": "string" },
-        "centerId": { "type": "string" },
-        "todayPlanCompletionRate": { "type": "number" },
-        "totalStudyMinutes": { "type": "number" },
-        "attendanceStreakDays": { "type": "number" },
-        "weeklyPlanCompletionRate": { "type": "number" },
-        "studyTimeGrowthRate": { "type": "number" },
-        "riskDetected": { "type": "boolean" }
-      }
-    },
-    "GrowthProgress": {
-      "title": "GrowthProgress",
-      "type": "object",
-      "description": "학생의 성장 트리 진행 상태",
-      "properties": {
-        "level": { "type": "number" },
-        "currentXp": { "type": "number" },
-        "stats": { "type": "object" },
-        "skills": { "type": "object" }
-      }
-    },
-    "AIOutput": {
-      "title": "AIOutput",
-      "type": "object",
-      "description": "AI가 생성한 기록 (위험 감지 등)",
-      "properties": {
-        "centerId": { "type": "string" },
-        "studentId": { "type": "string" },
-        "type": { "type": "string" },
-        "message": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -150,27 +100,11 @@
       },
       {
         "path": "/centers/{centerId}/counselingNotes/{noteId}",
-        "definition": { "entityName": "CounselingNote", "description": "상담일지" }
+        "definition": { "entityName": "CounselingNote", "description": "상담일지 (Plan A)" }
       },
       {
         "path": "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}",
-        "definition": { "entityName": "StudyPlanItem", "description": "주간/일간 학습 계획 상세 항목" }
-      },
-      {
-        "path": "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}",
-        "definition": { "entityName": "DailyStudentStat", "description": "일일 학생 통계" }
-      },
-      {
-        "path": "/centers/{centerId}/studyLogs/{studentId}/days/{date}",
-        "definition": { "entityName": "StudyLogDay", "description": "일별 학습 로그" }
-      },
-      {
-        "path": "/centers/{centerId}/growthProgress/{userId}",
-        "definition": { "entityName": "GrowthProgress", "description": "성장 진행도" }
-      },
-      {
-        "path": "/centers/{centerId}/records/{recordId}",
-        "definition": { "entityName": "AIOutput", "description": "AI 기록 (위험 알림 등)" }
+        "definition": { "entityName": "StudyPlanItem", "description": "학습 계획 상세 항목" }
       }
     ]
   }
