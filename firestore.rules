@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -11,11 +12,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/centers/$(centerId)/members/$(uid);
     }
 
-    // 멤버 문서가 없을 때도 에러 없이 null 반환
+    // 멤버 문서에서 역할 가져오기 (실시간 검증)
     function getRole(centerId, uid) {
-      return exists(memberPath(centerId, uid))
-        ? get(memberPath(centerId, uid)).data.role
-        : null;
+      let memberDoc = get(memberPath(centerId, uid));
+      return memberDoc != null ? memberDoc.data.role : null;
     }
 
     function hasRole(centerId, roles) {
@@ -42,9 +42,9 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // 학생은 본인의 예약만, 스태프는 전체 조회 가능
+        // 읽기: 본인 데이터거나 스태프인 경우
         allow read: if isSignedIn() && (
-          resource.data.studentId == request.auth.uid ||
+          (resource == null || resource.data.studentId == request.auth.uid) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
 
@@ -64,10 +64,9 @@ service cloud.firestore {
 
       // 상담일지 (Counseling Notes)
       match /counselingNotes/{noteId} {
-        // 학생은 공개된 본인 일지만, 스태프는 전체 조회 가능
+        // 읽기: 공개된 본인 일지거나 스태프인 경우
         allow read: if isSignedIn() && (
-          (resource.data.studentId == request.auth.uid &&
-           resource.data.visibility == 'student_and_parent') ||
+          (resource == null || (resource.data.studentId == request.auth.uid && resource.data.visibility == 'student_and_parent')) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
 

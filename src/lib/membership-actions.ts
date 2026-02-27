@@ -6,6 +6,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * 센터 가입을 위한 공통 부트스트랩 로직 (서버 사이드)
+ * 모든 필수 문서(User, Center, Member, UserCenters)를 한 번에 생성합니다.
  */
 async function bootstrapUserToCenter(
   uid: string,
@@ -38,9 +39,10 @@ async function bootstrapUserToCenter(
     id: uid,
     displayName,
     updatedAt: timestamp,
+    createdAt: timestamp,
   }, { merge: true });
 
-  // 3. 센터 멤버십 정보
+  // 3. 센터 멤버십 정보 (보안 규칙 hasRole의 핵심 문서)
   batch.set(memberRef, {
     role,
     status: "active",
@@ -48,12 +50,25 @@ async function bootstrapUserToCenter(
     displayName,
   });
 
-  // 4. 사용자별 가입 센터 인덱스
+  // 4. 사용자별 가입 센터 인덱스 (AuthGuard의 핵심 문서)
   batch.set(userCenterRef, {
     role,
     status: "active",
     joinedAt: timestamp,
   });
+
+  // 5. 학생인 경우 성장 로드맵 초기화
+  if (role === 'student') {
+    const progressRef = adminDb.doc(`centers/${centerId}/growthProgress/${uid}`);
+    batch.set(progressRef, {
+      level: 1,
+      currentXp: 0,
+      nextLevelXp: 1000,
+      stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+      skills: {},
+      updatedAt: timestamp,
+    }, { merge: true });
+  }
 
   await batch.commit();
 }
@@ -69,7 +84,7 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
     const inviteSnap = await transaction.get(inviteRef);
 
     if (!inviteSnap.exists) {
-      throw new Error("유효하지 않은 초대 코드입니다.");
+      throw new Error("유효하지 않은 초대 코드입니다. (테스트용: 학생 0313, 선생님 T0313)");
     }
 
     const inviteData = inviteSnap.data()!;
@@ -80,7 +95,7 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       throw new Error("이미 사용 한도가 초과된 코드입니다.");
     }
 
-    // 가입 처리
+    // 모든 필수 문서 생성 및 가입 처리
     await bootstrapUserToCenter(uid, centerId, role, displayName);
 
     // 사용 횟수 증가
@@ -89,7 +104,7 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    return { ok: true, message: "가입이 완료되었습니다!" };
+    return { ok: true, message: `${role === 'teacher' ? '선생님' : '학생'}으로 가입이 완료되었습니다!` };
   });
 }
 
@@ -99,7 +114,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
 export async function devJoinCenterAction(data: { uid: string, centerId: string, role: string, devSecret: string }) {
   const { uid, centerId, role, devSecret } = data;
   
-  // 보안 확인 (환경변수 또는 고정값)
   const expectedSecret = process.env.DEV_SECRET || '0313'; 
   if (devSecret !== expectedSecret) {
     throw new Error("개발용 비밀 키가 올바르지 않습니다.");
@@ -110,27 +124,41 @@ export async function devJoinCenterAction(data: { uid: string, centerId: string,
 }
 
 /**
- * 테스트용 초기 데이터 시딩 액션
+ * 테스트용 초기 데이터 시딩 액션 (초대 코드 포함)
  */
 export async function seedInitialData(uid: string, centerId: string) {
   const timestamp = FieldValue.serverTimestamp();
   const dateKey = new Date().toISOString().split('T')[0];
-  const weekId = `2024-W01`; 
-
   const batch = adminDb.batch();
 
-  // 1. users
+  // 1. 초대 코드 생성 (학생용 & 선생님용)
+  batch.set(adminDb.doc(`inviteCodes/0313`), {
+    centerId,
+    intendedRole: 'student',
+    usedCount: 0,
+    maxUses: 999,
+    createdAt: timestamp,
+  });
+
+  batch.set(adminDb.doc(`inviteCodes/T0313`), {
+    centerId,
+    intendedRole: 'teacher',
+    usedCount: 0,
+    maxUses: 100,
+    createdAt: timestamp,
+  });
+
+  // 2. 기본 사용자 및 멤버십 정보 (현재 로그인 유저용)
   batch.set(adminDb.doc(`users/${uid}`), {
     id: uid,
-    displayName: "테스트 학생",
+    displayName: "테스트 유저",
     createdAt: timestamp,
     updatedAt: timestamp,
   }, { merge: true });
 
-  // 2. centers & members
   batch.set(adminDb.doc(`centers/${centerId}`), {
     id: centerId,
-    name: "테스트 센터",
+    name: "공부트랙 동백센터",
     createdAt: timestamp,
     updatedAt: timestamp,
   }, { merge: true });
@@ -139,74 +167,9 @@ export async function seedInitialData(uid: string, centerId: string) {
     role: "student",
     status: "active",
     joinedAt: timestamp,
-    displayName: "테스트 학생",
+    displayName: "테스트 유저",
   });
 
-  // 3. appointments
-  const apt1 = adminDb.collection(`centers/${centerId}/appointments`).doc();
-  batch.set(apt1, {
-    studentId: uid,
-    studentName: "테스트 학생",
-    teacherId: "teacher_placeholder",
-    startAt: timestamp,
-    endAt: timestamp,
-    status: "confirmed",
-    createdByRole: "student",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
-  // 4. counselingNotes
-  const note1 = adminDb.collection(`centers/${centerId}/counselingNotes`).doc();
-  batch.set(note1, {
-    studentId: uid,
-    studentName: "테스트 학생",
-    teacherId: "teacher_placeholder",
-    content: "학습 루틴 점검 및 목표 설정. 수학 미적분 위주로 학습 계획을 수립함.",
-    visibility: "student_and_parent",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
-  // 5. plans
-  const plan1 = adminDb.collection(`centers/${centerId}/plans/${uid}/weeks/${weekId}/items`).doc();
-  batch.set(plan1, {
-    title: "수학 미적분",
-    weight: 1,
-    done: false,
-    dateKey: dateKey,
-    studentId: uid,
-    centerId: centerId,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
-  // 6. studyLogs
-  batch.set(adminDb.doc(`centers/${centerId}/studyLogs/${uid}/days/${dateKey}`), {
-    totalMinutes: 210,
-    dateKey: dateKey,
-    studentId: uid,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
-  // 7. dailyStudentStats
-  batch.set(adminDb.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${uid}`), {
-    totalMinutes: 210,
-    todayPlanCompletionRate: 0.5,
-    updatedAt: timestamp,
-  });
-
-  // 8. growthProgress - Curved Leveling Initial Data
-  batch.set(adminDb.doc(`centers/${centerId}/growthProgress/${uid}`), {
-    level: 1,
-    currentXp: 150,
-    nextLevelXp: 1000, // Curved initial threshold
-    stats: { focus: 15, consistency: 10, achievement: 5, resilience: 8 },
-    updatedAt: timestamp,
-  });
-
-  // 9. userCenters
   batch.set(adminDb.doc(`userCenters/${uid}/centers/${centerId}`), {
     role: "student",
     status: "active",
