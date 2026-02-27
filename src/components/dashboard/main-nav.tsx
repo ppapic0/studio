@@ -31,12 +31,6 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/appointments', label: '상담 예약', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
-  parent: [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-    { href: '/dashboard/growth', label: '자녀 성장', icon: Zap },
-    { href: '/dashboard/appointments', label: '자녀 상담', icon: MessageCircle },
-    { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
-  ],
   teacher: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/attendance', label: '출석 관리', icon: Users },

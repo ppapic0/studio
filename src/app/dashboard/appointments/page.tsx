@@ -75,7 +75,6 @@ export default function AppointmentsPage() {
   const isStudent = activeMembership?.role === 'student';
   const isTeacher = activeMembership?.role === 'teacher';
   const isAdmin = activeMembership?.role === 'centerAdmin';
-  const isParent = activeMembership?.role === 'parent';
 
   // --- 상담 예약 쿼리 ---
   const appointmentsQuery = useMemoFirebase(() => {
@@ -85,27 +84,19 @@ export default function AppointmentsPage() {
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
     }
-    if (isParent) {
-      const children = activeMembership.linkedStudentIds || [];
-      if (children.length === 0) return null;
-      return query(baseRef, where('studentId', 'in', children), orderBy('startAt', 'desc'));
-    }
     if (isTeacher || isAdmin) {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
     
     return null;
-  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isParent, isTeacher, isAdmin]);
+  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isTeacher, isAdmin]);
 
   const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 (부모님 접근 제외) ---
+  // --- 상담 일지 쿼리 ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
     
-    // 부모님은 직접 조회를 차단 (운영 방침상 복붙 전달)
-    if (isParent) return null;
-
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
     
     if (isStudent) {
@@ -121,7 +112,7 @@ export default function AppointmentsPage() {
     }
 
     return null;
-  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isParent, isTeacher, isAdmin]);
+  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isTeacher, isAdmin]);
 
   const { data: notes, isLoading: notesLoading } = useCollection<CounselingNote>(notesQuery);
 
@@ -133,7 +124,7 @@ export default function AppointmentsPage() {
       const endAt = new Date(startAt.getTime() + 30 * 60000); 
       await addDoc(collection(firestore, 'centers', activeMembership.id, 'appointments'), {
         centerId: activeMembership.id,
-        studentId: isStudent ? user.uid : (activeMembership.linkedStudentIds?.[0] || ''),
+        studentId: user.uid,
         studentName: user.displayName || '학생',
         startAt: Timestamp.fromDate(startAt),
         endAt: Timestamp.fromDate(endAt),
@@ -174,7 +165,7 @@ export default function AppointmentsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-black tracking-tighter">상담 및 피드백</h1>
-        {(isStudent || isParent) && (
+        {isStudent && (
           <Dialog open={isRequestOpen} onOpenChange={setIsRequestOpen}>
             <DialogTrigger asChild>
               <Button className="rounded-2xl h-12 px-6 gap-2 font-black shadow-lg">
@@ -244,12 +235,7 @@ export default function AppointmentsPage() {
           <Card className="border-none shadow-lg rounded-[2rem] bg-white overflow-hidden">
             <CardHeader><CardTitle className="text-lg font-black flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> 최근 상담일지</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {isParent ? (
-                <div className="p-10 border-2 border-dashed rounded-3xl flex flex-col items-center gap-2 opacity-40 text-center">
-                  <XCircle className="h-8 w-8" />
-                  <span className="text-[10px] font-black">일지는 센터에서 직접<br/>전달해 드립니다.</span>
-                </div>
-              ) : notesLoading ? <Loader2 className="animate-spin mx-auto" /> : 
+              {notesLoading ? <Loader2 className="animate-spin mx-auto" /> : 
                !notes || notes.length === 0 ? (
                 <div className="p-10 border-2 border-dashed rounded-3xl flex flex-col items-center gap-2 opacity-40">
                   <XCircle className="h-8 w-8" /><span className="text-[10px] font-black">일지 데이터 없음</span>

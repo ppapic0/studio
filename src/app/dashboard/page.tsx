@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -7,7 +6,6 @@ import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
-import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { useUser } from '@/firebase';
@@ -55,7 +53,7 @@ const inviteCodeFormSchema = z.object({
 
 const devJoinFormSchema = z.object({
   centerId: z.string().min(1, '센터 ID가 필요합니다.'),
-  role: z.enum(['student', 'teacher', 'parent', 'centerAdmin']),
+  role: z.enum(['student', 'teacher', 'centerAdmin']),
   devSecret: z.string().min(1, '개발용 비밀 키가 필요합니다.'),
 });
 
@@ -205,7 +203,6 @@ export default function DashboardPage() {
                             <SelectItem value="centerAdmin">센터 관리자</SelectItem>
                             <SelectItem value="teacher">교사</SelectItem>
                             <SelectItem value="student">학생</SelectItem>
-                            <SelectItem value="parent">학부모</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -244,7 +241,6 @@ export default function DashboardPage() {
       <p className="text-muted-foreground">공부트랙 동백센터의 오늘 현황입니다.</p>
       <div className="mt-4 flex flex-col gap-4">
         <StudentDashboard isActive={userRole === 'student'} />
-        <ParentDashboard isActive={userRole === 'parent'} />
         <TeacherDashboard isActive={userRole === 'teacher'} />
         <AdminDashboard isActive={userRole === 'centerAdmin'} />
       </div>
