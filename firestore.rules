@@ -40,8 +40,9 @@ service cloud.firestore {
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
         // 읽기 권한: 본인, 담당 교사, 관리자, 또는 연결된 학부모
+        // resource.data 가 없는 경우(list 쿼리 시작 등)에도 안전하게 평가되도록 함
         allow read: if isSignedIn() && (
-          (resource == null) || // list 쿼리 시작 시점 허용
+          (resource == null) || 
           (resource.data.studentId == request.auth.uid) ||
           (resource.data.teacherId == request.auth.uid) ||
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
