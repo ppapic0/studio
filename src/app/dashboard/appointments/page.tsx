@@ -80,14 +80,14 @@ export default function AppointmentsPage() {
   const isAdmin = activeMembership?.role === 'centerAdmin';
   const isParent = activeMembership?.role === 'parent';
 
-  // 1. 상담 데이터 쿼리 설정 - 보안 규칙과 필터가 완벽히 일치해야 함
+  // 상담 데이터 쿼리 설정 - 보안 규칙과 필터가 완벽히 일치해야 함
   const appointmentsQuery = useMemoFirebase(() => {
     // 필수 정보가 로드될 때까지 기다림
     if (!firestore || membershipsLoading || !activeMembership || !user || !activeMembership.role) return null;
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
-    // 학생: 본인 데이터만 필터링 (보안 규칙 준수)
+    // 1. 학생: 반드시 studentId 필터 적용 (보안 규칙 준수)
     if (isStudent) {
       return query(
         baseRef, 
@@ -96,7 +96,7 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 학부모: 연결된 자녀 데이터 필터링
+    // 2. 학부모: 연결된 자녀 데이터 필터링
     if (isParent) {
       const studentIds = activeMembership.linkedStudentIds || [];
       if (studentIds.length === 0) return null;
@@ -107,7 +107,7 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 교사: 본인 담당 필터링
+    // 3. 교사: 본인 담당 필터링
     if (isTeacher) {
       return query(
         baseRef, 
@@ -116,7 +116,7 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 관리자: 전체 조회
+    // 4. 관리자: 전체 조회
     if (isAdmin) {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
