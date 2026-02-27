@@ -66,14 +66,13 @@ export function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
-      // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입 (필수 문서들 생성 포함)
+      // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입
+      // 참고: 초대 코드가 역할을 결정하므로, 폼에서 선택한 역할과 코드가 일치해야 함
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
         toast({ title: '가입 성공', description: result.message });
-        // 가입 후 멤버십 정보가 반영되도록 대시보드로 이동
         router.push('/dashboard');
-        // 강제 새로고침으로 AuthGuard가 최신 데이터를 읽도록 함
         setTimeout(() => window.location.reload(), 500);
       }
     } catch (error: any) {
@@ -152,6 +151,9 @@ export function SignupForm() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <FormDescription className="text-[10px]">
+                선택한 역할에 맞는 초대 코드를 입력해야 합니다.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -164,10 +166,10 @@ export function SignupForm() {
             <FormItem>
               <FormLabel>초대 코드</FormLabel>
               <FormControl><Input placeholder="코드 입력" {...field} /></FormControl>
-              <FormDescription className="text-[10px]">
+              <FormDescription className="text-[10px] font-bold text-primary">
                 {form.watch('role') === 'teacher' 
-                  ? '선생님용 코드를 입력하세요 (테스트: T0313)' 
-                  : '학생용 코드를 입력하세요 (테스트: 0313)'}
+                  ? '선생님용 테스트 코드: T0313' 
+                  : '학생용 테스트 코드: 0313'}
               </FormDescription>
               <FormMessage />
             </FormItem>

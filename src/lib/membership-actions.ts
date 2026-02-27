@@ -83,11 +83,22 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
     const inviteRef = adminDb.doc(`inviteCodes/${code}`);
     const inviteSnap = await transaction.get(inviteRef);
 
-    if (!inviteSnap.exists) {
+    let inviteData = inviteSnap.exists ? inviteSnap.data() : null;
+
+    // --- 테스트 편의를 위한 폴백 로직 ---
+    // DB에 코드가 없더라도 0313, T0313은 기본적으로 작동하게 함
+    if (!inviteData) {
+      if (code === '0313') {
+        inviteData = { centerId: 'learning-lab-dongbaek', intendedRole: 'student' };
+      } else if (code === 'T0313') {
+        inviteData = { centerId: 'learning-lab-dongbaek', intendedRole: 'teacher' };
+      }
+    }
+
+    if (!inviteData) {
       throw new Error("유효하지 않은 초대 코드입니다. (테스트용: 학생 0313, 선생님 T0313)");
     }
 
-    const inviteData = inviteSnap.data()!;
     const centerId = inviteData.centerId;
     const role = inviteData.intendedRole || 'student';
 
@@ -98,11 +109,13 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
     // 모든 필수 문서 생성 및 가입 처리
     await bootstrapUserToCenter(uid, centerId, role, displayName);
 
-    // 사용 횟수 증가
-    transaction.update(inviteRef, {
-      usedCount: FieldValue.increment(1),
-      updatedAt: FieldValue.serverTimestamp()
-    });
+    // 사용 횟수 증가 (실제 문서가 존재할 때만)
+    if (inviteSnap.exists) {
+      transaction.update(inviteRef, {
+        usedCount: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
 
     return { ok: true, message: `${role === 'teacher' ? '선생님' : '학생'}으로 가입이 완료되었습니다!` };
   });
@@ -124,14 +137,13 @@ export async function devJoinCenterAction(data: { uid: string, centerId: string,
 }
 
 /**
- * 테스트용 초기 데이터 시딩 액션 (초대 코드 포함)
+ * 테스트용 초기 데이터 시딩 액션 (초대 코드 + Mock 학생 데이터 포함)
  */
 export async function seedInitialData(uid: string, centerId: string) {
   const timestamp = FieldValue.serverTimestamp();
-  const dateKey = new Date().toISOString().split('T')[0];
   const batch = adminDb.batch();
 
-  // 1. 초대 코드 생성 (학생용 & 선생님용)
+  // 1. 초대 코드 생성
   batch.set(adminDb.doc(`inviteCodes/0313`), {
     centerId,
     intendedRole: 'student',
@@ -148,30 +160,43 @@ export async function seedInitialData(uid: string, centerId: string) {
     createdAt: timestamp,
   });
 
-  // 2. 기본 사용자 및 멤버십 정보 (현재 로그인 유저용)
-  batch.set(adminDb.doc(`users/${uid}`), {
-    id: uid,
-    displayName: "테스트 유저",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  }, { merge: true });
+  // 2. Mock 학생 데이터 생성 (Teacher Dashboard 테스트용)
+  const mockStudents = [
+    { id: 'mock_std_1', name: '김철수', seatNo: 5, grade: '고3' },
+    { id: 'mock_std_2', name: '이영희', seatNo: 12, grade: '중3' },
+    { id: 'mock_std_3', name: '박지민', seatNo: 24, grade: '고2' },
+  ];
 
-  batch.set(adminDb.doc(`centers/${centerId}`), {
-    id: centerId,
-    name: "공부트랙 동백센터",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  }, { merge: true });
+  for (const s of mockStudents) {
+    // 학생 프로필
+    batch.set(adminDb.doc(`centers/${centerId}/students/${s.id}`), {
+      name: s.name,
+      seatNo: s.seatNo,
+      grade: s.grade,
+      targetDailyMinutes: 360,
+      parentUids: [],
+      createdAt: timestamp,
+    });
 
+    // 실시간 출결 상태 (일부는 공부 중, 일부는 외출)
+    batch.set(adminDb.doc(`centers/${centerId}/attendanceCurrent/${s.id}`), {
+      seatNo: s.seatNo,
+      status: s.id === 'mock_std_2' ? 'away' : 'studying',
+      updatedAt: timestamp,
+      lastCheckInAt: timestamp,
+    });
+  }
+
+  // 3. 현재 유저 멤버십 (관리자용)
   batch.set(adminDb.doc(`centers/${centerId}/members/${uid}`), {
-    role: "student",
+    role: "centerAdmin",
     status: "active",
     joinedAt: timestamp,
-    displayName: "테스트 유저",
+    displayName: "시스템 관리자",
   });
 
   batch.set(adminDb.doc(`userCenters/${uid}/centers/${centerId}`), {
-    role: "student",
+    role: "centerAdmin",
     status: "active",
     joinedAt: timestamp,
   });
