@@ -9,6 +9,100 @@ const db = admin.firestore();
 const region = "asia-northeast3";
 
 /**
+ * 선생님이 학생 계정을 직접 생성하고 센터에 등록하는 함수
+ */
+export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
+  // 1. 권한 확인 (로그인 여부 및 선생님 역할 확인)
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
+  
+  const { email, password, displayName, schoolName, grade, centerId } = data;
+  
+  if (!email || !password || !displayName || !schoolName || !centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "필수 정보가 누락되었습니다.");
+  }
+
+  // 호출자가 해당 센터의 선생님인지 확인
+  const callerId = context.auth.uid;
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
+  const callerData = callerMemberSnap.data();
+  
+  if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
+    throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
+  }
+
+  try {
+    // 2. Auth 계정 생성
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName,
+    });
+
+    const uid = userRecord.uid;
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+    // 3. Firestore 데이터 일괄 생성 (트랜잭션)
+    await db.runTransaction(async (transaction) => {
+      // 기본 프로필
+      transaction.set(db.doc(`users/${uid}`), {
+        id: uid,
+        email,
+        displayName,
+        schoolName,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      // 센터 멤버십
+      transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
+        id: uid,
+        centerId,
+        role: 'student',
+        status: "active",
+        joinedAt: timestamp,
+        displayName,
+      });
+
+      // 사용자 센터 역인덱스 (AuthGuard용)
+      transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
+        id: centerId,
+        centerId,
+        role: 'student',
+        status: "active",
+        joinedAt: timestamp,
+      });
+
+      // 학생 상세 프로필
+      transaction.set(db.doc(`centers/${centerId}/students/${uid}`), {
+        id: uid,
+        name: displayName,
+        schoolName,
+        grade,
+        seatNo: 0,
+        targetDailyMinutes: 360,
+        parentUids: [],
+        createdAt: timestamp,
+      });
+
+      // 성장 로드맵 초기화
+      transaction.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
+        level: 1,
+        currentXp: 0,
+        nextLevelXp: 1000,
+        stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+        skills: {},
+        updatedAt: timestamp,
+      });
+    });
+
+    return { ok: true, message: "학생 등록 완료" };
+  } catch (error: any) {
+    console.error("Register Student Error:", error);
+    throw new functions.https.HttpsError("internal", error.message || "학생 등록 중 서버 오류가 발생했습니다.");
+  }
+});
+
+/**
  * 학부모 피드백이 'final' 상태로 업데이트되면 messageQueue에 적재
  */
 export const onParentFeedbackFinalized = functions.region(region).firestore
@@ -21,7 +115,6 @@ export const onParentFeedbackFinalized = functions.region(region).firestore
     if (before.status !== 'final' && after.status === 'final') {
       const messageId = `msg_${Date.now()}_${after.studentId}`;
       
-      // 1. messageQueue에 적재
       await db.collection('messageQueue').doc(messageId).set({
         centerId,
         studentId: after.studentId,
@@ -36,7 +129,6 @@ export const onParentFeedbackFinalized = functions.region(region).firestore
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 2. 로그 기록
       await db.collection(`centers/${centerId}/parentFeedbackLogs`).add({
         studentId: after.studentId,
         teacherId: after.teacherId,
@@ -72,7 +164,6 @@ export const onStudySessionEnded = functions.region(region).firestore
     }
   });
 
-// --- 기존 Functions (가입 처리 등) 유지 ---
 async function bootstrapUserToCenter(
   transaction: admin.firestore.Transaction,
   uid: string,
@@ -152,7 +243,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
 
 export const devJoinCenter = functions.region(region).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
-  const { centerId, role, devSecret } = data;
+  const { centerId, role } = data;
   const uid = context.auth.uid;
   const email = context.auth.token.email || `${uid}@example.com`;
   const displayName = context.auth.token.name || "개발자";

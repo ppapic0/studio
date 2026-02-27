@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2, Mail, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
@@ -32,11 +33,11 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { registerStudentAction } from '@/lib/membership-actions';
 
 export default function StudentListPage() {
   const { activeMembership } = useAppContext();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -74,7 +75,7 @@ export default function StudentListPage() {
   );
 
   const handleAddStudent = async () => {
-    if (!centerId) return;
+    if (!centerId || !functions) return;
     
     // 필수 값 검증
     if (!newStudent.name || !newStudent.email || !newStudent.password || !newStudent.schoolName) {
@@ -89,7 +90,9 @@ export default function StudentListPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await registerStudentAction({
+      // 클라우드 함수 호출
+      const registerStudentFn = httpsCallable(functions, 'registerStudent');
+      const result: any = await registerStudentFn({
         email: newStudent.email,
         password: newStudent.password,
         displayName: newStudent.name,
@@ -98,13 +101,14 @@ export default function StudentListPage() {
         centerId: centerId
       });
 
-      if (result.ok) {
+      if (result.data.ok) {
         toast({ title: "학생 등록 성공", description: `${newStudent.name} 학생의 계정이 생성되었습니다.` });
         setIsAddModalOpen(false);
         setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
       }
     } catch (e: any) {
-      toast({ variant: "destructive", title: "등록 실패", description: e.message });
+      console.error("Add Student Error:", e);
+      toast({ variant: "destructive", title: "등록 실패", description: e.message || "오류가 발생했습니다." });
     } finally {
       setIsSubmitting(false);
     }

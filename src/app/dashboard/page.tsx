@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
-import { useUser } from '@/firebase';
+import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2, RefreshCw, Compass, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,8 +23,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { redeemInviteCodeAction } from '@/lib/membership-actions';
 import { useToast } from '@/hooks/use-toast';
+import { httpsCallable } from 'firebase/functions';
 
 const inviteFormSchema = z.object({
   inviteCode: z.string().min(1, '코드를 입력해주세요.'),
@@ -32,12 +32,12 @@ const inviteFormSchema = z.object({
 
 export default function DashboardPage() {
   const { user } = useUser();
+  const functions = useFunctions();
   const { activeMembership, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
 
-  // 가입 직후 데이터 동기화 시간을 고려하여 5초간 끈기 있게 기다림
   useEffect(() => {
     const timer = setTimeout(() => setShowRetry(true), 5000);
     return () => clearTimeout(timer);
@@ -49,12 +49,15 @@ export default function DashboardPage() {
   });
 
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
-    if (!user) return;
+    if (!user || !functions) return;
     setIsSubmitting(true);
     try {
-      const result = await redeemInviteCodeAction(user.uid, values.inviteCode, user.displayName || '사용자');
-      if (result.ok) {
-        toast({ title: '가입 성공', description: result.message });
+      // 클라우드 함수 호출 (Asia-Northeast3 리전)
+      const redeemFn = httpsCallable(functions, 'redeemInviteCode');
+      const result: any = await redeemFn({ code: values.inviteCode });
+      
+      if (result.data.ok) {
+        toast({ title: '가입 성공', description: result.data.message });
         window.location.reload();
       }
     } catch (error: any) {
@@ -64,7 +67,6 @@ export default function DashboardPage() {
     }
   }
 
-  // 1. 멤버십 정보를 찾는 중 (로딩)
   if (membershipsLoading || (!activeMembership && !showRetry)) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
@@ -80,7 +82,6 @@ export default function DashboardPage() {
     );
   }
 
-  // 2. 충분히 기다렸음에도 멤버십이 없는 경우
   if (!activeMembership) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
@@ -142,7 +143,6 @@ export default function DashboardPage() {
     );
   }
 
-  // 3. 정상적인 멤버십 보유 상태
   const userRole = activeMembership.role;
   return (
     <div className="flex flex-col gap-2">
