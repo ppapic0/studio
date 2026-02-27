@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -657,14 +658,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {scheduleItems.length > 0 && (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
+        <div className="flex flex-wrap items-center justify-center gap-4">
           {scheduleItems.map((item) => {
             const [title, time] = item.title.split(': ');
             return (
-              <Card key={item.id} className="bg-card/50 backdrop-blur-sm border-dashed rounded-3xl transition-all hover:scale-105 hover:border-primary/50 group">
+              <Card key={item.id} className="min-w-[140px] flex-1 sm:flex-none bg-white border-2 border-primary/10 rounded-3xl transition-all hover:scale-105 hover:border-primary/40 hover:shadow-md group">
                 <CardContent className="p-4 flex flex-col items-center justify-center gap-1 text-center">
-                  <span className="text-[10px] font-black text-muted-foreground/50 group-hover:text-primary/50 uppercase tracking-widest transition-colors">{title}</span>
-                  <span className="text-lg font-black text-primary">{time || '-'}</span>
+                  <span className="text-[11px] font-black text-primary/70 group-hover:text-primary uppercase tracking-widest transition-colors">{title}</span>
+                  <span className="text-xl font-black text-primary">{time || '-'}</span>
                 </CardContent>
               </Card>
             );
