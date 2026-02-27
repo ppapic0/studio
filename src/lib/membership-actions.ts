@@ -197,11 +197,11 @@ export async function seedInitialData(uid: string, centerId: string) {
     updatedAt: timestamp,
   });
 
-  // 8. growthProgress
+  // 8. growthProgress - Curved Leveling Initial Data
   batch.set(adminDb.doc(`centers/${centerId}/growthProgress/${uid}`), {
     level: 1,
     currentXp: 150,
-    nextLevelXp: 5000,
+    nextLevelXp: 1000, // Curved initial threshold
     stats: { focus: 15, consistency: 10, achievement: 5, resilience: 8 },
     updatedAt: timestamp,
   });

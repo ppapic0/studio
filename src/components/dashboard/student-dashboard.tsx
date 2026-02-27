@@ -85,7 +85,8 @@ const RANK_THRESHOLDS: Record<MetricType, number[]> = {
 
 const AUTO_TERMINATE_SECONDS = 7200; // 2시간
 const GRACE_PERIOD_SECONDS = 60; // 1분
-const XP_PER_LEVEL = 5000;
+// 곡선형 레벨업 공식: 1000 + (L-1)*300
+const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
 
 function getRankData(value: number, type: MetricType) {
   const thresholds = RANK_THRESHOLDS[type];
@@ -478,19 +479,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    // 레벨업 체크
+    // 가변형 레벨업 체크
     const snap = await getDoc(progressRef);
     if (snap.exists()) {
       const p = snap.data() as GrowthProgress;
-      if (p.currentXp >= (p.nextLevelXp || XP_PER_LEVEL)) {
-        const threshold = p.nextLevelXp || XP_PER_LEVEL;
+      const threshold = getNextLevelXp(p.level);
+      if (p.currentXp >= threshold) {
         const overflow = p.currentXp - threshold;
+        const newLevel = p.level + 1;
+        const newThreshold = getNextLevelXp(newLevel);
+        
         updateDoc(progressRef, {
           level: increment(1),
           currentXp: overflow,
+          nextLevelXp: newThreshold,
           updatedAt: serverTimestamp()
         });
-        toast({ title: "🎉 레벨 업!", description: "학습 후 새로운 레벨에 도달하셨습니다!" });
+        toast({ title: "🎉 레벨 업!", description: `축하합니다! 마스터리 Lv.${newLevel}에 도달하셨습니다!` });
       }
     }
   };

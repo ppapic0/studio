@@ -83,8 +83,9 @@ const STAT_CONFIG = {
 };
 
 const MAX_LEVEL = 30;
-const XP_PER_LEVEL = 5000; // 150,000 XP / 30 levels
-const TOTAL_MASTER_XP = MAX_LEVEL * XP_PER_LEVEL; 
+// 곡선형 레벨업 공식: 1000 + (L-1)*300
+const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
+const TOTAL_MASTER_XP = 150000; 
 
 function SystemGuideDialog() {
   return (
@@ -143,13 +144,14 @@ function SystemGuideDialog() {
 
           <div className="space-y-3 pt-2">
             <h4 className="flex items-center gap-2 font-black text-sm text-primary">
-              <Zap className="h-4 w-4 fill-current" /> 경험치(XP)와 300일의 여정
+              <Zap className="h-4 w-4 fill-current" /> 경험치(XP)와 곡선형 성장
             </h4>
             <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 text-[11px] font-bold leading-relaxed text-muted-foreground">
               - **1분 몰입 = 1 XP** (기본)<br/>
-              - 스킬 해금 시 **XP 획득 배율(Multiplier)**이 상승하여 성장 속도가 빨라집니다.<br/>
-              - 마스터 보너스를 포함하여 하루 **평균 500 XP**를 획득해야 300일 뒤 Lv.30에 도달합니다.<br/>
-              - **레벨업**: {XP_PER_LEVEL.toLocaleString()} XP를 모을 때마다 다음 레벨로 승급합니다.
+              - 초반 레벨업은 빠르며, 후반으로 갈수록 요구 XP가 증가합니다.<br/>
+              - **레벨 1 목표**: 1,000 XP (약 2일 소요)<br/>
+              - **레벨 29 목표**: 9,400 XP (약 19일 소요)<br/>
+              - 총 300일간 하루 평균 500 XP(마스터리 보너스 포함)를 모아야 Lv.30에 도달합니다.
             </div>
           </div>
         </div>
@@ -178,17 +180,23 @@ export default function GrowthPage() {
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
 
+  // 현재 레벨에 따른 목표 경험치 실시간 계산
+  const currentLevelThreshold = useMemo(() => {
+    if (!progress) return 1000;
+    return getNextLevelXp(progress.level);
+  }, [progress?.level]);
+
   // 자동 레벨업 로직
   useEffect(() => {
-    if (progress && progressRef && progress.currentXp >= (progress.nextLevelXp || XP_PER_LEVEL)) {
-      const nextXpThreshold = progress.nextLevelXp || XP_PER_LEVEL;
-      const overflowXp = progress.currentXp - nextXpThreshold;
+    if (progress && progressRef && progress.currentXp >= currentLevelThreshold) {
+      const overflowXp = progress.currentXp - currentLevelThreshold;
       const newLevel = progress.level + 1;
+      const newNextXp = getNextLevelXp(newLevel);
 
       updateDoc(progressRef, {
         level: increment(1),
         currentXp: overflowXp,
-        nextLevelXp: XP_PER_LEVEL, // 일관성을 위해 5000으로 강제 업데이트
+        nextLevelXp: newNextXp,
         updatedAt: serverTimestamp()
       }).then(() => {
         toast({
@@ -197,7 +205,7 @@ export default function GrowthPage() {
         });
       });
     }
-  }, [progress, progressRef, toast]);
+  }, [progress, progressRef, currentLevelThreshold, toast]);
 
   // 실시간 마스터리 보너스 계산
   const totalMultiplier = useMemo(() => {
@@ -253,8 +261,14 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
-  const currentTotalXp = ((progress?.level || 1) - 1) * XP_PER_LEVEL + (progress?.currentXp || 0); 
-  const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_XP - currentTotalXp) / 500); // 500 effective XP per day target
+  // 누적 XP 대략적 계산 (정확한 곡선 합계는 아니나 UI용으로 사용)
+  const calculateTotalXpSpent = (lvl: number) => {
+    let sum = 0;
+    for(let i=1; i<lvl; i++) sum += getNextLevelXp(i);
+    return sum;
+  };
+  const currentTotalXp = calculateTotalXpSpent(progress?.level || 1) + (progress?.currentXp || 0); 
+  const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_XP - currentTotalXp) / 500); 
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
 
   return (
@@ -268,7 +282,7 @@ export default function GrowthPage() {
         </div>
         <div className="flex items-center gap-2 ml-1">
           <Badge variant="outline" className="border-primary/20 text-primary font-bold px-2 py-0">핵심 로드맵</Badge>
-          <p className="text-sm font-bold text-muted-foreground">하루 6시간 몰입을 300일간 지속해야 도달할 수 있는 Lv.30 마스터리 여정입니다.</p>
+          <p className="text-sm font-bold text-muted-foreground">초반에는 빠른 성장을, 후반에는 극한의 몰입을 요구하는 곡선형 마스터리 시스템입니다.</p>
         </div>
       </header>
 
@@ -318,9 +332,9 @@ export default function GrowthPage() {
           <CardHeader className="pb-2 relative z-10">
             <CardTitle className="text-xl font-black flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-400 fill-current" />
-              성장 페이스 분석 (300일 가이드)
+              성장 페이스 분석 (곡선형 가이드)
             </CardTitle>
-            <CardDescription className="text-primary-foreground/60 font-bold">하루 6시간, 360분 몰입을 기본으로 측정합니다.</CardDescription>
+            <CardDescription className="text-primary-foreground/60 font-bold">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} XP</CardDescription>
           </CardHeader>
           <CardContent className="relative z-10">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
@@ -355,7 +369,7 @@ export default function GrowthPage() {
             </div>
             <div className="mt-6 p-4 bg-black/20 rounded-2xl border border-white/5">
               <p className="text-xs font-bold leading-relaxed opacity-90">
-                ⚠️ <span className="text-amber-400">주의:</span> 이 페이스 분석은 **하루 6시간의 고강도 몰입과 모든 스킬 해금**을 전제로 합니다. 스킬 보너스 배율이 낮을수록 남은 일수가 기하급수적으로 늘어납니다.
+                ⚠️ <span className="text-amber-400">곡선 성장:</span> 후반부로 갈수록 레벨업에 필요한 XP가 기하급수적으로 늘어납니다. 스킬 해금을 통한 보너스 획득이 후반부 돌파의 핵심입니다.
               </p>
             </div>
           </CardContent>
@@ -375,7 +389,7 @@ export default function GrowthPage() {
               </div>
               <div>
                 <p className="text-xs font-black">집중력 1,000분당 1점</p>
-                <p className="text-[10px] font-bold text-muted-foreground">하루 6시간 몰입 시 약 0.36점의 집중력을 얻습니다.</p>
+                <p className="text-[10px] font-bold text-muted-foreground">현재 레벨 {progress?.level || 1} 마스터리에 도전 중입니다.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 group hover:bg-primary/5 transition-colors cursor-pointer">
@@ -383,8 +397,8 @@ export default function GrowthPage() {
                 <RefreshCw className="h-4 w-4 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs font-black">세션당 0.1점의 꾸준함</p>
-                <p className="text-[10px] font-bold text-muted-foreground">하루 3번의 몰입 세션을 끝내면 0.3점이 누적됩니다.</p>
+                <p className="text-xs font-black">다음 레벨까지 {currentLevelThreshold - (progress?.currentXp || 0)} XP</p>
+                <p className="text-[10px] font-bold text-muted-foreground">학습 몰입 1분마다 1 XP가 적립됩니다.</p>
               </div>
             </div>
             <SystemGuideDialog />
@@ -411,7 +425,7 @@ export default function GrowthPage() {
               <svg className="h-20 w-20 transform -rotate-90">
                 <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-muted/30" />
                 <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-primary" 
-                  style={{ strokeDasharray: 213.6, strokeDashoffset: 213.6 - (213.6 * (progress?.currentXp || 0) / (progress?.nextLevelXp || XP_PER_LEVEL)) }} 
+                  style={{ strokeDasharray: 213.6, strokeDashoffset: 213.6 - (213.6 * (progress?.currentXp || 0) / currentLevelThreshold) }} 
                 />
               </svg>
               <div className="absolute flex flex-col items-center leading-none">
@@ -422,9 +436,9 @@ export default function GrowthPage() {
             <div className="flex-1 flex flex-col gap-1.5">
               <div className="flex justify-between items-end">
                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">마스터리 숙련도</span>
-                <span className="text-[10px] font-bold">{progress?.currentXp || 0} / {progress?.nextLevelXp || XP_PER_LEVEL} XP</span>
+                <span className="text-[10px] font-bold">{progress?.currentXp || 0} / {currentLevelThreshold} XP</span>
               </div>
-              <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || XP_PER_LEVEL)) * 100} className="h-2.5 rounded-full shadow-inner" />
+              <Progress value={((progress?.currentXp || 0) / currentLevelThreshold) * 100} className="h-2.5 rounded-full shadow-inner" />
               <div className="flex justify-between items-center mt-0.5">
                 <span className="text-[9px] font-black text-primary/60">목표: Lv.{MAX_LEVEL}</span>
                 <span className="text-[9px] font-black text-muted-foreground flex items-center gap-1">
@@ -614,7 +628,7 @@ export default function GrowthPage() {
             <Crown className="h-5 w-5 text-emerald-500" />
           </div>
           <div>
-            <h5 className="font-black text-sm mb-1">마스터리 보너스</h5>
+            <h5 className="font-black text-sm mb-1">곡선형 마스터리</h5>
             <p className="text-xs font-medium text-muted-foreground leading-relaxed">스킬 해금 시 XP 배율이 영구 상승하여, 후반부의 거대한 요구량을 충족할 수 있습니다.</p>
           </div>
         </div>
