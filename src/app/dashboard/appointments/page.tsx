@@ -99,25 +99,19 @@ export default function AppointmentsPage() {
 
   const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 ---
+  // --- 상담 일지 쿼리 (학부모 접근 제외) ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    
+    // 부모님은 직접 조회를 차단 (운영 방침상 복붙 전달)
+    if (isParent) return null;
+
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
     
     if (isStudent) {
       return query(
         baseRef, 
         where('studentId', '==', user.uid), 
-        where('visibility', '==', 'student_and_parent'),
-        orderBy('createdAt', 'desc')
-      );
-    }
-    if (isParent) {
-      const children = activeMembership.linkedStudentIds || [];
-      if (children.length === 0) return null;
-      return query(
-        baseRef, 
-        where('studentId', 'in', children), 
         where('visibility', '==', 'student_and_parent'),
         orderBy('createdAt', 'desc')
       );
@@ -250,7 +244,12 @@ export default function AppointmentsPage() {
           <Card className="border-none shadow-lg rounded-[2rem] bg-white overflow-hidden">
             <CardHeader><CardTitle className="text-lg font-black flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> 최근 상담일지</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {notesLoading ? <Loader2 className="animate-spin mx-auto" /> : 
+              {isParent ? (
+                <div className="p-10 border-2 border-dashed rounded-3xl flex flex-col items-center gap-2 opacity-40 text-center">
+                  <XCircle className="h-8 w-8" />
+                  <span className="text-[10px] font-black">일지는 센터에서 직접<br/>전달해 드립니다.</span>
+                </div>
+              ) : notesLoading ? <Loader2 className="animate-spin mx-auto" /> : 
                !notes || notes.length === 0 ? (
                 <div className="p-10 border-2 border-dashed rounded-3xl flex flex-col items-center gap-2 opacity-40">
                   <XCircle className="h-8 w-8" /><span className="text-[10px] font-black">일지 데이터 없음</span>
