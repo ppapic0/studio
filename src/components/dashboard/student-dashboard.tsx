@@ -216,7 +216,7 @@ function GamifiedStatCard({
               </div>
               <p className="text-[11px] text-center font-bold text-primary/60 italic">
                 {type === 'completion' && (dailyValue >= 100 ? "🎉 오늘 계획 마스터! 완벽합니다." : `오늘 남은 계획을 마쳐서 ${dailyValue.toFixed(0)}%를 채우세요!`)}
-                {type === 'attendance' && (dailyValue >= 180 ? "⚡ 3시간 몰입 성공! 출석 인정되었습니다." : `앞으로 ${(180 - dailyValue).toFixed(0)}분만 더 공부하면 출석이 인정돼요!`)}
+                {type === 'attendance' && (dailyValue >= 180 ? "⚡ 3시간 몰입 성공! 출석 인정되었습니다." : `앞으로 ${(180 - dailyValue.toFixed(0))}분만 더 공부하면 출석이 인정돼요!`)}
                 {type === 'growth' && (dailyValue > 0 ? "📈 어제보다 더 성장하고 있습니다. 페이스를 유지하세요!" : "오늘의 학습을 시작하여 성장 지수를 높여보세요!")}
               </p>
             </div>
@@ -538,7 +538,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
   const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
-  // 학습 시간 포맷팅 (0시간 0분 스타일)
+  // 학습 시간 포맷팅 (0시간 0분 스타일 고정)
   const totalMinutes = todayStudyLog?.totalMinutes || 0;
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
@@ -687,7 +687,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               ) : (
                 <div className="flex items-center gap-1 justify-between">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black tracking-tight">
+                    <span className="text-3xl font-black tracking-tight text-primary">
                       {h}시간 {m}분
                     </span>
                   </div>
