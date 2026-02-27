@@ -93,7 +93,7 @@ export default function StudentListPage() {
 
     setIsSubmitting(true);
     try {
-      // Cloud Functions 호출 (등록하려는 선생님의 센터 ID 전달)
+      // Cloud Functions 호출 (Asia-Northeast3 리전 명시)
       const registerStudentFn = httpsCallable(functions, 'registerStudent');
       const result: any = await registerStudentFn({
         email: newStudent.email,
@@ -113,10 +113,18 @@ export default function StudentListPage() {
       }
     } catch (e: any) {
       console.error("Add Student Function Error:", e);
-      // 구체적인 오류 메시지 추출
-      const errorMsg = e.code === 'already-exists' ? "이미 등록된 이메일 주소입니다." :
-                       e.code === 'permission-denied' ? "학생을 등록할 권한이 없습니다." :
-                       e.message || "서버와의 통신 중 오류가 발생했습니다.";
+      // 구체적인 오류 메시지 추출 (코드 기반)
+      let errorMsg = "서버와의 통신 중 오류가 발생했습니다.";
+      
+      if (e.code === 'already-exists' || e.message?.includes('already-exists')) {
+        errorMsg = "이미 등록된 이메일 주소입니다.";
+      } else if (e.code === 'permission-denied' || e.message?.includes('permission-denied')) {
+        errorMsg = "학생을 등록할 권한이 없습니다.";
+      } else if (e.code === 'invalid-argument' || e.message?.includes('invalid-argument')) {
+        errorMsg = "입력한 정보가 올바르지 않습니다.";
+      } else if (e.message) {
+        errorMsg = e.message;
+      }
       
       toast({ 
         variant: "destructive", 
