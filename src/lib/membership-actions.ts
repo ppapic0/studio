@@ -55,7 +55,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       }
 
       // 3. 핵심 문서들 생성 (보안 규칙 및 조회용)
-      // /users/{uid}
       transaction.set(userRef, { 
         id: uid, 
         displayName, 
@@ -63,7 +62,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         createdAt: timestamp 
       }, { merge: true });
       
-      // /centers/{centerId}/members/{uid}
       transaction.set(memberRef, {
         id: fixedCenterId,
         role,
@@ -72,7 +70,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         displayName,
       });
 
-      // /userCenters/{uid}/centers/{centerId}
       transaction.set(userCenterRef, {
         id: fixedCenterId,
         role,

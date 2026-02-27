@@ -14,7 +14,7 @@ import { ArrowUpRight, Armchair, MessageSquare, TrendingUp, Users, Loader2, Zap 
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, limit, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -202,7 +202,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   <span className="text-xs font-black">몰입 시간 급감 감지</span>
                 </div>
                 <p className="text-sm font-bold leading-relaxed">
-                  <span className="underline decoration-white/40">이소피아</span> 학생의 이번 주 집중도가 지난주 평균 대비 <span className="text-red-300">15% 하락</span>했습니다.
+                  이소피아 학생의 이번 주 집중도가 지난주 평균 대비 <span className="text-red-300">15% 하락</span>했습니다.
                 </p>
               </div>
               <Button className="w-full h-12 bg-white text-accent hover:bg-white/90 rounded-2xl font-black text-sm shadow-lg">전체 리포트 확인</Button>
