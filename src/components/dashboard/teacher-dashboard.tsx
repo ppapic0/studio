@@ -21,7 +21,6 @@ import {
   X,
   Plus,
   ArrowRight,
-  TrendingUp,
   Monitor,
   MessageSquare,
   ChevronRight,
@@ -40,7 +39,6 @@ import {
   serverTimestamp,
   where,
   Timestamp,
-  updateDoc
 } from 'firebase/firestore';
 import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -86,7 +84,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 오늘 상담 예약
+  // 3. 오늘 상담 예약 (counselingReservations로 통일)
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const today = new Date();
@@ -123,7 +121,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const existingIndex = tempLayout.findIndex(s => s.x === x && s.y === y);
     if (existingIndex !== -1) {
       const newList = tempLayout.filter((_, i) => i !== existingIndex);
-      // 번호 재정렬 (요청에 따라 1번부터 순차적으로)
+      // 번호 재정렬
       setTempLayout(newList.map((s, i) => ({ ...s, seatNo: i + 1 })));
     } else {
       setTempLayout([...tempLayout, { x, y, seatNo: tempLayout.length + 1 }]);
@@ -165,13 +163,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     try {
       const batch = writeBatch(firestore);
       
-      // 1. 학생 문서 업데이트 (좌석 번호 부여)
       batch.update(doc(firestore, 'centers', centerId, 'students', student.id), {
         seatNo: selectedSeatForAssign.seatNo,
         updatedAt: serverTimestamp()
       });
 
-      // 2. 실시간 좌석 정보 업데이트 (배정된 학생 ID 기록)
       batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeatForAssign.id), {
         studentId: student.id,
         updatedAt: serverTimestamp()
@@ -234,7 +230,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-xs sm:text-sm text-muted-foreground">빈 좌석을 클릭하여 학생을 배정할 수 있습니다.</CardDescription>
+                <CardDescription className="font-bold text-xs sm:text-sm text-muted-foreground">도면에서 각 좌석의 위치를 확인하고 학생을 배정하세요.</CardDescription>
               </div>
               <Button 
                 variant="outline" 
@@ -256,8 +252,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             ) : (
               <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
                 <div 
-                  className="grid gap-2 sm:gap-3 mx-auto p-3 sm:p-4 bg-muted/5 rounded-[1.5rem] border shadow-inner"
-                  style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(45px, 65px))`, width: 'fit-content' }}
+                  className="grid gap-2 sm:gap-3 mx-auto p-4 sm:p-6 bg-muted/5 rounded-[1.5rem] border shadow-inner relative"
+                  style={{ 
+                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(45px, 65px))`, 
+                    width: 'fit-content',
+                    backgroundImage: 'radial-gradient(circle, #00000005 1px, transparent 1px)',
+                    backgroundSize: '20px 20px'
+                  }}
                 >
                   {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
                     const x = idx % GRID_WIDTH;
@@ -265,7 +266,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                     const occupant = students?.find(s => s.seatNo === seat?.seatNo);
 
-                    if (!seat) return <div key={idx} className="w-[45px] h-[45px] sm:w-[60px] sm:h-[60px] opacity-10 bg-muted/20 rounded-lg" />;
+                    if (!seat) return <div key={idx} className="w-[45px] h-[45px] sm:w-[60px] sm:h-[60px] opacity-[0.02] bg-primary rounded-lg border border-transparent" />;
 
                     return (
                       <div 
@@ -279,19 +280,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "w-[45px] h-[45px] sm:w-[60px] sm:h-[60px] rounded-lg sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-sm cursor-pointer",
-                          seat.status === 'studying' ? "bg-emerald-50 border-emerald-400 text-emerald-700 ring-4 ring-emerald-500/10" : 
+                          "w-[45px] h-[45px] sm:w-[60px] sm:h-[60px] rounded-lg sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-sm cursor-pointer group",
+                          seat.status === 'studying' ? "bg-emerald-50 border-emerald-400 text-emerald-700 ring-4 ring-emerald-500/10 shadow-emerald-100" : 
                           seat.status === 'away' ? "bg-amber-50 border-amber-400 text-amber-700" :
                           seat.status === 'break' ? "bg-blue-50 border-blue-400 text-blue-700" : 
-                          occupant ? "bg-white border-primary/40 text-primary" : "bg-white border-dashed border-border text-muted-foreground/30"
+                          occupant ? "bg-white border-primary/40 text-primary hover:border-primary shadow-md" : "bg-white border-dashed border-border/60 text-muted-foreground/30 hover:border-primary/30"
                         )}
                       >
-                        <span className="text-[8px] sm:text-[10px] font-black opacity-40">{seat.seatNo}</span>
+                        <span className="text-[8px] sm:text-[10px] font-black opacity-40 group-hover:opacity-100 transition-opacity">{seat.seatNo}</span>
                         <span className="text-[9px] sm:text-[11px] font-black truncate px-1 w-full text-center">
                           {occupant ? occupant.name : ''}
                         </span>
                         {seat.status === 'studying' && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />}
-                        {!occupant && <Plus className="absolute inset-0 m-auto h-3 w-3 opacity-0 group-hover:opacity-100 text-muted-foreground" />}
+                        {!occupant && <Plus className="absolute inset-0 m-auto h-3 w-3 opacity-0 group-hover:opacity-40 text-primary transition-opacity" />}
                       </div>
                     );
                   })}
@@ -314,7 +315,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <div className="py-10 text-center text-muted-foreground text-xs font-bold border-2 border-dashed rounded-3xl">오늘 예정된 상담이 없습니다.</div>
             ) : (
               appointments.map((apt: any) => (
-                <div key={apt.id} className="p-4 rounded-2xl bg-muted/20 border flex justify-between items-center group hover:border-primary transition-all">
+                <div key={apt.id} className="p-4 rounded-2xl bg-muted/20 border flex justify-between items-center group hover:border-primary transition-all shadow-sm hover:shadow-md">
                   <div className="grid gap-1">
                     <span className="text-xs font-black text-primary">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'p') : '-'}</span>
                     <span className="text-sm font-bold">{apt.studentName} 학생</span>
@@ -350,15 +351,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <Button variant="ghost" onClick={() => setTempLayout([])} className="text-destructive font-black h-10 text-sm gap-2"><Trash2 className="h-4 w-4" /> 전체 삭제</Button>
             </div>
             <div className="relative overflow-auto border-2 border-border/50 rounded-[1.5rem] p-4 bg-muted/5 flex-1 custom-scrollbar">
-              <div className="grid gap-1 mx-auto" style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(40px, 50px))`, width: 'fit-content' }}>
+              <div 
+                className="grid gap-1 mx-auto" 
+                style={{ 
+                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(40px, 50px))`, 
+                  width: 'fit-content',
+                  backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
+                  backgroundSize: '15px 15px'
+                }}
+              >
                 {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
                   const x = idx % GRID_WIDTH;
                   const y = Math.floor(idx / GRID_WIDTH);
                   const seat = tempLayout.find(s => s.x === x && s.y === y);
                   return (
                     <div key={idx} onClick={() => handleGridClick(x, y)} className={cn(
-                      "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group",
-                      seat ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-white border-dashed border-border/40 hover:border-primary/30"
+                      "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group relative",
+                      seat ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-white/50 border-dashed border-border/40 hover:border-primary/30"
                     )}>
                       {seat ? <span className="text-[10px] sm:text-xs font-black">{seat.seatNo}</span> : <Plus className="h-3 w-3 opacity-0 group-hover:opacity-100" />}
                     </div>
@@ -395,7 +404,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <ScrollArea className="h-[300px] pr-4">
               {studentsLoading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div> :
                unassignedStudents.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground italic text-sm font-bold bg-muted/20 rounded-2xl">
+                <div className="text-center py-10 text-muted-foreground italic text-sm font-bold bg-muted/20 rounded-2xl border-2 border-dashed">
                   좌석을 기다리는 학생이 없습니다.
                 </div>
               ) : (
@@ -404,7 +413,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     <div 
                       key={student.id} 
                       onClick={() => assignStudentToSeat(student)}
-                      className="flex items-center justify-between p-4 rounded-2xl border-2 border-transparent hover:border-accent hover:bg-accent/5 transition-all cursor-pointer group"
+                      className="flex items-center justify-between p-4 rounded-2xl border-2 border-transparent hover:border-accent hover:bg-accent/5 transition-all cursor-pointer group shadow-sm hover:shadow-md bg-white"
                     >
                       <div className="flex flex-col">
                         <span className="font-black text-lg group-hover:text-accent">{student.name}</span>
