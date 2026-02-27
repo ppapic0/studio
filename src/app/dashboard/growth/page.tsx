@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -98,42 +99,42 @@ function SystemGuideDialog() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tighter">성장 시스템 마스터 가이드</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 font-bold">
-              입시트랙의 성장은 단순한 시간이 아닌 '밀도'로 결정됩니다.
+              입시트랙의 성장은 단순한 시간이 아닌 '밀도'로 결정됩니다. 하루 최대 획득량은 엄격히 제한됩니다.
             </DialogDescription>
           </DialogHeader>
         </div>
         <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
           <div className="space-y-4">
             <h4 className="flex items-center gap-2 font-black text-sm text-primary">
-              <ArrowUpCircle className="h-4 w-4" /> 4대 핵심 스탯 획득법
+              <ArrowUpCircle className="h-4 w-4" /> 4대 핵심 스탯 획득법 (일일 최대 약 1점)
             </h4>
             <div className="grid gap-3">
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-blue-50 border border-blue-100">
                 <Target className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-blue-900">집중력 (Focus)</p>
-                  <p className="text-[10px] font-bold text-blue-700/70">학습 몰입 60분당 1점이 부여됩니다. 연속성이 중요합니다.</p>
+                  <p className="text-[10px] font-bold text-blue-700/70">학습 몰입 600분(10시간)당 1점이 부여됩니다. 티끌 모아 태산입니다.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
                 <RefreshCw className="h-5 w-5 text-emerald-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-emerald-900">꾸준함 (Consistency)</p>
-                  <p className="text-[10px] font-bold text-emerald-700/70">세션을 완료하고 학습 기록을 남길 때마다 0.2점이 누적됩니다.</p>
+                  <p className="text-[10px] font-bold text-emerald-700/70">세션을 완료할 때마다 0.2점이 누적됩니다. 하루 5번의 몰입이면 충분합니다.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-100">
                 <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-amber-900">목표달성 (Achievement)</p>
-                  <p className="text-[10px] font-bold text-amber-700/70">플래너 To-do 항목을 하나 완료할 때마다 0.2점이 상승합니다.</p>
+                  <p className="text-[10px] font-bold text-amber-700/70">플래너 To-do 항목을 하나 완료할 때마다 0.1점이 상승합니다.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-rose-50 border border-rose-100">
                 <ShieldCheck className="h-5 w-5 text-rose-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-rose-900">회복력 (Resilience)</p>
-                  <p className="text-[10px] font-bold text-rose-700/70">3시간(180분) 이상의 딥워크 세션을 성공하면 1점이 부여됩니다.</p>
+                  <p className="text-[10px] font-bold text-rose-700/70">5시간(300분) 이상의 연속 딥워크 세션을 성공하면 1점이 부여됩니다.</p>
                 </div>
               </div>
             </div>
@@ -331,7 +332,7 @@ export default function GrowthPage() {
             </div>
             <div className="mt-6 p-4 bg-black/20 rounded-2xl border border-white/5">
               <p className="text-xs font-bold leading-relaxed opacity-90">
-                ⚠️ <span className="text-amber-400">주의:</span> 현재 스탯 획득 가중치가 매우 정교하게 설정되어 있습니다. **하루 6시간 공부와 플래너 완성을 300일간 지속**해야만 Lv.30 마스터리에 도달할 수 있습니다. 쉬운 길은 없습니다.
+                ⚠️ <span className="text-amber-400">주의:</span> 현재 스탯 획득 가중치가 매우 보수적으로 설정되어 있습니다. **하루 10시간 몰입과 플래너 완성을 300일간 지속**해야만 Lv.30 마스터리에 도달할 수 있습니다. 지치지 않는 것이 핵심입니다.
               </p>
             </div>
           </CardContent>
@@ -350,8 +351,8 @@ export default function GrowthPage() {
                 <Target className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs font-black">집중력은 1시간 단위</p>
-                <p className="text-[10px] font-bold text-muted-foreground">연속 60분 몰입 시 집중력 점수 1점이 부여됩니다.</p>
+                <p className="text-xs font-black">집중력은 10시간 단위</p>
+                <p className="text-[10px] font-bold text-muted-foreground">총 600분 몰입 시 집중력 점수 1점이 부여됩니다.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 group hover:bg-primary/5 transition-colors cursor-pointer">
@@ -582,7 +583,7 @@ export default function GrowthPage() {
           </div>
           <div>
             <h5 className="font-black text-sm mb-1">데이터 기반 성장</h5>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed">스탯 가중치는 엄격하게 관리됩니다. 단순한 접속이 아닌 몰입의 질이 핵심입니다.</p>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed">스탯 가중치는 엄격하게 관리됩니다. 하루 최대 획득량은 약 1점으로 제한됩니다.</p>
           </div>
         </div>
         <div className="flex gap-4 p-6 bg-muted/20 rounded-[2rem] border border-border/50 items-start hover:bg-white transition-colors duration-300 shadow-sm">

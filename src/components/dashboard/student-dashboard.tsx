@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -204,17 +205,17 @@ function GamifiedStatCard({
               </div>
               <div className="space-y-2">
                 <Progress 
-                  value={type === 'attendance' ? Math.min(100, (dailyValue / 180) * 100) : dailyValue} 
+                  value={type === 'attendance' ? Math.min(100, (dailyValue / 300) * 100) : dailyValue} 
                   className="h-3 rounded-full bg-white/50" 
                 />
                 <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
                   <span>START</span>
-                  <span>{type === 'attendance' ? '목표 180분' : '목표 100%'}</span>
+                  <span>{type === 'attendance' ? '목표 300분' : '목표 100%'}</span>
                 </div>
               </div>
               <p className="text-[11px] text-center font-bold text-primary/60 italic">
                 {type === 'completion' && (dailyValue >= 100 ? "🎉 오늘 계획 마스터! 완벽합니다." : `오늘 남은 계획을 마쳐서 ${dailyValue.toFixed(0)}%를 채우세요!`)}
-                {type === 'attendance' && (dailyValue >= 180 ? "⚡ 3시간 몰입 성공! 출석 인정되었습니다." : `앞으로 ${(180 - dailyValue.toFixed(0))}분만 더 공부하면 출석이 인정돼요!`)}
+                {type === 'attendance' && (dailyValue >= 300 ? "⚡ 5시간 초몰입 성공! 회복력 1점이 부여됩니다." : `앞으로 ${(300 - dailyValue.toFixed(0))}분만 더 공부하면 회복력 점수가 상승해요!`)}
                 {type === 'growth' && (dailyValue > 0 ? "📈 어제보다 더 성장하고 있습니다. 페이스를 유지하세요!" : "오늘의 학습을 시작하여 성장 지수를 높여보세요!")}
               </p>
             </div>
@@ -224,7 +225,7 @@ function GamifiedStatCard({
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle className="text-[10px] font-black uppercase tracking-widest">엄격한 출석 인정 기준 (3시간 룰)</AlertTitle>
                 <AlertDescription className="text-[11px] leading-relaxed font-bold mt-1">
-                  출석 등급은 일일 **3시간(180분) 이상** 학습을 완료한 날만 카운트됩니다.
+                  출석 등급은 일일 **3시간(180분) 이상** 학습을 완료한 날만 카운트됩니다. 회복력 1점은 **5시간 이상** 시 부여됩니다.
                 </AlertDescription>
               </Alert>
             )}
@@ -418,8 +419,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(0.2) },
-        currentXp: increment(20),
+        stats: { achievement: increment(0.1) }, // 0.1pt per task
+        currentXp: increment(10),
         updatedAt: serverTimestamp()
       }, { merge: true });
     }
@@ -464,13 +465,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
 
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-    const focusGain = (sessionMinutes / 60); 
+    const focusGain = (sessionMinutes / 600); // 10시간당 1점 (시간당 0.1점)
     
     setDoc(progressRef, {
       stats: {
-        focus: increment(Number(focusGain.toFixed(2))),
-        consistency: increment(0.2),
-        resilience: sessionMinutes >= 180 ? increment(1) : increment(0)
+        focus: increment(Number(focusGain.toFixed(3))),
+        consistency: increment(0.2), // 세션당 0.2점
+        resilience: sessionMinutes >= 300 ? increment(1) : increment(0) // 5시간 이상 시 1점
       },
       currentXp: increment(sessionMinutes),
       updatedAt: serverTimestamp()
