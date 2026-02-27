@@ -37,7 +37,7 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // 단일 조회 (Get)
+        // 단일 문서 조회 (Get)
         allow get: if isSignedIn() && (
           resource.data.studentId == request.auth.uid ||
           resource.data.teacherId == request.auth.uid ||
@@ -45,10 +45,14 @@ service cloud.firestore {
           isParentOf(centerId, resource.data.studentId)
         );
         
-        // 쿼리 조회 (List) - 각 역할별로 명시적 분리하여 정적 분석 통과 보장
+        // 쿼리 조회 (List) - 역할별 명시적 분리
+        // 1. 학생: 본인 필터링 쿼리 승인
         allow list: if isSignedIn() && resource.data.studentId == request.auth.uid;
+        // 2. 교사: 본인 필터링 쿼리 승인
         allow list: if isSignedIn() && resource.data.teacherId == request.auth.uid;
+        // 3. 관리자/교사: 전체 조회 승인 (hasRole 조건만으로 평가됨)
         allow list: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
+        // 4. 학부모: 자녀 필터링 쿼리 승인
         allow list: if isSignedIn() && isParentOf(centerId, resource.data.studentId);
         
         allow create: if isSignedIn() && (
@@ -114,14 +118,13 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      // AI 및 기타 기록
+      // 센터 하위 records (AI 알림 등)
       match /records/{recordId} {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
           resource.data.studentId == request.auth.uid ||
           isParentOf(centerId, resource.data.studentId)
         );
-        allow write: if false; 
       }
     }
 
@@ -133,6 +136,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // Collection Group 규칙 (AI 위험 감지 등)
     match /{path=**}/records/{recordId} {
       allow read: if isSignedIn() && (
         hasRole(resource.data.centerId, ['centerAdmin', 'teacher']) ||

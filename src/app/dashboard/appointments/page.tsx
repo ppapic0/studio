@@ -74,7 +74,7 @@ export default function AppointmentsPage() {
     note: '',
   });
 
-  // 상담 데이터 쿼리 설정
+  // 상담 데이터 쿼리 설정 - 보안 규칙과 1:1 매칭되도록 필터 강화
   const appointmentsQuery = useMemoFirebase(() => {
     // 필수 정보가 모두 존재하고, 로딩이 끝났을 때만 쿼리 생성
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !activeMembership.role) {
@@ -85,7 +85,7 @@ export default function AppointmentsPage() {
     const role = activeMembership.role;
     const uid = user.uid;
     
-    // 1. 학생: 본인 예약만 조회 ( studentId 필터 필수 )
+    // 1. 학생: 본인 예약만 조회 ( studentId 필터 필수 - 규칙 allow list: if resource.data.studentId == request.auth.uid )
     if (role === 'student') {
       return query(
         baseRef, 
@@ -94,10 +94,11 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 2. 학부모: 연결된 자녀 데이터 조회
+    // 2. 학부모: 연결된 자녀 데이터 조회 ( isParentOf 규칙 대응 )
     if (role === 'parent') {
       const studentIds = activeMembership.linkedStudentIds || [];
       if (studentIds.length === 0) return null;
+      // Note: 'in' query supports up to 10 IDs.
       return query(
         baseRef, 
         where('studentId', 'in', studentIds), 
@@ -105,7 +106,7 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 3. 교사: 본인에게 배정된 상담 조회
+    // 3. 교사: 본인에게 배정된 상담 조회 ( teacherId 필터 필수 )
     if (role === 'teacher') {
       return query(
         baseRef, 
@@ -114,7 +115,7 @@ export default function AppointmentsPage() {
       );
     } 
     
-    // 4. 관리자: 센터 전체 조회
+    // 4. 관리자: 센터 전체 조회 ( hasRole 규칙 대응 )
     if (role === 'centerAdmin') {
       return query(baseRef, orderBy('startAt', 'desc'));
     }
