@@ -90,7 +90,7 @@ export default function StudentListPage() {
 
     setIsSubmitting(true);
     try {
-      // Cloud Functions 호출
+      // Cloud Functions 호출 (asia-northeast3 리전)
       const registerStudentFn = httpsCallable(functions, 'registerStudent');
       const result: any = await registerStudentFn({
         email: newStudent.email,
@@ -108,12 +108,15 @@ export default function StudentListPage() {
       }
     } catch (e: any) {
       console.error("Add Student Function Error:", e);
-      // HttpsError의 상세 메시지를 사용자에게 전달
-      const message = e.details?.message || e.message || "서버 오류가 발생했습니다.";
+      // 구체적인 오류 메시지 추출
+      const errorMsg = e.code === 'already-exists' ? "이미 등록된 이메일 주소입니다." :
+                       e.code === 'permission-denied' ? "권한이 없습니다." :
+                       e.message || "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+      
       toast({ 
         variant: "destructive", 
         title: "등록 실패", 
-        description: message
+        description: errorMsg
       });
     } finally {
       setIsSubmitting(false);
