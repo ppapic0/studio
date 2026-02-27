@@ -18,7 +18,7 @@ service cloud.firestore {
       return isSignedIn() && 
              exists(memberPath) && 
              get(memberPath).data.get('role', 'none') == 'parent' && 
-             studentId in get(memberPath).data.get('linkedStudentIds', []);
+             (studentId != null && studentId in get(memberPath).data.get('linkedStudentIds', []));
     }
 
     // --- 컬렉션 규칙 ---
