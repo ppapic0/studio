@@ -1,72 +1,100 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import {
+  initializeApp,
+  getApps,
+  getApp,
+  FirebaseApp,
+} from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { 
-  getFirestore, 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager, 
-  Firestore 
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  Firestore,
 } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
 
 /**
- * 프로젝트 전역에서 공유될 Firebase 서비스 인스턴스 (싱글톤)
+ * 프로젝트 전역 싱글톤 Firebase 서비스 인스턴스
+ * - Firestore는 반드시 initializeFirestore로만 생성(설정 강제)
+ * - getFirestore(app) 사용 금지: 설정(host/ssl) 다른 인스턴스가 생길 수 있음
  */
-let firebaseApp: FirebaseApp;
-let firestore: Firestore;
-let auth: Auth;
-let functions: Functions;
+let firebaseApp: FirebaseApp | null = null;
+let firestore: Firestore | null = null;
+let auth: Auth | null = null;
+let functions: Functions | null = null;
 
-/**
- * Firebase 서비스를 초기화하고 인스턴스를 반환합니다.
- * 에뮬레이터 연결 코드를 완전히 제거하고 오직 프로덕션 환경으로만 연결합니다.
- */
-export function initializeFirebase() {
-  // 이미 앱이 초기화되어 있다면 기존 인스턴스들을 반환
+function ensureApp(): FirebaseApp {
+  if (firebaseApp) return firebaseApp;
+
   if (getApps().length > 0) {
     firebaseApp = getApp();
-    return getSdks(firebaseApp);
+    return firebaseApp;
   }
 
-  // 1. Firebase App 초기화
   firebaseApp = initializeApp(firebaseConfig);
+  return firebaseApp;
+}
 
-  // 2. Firestore 초기화 (프로덕션 호스트 명시 및 오프라인 캐시 설정)
-  firestore = initializeFirestore(firebaseApp, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+function ensureFirestore(app: FirebaseApp): Firestore {
+  if (firestore) return firestore;
+
+  // ✅ 항상 initializeFirestore로만 생성해서 host/ssl 강제
+  firestore = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
     host: 'firestore.googleapis.com',
     ssl: true,
   });
 
-  // 3. 기타 서비스 인스턴스 생성
-  auth = getAuth(firebaseApp);
-  functions = getFunctions(firebaseApp, 'asia-northeast3');
+  // ✅ 디버그(브라우저 콘솔에서 확인)
+  // @ts-ignore
+  console.log('[DEBUG] Firestore host:', firestore?._settings?.host, 'ssl:', firestore?._settings?.ssl);
 
-  return { firebaseApp, auth, firestore, functions };
+  return firestore;
+}
+
+function ensureAuth(app: FirebaseApp): Auth {
+  if (auth) return auth;
+  auth = getAuth(app);
+  return auth;
+}
+
+function ensureFunctions(app: FirebaseApp): Functions {
+  if (functions) return functions;
+  functions = getFunctions(app, 'asia-northeast3');
+  return functions;
 }
 
 /**
- * 초기화된 앱 인스턴스로부터 서비스 인스턴스들을 안전하게 가져오는 헬퍼 함수
+ * Firebase 서비스를 초기화하고 싱글톤 인스턴스를 반환
+ */
+export function initializeFirebase() {
+  const app = ensureApp();
+  const db = ensureFirestore(app);
+  const a = ensureAuth(app);
+  const fn = ensureFunctions(app);
+
+  return { firebaseApp: app, auth: a, firestore: db, functions: fn };
+}
+
+/**
+ * (호환용) 앱 인스턴스로부터 SDK를 가져오는 함수
+ * - Firestore는 getFirestore()로 만들지 말고 ensureFirestore() 사용
  */
 export function getSdks(app: FirebaseApp) {
-  if (!firestore) {
-    firestore = getFirestore(app);
-  }
-  if (!auth) {
-    auth = getAuth(app);
-  }
-  if (!functions) {
-    functions = getFunctions(app, 'asia-northeast3');
-  }
+  const db = ensureFirestore(app);
+  const a = ensureAuth(app);
+  const fn = ensureFunctions(app);
 
   return {
     firebaseApp: app,
-    auth,
-    firestore,
-    functions
+    auth: a,
+    firestore: db,
+    functions: fn,
   };
 }
 

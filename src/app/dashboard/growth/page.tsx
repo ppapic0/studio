@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
-import { useDoc, useFirestore, useUser } from '@/firebase';
+import { useDoc, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { GrowthProgress, SkillNode } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -41,6 +41,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 // 확장된 20개 스킬 로드맵
 const MOCK_SKILLS: (SkillNode & { link: string })[] = [
@@ -161,6 +162,7 @@ export default function GrowthPage() {
   const { user } = useUser();
   const { activeMembership } = useAppContext();
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [activeBranch, setActiveBranch] = useState<'focus' | 'consistency' | 'achievement' | 'resilience'>('focus');
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
 
@@ -181,6 +183,35 @@ export default function GrowthPage() {
     const firstSkill = MOCK_SKILLS.find(s => s.branch === activeBranch);
     if (firstSkill) setSelectedSkillId(firstSkill.id);
   }, [activeBranch]);
+
+  const handleUnlockSkill = (skillId: string) => {
+    if (!progressRef || !user) return;
+    
+    const updateData = {
+      skills: {
+        [skillId]: {
+          level: 1,
+          unlockedAt: serverTimestamp()
+        }
+      },
+      updatedAt: serverTimestamp()
+    };
+
+    setDoc(progressRef, updateData, { merge: true })
+      .then(() => {
+        toast({
+          title: "스킬 해금 완료!",
+          description: "새로운 마스터리 능력이 활성화되었습니다.",
+        });
+      })
+      .catch(async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: progressRef.path,
+          operation: 'write',
+          requestResourceData: updateData,
+        }));
+      });
+  };
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
@@ -494,7 +525,10 @@ export default function GrowthPage() {
                           마스터리 레벨업 (준비 중)
                         </Button>
                       ) : (stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
-                        <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-base shadow-xl gap-2 animate-pulse-soft">
+                        <Button 
+                          onClick={() => handleUnlockSkill(selectedSkill.id)}
+                          className="w-full h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-base shadow-xl gap-2 animate-pulse-soft"
+                        >
                           <Unlock className="h-5 w-5" />
                           지금 해금하기
                         </Button>

@@ -50,7 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
@@ -62,8 +62,6 @@ import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 const RANKS = [
   { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' },
@@ -657,13 +655,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {scheduleItems.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+        <div className="flex flex-wrap items-center justify-center gap-4 py-2 w-full">
           {scheduleItems.map((item) => {
             const [title, time] = item.title.split(': ');
             return (
-              <Card key={item.id} className="min-w-[140px] flex-1 sm:flex-none bg-primary/[0.03] border-2 border-primary/20 rounded-3xl transition-all hover:scale-105 hover:border-primary/50 hover:bg-white hover:shadow-lg group">
+              <Card key={item.id} className="min-w-[140px] flex-1 sm:flex-none bg-white border-2 border-primary/30 rounded-3xl shadow-sm transition-all hover:scale-105 hover:border-primary/60 hover:shadow-xl group">
                 <CardContent className="p-4 flex flex-col items-center justify-center gap-1.5 text-center">
-                  <span className="text-[11px] font-black text-primary/80 group-hover:text-primary uppercase tracking-[0.1em] transition-colors">{title}</span>
+                  <span className="text-[11px] font-black text-primary uppercase tracking-[0.1em] transition-colors">{title}</span>
                   <span className="text-2xl font-black text-primary tracking-tighter">{time || '-'}</span>
                 </CardContent>
               </Card>
