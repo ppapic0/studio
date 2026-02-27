@@ -29,11 +29,18 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        // 단건 및 목록 조회 통합 관리
-        allow read: if isSignedIn() && (
-          resource.data.get('studentId', '') == request.auth.uid ||
+        // 단건 조회 (get)
+        allow get: if isSignedIn() && (
+          resource.data.studentId == request.auth.uid ||
           getMemberData(centerId, request.auth.uid).role in ['centerAdmin', 'teacher'] ||
-          (getMemberData(centerId, request.auth.uid).role == 'parent' && resource.data.get('studentId', '') in getMemberData(centerId, request.auth.uid).get('linkedStudentIds', []))
+          (getMemberData(centerId, request.auth.uid).role == 'parent' && resource.data.studentId in getMemberData(centerId, request.auth.uid).get('linkedStudentIds', []))
+        );
+        
+        // 목록 조회 (list) - 쿼리 필터와 일치하도록 최적화
+        allow list: if isSignedIn() && (
+          getMemberData(centerId, request.auth.uid).role in ['centerAdmin', 'teacher'] ||
+          resource.data.studentId == request.auth.uid ||
+          (getMemberData(centerId, request.auth.uid).role == 'parent' && resource.data.studentId in getMemberData(centerId, request.auth.uid).get('linkedStudentIds', []))
         );
         
         allow create: if isSignedIn() && (
@@ -47,11 +54,16 @@ service cloud.firestore {
         );
       }
 
-      // 상담일지 (Counseling Notes) - 부모님 접근 완전 차단 (Plan A)
+      // 상담일지 (Counseling Notes) - 부모님 접근 차단 (선생님이 복붙 전달)
       match /counselingNotes/{noteId} {
-        allow read: if isSignedIn() && (
+        allow get: if isSignedIn() && (
           getMemberData(centerId, request.auth.uid).role in ['centerAdmin', 'teacher'] ||
-          (resource.data.get('studentId', '') == request.auth.uid && resource.data.get('visibility', 'student_and_parent') == 'student_and_parent')
+          (resource.data.studentId == request.auth.uid && resource.data.visibility == 'student_and_parent')
+        );
+
+        allow list: if isSignedIn() && (
+          getMemberData(centerId, request.auth.uid).role in ['centerAdmin', 'teacher'] ||
+          (resource.data.studentId == request.auth.uid && resource.data.visibility == 'student_and_parent')
         );
 
         allow write: if isSignedIn() && getMemberData(centerId, request.auth.uid).role in ['centerAdmin', 'teacher'];

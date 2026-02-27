@@ -687,7 +687,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               ) : (
                 <div className="flex items-center gap-1 justify-between">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black tracking-tighter">
+                    <span className="text-3xl font-black tracking-tight">
                       {h}시간 {m}분
                     </span>
                   </div>
