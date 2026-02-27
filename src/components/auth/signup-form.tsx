@@ -22,8 +22,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import Link from 'next/link';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserCircle, GraduationCap } from 'lucide-react';
@@ -41,6 +42,7 @@ const formSchema = z.object({
 
 export function SignupForm() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
@@ -57,25 +59,37 @@ export function SignupForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth) return;
+    if (!auth || !firestore) return;
     setIsLoading(true);
     try {
       setLoadingStatus('계정 생성 중...');
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
       
-      await updateProfile(userCredential.user, { displayName: values.displayName });
+      await updateProfile(user, { displayName: values.displayName });
 
+      // 1. 클라이언트 측에서 즉시 users 컬렉션에 문서 생성 (중요!)
+      setLoadingStatus('프로필 정보 저장 중...');
+      await setDoc(doc(firestore, 'users', user.uid), {
+        id: user.uid,
+        email: values.email,
+        displayName: values.displayName,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // 2. 서버 액션을 통한 센터 가입 및 역할 부여
       setLoadingStatus('센터 가입 및 멤버십 설정 중...');
-      const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
+      const result = await redeemInviteCodeAction(user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
-        setLoadingStatus('데이터 동기화 및 대시보드 준비 중...');
+        setLoadingStatus('대시보드로 이동 중...');
         toast({ title: '가입 성공', description: result.message });
         
-        // 데이터 전파 지연을 고려하여 2.5초 후 이동
+        // 데이터 전파 완료를 위해 충분히 기다린 후 새로고침 이동
         setTimeout(() => {
           window.location.href = '/dashboard';
-        }, 2500);
+        }, 2000);
       }
     } catch (error: any) {
       console.error('Signup Error:', error);

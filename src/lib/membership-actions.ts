@@ -5,7 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * 초대 코드를 검증하고 센터 가입 처리를 수행합니다.
- * 트랜잭션을 사용하여 모든 필수 문서(User, Center, Member, UserCenter)를 원자적으로 생성합니다.
+ * 트랜잭션을 사용하여 모든 필수 문서(Center, Member, UserCenter)를 원자적으로 생성합니다.
  */
 export async function redeemInviteCodeAction(uid: string, code: string, displayName: string) {
   if (!code) throw new Error("초대 코드가 필요합니다.");
@@ -38,7 +38,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
 
       const timestamp = FieldValue.serverTimestamp();
       const centerRef = adminDb.doc(`centers/${fixedCenterId}`);
-      const userRef = adminDb.doc(`users/${uid}`);
       const memberRef = adminDb.doc(`centers/${fixedCenterId}/members/${uid}`);
       const userCenterRef = adminDb.doc(`userCenters/${uid}/centers/${fixedCenterId}`);
 
@@ -54,30 +53,26 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         });
       }
 
-      // 3. 핵심 문서들 생성 (보안 규칙 및 조회용)
-      transaction.set(userRef, { 
-        id: uid, 
-        displayName, 
-        updatedAt: timestamp, 
-        createdAt: timestamp 
-      }, { merge: true });
-      
+      // 3. 멤버십 문서 생성 (보안 규칙 필수 참조 경로)
       transaction.set(memberRef, {
-        id: fixedCenterId,
+        id: uid, // Member ID는 사용자의 UID여야 함
+        centerId: fixedCenterId,
         role,
         status: "active",
         joinedAt: timestamp,
         displayName,
       });
 
+      // 4. 사용자 센터 역인덱스 생성 (AuthGuard 리스너 경로)
       transaction.set(userCenterRef, {
         id: fixedCenterId,
+        centerId: fixedCenterId,
         role,
         status: "active",
         joinedAt: timestamp,
       });
 
-      // 4. 역할별 초기 데이터 설정
+      // 5. 학생일 경우 추가 초기 데이터 설정
       if (role === 'student') {
         const progressRef = adminDb.doc(`centers/${fixedCenterId}/growthProgress/${uid}`);
         transaction.set(progressRef, {
@@ -88,21 +83,6 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
           skills: {},
           updatedAt: timestamp,
         }, { merge: true });
-      }
-
-      if (role === 'teacher') {
-        // 선생님을 위한 기본 학생 데이터 시딩
-        const mockStudents = [
-          { id: 'mock_std_1', name: '김철수', seatNo: 1, grade: '고3' },
-          { id: 'mock_std_2', name: '이영희', seatNo: 2, grade: '중3' },
-          { id: 'mock_std_3', name: '박지민', seatNo: 3, grade: '고2' },
-        ];
-        for (const s of mockStudents) {
-          const sRef = adminDb.doc(`centers/${fixedCenterId}/students/${s.id}`);
-          const aRef = adminDb.doc(`centers/${fixedCenterId}/attendanceCurrent/${s.id}`);
-          transaction.set(sRef, { ...s, targetDailyMinutes: 360, createdAt: timestamp }, { merge: true });
-          transaction.set(aRef, { seatNo: s.seatNo, status: 'studying', updatedAt: timestamp }, { merge: true });
-        }
       }
 
       return { ok: true, message: `${role === 'teacher' ? '선생님' : '학생'} 가입이 완료되었습니다!` };
