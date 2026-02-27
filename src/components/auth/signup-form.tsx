@@ -67,13 +67,15 @@ export function SignupForm() {
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
       // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입
-      // 참고: 초대 코드가 역할을 결정하므로, 폼에서 선택한 역할과 코드가 일치해야 함
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
         toast({ title: '가입 성공', description: result.message });
-        router.push('/dashboard');
-        setTimeout(() => window.location.reload(), 500);
+        // 세션 갱신을 위해 잠시 대기 후 이동
+        setTimeout(() => {
+          router.push('/dashboard');
+          window.location.reload();
+        }, 800);
       }
     } catch (error: any) {
       console.error('Signup Error:', error);
@@ -82,7 +84,6 @@ export function SignupForm() {
         title: '가입 실패',
         description: error.message || '오류가 발생했습니다. 초대 코드를 확인해 주세요.',
       });
-    } finally {
       setIsLoading(false);
     }
   }
@@ -178,7 +179,7 @@ export function SignupForm() {
 
         <Button type="submit" className="w-full h-12 rounded-xl font-bold mt-2" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLoading ? '가입 중...' : '가입 및 센터 참여'}
+          {isLoading ? '처리 중...' : '가입 및 센터 참여'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">
