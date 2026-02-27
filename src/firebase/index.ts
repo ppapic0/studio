@@ -13,7 +13,7 @@ import {
 import { getFunctions, Functions } from 'firebase/functions';
 
 /**
- * 프로젝트 전역에서 공유될 Firebase 서비스 인스턴스 (싱글톤 관리)
+ * 프로젝트 전역에서 공유될 Firebase 서비스 인스턴스 (싱글톤)
  */
 let firebaseApp: FirebaseApp;
 let firestore: Firestore;
@@ -31,12 +31,10 @@ export function initializeFirebase() {
     return getSdks(firebaseApp);
   }
 
-  // 1. Firebase App 초기화 (src/firebase/config.ts의 프로덕션 설정 사용)
+  // 1. Firebase App 초기화
   firebaseApp = initializeApp(firebaseConfig);
 
-  // 2. Firestore 초기화
-  // host와 ssl을 명시하여 프로덕션(firestore.googleapis.com) 연결을 보장하고,
-  // 안정적인 다중 탭 캐시를 활성화합니다.
+  // 2. Firestore 초기화 (프로덕션 호스트 명시 및 오프라인 캐시 설정)
   firestore = initializeFirestore(firebaseApp, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     host: 'firestore.googleapis.com',
@@ -54,7 +52,6 @@ export function initializeFirebase() {
  * 초기화된 앱 인스턴스로부터 서비스 인스턴스들을 안전하게 가져오는 헬퍼 함수
  */
 export function getSdks(app: FirebaseApp) {
-  // initializeFirestore가 이미 호출된 경우 getFirestore는 해당 설정을 가진 인스턴스를 반환합니다.
   if (!firestore) {
     firestore = getFirestore(app);
   }
