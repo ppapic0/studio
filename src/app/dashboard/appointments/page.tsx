@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -84,12 +83,13 @@ export default function AppointmentsPage() {
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     const role = activeMembership.role;
+    const uid = user.uid;
     
     // 1. 학생: 본인 예약만 조회 ( studentId 필터 필수 )
     if (role === 'student') {
       return query(
         baseRef, 
-        where('studentId', '==', user.uid), 
+        where('studentId', '==', uid), 
         orderBy('startAt', 'desc')
       );
     } 
@@ -109,7 +109,7 @@ export default function AppointmentsPage() {
     if (role === 'teacher') {
       return query(
         baseRef, 
-        where('teacherId', '==', user.uid), 
+        where('teacherId', '==', uid), 
         orderBy('startAt', 'desc')
       );
     } 
