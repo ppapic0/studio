@@ -254,8 +254,8 @@ export default function StudyPlanPage() {
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(0.1) }, // 밸런스: 항목당 0.1점 (하루 최대 약 1점 목표)
-        currentXp: increment(10), // 밸런스: 항목당 10XP
+        stats: { achievement: increment(0.05) }, // Calibration: 20 items = 1pt Achievement
+        currentXp: increment(10), // Small bonus XP for task completion
         updatedAt: serverTimestamp()
       }, { merge: true });
     }
