@@ -60,18 +60,19 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     setIsLoading(true);
+    
     try {
+      // 1. 계정 생성
       setLoadingStatus('계정 생성 중...');
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
-      
       await updateProfile(user, { displayName: values.displayName });
 
-      const centerId = 'learning-lab-dongbaek'; // 고정 센터 ID
+      const centerId = 'learning-lab-dongbaek'; 
       const timestamp = serverTimestamp();
 
-      // 1. 프로필 정보 저장
-      setLoadingStatus('프로필 저장 중...');
+      // 2. 프로필 정보 저장
+      setLoadingStatus('프로필 정보 등록 중...');
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
@@ -80,8 +81,8 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 2. 센터 정보 존재 확인 및 생성 (없을 경우에만)
-      setLoadingStatus('센터 정보 확인 중...');
+      // 3. 센터 정보 존재 확인 및 생성
+      setLoadingStatus('센터 연결 설정 중...');
       const centerRef = doc(firestore, 'centers', centerId);
       const centerSnap = await getDoc(centerRef);
       if (!centerSnap.exists()) {
@@ -94,8 +95,7 @@ export function SignupForm() {
         });
       }
 
-      // 3. 멤버십 문서 생성 (보안 규칙 통과를 위해 필수)
-      setLoadingStatus('멤버십 설정 중...');
+      // 4. 멤버십 문서 생성 (보안 규칙 필수 경로)
       await setDoc(doc(firestore, 'centers', centerId, 'members', user.uid), {
         id: user.uid,
         centerId: centerId,
@@ -105,7 +105,7 @@ export function SignupForm() {
         displayName: values.displayName,
       });
 
-      // 4. 사용자 센터 역인덱스 생성 (AuthGuard 감지용)
+      // 5. 사용자 센터 역인덱스 생성 (AuthGuard 감지용)
       await setDoc(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
         id: centerId,
         centerId: centerId,
@@ -114,9 +114,9 @@ export function SignupForm() {
         joinedAt: timestamp,
       });
 
-      // 5. 학생일 경우 성장 로드맵 초기화
+      // 6. 학생일 경우 추가 데이터 초기화
       if (values.role === 'student') {
-        setLoadingStatus('성장 로드맵 초기화 중...');
+        setLoadingStatus('학습 성장 로드맵 생성 중...');
         await setDoc(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
           level: 1,
           currentXp: 0,
@@ -127,10 +127,10 @@ export function SignupForm() {
         });
       }
 
-      setLoadingStatus('완료! 대시보드로 이동합니다...');
+      setLoadingStatus('완료! 대시보드로 이동합니다.');
       toast({ title: '가입 성공', description: '환영합니다!' });
       
-      // 즉시 이동
+      // 즉시 페이지 이동
       window.location.href = '/dashboard';
 
     } catch (error: any) {
@@ -195,18 +195,8 @@ export function SignupForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="student">
-                    <div className="flex items-center gap-2">
-                      <UserCircle className="h-4 w-4" />
-                      <span>학생 (공부하러 왔어요)</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="teacher">
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4" />
-                      <span>선생님 (학생을 관리할게요)</span>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="student">학생</SelectItem>
+                  <SelectItem value="teacher">선생님</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -231,9 +221,9 @@ export function SignupForm() {
           )}
         />
 
-        <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg mt-2 shadow-xl active:scale-95 transition-all" disabled={isLoading}>
+        <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg mt-2 shadow-xl" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-          {isLoading ? (loadingStatus || '처리 중...') : '가입 및 센터 참여'}
+          {isLoading ? (loadingStatus || '처리 중...') : '가입 완료'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm font-bold text-muted-foreground">
