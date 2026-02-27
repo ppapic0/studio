@@ -65,15 +65,14 @@ export function SignupForm() {
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
       // 2. 서버 액션을 통해 초대 코드 사용 및 센터 가입
-      // 이 작업이 완료될 때까지 기다려야 Guard가 올바른 데이터를 읽습니다.
+      // 가입 처리가 완료될 때까지 기다림
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
         toast({ title: '가입 성공', description: result.message });
         
-        // 중요: router.push 대신 window.location.href를 사용합니다.
-        // 이는 클라이언트 앱 상태(AppContext 등)를 완전히 초기화하고 
-        // AuthGuard가 새로운 유저 세션에서 멤버십을 처음부터 다시 조회하도록 강제합니다.
+        // 중요: window.location.href를 사용하여 앱 전체 상태를 리셋하고 리디렉션
+        // AuthGuard가 새로운 멤버십 정보를 처음부터 다시 읽도록 강제함
         window.location.href = '/dashboard';
       }
     } catch (error: any) {
@@ -132,7 +131,7 @@ export function SignupForm() {
               <FormLabel>가입 역할</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-12 rounded-xl">
+                  <SelectTrigger className="h-12 rounded-xl border-2">
                     <SelectValue placeholder="역할을 선택하세요" />
                   </SelectTrigger>
                 </FormControl>
@@ -151,8 +150,8 @@ export function SignupForm() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription className="text-[10px]">
-                선택한 역할에 맞는 초대 코드를 입력해야 합니다.
+              <FormDescription className="text-[10px] font-bold">
+                센터 성격에 맞는 역할을 선택해주세요.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -165,24 +164,24 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>초대 코드</FormLabel>
-              <FormControl><Input placeholder="코드 입력" {...field} /></FormControl>
-              <FormDescription className="text-[10px] font-bold text-primary">
+              <FormControl><Input placeholder="코드 입력" {...field} className="h-12 rounded-xl border-2" /></FormControl>
+              <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
                 {form.watch('role') === 'teacher' 
-                  ? '선생님용 테스트 코드: T0313' 
-                  : '학생용 테스트 코드: 0313'}
+                  ? '💡 선생님용 테스트 코드: T0313' 
+                  : '💡 학생용 테스트 코드: 0313'}
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full h-12 rounded-xl font-bold mt-2" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg mt-2 shadow-xl active:scale-95 transition-all" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
           {isLoading ? '처리 중...' : '가입 및 센터 참여'}
         </Button>
       </form>
-      <div className="mt-4 text-center text-sm">
-        이미 계정이 있으신가요? <Link href="/login" className="underline">로그인</Link>
+      <div className="mt-4 text-center text-sm font-bold text-muted-foreground">
+        이미 계정이 있으신가요? <Link href="/login" className="underline text-primary">로그인</Link>
       </div>
     </Form>
   );
