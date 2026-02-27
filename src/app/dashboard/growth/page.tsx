@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { GrowthProgress, SkillNode } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -83,7 +83,8 @@ const STAT_CONFIG = {
 };
 
 const MAX_LEVEL = 30;
-const TOTAL_MASTER_XP = 150000; 
+const XP_PER_LEVEL = 5000; // 150,000 XP / 30 levels
+const TOTAL_MASTER_XP = MAX_LEVEL * XP_PER_LEVEL; 
 
 function SystemGuideDialog() {
   return (
@@ -147,7 +148,8 @@ function SystemGuideDialog() {
             <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 text-[11px] font-bold leading-relaxed text-muted-foreground">
               - **1분 몰입 = 1 XP** (기본)<br/>
               - 스킬 해금 시 **XP 획득 배율(Multiplier)**이 상승하여 성장 속도가 빨라집니다.<br/>
-              - 마스터 보너스를 포함하여 하루 **평균 500 XP**를 획득해야 300일 뒤 Lv.30에 도달합니다.
+              - 마스터 보너스를 포함하여 하루 **평균 500 XP**를 획득해야 300일 뒤 Lv.30에 도달합니다.<br/>
+              - **레벨업**: {XP_PER_LEVEL.toLocaleString()} XP를 모을 때마다 다음 레벨로 승급합니다.
             </div>
           </div>
         </div>
@@ -175,6 +177,27 @@ export default function GrowthPage() {
   }, [firestore, activeMembership, targetUid]);
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
+
+  // 자동 레벨업 로직
+  useEffect(() => {
+    if (progress && progressRef && progress.currentXp >= (progress.nextLevelXp || XP_PER_LEVEL)) {
+      const nextXpThreshold = progress.nextLevelXp || XP_PER_LEVEL;
+      const overflowXp = progress.currentXp - nextXpThreshold;
+      const newLevel = progress.level + 1;
+
+      updateDoc(progressRef, {
+        level: increment(1),
+        currentXp: overflowXp,
+        nextLevelXp: XP_PER_LEVEL, // 일관성을 위해 5000으로 강제 업데이트
+        updatedAt: serverTimestamp()
+      }).then(() => {
+        toast({
+          title: "🎉 레벨 업!",
+          description: `축하합니다! 마스터리 Lv.${newLevel}에 도달하셨습니다.`,
+        });
+      });
+    }
+  }, [progress, progressRef, toast]);
 
   // 실시간 마스터리 보너스 계산
   const totalMultiplier = useMemo(() => {
@@ -230,7 +253,7 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
-  const currentTotalXp = (progress?.level || 1) * (progress?.nextLevelXp || 1000) + (progress?.currentXp || 0); 
+  const currentTotalXp = ((progress?.level || 1) - 1) * XP_PER_LEVEL + (progress?.currentXp || 0); 
   const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_XP - currentTotalXp) / 500); // 500 effective XP per day target
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
 
@@ -388,7 +411,7 @@ export default function GrowthPage() {
               <svg className="h-20 w-20 transform -rotate-90">
                 <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-muted/30" />
                 <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-primary" 
-                  style={{ strokeDasharray: 213.6, strokeDashoffset: 213.6 - (213.6 * (progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) }} 
+                  style={{ strokeDasharray: 213.6, strokeDashoffset: 213.6 - (213.6 * (progress?.currentXp || 0) / (progress?.nextLevelXp || XP_PER_LEVEL)) }} 
                 />
               </svg>
               <div className="absolute flex flex-col items-center leading-none">
@@ -399,9 +422,9 @@ export default function GrowthPage() {
             <div className="flex-1 flex flex-col gap-1.5">
               <div className="flex justify-between items-end">
                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">마스터리 숙련도</span>
-                <span className="text-[10px] font-bold">{progress?.currentXp || 0} / {progress?.nextLevelXp || 1000} XP</span>
+                <span className="text-[10px] font-bold">{progress?.currentXp || 0} / {progress?.nextLevelXp || XP_PER_LEVEL} XP</span>
               </div>
-              <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) * 100} className="h-2.5 rounded-full shadow-inner" />
+              <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || XP_PER_LEVEL)) * 100} className="h-2.5 rounded-full shadow-inner" />
               <div className="flex justify-between items-center mt-0.5">
                 <span className="text-[9px] font-black text-primary/60">목표: Lv.{MAX_LEVEL}</span>
                 <span className="text-[9px] font-black text-muted-foreground flex items-center gap-1">

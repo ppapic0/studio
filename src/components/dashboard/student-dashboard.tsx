@@ -54,8 +54,8 @@ import {
 import { useDoc, useCollection, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress } from '@/lib/types';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
 import { format, startOfMonth, differenceInDays, addMonths } from 'date-fns';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -85,6 +85,7 @@ const RANK_THRESHOLDS: Record<MetricType, number[]> = {
 
 const AUTO_TERMINATE_SECONDS = 7200; // 2시간
 const GRACE_PERIOD_SECONDS = 60; // 1분
+const XP_PER_LEVEL = 5000;
 
 function getRankData(value: number, type: MetricType) {
   const thresholds = RANK_THRESHOLDS[type];
@@ -419,7 +420,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(0.05) }, // Calibration: 20 tasks = 1pt
+        stats: { achievement: increment(0.05) }, 
         currentXp: increment(10),
         updatedAt: serverTimestamp()
       }, { merge: true });
@@ -439,7 +440,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     });
   };
 
-  const saveStudyTime = () => {
+  const saveStudyTime = async () => {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
     
     const sessionMinutes = Math.floor(secondsElapsed / 60);
@@ -465,18 +466,33 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
 
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-    // Calibration: 1,000 minutes = 1pt Focus. 6 hours (360m) = 0.36pt.
     const focusGain = (sessionMinutes / 1000); 
     
-    setDoc(progressRef, {
+    await setDoc(progressRef, {
       stats: {
         focus: increment(Number(focusGain.toFixed(4))),
-        consistency: increment(0.1), // Calibration: 10 sessions = 1pt
-        resilience: sessionMinutes >= 360 ? increment(0.5) : increment(0) // 6 hours ultra-session = 0.5pt
+        consistency: increment(0.1), 
+        resilience: sessionMinutes >= 360 ? increment(0.5) : increment(0) 
       },
-      currentXp: increment(sessionMinutes), // 1 min = 1 base XP
+      currentXp: increment(sessionMinutes), 
       updatedAt: serverTimestamp()
     }, { merge: true });
+
+    // 레벨업 체크
+    const snap = await getDoc(progressRef);
+    if (snap.exists()) {
+      const p = snap.data() as GrowthProgress;
+      if (p.currentXp >= (p.nextLevelXp || XP_PER_LEVEL)) {
+        const threshold = p.nextLevelXp || XP_PER_LEVEL;
+        const overflow = p.currentXp - threshold;
+        updateDoc(progressRef, {
+          level: increment(1),
+          currentXp: overflow,
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: "🎉 레벨 업!", description: "학습 후 새로운 레벨에 도달하셨습니다!" });
+      }
+    }
   };
 
   const handleStudyStartStop = () => {

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb } from './firebase-admin';
@@ -114,7 +115,7 @@ export async function devJoinCenterAction(data: { uid: string, centerId: string,
 export async function seedInitialData(uid: string, centerId: string) {
   const timestamp = FieldValue.serverTimestamp();
   const dateKey = new Date().toISOString().split('T')[0];
-  const weekId = `2024-W01`; // 예시 주차 ID
+  const weekId = `2024-W01`; 
 
   const batch = adminDb.batch();
 
@@ -155,19 +156,6 @@ export async function seedInitialData(uid: string, centerId: string) {
     updatedAt: timestamp,
   });
 
-  const apt2 = adminDb.collection(`centers/${centerId}/appointments`).doc();
-  batch.set(apt2, {
-    studentId: uid,
-    studentName: "테스트 학생",
-    teacherId: "teacher_placeholder",
-    startAt: timestamp,
-    endAt: timestamp,
-    status: "requested",
-    createdByRole: "student",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
   // 4. counselingNotes
   const note1 = adminDb.collection(`centers/${centerId}/counselingNotes`).doc();
   batch.set(note1, {
@@ -175,17 +163,6 @@ export async function seedInitialData(uid: string, centerId: string) {
     studentName: "테스트 학생",
     teacherId: "teacher_placeholder",
     content: "학습 루틴 점검 및 목표 설정. 수학 미적분 위주로 학습 계획을 수립함.",
-    visibility: "student_and_parent",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
-  const note2 = adminDb.collection(`centers/${centerId}/counselingNotes`).doc();
-  batch.set(note2, {
-    studentId: uid,
-    studentName: "테스트 학생",
-    teacherId: "teacher_placeholder",
-    content: "시간관리 및 오답정리 피드백. 국어 독서 파트의 집중력 향상이 필요함.",
     visibility: "student_and_parent",
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -224,7 +201,7 @@ export async function seedInitialData(uid: string, centerId: string) {
   batch.set(adminDb.doc(`centers/${centerId}/growthProgress/${uid}`), {
     level: 1,
     currentXp: 150,
-    nextLevelXp: 1000,
+    nextLevelXp: 5000,
     stats: { focus: 15, consistency: 10, achievement: 5, resilience: 8 },
     updatedAt: timestamp,
   });
