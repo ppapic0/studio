@@ -30,7 +30,6 @@ service cloud.firestore {
     }
 
     match /centers/{centerId} {
-      // 센터 기본 정보는 인증된 사용자라면 누구나 읽기 가능
       allow read: if isSignedIn();
 
       match /members/{memberId} {
@@ -39,6 +38,8 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
+        // read는 get과 list를 모두 포함합니다.
+        // 쿼리(list) 요청 시 resource.data 조건이 쿼리의 where 조건과 일치해야 승인됩니다.
         allow read: if isSignedIn() && (
           (resource.data.studentId == request.auth.uid) ||
           (resource.data.teacherId == request.auth.uid) ||
@@ -64,7 +65,7 @@ service cloud.firestore {
       match /counselingNotes/{noteId} {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          (resource.data.visibility == 'student_and_parent' && 
+          (resource.data.get('visibility', 'student_and_parent') == 'student_and_parent' && 
            (request.auth.uid == resource.data.studentId || isParentOf(centerId, resource.data.studentId)))
         );
         allow write: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
