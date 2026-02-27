@@ -42,14 +42,9 @@ service cloud.firestore {
 
       // 상담 예약 (Appointments)
       match /appointments/{appointmentId} {
-        allow get: if isSignedIn() && (
+        // 학생은 본인의 예약만, 스태프는 전체 조회 가능
+        allow read: if isSignedIn() && (
           resource.data.studentId == request.auth.uid ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-
-        // ✅ list는 resource.data 쓰면 안 됨. 학생은 쿼리로 본인 데이터만 가져오게 운영.
-        allow list: if isSignedIn() && (
-          getRole(centerId, request.auth.uid) == 'student' ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
 
@@ -69,15 +64,10 @@ service cloud.firestore {
 
       // 상담일지 (Counseling Notes)
       match /counselingNotes/{noteId} {
-        allow get: if isSignedIn() && (
+        // 학생은 공개된 본인 일지만, 스태프는 전체 조회 가능
+        allow read: if isSignedIn() && (
           (resource.data.studentId == request.auth.uid &&
            resource.data.visibility == 'student_and_parent') ||
-          hasRole(centerId, ['centerAdmin', 'teacher'])
-        );
-
-        // ✅ list는 쿼리 검증 대신(환경 이슈 피함) 학생 role이면 허용
-        allow list: if isSignedIn() && (
-          getRole(centerId, request.auth.uid) == 'student' ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
 
