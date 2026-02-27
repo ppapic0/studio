@@ -8,6 +8,7 @@ import { useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2, RefreshCw, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -36,9 +37,9 @@ export default function DashboardPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingGrace, setIsCheckingGrace] = useState(true);
 
-  // 가입 직후 데이터 전파 지연을 대비해 3초간은 로딩 유지
+  // 데이터 전파 지연을 고려하여 진입 후 3초간은 로딩을 유지하며 백그라운드에서 데이터를 기다림
   useEffect(() => {
-    const timer = setTimeout(() => setIsCheckingGrace(false), 3000);
+    const timer = setTimeout(() => setIsCheckingGrace(false), 3500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -63,7 +64,7 @@ export default function DashboardPage() {
     }
   }
 
-  // 로딩 상태 (멤버십 로딩 중이거나 가입 직후 대기 시간인 경우)
+  // 1. 초기 로딩 상태
   if (membershipsLoading || (isCheckingGrace && !activeMembership)) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
@@ -72,14 +73,14 @@ export default function DashboardPage() {
           <Compass className="h-12 w-12 text-primary absolute inset-0 animate-pulse" />
         </div>
         <div className="text-center space-y-2">
-          <p className="text-xl font-black text-primary tracking-tighter">프로필 정보를 불러오는 중입니다</p>
+          <p className="text-xl font-black text-primary tracking-tighter">멤버십 정보를 동기화하고 있습니다</p>
           <p className="text-sm font-bold text-muted-foreground italic">잠시만 기다려주시면 대시보드가 준비됩니다...</p>
         </div>
       </div>
     );
   }
 
-  // 확실히 멤버십이 없는 경우
+  // 2. 충분히 기다렸음에도 멤버십이 없는 경우
   if (!activeMembership) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
@@ -88,10 +89,10 @@ export default function DashboardPage() {
             <RefreshCw className="h-12 w-12 text-primary animate-spin-slow" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tighter">아직 소속된 센터가 없습니다</h1>
+            <h1 className="text-4xl font-black tracking-tighter">소속된 센터를 찾을 수 없습니다</h1>
             <p className="text-muted-foreground font-bold max-w-sm mx-auto leading-relaxed">
-              가입을 완료하셨다면 잠시 후 자동으로 전환됩니다.<br/>
-              변화가 없다면 아래 버튼을 눌러주세요.
+              방금 가입하셨다면 서버 동기화에 몇 초가 소요될 수 있습니다.<br/>
+              정보가 나타나지 않으면 아래 버튼을 눌러주세요.
             </p>
           </div>
         </div>
@@ -108,7 +109,7 @@ export default function DashboardPage() {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black shadow-xl">초대 코드로 가입</Button>
+              <Button size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black shadow-xl">초대 코드로 재가입</Button>
             </DialogTrigger>
             <DialogContent className="rounded-[2.5rem] p-8 border-none shadow-2xl">
               <DialogHeader>
@@ -123,14 +124,14 @@ export default function DashboardPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="font-black text-xs uppercase tracking-widest text-primary/70">코드를 입력하세요</FormLabel>
-                        <FormControl><Input placeholder="예: 0313" {...field} className="h-14 rounded-xl border-2 text-xl font-black tracking-widest" /></FormControl>
+                        <FormControl><Input placeholder="예: T0313" {...field} className="h-14 rounded-xl border-2 text-xl font-black tracking-widest" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <DialogFooter>
                     <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">
-                      {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '센터 가입하기'}
+                      {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '멤버십 생성하기'}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -142,18 +143,19 @@ export default function DashboardPage() {
     );
   }
 
+  // 3. 정상적인 멤버십 보유 상태
   const userRole = activeMembership.role;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
         <h1 className="text-4xl font-black tracking-tighter">
-          {user?.displayName}님, {userRole === 'teacher' ? '선생님' : '학생'} 모드
+          {user?.displayName}님, {userRole === 'teacher' ? '선생님' : '학생'} 대시보드
         </h1>
         <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none uppercase tracking-tighter">
           {userRole}
         </Badge>
       </div>
-      <p className="text-muted-foreground font-bold italic mb-8 ml-1">공부트랙 동백센터의 실시간 지표를 분석 중입니다.</p>
+      <p className="text-muted-foreground font-bold italic mb-8 ml-1">공부트랙 동백센터의 데이터를 실시간으로 모니터링 중입니다.</p>
       
       <div className="flex flex-col gap-8">
         <StudentDashboard isActive={userRole === 'student'} />

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -63,19 +62,22 @@ export function SignupForm() {
     try {
       setLoadingStatus('계정 생성 중...');
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      
+      // 프로필 업데이트 완료 대기
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
-      setLoadingStatus('센터 가입 처리 중...');
+      setLoadingStatus('센터 가입 및 멤버십 설정 중...');
+      // 서버에서 모든 문서를 원자적으로 생성 (트랜잭션)
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
-        setLoadingStatus('대시보드 준비 중...');
+        setLoadingStatus('데이터 동기화 및 대시보드 준비 중...');
         toast({ title: '가입 성공', description: result.message });
         
-        // 중요: Firestore 데이터 전파를 위해 아주 잠시 대기 후 리디렉션
+        // 데이터 전파(Replication)를 위해 2초 대기 후 전체 새로고침 리디렉션
         setTimeout(() => {
           window.location.href = '/dashboard';
-        }, 1500);
+        }, 2000);
       }
     } catch (error: any) {
       console.error('Signup Error:', error);
