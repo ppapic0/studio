@@ -1,124 +1,119 @@
-"use strict";
-var _a;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.devJoinCenter = exports.redeemInviteCode = void 0;
+"use client";
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
+
 const db = admin.firestore();
-const DEV_SECRET = (_a = functions.config().dev) === null || _a === void 0 ? void 0 : _a.secret;
-/**
- * 데이터 생성 부트스트랩 로직
- */
-async function bootstrapUserToCenter(transaction, uid, email, displayName, centerId, role) {
-    const timestamp = admin.firestore.FieldValue.serverTimestamp();
-    const centerRef = db.doc(`centers/${centerId}`);
-    const userRef = db.doc(`users/${uid}`);
-    const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
-    const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
-    // 1. 센터 자동 생성 (동백센터 전용 이름 설정)
-    const centerSnap = await transaction.get(centerRef);
-    if (!centerSnap.exists) {
-        transaction.set(centerRef, {
-            id: centerId,
-            name: centerId === 'learning-lab-dongbaek' ? "공부트랙 동백센터" : `센터 (${centerId})`,
-            subscriptionTier: "Pro",
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        });
-    }
-    // 2. 사용자 프로필
-    transaction.set(userRef, {
-        id: uid,
-        email,
-        displayName,
-        updatedAt: timestamp,
-        createdAt: timestamp,
-    }, { merge: true });
-    // 3. 센터 멤버십
-    transaction.set(memberRef, {
-        role,
-        status: "active",
-        joinedAt: timestamp,
-        displayName,
-    });
-    // 4. 사용자 센터 인덱스 (역인덱스)
-    transaction.set(userCenterRef, {
-        role,
-        status: "active",
-        joinedAt: timestamp,
-    });
-}
-/**
- * 리전을 asia-northeast3 (서울)로 명시적으로 설정
- */
 const region = "asia-northeast3";
-exports.redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
-    if (!context.auth)
-        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    const { code } = data;
-    if (!code)
-        throw new functions.https.HttpsError("invalid-argument", "초대 코드가 누락되었습니다.");
-    const uid = context.auth.uid;
-    const email = context.auth.token.email || `${uid}@example.com`;
-    const displayName = context.auth.token.name || email.split('@')[0];
-    console.log(`Attempting to redeem code: ${code} for user: ${uid}`);
-    try {
-        return await db.runTransaction(async (transaction) => {
-            // 1. 최상위 /inviteCodes 에서 검색 (문서 ID가 코드인 경우)
-            const inviteRef = db.doc(`inviteCodes/${code}`);
-            const inviteSnap = await transaction.get(inviteRef);
-            if (!inviteSnap.exists) {
-                console.error(`Invite code not found: ${code}`);
-                throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다.");
-            }
-            const inviteData = inviteSnap.data();
-            const centerId = inviteData.centerId;
-            const role = inviteData.intendedRole || 'student';
-            if (!centerId) {
-                throw new functions.https.HttpsError("failed-precondition", "초대 코드에 연결된 센터 정보가 없습니다.");
-            }
-            if (inviteData.maxUses && inviteData.usedCount >= inviteData.maxUses) {
-                throw new functions.https.HttpsError("resource-exhausted", "이 초대 코드는 더 이상 사용할 수 없습니다.");
-            }
-            // 부트스트랩 및 가입 처리
-            await bootstrapUserToCenter(transaction, uid, email, displayName, centerId, role);
-            // 코드 사용 횟수 업데이트
-            transaction.update(inviteRef, {
-                usedCount: admin.firestore.FieldValue.increment(1),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            return { ok: true, message: "가입이 완료되었습니다!" };
-        });
-    }
-    catch (error) {
-        console.error("Redeem Transaction Error:", error);
-        if (error instanceof functions.https.HttpsError)
-            throw error;
-        throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류");
-    }
-});
-exports.devJoinCenter = functions.region(region).https.onCall(async (data, context) => {
-    if (!context.auth)
+
+exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
+    if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
-    const { centerId, role, devSecret } = data;
-    if (process.env.FUNCTIONS_EMULATOR !== 'true' && devSecret !== DEV_SECRET) {
-        throw new functions.https.HttpsError("permission-denied", "비밀 키가 올바르지 않습니다.");
     }
-    const uid = context.auth.uid;
-    const email = context.auth.token.email || `${uid}@example.com`;
-    const displayName = context.auth.token.name || "개발자";
+    const { email, password, displayName, schoolName, grade, centerId } = data;
+    if (!email || !password || !displayName || !schoolName || !centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "필수 정보가 누락되었습니다.");
+    }
+    const callerId = context.auth.uid;
     try {
-        await db.runTransaction(async (transaction) => {
-            await bootstrapUserToCenter(transaction, uid, email, displayName, centerId, role);
+        const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
+        if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
+            throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
+        }
+        const userRecord = await admin.auth().createUser({
+            email,
+            password,
+            displayName,
         });
-        return { ok: true, message: "강제 가입 성공!" };
-    }
-    catch (error) {
-        console.error("Dev Join Error:", error);
+        const uid = userRecord.uid;
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
+        await db.runTransaction(async (transaction) => {
+            transaction.set(db.doc(`users/${uid}`), {
+                id: uid,
+                email,
+                displayName,
+                schoolName,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            });
+            transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
+                role: 'student',
+                status: "active",
+                joinedAt: timestamp,
+                displayName,
+            });
+            transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
+                role: 'student',
+                status: "active",
+                joinedAt: timestamp,
+            });
+            transaction.set(db.doc(`centers/${centerId}/students/${uid}`), {
+                id: uid,
+                name: displayName,
+                schoolName,
+                grade,
+                seatNo: 0,
+                targetDailyMinutes: 360,
+                parentUids: [],
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            });
+            transaction.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
+                level: 1,
+                currentXp: 0,
+                nextLevelXp: 1000,
+                stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+                skills: {},
+                updatedAt: timestamp,
+            });
+        });
+        return { ok: true, uid, message: "학생 등록이 완료되었습니다." };
+    } catch (error) {
+        console.error("Register Error:", error);
+        if (error instanceof functions.https.HttpsError) throw error;
+        if (error.code === 'auth/email-already-exists') {
+            throw new functions.https.HttpsError("already-exists", "이미 가입된 이메일 주소입니다.");
+        }
         throw new functions.https.HttpsError("internal", error.message);
     }
 });
-//# sourceMappingURL=index.js.map
+
+exports.redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    const { code } = data;
+    const uid = context.auth.uid;
+    const email = context.auth.token.email || "";
+    const displayName = context.auth.token.name || email.split('@')[0];
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const inviteRef = db.doc(`inviteCodes/${code}`);
+            const inviteSnap = await transaction.get(inviteRef);
+            if (!inviteSnap.exists) throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다.");
+            const inviteData = inviteSnap.data();
+            const centerId = inviteData.centerId;
+            const role = inviteData.intendedRole || 'student';
+            const timestamp = admin.firestore.FieldValue.serverTimestamp();
+            transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
+                role,
+                status: "active",
+                joinedAt: timestamp,
+            });
+            transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
+                role,
+                status: "active",
+                joinedAt: timestamp,
+                displayName,
+            });
+            transaction.update(inviteRef, {
+                usedCount: admin.firestore.FieldValue.increment(1),
+                updatedAt: timestamp
+            });
+            return { ok: true, message: "센터 가입이 완료되었습니다." };
+        });
+    } catch (error) {
+        throw new functions.https.HttpsError("internal", error.message);
+    }
+});

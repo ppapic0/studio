@@ -108,10 +108,12 @@ export default function StudentListPage() {
       }
     } catch (e: any) {
       console.error("Add Student Function Error:", e);
+      // HttpsError의 상세 메시지를 사용자에게 전달
+      const message = e.details?.message || e.message || "서버 오류가 발생했습니다.";
       toast({ 
         variant: "destructive", 
         title: "등록 실패", 
-        description: e.message || "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." 
+        description: message
       });
     } finally {
       setIsSubmitting(false);
@@ -243,7 +245,7 @@ export default function StudentListPage() {
                           <span className="flex items-center gap-1 text-[11px] text-primary/70">
                             <Building2 className="h-3 w-3" /> {student.schoolName || '학교 정보 없음'}
                           </span>
-                          <span>{student.grade} · 목표 {student.targetDailyMinutes}분</span>
+                          <span>{student.grade}</span>
                         </div>
                       </div>
                       <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
