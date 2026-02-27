@@ -188,7 +188,6 @@ export default function InviteCodesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="student">학생</SelectItem>
-                <SelectItem value="parent">학부모</SelectItem>
                 <SelectItem value="teacher">교사</SelectItem>
                 <SelectItem value="centerAdmin">센터 관리자</SelectItem>
               </SelectContent>

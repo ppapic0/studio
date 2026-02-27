@@ -31,8 +31,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
-  Calendar as CalendarIcon, 
-  Clock, 
   Plus, 
   Loader2,
   XCircle,
@@ -72,9 +70,9 @@ export default function AppointmentsPage() {
     note: '',
   });
 
-  const isStudent = activeMembership?.role === 'student';
-  const isTeacher = activeMembership?.role === 'teacher';
-  const isAdmin = activeMembership?.role === 'centerAdmin';
+  const role = activeMembership?.role;
+  const isStudent = role === 'student';
+  const isStaff = role === 'teacher' || role === 'centerAdmin';
 
   // --- 상담 예약 쿼리 ---
   const appointmentsQuery = useMemoFirebase(() => {
@@ -82,24 +80,26 @@ export default function AppointmentsPage() {
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
     if (isStudent) {
+      // 보안 규칙: resource.data.studentId == request.auth.uid
       return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
     }
-    if (isTeacher || isAdmin) {
+    if (isStaff) {
+      // 보안 규칙: getMemberData(...).role in ['centerAdmin', 'teacher']
       return query(baseRef, orderBy('startAt', 'desc'));
     }
     
     return null;
-  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isTeacher, isAdmin]);
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff]);
 
   const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
 
   // --- 상담 일지 쿼리 ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
-    
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
     
     if (isStudent) {
+      // 보안 규칙: studentId == uid && visibility == 'student_and_parent'
       return query(
         baseRef, 
         where('studentId', '==', user.uid), 
@@ -107,12 +107,12 @@ export default function AppointmentsPage() {
         orderBy('createdAt', 'desc')
       );
     }
-    if (isTeacher || isAdmin) {
+    if (isStaff) {
       return query(baseRef, orderBy('createdAt', 'desc'));
     }
 
     return null;
-  }, [firestore, membershipsLoading, activeMembership, user?.uid, isStudent, isTeacher, isAdmin]);
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff]);
 
   const { data: notes, isLoading: notesLoading } = useCollection<CounselingNote>(notesQuery);
 
@@ -155,7 +155,7 @@ export default function AppointmentsPage() {
     switch (status) {
       case 'requested': return <Badge variant="outline" className="bg-amber-50">신청됨</Badge>;
       case 'confirmed': return <Badge variant="secondary" className="bg-blue-50">확정됨</Badge>;
-      case 'completed': return <Badge className="bg-emerald-50">완료</Badge>;
+      case 'completed': return <Badge className="bg-emerald-50 text-emerald-700">완료</Badge>;
       case 'cancelled': return <Badge variant="destructive">취소됨</Badge>;
       default: return <Badge variant="outline">미참석</Badge>;
     }
@@ -220,7 +220,7 @@ export default function AppointmentsPage() {
                       <TableCell>{getStatusBadge(apt.status)}</TableCell>
                       <TableCell className="text-right">
                         {isStudent && apt.status === 'requested' && <Button variant="ghost" onClick={() => updateStatus(apt.id, 'cancelled')}>취소</Button>}
-                        {(isTeacher || isAdmin) && apt.status === 'requested' && <Button variant="outline" onClick={() => updateStatus(apt.id, 'confirmed')}>확정</Button>}
+                        {isStaff && apt.status === 'requested' && <Button variant="outline" onClick={() => updateStatus(apt.id, 'confirmed')}>확정</Button>}
                       </TableCell>
                     </TableRow>
                   ))}
