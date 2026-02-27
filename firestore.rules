@@ -31,18 +31,18 @@ service cloud.firestore {
       // 멤버 정보
       match /members/{memberId} {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow create, write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin'])); 
+        allow create, write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher'])); 
       }
 
-      // 실시간 출결 (수정됨: list 권한 보장)
+      // 실시간 출결
       match /attendanceCurrent/{docId} {
-        allow read: if isSignedIn();
+        allow read, list: if isSignedIn();
         allow write: if isSignedIn();
       }
 
-      // 학생 프로필 (수정됨: list 권한 보장)
+      // 학생 프로필
       match /students/{studentId} {
-        allow read: if isSignedIn();
+        allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
@@ -52,24 +52,38 @@ service cloud.firestore {
         allow create, write: if isSignedIn() && request.auth.uid == uid;
       }
       
-      // 상담 예약
+      // 상담 예약 (counselingReservations로 통일)
       match /counselingReservations/{resId} {
-        allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow get: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow list: if isSignedIn() && (hasRole(centerId, ['teacher', 'centerAdmin']) || request.query.limit <= 100);
         allow create: if isSignedIn();
         allow update: if hasRole(centerId, ['teacher', 'centerAdmin']) || (isSignedIn() && resource.data.studentId == request.auth.uid);
       }
 
-      // 상담 일지
+      // 상담 일지 (counselingLogs로 통일)
       match /counselingLogs/{logId} {
-        allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow get: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
         allow create: if hasRole(centerId, ['teacher', 'centerAdmin']);
         allow update: if hasRole(centerId, ['centerAdmin']) || (hasRole(centerId, ['teacher']) && resource.data.teacherId == request.auth.uid);
       }
 
       // 학습 계획
       match /studyPlans/{planId} {
-        allow read: if isSignedIn();
+        allow read, list: if isSignedIn();
         allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
+
+      // 학생별 세부 계획 경로
+      match /plans/{studentId}/weeks/{weekId}/items/{itemId} {
+        allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow create, write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
+      // 학습 로그
+      match /studyLogs/{studentId}/days/{dateKey} {
+        allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow create, write: if isSignedIn() && request.auth.uid == studentId;
       }
     }
 
@@ -77,13 +91,14 @@ service cloud.firestore {
     match /userCenters/{userId} {
       allow read, list: if isSignedIn() && request.auth.uid == userId;
       match /centers/{centerId} {
-        allow read, create, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, list, create, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
     // 초대 코드
     match /inviteCodes/{code} {
       allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
     }
   }
 }
