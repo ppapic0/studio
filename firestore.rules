@@ -25,18 +25,24 @@ service cloud.firestore {
     }
 
     match /centers/{centerId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn(); // 센터 생성 허용
+      allow get: if isSignedIn();
+      allow create: if isSignedIn(); 
 
-      // 멤버 정보 (가입 시 본인 문서 작성 허용)
+      // 멤버 정보
       match /members/{memberId} {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow create, write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin'])); 
       }
 
-      // 학생 프로필
+      // 실시간 출결 (수정됨: list 권한 보장)
+      match /attendanceCurrent/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
+      }
+
+      // 학생 프로필 (수정됨: list 권한 보장)
       match /students/{studentId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow read: if isSignedIn();
         allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
@@ -59,9 +65,15 @@ service cloud.firestore {
         allow create: if hasRole(centerId, ['teacher', 'centerAdmin']);
         allow update: if hasRole(centerId, ['centerAdmin']) || (hasRole(centerId, ['teacher']) && resource.data.teacherId == request.auth.uid);
       }
+
+      // 학습 계획
+      match /studyPlans/{planId} {
+        allow read: if isSignedIn();
+        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
     }
 
-    // 사용자 멤버십 역인덱스 (가입 시 본인 문서 작성 허용)
+    // 사용자 멤버십 역인덱스 (AuthGuard 핵심 경로)
     match /userCenters/{userId} {
       allow read, list: if isSignedIn() && request.auth.uid == userId;
       match /centers/{centerId} {
@@ -71,7 +83,7 @@ service cloud.firestore {
 
     // 초대 코드
     match /inviteCodes/{code} {
-      allow get: if isSignedIn();
+      allow read: if isSignedIn();
     }
   }
 }

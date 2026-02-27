@@ -35,13 +35,13 @@ export default function DashboardPage() {
   const { activeMembership, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCheckingGrace, setIsCheckingGrace] = useState(true);
+  const [showRetry, setShowRetry] = useState(false);
 
-  // 가입 후 데이터 전파 지연을 고려하여 5초간 끈기 있게 기다림
+  // 가입 직후 데이터 동기화 시간을 고려하여 5초간 끈기 있게 기다림
   useEffect(() => {
-    const timer = setTimeout(() => setIsCheckingGrace(false), 5000);
+    const timer = setTimeout(() => setShowRetry(true), 5000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [activeMembership]);
 
   const form = useForm<z.infer<typeof inviteFormSchema>>({
     resolver: zodResolver(inviteFormSchema),
@@ -64,8 +64,8 @@ export default function DashboardPage() {
     }
   }
 
-  // 1. 로딩 상태 (멤버십 로딩 중이거나 가입 직후 대기 시간인 경우)
-  if (membershipsLoading || (isCheckingGrace && !activeMembership)) {
+  // 1. 멤버십 정보를 찾는 중 (로딩)
+  if (membershipsLoading || (!activeMembership && !showRetry)) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
         <div className="relative">
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     );
   }
 
-  // 2. 충분히 기다렸음에도 멤버십이 없는 경우 (진짜 가입 안 된 경우)
+  // 2. 충분히 기다렸음에도 멤버십이 없는 경우
   if (!activeMembership) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
@@ -92,7 +92,7 @@ export default function DashboardPage() {
             <h1 className="text-4xl font-black tracking-tighter">소속된 센터가 없습니다</h1>
             <p className="text-muted-foreground font-bold max-w-sm mx-auto leading-relaxed">
               회원가입 시 초대 코드를 정확히 입력하셨나요?<br/>
-              정보가 나타나지 않으면 아래 버튼을 눌러주세요.
+              정보가 나타나지 않으면 '다시 확인'을 눌러주세요.
             </p>
           </div>
         </div>
@@ -119,7 +119,6 @@ export default function DashboardPage() {
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onInviteSubmit)} className="space-y-6 pt-4">
                   <FormField
-                    control={form.control}
                     name="inviteCode"
                     render={({ field }) => (
                       <FormItem>

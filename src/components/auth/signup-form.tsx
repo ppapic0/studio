@@ -24,10 +24,10 @@ import {
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, collection, writeBatch } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserCircle, GraduationCap } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   displayName: z.string().min(2, '이름은 2자 이상이어야 합니다.'),
@@ -62,7 +62,6 @@ export function SignupForm() {
     setIsLoading(true);
     
     try {
-      // 1. 계정 생성
       setLoadingStatus('계정 생성 중...');
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
@@ -71,9 +70,13 @@ export function SignupForm() {
       const centerId = 'learning-lab-dongbaek'; 
       const timestamp = serverTimestamp();
 
-      // 2. 프로필 정보 저장
-      setLoadingStatus('프로필 정보 등록 중...');
-      await setDoc(doc(firestore, 'users', user.uid), {
+      // 클라이언트에서 모든 필수 문서 즉시 생성 (서버 지연 방지)
+      setLoadingStatus('멤버십 정보를 설정하고 있습니다...');
+      
+      const batch = writeBatch(firestore);
+
+      // 1. 프로필
+      batch.set(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
         displayName: values.displayName,
@@ -81,22 +84,17 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 3. 센터 정보 존재 확인 및 생성
-      setLoadingStatus('센터 연결 설정 중...');
-      const centerRef = doc(firestore, 'centers', centerId);
-      const centerSnap = await getDoc(centerRef);
-      if (!centerSnap.exists()) {
-        await setDoc(centerRef, {
-          id: centerId,
-          name: "공부트랙 동백센터",
-          subscriptionTier: "Pro",
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        });
-      }
+      // 2. 센터 (존재 여부 상관없이 덮어쓰기 방지를 위해 개별 체크는 생략하거나 setDoc merge 사용)
+      batch.set(doc(firestore, 'centers', centerId), {
+        id: centerId,
+        name: "공부트랙 동백센터",
+        subscriptionTier: "Pro",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }, { merge: true });
 
-      // 4. 멤버십 문서 생성 (보안 규칙 필수 경로)
-      await setDoc(doc(firestore, 'centers', centerId, 'members', user.uid), {
+      // 3. 멤버십 (보안 규칙 필수 경로)
+      batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), {
         id: user.uid,
         centerId: centerId,
         role: values.role,
@@ -105,8 +103,8 @@ export function SignupForm() {
         displayName: values.displayName,
       });
 
-      // 5. 사용자 센터 역인덱스 생성 (AuthGuard 감지용)
-      await setDoc(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
+      // 4. 역인덱스 (AuthGuard 감지용)
+      batch.set(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
         id: centerId,
         centerId: centerId,
         role: values.role,
@@ -114,10 +112,9 @@ export function SignupForm() {
         joinedAt: timestamp,
       });
 
-      // 6. 학생일 경우 추가 데이터 초기화
+      // 5. 학생 전용 데이터
       if (values.role === 'student') {
-        setLoadingStatus('학습 성장 로드맵 생성 중...');
-        await setDoc(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
+        batch.set(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
           level: 1,
           currentXp: 0,
           nextLevelXp: 1000,
@@ -127,11 +124,15 @@ export function SignupForm() {
         });
       }
 
+      await batch.commit();
+
       setLoadingStatus('완료! 대시보드로 이동합니다.');
-      toast({ title: '가입 성공', description: '환영합니다!' });
+      toast({ title: '가입 성공', description: '잠시 후 대시보드가 열립니다.' });
       
-      // 즉시 페이지 이동
-      window.location.href = '/dashboard';
+      // 강제 새로고침 리디렉션으로 상태 동기화 보장
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1500);
 
     } catch (error: any) {
       console.error('Signup Error:', error);

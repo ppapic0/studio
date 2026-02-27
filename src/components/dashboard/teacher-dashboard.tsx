@@ -10,7 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowUpRight, Armchair, MessageSquare, TrendingUp, Users, Loader2, Zap, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, Armchair, MessageSquare, TrendingUp, Users, Loader2, Zap, ChevronRight, AlertCircle } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -74,7 +74,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <CardTitle className="text-4xl font-black text-emerald-500 mt-2">{studyingCount}</CardTitle>
           </CardHeader>
           <CardContent className="px-6 pb-6">
-            <div className="text-[10px] font-bold text-muted-foreground">정원 {totalStudents}명 대비 {Math.round((studyingCount / (totalStudents || 1)) * 100)}%</div>
+            <div className="text-[10px] font-bold text-muted-foreground">정원 {totalStudents}명 대비 {totalStudents > 0 ? Math.round((studyingCount / totalStudents) * 100) : 0}%</div>
           </CardContent>
         </Card>
 
@@ -109,7 +109,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 실시간 좌석 현황 및 상담 예약 섹션 */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
           <CardHeader className="bg-muted/20 border-b p-8">
@@ -157,7 +156,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 오늘 상담 및 분석 카드 섹션 */}
         <div className="flex flex-col gap-6">
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden">
             <CardHeader className="p-8 pb-4">
