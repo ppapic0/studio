@@ -26,7 +26,6 @@ export function AccessTestPanel() {
     addResult(`🔄 학생 계획 항목 쓰기 시도...`);
     try {
       const weekKey = format(new Date(), "yyyy-'W'II");
-      // 데이터 구조에 맞는 정확한 경로 사용: centers/{centerId}/plans/{studentId}/weeks/{weekId}/items
       const planItemsRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
       
       const data = {
@@ -41,7 +40,7 @@ export function AccessTestPanel() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(planItemsRef, data)
+      addDoc(planItemsRef, data)
         .then(() => {
             addResult('✅ 성공: 학생 계획 항목 생성');
         })
@@ -65,7 +64,6 @@ export function AccessTestPanel() {
     addResult(`🔄 학생 학습 로그 쓰기 시도...`);
     try {
         const dateKey = format(new Date(), 'yyyy-MM-dd');
-        // 데이터 구조에 맞는 정확한 경로 사용: centers/{centerId}/studyLogs/{studentId}/days/{date}
         const dayLogRef = doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', dateKey);
         
         const data = {
@@ -98,12 +96,11 @@ export function AccessTestPanel() {
 
   const handleTeacherWriteAttendance = async () => {
     if (!firestore || !user || !activeMembership) return;
-    const someStudentId = 'student-test-uid'; // 테스트를 위한 가상 학생 UID
+    const someStudentId = 'student-test-uid'; 
     addResult(`🔄 교사 출석 기록 쓰기 시도 (대상 학생: ${someStudentId})...`);
 
     try {
         const dateKey = format(new Date(), 'yyyy-MM-dd');
-        // 정확한 경로 사용
         const attendanceRef = doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students', someStudentId);
         
         const data = {
@@ -146,12 +143,6 @@ export function AccessTestPanel() {
     </div>
   );
   
-  const renderParentTests = () => (
-     <div className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">학부모는 쓰기 권한이 없습니다. 읽기 테스트는 콘솔에서 확인하세요.</p>
-    </div>
-  );
-
   const renderAdminTests = () => (
     <div className="flex flex-col gap-2">
       <Button onClick={handleTeacherWriteAttendance}>교사/관리자: 출석 쓰기</Button>
@@ -184,7 +175,6 @@ export function AccessTestPanel() {
         <CardContent className="space-y-4">
             {activeMembership?.role === 'student' && renderStudentTests()}
             {activeMembership?.role === 'teacher' && renderTeacherTests()}
-            {activeMembership?.role === 'parent' && renderParentTests()}
             {activeMembership?.role === 'centerAdmin' && renderAdminTests()}
         </CardContent>
       </Card>

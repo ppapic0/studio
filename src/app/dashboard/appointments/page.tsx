@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { 
   Card, 
   CardContent, 
-  CardDescription, 
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
@@ -21,7 +20,6 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Dialog, 
   DialogContent, 
-  DialogDescription, 
   DialogHeader, 
   DialogTitle, 
   DialogTrigger,
@@ -80,11 +78,9 @@ export default function AppointmentsPage() {
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
     
     if (isStudent) {
-      // 보안 규칙: resource.data.studentId == request.auth.uid
       return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
     }
     if (isStaff) {
-      // 보안 규칙: getMemberData(...).role in ['centerAdmin', 'teacher']
       return query(baseRef, orderBy('startAt', 'desc'));
     }
     
@@ -99,7 +95,6 @@ export default function AppointmentsPage() {
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
     
     if (isStudent) {
-      // 보안 규칙: studentId == uid && visibility == 'student_and_parent'
       return query(
         baseRef, 
         where('studentId', '==', user.uid), 
@@ -199,7 +194,6 @@ export default function AppointmentsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* 상담 내역 테이블 */}
         <Card className="md:col-span-2 border-none shadow-xl rounded-[2.5rem] overflow-hidden">
           <CardHeader className="bg-muted/30 border-b pb-6">
             <CardTitle className="flex items-center gap-2 text-xl font-black">
@@ -230,7 +224,6 @@ export default function AppointmentsPage() {
           </CardContent>
         </Card>
 
-        {/* 상담 일지 리스트 */}
         <div className="flex flex-col gap-6">
           <Card className="border-none shadow-lg rounded-[2rem] bg-white overflow-hidden">
             <CardHeader><CardTitle className="text-lg font-black flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> 최근 상담일지</CardTitle></CardHeader>

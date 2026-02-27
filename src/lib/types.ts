@@ -1,4 +1,3 @@
-
 import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
@@ -14,11 +13,10 @@ export interface User {
 
 export interface CenterMembership {
   id: string; // This is the centerId
-  role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  role: 'student' | 'teacher' | 'centerAdmin';
   status: 'active' | 'pending' | 'inactive';
   joinedAt: Timestamp;
   displayName?: string;
-  linkedStudentIds?: string[];
 }
 
 export interface Appointment {
@@ -30,7 +28,7 @@ export interface Appointment {
   startAt: Timestamp;
   endAt: Timestamp;
   status: 'requested' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-  createdByRole: 'student' | 'parent' | 'teacher' | 'centerAdmin';
+  createdByRole: 'student' | 'teacher' | 'centerAdmin';
   teacherNote?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -41,6 +39,7 @@ export interface CounselingNote {
   appointmentId: string;
   studentId: string;
   teacherId: string;
+  studentName?: string;
   content: string;
   visibility: 'student_and_parent' | 'teacher_only';
   createdAt: Timestamp;

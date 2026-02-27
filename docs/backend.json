@@ -29,11 +29,10 @@
       "type": "object",
       "description": "센터 내 사용자 역할 및 멤버십",
       "properties": {
-        "role": { "type": "string", "enum": ["centerAdmin", "teacher", "student", "parent"] },
+        "role": { "type": "string", "enum": ["centerAdmin", "teacher", "student"] },
         "status": { "type": "string" },
         "joinedAt": { "type": "string", "format": "date-time" },
-        "displayName": { "type": "string" },
-        "linkedStudentIds": { "type": "array", "items": { "type": "string" }, "description": "학부모 계정에 연결된 학생 UID 목록" }
+        "displayName": { "type": "string" }
       },
       "required": ["role", "status", "joinedAt"]
     },
@@ -55,7 +54,7 @@
     "CounselingNote": {
       "title": "CounselingNote",
       "type": "object",
-      "description": "상담 완료 후 작성되는 상세 일지 (Plan A: 센터 통합 관리)",
+      "description": "상담 완료 후 작성되는 상세 일지",
       "properties": {
         "centerId": { "type": "string" },
         "appointmentId": { "type": "string" },
@@ -100,7 +99,7 @@
       },
       {
         "path": "/centers/{centerId}/counselingNotes/{noteId}",
-        "definition": { "entityName": "CounselingNote", "description": "상담일지 (Plan A)" }
+        "definition": { "entityName": "CounselingNote", "description": "상담일지" }
       },
       {
         "path": "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}",

@@ -31,7 +31,6 @@ import {
   Info,
   Trophy,
   Crown,
-  Flame,
   Medal,
   ArrowRight,
   TrendingUp,
@@ -165,7 +164,7 @@ export default function GrowthPage() {
   const [activeBranch, setActiveBranch] = useState<'focus' | 'consistency' | 'achievement' | 'resilience'>('focus');
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
 
-  const targetUid = activeMembership?.role === 'parent' ? activeMembership.linkedStudentIds?.[0] : user?.uid;
+  const targetUid = user?.uid;
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid) return null;
