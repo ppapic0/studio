@@ -79,18 +79,18 @@ export default function StudentListPage() {
     
     // 필수 값 검증
     if (!newStudent.name || !newStudent.email || !newStudent.password || !newStudent.schoolName) {
-      toast({ variant: "destructive", title: "모든 정보를 입력해주세요." });
+      toast({ variant: "destructive", title: "정보 미입력", description: "모든 필수 정보를 입력해 주세요." });
       return;
     }
 
     if (newStudent.password.length < 8) {
-      toast({ variant: "destructive", title: "비밀번호는 8자 이상이어야 합니다." });
+      toast({ variant: "destructive", title: "비밀번호 취약", description: "비밀번호는 최소 8자 이상이어야 합니다." });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 클라우드 함수 호출
+      // Cloud Functions 호출
       const registerStudentFn = httpsCallable(functions, 'registerStudent');
       const result: any = await registerStudentFn({
         email: newStudent.email,
@@ -102,13 +102,17 @@ export default function StudentListPage() {
       });
 
       if (result.data.ok) {
-        toast({ title: "학생 등록 성공", description: `${newStudent.name} 학생의 계정이 생성되었습니다.` });
+        toast({ title: "등록 완료", description: `${newStudent.name} 학생의 계정과 데이터가 생성되었습니다.` });
         setIsAddModalOpen(false);
         setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
       }
     } catch (e: any) {
-      console.error("Add Student Error:", e);
-      toast({ variant: "destructive", title: "등록 실패", description: e.message || "오류가 발생했습니다." });
+      console.error("Add Student Function Error:", e);
+      toast({ 
+        variant: "destructive", 
+        title: "등록 실패", 
+        description: e.message || "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -137,14 +141,14 @@ export default function StudentListPage() {
         
         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
           <DialogTrigger asChild>
-            <Button className="rounded-xl font-black gap-2 h-12 shadow-lg">
+            <Button className="rounded-xl font-black gap-2 h-12 shadow-lg interactive-button">
               <UserPlus className="h-5 w-5" /> 신규 학생 등록
             </Button>
           </DialogTrigger>
           <DialogContent className="rounded-[2rem] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 가입 및 등록</DialogTitle>
-              <DialogDescription className="font-bold">학생의 계정을 즉시 생성하고 센터에 배정합니다.</DialogDescription>
+              <DialogDescription className="font-bold text-muted-foreground">학생의 계정을 즉시 생성하고 센터에 배정합니다.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-5 py-4">
               <div className="grid gap-2">
@@ -183,7 +187,7 @@ export default function StudentListPage() {
               </div>
             </div>
             <DialogFooter className="pt-4 border-t">
-              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">
+              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg interactive-button">
                 {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '학생 계정 생성 및 등록'}
               </Button>
             </DialogFooter>
@@ -218,9 +222,9 @@ export default function StudentListPage() {
             const currentStatus = attendanceList?.find(a => a.studentId === student.id);
             return (
               <Link key={student.id} href={`/dashboard/teacher/students/${student.id}`}>
-                <Card className="rounded-3xl border-none shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden">
+                <Card className="rounded-3xl border-none shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden bg-white">
                   <div className={cn(
-                    "h-2 w-full",
+                    "h-2 w-full transition-colors",
                     currentStatus?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
                   )} />
                   <CardContent className="p-6">
@@ -252,7 +256,7 @@ export default function StudentListPage() {
                           {student.seatNo > 0 ? `${student.seatNo}번 좌석` : '좌석 미지정'}
                         </span>
                       </div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Profile View</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">관리 페이지 이동</span>
                     </div>
                   </CardContent>
                 </Card>
