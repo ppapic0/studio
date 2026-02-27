@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -18,7 +18,8 @@ import {
   Settings2,
   Save,
   Trash2,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -77,10 +78,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   // 편집 모드 시작
   const openLayoutEditor = () => {
     if (attendanceList && attendanceList.length > 0) {
-      setTempLayout(attendanceList.map(a => ({
+      // 기존 데이터가 있으면 1번부터 순차적으로 정렬하여 상태 초기화
+      const sorted = [...attendanceList].sort((a, b) => a.seatNo - b.seatNo);
+      setTempLayout(sorted.map((a, i) => ({
         x: a.gridX || 0,
         y: a.gridY || 0,
-        seatNo: a.seatNo
+        seatNo: i + 1 // 강제로 1번부터 다시 매김
       })));
     } else {
       setTempLayout([]);
@@ -93,9 +96,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const existingIndex = tempLayout.findIndex(s => s.x === x && s.y === y);
     
     if (existingIndex !== -1) {
-      // 이미 좌석이 있는 곳을 클릭하면 삭제하고 번호 재정렬
+      // 이미 좌석이 있는 곳을 클릭하면 삭제하고 나머지 번호 재정렬
       const newList = tempLayout.filter((_, i) => i !== existingIndex);
-      // 번호를 1번부터 다시 매깁니다 (사용자가 클릭한 순서 유지 원할 시)
       const renumberedList = newList.map((s, i) => ({ ...s, seatNo: i + 1 }));
       setTempLayout(renumberedList);
     } else {
@@ -117,7 +119,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     try {
       const batch = writeBatch(firestore);
       
-      // 1. 기존 좌석 데이터 전체 삭제
+      // 1. 기존 좌석 데이터 전체 삭제 (업데이트 시 꼬임 방지)
       if (attendanceList) {
         attendanceList.forEach(a => {
           batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', a.id));
