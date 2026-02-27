@@ -51,7 +51,7 @@ import {
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Appointment, CounselingNote } from '@/lib/types';
+import { Appointment, CounselingLog } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AppointmentsPage() {
@@ -72,33 +72,32 @@ export default function AppointmentsPage() {
   const isStudent = role === 'student';
   const isStaff = role === 'teacher' || role === 'centerAdmin';
 
-  // --- 상담 예약 쿼리 ---
+  // --- 상담 예약 쿼리 (counselingReservations로 통일) ---
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
-    const baseRef = collection(firestore, 'centers', activeMembership.id, 'appointments');
+    const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
     if (isStudent) {
-      return query(baseRef, where('studentId', '==', user.uid), orderBy('startAt', 'desc'));
+      return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
     }
     if (isStaff) {
-      return query(baseRef, orderBy('startAt', 'desc'));
+      return query(baseRef, orderBy('scheduledAt', 'desc'));
     }
     
     return null;
   }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff]);
 
-  const { data: appointments, isLoading: aptLoading } = useCollection<Appointment>(appointmentsQuery);
+  const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 ---
+  // --- 상담 일지 쿼리 (counselingLogs로 통일) ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
-    const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingNotes');
+    const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
     if (isStudent) {
       return query(
         baseRef, 
         where('studentId', '==', user.uid), 
-        where('visibility', '==', 'student_and_parent'),
         orderBy('createdAt', 'desc')
       );
     }
@@ -109,22 +108,19 @@ export default function AppointmentsPage() {
     return null;
   }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff]);
 
-  const { data: notes, isLoading: notesLoading } = useCollection<CounselingNote>(notesQuery);
+  const { data: notes, isLoading: notesLoading } = useCollection<CounselingLog>(notesQuery);
 
   const handleRequestSubmit = async () => {
     if (!firestore || !user || !activeMembership) return;
     setIsSubmitting(true);
     try {
-      const startAt = new Date(`${requestData.date}T${requestData.time}`);
-      const endAt = new Date(startAt.getTime() + 30 * 60000); 
-      await addDoc(collection(firestore, 'centers', activeMembership.id, 'appointments'), {
+      const scheduledAt = new Date(`${requestData.date}T${requestData.time}`);
+      await addDoc(collection(firestore, 'centers', activeMembership.id, 'counselingReservations'), {
         centerId: activeMembership.id,
         studentId: user.uid,
         studentName: user.displayName || '학생',
-        startAt: Timestamp.fromDate(startAt),
-        endAt: Timestamp.fromDate(endAt),
+        scheduledAt: Timestamp.fromDate(scheduledAt),
         status: 'requested',
-        createdByRole: activeMembership.role,
         teacherNote: requestData.note,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -138,21 +134,21 @@ export default function AppointmentsPage() {
     }
   };
 
-  const updateStatus = async (appointmentId: string, status: Appointment['status']) => {
+  const updateStatus = async (reservationId: string, status: string) => {
     if (!firestore || !activeMembership) return;
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'appointments', appointmentId), { 
+    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'counselingReservations', reservationId), { 
       status, 
       updatedAt: serverTimestamp() 
     });
   };
 
-  const getStatusBadge = (status: Appointment['status']) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'requested': return <Badge variant="outline" className="bg-amber-50">신청됨</Badge>;
       case 'confirmed': return <Badge variant="secondary" className="bg-blue-50">확정됨</Badge>;
-      case 'completed': return <Badge className="bg-emerald-50 text-emerald-700">완료</Badge>;
-      case 'cancelled': return <Badge variant="destructive">취소됨</Badge>;
-      default: return <Badge variant="outline">미참석</Badge>;
+      case 'done': return <Badge className="bg-emerald-50 text-emerald-700">완료</Badge>;
+      case 'canceled': return <Badge variant="destructive">취소됨</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -205,15 +201,15 @@ export default function AppointmentsPage() {
               <Table>
                 <TableHeader><TableRow><TableHead>일시</TableHead><TableHead>학생</TableHead><TableHead>상태</TableHead><TableHead className="text-right">관리</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {appointments?.map((apt) => (
+                  {appointments?.map((apt: any) => (
                     <TableRow key={apt.id}>
                       <TableCell className="font-bold">
-                        {apt.startAt ? format(apt.startAt.toDate(), 'M월 d일 p', { locale: ko }) : '-'}
+                        {apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'M월 d일 p', { locale: ko }) : '-'}
                       </TableCell>
-                      <TableCell className="font-bold">{apt.studentName}</TableCell>
+                      <TableCell className="font-bold">{apt.studentName || '학생'}</TableCell>
                       <TableCell>{getStatusBadge(apt.status)}</TableCell>
                       <TableCell className="text-right">
-                        {isStudent && apt.status === 'requested' && <Button variant="ghost" onClick={() => updateStatus(apt.id, 'cancelled')}>취소</Button>}
+                        {isStudent && apt.status === 'requested' && <Button variant="ghost" onClick={() => updateStatus(apt.id, 'canceled')}>취소</Button>}
                         {isStaff && apt.status === 'requested' && <Button variant="outline" onClick={() => updateStatus(apt.id, 'confirmed')}>확정</Button>}
                       </TableCell>
                     </TableRow>
@@ -237,7 +233,7 @@ export default function AppointmentsPage() {
                 notes.map(note => (
                   <div key={note.id} className="p-4 rounded-2xl bg-muted/20 border border-border/50">
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-[10px] font-bold text-primary">{note.studentName || '학생'}</span>
+                      <Badge variant="outline" className="text-[9px] uppercase">{note.type}</Badge>
                       <span className="text-[9px] text-muted-foreground">{note.createdAt ? format(note.createdAt.toDate(), 'yy.MM.dd') : ''}</span>
                     </div>
                     <p className="text-xs font-medium line-clamp-3 leading-relaxed">{note.content}</p>

@@ -16,7 +16,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, limit, orderBy, Timestamp } from 'firebase/firestore';
 import { format, startOfDay, endOfDay } from 'date-fns';
-import { type StudentProfile, type AttendanceCurrent, type Appointment } from '@/lib/types';
+import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -40,7 +40,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 오늘 상담 예약
+  // 3. 오늘 상담 예약 (counselingReservations)
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const start = Timestamp.fromDate(startOfDay(new Date()));
@@ -79,13 +79,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
         <Card className="rounded-3xl border-none shadow-md bg-white">
           <CardHeader className="p-6 pb-2">
-            <CardDescription className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">오늘 예약된 상담</CardDescription>
+            <CardDescription className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">오늘 상담 예약</CardDescription>
             <CardTitle className="text-4xl font-black text-primary mt-2">{reservations?.length ?? 0}</CardTitle>
           </CardHeader>
           <CardContent className="px-6 pb-6">
             <div className="text-[10px] font-bold text-primary/60">확정된 일정 기준</div>
           </CardContent>
-        </Card>
 
         <Card className="rounded-3xl border-none shadow-md bg-white">
           <CardHeader className="p-6 pb-2">
@@ -95,7 +94,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <CardContent className="px-6 pb-6">
             <div className="text-[10px] font-bold text-amber-600/60">전주 대비 +4%</div>
           </CardContent>
-        </Card>
 
         <Card className="rounded-3xl border-none shadow-md bg-primary text-primary-foreground">
           <CardHeader className="p-6 pb-2">
