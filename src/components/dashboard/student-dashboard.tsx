@@ -302,7 +302,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
 
-  // local tracking for session countdown
   const [showSessionAlert, setShowSessionAlert] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
 
@@ -341,7 +340,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return (doneCount / studyTasks.length) * 100;
   }, [studyTasks]);
 
-  // Persistent Session Checker
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive && lastActiveCheckTime) {
@@ -351,12 +349,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           setShowSessionAlert(true);
           setGracePeriod(GRACE_PERIOD_SECONDS);
         }
-      }, 5000); // Check every 5 seconds
+      }, 5000); 
     }
     return () => clearInterval(interval);
   }, [isTimerActive, lastActiveCheckTime, showSessionAlert]);
 
-  // Grace Period Countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (showSessionAlert && gracePeriod > 0) {
@@ -541,6 +538,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
   const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
+  // 학습 시간 포맷팅 (H시간 M분)
+  const totalMinutes = todayStudyLog?.totalMinutes || 0;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+
   return (
     <div className="flex flex-col gap-6 pb-10">
       <AlertDialog open={showSessionAlert} onOpenChange={setShowSessionAlert}>
@@ -685,8 +687,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               ) : (
                 <div className="flex items-center gap-1 justify-between">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black tracking-tighter">{todayStudyLog?.totalMinutes || 0}</span>
-                    <span className="text-xs font-black text-muted-foreground">분</span>
+                    <span className="text-3xl font-black tracking-tighter">{h}</span>
+                    <span className="text-[10px] font-black text-muted-foreground mr-1">시간</span>
+                    <span className="text-3xl font-black tracking-tighter">{m}</span>
+                    <span className="text-[10px] font-black text-muted-foreground">분</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -753,7 +757,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <CardContent className="p-8 grid gap-4">
           {plansLoading ? (
             <div className="space-y-4">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+              {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full rounded-2xl" key={i} />)}
             </div>
           ) : studyTasks.length > 0 ? (
               studyTasks.map((task) => (

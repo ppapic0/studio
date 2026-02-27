@@ -35,28 +35,37 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher']));
       }
 
-      // 상담 예약 (Appointments) - 쿼리 최적화된 통합 규칙
+      // 상담 예약 (Appointments) - 역할별 명시적 규칙 분리 (list 쿼리 최적화)
       match /appointments/{appointmentId} {
-        // 단일 문서 및 쿼리 조회 통합
-        allow read: if isSignedIn() && (
-          // 1. 학생 본인 데이터
-          resource.data.get('studentId', '') == request.auth.uid ||
-          // 2. 교사 본인에게 배정된 데이터
-          resource.data.get('teacherId', '') == request.auth.uid ||
-          // 3. 관리자/교사 전체 조회 권한 (가장 강력한 조건)
+        // 단일 문서 조회 (Get)
+        allow get: if isSignedIn() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.teacherId == request.auth.uid ||
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          // 4. 학부모의 연결된 자녀 데이터
-          isParentOf(centerId, resource.data.get('studentId', ''))
+          isParentOf(centerId, resource.data.studentId)
         );
+
+        // 쿼리 조회 (List) - Firestore 엔진이 쿼리 필터를 즉시 승인하도록 독립적 정의
+        // 1. 학생: 본인 데이터만 필터링 조회 시 승인
+        allow list: if isSignedIn() && resource.data.studentId == request.auth.uid;
+        
+        // 2. 교사: 본인 배정 데이터만 필터링 조회 시 승인
+        allow list: if isSignedIn() && resource.data.teacherId == request.auth.uid;
+        
+        // 3. 관리자/교사: 센터 전체 조회 권한 (hasRole은 resource.data에 의존하지 않으므로 전역 승인)
+        allow list: if hasRole(centerId, ['centerAdmin', 'teacher']);
+        
+        // 4. 학부모: 연결된 자녀 데이터 필터링 조회 시 승인
+        allow list: if isParentOf(centerId, resource.data.studentId);
         
         allow create: if isSignedIn() && (
-          (request.resource.data.get('studentId', '') == request.auth.uid) ||
-          isParentOf(centerId, request.resource.data.get('studentId', '')) ||
+          (request.resource.data.studentId == request.auth.uid) ||
+          isParentOf(centerId, request.resource.data.studentId) ||
           hasRole(centerId, ['centerAdmin', 'teacher'])
         );
         
         allow update: if isSignedIn() && (
-          (resource.data.get('studentId', '') == request.auth.uid && 
+          (resource.data.studentId == request.auth.uid && 
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
            request.resource.data.status == 'cancelled') ||
           (hasRole(centerId, ['centerAdmin', 'teacher']))
@@ -68,7 +77,7 @@ service cloud.firestore {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
           (resource.data.get('visibility', 'student_and_parent') == 'student_and_parent' && 
-           (request.auth.uid == resource.data.get('studentId', '') || isParentOf(centerId, resource.data.get('studentId', ''))))
+           (request.auth.uid == resource.data.studentId || isParentOf(centerId, resource.data.studentId)))
         );
         allow write: if isSignedIn() && hasRole(centerId, ['centerAdmin', 'teacher']);
       }
@@ -112,8 +121,8 @@ service cloud.firestore {
       match /records/{recordId} {
         allow read: if isSignedIn() && (
           hasRole(centerId, ['centerAdmin', 'teacher']) ||
-          resource.data.get('studentId', '') == request.auth.uid ||
-          isParentOf(centerId, resource.data.get('studentId', ''))
+          resource.data.studentId == request.auth.uid ||
+          isParentOf(centerId, resource.data.studentId)
         );
       }
     }
@@ -128,9 +137,9 @@ service cloud.firestore {
 
     match /{path=**}/records/{recordId} {
       allow read: if isSignedIn() && (
-        hasRole(resource.data.get('centerId', ''), ['centerAdmin', 'teacher']) ||
-        resource.data.get('studentId', '') == request.auth.uid ||
-        isParentOf(resource.data.get('centerId', ''), resource.data.get('studentId', ''))
+        hasRole(resource.data.centerId, ['centerAdmin', 'teacher']) ||
+        resource.data.studentId == request.auth.uid ||
+        isParentOf(resource.data.centerId, resource.data.studentId)
       );
     }
   }
