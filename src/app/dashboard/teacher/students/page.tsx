@@ -75,7 +75,10 @@ export default function StudentListPage() {
   );
 
   const handleAddStudent = async () => {
-    if (!centerId || !functions) return;
+    if (!centerId || !functions) {
+      toast({ variant: "destructive", title: "시스템 오류", description: "센터 정보 또는 서버 함수를 불러올 수 없습니다." });
+      return;
+    }
     
     // 필수 값 검증
     if (!newStudent.name || !newStudent.email || !newStudent.password || !newStudent.schoolName) {
@@ -90,7 +93,7 @@ export default function StudentListPage() {
 
     setIsSubmitting(true);
     try {
-      // Cloud Functions 호출 (asia-northeast3 리전)
+      // Cloud Functions 호출 (등록하려는 선생님의 센터 ID 전달)
       const registerStudentFn = httpsCallable(functions, 'registerStudent');
       const result: any = await registerStudentFn({
         email: newStudent.email,
@@ -101,17 +104,19 @@ export default function StudentListPage() {
         centerId: centerId
       });
 
-      if (result.data.ok) {
-        toast({ title: "등록 완료", description: `${newStudent.name} 학생의 계정과 데이터가 생성되었습니다.` });
+      if (result.data?.ok) {
+        toast({ title: "등록 완료", description: `${newStudent.name} 학생의 계정이 생성되어 ${centerId} 센터에 배정되었습니다.` });
         setIsAddModalOpen(false);
         setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
+      } else {
+        throw new Error(result.data?.message || "알 수 없는 응답 형식이 반환되었습니다.");
       }
     } catch (e: any) {
       console.error("Add Student Function Error:", e);
       // 구체적인 오류 메시지 추출
       const errorMsg = e.code === 'already-exists' ? "이미 등록된 이메일 주소입니다." :
-                       e.code === 'permission-denied' ? "권한이 없습니다." :
-                       e.message || "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+                       e.code === 'permission-denied' ? "학생을 등록할 권한이 없습니다." :
+                       e.message || "서버와의 통신 중 오류가 발생했습니다.";
       
       toast({ 
         variant: "destructive", 
@@ -153,7 +158,7 @@ export default function StudentListPage() {
           <DialogContent className="rounded-[2rem] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 가입 및 등록</DialogTitle>
-              <DialogDescription className="font-bold text-muted-foreground">학생의 계정을 즉시 생성하고 센터에 배정합니다.</DialogDescription>
+              <DialogDescription className="font-bold text-muted-foreground">선생님의 소속 센터({centerId})로 학생 계정을 즉시 생성합니다.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-5 py-4">
               <div className="grid gap-2">

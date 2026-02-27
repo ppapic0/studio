@@ -12,7 +12,6 @@ const region = "asia-northeast3";
  * 선생님이 학생 계정을 직접 생성하고 센터에 등록하는 함수
  */
 exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
-    // 1. 권한 확인
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
     }
@@ -24,16 +23,13 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
     }
 
     const callerId = context.auth.uid;
-    console.log(`[RegisterStudent] Starting registration: Email=${email}, Center=${centerId}`);
 
     try {
-        // 호출자가 해당 센터의 선생님인지 확인
         const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
         if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
             throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
         }
 
-        // 2. Auth 계정 생성
         let userRecord;
         try {
             userRecord = await admin.auth().createUser({
@@ -45,15 +41,13 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
             if (authError.code === 'auth/email-already-exists') {
                 throw new functions.https.HttpsError("already-exists", "이미 가입된 이메일 주소입니다.");
             }
-            throw authError;
+            throw new functions.https.HttpsError("internal", `계정 생성 오류: ${authError.message}`);
         }
 
         const uid = userRecord.uid;
         const timestamp = admin.firestore.Timestamp.now();
 
-        // 3. Firestore 데이터 일괄 생성 (트랜잭션)
         await db.runTransaction(async (transaction) => {
-            // (1) 기본 유저 프로필
             transaction.set(db.doc(`users/${uid}`), {
                 id: uid,
                 email,
@@ -63,7 +57,6 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
                 updatedAt: timestamp,
             });
 
-            // (2) 센터 멤버십 정보
             transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
                 id: uid,
                 centerId: centerId,
@@ -73,7 +66,6 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
                 displayName,
             });
 
-            // (3) 사용자 가입 센터 인덱스
             transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
                 id: centerId,
                 centerId: centerId,
@@ -82,7 +74,6 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
                 joinedAt: timestamp,
             });
 
-            // (4) 학생 상세 프로필
             transaction.set(db.doc(`centers/${centerId}/students/${uid}`), {
                 id: uid,
                 name: displayName,
@@ -95,7 +86,6 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
                 updatedAt: timestamp,
             });
 
-            // (5) 성장 로드맵 초기화
             transaction.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
                 level: 1,
                 currentXp: 0,
@@ -108,9 +98,9 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
 
         return { ok: true, uid, message: "학생 등록이 완료되었습니다." };
     } catch (error) {
-        console.error("[RegisterStudent] Fatal Error:", error);
+        console.error("[RegisterStudent] Error:", error);
         if (error instanceof functions.https.HttpsError) throw error;
-        throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류");
+        throw new functions.https.HttpsError("internal", error.message || "서버 오류");
     }
 });
 
@@ -122,8 +112,6 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
     
     const { code } = data;
     const uid = context.auth.uid;
-    const email = context.auth.token.email || "";
-    const displayName = context.auth.token.name || email.split('@')[0];
 
     try {
         return await db.runTransaction(async (transaction) => {
@@ -135,7 +123,6 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
             const inviteData = inviteSnap.data();
             const centerId = inviteData.centerId;
             const role = inviteData.intendedRole || 'student';
-
             const timestamp = admin.firestore.Timestamp.now();
 
             transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
@@ -152,7 +139,7 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
                 role,
                 status: "active",
                 joinedAt: timestamp,
-                displayName,
+                displayName: context.auth.token.name || context.auth.token.email.split('@')[0],
             });
 
             transaction.update(inviteRef, {
