@@ -24,11 +24,10 @@ import {
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserCircle, GraduationCap } from 'lucide-react';
-import { redeemInviteCodeAction } from '@/lib/membership-actions';
 
 const formSchema = z.object({
   displayName: z.string().min(2, '이름은 2자 이상이어야 합니다.'),
@@ -68,35 +67,78 @@ export function SignupForm() {
       
       await updateProfile(user, { displayName: values.displayName });
 
-      // 1. 클라이언트 측에서 즉시 users 컬렉션에 문서 생성 (중요!)
-      setLoadingStatus('프로필 정보 저장 중...');
+      const centerId = 'learning-lab-dongbaek'; // 고정 센터 ID
+      const timestamp = serverTimestamp();
+
+      // 1. 프로필 정보 저장
+      setLoadingStatus('프로필 저장 중...');
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
         displayName: values.displayName,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: timestamp,
+        updatedAt: timestamp,
       });
 
-      // 2. 서버 액션을 통한 센터 가입 및 역할 부여
-      setLoadingStatus('센터 가입 및 멤버십 설정 중...');
-      const result = await redeemInviteCodeAction(user.uid, values.inviteCode, values.displayName);
-
-      if (result.ok) {
-        setLoadingStatus('대시보드로 이동 중...');
-        toast({ title: '가입 성공', description: result.message });
-        
-        // 데이터 전파 완료를 위해 충분히 기다린 후 새로고침 이동
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 2000);
+      // 2. 센터 정보 존재 확인 및 생성 (없을 경우에만)
+      setLoadingStatus('센터 정보 확인 중...');
+      const centerRef = doc(firestore, 'centers', centerId);
+      const centerSnap = await getDoc(centerRef);
+      if (!centerSnap.exists()) {
+        await setDoc(centerRef, {
+          id: centerId,
+          name: "공부트랙 동백센터",
+          subscriptionTier: "Pro",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
       }
+
+      // 3. 멤버십 문서 생성 (보안 규칙 통과를 위해 필수)
+      setLoadingStatus('멤버십 설정 중...');
+      await setDoc(doc(firestore, 'centers', centerId, 'members', user.uid), {
+        id: user.uid,
+        centerId: centerId,
+        role: values.role,
+        status: "active",
+        joinedAt: timestamp,
+        displayName: values.displayName,
+      });
+
+      // 4. 사용자 센터 역인덱스 생성 (AuthGuard 감지용)
+      await setDoc(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
+        id: centerId,
+        centerId: centerId,
+        role: values.role,
+        status: "active",
+        joinedAt: timestamp,
+      });
+
+      // 5. 학생일 경우 성장 로드맵 초기화
+      if (values.role === 'student') {
+        setLoadingStatus('성장 로드맵 초기화 중...');
+        await setDoc(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
+          level: 1,
+          currentXp: 0,
+          nextLevelXp: 1000,
+          stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+          skills: {},
+          updatedAt: timestamp,
+        });
+      }
+
+      setLoadingStatus('완료! 대시보드로 이동합니다...');
+      toast({ title: '가입 성공', description: '환영합니다!' });
+      
+      // 즉시 이동
+      window.location.href = '/dashboard';
+
     } catch (error: any) {
       console.error('Signup Error:', error);
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description: error.message || '오류가 발생했습니다. 초대 코드를 확인해 주세요.',
+        description: error.message || '오류가 발생했습니다.',
       });
       setIsLoading(false);
       setLoadingStatus('');

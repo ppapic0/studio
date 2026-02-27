@@ -60,7 +60,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const studyingCount = attendanceList?.filter(a => a.status === 'studying').length ?? 0;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 w-full">
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="rounded-3xl border-none shadow-md bg-white overflow-hidden group">
           <CardHeader className="p-6 pb-2">
@@ -77,7 +77,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border-none shadow-md bg-white">
+        <Card className="rounded-3xl border-none shadow-md bg-white overflow-hidden">
           <CardHeader className="p-6 pb-2">
             <CardDescription className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">오늘 상담 예약</CardDescription>
             <CardTitle className="text-4xl font-black text-primary mt-2">{reservations?.length ?? 0}</CardTitle>
@@ -87,7 +87,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border-none shadow-md bg-white">
+        <Card className="rounded-3xl border-none shadow-md bg-white overflow-hidden">
           <CardHeader className="p-6 pb-2">
             <CardDescription className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">평균 완수율</CardDescription>
             <CardTitle className="text-4xl font-black text-amber-500 mt-2">88%</CardTitle>
@@ -97,7 +97,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border-none shadow-md bg-primary text-primary-foreground">
+        <Card className="rounded-3xl border-none shadow-md bg-primary text-primary-foreground overflow-hidden">
           <CardHeader className="p-6 pb-2">
             <CardDescription className="text-xs font-black uppercase tracking-widest opacity-60">좌석 점유율</CardDescription>
             <CardTitle className="text-4xl font-black mt-2">92%</CardTitle>
@@ -172,8 +172,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 reservations.map((res: any) => (
                   <div key={res.id} className="p-5 rounded-3xl bg-muted/20 border-2 border-transparent hover:border-primary/30 transition-all flex justify-between items-center group">
                     <div className="grid gap-1">
-                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">{format(res.scheduledAt.toDate(), 'p')}</span>
-                      <span className="text-base font-black text-foreground">{res.studentName} 학생</span>
+                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'p') : '시간 미정'}</span>
+                      <span className="text-base font-black text-foreground">{res.studentName || '학생'}</span>
                     </div>
                     <Button size="icon" variant="ghost" className="rounded-2xl group-hover:bg-primary group-hover:text-white transition-all shadow-sm" asChild>
                       <Link href={`/dashboard/teacher/students/${res.studentId}`}>
@@ -202,7 +202,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   <span className="text-xs font-black">몰입 시간 급감 감지</span>
                 </div>
                 <p className="text-sm font-bold leading-relaxed">
-                  이소피아 학생의 이번 주 집중도가 지난주 평균 대비 <span className="text-red-300">15% 하락</span>했습니다.
+                  일부 학생의 이번 주 집중도가 지난주 평균 대비 <span className="text-red-300">15% 하락</span>했습니다.
                 </p>
               </div>
               <Button className="w-full h-12 bg-white text-accent hover:bg-white/90 rounded-2xl font-black text-sm shadow-lg">전체 리포트 확인</Button>

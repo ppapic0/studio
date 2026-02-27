@@ -26,11 +26,13 @@ service cloud.firestore {
 
     match /centers/{centerId} {
       allow read: if isSignedIn();
+      // 센터 문서는 누구나 가입 시 생성할 수 있게 허용 (프로토타입용)
+      allow create: if isSignedIn();
 
-      // 멤버 정보 (권한 판단의 핵심)
+      // 멤버 정보 (가입 시 본인 문서 작성 허용)
       match /members/{memberId} {
         allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow write: if hasRole(centerId, ['centerAdmin']) || (isSignedIn() && request.auth.uid == memberId); 
+        allow write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin'])); 
       }
 
       // 학생 프로필
@@ -66,7 +68,7 @@ service cloud.firestore {
         allow update: if hasRole(centerId, ['centerAdmin']) || (hasRole(centerId, ['teacher']) && resource.data.teacherId == request.auth.uid);
       }
 
-      // 성장 로드맵 (growthProgress)
+      // 성장 로드맵 (본인 문서 생성 및 업데이트 허용)
       match /growthProgress/{uid} {
         allow read: if isSignedIn() && (request.auth.uid == uid || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow write: if isSignedIn() && request.auth.uid == uid;
@@ -78,7 +80,7 @@ service cloud.firestore {
       }
     }
 
-    // 사용자 멤버십 역인덱스 (AuthGuard용) - list 권한 추가
+    // 사용자 멤버십 역인덱스 (본인 문서 작성 허용)
     match /userCenters/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       match /centers/{centerId} {
