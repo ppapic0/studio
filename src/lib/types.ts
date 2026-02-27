@@ -7,6 +7,7 @@ export interface User {
   displayName: string;
   email: string;
   profileImageUrl?: string;
+  schoolName?: string; // 소속 학교 추가
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -23,6 +24,7 @@ export interface StudentProfile {
   id: string;
   name: string;
   grade: string;
+  schoolName: string; // 소속 학교 필수
   seatNo: number;
   targetDailyMinutes: number;
   parentUids: string[];

@@ -36,6 +36,10 @@ const formSchema = z.object({
   role: z.enum(['student', 'teacher'], {
     required_error: '역할을 선택해주세요.',
   }),
+  schoolName: z.string().optional().refine((val) => {
+    // 학생일 때만 학교명 필수
+    return true; 
+  }, { message: '학교명을 입력해주세요.' }),
   inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
 });
 
@@ -53,12 +57,22 @@ export function SignupForm() {
       email: '', 
       password: '', 
       role: 'student',
+      schoolName: '',
       inviteCode: '' 
     },
   });
 
+  const selectedRole = form.watch('role');
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
+    
+    // 추가 검증: 학생이면 학교명 필수
+    if (values.role === 'student' && (!values.schoolName || values.schoolName.length < 3)) {
+      form.setError('schoolName', { message: '학교명을 풀네임으로 입력해주세요 (예: 000고등학교)' });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -79,6 +93,7 @@ export function SignupForm() {
         id: user.uid,
         email: values.email,
         displayName: values.displayName,
+        schoolName: values.schoolName || '',
         createdAt: timestamp,
         updatedAt: timestamp,
       });
@@ -111,8 +126,19 @@ export function SignupForm() {
         joinedAt: timestamp,
       });
 
-      // 5. 성장 로드맵 초기화 (학생 전용)
+      // 5. 학생일 경우 상세 프로필 및 성장 로드맵 초기화
       if (values.role === 'student') {
+        batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
+          id: user.uid,
+          name: values.displayName,
+          schoolName: values.schoolName || '',
+          grade: '고등학생', // 기본값
+          seatNo: 0,
+          targetDailyMinutes: 360,
+          parentUids: [],
+          createdAt: timestamp,
+        });
+
         batch.set(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
           level: 1,
           currentXp: 0,
@@ -201,6 +227,21 @@ export function SignupForm() {
             </FormItem>
           )}
         />
+
+        {selectedRole === 'student' && (
+          <FormField
+            control={form.control}
+            name="schoolName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>소속 학교</FormLabel>
+                <FormControl><Input placeholder="예: 동백고등학교" {...field} className="h-12 rounded-xl border-2" /></FormControl>
+                <FormDescription className="text-[10px]">반드시 "OOO고등학교"까지 풀네임으로 적어주세요.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <FormField
           control={form.control}

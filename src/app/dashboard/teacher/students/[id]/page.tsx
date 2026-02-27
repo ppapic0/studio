@@ -20,7 +20,8 @@ import {
   MessageCircle, 
   Send,
   History,
-  TrendingUp
+  TrendingUp,
+  Building2
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyPlan, CounselingLog, ParentFeedbackDraft } from '@/lib/types';
@@ -104,16 +105,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="rounded-full" asChild>
-          <Link href="/dashboard/teacher">
+          <Link href="/dashboard/teacher/students">
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
         <div className="flex flex-col">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-black">{student?.name} 학생</h1>
-            <Badge className="bg-primary text-white">{student?.seatNo}번 좌석</Badge>
+            <Badge className="bg-primary text-white">{student?.seatNo || '미배정'}번 좌석</Badge>
           </div>
-          <p className="text-sm text-muted-foreground font-bold">{student?.grade} · 일일 목표 {student?.targetDailyMinutes}분</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground font-bold mt-1">
+            <span className="flex items-center gap-1 text-primary">
+              <Building2 className="h-3.5 w-3.5" /> {student?.schoolName || '학교 정보 없음'}
+            </span>
+            <span>·</span>
+            <span>{student?.grade}</span>
+            <span>·</span>
+            <span>일일 목표 {student?.targetDailyMinutes}분</span>
+          </div>
         </div>
       </div>
 
@@ -137,7 +146,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-[10px] text-muted-foreground font-bold mt-1">목표 대비 65% 달성</p>
               </CardContent>
             </Card>
-            {/* 추가 지표 카드들... */}
           </div>
 
           <Card className="rounded-[2rem] border-none shadow-lg">
@@ -201,7 +209,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
 
         <TabsContent value="counseling" className="mt-6 grid gap-6 md:grid-cols-2">
-          {/* 일지 작성 폼 */}
           <Card className="rounded-[2rem] border-none shadow-lg">
             <CardHeader>
               <CardTitle>새 상담 일지 작성</CardTitle>
@@ -249,7 +256,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
 
-          {/* 과거 기록 리스트 */}
           <Card className="rounded-[2rem] border-none shadow-lg overflow-hidden">
             <CardHeader className="bg-muted/30 border-b">
               <CardTitle className="flex items-center gap-2">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -10,16 +9,38 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair } from 'lucide-react';
+import { collection, query, orderBy, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 export default function StudentListPage() {
   const { activeMembership } = useAppContext();
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // 신규 학생 등록 상태
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newStudent, setNewStudent] = useState({
+    name: '',
+    schoolName: '',
+    grade: '고등학생',
+    targetMinutes: 360
+  });
 
   const centerId = activeMembership?.id;
 
@@ -39,8 +60,41 @@ export default function StudentListPage() {
 
   const filteredStudents = students?.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.schoolName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.seatNo.toString().includes(searchTerm)
   );
+
+  const handleAddStudent = async () => {
+    if (!firestore || !centerId || !newStudent.name || !newStudent.schoolName) {
+      toast({ variant: "destructive", title: "모든 정보를 입력해주세요." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const studentId = `st_${Date.now()}`; // 고유 ID 생성 (Auth 계정과는 별도)
+      const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
+      
+      await setDoc(studentRef, {
+        id: studentId,
+        name: newStudent.name,
+        schoolName: newStudent.schoolName,
+        grade: newStudent.grade,
+        seatNo: 0,
+        targetDailyMinutes: Number(newStudent.targetMinutes),
+        parentUids: [],
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: "학생이 등록되었습니다." });
+      setIsAddModalOpen(false);
+      setNewStudent({ name: '', schoolName: '', grade: '고등학생', targetMinutes: 360 });
+    } catch (e) {
+      toast({ variant: "destructive", title: "등록 실패" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -62,16 +116,52 @@ export default function StudentListPage() {
           </h1>
           <p className="text-muted-foreground font-bold">센터에 등록된 모든 학생을 관리합니다.</p>
         </div>
-        <Button className="rounded-xl font-black gap-2 h-12 shadow-lg">
-          <UserPlus className="h-5 w-5" /> 신규 학생 등록
-        </Button>
+        
+        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="rounded-xl font-black gap-2 h-12 shadow-lg">
+              <UserPlus className="h-5 w-5" /> 신규 학생 등록
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-[2rem] sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 등록</DialogTitle>
+              <DialogDescription className="font-bold">시스템에 학생 프로필을 즉시 생성합니다.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">이름</Label>
+                <Input id="name" placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="school">소속 학교 (풀네임)</Label>
+                <Input id="school" placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="grade">학년</Label>
+                  <Input id="grade" placeholder="예: 고3" value={newStudent.grade} onChange={(e) => setNewStudent({...newStudent, grade: e.target.value})} className="rounded-xl" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="target">일일 목표 (분)</Label>
+                  <Input id="target" type="number" value={newStudent.targetMinutes} onChange={(e) => setNewStudent({...newStudent, targetMinutes: Number(e.target.value)})} className="rounded-xl" />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : '즉시 가입/등록'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </header>
 
       <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border shadow-sm">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="학생 이름 또는 좌석 번호로 검색..." 
+            placeholder="이름, 학교 또는 좌석 번호로 검색..." 
             className="pl-10 h-11 border-none focus-visible:ring-0 text-base"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -91,7 +181,7 @@ export default function StudentListPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredStudents.map((student) => {
-            const currentStatus = attendanceList?.find(a => a.id === student.id);
+            const currentStatus = attendanceList?.find(a => a.studentId === student.id);
             return (
               <Link key={student.id} href={`/dashboard/teacher/students/${student.id}`}>
                 <Card className="rounded-3xl border-none shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden">
@@ -106,20 +196,27 @@ export default function StudentListPage() {
                           {student.name.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-black">{student.name}</h3>
+                          <h3 className="text-lg font-black truncate">{student.name}</h3>
                           {getStatusBadge(currentStatus?.status)}
                         </div>
-                        <p className="text-sm text-muted-foreground font-bold">{student.grade} · 목표 {student.targetDailyMinutes}분</p>
+                        <div className="flex flex-col text-sm text-muted-foreground font-bold">
+                          <span className="flex items-center gap-1 text-[11px] text-primary/70">
+                            <Building2 className="h-3 w-3" /> {student.schoolName || '학교 정보 없음'}
+                          </span>
+                          <span>{student.grade} · 목표 {student.targetDailyMinutes}분</span>
+                        </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
                     </div>
                     
                     <div className="mt-6 flex items-center justify-between p-3 bg-muted/30 rounded-2xl">
                       <div className="flex items-center gap-2">
                         <Armchair className="h-4 w-4 text-primary/60" />
-                        <span className="text-sm font-black text-primary/80">{student.seatNo}번 좌석</span>
+                        <span className="text-sm font-black text-primary/80">
+                          {student.seatNo > 0 ? `${student.seatNo}번 좌석` : '좌석 미지정'}
+                        </span>
                       </div>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Profile View</span>
                     </div>
