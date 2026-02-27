@@ -63,21 +63,19 @@ export function SignupForm() {
       setLoadingStatus('계정 생성 중...');
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       
-      // 프로필 업데이트 완료 대기
       await updateProfile(userCredential.user, { displayName: values.displayName });
 
       setLoadingStatus('센터 가입 및 멤버십 설정 중...');
-      // 서버에서 모든 문서를 원자적으로 생성 (트랜잭션)
       const result = await redeemInviteCodeAction(userCredential.user.uid, values.inviteCode, values.displayName);
 
       if (result.ok) {
         setLoadingStatus('데이터 동기화 및 대시보드 준비 중...');
         toast({ title: '가입 성공', description: result.message });
         
-        // 데이터 전파(Replication)를 위해 2초 대기 후 전체 새로고침 리디렉션
+        // 데이터 전파 지연을 고려하여 2.5초 후 이동
         setTimeout(() => {
           window.location.href = '/dashboard';
-        }, 2000);
+        }, 2500);
       }
     } catch (error: any) {
       console.error('Signup Error:', error);
@@ -155,9 +153,6 @@ export function SignupForm() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription className="text-[10px] font-bold">
-                센터 성격에 맞는 역할을 선택해주세요.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

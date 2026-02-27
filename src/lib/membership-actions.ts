@@ -10,10 +10,11 @@ import { FieldValue } from 'firebase-admin/firestore';
 export async function redeemInviteCodeAction(uid: string, code: string, displayName: string) {
   if (!code) throw new Error("초대 코드가 필요합니다.");
 
+  const fixedCenterId = 'learning-lab-dongbaek';
+
   try {
     return await adminDb.runTransaction(async (transaction) => {
-      // 1. 초대 코드 정보 결정 (테스트용 하드코딩 포함)
-      let centerId = 'learning-lab-dongbaek';
+      // 1. 초대 코드 정보 결정
       let role: 'student' | 'teacher' = 'student';
 
       if (code === 'T0313') {
@@ -21,14 +22,12 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       } else if (code === '0313') {
         role = 'student';
       } else {
-        // 실제 DB에서 코드 확인
         const inviteRef = adminDb.doc(`inviteCodes/${code}`);
         const inviteSnap = await transaction.get(inviteRef);
         if (!inviteSnap.exists) {
-          throw new Error("유효하지 않은 초대 코드입니다. (테스트 코드: 학생 0313, 선생님 T0313)");
+          throw new Error("유효하지 않은 초대 코드입니다. (학생: 0313, 선생님: T0313)");
         }
         const data = inviteSnap.data()!;
-        centerId = data.centerId;
         role = data.intendedRole || 'student';
         
         if (data.maxUses && data.usedCount >= data.maxUses) {
@@ -38,17 +37,17 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       }
 
       const timestamp = FieldValue.serverTimestamp();
-      const centerRef = adminDb.doc(`centers/${centerId}`);
+      const centerRef = adminDb.doc(`centers/${fixedCenterId}`);
       const userRef = adminDb.doc(`users/${uid}`);
-      const memberRef = adminDb.doc(`centers/${centerId}/members/${uid}`);
-      const userCenterRef = adminDb.doc(`userCenters/${uid}/centers/${centerId}`);
+      const memberRef = adminDb.doc(`centers/${fixedCenterId}/members/${uid}`);
+      const userCenterRef = adminDb.doc(`userCenters/${uid}/centers/${fixedCenterId}`);
 
       // 2. 센터 정보 보장
       const centerSnap = await transaction.get(centerRef);
       if (!centerSnap.exists) {
         transaction.set(centerRef, {
-          id: centerId,
-          name: centerId === 'learning-lab-dongbaek' ? "공부트랙 동백센터" : `센터 (${centerId})`,
+          id: fixedCenterId,
+          name: "공부트랙 동백센터",
           subscriptionTier: "Pro",
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -56,26 +55,34 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
       }
 
       // 3. 핵심 문서들 생성 (보안 규칙 및 조회용)
-      transaction.set(userRef, { id: uid, displayName, updatedAt: timestamp, createdAt: timestamp }, { merge: true });
+      // /users/{uid}
+      transaction.set(userRef, { 
+        id: uid, 
+        displayName, 
+        updatedAt: timestamp, 
+        createdAt: timestamp 
+      }, { merge: true });
       
-      // /centers/{centerId}/members/{uid} -> hasRole() 규칙의 근거
+      // /centers/{centerId}/members/{uid}
       transaction.set(memberRef, {
+        id: fixedCenterId,
         role,
         status: "active",
         joinedAt: timestamp,
         displayName,
       });
 
-      // /userCenters/{uid}/centers/{centerId} -> AuthGuard 조회 근거
+      // /userCenters/{uid}/centers/{centerId}
       transaction.set(userCenterRef, {
+        id: fixedCenterId,
         role,
         status: "active",
         joinedAt: timestamp,
       });
 
-      // 4. 학생용 초기화
+      // 4. 역할별 초기 데이터 설정
       if (role === 'student') {
-        const progressRef = adminDb.doc(`centers/${centerId}/growthProgress/${uid}`);
+        const progressRef = adminDb.doc(`centers/${fixedCenterId}/growthProgress/${uid}`);
         transaction.set(progressRef, {
           level: 1,
           currentXp: 0,
@@ -86,16 +93,16 @@ export async function redeemInviteCodeAction(uid: string, code: string, displayN
         }, { merge: true });
       }
 
-      // 5. 선생님용 초기 데이터 시딩
       if (role === 'teacher') {
+        // 선생님을 위한 기본 학생 데이터 시딩
         const mockStudents = [
           { id: 'mock_std_1', name: '김철수', seatNo: 1, grade: '고3' },
           { id: 'mock_std_2', name: '이영희', seatNo: 2, grade: '중3' },
           { id: 'mock_std_3', name: '박지민', seatNo: 3, grade: '고2' },
         ];
         for (const s of mockStudents) {
-          const sRef = adminDb.doc(`centers/${centerId}/students/${s.id}`);
-          const aRef = adminDb.doc(`centers/${centerId}/attendanceCurrent/${s.id}`);
+          const sRef = adminDb.doc(`centers/${fixedCenterId}/students/${s.id}`);
+          const aRef = adminDb.doc(`centers/${fixedCenterId}/attendanceCurrent/${s.id}`);
           transaction.set(sRef, { ...s, targetDailyMinutes: 360, createdAt: timestamp }, { merge: true });
           transaction.set(aRef, { seatNo: s.seatNo, status: 'studying', updatedAt: timestamp }, { merge: true });
         }

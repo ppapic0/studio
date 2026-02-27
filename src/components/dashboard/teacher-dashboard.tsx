@@ -10,7 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowUpRight, Armchair, MessageSquare, TrendingUp, Users, Loader2 } from 'lucide-react';
+import { ArrowUpRight, Armchair, MessageSquare, TrendingUp, Users, Loader2, Zap } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -85,6 +85,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <CardContent className="px-6 pb-6">
             <div className="text-[10px] font-bold text-primary/60">확정된 일정 기준</div>
           </CardContent>
+        </Card>
 
         <Card className="rounded-3xl border-none shadow-md bg-white">
           <CardHeader className="p-6 pb-2">
@@ -94,6 +95,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <CardContent className="px-6 pb-6">
             <div className="text-[10px] font-bold text-amber-600/60">전주 대비 +4%</div>
           </CardContent>
+        </Card>
 
         <Card className="rounded-3xl border-none shadow-md bg-primary text-primary-foreground">
           <CardHeader className="p-6 pb-2">
