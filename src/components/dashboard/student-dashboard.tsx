@@ -290,7 +290,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     secondsElapsed, 
     setSecondsElapsed,
     startTime,
-    setStartTime
+    setStartTime,
+    lastActiveCheckTime,
+    setLastActiveCheckTime
   } = useAppContext();
   
   const today = useMemo(() => new Date(), []);
@@ -300,8 +302,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
 
-  // local tracking for session check
-  const [timeSinceCheck, setTimeSinceCheck] = useState(0);
+  // local tracking for session countdown
   const [showSessionAlert, setShowSessionAlert] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
 
@@ -340,25 +341,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return (doneCount / studyTasks.length) * 100;
   }, [studyTasks]);
 
+  // Persistent Session Checker
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isTimerActive) {
+    if (isTimerActive && lastActiveCheckTime) {
       interval = setInterval(() => {
-        setTimeSinceCheck(t => {
-          const next = t + 1;
-          if (next >= AUTO_TERMINATE_SECONDS) {
-            setShowSessionAlert(true);
-            setGracePeriod(GRACE_PERIOD_SECONDS);
-          }
-          return next;
-        });
-      }, 1000);
-    } else {
-      setTimeSinceCheck(0);
+        const timeSinceLastCheck = Date.now() - lastActiveCheckTime;
+        if (!showSessionAlert && timeSinceLastCheck >= AUTO_TERMINATE_SECONDS * 1000) {
+          setShowSessionAlert(true);
+          setGracePeriod(GRACE_PERIOD_SECONDS);
+        }
+      }, 5000); // Check every 5 seconds
     }
     return () => clearInterval(interval);
-  }, [isTimerActive]);
+  }, [isTimerActive, lastActiveCheckTime, showSessionAlert]);
 
+  // Grace Period Countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (showSessionAlert && gracePeriod > 0) {
@@ -437,6 +435,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     saveStudyTime();
     setIsTimerActive(false);
     setStartTime(null);
+    setLastActiveCheckTime(null);
     setShowSessionAlert(false);
     toast({
       title: "장시간 미응답으로 자동 종료",
@@ -491,8 +490,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       saveStudyTime();
       setIsTimerActive(false);
       setStartTime(null);
+      setLastActiveCheckTime(null);
       setSecondsElapsed(0);
-      setTimeSinceCheck(0);
       toast({
         title: "공부 종료 및 기록 완료",
         description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
@@ -500,9 +499,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     } else {
       const now = Date.now();
       setStartTime(now);
+      setLastActiveCheckTime(now);
       setIsTimerActive(true);
       setSecondsElapsed(0);
-      setTimeSinceCheck(0);
       toast({
         title: "공부 모드 시작!",
         description: "동백센터 학습 구역에 입장하셨습니다. 집중력을 발휘해 보세요!",
@@ -512,7 +511,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleMaintainSession = () => {
     setShowSessionAlert(false);
-    setTimeSinceCheck(0);
+    setLastActiveCheckTime(Date.now());
     toast({
       title: "학습 세션 유지",
       description: "집중을 계속 이어가세요! 화이팅!",
@@ -520,7 +519,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleManualSessionReset = () => {
-    setTimeSinceCheck(0);
+    setLastActiveCheckTime(Date.now());
     toast({
       title: "세션 연장 완료",
       description: "2시간이 다시 충전되었습니다.",

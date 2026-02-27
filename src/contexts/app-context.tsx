@@ -7,6 +7,7 @@ export type CenterMembership = {
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
   status: 'active' | 'pending' | 'inactive';
   joinedAt: any; // Firestore Timestamp
+  linkedStudentIds?: string[];
 };
 
 interface AppContextType {
@@ -24,6 +25,8 @@ interface AppContextType {
   setSecondsElapsed: (seconds: number | ((prev: number) => number)) => void;
   startTime: number | null;
   setStartTime: (time: number | null) => void;
+  lastActiveCheckTime: number | null;
+  setLastActiveCheckTime: (time: number | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -37,10 +40,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
   // Initial Sync with LocalStorage
   useEffect(() => {
     const savedStartTime = localStorage.getItem('study_start_time');
+    const savedCheckTime = localStorage.getItem('study_last_check_time');
+    
     if (savedStartTime) {
       const start = parseInt(savedStartTime, 10);
       setStartTime(start);
@@ -49,6 +55,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Calculate initial elapsed
       const elapsed = Math.floor((Date.now() - start) / 1000);
       setSecondsElapsed(elapsed);
+    }
+
+    if (savedCheckTime) {
+      setLastActiveCheckTime(parseInt(savedCheckTime, 10));
     }
   }, []);
 
@@ -74,6 +84,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [isTimerActive, startTime]);
 
+  useEffect(() => {
+    if (lastActiveCheckTime) {
+      localStorage.setItem('study_last_check_time', lastActiveCheckTime.toString());
+    } else {
+      localStorage.removeItem('study_last_check_time');
+    }
+  }, [lastActiveCheckTime]);
+
   return (
     <AppContext.Provider
       value={{
@@ -88,7 +106,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         secondsElapsed,
         setSecondsElapsed,
         startTime,
-        setStartTime
+        setStartTime,
+        lastActiveCheckTime,
+        setLastActiveCheckTime
       }}
     >
       {children}
