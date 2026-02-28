@@ -28,6 +28,7 @@ import {
   CircleDot,
   History,
   RefreshCw,
+  ListTodo,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -583,6 +584,121 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           type="growth"
           gameTitle="성장 챔피언"
         />
+      </div>
+
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {/* 오늘의 학습 계획 */}
+        <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-border/50">
+          <CardHeader className="bg-muted/10 border-b p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2">
+                  <ListTodo className="h-6 w-6 text-primary" /> 오늘의 학습 계획
+                </CardTitle>
+                <CardDescription className="font-bold text-xs text-muted-foreground uppercase tracking-widest">Today's Study Checklist</CardDescription>
+              </div>
+              <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-primary">{Math.round(todayCompletionRate)}%</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">달성</span>
+                </div>
+                <Progress value={todayCompletionRate} className="w-full sm:w-32 h-2 rounded-full shadow-inner" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 sm:p-8">
+            {plansLoading ? (
+              <div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+            ) : !studyTasks || studyTasks.length === 0 ? (
+              <div className="py-16 text-center flex flex-col items-center gap-4 bg-muted/5 rounded-[2.5rem] border-2 border-dashed border-border/50">
+                <div className="bg-white p-4 rounded-full shadow-sm">
+                  <ClipboardCheck className="h-10 w-10 text-muted-foreground opacity-20" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-muted-foreground/60 italic">오늘 등록된 자습 계획이 없습니다.</p>
+                  <p className="text-[10px] font-medium text-muted-foreground/40">미리 계획을 세우면 집중력이 20% 향상됩니다.</p>
+                </div>
+                <Button asChild variant="outline" size="sm" className="rounded-xl font-black mt-2 border-2 px-6 h-10 hover:bg-primary hover:text-white transition-all">
+                  <Link href="/dashboard/plan">계획 세우러 가기</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {studyTasks.slice(0, 6).map((task) => (
+                  <div 
+                    key={task.id} 
+                    className={cn(
+                      "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 group",
+                      task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent hover:border-primary/10 hover:bg-muted/5 shadow-sm"
+                    )}
+                  >
+                    <Checkbox 
+                      id={task.id} 
+                      checked={task.done} 
+                      onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                      className="h-5 w-5 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                    />
+                    <Label 
+                      htmlFor={task.id}
+                      className={cn(
+                        "flex-1 font-bold text-sm cursor-pointer transition-all",
+                        task.done ? "line-through text-muted-foreground/50 italic" : "text-foreground"
+                      )}
+                    >
+                      {task.title}
+                    </Label>
+                    {task.done && <CheckCircle2 className="h-4 w-4 text-emerald-500 animate-in zoom-in duration-300" />}
+                  </div>
+                ))}
+                {studyTasks.length > 6 && (
+                  <Button asChild variant="ghost" className="w-full mt-4 font-black text-xs text-muted-foreground/60 hover:text-primary transition-colors gap-2">
+                    <Link href="/dashboard/plan">
+                      나머지 {studyTasks.length - 6}개의 계획 더보기 <ChevronRight className="h-3 w-3" />
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 퀵 스케줄 요약 */}
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white flex flex-col ring-1 ring-border/50 overflow-hidden">
+          <CardHeader className="p-6 sm:p-8">
+            <CardTitle className="text-xl font-black flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-primary" /> 생활 시간표
+            </CardTitle>
+            <CardDescription className="font-bold text-xs opacity-60 uppercase tracking-tighter">Daily Routine Summary</CardDescription>
+          </CardHeader>
+          <CardContent className="px-6 sm:px-8 pb-8 flex-1">
+            {!scheduleItems || scheduleItems.length === 0 ? (
+              <div className="h-full py-16 text-center text-muted-foreground/40 text-xs font-black border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-2">
+                <Clock className="h-8 w-8 opacity-10" />
+                <span>시간표가 등록되지 않았습니다.</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {scheduleItems.map((item) => {
+                  const [title, time] = item.title.split(': ');
+                  return (
+                    <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/10 border border-border/50 group hover:bg-white hover:shadow-md transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary/10 transition-colors">
+                          <CircleDot className="h-3 w-3 text-primary/60" />
+                        </div>
+                        <span className="text-sm font-bold text-foreground/80">{title}</span>
+                      </div>
+                      <span className="text-xs font-black font-mono text-primary bg-white px-3 py-1 rounded-lg shadow-sm">{time || '-'}</span>
+                    </div>
+                  );
+                })}
+                <Button asChild variant="ghost" className="w-full mt-4 font-black text-[10px] text-primary/40 hover:text-primary transition-colors">
+                  <Link href="/dashboard/plan">스케줄 편집하기</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
