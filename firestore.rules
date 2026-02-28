@@ -8,8 +8,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getRole(centerId) {
-      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role;
+    function getMembership(centerId) {
+      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data;
     }
 
     function isMember(centerId) {
@@ -17,12 +17,7 @@ service cloud.firestore {
     }
 
     function isStaff(centerId) {
-      return isMember(centerId) && getRole(centerId) in ['teacher', 'centerAdmin'];
-    }
-
-    // --- [CRITICAL] 선생님/관리자 전능 권한 ---
-    match /centers/{centerId}/{allSubcollections=**} {
-      allow read, write: if isStaff(centerId);
+      return isMember(centerId) && getMembership(centerId).role in ['teacher', 'centerAdmin'];
     }
 
     // --- 유저 프로필 ---
@@ -37,10 +32,15 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // --- 개별 접근 규칙 ---
+    // --- 센터별 데이터 ---
     match /centers/{centerId} {
       allow read: if isMember(centerId);
       
+      // 선생님/관리자는 해당 센터의 모든 하위 데이터를 읽고 쓸 수 있음
+      match /{allSubcollections=**} {
+        allow read, write: if isStaff(centerId);
+      }
+
       match /members/{memberId} {
         allow read: if isMember(centerId) && (request.auth.uid == memberId);
       }
@@ -50,11 +50,13 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
+      // 학습 계획: 본인 것만 쓰기 가능, 읽기는 본인 및 스태프
       match /plans/{studentId}/weeks/{week}/items/{itemId} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
+      // 학습 로그: 본인 것만 쓰기 가능, 읽기는 본인 및 스태프
       match /studyLogs/{studentId}/days/{date} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
@@ -70,20 +72,21 @@ service cloud.firestore {
       }
 
       match /dailyReports/{reportId} {
-        allow read: if isMember(centerId);
+        allow read: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
       }
       
       match /attendanceCurrent/{id} {
         allow read: if isMember(centerId);
       }
       
-      // 상담 예약 규칙 보강
+      // 상담 예약: 신청은 본인만, 조회는 센터 멤버 전체 (현황 공유 목적)
       match /counselingReservations/{id} {
         allow read: if isMember(centerId);
         allow create: if isMember(centerId) && request.resource.data.studentId == request.auth.uid;
         allow update, delete: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
       }
       
+      // 상담 일지: 민감한 정보이므로 본인 또는 선생님만 조회 가능
       match /counselingLogs/{id} {
         allow read: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
       }
@@ -94,7 +97,7 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // 시스템 와일드카드
+    // 시스템 예외 (동백 센터 관리자용)
     match /{document=**} {
       allow read, write: if isSignedIn() && isStaff('learning-lab-dongbaek');
     }
