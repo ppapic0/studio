@@ -1,22 +1,21 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useUser, useFirestore } from '@/firebase';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 export type CenterMembership = {
-  id: string; // This is the centerId
+  id: string; // centerId
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
   status: 'active' | 'pending' | 'inactive';
-  joinedAt: any; // Firestore Timestamp
-  linkedStudentIds?: string[];
+  joinedAt: any;
+  displayName?: string;
 };
 
 interface AppContextType {
   memberships: CenterMembership[];
-  setMemberships: (memberships: CenterMembership[]) => void;
   activeMembership: CenterMembership | null;
-  setActiveMembership: (membership: CenterMembership | null) => void;
   membershipsLoading: boolean;
-  setMembershipsLoading: (loading: boolean) => void;
   
   // Timer Global State
   isTimerActive: boolean;
@@ -32,6 +31,8 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user } = useUser();
+  const firestore = useFirestore();
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
@@ -42,7 +43,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
-  // Initial Sync with LocalStorage
+  // 멤버십 데이터 실시간 동기화
+  useEffect(() => {
+    if (!user || !firestore) {
+      setMemberships([]);
+      setActiveMembership(null);
+      setMembershipsLoading(false);
+      return;
+    }
+
+    setMembershipsLoading(true);
+    const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
+    
+    const unsubscribe = onSnapshot(userCentersRef, (snapshot) => {
+      const fetched = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as CenterMembership));
+
+      setMemberships(fetched);
+      const active = fetched.find(m => m.status === 'active') || fetched[0] || null;
+      setActiveMembership(active);
+      setMembershipsLoading(false);
+    }, (error) => {
+      console.error("Membership sync error:", error);
+      setMembershipsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, firestore]);
+
+  // Timer LocalStorage Sync
   useEffect(() => {
     const savedStartTime = localStorage.getItem('study_start_time');
     const savedCheckTime = localStorage.getItem('study_last_check_time');
@@ -51,31 +82,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const start = parseInt(savedStartTime, 10);
       setStartTime(start);
       setIsTimerActive(true);
-      
-      // Calculate initial elapsed
       const elapsed = Math.floor((Date.now() - start) / 1000);
       setSecondsElapsed(elapsed);
     }
-
-    if (savedCheckTime) {
-      setLastActiveCheckTime(parseInt(savedCheckTime, 10));
-    }
+    if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
   }, []);
 
-  // Background Timer Ticking
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive && startTime) {
       interval = setInterval(() => {
-        const now = Date.now();
-        const elapsed = Math.floor((now - startTime) / 1000);
-        setSecondsElapsed(elapsed);
+        setSecondsElapsed(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
     }
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
-  // Persist State Changes
   useEffect(() => {
     if (isTimerActive && startTime) {
       localStorage.setItem('study_start_time', startTime.toString());
@@ -84,23 +106,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [isTimerActive, startTime]);
 
-  useEffect(() => {
-    if (lastActiveCheckTime) {
-      localStorage.setItem('study_last_check_time', lastActiveCheckTime.toString());
-    } else {
-      localStorage.removeItem('study_last_check_time');
-    }
-  }, [lastActiveCheckTime]);
-
   return (
     <AppContext.Provider
       value={{
         memberships,
-        setMemberships,
         activeMembership,
-        setActiveMembership,
         membershipsLoading,
-        setMembershipsLoading,
         isTimerActive,
         setIsTimerActive,
         secondsElapsed,
@@ -118,8 +129,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 export function useAppContext() {
   const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
+  if (context === undefined) throw new Error('useAppContext must be used within an AppProvider');
   return context;
 }
