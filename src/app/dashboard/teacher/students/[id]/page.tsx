@@ -2,10 +2,10 @@
 'use client';
 
 import { use, useState, useMemo, useEffect } from 'react';
-import { useDoc, useCollection, useFirestore, useFunctions } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Dialog,
   DialogContent,
@@ -43,11 +44,16 @@ import {
   Lock,
   Sparkles,
   Activity,
-  Check
+  Check,
+  CalendarPlus,
+  FileEdit,
+  History,
+  MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
 import { format, subDays, startOfDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ResponsiveContainer, 
@@ -129,6 +135,7 @@ function StatAnalysisCard({
 
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = use(params);
+  const { user: currentUser } = useUser();
   const { activeMembership } = useAppContext();
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -136,6 +143,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  // --- 상담 관리 상태 ---
+  const [aptDate, setAptDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [aptTime, setAptTime] = useState('14:00');
+  const [aptNote, setAptNote] = useState('');
+  
+  const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
+  const [logContent, setLogContent] = useState('');
+  const [logImprovement, setLogImprovement] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- 데이터 패칭 ---
   const studentRef = useMemoFirebase(() => {
@@ -166,14 +183,36 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
 
-  // 멤버십 정보 조회 (상태 변경용)
   const membershipRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId, 'members', studentId);
   }, [firestore, centerId, studentId]);
   const { data: studentMembership } = useDoc<CenterMembership>(membershipRef);
 
-  // --- 데이터 가공 ---
+  // 상담 데이터 조회
+  const aptsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'counselingReservations'), where('studentId', '==', studentId));
+  }, [firestore, centerId, studentId]);
+  const { data: rawApts } = useCollection<any>(aptsQuery);
+
+  const counselLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'counselingLogs'), where('studentId', '==', studentId));
+  }, [firestore, centerId, studentId]);
+  const { data: rawCounselLogs } = useCollection<CounselingLog>(counselLogsQuery);
+
+  // --- 데이터 정렬 (인덱스 방지) ---
+  const appointments = useMemo(() => {
+    if (!rawApts) return [];
+    return [...rawApts].sort((a, b) => b.scheduledAt?.toMillis() - a.scheduledAt?.toMillis());
+  }, [rawApts]);
+
+  const counselingLogs = useMemo(() => {
+    if (!rawCounselLogs) return [];
+    return [...rawCounselLogs].sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+  }, [rawCounselLogs]);
+
   const logs = useMemo(() => {
     if (!rawLogs) return [];
     return [...rawLogs].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
@@ -198,7 +237,59 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     };
   }, [logs, todayKey]);
 
-  // --- 분석 상태 ---
+  // --- 핸들러 ---
+  const handleAddAppointment = async () => {
+    if (!firestore || !centerId || !student || !currentUser) return;
+    setIsSubmitting(true);
+    try {
+      const scheduledAt = new Date(`${aptDate}T${aptTime}`);
+      await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
+        centerId,
+        studentId,
+        studentName: student.name,
+        teacherId: currentUser.uid,
+        teacherName: currentUser.displayName || '선생님',
+        scheduledAt: Timestamp.fromDate(scheduledAt),
+        status: 'confirmed',
+        teacherNote: aptNote,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "상담 예약 완료" });
+      setAptNote('');
+    } catch (e) {
+      toast({ variant: "destructive", title: "예약 실패" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddCounselLog = async () => {
+    if (!firestore || !centerId || !currentUser) return;
+    if (!logContent.trim()) {
+      toast({ variant: "destructive", title: "내용을 입력해주세요." });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), {
+        studentId,
+        teacherId: currentUser.uid,
+        type: logType,
+        content: logContent,
+        improvement: logImprovement,
+        createdAt: serverTimestamp(),
+      });
+      toast({ title: "상담 일지 기록 완료" });
+      setLogContent('');
+      setLogImprovement('');
+    } catch (e) {
+      toast({ variant: "destructive", title: "기록 실패" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const [activeAnalysis, setActiveAnalysis] = useState<'today' | 'weekly' | 'monthly' | 'level' | 'rank' | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -215,22 +306,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   }, [student, studentMembership]);
 
-  // --- 차트 데이터 준비 ---
   const analysisData = useMemo(() => {
     if (!activeAnalysis) return null;
-
     switch (activeAnalysis) {
       case 'today':
         const target = student?.targetDailyMinutes || 360;
-        const current = stats.today;
         return [
-          { name: '달성', value: Math.min(current, target), fill: 'hsl(var(--primary))' },
-          { name: '남음', value: Math.max(0, target - current), fill: 'hsl(var(--muted))' }
+          { name: '달성', value: Math.min(stats.today, target), fill: 'hsl(var(--primary))' },
+          { name: '남음', value: Math.max(0, target - stats.today), fill: 'hsl(var(--muted))' }
         ];
-      case 'weekly':
-        return stats.chartData.slice(-7);
-      case 'monthly':
-        return stats.chartData;
+      case 'weekly': return stats.chartData.slice(-7);
+      case 'monthly': return stats.chartData;
       case 'level':
         const s = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
         return [
@@ -244,12 +330,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           { name: '본인', value: rankEntry?.[0]?.value || 0, fill: 'hsl(var(--primary))' },
           { name: '센터 평균', value: 85, fill: 'hsl(var(--muted))' }
         ];
-      default:
-        return null;
+      default: return null;
     }
   }, [activeAnalysis, stats, student, progress, rankEntry]);
 
-  // --- 핸들러 ---
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId) return;
     setIsUpdating(true);
@@ -281,10 +365,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const batch = writeBatch(firestore);
       const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
-      
       batch.update(memberRef, { status: statusForm, updatedAt: serverTimestamp() });
       batch.update(userCenterRef, { status: statusForm, updatedAt: serverTimestamp() });
-      
       await batch.commit();
       toast({ title: "학생 상태 변경 완료" });
       setIsStatusModalOpen(false);
@@ -388,7 +470,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <TabsList className="grid w-full grid-cols-3 rounded-[1.5rem] h-16 p-1.5 bg-muted/30 border border-border/50 shadow-inner">
           <TabsTrigger value="overview" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">학습 리포트</TabsTrigger>
           <TabsTrigger value="plans" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">공부 계획</TabsTrigger>
-          <TabsTrigger value="counseling" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">상담 히스토리</TabsTrigger>
+          <TabsTrigger value="counseling" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">상담 관리</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-8">
@@ -417,9 +499,141 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="counseling" className="mt-8 space-y-8">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* 상담 예약 섹션 */}
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+              <CardHeader className="bg-blue-50/50 border-b pb-6">
+                <CardTitle className="flex items-center gap-2 text-xl font-black text-blue-700">
+                  <CalendarPlus className="h-5 w-5" /> 새 상담 예약
+                </CardTitle>
+                <CardDescription className="font-bold">선생님이 먼저 상담 일정을 잡을 수 있습니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase text-muted-foreground">날짜</Label>
+                    <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase text-muted-foreground">시간</Label>
+                    <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase text-muted-foreground">상담 주제/메모</Label>
+                  <Input placeholder="예: 3월 모의고사 피드백" value={aptNote} onChange={(e) => setAptNote(e.target.value)} className="rounded-xl" />
+                </div>
+                <Button onClick={handleAddAppointment} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black bg-blue-600 hover:bg-blue-700 shadow-md">
+                  {isSubmitting ? <Loader2 className="animate-spin" /> : "예약 확정하기"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* 상담 일지 작성 섹션 */}
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+              <CardHeader className="bg-emerald-50/50 border-b pb-6">
+                <CardTitle className="flex items-center gap-2 text-xl font-black text-emerald-700">
+                  <FileEdit className="h-5 w-5" /> 상담 일지 작성
+                </CardTitle>
+                <CardDescription className="font-bold">상담 내용을 기록하여 체계적으로 관리하세요.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase text-muted-foreground">상담 유형</Label>
+                  <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="academic">학업/성적</SelectItem>
+                      <SelectItem value="life">생활 습관</SelectItem>
+                      <SelectItem value="career">진로/진학</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase text-muted-foreground">상담 내용</Label>
+                  <Textarea placeholder="상담한 핵심 내용을 적어주세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[100px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase text-muted-foreground">개선 권고 사항</Label>
+                  <Input placeholder="학생에게 전달할 실천 과제" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl" />
+                </div>
+                <Button onClick={handleAddCounselLog} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-md">
+                  {isSubmitting ? <Loader2 className="animate-spin" /> : "상담 일지 저장"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* 최근 예약 리스트 */}
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+              <CardHeader className="p-6 border-b">
+                <CardTitle className="text-lg font-black flex items-center gap-2">
+                  <History className="h-5 w-5 text-blue-500" /> 상담 예약 현황
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {appointments.length === 0 ? (
+                    <div className="py-20 text-center text-muted-foreground font-bold text-sm">예정된 상담이 없습니다.</div>
+                  ) : (
+                    appointments.map((apt: any) => (
+                      <div key={apt.id} className="p-4 flex items-center justify-between hover:bg-muted/5">
+                        <div className="grid gap-0.5">
+                          <span className="text-xs font-black text-blue-600">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'M월 d일 p', { locale: ko }) : '-'}</span>
+                          <span className="text-sm font-bold">{apt.teacherNote || '상담 주제 없음'}</span>
+                        </div>
+                        <Badge variant={apt.status === 'confirmed' ? 'default' : 'outline'} className="rounded-full text-[10px]">
+                          {apt.status === 'confirmed' ? '확정' : apt.status}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 과거 상담 일지 리스트 */}
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+              <CardHeader className="p-6 border-b">
+                <CardTitle className="text-lg font-black flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-emerald-500" /> 과거 상담 기록
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {counselingLogs.length === 0 ? (
+                    <div className="py-20 text-center text-muted-foreground font-bold text-sm">기록된 상담 일지가 없습니다.</div>
+                  ) : (
+                    counselingLogs.map((log: any) => (
+                      <div key={log.id} className="p-5 hover:bg-muted/5 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter">
+                            {log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로'}
+                          </Badge>
+                          <span className="text-[10px] font-bold text-muted-foreground">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd') : '-'}</span>
+                        </div>
+                        <p className="text-sm font-bold line-clamp-2 leading-relaxed">{log.content}</p>
+                        {log.improvement && (
+                          <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                            <p className="text-[10px] font-black text-emerald-700 flex items-center gap-1">
+                              <Check className="h-3 w-3" /> 개선 과제: {log.improvement}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
 
-      {/* 분석 다이얼로그 */}
+      {/* 분석 다이얼로그 (생략 - 기존과 동일) */}
       <Dialog open={!!activeAnalysis} onOpenChange={(open) => !open && setActiveAnalysis(null)}>
         <DialogContent className="sm:max-w-3xl rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
           <div className="bg-primary p-8 sm:p-12 text-primary-foreground relative">
