@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 export type CenterMembership = {
   id: string; // centerId
@@ -17,11 +17,9 @@ interface AppContextType {
   activeMembership: CenterMembership | null;
   membershipsLoading: boolean;
   
-  // Timer Global State
+  // Timer Global State (Static references only to prevent re-render loops)
   isTimerActive: boolean;
   setIsTimerActive: (active: boolean) => void;
-  secondsElapsed: number;
-  setSecondsElapsed: (seconds: number | ((prev: number) => number)) => void;
   startTime: number | null;
   setStartTime: (time: number | null) => void;
   lastActiveCheckTime: number | null;
@@ -37,13 +35,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
 
-  // Timer States
+  // Timer States (Only keep start times, remove secondsElapsed which causes 1s re-renders)
   const [isTimerActive, setIsTimerActive] = useState(false);
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
-  // Use a ref to store activeMembership content to prevent reference oscillation
   const activeMembershipRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -67,7 +63,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMemberships(fetched);
       const active = fetched.find(m => m.status === 'active') || fetched[0] || null;
       
-      // Deep comparison via stringification to prevent reference oscillation
       const activeKey = active ? `${active.id}_${active.status}_${active.role}` : 'null';
       if (activeMembershipRef.current !== activeKey) {
         setActiveMembership(active);
@@ -83,30 +78,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  // Timer LocalStorage Sync
+  // Timer Persistence Sync (Only on start/stop)
   useEffect(() => {
     const savedStartTime = localStorage.getItem('study_start_time');
     const savedCheckTime = localStorage.getItem('study_last_check_time');
     
     if (savedStartTime) {
-      const start = parseInt(savedStartTime, 10);
-      setStartTime(start);
+      setStartTime(parseInt(savedStartTime, 10));
       setIsTimerActive(true);
-      const elapsed = Math.floor((Date.now() - start) / 1000);
-      setSecondsElapsed(elapsed);
     }
     if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
   }, []);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isTimerActive && startTime) {
-      interval = setInterval(() => {
-        setSecondsElapsed(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerActive, startTime]);
 
   useEffect(() => {
     if (isTimerActive && startTime) {
@@ -122,8 +104,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     membershipsLoading,
     isTimerActive,
     setIsTimerActive,
-    secondsElapsed,
-    setSecondsElapsed,
     startTime,
     setStartTime,
     lastActiveCheckTime,
@@ -133,7 +113,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     activeMembership, 
     membershipsLoading, 
     isTimerActive, 
-    secondsElapsed, 
     startTime, 
     lastActiveCheckTime
   ]);

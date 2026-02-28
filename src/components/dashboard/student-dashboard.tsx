@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -57,7 +56,7 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
 import { format, startOfMonth, differenceInDays, addMonths } from 'date-fns';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -85,7 +84,6 @@ const RANK_THRESHOLDS: Record<MetricType, number[]> = {
 
 const AUTO_TERMINATE_SECONDS = 7200; // 2시간
 const GRACE_PERIOD_SECONDS = 60; // 1분
-// 곡선형 레벨업 공식: 1000 + (L-1)*300
 const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
 
 function getRankData(value: number, type: MetricType) {
@@ -215,19 +213,14 @@ function GamifiedStatCard({
                   <span>{type === 'attendance' ? '목표 360분' : '목표 100%'}</span>
                 </div>
               </div>
-              <p className="text-[11px] text-center font-bold text-primary/60 italic">
-                {type === 'completion' && (dailyValue >= 100 ? "🎉 오늘 계획 마스터! 완벽합니다." : `오늘 남은 계획을 마쳐서 ${dailyValue.toFixed(0)}%를 채우세요!`)}
-                {type === 'attendance' && (dailyValue >= 360 ? "⚡ 6시간 초몰입 성공! 회복력 0.5점이 부여됩니다." : `앞으로 ${(360 - dailyValue.toFixed(0))}분만 더 공부하면 회복력 점수가 상승해요!`)}
-                {type === 'growth' && (dailyValue > 0 ? "📈 어제보다 더 성장하고 있습니다. 페이스를 유지하세요!" : "오늘의 학습을 시작하여 성장 지수를 높여보세요!")}
-              </p>
             </div>
 
             {type === 'attendance' && (
               <Alert className="bg-destructive/5 border-destructive/20 text-destructive rounded-2xl py-3">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle className="text-[10px] font-black uppercase tracking-widest">엄격한 출석 인정 기준 (3시간 룰)</AlertTitle>
+                <AlertTitle className="text-[10px] font-black uppercase tracking-widest">엄격한 출석 인정 기준</AlertTitle>
                 <AlertDescription className="text-[11px] leading-relaxed font-bold mt-1">
-                  출석 등급은 일일 **3시간(180분) 이상** 학습을 완료한 날만 카운트됩니다. 회복력 0.5점은 **6시간 이상** 시 부여됩니다.
+                  출석 등급은 일일 **3시간(180분) 이상** 학습을 완료한 날만 카운트됩니다.
                 </AlertDescription>
               </Alert>
             )}
@@ -244,35 +237,6 @@ function GamifiedStatCard({
                 />
               </div>
             )}
-
-            <div className="rounded-3xl border border-border/50 bg-muted/20 overflow-hidden">
-              <div className="bg-muted/40 px-6 py-4 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-primary/70">
-                  <Info className="h-4 w-4" />
-                  <span>시즌 등급 달성 조건</span>
-                </div>
-                <span className="text-[10px] font-black text-muted-foreground/60">단위: {type === 'attendance' ? '일' : '%'}</span>
-              </div>
-              <div className="p-3 space-y-1.5">
-                {RANKS.map((r, idx) => (
-                  <div key={r.name} className={cn(
-                    "flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs transition-all duration-300",
-                    rankData.current.name === r.name 
-                      ? cn("bg-white shadow-lg ring-1 scale-[1.03] z-10", r.border) 
-                      : "opacity-40 grayscale-[0.2]"
-                  )}>
-                    <div className="flex items-center gap-3">
-                      <div className={cn("h-2.5 w-2.5 rounded-full shadow-sm", r.bg.replace('bg-', 'bg-opacity-100 bg-'))} />
-                      <span className={cn("font-black tracking-tight", r.color)}>{r.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 font-mono font-black">
-                      <span className="text-muted-foreground text-[10px] mr-1 font-bold">이상</span>
-                      {RANK_THRESHOLDS[type][idx]}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </DialogContent>
@@ -288,8 +252,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     activeMembership, 
     isTimerActive, 
     setIsTimerActive, 
-    secondsElapsed, 
-    setSecondsElapsed,
     startTime,
     setStartTime,
     lastActiveCheckTime,
@@ -300,11 +262,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = format(today, 'yyyy-MM-dd');
   const weekKey = format(today, "yyyy-'W'II");
 
+  // Local-only timer state to prevent entire dashboard re-renders
+  const [localSeconds, setLocalSeconds] = useState(0);
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
-
   const [showSessionAlert, setShowSessionAlert] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
+
+  const isLevelingUp = useRef(false);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerActive && startTime) {
+      // Sync local seconds immediately
+      setLocalSeconds(Math.floor((Date.now() - startTime) / 1000));
+      interval = setInterval(() => {
+        setLocalSeconds(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    } else {
+      setLocalSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerActive, startTime]);
 
   const daysUntilReset = useMemo(() => {
     const nextMonth = startOfMonth(addMonths(today, 1));
@@ -376,47 +355,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setLocationStatus('checking');
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const dist = calculateDistance(
-          position.coords.latitude,
-          position.coords.longitude,
-          TARGET_LAT,
-          TARGET_LON
-        );
+        const dist = calculateDistance(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
         setDistance(dist);
-        if (dist <= DISTANCE_THRESHOLD_KM) {
-          setLocationStatus('inside');
-        } else {
-          setLocationStatus('outside');
-        }
+        setLocationStatus(dist <= DISTANCE_THRESHOLD_KM ? 'inside' : 'outside');
       },
-      (error) => {
-        console.error("Geolocation error:", error);
-        setLocationStatus('error');
-      },
+      () => setLocationStatus('error'),
       { enableHighAccuracy: true }
     );
   }, []);
 
   useEffect(() => {
-    if (isActive) {
-      checkLocation();
-    }
+    if (isActive) checkLocation();
   }, [isActive, checkLocation]);
   
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     
-    updateDoc(itemRef, {
-      done: !item.done,
-      updatedAt: serverTimestamp(),
-    }).catch(e => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: itemRef.path,
-        operation: 'update',
-        requestResourceData: { done: !item.done }
-      }));
-    });
+    updateDoc(itemRef, { done: !item.done, updatedAt: serverTimestamp() });
 
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
@@ -435,16 +391,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setStartTime(null);
     setLastActiveCheckTime(null);
     setShowSessionAlert(false);
-    toast({
-      title: "장시간 미응답으로 자동 종료",
-      description: "2시간 세션이 만료되어 학습 시간이 저장되었습니다.",
-    });
   };
 
   const saveStudyTime = async () => {
-    if (!firestore || !user || !activeMembership || !studyLogRef) return;
+    if (!firestore || !user || !activeMembership || !studyLogRef || !startTime) return;
     
-    const sessionMinutes = Math.floor(secondsElapsed / 60);
+    const sessionMinutes = Math.floor((Date.now() - startTime) / 60000);
     if (sessionMinutes <= 0) return;
 
     const data = {
@@ -457,14 +409,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       createdAt: serverTimestamp(),
     };
 
-    setDoc(studyLogRef, data, { merge: true })
-      .catch((e) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: studyLogRef.path,
-          operation: 'write',
-          requestResourceData: data
-        }));
-      });
+    setDoc(studyLogRef, data, { merge: true });
 
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
     const focusGain = (sessionMinutes / 1000); 
@@ -479,24 +424,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    // 가변형 레벨업 체크 (절대값 기반으로 동기화 강화)
     const snap = await getDoc(progressRef);
-    if (snap.exists()) {
+    if (snap.exists() && !isLevelingUp.current) {
       const p = snap.data() as GrowthProgress;
       const currentThreshold = getNextLevelXp(Number(p.level) || 1);
       
       if (p.currentXp >= currentThreshold) {
+        isLevelingUp.current = true;
         const overflow = p.currentXp - currentThreshold;
         const nextLevel = (Number(p.level) || 1) + 1;
         const nextThreshold = getNextLevelXp(nextLevel);
         
-        updateDoc(progressRef, {
+        await updateDoc(progressRef, {
           level: nextLevel,
           currentXp: overflow,
           nextLevelXp: nextThreshold,
           updatedAt: serverTimestamp()
         });
-        toast({ title: "🎉 레벨 업!", description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다!` });
+        toast({ title: "🎉 레벨 업!", description: `마스터리 Lv.${nextLevel} 도달!` });
+        isLevelingUp.current = false;
       }
     }
   };
@@ -505,45 +451,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
     if (isTimerActive) {
-      const sessionMinutes = Math.floor(secondsElapsed / 60);
       saveStudyTime();
       setIsTimerActive(false);
       setStartTime(null);
       setLastActiveCheckTime(null);
-      setSecondsElapsed(0);
-      toast({
-        title: "공부 종료 및 기록 완료",
-        description: `이번 세션에서 ${sessionMinutes}분 동안 학습하셨습니다.`,
-      });
+      setLocalSeconds(0);
+      toast({ title: "공부 종료 및 기록 완료" });
     } else {
       const now = Date.now();
       setStartTime(now);
       setLastActiveCheckTime(now);
       setIsTimerActive(true);
-      setSecondsElapsed(0);
-      toast({
-        title: "공부 모드 시작!",
-        description: "동백센터 학습 구역에 입장하셨습니다. 집중력을 발휘해 보세요!",
-      });
+      setLocalSeconds(0);
+      toast({ title: "공부 모드 시작!" });
     }
   };
-
-  const handleMaintainSession = () => {
-    setShowSessionAlert(false);
-    setLastActiveCheckTime(Date.now());
-    toast({
-      title: "학습 세션 유지",
-      description: "집중을 계속 이어가세요! 화이팅!",
-    });
-  };
-
-  const handleManualSessionReset = () => {
-    setLastActiveCheckTime(Date.now());
-    toast({
-      title: "세션 연장 완료",
-      description: "2시간이 다시 충전되었습니다.",
-    });
-  }
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -551,17 +473,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!isActive) {
-    return null;
-  }
+  if (!isActive) return null;
 
   const growthRate = (dailyStat?.studyTimeGrowthRate ?? 0) * 100;
-  const growthSign = growthRate >= 0 ? '+' : '';
   const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
   const attendanceDays = dailyStat?.attendanceStreakDays ?? 0;
 
-  // 학습 시간 합산
-  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.floor(secondsElapsed / 60);
+  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.floor(localSeconds / 60);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
 
@@ -571,158 +489,66 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-black flex items-center gap-2">
-              <History className="h-6 w-6 text-primary animate-spin-slow" />
+              <History className="h-6 w-6 text-primary" />
               학습 세션을 유지할까요?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base font-bold text-muted-foreground pt-2">
-              어느덧 2시간이 지났습니다! 아직 집중하고 계신가요?<br />
-              <span className="text-destructive font-black">
-                {gracePeriod}초
-              </span> 후 응답이 없으면 학습이 자동으로 저장되고 종료됩니다.
+              <span className="text-destructive font-black">{gracePeriod}초</span> 후 자동 저장됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="pt-4">
-            <AlertDialogAction 
-              onClick={handleMaintainSession}
-              className="bg-primary text-primary-foreground font-black px-8 h-12 rounded-2xl hover:scale-105 transition-all"
-            >
-              학습세션 유지
-            </AlertDialogAction>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => { setShowSessionAlert(false); setLastActiveCheckTime(Date.now()); }} className="rounded-2xl">유지하기</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="bg-primary/5 border border-primary/10 rounded-3xl p-4 flex items-center justify-between backdrop-blur-sm shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-2xl">
-            <CalendarClock className="h-5 w-5 text-primary" />
-          </div>
-          <div className="text-sm font-bold">
-            <span className="font-black text-primary text-base">{format(today, 'M월')} 시즌</span> 진행 중
-          </div>
-        </div>
-        <div className="text-[11px] font-black text-muted-foreground bg-white/50 px-4 py-2 rounded-2xl border border-border/50">
-          시즌 종료까지 <span className="text-primary font-black">{daysUntilReset}일</span>
-        </div>
-      </div>
-
-      <section className="group relative overflow-hidden rounded-[2.5rem] bg-primary p-6 sm:p-8 text-primary-foreground shadow-2xl transition-all duration-500 hover:shadow-primary/20">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-accent opacity-20 transition-opacity group-hover:opacity-40" />
+      <section className="group relative overflow-hidden rounded-[2.5rem] bg-primary p-6 sm:p-8 text-primary-foreground shadow-2xl">
         <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:justify-between md:text-left">
           <div className="space-y-3">
             <h2 className="text-2xl font-black tracking-tighter sm:text-3xl leading-tight">
               {isTimerActive ? "몰입의 즐거움을\n경험하세요!" : "오늘의 성장을\n지금 시작할까요?"}
             </h2>
-            <div className="flex flex-col gap-2">
-              <p className="flex items-center gap-2 text-primary-foreground/70 font-black bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-sm border border-white/10 text-[11px]">
-                <MapPin className="h-3 w-3 text-accent animate-pulse" />
-                {locationStatus === 'checking' && "위치 확인 중..."}
-                {locationStatus === 'inside' && "동백센터 구역 내"}
-                {locationStatus === 'outside' && `구역 밖 (${distance?.toFixed(1)}km)`}
-                {locationStatus === 'error' && "위치 권한 필요"}
-              </p>
-              <p className="text-[10px] text-primary-foreground/50 font-bold ml-1">
-                ※ 2시간 미응답 시 세션 자동 종료 (중간 연장 가능)
-              </p>
-            </div>
+            <p className="flex items-center gap-2 text-primary-foreground/70 font-black bg-white/10 w-fit px-4 py-2 rounded-2xl text-[11px]">
+              <MapPin className="h-3 w-3 text-accent animate-pulse" />
+              {locationStatus === 'inside' ? "동백센터 구역 내" : "위치 확인 중..."}
+            </p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             {isTimerActive && (
-              <div className="flex flex-col items-center gap-0.5 bg-white/10 backdrop-blur-xl px-7 py-4 rounded-3xl border border-white/20 shadow-inner animate-pulse-soft relative group/timer">
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest opacity-70">
-                  <Timer className="h-3 w-3" />
-                  <span>진행 시간</span>
-                </div>
+              <div className="flex flex-col items-center bg-white/10 backdrop-blur-xl px-7 py-4 rounded-3xl border border-white/20">
                 <span className="text-4xl font-mono font-black tracking-tighter">
-                  {formatTime(secondsElapsed)}
+                  {formatTime(localSeconds)}
                 </span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleManualSessionReset}
-                  className="mt-2 h-7 rounded-xl bg-white/10 text-[10px] font-black hover:bg-white/20 hover:text-white border-white/10"
-                >
-                  <RefreshCw className="mr-1.5 h-3 w-3" />
-                  세션 연장
-                </Button>
               </div>
             )}
             
             <Button 
               size="lg" 
               className={cn(
-                "h-16 w-full rounded-[1.5rem] px-10 text-xl font-black transition-all md:w-auto shadow-xl active:scale-95",
-                isTimerActive 
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" 
-                  : locationStatus === 'inside' 
-                    ? "bg-accent text-accent-foreground hover:scale-105 hover:shadow-accent/40 hover:bg-accent/90" 
-                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                "h-16 w-full rounded-[1.5rem] px-10 text-xl font-black transition-all md:w-auto shadow-xl",
+                isTimerActive ? "bg-destructive" : "bg-accent"
               )}
               disabled={!isTimerActive && locationStatus !== 'inside'}
               onClick={handleStudyStartStop}
             >
-              {isTimerActive ? (
-                <>
-                  <Square className="mr-2 h-6 w-6 fill-current" />
-                  학습 마침
-                </>
-              ) : (
-                <>
-                  <Play className="mr-3 h-7 w-7 fill-current" />
-                  학습 시작
-                </>
-              )}
+              {isTimerActive ? "학습 마침" : "학습 시작"}
             </Button>
           </div>
         </div>
       </section>
 
-      {scheduleItems.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-4 py-2 w-full">
-          {scheduleItems.map((item) => {
-            const [title, time] = item.title.split(': ');
-            return (
-              <Card key={item.id} className="min-w-[140px] flex-1 sm:flex-none bg-white border-2 border-primary/30 rounded-3xl shadow-sm transition-all hover:scale-105 hover:border-primary/60 hover:shadow-xl group">
-                <CardContent className="p-4 flex flex-col items-center justify-center gap-1.5 text-center">
-                  <span className="text-[11px] font-black text-primary uppercase tracking-[0.1em] transition-colors">{title}</span>
-                  <span className="text-2xl font-black text-primary tracking-tighter">{time || '-'}</span>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/dashboard/study-history">
-          <Card className="cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-[1.03] active:scale-[0.98] group h-full border border-border/50 bg-card/80 backdrop-blur-sm rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-black text-muted-foreground group-hover:text-primary transition-colors">오늘의 학습 시간</CardTitle>
-              <div className="bg-primary/5 p-1.5 rounded-lg group-hover:bg-primary/10 transition-colors">
-                <Clock className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {todayStudyLogLoading ? (
-                <Skeleton className="h-8 w-24 mt-1" />
-              ) : (
-                <div className="flex items-center gap-1 justify-between">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black tracking-tight text-primary">
-                      {h}시간 {m}분
-                    </span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-                </div>
-              )}
-              <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2 text-[10px] font-black text-primary/60 uppercase tracking-widest">
-                 <Activity className="h-3 w-3" />
-                 <span>학습 히스토리</span>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+        <Card className="border border-border/50 bg-card/80 rounded-3xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-black text-muted-foreground">오늘의 학습 시간</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black tracking-tight text-primary">
+              {h}시간 {m}분
+            </div>
+          </CardContent>
+        </Card>
 
         <GamifiedStatCard 
           title="월간 완수율"
@@ -730,7 +556,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           value={`${Math.round(completionRate)}%`}
           numericValue={completionRate}
           dailyValue={todayCompletionRate}
-          evolution="시즌 마스터리 도전"
           isLoading={dailyStatLoading}
           type="completion"
           gameTitle="완수 마스터"
@@ -743,7 +568,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           numericValue={attendanceDays}
           dailyValue={totalMinutes}
           dailyUnit="분"
-          evolution="몰입 시간 달성"
           isLoading={dailyStatLoading}
           type="attendance"
           gameTitle="출석 킹"
@@ -752,73 +576,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <GamifiedStatCard 
           title="월간 성장 지수"
           icon={TrendingUp}
-          value={`${growthSign}${Math.round(growthRate)}%`}
+          value={`${Math.round(growthRate)}%`}
           numericValue={growthRate}
           dailyValue={growthRate}
-          evolution="능력치 상승 중"
           isLoading={dailyStatLoading}
           type="growth"
           gameTitle="성장 챔피언"
         />
       </div>
-
-      <Card className="w-full rounded-[2.5rem] border border-border/50 bg-card/50 backdrop-blur-xl shadow-xl overflow-hidden">
-        <CardHeader className="flex flex-row items-center p-8 bg-muted/20">
-          <div className="grid gap-1">
-            <CardTitle className="text-2xl font-black tracking-tighter">오늘의 자습 계획</CardTitle>
-            <CardDescription className="font-bold text-muted-foreground/70 text-xs">성취를 위한 마지막 한 걸음</CardDescription>
-          </div>
-          <Button asChild size="sm" variant="outline" className="ml-auto gap-2 rounded-2xl border-2 font-black transition-all hover:bg-primary hover:text-white h-10 px-5">
-            <Link href="/dashboard/plan">
-              계획 관리
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="p-8 grid gap-4">
-          {plansLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full rounded-2xl" key={i} />)}
-            </div>
-          ) : studyTasks.length > 0 ? (
-              studyTasks.map((task) => (
-                <div key={task.id} className="group flex items-center space-x-4 rounded-[1.5rem] border border-border/50 p-5 bg-white/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] transition-all duration-300">
-                  <div className="relative flex items-center">
-                    <Checkbox 
-                      id={task.id} 
-                      checked={task.done} 
-                      onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                      className="h-6 w-6 rounded-lg border-2"
-                    />
-                  </div>
-                  <Label
-                    htmlFor={task.id}
-                    className={cn(
-                      "flex-1 text-base font-bold leading-none cursor-pointer transition-all",
-                      task.done ? "line-through text-muted-foreground opacity-50" : "text-foreground group-hover:text-primary"
-                    )}
-                  >
-                    {task.title}
-                  </Label>
-                  {task.done && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-                </div>
-              ))
-          ) : (
-              <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4">
-                <div className="bg-muted/50 p-4 rounded-full">
-                  <CircleDot className="h-10 w-10 opacity-30" />
-                </div>
-                <div className="grid gap-1">
-                  <p className="text-lg font-black">오늘 세워진 자습 계획이 없어요.</p>
-                  <p className="text-xs font-bold opacity-60">미리 계획을 세우면 더 높은 완수율을 달성할 수 있습니다.</p>
-                </div>
-                <Link href="/dashboard/plan">
-                   <Button variant="link" className="font-black text-primary text-base p-0 mt-2">지금 계획하러 가기 →</Button>
-                </Link>
-              </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
