@@ -25,7 +25,11 @@ import {
   MessageSquare,
   ChevronRight,
   UserPlus,
-  Check
+  Check,
+  AlertCircle,
+  Clock,
+  MapPin,
+  Maximize2
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -39,6 +43,7 @@ import {
   serverTimestamp,
   where,
   Timestamp,
+  updateDoc
 } from 'firebase/firestore';
 import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -64,7 +69,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isManagingSeatModalOpen, setIsManagingSeatModalOpen] = useState(false);
+  
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState<{id: string, seatNo: number} | null>(null);
+  const [selectedSeatForManage, setSelectedSeatForManage] = useState<AttendanceCurrent | null>(null);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [tempLayout, setTempLayout] = useState<{ x: number, y: number, seatNo: number }[]>([]);
 
@@ -176,9 +185,26 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
+    if (!firestore || !centerId || !selectedSeatForManage) return;
+    
+    try {
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeatForManage.id);
+      await updateDoc(seatRef, {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: `상태가 ${status}로 변경되었습니다.` });
+      setIsManagingSeatModalOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "변경 실패" });
+    }
+  };
+
   if (!isActive) return null;
 
   const studyingCount = attendanceList?.filter(a => a.status === 'studying').length ?? 0;
+  const alertCount = attendanceList?.filter(a => a.studentId && a.status === 'absent').length ?? 0;
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8 w-full">
@@ -187,15 +213,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <Monitor className="h-6 w-6 sm:h-8 sm:w-8" />
           실시간 관제 대시보드
         </h1>
-        <p className="text-sm font-bold text-muted-foreground">센터 내 학생들의 학습 상태를 시각화하여 모니터링합니다.</p>
+        <p className="text-sm font-bold text-muted-foreground">센터 내 학생들의 학습 및 출결 상태를 실시간으로 모니터링합니다.</p>
       </div>
 
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {[
           { label: '현재 학습 중', val: studyingCount, color: 'text-emerald-600', icon: Users, sub: '실시간 몰입도' },
-          { label: '전체 배치 좌석', val: attendanceList?.length || 0, color: 'text-primary', icon: Armchair, sub: '관리 중인 좌석' },
-          { label: '미배정 학생', val: unassignedStudents.length, color: 'text-amber-600', icon: UserPlus, sub: '좌석 대기 중' },
-          { label: '오늘 상담', val: appointments?.length || 0, color: 'text-blue-600', icon: MessageSquare, sub: '상담 예약 건수' }
+          { label: '미입실/지각', val: alertCount, color: 'text-rose-600', icon: AlertCircle, sub: '즉각 관리 대상' },
+          { label: '외출/휴식', val: attendanceList?.filter(a => ['away', 'break'].includes(a.status)).length || 0, color: 'text-amber-600', icon: Clock, sub: '이동 중' },
+          { label: '전체 배치 좌석', val: attendanceList?.length || 0, color: 'text-primary', icon: Armchair, sub: '관리 중인 좌석' }
         ].map((item, i) => (
           <Card key={i} className="rounded-2xl border-none shadow-sm bg-white overflow-hidden group transition-all hover:shadow-md border border-border/50">
             <CardHeader className="p-4 sm:p-6 pb-1 sm:pb-2">
@@ -222,7 +248,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-xs text-muted-foreground">전체 좌석을 컴팩트하게 모니터링합니다.</CardDescription>
+                <CardDescription className="font-bold text-xs text-muted-foreground">좌석을 클릭하여 출결 상태를 즉시 관리하세요.</CardDescription>
               </div>
               <div className="flex gap-2">
                 <Button 
@@ -267,16 +293,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     const x = idx % GRID_WIDTH;
                     const y = Math.floor(idx / GRID_WIDTH);
                     const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
-                    const occupant = students?.find(s => s.seatNo === seat?.seatNo);
+                    const occupant = students?.find(s => s.id === seat?.studentId);
 
                     if (!seat) return <div key={idx} className="w-[35px] h-[35px] sm:w-[42px] sm:h-[42px] opacity-[0.01]" />;
+
+                    const isLateOrAbsent = seat.studentId && seat.status === 'absent';
 
                     return (
                       <div 
                         key={seat.id} 
                         onClick={() => {
                           if (occupant) {
-                            window.location.href = `/dashboard/teacher/students/${occupant.id}`;
+                            setSelectedSeatForManage(seat);
+                            setIsManagingSeatModalOpen(true);
                           } else {
                             setSelectedSeatForAssign({id: seat.id, seatNo: seat.seatNo});
                             setIsAssignModalOpen(true);
@@ -284,9 +313,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         }}
                         className={cn(
                           "w-[35px] h-[35px] sm:w-[42px] sm:h-[42px] rounded-lg border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-sm cursor-pointer group border-solid",
-                          seat.status === 'studying' ? "bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/10" : 
-                          seat.status === 'away' ? "bg-amber-50 border-amber-500 text-amber-700" :
-                          seat.status === 'break' ? "bg-blue-50 border-blue-500 text-blue-700" : 
+                          seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white shadow-md animate-pulse-soft" : 
+                          isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700 shadow-inner" :
+                          seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
+                          seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
                           occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/40 text-muted-foreground/30 hover:border-primary"
                         )}
                       >
@@ -299,7 +329,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           {occupant ? occupant.name : ''}
                         </span>
                         
-                        {seat.status === 'studying' && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 border border-white shadow-sm animate-pulse" />}
+                        {isLateOrAbsent && (
+                          <div className="absolute -top-1 -right-1 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white animate-bounce">
+                            <AlertCircle className="h-2 w-2" />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -452,6 +486,70 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <DialogFooter className="p-6 bg-muted/10 border-t">
             <Button variant="ghost" onClick={() => setIsAssignModalOpen(false)} className="w-full rounded-2xl font-black h-14 text-base">닫기</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 좌석 직접 관리 다이얼로그 추가 */}
+      <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
+        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
+          {selectedSeatForManage && (
+            <>
+              <div className={cn(
+                "p-8 text-white relative overflow-hidden",
+                selectedSeatForManage.status === 'studying' ? "bg-emerald-600" : 
+                selectedSeatForManage.studentId && selectedSeatForManage.status === 'absent' ? "bg-rose-600" : 
+                "bg-primary"
+              )}>
+                <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
+                  <Armchair className="h-32 w-32" />
+                </div>
+                <DialogHeader className="relative z-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Quick Control</Badge>
+                    <span className="text-white/60 font-bold text-xs">{selectedSeatForManage.seatNo}번 좌석</span>
+                  </div>
+                  <DialogTitle className="text-4xl font-black tracking-tighter">
+                    {students?.find(s => s.id === selectedSeatForManage.studentId)?.name || '학생 정보 없음'}
+                  </DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold text-lg">
+                    현재 상태: <span className="text-white underline underline-offset-4">{
+                      selectedSeatForManage.status === 'studying' ? '학습 중' :
+                      selectedSeatForManage.status === 'away' ? '외출 중' :
+                      selectedSeatForManage.status === 'break' ? '휴식 중' : '미입실'
+                    }</span>
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button onClick={() => handleStatusUpdate('studying')} className="h-14 rounded-2xl font-black bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-100 gap-2">
+                    <Clock className="h-4 w-4" /> 입실/학습
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('away')} className="h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-100 gap-2">
+                    <MapPin className="h-4 w-4" /> 외출 처리
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('break')} className="h-14 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-100 gap-2">
+                    <Maximize2 className="h-4 w-4" /> 휴식 처리
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-14 rounded-2xl font-black border-2 border-rose-200 text-rose-600 hover:bg-rose-50 gap-2">
+                    <AlertCircle className="h-4 w-4" /> 퇴실 처리
+                  </Button>
+                </div>
+
+                <div className="pt-4 border-t border-dashed">
+                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black text-primary hover:bg-primary/5 gap-2" asChild>
+                    <Link href={`/dashboard/teacher/students/${selectedSeatForManage.studentId}`}>
+                      학생 상세 분석 보기 <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+              <DialogFooter className="p-6 bg-muted/10">
+                <Button variant="ghost" onClick={() => setIsManagingSeatModalOpen(false)} className="w-full rounded-xl font-black">닫기</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
