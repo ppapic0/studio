@@ -53,7 +53,8 @@ export default function DailyReportsPage() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // 기본값을 어제(전날)로 설정
+  const [selectedDate, setSelectedDate] = useState(subDays(new Date(), 1));
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
   const weekKey = format(selectedDate, "yyyy-'W'II");
   const centerId = activeMembership?.id;
@@ -96,7 +97,7 @@ export default function DailyReportsPage() {
     if (!selectedStudent || !firestore || !centerId) return;
     setAiLoading(true);
     try {
-      // 1. 오늘 데이터 수집
+      // 1. 선택된 날짜 데이터 수집
       const plansRef = collection(firestore, 'centers', centerId, 'plans', selectedStudent.id, 'weeks', weekKey, 'items');
       const plansSnap = await getDocs(query(plansRef, where('dateKey', '==', dateKey)));
       const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
@@ -105,13 +106,16 @@ export default function DailyReportsPage() {
       const logSnap = await getDoc(logRef);
       const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDay) : null;
 
-      // 2. 최근 7일 데이터 수집 (비석 추이 분석용)
-      const last7DaysRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days');
-      const historySnap = await getDocs(query(last7DaysRef, orderBy('dateKey', 'desc'), limit(7)));
-      const history7Days = historySnap.docs.map(d => ({
-        date: d.data().dateKey,
-        minutes: d.data().totalMinutes || 0
-      }));
+      // 2. 최근 기록 수집 (리포트 날짜 이전 14일치를 가져와서 7일을 필터링)
+      const lastLogsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days');
+      const historySnap = await getDocs(query(lastLogsRef, orderBy('dateKey', 'desc'), limit(14)));
+      const history7Days = historySnap.docs
+        .map(d => ({
+          date: d.data().dateKey,
+          minutes: d.data().totalMinutes || 0
+        }))
+        .filter(h => h.date < dateKey) // 리포트 날짜보다 이전 데이터만
+        .slice(0, 7);
 
       // 3. 완수율 계산
       const studyTasks = plans.filter(p => p.category === 'study' || !p.category);
@@ -182,7 +186,7 @@ export default function DailyReportsPage() {
             <FileText className="h-8 w-8 text-primary" />
             데일리 리포트 센터
           </h1>
-          <p className="text-sm font-bold text-muted-foreground ml-1">AI가 분석하는 10단계 학습 성취도 리포트</p>
+          <p className="text-sm font-bold text-muted-foreground ml-1">전날의 학습 데이터를 분석하여 리포트를 생성합니다.</p>
         </div>
         <div className="flex items-center gap-3">
           <Input 
@@ -294,7 +298,7 @@ export default function DailyReportsPage() {
             <DialogHeader className="relative z-10">
               <div className="flex items-center gap-3 mb-2">
                 <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Premium AI Analysis</Badge>
-                <span className="text-white/60 font-bold text-xs">{dateKey}</span>
+                <span className="text-white/60 font-bold text-xs">{dateKey} (대상 날짜)</span>
               </div>
               <DialogTitle className="text-4xl font-black tracking-tighter">{selectedStudent?.name} 학생 학습 분석</DialogTitle>
               <DialogDescription className="text-white/70 font-bold text-lg">10단계 마스터리 시스템 기반 리포트를 생성합니다.</DialogDescription>
@@ -335,7 +339,7 @@ export default function DailyReportsPage() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-muted-foreground uppercase">7일 평균 비교</p>
-                      <p className="text-sm font-bold">전주 대비 학습 성취도 정밀 분석</p>
+                      <p className="text-sm font-bold">리포트 날짜 이전 1주일 성과 대조</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-5 rounded-[1.5rem] bg-white border-2 border-primary/5 shadow-sm">
@@ -343,8 +347,8 @@ export default function DailyReportsPage() {
                       <Trophy className="h-5 w-5 text-emerald-600" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase">연속 달성 뱃지</p>
-                      <p className="text-sm font-bold">5일 연속 고몰입 달성 시 엠블럼 부여</p>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase">데이터 기반 진단</p>
+                      <p className="text-sm font-bold">학습 시간과 완수율 기반 10단계 분석</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-5 rounded-[1.5rem] bg-white border-2 border-primary/5 shadow-sm">
@@ -352,8 +356,8 @@ export default function DailyReportsPage() {
                       <AlertCircle className="h-5 w-5 text-rose-600" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase">집중 저조 알림</p>
-                      <p className="text-sm font-bold">3일 연속 학습량 감소 시 자동 경고</p>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase">자동 알림 시스템</p>
+                      <p className="text-sm font-bold">연속 저조 또는 기록 갱신 여부 탐지</p>
                     </div>
                   </div>
                 </div>
@@ -381,7 +385,7 @@ export default function DailyReportsPage() {
 
           <DialogFooter className="p-8 bg-white border-t shrink-0 flex items-center justify-between gap-4">
             <div className="text-[10px] font-bold text-muted-foreground italic">
-              ※ 발송된 리포트는 학부모님용 웹/앱 대시보드에 즉시 업데이트됩니다.
+              ※ 전날 완료된 학습 데이터를 바탕으로 작성하는 것을 권장합니다.
             </div>
             <div className="flex gap-3">
               <Button variant="outline" className="rounded-xl h-12 px-6 font-black" onClick={() => handleSaveReport('draft')} disabled={isSaving}>임시 저장</Button>
