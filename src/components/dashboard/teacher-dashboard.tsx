@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -53,7 +52,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { startOfDay, endOfDay } from 'date-fns';
-import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const GRID_WIDTH = 20;
@@ -72,21 +70,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = activeMembership?.id;
 
-  // 1. 학생 데이터
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
-  // 2. 실시간 좌석 현황
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 오늘 상담 예약
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const today = new Date();
@@ -99,7 +94,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery, { enabled: isActive });
 
-  // 좌석이 없는 학생들 필터링
   const unassignedStudents = useMemo(() => {
     if (!students) return [];
     return students.filter(s => !s.seatNo || s.seatNo === 0);
@@ -163,17 +157,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
-      
       batch.update(doc(firestore, 'centers', centerId, 'students', student.id), {
         seatNo: selectedSeatForAssign.seatNo,
         updatedAt: serverTimestamp()
       });
-
       batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeatForAssign.id), {
         studentId: student.id,
         updatedAt: serverTimestamp()
       });
-
       await batch.commit();
       toast({ title: `${student.name} 학생이 ${selectedSeatForAssign.seatNo}번 좌석에 배정되었습니다.` });
       setIsAssignModalOpen(false);
@@ -229,9 +220,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2">
-                  <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면 (한눈에 보기)
+                  <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-xs text-muted-foreground">전체 좌석을 컴팩트한 크기로 모니터링합니다.</CardDescription>
+                <CardDescription className="font-bold text-xs text-muted-foreground">전체 좌석을 컴팩트하게 모니터링합니다.</CardDescription>
               </div>
               <div className="flex gap-2">
                 <Button 
@@ -266,7 +257,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <div 
                   className="grid gap-1.5 sm:gap-2 mx-auto p-4 sm:p-6 bg-white rounded-[1.5rem] border shadow-inner relative"
                   style={{ 
-                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(35px, 45px))`, 
+                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(35px, 42px))`, 
                     width: 'fit-content',
                     backgroundImage: 'radial-gradient(circle, #00000003 1px, transparent 1px)',
                     backgroundSize: '18px 18px'
@@ -356,7 +347,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 좌석 배치 에디터 모달 */}
       <Dialog open={isLayoutModalOpen} onOpenChange={setIsLayoutModalOpen}>
         <DialogContent className="max-w-[98vw] lg:max-w-7xl h-[95vh] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col">
           <DialogHeader className="p-6 sm:p-10 bg-primary text-primary-foreground shrink-0 relative">
@@ -364,7 +354,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <X className="h-8 w-8" />
             </Button>
             <DialogTitle className="text-2xl sm:text-4xl font-black tracking-tighter">도면 배치 에디터</DialogTitle>
-            <DialogDescription className="text-primary-foreground/60 font-bold text-xs sm:text-lg mt-2">격자를 클릭하여 좌석을 배치하세요. 번호는 1번부터 자동으로 부여됩니다.</DialogDescription>
+            <DialogDescription className="text-primary-foreground/60 font-bold text-xs sm:text-lg mt-2">격자를 클릭하여 좌석을 배치하세요. 실선 갈색으로 표시됩니다.</DialogDescription>
           </DialogHeader>
           <div className="p-4 sm:p-10 bg-background overflow-hidden flex flex-col gap-6 flex-1">
             <div className="flex flex-col sm:flex-row items-center justify-between p-5 bg-muted/20 rounded-[1.5rem] border border-dashed border-primary/20 gap-4 shrink-0">
@@ -416,7 +406,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
 
-      {/* 학생 배정 모달 */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
         <DialogContent className="sm:max-w-lg rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
           <DialogHeader className="p-8 bg-primary text-primary-foreground">
@@ -449,7 +438,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     >
                       <div className="flex flex-col">
                         <span className="font-black text-xl group-hover:text-primary transition-colors">{student.name}</span>
-                        <span className="text-xs font-bold text-muted-foreground/60">{student.grade} · 목표 {student.targetDailyMinutes}분</span>
+                        <span className="text-xs font-bold text-muted-foreground/60">{student.grade} · {student.schoolName}</span>
                       </div>
                       <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-inner">
                         <Check className="h-5 w-5" />

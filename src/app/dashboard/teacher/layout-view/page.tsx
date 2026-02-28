@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -118,7 +117,7 @@ export default function LayoutViewPage() {
               <div 
                 className="grid gap-2 sm:gap-3 mx-auto relative"
                 style={{ 
-                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(45px, 60px))`, 
+                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(42px, 55px))`, 
                   width: 'fit-content',
                   backgroundImage: 'radial-gradient(circle, #00000005 1px, transparent 1px)',
                   backgroundSize: '24px 24px'
@@ -130,17 +129,17 @@ export default function LayoutViewPage() {
                   const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                   const occupant = students?.find(s => s.seatNo === seat?.seatNo);
 
-                  if (!seat) return <div key={idx} className="w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] opacity-[0.01]" />;
+                  if (!seat) return <div key={idx} className="w-[42px] h-[42px] sm:w-[52px] sm:h-[52px] opacity-[0.01]" />;
 
                   return (
                     <div 
                       key={seat.id} 
                       className={cn(
-                        "w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative shadow-md border-solid",
+                        "w-[42px] h-[42px] sm:w-[52px] sm:h-[52px] rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative shadow-md border-solid",
                         seat.status === 'studying' ? "bg-emerald-50 border-emerald-500 text-emerald-700 ring-4 ring-emerald-500/10 scale-105 z-10" : 
                         seat.status === 'away' ? "bg-amber-50 border-amber-500 text-amber-700" :
                         seat.status === 'break' ? "bg-blue-50 border-blue-500 text-blue-700" : 
-                        occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/30 text-muted-foreground/20"
+                        occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/40 text-muted-foreground/20"
                       )}
                     >
                       <span className={cn(
