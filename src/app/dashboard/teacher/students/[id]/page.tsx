@@ -1,7 +1,6 @@
-
 'use client';
 
-import { use, useState, useMemo, useEffect } from 'react';
+import { use, useState, useMemo, useEffect, useRef } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -152,6 +151,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
+  
+  const hasInitializedForm = useRef(false);
 
   // --- 상담 관리 상태 ---
   const [aptDate, setAptDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -305,14 +306,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [editForm, setEditForm] = useState({ name: '', schoolName: '', grade: '', password: '' });
   const [statusForm, setStatusForm] = useState<string>('active');
 
+  // Initialize form only once or when student fundamentally changes to avoid infinite loop
   useEffect(() => {
-    if (student) {
+    if (student && !hasInitializedForm.current) {
       setEditForm({ name: student.name, schoolName: student.schoolName, grade: student.grade, password: '' });
+      hasInitializedForm.current = true;
     }
+  }, [student]);
+
+  useEffect(() => {
     if (studentMembership) {
       setStatusForm(studentMembership.status);
     }
-  }, [student, studentMembership]);
+  }, [studentMembership]);
 
   const analysisData = useMemo(() => {
     if (!activeAnalysis) return null;

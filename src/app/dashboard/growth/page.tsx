@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -171,6 +170,8 @@ export default function GrowthPage() {
   const { toast } = useToast();
   const [activeBranch, setActiveBranch] = useState<'focus' | 'consistency' | 'achievement' | 'resilience'>('focus');
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  
+  const isLevelingUp = useRef(false);
 
   const targetUid = user?.uid;
 
@@ -189,7 +190,8 @@ export default function GrowthPage() {
 
   // 자동 레벨업 로직 (안정적인 절대값 업데이트 방식)
   useEffect(() => {
-    if (progress && progressRef && progress.currentXp >= currentLevelThreshold) {
+    if (progress && progressRef && progress.currentXp >= currentLevelThreshold && !isLevelingUp.current) {
+      isLevelingUp.current = true;
       const overflowXp = progress.currentXp - currentLevelThreshold;
       const nextLevel = (Number(progress.level) || 1) + 1;
       const nextThreshold = getNextLevelXp(nextLevel);
@@ -204,6 +206,8 @@ export default function GrowthPage() {
           title: "🎉 레벨 업!",
           description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다.`,
         });
+      }).finally(() => {
+        isLevelingUp.current = false;
       });
     }
   }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold, toast]);

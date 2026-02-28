@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
@@ -63,7 +63,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       setMemberships(fetched);
       const active = fetched.find(m => m.status === 'active') || fetched[0] || null;
-      setActiveMembership(active);
+      
+      // Only update if the ID has changed or it's the first load to prevent flickering
+      setActiveMembership(prev => {
+        if (!prev && active) return active;
+        if (prev && active && prev.id === active.id && prev.status === active.status) return prev;
+        return active;
+      });
+      
       setMembershipsLoading(false);
     }, (error) => {
       console.error("Membership sync error:", error);
@@ -106,22 +113,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [isTimerActive, startTime]);
 
+  // Memoize context value to prevent unnecessary re-renders of the entire app
+  const contextValue = useMemo(() => ({
+    memberships,
+    activeMembership,
+    membershipsLoading,
+    isTimerActive,
+    setIsTimerActive,
+    secondsElapsed,
+    setSecondsElapsed,
+    startTime,
+    setStartTime,
+    lastActiveCheckTime,
+    setLastActiveCheckTime
+  }), [
+    memberships, 
+    activeMembership, 
+    membershipsLoading, 
+    isTimerActive, 
+    secondsElapsed, 
+    startTime, 
+    lastActiveCheckTime
+  ]);
+
   return (
-    <AppContext.Provider
-      value={{
-        memberships,
-        activeMembership,
-        membershipsLoading,
-        isTimerActive,
-        setIsTimerActive,
-        secondsElapsed,
-        setSecondsElapsed,
-        startTime,
-        setStartTime,
-        lastActiveCheckTime,
-        setLastActiveCheckTime
-      }}
-    >
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );
