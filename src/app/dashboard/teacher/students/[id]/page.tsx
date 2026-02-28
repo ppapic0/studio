@@ -1,4 +1,3 @@
-
 'use client';
 
 import { use, useState, useMemo } from 'react';
@@ -18,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { 
@@ -115,12 +115,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef);
 
-  // 4. 랭킹 정보 (간소화된 조회)
+  // 4. 랭킹 정보 (지표: 완수율 기준 조회)
   const rankingQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const periodKey = format(new Date(), 'yyyy-MM');
     return query(
-      collection(firestore, 'centers', centerId, 'leaderboards', periodKey, 'monthlyCompletion', 'entries'),
+      collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_completion`, 'entries'),
       where('studentId', '==', studentId)
     );
   }, [firestore, centerId, studentId]);
@@ -462,7 +462,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-muted/10 p-8 border-b">
               <CardTitle className="text-xl font-black flex items-center gap-2">
-                <History className="h-5 w-5 text-primary" /> 히스토리 히스토리
+                <History className="h-5 w-5 text-primary" /> 상담 히스토리
               </CardTitle>
               <CardDescription className="font-bold">과거 모든 상담 및 기록을 확인합니다.</CardDescription>
             </CardHeader>

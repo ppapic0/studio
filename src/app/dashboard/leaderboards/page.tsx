@@ -42,61 +42,72 @@ type LeaderboardTabProps = {
 
 function LeaderboardTab({ title, description, entries, isLoading, metricType }: LeaderboardTabProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-500" />
+    <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white">
+      <CardHeader className="bg-muted/10 pb-6 border-b">
+        <CardTitle className="flex items-center gap-2 text-xl font-black">
+          <Trophy className={cn("h-6 w-6", 
+            metricType === 'completion' ? "text-yellow-500" : 
+            metricType === 'attendance' ? "text-blue-500" : "text-emerald-500"
+          )} />
           {title}
         </CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardDescription className="font-bold">{description}</CardDescription>
         {metricType === 'attendance' && (
-          <div className="mt-2 text-[11px] text-destructive flex items-center gap-1 bg-destructive/5 p-2 rounded border border-destructive/10">
-            <AlertCircle className="h-3 w-3" />
+          <div className="mt-4 text-[11px] text-destructive flex items-center gap-2 bg-destructive/5 p-3 rounded-xl border border-destructive/10 font-bold">
+            <AlertCircle className="h-4 w-4" />
             일일 학습 3시간(180분) 이상 달성 시에만 출석 일수로 인정됩니다.
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {isLoading ? (
-          <div className="flex justify-center p-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
           </div>
         ) : !entries || entries.length === 0 ? (
-          <div className="text-center text-muted-foreground p-8">
-            이번 시즌 랭킹 데이터가 아직 없습니다. 첫 기록을 남겨보세요!
+          <div className="text-center py-20 flex flex-col items-center gap-4">
+            <Trophy className="h-16 w-16 text-muted-foreground opacity-10" />
+            <p className="text-sm font-bold text-muted-foreground/40">이번 시즌 랭킹 데이터가 아직 없습니다.<br/>첫 기록을 남겨보세요!</p>
           </div>
         ) : (
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-[80px]">순위</TableHead>
-              <TableHead>학생</TableHead>
-              <TableHead className="text-right">점수</TableHead>
+            <TableRow className="hover:bg-transparent border-b">
+              <TableHead className="w-[100px] font-black text-center">순위</TableHead>
+              <TableHead className="font-black">학생</TableHead>
+              <TableHead className="text-right font-black pr-8">성취도</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries?.map((entry) => (
-              <TableRow key={entry.id} className={entry.rank <= 3 ? "bg-accent/5" : ""}>
-                <TableCell>
+              <TableRow key={entry.id} className={cn("hover:bg-muted/5 transition-colors border-b", entry.rank <= 3 ? "bg-primary/5" : "")}>
+                <TableCell className="text-center">
                   <div className={cn(
-                    "font-bold text-lg flex items-center justify-center h-8 w-8 rounded-full",
+                    "mx-auto font-black text-sm flex items-center justify-center h-8 w-8 rounded-xl shadow-sm",
                     entry.rank === 1 ? "bg-yellow-400 text-white" : 
-                    entry.rank === 2 ? "bg-gray-300 text-white" : 
-                    entry.rank === 3 ? "bg-orange-400 text-white" : ""
+                    entry.rank === 2 ? "bg-slate-300 text-white" : 
+                    entry.rank === 3 ? "bg-orange-400 text-white" : "bg-muted/50 text-muted-foreground"
                   )}>
                     {entry.rank}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback>{entry.displayNameSnapshot.charAt(0)}</AvatarFallback>
+                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                      <AvatarFallback className="font-black text-primary bg-primary/5">
+                        {entry.displayNameSnapshot?.charAt(0) || 'S'}
+                      </AvatarFallback>
                     </Avatar>
-                    <div className="font-medium">{entry.displayNameSnapshot}</div>
+                    <div className="font-black tracking-tight">{entry.displayNameSnapshot}</div>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono font-bold text-primary">
-                  {entry.value.toLocaleString()}{metricType === 'attendance' ? '일' : metricType === 'growth' ? '%' : '%'}
+                <TableCell className="text-right pr-8">
+                  <div className="flex flex-col items-end">
+                    <span className="text-lg font-black text-primary tabular-nums">
+                      {entry.value.toLocaleString()}{metricType === 'attendance' ? '일' : '%'}
+                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Mastery Value</span>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -113,13 +124,13 @@ export default function LeaderboardsPage() {
   const { activeMembership } = useAppContext();
   
   const isMember = !!activeMembership;
-  // 매달 1일 초기화되는 월간 시즌 키 (YYYY-MM)
   const periodKey = format(new Date(), 'yyyy-MM');
 
+  // Segments count check: 1(centers) 2(id) 3(leaderboards) 4(docId) 5(entries) = 5 (Valid Odd Number)
   const completionQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, 'monthlyCompletion', 'entries'),
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_completion`, 'entries'),
       orderBy('rank', 'asc'),
       limit(20)
     );
@@ -129,7 +140,7 @@ export default function LeaderboardsPage() {
   const consistencyQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, 'monthlyAttendance', 'entries'),
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_attendance`, 'entries'),
       orderBy('rank', 'asc'),
       limit(20)
     );
@@ -139,7 +150,7 @@ export default function LeaderboardsPage() {
   const growthQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', periodKey, 'monthlyGrowth', 'entries'),
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_growth`, 'entries'),
       orderBy('rank', 'asc'),
       limit(20)
     );
@@ -148,50 +159,55 @@ export default function LeaderboardsPage() {
 
   if (!isMember) {
     return (
-        <Alert>
-          <AlertTitle>멤버십 필요</AlertTitle>
-          <AlertDescription>
-            리더보드를 보려면 센터에 가입해야 합니다.
+        <Alert className="rounded-[2rem] border-none shadow-xl bg-white p-8">
+          <AlertTitle className="text-xl font-black mb-2">멤버십 확인 필요</AlertTitle>
+          <AlertDescription className="font-bold text-muted-foreground">
+            리더보드를 확인하려면 먼저 센터에 가입해야 합니다.
           </AlertDescription>
         </Alert>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-headline font-bold">시즌 랭킹</h1>
-        <p className="text-muted-foreground">{format(new Date(), 'yyyy년 M월')} 시즌 명예의 전당입니다.</p>
+    <div className="space-y-8 max-w-5xl mx-auto pb-20">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20">
+            <Trophy className="h-6 w-6 text-white" />
+          </div>
+          <h1 className="text-3xl font-black tracking-tighter">시즌 명예의 전당</h1>
+        </div>
+        <p className="text-muted-foreground font-bold ml-1">{format(new Date(), 'yyyy년 M월')} 시즌 실시간 랭킹입니다.</p>
       </div>
 
       <Tabs defaultValue="completion" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
-          <TabsTrigger value="completion">완수 마스터</TabsTrigger>
-          <TabsTrigger value="consistency">출석 킹</TabsTrigger>
-          <TabsTrigger value="growth">성장 챔피언</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-muted/30 p-1.5 rounded-[1.5rem] h-16 mb-8 border border-border/50 shadow-inner">
+          <TabsTrigger value="completion" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">완수 마스터</TabsTrigger>
+          <TabsTrigger value="consistency" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">출석 킹</TabsTrigger>
+          <TabsTrigger value="growth" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all text-sm">성장 챔피언</TabsTrigger>
         </TabsList>
-        <TabsContent value="completion" className="mt-4">
+        <TabsContent value="completion" className="mt-0">
           <LeaderboardTab
             title="월간 완수 마스터"
-            description="이번 시즌 학습 계획 완수율이 가장 높은 학생들입니다."
+            description="학습 계획 완수율이 가장 높은 학생들입니다."
             entries={completionEntries}
             isLoading={completionLoading}
             metricType="completion"
           />
         </TabsContent>
-        <TabsContent value="consistency" className="mt-4">
+        <TabsContent value="consistency" className="mt-0">
           <LeaderboardTab
             title="월간 출석 킹 (3h+)"
-            description="이번 시즌 3시간 이상 학습한 날이 가장 많은 학생들입니다."
+            description="3시간 이상 몰입한 날이 가장 많은 학생들입니다."
             entries={consistencyEntries}
             isLoading={consistencyLoading}
             metricType="attendance"
           />
         </TabsContent>
-        <TabsContent value="growth" className="mt-4">
+        <TabsContent value="growth" className="mt-0">
           <LeaderboardTab
             title="월간 성장 챔피언"
-            description="지난 달 대비 학습 능력이 가장 비약적으로 상승한 학생들입니다."
+            description="지난 달 대비 성취도가 가장 비약적으로 상승한 학생들입니다."
             entries={growthEntries}
             isLoading={growthLoading}
             metricType="growth"

@@ -1,62 +1,115 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // [Helper] 해당 센터에서 선생님 또는 관리자 권한이 있는지 확인
+    // [Helper] 로그인 여부 확인
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // [Helper] 해당 센터 멤버인지 확인
+    function isCenterMember(centerId) {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)) ||
+        exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid))
+      );
+    }
+
+    // [Helper] 해당 센터 관리자/선생님인지 확인
     function isStaff(centerId) {
-      return request.auth != null && 
-             (get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role in ['teacher', 'centerAdmin']);
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role in ['teacher', 'centerAdmin'];
     }
 
-    // [User Profiles] 누구나 로그인하면 읽을 수 있고, 본인만 수정 가능
+    // [User Profiles] 
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // [User Centers] 로그인 가드를 위한 역인덱스
+    // [User Centers] 
     match /userCenters/{userId}/centers/{centerId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null; // 가입 시 생성 허용
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn();
     }
 
-    // [Centers] 센터 데이터 및 모든 하위 경로
+    // [Centers Master]
     match /centers/{centerId} {
-      // 센터 기본 정보는 인증된 사용자라면 읽기 가능
-      allow read: if request.auth != null;
-      allow write: if request.auth != null; // 초기 생성 및 업데이트 허용
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn(); // 가입 시 초기 생성/업데이트 허용
 
-      // 센터 내의 모든 데이터 (학생, 출결, 로그, 계획 등)
-      match /{allSubpaths=**} {
-        // 선생님과 관리자는 'Owner'급 권한을 가짐 (모든 읽기/쓰기 허용)
-        allow read, write: if isStaff(centerId);
-        
-        // 학생은 본인의 데이터에 대해 개별적인 권한을 가짐 (기본적으로 읽기는 허용)
-        allow read: if request.auth != null;
+      // [Members]
+      match /members/{memberId} {
+        allow read: if isCenterMember(centerId);
+        allow list: if isStaff(centerId) || isSignedIn();
+        allow write: if isSignedIn();
+      }
+
+      // [Students Detail]
+      match /students/{studentId} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      }
+
+      // [Daily Stats & Logs]
+      match /dailyStudentStats/{date}/{document=**} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isSignedIn();
       }
       
-      // 학생이 자신의 로그나 계획을 직접 수정하는 경우를 위한 보강
       match /studyLogs/{studentId}/{document=**} {
-        allow write: if request.auth != null && request.auth.uid == studentId;
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
       }
+
+      // [Plans]
       match /plans/{studentId}/{document=**} {
-        allow write: if request.auth != null && request.auth.uid == studentId;
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
       }
+
+      // [Growth & Mastery]
       match /growthProgress/{studentId} {
-        allow write: if request.auth != null && request.auth.uid == studentId;
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      }
+
+      // [Leaderboards] - Adjusted structure to keep paths odd
+      match /leaderboards/{leaderboardId}/{allSubpaths=**} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId);
+      }
+
+      // [Counseling]
+      match /counselingReservations/{resId} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isCenterMember(centerId);
+      }
+      match /counselingLogs/{logId} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId);
+      }
+
+      // [Attendance Records]
+      match /attendanceRecords/{dateKey}/{document=**} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId);
+      }
+      match /attendanceCurrent/{seatId} {
+        allow read: if isCenterMember(centerId);
+        allow write: if isStaff(centerId) || isSignedIn();
       }
     }
 
-    // [Invite Codes] 초대 코드 조회
+    // [Invite Codes]
     match /inviteCodes/{code} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
-    // [Fallback] 기타 모든 경로에 대해 최소한의 인증 확인
+    // [Fallback] 
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
   }
 }
