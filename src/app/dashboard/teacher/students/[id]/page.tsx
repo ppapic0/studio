@@ -47,14 +47,37 @@ import {
   Settings2,
   UserCheck,
   UserX,
-  Lock
+  Lock,
+  Sparkles,
+  MousePointer2,
+  Info
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, CounselingLog, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar, Cell, ResponsiveContainer as ReChartsResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
+
+// 커스텀 툴팁 컴포넌트
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/80 backdrop-blur-md border border-white/40 p-4 rounded-2xl shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in duration-200">
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{label} 기록</p>
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-black text-primary tracking-tighter">{payload[0].value}</span>
+          <span className="text-xs font-bold text-muted-foreground">시간</span>
+        </div>
+        <div className="mt-2 pt-2 border-t border-black/5 flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[9px] font-bold text-emerald-600">안정적인 학습 페이스</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 // 통계 카드 컴포넌트
 function StatAnalysisCard({ 
@@ -74,16 +97,18 @@ function StatAnalysisCard({
 }) {
   return (
     <Card 
-      className="group cursor-pointer hover:shadow-xl transition-all duration-300 border-none shadow-md overflow-hidden relative active:scale-95"
+      className="group cursor-pointer hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-none shadow-md overflow-hidden relative active:scale-95 bg-white/50 backdrop-blur-sm"
       onClick={onClick}
     >
-      <div className={cn("absolute top-0 left-0 w-1 h-full", colorClass.replace('text-', 'bg-'))} />
+      <div className={cn("absolute top-0 left-0 w-1.5 h-full transition-all duration-500 group-hover:w-2", colorClass.replace('text-', 'bg-'))} />
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-xs font-black text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
-        <Icon className={cn("h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity", colorClass)} />
+        <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{title}</CardTitle>
+        <div className={cn("p-2 rounded-xl bg-opacity-10 group-hover:scale-110 transition-transform duration-500", colorClass.replace('text-', 'bg-'))}>
+          <Icon className={cn("h-4 w-4", colorClass)} />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-black tracking-tighter">{value}</div>
+        <div className="text-2xl font-black tracking-tighter group-hover:translate-x-1 transition-transform duration-500">{value}</div>
         <p className="text-[10px] font-bold text-muted-foreground mt-1 flex items-center gap-1">
           {subValue}
           <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all translate-x-0 group-hover:translate-x-1" />
@@ -103,7 +128,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // --- 데이터 조회 섹션 (인덱스 오류 방지를 위해 정렬 제거) ---
+  // --- 데이터 조회 섹션 ---
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId, 'students', studentId);
@@ -268,7 +293,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <DialogTrigger asChild>
               <Button variant="outline" className="rounded-xl font-bold h-12 px-6 shadow-sm gap-2"><Settings2 className="h-4 w-4" /> 정보 수정</Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[2rem] sm:max-w-md">
+            <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black tracking-tighter">학생 정보 수정</DialogTitle>
                 <DialogDescription className="font-bold">이름, 학교, 학년 및 계정 비밀번호를 변경합니다.</DialogDescription>
@@ -312,7 +337,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <DialogTrigger asChild>
               <Button className="rounded-xl font-bold h-12 px-6 shadow-lg gap-2"><UserCheck className="h-4 w-4" /> 상태 변경</Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[2.5rem] sm:max-w-sm">
+            <DialogContent className="rounded-[2.5rem] sm:max-w-sm border-none shadow-2xl">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black tracking-tighter">학생 상태 관리</DialogTitle>
                 <DialogDescription className="font-bold">학생의 센터 등록 상태를 변경합니다.</DialogDescription>
@@ -417,30 +442,127 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
       </Tabs>
 
-      {/* 분석 다이얼로그 */}
+      {/* 분석 다이얼로그 - 고급 막대 그래프 디자인 적용 */}
       <Dialog open={!!activeAnalysis} onOpenChange={(open) => !open && setActiveAnalysis(null)}>
-        <DialogContent className="sm:max-w-2xl rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
-          <div className="bg-primary p-8 text-primary-foreground">
-            <DialogHeader>
-              <DialogTitle className="text-3xl font-black tracking-tighter">데이터 심층 분석</DialogTitle>
-              <DialogDescription className="text-primary-foreground/60 font-bold text-lg">시각화된 지표를 통해 학생의 학습 상태를 분석합니다.</DialogDescription>
+        <DialogContent className="sm:max-w-3xl rounded-[3rem] border-none shadow-[0_30px_100px_rgba(0,0,0,0.3)] p-0 overflow-hidden transform-gpu transition-all">
+          <div className="bg-primary p-8 sm:p-12 text-primary-foreground relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-[0.03] rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-accent opacity-[0.05] rounded-full -ml-10 -mb-10 blur-2xl pointer-events-none" />
+            
+            <DialogHeader className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-white/10 backdrop-blur-xl p-2.5 rounded-2xl border border-white/10 shadow-inner">
+                  <Sparkles className="h-6 w-6 text-amber-400 fill-amber-400" />
+                </div>
+                <Badge className="bg-white/20 hover:bg-white/30 text-white border-none font-black text-[10px] tracking-widest uppercase py-1">Deep Data Analysis</Badge>
+              </div>
+              <DialogTitle className="text-4xl sm:text-5xl font-black tracking-tighter mb-2 leading-none">학습 심층 분석 리포트</DialogTitle>
+              <DialogDescription className="text-primary-foreground/70 font-bold text-lg max-w-md leading-relaxed">
+                데이터로 증명되는 {student?.name} 학생의 최근 학습 몰입도와 성취 지표입니다.
+              </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="p-8">
-            <div className="h-[300px] w-full mb-8">
+
+          <div className="p-8 sm:p-12 bg-white flex flex-col gap-10">
+            <div className="h-[350px] w-full group/chart">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.chartData.slice(-14)}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} />
-                  <YAxis fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} unit="h" />
-                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
-                  <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                <BarChart data={stats.chartData.slice(-14)} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1} />
+                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
+                    </linearGradient>
+                    <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                      <feOffset dx="0" dy="4" result="offsetblur" />
+                      <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.2" />
+                      </feComponentTransfer>
+                      <feMerge>
+                        <feMergeNode />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
+                  <XAxis 
+                    dataKey="name" 
+                    fontSize={11} 
+                    fontWeight="900" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    dy={15}
+                    tick={{ fill: 'rgba(0,0,0,0.4)' }}
+                  />
+                  <YAxis 
+                    fontSize={11} 
+                    fontWeight="900" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    unit="h"
+                    tick={{ fill: 'rgba(0,0,0,0.4)' }}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(0,0,0,0.02)', radius: 12 }} 
+                    content={<CustomTooltip />}
+                  />
+                  <Bar 
+                    dataKey="hours" 
+                    radius={[10, 10, 0, 0]} 
+                    barSize={32}
+                    animationDuration={1500}
+                    animationBegin={200}
+                  >
+                    {stats.chartData.slice(-14).map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill="url(#barGradient)" 
+                        filter="url(#barShadow)"
+                        className="transition-all duration-500 hover:opacity-80"
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+
+            <div className="grid sm:grid-cols-2 gap-6 pt-4 border-t border-dashed border-muted-foreground/20">
+              <div className="flex items-start gap-4 p-5 rounded-3xl bg-muted/20 hover:bg-primary/5 transition-colors duration-300">
+                <div className="bg-primary/10 p-2.5 rounded-2xl">
+                  <MousePointer2 className="h-5 w-5 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-primary/70">데이터 인사이트</h4>
+                  <p className="text-sm font-bold text-muted-foreground leading-relaxed">
+                    지난 14일간의 평균 학습량은 <span className="text-primary font-black">{(stats.chartData.slice(-14).reduce((acc, c) => acc + c.hours, 0) / 14).toFixed(1)}시간</span>입니다. 상위권 도약을 위한 안정적인 구간입니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4 p-5 rounded-3xl bg-emerald-50 hover:bg-emerald-100/50 transition-colors duration-300">
+                <div className="bg-emerald-500/10 p-2.5 rounded-2xl">
+                  <Target className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-emerald-600/70">다음 목표 권장</h4>
+                  <p className="text-sm font-bold text-muted-foreground leading-relaxed">
+                    주간 평균 <span className="text-emerald-600 font-black">{(stats.weeklyAvg / 60 + 0.5).toFixed(1)}시간</span> 몰입을 달성하면 시즌 랭킹이 대폭 상승할 것으로 예상됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="p-6 bg-muted/20 border-t flex justify-end">
-            <Button onClick={() => setActiveAnalysis(null)} className="rounded-xl font-black h-12 px-8">닫기</Button>
+
+          <div className="p-8 bg-muted/10 border-t flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground italic">
+              <Info className="h-4 w-4 text-primary opacity-50" />
+              모든 데이터는 실시간 학습 로그를 기반으로 자동 생성되었습니다.
+            </div>
+            <Button 
+              onClick={() => setActiveAnalysis(null)} 
+              className="w-full sm:w-auto rounded-2xl font-black h-14 px-12 shadow-xl hover:scale-105 active:scale-95 transition-all text-base"
+            >
+              분석 창 닫기
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
