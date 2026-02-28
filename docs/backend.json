@@ -93,6 +93,19 @@
         "dateKey": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "DailyStudentStat": {
+      "title": "DailyStudentStat",
+      "type": "object",
+      "description": "학생별 일일 성과 통계",
+      "properties": {
+        "todayPlanCompletionRate": { "type": "number" },
+        "totalStudyMinutes": { "type": "number" },
+        "attendanceStreakDays": { "type": "number" },
+        "weeklyPlanCompletionRate": { "type": "number" },
+        "studyTimeGrowthRate": { "type": "number" },
+        "riskDetected": { "type": "boolean" }
+      }
     }
   },
   "auth": {
@@ -134,6 +147,22 @@
     "/centers/{centerId}/dailyReports/{reportId}": {
       "schema": { "$ref": "#/entities/DailyReport" },
       "description": "일일 학습 리포트 기록"
+    },
+    "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/DailyStudentStat" },
+      "description": "학생별 일일 성과 지표 통계"
+    },
+    "/centers/{centerId}/attendanceCurrent/{seatId}": {
+      "schema": { "type": "object" },
+      "description": "실시간 좌석 및 출결 상태"
+    },
+    "/centers/{centerId}/counselingReservations/{resId}": {
+      "schema": { "type": "object" },
+      "description": "상담 예약 데이터"
+    },
+    "/centers/{centerId}/counselingLogs/{logId}": {
+      "schema": { "type": "object" },
+      "description": "상담 일지 기록"
     }
   }
 }

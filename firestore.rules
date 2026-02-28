@@ -44,7 +44,7 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // --- 개별 접근 규칙 (학생용) ---
+    // --- 개별 접근 규칙 (학생/학부모용) ---
     match /centers/{centerId} {
       allow read: if isMember(centerId);
       
@@ -58,22 +58,46 @@ service cloud.firestore {
       }
 
       match /plans/{studentId}/weeks/{week}/items/{itemId} {
-        allow read: if isSignedIn() && request.auth.uid == studentId;
+        allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
       match /studyLogs/{studentId}/days/{date} {
-        allow read: if isSignedIn() && request.auth.uid == studentId;
+        allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
       match /growthProgress/{studentId} {
-        allow read: if isSignedIn() && request.auth.uid == studentId;
+        allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
+      // 일일 성과 지표 (추가됨)
+      match /dailyStudentStats/{date}/students/{studentId} {
+        allow read: if isMember(centerId) && (request.auth.uid == studentId || isStaff(centerId));
+      }
+
+      // 리포트 접근 (추가됨)
+      match /dailyReports/{reportId} {
+        allow read: if isMember(centerId);
+      }
+      
+      // 상담 및 출결 정보 (추가됨)
+      match /attendanceCurrent/{id} {
+        allow read: if isMember(centerId);
+      }
+      
+      match /counselingReservations/{id} {
+        allow read: if isMember(centerId);
+        allow write: if isMember(centerId);
+      }
+      
+      match /counselingLogs/{id} {
+        allow read: if isMember(centerId);
       }
     }
 
-    // --- 기타 시스템 와일드카드 (최후의 보루) ---
+    // --- 기타 시스템 와일드카드 ---
     match /{document=**} {
       allow read, write: if isSignedIn() && isStaff('learning-lab-dongbaek');
     }
