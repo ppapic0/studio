@@ -3,60 +3,56 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // --- 공통 헬퍼 함수 ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function getMembership(centerId) {
-      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data;
+    function getRole(centerId) {
+      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role;
     }
 
-    function isCenterMember(centerId) {
+    function isMember(centerId) {
       return isSignedIn() && exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId));
     }
 
     function isStaff(centerId) {
-      return isCenterMember(centerId) && getMembership(centerId).role in ['teacher', 'centerAdmin'];
+      return isMember(centerId) && getRole(centerId) in ['teacher', 'centerAdmin'];
     }
 
+    // --- 유저 프로필 ---
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // --- 유저별 센터 역인덱스 (로그인 및 권한 확인의 핵심) ---
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow write: if isSignedIn();
     }
 
+    // --- 센터 마스터 데이터 및 모든 하위 데이터 ---
     match /centers/{centerId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      // 센터 기본 정보는 멤버라면 누구나 읽기 가능
+      allow read: if isMember(centerId);
+      // 센터 정보 수정은 스태프만 가능
+      allow write: if isStaff(centerId);
 
+      // [CRITICAL] 선생님/관리자는 센터 내 모든 하위 컬렉션에 대해 OWNER 권한을 가짐
+      match /{allSubcollections=**} {
+        allow read, write: if isStaff(centerId);
+      }
+
+      // 학생 및 일반 멤버를 위한 개별 접근 허용 (스태프가 아닌 경우를 위해)
       match /members/{memberId} {
-        allow read: if isCenterMember(centerId);
-        allow list: if isStaff(centerId) || (isSignedIn() && request.auth.uid == memberId);
-        allow write: if isSignedIn();
+        allow read: if isMember(centerId) && (request.auth.uid == memberId || isStaff(centerId));
+        allow list: if isStaff(centerId);
       }
 
       match /students/{studentId} {
-        allow read: if isCenterMember(centerId);
+        allow read: if isMember(centerId);
         allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
-      }
-
-      match /dailyStudentStats/{date}/students/{studentId} {
-        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
-        allow write: if isStaff(centerId);
-      }
-      
-      match /dailyReports/{reportId} {
-        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == resource.data.studentId);
-        allow write: if isStaff(centerId);
-      }
-
-      match /studyLogs/{studentId}/days/{date} {
-        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
-        allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
       match /plans/{studentId}/weeks/{week}/items/{itemId} {
@@ -64,42 +60,36 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      match /growthProgress/{studentId} {
+      match /studyLogs/{studentId}/days/{date} {
         allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      match /leaderboards/{leaderboardId}/entries/{studentId} {
-        allow read: if isCenterMember(centerId);
+      match /growthProgress/{studentId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      }
+      
+      match /dailyStudentStats/{date}/students/{studentId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
         allow write: if isStaff(centerId);
       }
 
-      match /counselingReservations/{resId} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isCenterMember(centerId);
-      }
-      match /counselingLogs/{logId} {
-        allow read: if isCenterMember(centerId);
+      match /dailyReports/{reportId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == resource.data.studentId);
         allow write: if isStaff(centerId);
-      }
-
-      match /attendanceRecords/{date}/students/{studentId} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isStaff(centerId);
-      }
-      match /attendanceCurrent/{seatId} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isStaff(centerId) || (isSignedIn() && seatId.hasPrefix('seat_'));
       }
     }
 
+    // --- 초대 코드 ---
     match /inviteCodes/{code} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
 
+    // --- 기타 시스템 와일드카드 ---
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/learning-lab-dongbaek) && getRole('learning-lab-dongbaek') in ['teacher', 'centerAdmin'];
     }
   }
 }

@@ -57,12 +57,12 @@ export default function StudentListPage() {
   const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
   // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회
+  // [FIX] orderBy를 제거하여 복합 인덱스 누락으로 인한 가짜 권한 오류를 방지합니다.
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'), 
       where('role', '==', 'student')
-      // orderBy 제거: 복합 인덱스 오류(Missing permissions로 표시됨) 방지
     );
   }, [firestore, centerId, isTeacherOrAdmin]);
   

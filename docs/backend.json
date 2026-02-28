@@ -21,29 +21,25 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "subscriptionTier": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "name"]
+        "subscriptionTier": { "type": "string" }
+      }
     },
     "CenterMember": {
       "title": "CenterMember",
       "type": "object",
-      "description": "센터 소속 멤버 및 역할",
+      "description": "센터 소속 멤버 역할 및 상태",
       "properties": {
         "id": { "type": "string" },
-        "centerId": { "type": "string" },
-        "role": { "type": "string", "enum": ["centerAdmin", "teacher", "student"] },
-        "status": { "type": "string" },
-        "joinedAt": { "type": "string", "format": "date-time" },
-        "displayName": { "type": "string" }
-      },
-      "required": ["role", "status"]
+        "role": { "type": "string", "enum": ["student", "teacher", "centerAdmin"] },
+        "status": { "type": "string", "enum": ["active", "onHold", "withdrawn"] },
+        "displayName": { "type": "string" },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      }
     },
     "StudentProfile": {
       "title": "StudentProfile",
       "type": "object",
-      "description": "학생별 상세 교육 프로필",
+      "description": "학생 상세 교육 정보",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
@@ -53,45 +49,45 @@
         "targetDailyMinutes": { "type": "number" }
       }
     },
-    "DailyStudentStat": {
-      "title": "DailyStudentStat",
+    "StudyPlanItem": {
+      "title": "StudyPlanItem",
       "type": "object",
-      "description": "학생별 일일 학습 통계 지표",
+      "description": "일일 학습 계획 항목",
       "properties": {
-        "centerId": { "type": "string" },
-        "studentId": { "type": "string" },
+        "title": { "type": "string" },
+        "done": { "type": "boolean" },
         "dateKey": { "type": "string" },
-        "todayPlanCompletionRate": { "type": "number" },
-        "totalStudyMinutes": { "type": "number" },
-        "attendanceStreakDays": { "type": "number" },
-        "weeklyPlanCompletionRate": { "type": "number" },
-        "studyTimeGrowthRate": { "type": "number" },
-        "riskDetected": { "type": "boolean" }
+        "category": { "type": "string" }
       }
     },
-    "LeaderboardEntry": {
-      "title": "LeaderboardEntry",
+    "StudyLogDay": {
+      "title": "StudyLogDay",
       "type": "object",
-      "description": "리더보드 순위 데이터",
+      "description": "일일 누적 학습 시간",
       "properties": {
-        "studentId": { "type": "string" },
-        "displayNameSnapshot": { "type": "string" },
-        "rank": { "type": "number" },
-        "value": { "type": "number" }
+        "totalMinutes": { "type": "number" },
+        "dateKey": { "type": "string" }
+      }
+    },
+    "GrowthProgress": {
+      "title": "GrowthProgress",
+      "type": "object",
+      "description": "학생 성장 레벨 및 스탯",
+      "properties": {
+        "level": { "type": "number" },
+        "currentXp": { "type": "number" },
+        "stats": { "type": "object" }
       }
     },
     "DailyReport": {
       "title": "DailyReport",
       "type": "object",
-      "description": "학부모에게 발송되는 일일 학습 리포트",
+      "description": "학부모 발송 리포트",
       "properties": {
         "studentId": { "type": "string" },
-        "teacherId": { "type": "string" },
-        "dateKey": { "type": "string" },
         "content": { "type": "string" },
-        "status": { "type": "string", "enum": ["draft", "sent"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "status": { "type": "string" },
+        "dateKey": { "type": "string" }
       }
     }
   },
@@ -103,33 +99,37 @@
       "schema": { "$ref": "#/entities/User" },
       "description": "전역 사용자 프로필"
     },
+    "/userCenters/{userId}/centers/{centerId}": {
+      "schema": { "$ref": "#/entities/CenterMember" },
+      "description": "사용자별 가입 센터 정보"
+    },
     "/centers/{centerId}": {
       "schema": { "$ref": "#/entities/Center" },
-      "description": "센터 마스터 데이터"
+      "description": "센터 기본 데이터"
     },
     "/centers/{centerId}/members/{memberId}": {
       "schema": { "$ref": "#/entities/CenterMember" },
-      "description": "센터별 멤버십 정보"
+      "description": "센터 내 역할 및 상태 관리"
     },
     "/centers/{centerId}/students/{studentId}": {
       "schema": { "$ref": "#/entities/StudentProfile" },
-      "description": "학생 상세 관리 데이터"
+      "description": "학생 상세 관리 프로필"
     },
-    "/centers/{centerId}/dailyStudentStats/{dateKey}/students/{studentId}": {
-      "schema": { "$ref": "#/entities/DailyStudentStat" },
-      "description": "날짜별 학생 통계 요약"
+    "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/StudyPlanItem" },
+      "description": "학생별 학습 계획"
     },
-    "/centers/{centerId}/leaderboards/{leaderboardId}/entries/{studentId}": {
-      "schema": { "$ref": "#/entities/LeaderboardEntry" },
-      "description": "시즌별 리더보드 항목 (leaderboardId 형식: YYYY-MM_metricType)"
+    "/centers/{centerId}/studyLogs/{studentId}/days/{dateKey}": {
+      "schema": { "$ref": "#/entities/StudyLogDay" },
+      "description": "학생별 일일 학습 시간 로그"
+    },
+    "/centers/{centerId}/growthProgress/{studentId}": {
+      "schema": { "$ref": "#/entities/GrowthProgress" },
+      "description": "학생 성장 시스템 데이터"
     },
     "/centers/{centerId}/dailyReports/{reportId}": {
       "schema": { "$ref": "#/entities/DailyReport" },
-      "description": "일일 학습 리포트 (reportId 형식: YYYY-MM-DD_studentId)"
-    },
-    "/userCenters/{userId}/centers/{centerId}": {
-      "schema": { "$ref": "#/entities/CenterMember" },
-      "description": "사용자별 소속 센터 역인덱스"
+      "description": "일일 학습 리포트 기록"
     }
   }
 }
