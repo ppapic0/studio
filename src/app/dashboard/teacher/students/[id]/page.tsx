@@ -5,7 +5,7 @@ import { use, useState, useMemo, useEffect } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -41,7 +42,8 @@ import {
   UserCheck,
   Lock,
   Sparkles,
-  Activity
+  Activity,
+  Check
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
@@ -164,6 +166,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
 
+  // 멤버십 정보 조회 (상태 변경용)
+  const membershipRef = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return doc(firestore, 'centers', centerId, 'members', studentId);
+  }, [firestore, centerId, studentId]);
+  const { data: studentMembership } = useDoc<CenterMembership>(membershipRef);
+
   // --- 데이터 가공 ---
   const logs = useMemo(() => {
     if (!rawLogs) return [];
@@ -195,12 +204,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', schoolName: '', grade: '', password: '' });
+  const [statusForm, setStatusForm] = useState<string>('active');
 
   useEffect(() => {
     if (student) {
       setEditForm({ name: student.name, schoolName: student.schoolName, grade: student.grade, password: '' });
     }
-  }, [student]);
+    if (studentMembership) {
+      setStatusForm(studentMembership.status);
+    }
+  }, [student, studentMembership]);
 
   // --- 차트 데이터 준비 ---
   const analysisData = useMemo(() => {
@@ -261,6 +274,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleUpdateStatus = async () => {
+    if (!firestore || !centerId || !studentId) return;
+    setIsUpdating(true);
+    try {
+      const batch = writeBatch(firestore);
+      const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
+      const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
+      
+      batch.update(memberRef, { status: statusForm, updatedAt: serverTimestamp() });
+      batch.update(userCenterRef, { status: statusForm, updatedAt: serverTimestamp() });
+      
+      await batch.commit();
+      toast({ title: "학생 상태 변경 완료" });
+      setIsStatusModalOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "상태 변경 실패", description: e.message });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
   return (
@@ -275,6 +309,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-3">
               <h1 className="text-4xl font-black tracking-tighter">{student?.name} 학생</h1>
               <Badge className="bg-primary text-white px-3 py-1 rounded-full font-black text-xs">{student?.seatNo || '미배정'}번 좌석</Badge>
+              {studentMembership && (
+                <Badge variant="outline" className={cn(
+                  "font-bold text-xs px-3 py-1 rounded-full",
+                  studentMembership.status === 'active' ? "text-emerald-600 border-emerald-200 bg-emerald-50" :
+                  studentMembership.status === 'onHold' ? "text-amber-600 border-amber-200 bg-amber-50" :
+                  "text-muted-foreground border-border bg-muted/50"
+                )}>
+                  {studentMembership.status === 'active' ? "재원생" : 
+                   studentMembership.status === 'onHold' ? "휴학생" : "퇴원생"}
+                </Badge>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground font-bold">
               <span className="flex items-center gap-1.5 text-primary"><Building2 className="h-4 w-4" /> {student?.schoolName}</span>
@@ -374,7 +419,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
       </Tabs>
 
-      {/* 분석 다이얼로그 - 맞춤형 차트 적용 */}
+      {/* 분석 다이얼로그 */}
       <Dialog open={!!activeAnalysis} onOpenChange={(open) => !open && setActiveAnalysis(null)}>
         <DialogContent className="sm:max-w-3xl rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
           <div className="bg-primary p-8 sm:p-12 text-primary-foreground relative">
@@ -536,6 +581,47 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <DialogFooter>
             <Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full rounded-2xl h-14 font-black shadow-lg">
               {isUpdating ? <Loader2 className="animate-spin" /> : "변경 내용 저장"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 상태 변경 모달 */}
+      <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
+        <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tighter">학생 상태 관리</DialogTitle>
+            <DialogDescription className="font-bold">학생의 센터 소속 상태를 변경합니다.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="grid gap-3">
+              {[
+                { id: 'active', label: '재원생', desc: '현재 정상적으로 등원 중인 학생입니다.', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { id: 'onHold', label: '휴학생', desc: '일시적으로 등원을 중단한 상태입니다.', color: 'text-amber-600', bg: 'bg-amber-50' },
+                { id: 'withdrawn', label: '퇴원생', desc: '완전히 퇴원 처리된 학생입니다.', color: 'text-muted-foreground', bg: 'bg-muted/30' },
+              ].map((item) => (
+                <div 
+                  key={item.id} 
+                  onClick={() => setStatusForm(item.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-4",
+                    statusForm === item.id ? "border-primary bg-white shadow-md scale-[1.02]" : "border-transparent bg-muted/10 hover:bg-muted/20"
+                  )}
+                >
+                  <div className={cn("p-2 rounded-xl mt-0.5", statusForm === item.id ? "bg-primary text-white" : "bg-white text-muted-foreground")}>
+                    {statusForm === item.id ? <Check className="h-4 w-4" /> : <div className="h-4 w-4" />}
+                  </div>
+                  <div className="grid gap-0.5">
+                    <span className={cn("font-black text-lg", item.color)}>{item.label}</span>
+                    <span className="text-xs font-bold text-muted-foreground">{item.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full rounded-2xl h-14 font-black shadow-lg">
+              {isUpdating ? <Loader2 className="animate-spin" /> : "학생 상태 업데이트"}
             </Button>
           </DialogFooter>
         </DialogContent>
