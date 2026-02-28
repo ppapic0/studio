@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
@@ -43,12 +43,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
-  // 멤버십 데이터 실시간 동기화
+  // Use a ref to store activeMembership content to prevent reference oscillation
+  const activeMembershipRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!user || !firestore) {
       setMemberships([]);
       setActiveMembership(null);
       setMembershipsLoading(false);
+      activeMembershipRef.current = null;
       return;
     }
 
@@ -64,12 +67,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMemberships(fetched);
       const active = fetched.find(m => m.status === 'active') || fetched[0] || null;
       
-      // Only update if the ID has changed or it's the first load to prevent flickering
-      setActiveMembership(prev => {
-        if (!prev && active) return active;
-        if (prev && active && prev.id === active.id && prev.status === active.status) return prev;
-        return active;
-      });
+      // Deep comparison via stringification to prevent reference oscillation
+      const activeKey = active ? `${active.id}_${active.status}_${active.role}` : 'null';
+      if (activeMembershipRef.current !== activeKey) {
+        setActiveMembership(active);
+        activeMembershipRef.current = activeKey;
+      }
       
       setMembershipsLoading(false);
     }, (error) => {
@@ -113,7 +116,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [isTimerActive, startTime]);
 
-  // Memoize context value to prevent unnecessary re-renders of the entire app
   const contextValue = useMemo(() => ({
     memberships,
     activeMembership,

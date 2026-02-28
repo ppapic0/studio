@@ -178,7 +178,7 @@ export default function GrowthPage() {
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-  }, [firestore, activeMembership, targetUid]);
+  }, [firestore, activeMembership?.id, targetUid]); // Only depend on membership ID
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
 
@@ -188,7 +188,7 @@ export default function GrowthPage() {
     return getNextLevelXp(Number(progress.level) || 1);
   }, [progress?.level]);
 
-  // 자동 레벨업 로직 (안정적인 절대값 업데이트 방식)
+  // 자동 레벨업 로직
   useEffect(() => {
     if (progress && progressRef && progress.currentXp >= currentLevelThreshold && !isLevelingUp.current) {
       isLevelingUp.current = true;
@@ -207,10 +207,13 @@ export default function GrowthPage() {
           description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다.`,
         });
       }).finally(() => {
-        isLevelingUp.current = false;
+        // Delay resetting to allow firestore snapshot to arrive
+        setTimeout(() => {
+          isLevelingUp.current = false;
+        }, 1000);
       });
     }
-  }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold, toast]);
+  }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold]); // Remove unstable toast
 
   // 실시간 마스터리 보너스 계산
   const totalMultiplier = useMemo(() => {
@@ -266,7 +269,7 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
-  // 누적 XP 대략적 계산 (정확한 곡선 합계는 아니나 UI용으로 사용)
+  // 누적 XP 대략적 계산
   const calculateTotalXpSpent = (lvl: number) => {
     let sum = 0;
     for(let i=1; i<lvl; i++) sum += getNextLevelXp(i);
@@ -412,7 +415,6 @@ export default function GrowthPage() {
       </section>
 
       <section className="bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
-        {/* 장식용 배경 요소 */}
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
