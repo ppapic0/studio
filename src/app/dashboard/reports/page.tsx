@@ -25,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   FileText, 
@@ -141,7 +142,7 @@ export default function DailyReportsPage() {
         content: reportContent,
         status,
         updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(), // existing check logic could be added for createdAt
+        createdAt: serverTimestamp(),
       }, { merge: true });
 
       toast({ 
@@ -371,7 +372,7 @@ export default function DailyReportsPage() {
                 <Save className="h-4 w-4 mr-2" /> 임시 저장
               </Button>
               <Button 
-                onClick={() => handleSaveReport('sent')} 
+                onClick={handleSaveReport('sent')} 
                 disabled={isSaving || !reportContent.trim()}
                 className="rounded-xl font-black h-12 px-10 gap-2 shadow-xl active:scale-95 transition-all"
               >
