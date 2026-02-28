@@ -229,36 +229,47 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2">
-                  <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
+                  <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면 (한눈에 보기)
                 </CardTitle>
-                <CardDescription className="font-bold text-xs text-muted-foreground">좌석을 클릭하여 학생 정보를 확인하거나 신규 학생을 배정하세요.</CardDescription>
+                <CardDescription className="font-bold text-xs text-muted-foreground">전체 좌석을 컴팩트한 크기로 모니터링합니다.</CardDescription>
               </div>
-              <Button 
-                variant="outline" 
-                className="rounded-xl font-black border-2 h-10 sm:h-12 px-4 gap-2 border-primary/10 hover:border-primary hover:bg-primary/5 transition-all text-xs sm:text-sm"
-                onClick={openLayoutEditor}
-              >
-                <Settings2 className="h-4 w-4" /> 도면 배치 수정
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="rounded-xl font-black border-2 h-10 px-4 border-primary/10 hover:border-primary hover:bg-primary/5"
+                  asChild
+                >
+                  <Link href="/dashboard/teacher/layout-view">전체화면 보기</Link>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="rounded-xl font-black border-2 h-10 px-4 gap-2 border-primary/10 hover:border-primary hover:bg-primary/5 transition-all text-xs"
+                  onClick={openLayoutEditor}
+                >
+                  <Settings2 className="h-4 w-4" /> 도면 편집
+                </Button>
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-8 bg-[#fdfdfd]">
+          <CardContent className="p-4 sm:p-6 bg-[#fdfdfd]">
             {attendanceLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
             ) : !attendanceList || attendanceList.length === 0 ? (
               <div className="py-20 text-center flex flex-col items-center gap-4 bg-muted/5 rounded-[2rem] border-2 border-dashed">
                 <Armchair className="h-16 w-16 text-muted-foreground opacity-10" />
-                <p className="text-sm font-bold text-muted-foreground/40">아직 배치된 좌석이 없습니다. 상단의 '도면 배치 수정'을 눌러주세요.</p>
+                <p className="text-sm font-bold text-muted-foreground/40">아직 배치된 좌석이 없습니다.</p>
               </div>
             ) : (
-              <div className="w-full overflow-x-auto pb-6 custom-scrollbar">
+              <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
                 <div 
-                  className="grid gap-3 sm:gap-4 mx-auto p-6 sm:p-10 bg-white rounded-[2.5rem] border shadow-inner relative"
+                  className="grid gap-1.5 sm:gap-2 mx-auto p-4 sm:p-6 bg-white rounded-[1.5rem] border shadow-inner relative"
                   style={{ 
-                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(50px, 70px))`, 
+                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(35px, 45px))`, 
                     width: 'fit-content',
                     backgroundImage: 'radial-gradient(circle, #00000003 1px, transparent 1px)',
-                    backgroundSize: '24px 24px'
+                    backgroundSize: '18px 18px'
                   }}
                 >
                   {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -267,7 +278,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                     const occupant = students?.find(s => s.seatNo === seat?.seatNo);
 
-                    if (!seat) return <div key={idx} className="w-[50px] h-[50px] sm:w-[65px] sm:h-[65px] opacity-[0.01]" />;
+                    if (!seat) return <div key={idx} className="w-[35px] h-[35px] sm:w-[42px] sm:h-[42px] opacity-[0.01]" />;
 
                     return (
                       <div 
@@ -281,24 +292,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "w-[50px] h-[50px] sm:w-[65px] sm:h-[65px] rounded-xl sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-md cursor-pointer group border-solid",
-                          seat.status === 'studying' ? "bg-emerald-50 border-emerald-500 text-emerald-700 ring-4 ring-emerald-500/10" : 
+                          "w-[35px] h-[35px] sm:w-[42px] sm:h-[42px] rounded-lg border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:scale-110 relative shadow-sm cursor-pointer group border-solid",
+                          seat.status === 'studying' ? "bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/10" : 
                           seat.status === 'away' ? "bg-amber-50 border-amber-500 text-amber-700" :
                           seat.status === 'break' ? "bg-blue-50 border-blue-500 text-blue-700" : 
                           occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/40 text-muted-foreground/30 hover:border-primary"
                         )}
                       >
                         <span className={cn(
-                          "text-[9px] sm:text-[11px] font-black absolute top-1.5 left-2 transition-opacity",
+                          "text-[7px] sm:text-[9px] font-black absolute top-0.5 left-1 transition-opacity",
                           occupant ? "opacity-40" : "opacity-60 group-hover:opacity-100"
                         )}>{seat.seatNo}</span>
                         
-                        <span className="text-[10px] sm:text-[13px] font-black truncate px-1 w-full text-center mt-1">
+                        <span className="text-[8px] sm:text-[10px] font-black truncate px-0.5 w-full text-center mt-1">
                           {occupant ? occupant.name : ''}
                         </span>
                         
-                        {seat.status === 'studying' && <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm animate-pulse" />}
-                        {!occupant && <Plus className="absolute inset-0 m-auto h-4 w-4 opacity-0 group-hover:opacity-60 text-primary transition-all" />}
+                        {seat.status === 'studying' && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 border border-white shadow-sm animate-pulse" />}
                       </div>
                     );
                   })}
@@ -369,7 +379,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <div 
                 className="grid gap-1.5 mx-auto" 
                 style={{ 
-                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(45px, 55px))`, 
+                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(40px, 50px))`, 
                   width: 'fit-content',
                   backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
                   backgroundSize: '18px 18px'
@@ -381,7 +391,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   const seat = tempLayout.find(s => s.x === x && s.y === y);
                   return (
                     <div key={idx} onClick={() => handleGridClick(x, y)} className={cn(
-                      "w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group relative border-solid",
+                      "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group relative border-solid",
                       seat ? "bg-primary border-primary text-primary-foreground shadow-lg scale-105" : "bg-white/50 border-primary/20 hover:border-primary/60"
                     )}>
                       {seat ? <span className="text-[10px] sm:text-xs font-black">{seat.seatNo}</span> : <Plus className="h-4 w-4 opacity-0 group-hover:opacity-100 text-primary transition-opacity" />}

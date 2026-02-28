@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -13,7 +14,8 @@ import {
   CalendarDays,
   Zap,
   MessageCircle,
-  GraduationCap
+  GraduationCap,
+  Armchair
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -34,6 +36,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   ],
   teacher: [
     { href: '/dashboard/teacher', label: '센터 홈', icon: LayoutDashboard },
+    { href: '/dashboard/teacher/layout-view', label: '좌석 도면', icon: Armchair },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
     { href: '/dashboard/attendance', label: '출석 관리', icon: Users },
     { href: '/dashboard/appointments', label: '상담 관리', icon: MessageCircle },
@@ -41,6 +44,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   ],
   centerAdmin: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/teacher/layout-view', label: '좌석 도면', icon: Armchair },
     { href: '/dashboard/attendance', label: '출석 현황', icon: Users },
     { href: '/dashboard/appointments', label: '상담 현황', icon: MessageCircle },
     { href: '/dashboard/analytics', label: '센터 분석', icon: BarChart3 },
