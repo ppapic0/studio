@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, setDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, setDoc, doc, serverTimestamp, getDocs, getDoc } from 'firebase/firestore';
 import { StudentProfile, DailyReport, CenterMembership, StudyPlanItem, StudyLogDay } from '@/lib/types';
 import { 
   Card, 
@@ -97,29 +97,40 @@ export default function DailyReportsPage() {
     setAiLoading(true);
     try {
       // 1. 데이터 수집 (계획, 시간표, 공부시간)
+      // (1) 오늘 계획 항목들
       const plansRef = collection(firestore, 'centers', centerId, 'plans', selectedStudent.id, 'weeks', weekKey, 'items');
       const plansSnap = await getDocs(query(plansRef, where('dateKey', '==', dateKey)));
       const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
 
+      // (2) 오늘 총 공부 시간
       const logRef = doc(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days', dateKey);
-      const logSnap = await getDocs(query(collection(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days'), where('dateKey', '==', dateKey)));
-      const todayLog = logSnap.docs[0]?.data() as StudyLogDay;
+      const logSnap = await getDoc(logRef);
+      const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDay) : null;
 
       // 2. AI 요청 데이터 구성
       const aiInput = {
         studentName: selectedStudent.name,
         date: dateKey,
         totalStudyMinutes: todayLog?.totalMinutes || 0,
-        plans: plans.filter(p => p.category === 'study' || !p.category).map(p => ({ title: p.title, done: p.done })),
-        schedule: plans.filter(p => p.category === 'schedule').map(p => {
-          const [title, time] = p.title.split(': ');
-          return { title, time: time || '-' };
-        }),
+        plans: plans
+          .filter(p => p.category === 'study' || !p.category)
+          .map(p => ({ title: p.title, done: p.done, category: 'study' })),
+        schedule: plans
+          .filter(p => p.category === 'schedule')
+          .map(p => {
+            // "등원 시간: 08:30" 형태에서 시간만 추출하거나 전체 타이틀 사용
+            const parts = p.title.split(': ');
+            return { title: parts[0], time: parts[1] || '-' };
+          }),
       };
+
+      if (aiInput.plans.length === 0 && aiInput.totalStudyMinutes === 0) {
+        throw new Error('오늘 기록된 학습 데이터가 없어 리포트를 생성할 수 없습니다.');
+      }
 
       const result = await generateDailyReport(aiInput);
       setReportContent(result.content);
-      toast({ title: "AI 리포트 생성 완료", description: "학생의 데이터를 기반으로 초안이 작성되었습니다." });
+      toast({ title: "AI 리포트 생성 완료", description: "학생의 데이터를 분석하여 초안을 작성했습니다." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "AI 생성 실패", description: e.message });
     } finally {
