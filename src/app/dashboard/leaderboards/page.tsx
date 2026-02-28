@@ -28,7 +28,7 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { LeaderboardEntry, WithId } from '@/lib/types';
-import { Loader2, Trophy, AlertCircle, Medal, Crown, Star, Flame, TrendingUp } from 'lucide-react';
+import { Loader2, Trophy, AlertCircle, Medal, Crown, Star, Flame, TrendingUp, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
