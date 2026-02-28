@@ -35,21 +35,21 @@ service cloud.firestore {
         allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
         // 본인이거나 선생님/관리자면 단일 문서 조회가 가능함
         allow get: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        
         // 본인 가입 또는 선생님/관리자의 멤버 관리
         allow create, write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher'])); 
       }
 
-      // 실시간 출결
+      // 실시간 출결 (좌석 도면용)
       match /attendanceCurrent/{docId} {
         allow read, list: if isSignedIn();
-        allow write: if isSignedIn();
+        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
-      // 학생 프로필
+      // 학생 상세 프로필
       match /students/{studentId} {
         allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+        allow create: if isSignedIn() && request.auth.uid == studentId; // 가입 시 본인 생성 허용
+        allow update, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
       // 성장 로드맵
@@ -74,10 +74,9 @@ service cloud.firestore {
         allow update: if hasRole(centerId, ['centerAdmin']) || (hasRole(centerId, ['teacher']) && resource.data.teacherId == request.auth.uid);
       }
 
-      // 학습 계획
-      match /studyPlans/{planId} {
-        allow read, list: if isSignedIn();
-        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      // 학부모 피드백 초안
+      match /parentFeedbackDrafts/{draftId} {
+        allow read, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
       // 학생별 세부 계획 경로
@@ -90,6 +89,24 @@ service cloud.firestore {
       match /studyLogs/{studentId}/days/{dateKey} {
         allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow create, write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
+      // 일일 학생 통계 (대시보드 지표)
+      match /dailyStudentStats/{dateKey}/students/{studentId} {
+        allow get, read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
+
+      // 출석 기록 (역사적 데이터)
+      match /attendanceRecords/{dateKey}/students/{studentId} {
+        allow read, get: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
+        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      }
+
+      // 리더보드
+      match /leaderboards/{periodKey}/{metricType}/entries/{studentId} {
+        allow read, list: if isSignedIn();
       }
     }
 

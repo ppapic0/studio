@@ -8,6 +8,7 @@
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
+        "schoolName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "email", "displayName", "createdAt"]
@@ -43,40 +44,24 @@
       "properties": {
         "centerId": { "type": "string" },
         "studentId": { "type": "string" },
-        "teacherId": { "type": "string" },
-        "startAt": { "type": "string", "format": "date-time" },
-        "endAt": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["requested", "confirmed", "cancelled", "completed", "no_show"] },
-        "createdByRole": { "type": "string" },
+        "studentName": { "type": "string" },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["requested", "confirmed", "cancelled", "done"] },
         "teacherNote": { "type": "string" }
       }
     },
-    "CounselingNote": {
-      "title": "CounselingNote",
+    "DailyStudentStat": {
+      "title": "DailyStudentStat",
       "type": "object",
-      "description": "상담 완료 후 작성되는 상세 일지",
+      "description": "학생의 일일 성과 지표",
       "properties": {
         "centerId": { "type": "string" },
-        "appointmentId": { "type": "string" },
         "studentId": { "type": "string" },
-        "teacherId": { "type": "string" },
-        "content": { "type": "string" },
-        "visibility": { "type": "string", "enum": ["student_and_parent", "teacher_only"] },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "StudyPlanItem": {
-      "title": "StudyPlanItem",
-      "type": "object",
-      "description": "학생의 학습 계획 항목 (To-do)",
-      "properties": {
-        "title": { "type": "string" },
-        "done": { "type": "boolean" },
-        "weight": { "type": "number" },
         "dateKey": { "type": "string" },
-        "category": { "type": "string", "enum": ["schedule", "personal", "study"] },
-        "studentId": { "type": "string" },
-        "centerId": { "type": "string" }
+        "weeklyPlanCompletionRate": { "type": "number" },
+        "attendanceStreakDays": { "type": "number" },
+        "studyTimeGrowthRate": { "type": "number" },
+        "riskDetected": { "type": "boolean" }
       }
     }
   },
@@ -94,12 +79,12 @@
         "definition": { "entityName": "CenterMember", "description": "센터 멤버 정보" }
       },
       {
-        "path": "/centers/{centerId}/appointments/{appointmentId}",
+        "path": "/centers/{centerId}/counselingReservations/{resId}",
         "definition": { "entityName": "Appointment", "description": "상담 예약" }
       },
       {
-        "path": "/centers/{centerId}/counselingNotes/{noteId}",
-        "definition": { "entityName": "CounselingNote", "description": "상담일지" }
+        "path": "/centers/{centerId}/dailyStudentStats/{dateKey}/students/{studentId}",
+        "definition": { "entityName": "DailyStudentStat", "description": "일일 학생 통계" }
       },
       {
         "path": "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}",
