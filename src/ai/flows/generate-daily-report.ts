@@ -91,7 +91,7 @@ const dailyReportPrompt = ai.definePrompt({
    - 5일 연속 6단계 이상 시 "🏆 우수 학습자 트로피" 언급
 5. **톤앤매너**: 정중하고, 전문적이며, 학부모님이 신뢰할 수 있는 어조여야 합니다.
 
-### 📘 출력 리포트 템플릿 형식
+### 📘 출력 리포트 템플릿 형식 (content 필드에 들어갈 내용)
 📘 [학습 AI 리포트] - {{{date}}}
 🕒 출결 정보
 - 등원: (시간표 중 등원 시간)
@@ -103,7 +103,7 @@ const dailyReportPrompt = ai.definePrompt({
 - {{{completionRate}}}% 달성
 
 📊 AI 분석 결과
-- 오늘은 **{{level}}단계 ({{levelName}})**에 해당합니다.
+- 오늘은 **[AI가 판단한 단계]단계 ([AI가 판단한 명칭])**에 해당합니다.
 - (7일 평균 대비 비교 분석 문장)
 - (기록 갱신/알림/트로피 등 특이사항 문장)
 
@@ -123,7 +123,7 @@ const dailyReportFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await dailyReportPrompt(input);
-    if (!output) throw new Error('리포트 생성 실패');
+    if (!output) throw new Error('리포트 생성 실패: AI가 유효한 출력을 반환하지 않았습니다.');
     return output;
   }
 );

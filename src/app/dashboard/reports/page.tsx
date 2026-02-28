@@ -141,9 +141,14 @@ export default function DailyReportsPage() {
 
       const result = await generateDailyReport(aiInput);
       setReportContent(result.content);
-      toast({ title: `Lv.${result.level} 리포트 생성 완료` });
+      toast({ title: `AI 리포트 생성 완료 (진단: Lv.${result.level})` });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "AI 생성 실패", description: e.message });
+      console.error("Gemini AI Flow Error:", e);
+      toast({ 
+        variant: "destructive", 
+        title: "AI 생성 실패", 
+        description: e.message || "연결 상태 또는 API 키를 확인해 주세요." 
+      });
     } finally {
       setAiLoading(false);
     }
@@ -327,7 +332,7 @@ export default function DailyReportsPage() {
                       className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-14 font-black text-base shadow-lg shadow-amber-100 gap-3 active:scale-95 transition-all"
                     >
                       {aiLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5" />}
-                      제미나이 AI 초안 생성
+                      AI 리포트 생성
                     </Button>
                   </CardContent>
                 </Card>
@@ -375,7 +380,7 @@ export default function DailyReportsPage() {
                   />
                   {!reportContent && !aiLoading && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                      <p className="font-black text-lg">상단의 AI 초안 생성을 눌러주세요.</p>
+                      <p className="font-black text-lg">상단의 AI 리포트 생성을 눌러주세요.</p>
                     </div>
                   )}
                 </div>
