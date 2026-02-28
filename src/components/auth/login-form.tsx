@@ -49,7 +49,8 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/dashboard');
+      // Force a hard redirect to refresh membership state completely
+      window.location.href = '/dashboard';
     } catch (error: any) {
       console.error('Login failed:', error);
       let errorMessage = '오류가 발생했습니다. 다시 시도해 주세요.';
