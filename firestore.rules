@@ -8,17 +8,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // [중요] 재귀 방지를 위해 getMembership은 단순히 데이터를 가져오는 역할만 수행
-    function getMembershipData(centerId) {
-      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data;
+    // 사용자의 역할(Role)을 직접 가져오는 함수 (가장 단순한 경로 사용)
+    function getRole(centerId) {
+      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role;
     }
 
+    // 멤버 여부 확인
     function isMember(centerId) {
       return isSignedIn() && exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId));
     }
 
+    // 선생님/관리자 여부 확인
     function isStaff(centerId) {
-      return isMember(centerId) && getMembershipData(centerId).role in ['teacher', 'centerAdmin'];
+      return isMember(centerId) && getRole(centerId) in ['teacher', 'centerAdmin'];
     }
 
     // --- 유저 프로필 ---
@@ -27,85 +29,70 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- 유저별 센터 역인덱스 (재귀 발생의 핵심 지점이므로 가장 단순하게 유지) ---
+    // --- 유저별 센터 가입 정보 ---
     match /userCenters/{userId}/centers/{centerId} {
-      // 본인은 항상 자신의 가입 정보를 읽을 수 있어야 함
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      // 선생님이 학생을 등록할 때 등의 상황을 위해 멤버 존재 여부로 확인 (재귀 함수 호출 금지)
-      allow read: if isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
+      allow read: if isSignedIn() && (request.auth.uid == userId || isStaff(centerId));
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- 센터별 데이터 ---
+    // --- 센터별 데이터 관리 ---
     match /centers/{centerId} {
+      // 센터 기본 정보 조회
       allow get: if isMember(centerId);
       
-      // 선생님/관리자 전용 접근 권한
-      match /{allSubcollections=**} {
-        allow read, write: if isStaff(centerId);
-      }
-
-      match /members/{memberId} {
-        allow read: if isMember(centerId) && (request.auth.uid == memberId || isStaff(centerId));
-      }
-
-      match /students/{studentId} {
-        allow read: if isMember(centerId);
-        allow write: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
-      }
-
-      // 학습 계획 및 로그
-      match /plans/{studentId}/weeks/{week}/items/{itemId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
-        allow write: if isSignedIn() && request.auth.uid == studentId;
-      }
-
-      match /studyLogs/{studentId}/days/{date} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
-        allow write: if isSignedIn() && request.auth.uid == studentId;
-      }
-
-      match /growthProgress/{studentId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
-        allow write: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
-      }
-
-      // 성과 통계 및 리포트
-      match /dailyStudentStats/{date}/students/{studentId} {
-        allow read: if isMember(centerId) && (request.auth.uid == studentId || isStaff(centerId));
-      }
-
-      match /dailyReports/{reportId} {
-        allow read: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
-      }
-      
-      match /attendanceCurrent/{id} {
-        allow read: if isMember(centerId);
-      }
-      
-      // --- 상담 관리 (보안 강화) ---
-      // 예약: 본인 기록만 list/get 가능, 생성은 본인만, 수정은 본인/스태프
+      // [상담 예약]
       match /counselingReservations/{id} {
-        allow read: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid));
+        // 학생은 본인 데이터만, 선생님은 전체 조회 가능
+        allow read: if isMember(centerId) && (isStaff(centerId) || resource.data.studentId == request.auth.uid);
+        // 생성은 센터 멤버만 가능하며, 본인 ID를 담아야 함
         allow create: if isMember(centerId) && request.resource.data.studentId == request.auth.uid;
-        allow update, delete: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid));
+        // 수정/삭제는 본인 또는 선생님만 가능
+        allow update, delete: if isMember(centerId) && (isStaff(centerId) || resource.data.studentId == request.auth.uid);
       }
       
-      // 일지: 학생은 본인 것만 list/get 가능, 쓰기는 스태프만
+      // [상담 일지]
       match /counselingLogs/{id} {
-        allow read: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid));
+        // 읽기: 본인 기록만(학생) 또는 전체(선생님)
+        allow read: if isMember(centerId) && (isStaff(centerId) || resource.data.studentId == request.auth.uid);
+        // 쓰기: 선생님만 가능
         allow write: if isStaff(centerId);
       }
+
+      // [기타 하위 컬렉션 공통 규칙]
+      match /members/{memberId} {
+        allow read: if isMember(centerId);
+      }
+      match /students/{studentId} {
+        allow read: if isMember(centerId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      }
+      match /plans/{studentId}/weeks/{week}/items/{itemId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+      match /studyLogs/{studentId}/days/{date} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+      match /dailyStudentStats/{date}/students/{studentId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      }
+      match /dailyReports/{reportId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      }
+      match /attendanceCurrent/{id} {
+        allow read: if isMember(centerId);
+        allow write: if isStaff(centerId);
+      }
+      match /growthProgress/{studentId} {
+        allow read: if isMember(centerId);
+        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      }
     }
 
+    // 초대 코드 (임시 허용)
     match /inviteCodes/{code} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    // 시스템 예외 (동백 센터 관리자용)
-    match /{document=**} {
-      allow read, write: if isSignedIn() && isStaff('learning-lab-dongbaek');
+      allow read, write: if isSignedIn();
     }
   }
 }
