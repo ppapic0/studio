@@ -90,6 +90,7 @@ export default function AppointmentsPage() {
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
     if (isStudent) {
+      // 보안 규칙 리스트(List) 허용을 위해 필터링 필수
       return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
     }
     if (isStaff) {
@@ -107,6 +108,7 @@ export default function AppointmentsPage() {
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
     if (isStudent) {
+      // 보안 규칙 리스트(List) 허용을 위해 필터링 필수
       return query(
         baseRef, 
         where('studentId', '==', user.uid), 
