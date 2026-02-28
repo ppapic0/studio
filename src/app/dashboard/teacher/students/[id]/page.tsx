@@ -1,10 +1,11 @@
+
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useMemo } from 'react';
 import { useDoc, useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, orderBy, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -15,18 +16,14 @@ import { Label } from '@/components/ui/label';
 import { 
   Loader2, 
   ArrowLeft, 
-  Calendar, 
-  ClipboardCheck, 
-  MessageCircle, 
-  Send,
-  History,
+  Building2,
   TrendingUp,
-  Building2
+  Send,
+  History
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyPlan, CounselingLog, ParentFeedbackDraft } from '@/lib/types';
 import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -44,35 +41,44 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: student, isLoading: studentLoading } = useDoc<StudentProfile>(studentRef);
 
-  // 2. 공부 계획 리스트
+  // 2. 공부 계획 리스트 (orderBy 제거하여 인덱스 오류 방지)
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'studyPlans'),
-      where('studentId', '==', studentId),
-      orderBy('startDate', 'desc')
+      where('studentId', '==', studentId)
     );
   }, [firestore, centerId, studentId]);
   const { data: plans, isLoading: plansLoading } = useCollection<StudyPlan>(plansQuery);
 
-  // 3. 상담 기록 리스트
+  // 3. 상담 기록 리스트 (orderBy 제거하여 인덱스 오류 방지)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'counselingLogs'),
-      where('studentId', '==', studentId),
-      orderBy('createdAt', 'desc')
+      where('studentId', '==', studentId)
     );
   }, [firestore, centerId, studentId]);
   const { data: logs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
 
-  // 4. 피드백 초안 (오늘 날짜 기반)
+  // 4. 피드백 초안
   const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
   const draftRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId, 'parentFeedbackDrafts', `${studentId}_${todayStr}`);
   }, [firestore, centerId, studentId, todayStr]);
   const { data: draft } = useDoc<ParentFeedbackDraft>(draftRef);
+
+  // 정렬된 데이터 생성
+  const sortedPlans = useMemo(() => {
+    if (!plans) return [];
+    return [...plans].sort((a, b) => b.startDate.toMillis() - a.startDate.toMillis());
+  }, [plans]);
+
+  const sortedLogs = useMemo(() => {
+    if (!logs) return [];
+    return [...logs].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  }, [logs]);
 
   // --- 상담 작성 상태 ---
   const [isSubmittingLog, setIsSubmittingLog] = useState(false);
@@ -183,7 +189,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <CardContent className="p-0">
               {plansLoading ? <Loader2 className="animate-spin mx-auto my-10" /> : (
                 <div className="divide-y">
-                  {plans?.map(plan => (
+                  {sortedPlans.map(plan => (
                     <div key={plan.id} className="p-6 flex items-center justify-between group hover:bg-muted/20 transition-all">
                       <div className="grid gap-1">
                         <span className="text-base font-black">{plan.subject}</span>
@@ -265,7 +271,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <CardContent className="p-0 max-h-[500px] overflow-y-auto">
               {logsLoading ? <Loader2 className="animate-spin mx-auto my-10" /> : (
                 <div className="divide-y">
-                  {logs?.map(log => (
+                  {sortedLogs.map(log => (
                     <div key={log.id} className="p-5 space-y-2">
                       <div className="flex justify-between items-start">
                         <Badge variant="outline" className="text-[10px] uppercase font-black">{log.type}</Badge>

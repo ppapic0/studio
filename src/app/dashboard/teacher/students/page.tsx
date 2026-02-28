@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2, Mail, Lock } from 'lucide-react';
 import Link from 'next/link';
@@ -55,13 +56,13 @@ export default function StudentListPage() {
   const centerId = activeMembership?.id;
   const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
-  // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회 (권한이 있을 때만 쿼리 실행)
+  // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'), 
-      where('role', '==', 'student'),
-      orderBy('displayName', 'asc')
+      where('role', '==', 'student')
+      // orderBy 제거: 복합 인덱스 오류(Missing permissions로 표시됨) 방지
     );
   }, [firestore, centerId, isTeacherOrAdmin]);
   
@@ -83,17 +84,23 @@ export default function StudentListPage() {
   
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
-  // 데이터 통합 및 필터링
-  const filteredStudents = studentMembers?.filter(member => {
-    const profile = studentsProfiles?.find(p => p.id === member.id);
+  // 데이터 통합, 필터링 및 정렬 (인덱스 대신 프론트에서 처리)
+  const filteredStudents = useMemo(() => {
+    if (!studentMembers) return [];
+    
     const search = searchTerm.toLowerCase();
     
-    return (
-      member.displayName?.toLowerCase().includes(search) || 
-      profile?.schoolName?.toLowerCase().includes(search) ||
-      profile?.seatNo?.toString().includes(search)
-    );
-  });
+    return studentMembers
+      .filter(member => {
+        const profile = studentsProfiles?.find(p => p.id === member.id);
+        return (
+          member.displayName?.toLowerCase().includes(search) || 
+          profile?.schoolName?.toLowerCase().includes(search) ||
+          profile?.seatNo?.toString().includes(search)
+        );
+      })
+      .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
+  }, [studentMembers, studentsProfiles, searchTerm]);
 
   const handleAddStudent = async () => {
     if (!centerId || !functions) {

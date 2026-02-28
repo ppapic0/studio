@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -39,6 +40,19 @@
       },
       "required": ["role", "status"]
     },
+    "StudentProfile": {
+      "title": "StudentProfile",
+      "type": "object",
+      "description": "학생별 상세 교육 프로필",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "grade": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "seatNo": { "type": "number" },
+        "targetDailyMinutes": { "type": "number" }
+      }
+    },
     "StudyLogDay": {
       "title": "StudyLogDay",
       "type": "object",
@@ -66,9 +80,13 @@
       "schema": { "$ref": "#/entities/CenterMember" },
       "description": "센터별 멤버십 정보"
     },
+    "/centers/{centerId}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/StudentProfile" },
+      "description": "학생 상세 관리 데이터"
+    },
     "/userCenters/{userId}/centers/{centerId}": {
       "schema": { "$ref": "#/entities/CenterMember" },
-      "description": "사용자별 소속 센터 역인덱스 (로그인 가드용)"
+      "description": "사용자별 소속 센터 역인덱스 (역할 확인용)"
     },
     "/centers/{centerId}/studyLogs/{studentId}/days/{dateKey}": {
       "schema": { "$ref": "#/entities/StudyLogDay" },

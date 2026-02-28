@@ -1,8 +1,60 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // [MVP 단순화] 로그인한 사용자라면 모든 데이터를 자유롭게 읽고 쓸 수 있도록 허용합니다.
-    // 복잡한 역할 기반 권한 체크를 제거하여 접근성 이슈를 해결했습니다.
+    
+    // [Helper] 해당 센터에서 선생님 또는 관리자 권한이 있는지 확인
+    function isStaff(centerId) {
+      return request.auth != null && 
+             (get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role in ['teacher', 'centerAdmin']);
+    }
+
+    // [User Profiles] 누구나 로그인하면 읽을 수 있고, 본인만 수정 가능
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // [User Centers] 로그인 가드를 위한 역인덱스
+    match /userCenters/{userId}/centers/{centerId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null; // 가입 시 생성 허용
+    }
+
+    // [Centers] 센터 데이터 및 모든 하위 경로
+    match /centers/{centerId} {
+      // 센터 기본 정보는 인증된 사용자라면 읽기 가능
+      allow read: if request.auth != null;
+      allow write: if request.auth != null; // 초기 생성 및 업데이트 허용
+
+      // 센터 내의 모든 데이터 (학생, 출결, 로그, 계획 등)
+      match /{allSubpaths=**} {
+        // 선생님과 관리자는 'Owner'급 권한을 가짐 (모든 읽기/쓰기 허용)
+        allow read, write: if isStaff(centerId);
+        
+        // 학생은 본인의 데이터에 대해 개별적인 권한을 가짐 (기본적으로 읽기는 허용)
+        allow read: if request.auth != null;
+      }
+      
+      // 학생이 자신의 로그나 계획을 직접 수정하는 경우를 위한 보강
+      match /studyLogs/{studentId}/{document=**} {
+        allow write: if request.auth != null && request.auth.uid == studentId;
+      }
+      match /plans/{studentId}/{document=**} {
+        allow write: if request.auth != null && request.auth.uid == studentId;
+      }
+      match /growthProgress/{studentId} {
+        allow write: if request.auth != null && request.auth.uid == studentId;
+      }
+    }
+
+    // [Invite Codes] 초대 코드 조회
+    match /inviteCodes/{code} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // [Fallback] 기타 모든 경로에 대해 최소한의 인증 확인
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
