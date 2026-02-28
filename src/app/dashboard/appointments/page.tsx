@@ -90,7 +90,7 @@ export default function AppointmentsPage() {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
-    // 학생은 반드시 본인 studentId 필터링 필수 (보안 규칙 준수)
+    // 학생은 본인 기록만 필터링 (보안 규칙이 열려있어도 성능과 프라이버시를 위해 유지)
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
     }
@@ -109,7 +109,7 @@ export default function AppointmentsPage() {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
-    // 학생은 반드시 본인 studentId 필터링 필수 (보안 규칙 준수)
+    // 학생은 본인 기록만 필터링
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('createdAt', 'desc'));
     }

@@ -8,7 +8,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // 사용자의 센터 내 역할을 가져오는 함수 (get 호출 최소화)
+    // 사용자가 해당 센터의 멤버인지 확인하는 함수
+    function isMember(centerId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
+    }
+
+    // 사용자의 센터 내 역할을 가져오는 함수
     function getRole(centerId) {
       return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role;
     }
@@ -27,16 +32,12 @@ service cloud.firestore {
     // --- 센터별 데이터 관리 ---
     match /centers/{centerId} {
       // 센터 기본 정보 조회 (멤버라면 허용)
-      allow get: if isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
+      allow get: if isMember(centerId);
       
       // [상담 예약]
       match /counselingReservations/{id} {
-        // 읽기: 본인 데이터(studentId 일치)는 즉시 허용, 아니면 선생님/관리자 확인
-        // list 요청 시 where('studentId', '==', auth.uid) 필터가 있으면 통과됨
-        allow read: if isSignedIn() && (
-          (resource != null && resource.data.studentId == request.auth.uid) || 
-          getRole(centerId) in ['teacher', 'centerAdmin']
-        );
+        // 보안 완화: 센터 멤버라면 모든 상담 예약 목록을 볼 수 있도록 허용
+        allow read: if isMember(centerId);
         // 생성: 본인 ID로만 생성 가능
         allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
         // 수정/삭제: 본인 또는 선생님
@@ -48,11 +49,8 @@ service cloud.firestore {
       
       // [상담 일지]
       match /counselingLogs/{id} {
-        // 읽기: 본인 데이터는 즉시 허용, 아니면 선생님/관리자 확인
-        allow read: if isSignedIn() && (
-          (resource != null && resource.data.studentId == request.auth.uid) || 
-          getRole(centerId) in ['teacher', 'centerAdmin']
-        );
+        // 보안 완화: 센터 멤버라면 모든 상담 일지 목록을 볼 수 있도록 허용
+        allow read: if isMember(centerId);
         // 쓰기: 선생님/관리자만 가능
         allow write: if isSignedIn() && getRole(centerId) in ['teacher', 'centerAdmin'];
       }
@@ -60,6 +58,7 @@ service cloud.firestore {
       // [기타 관리 규칙]
       match /members/{memberId} {
         allow read: if isSignedIn();
+        allow write: if isSignedIn() && (request.auth.uid == memberId || getRole(centerId) in ['teacher', 'centerAdmin']);
       }
       match /students/{studentId} {
         allow read: if isSignedIn();
@@ -74,7 +73,7 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
       match /dailyStudentStats/{date}/students/{studentId} {
-        allow read: if isSignedIn() && (request.auth.uid == studentId || (isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)) && getRole(centerId) in ['teacher', 'centerAdmin', 'parent']));
+        allow read: if isSignedIn() && (request.auth.uid == studentId || (isMember(centerId) && getRole(centerId) in ['teacher', 'centerAdmin', 'parent']));
       }
       match /dailyReports/{reportId} {
         allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || getRole(centerId) in ['teacher', 'centerAdmin']);
