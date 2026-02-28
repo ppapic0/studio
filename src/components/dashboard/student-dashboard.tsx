@@ -83,8 +83,8 @@ const RANK_THRESHOLDS: Record<MetricType, number[]> = {
   growth: [50, 40, 30, 20, 10, 5, 0, -50],
 };
 
-const AUTO_TERMINATE_SECONDS = 7200; // 2시간
-const GRACE_PERIOD_SECONDS = 60; // 1분
+const AUTO_TERMINATE_SECONDS = 7200; 
+const GRACE_PERIOD_SECONDS = 60; 
 const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
 
 function getRankData(value: number, type: MetricType) {
@@ -259,11 +259,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setLastActiveCheckTime
   } = useAppContext();
   
-  const today = useMemo(() => new Date(), []);
-  const todayKey = format(today, 'yyyy-MM-dd');
-  const weekKey = format(today, "yyyy-'W'II");
+  const [today, setToday] = useState<Date | null>(null);
+  
+  useEffect(() => {
+    setToday(new Date());
+  }, []);
 
-  // Local-only timer state to prevent entire dashboard re-renders
+  const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
+  const weekKey = today ? format(today, "yyyy-'W'II") : '';
+
   const [localSeconds, setLocalSeconds] = useState(0);
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
   const [distance, setDistance] = useState<number | null>(null);
@@ -275,7 +279,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive && startTime) {
-      // Sync local seconds immediately
       setLocalSeconds(Math.floor((Date.now() - startTime) / 1000));
       interval = setInterval(() => {
         setLocalSeconds(Math.floor((Date.now() - startTime) / 1000));
@@ -287,24 +290,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [isTimerActive, startTime]);
 
   const daysUntilReset = useMemo(() => {
+    if (!today) return 0;
     const nextMonth = startOfMonth(addMonths(today, 1));
     return differenceInDays(nextMonth, today);
   }, [today]);
 
   const dailyStatRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', user.uid);
   }, [firestore, activeMembership, user, todayKey]);
   const { data: dailyStat, isLoading: dailyStatLoading } = useDoc<DailyStudentStat>(dailyStatRef, { enabled: isActive });
 
   const studyLogRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
   }, [firestore, activeMembership, user, todayKey]);
   const { data: todayStudyLog, isLoading: todayStudyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const allPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !user || !weekKey || !todayKey) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
       where('dateKey', '==', todayKey)
@@ -348,7 +352,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [showSessionAlert, gracePeriod]);
 
   const checkLocation = useCallback(() => {
-    if (!navigator.geolocation) {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
       setLocationStatus('error');
       return;
     }
@@ -370,7 +374,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [isActive, checkLocation]);
   
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (!firestore || !user || !activeMembership) return;
+    if (!firestore || !user || !activeMembership || !weekKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     
     updateDoc(itemRef, { done: !item.done, updatedAt: serverTimestamp() });
@@ -385,17 +389,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
-  const handleStudyEndAutomatically = () => {
-    if (!isTimerActive) return;
-    saveStudyTime();
-    setIsTimerActive(false);
-    setStartTime(null);
-    setLastActiveCheckTime(null);
-    setShowSessionAlert(false);
-  };
-
   const saveStudyTime = async () => {
-    if (!firestore || !user || !activeMembership || !studyLogRef || !startTime) return;
+    if (!firestore || !user || !activeMembership || !studyLogRef || !startTime || !todayKey) return;
     
     const sessionMinutes = Math.floor((Date.now() - startTime) / 60000);
     if (sessionMinutes <= 0) return;
@@ -448,6 +443,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleStudyEndAutomatically = () => {
+    if (!isTimerActive) return;
+    saveStudyTime();
+    setIsTimerActive(false);
+    setStartTime(null);
+    setLastActiveCheckTime(null);
+    setShowSessionAlert(false);
+  };
+
   const handleStudyStartStop = () => {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
@@ -475,6 +479,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   if (!isActive) return null;
+  if (!today) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
   const growthRate = (dailyStat?.studyTimeGrowthRate ?? 0) * 100;
   const completionRate = (dailyStat?.weeklyPlanCompletionRate ?? 0) * 100;
@@ -587,7 +592,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-        {/* 오늘의 학습 계획 */}
         <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-border/50">
           <CardHeader className="bg-muted/10 border-b p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -662,7 +666,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 퀵 스케줄 요약 */}
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white flex flex-col ring-1 ring-border/50 overflow-hidden">
           <CardHeader className="p-6 sm:p-8">
             <CardTitle className="text-xl font-black flex items-center gap-2">

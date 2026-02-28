@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -85,24 +84,29 @@ export default function StudyPlanPage() {
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
 
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isStudent = activeMembership?.role === 'student';
-  const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
-  const weekKey = format(selectedDate, "yyyy-'W'II");
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []);
 
-  const isPast = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
+  const isStudent = activeMembership?.role === 'student';
+  const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
+
+  const isPast = selectedDate ? isBefore(startOfDay(selectedDate), startOfDay(new Date())) : false;
 
   const weekDays = useMemo(() => {
+    if (!selectedDate) return [];
     const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
     return [...Array(7)].map((_, i) => addDays(start, i));
   }, [selectedDate]);
 
   const planItemsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !activeMembership) return null;
+    if (!firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return null;
     return query(
       collection(
         firestore,
@@ -157,7 +161,7 @@ export default function StudyPlanPage() {
   };
 
   const handleAddTask = async (title: string, category: 'study' | 'personal') => {
-    if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent) return;
+    if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) return;
     
     setIsSubmitting(true);
     const itemsCollectionRef = collection(
@@ -194,7 +198,7 @@ export default function StudyPlanPage() {
   };
 
   const handleUpdateSchedule = async (title: string, timeValue: string, periodValue: '오전' | '오후') => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent) return;
+    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
     
     const formattedTime = to24h(timeValue, periodValue);
     const existing = scheduleItems.find(p => p.title.startsWith(title));
@@ -232,7 +236,7 @@ export default function StudyPlanPage() {
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent) return;
+    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
     const itemRef = doc(
       firestore,
       'centers',
@@ -254,15 +258,15 @@ export default function StudyPlanPage() {
     if (!item.done) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
       setDoc(progressRef, {
-        stats: { achievement: increment(0.05) }, // Calibration: 20 items = 1pt Achievement
-        currentXp: increment(10), // Small bonus XP for task completion
+        stats: { achievement: increment(0.05) },
+        currentXp: increment(10),
         updatedAt: serverTimestamp()
       }, { merge: true });
     }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent) return;
+    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
     const itemRef = doc(
       firestore,
       'centers',
@@ -352,6 +356,10 @@ export default function StudyPlanPage() {
         </Card>
       </div>
     );
+  }
+
+  if (!selectedDate) {
+    return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
   }
 
   return (

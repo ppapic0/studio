@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -53,10 +53,15 @@ export default function DailyReportsPage() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
-  // 기본값을 어제(전날)로 설정
-  const [selectedDate, setSelectedDate] = useState(subDays(new Date(), 1));
-  const dateKey = format(selectedDate, 'yyyy-MM-dd');
-  const weekKey = format(selectedDate, "yyyy-'W'II");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  
+  useEffect(() => {
+    // 하이드레이션 오류 방지를 위해 클라이언트 마운트 후 날짜 설정
+    setSelectedDate(subDays(new Date(), 1));
+  }, []);
+
+  const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const centerId = activeMembership?.id;
 
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
@@ -73,7 +78,7 @@ export default function DailyReportsPage() {
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery);
 
   const reportsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !dateKey) return null;
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', dateKey));
   }, [firestore, centerId, dateKey]);
   const { data: dailyReports, isLoading: reportsLoading } = useCollection<DailyReport>(reportsQuery);
@@ -94,10 +99,9 @@ export default function DailyReportsPage() {
   };
 
   const handleGenerateAiReport = async () => {
-    if (!selectedStudent || !firestore || !centerId) return;
+    if (!selectedStudent || !firestore || !centerId || !dateKey) return;
     setAiLoading(true);
     try {
-      // 1. 선택된 날짜 데이터 수집
       const plansRef = collection(firestore, 'centers', centerId, 'plans', selectedStudent.id, 'weeks', weekKey, 'items');
       const plansSnap = await getDocs(query(plansRef, where('dateKey', '==', dateKey)));
       const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
@@ -106,7 +110,6 @@ export default function DailyReportsPage() {
       const logSnap = await getDoc(logRef);
       const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDay) : null;
 
-      // 2. 최근 기록 수집 (리포트 날짜 이전 14일치를 가져와서 7일을 필터링)
       const lastLogsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days');
       const historySnap = await getDocs(query(lastLogsRef, orderBy('dateKey', 'desc'), limit(14)));
       const history7Days = historySnap.docs
@@ -114,10 +117,9 @@ export default function DailyReportsPage() {
           date: d.data().dateKey,
           minutes: d.data().totalMinutes || 0
         }))
-        .filter(h => h.date < dateKey) // 리포트 날짜보다 이전 데이터만
+        .filter(h => h.date < dateKey)
         .slice(0, 7);
 
-      // 3. 완수율 계산
       const studyTasks = plans.filter(p => p.category === 'study' || !p.category);
       const completionRate = studyTasks.length > 0 
         ? Math.round((studyTasks.filter(t => t.done).length / studyTasks.length) * 100)
@@ -155,7 +157,7 @@ export default function DailyReportsPage() {
   };
 
   const handleSaveReport = async (status: 'draft' | 'sent' = 'draft') => {
-    if (!selectedStudent || !firestore || !centerId || !user) return;
+    if (!selectedStudent || !firestore || !centerId || !user || !dateKey) return;
     setIsSaving(true);
     try {
       const reportId = `${dateKey}_${selectedStudent.id}`;
@@ -181,7 +183,15 @@ export default function DailyReportsPage() {
     }
   };
 
-  const isLoading = membersLoading || reportsLoading;
+  const isLoading = !selectedDate || membersLoading || reportsLoading;
+
+  if (!selectedDate) {
+    return (
+      <div className="flex h-[70vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto pb-20">

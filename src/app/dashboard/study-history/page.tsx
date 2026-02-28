@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -87,12 +87,16 @@ export default function StudyHistoryPage() {
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);
   
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, []);
 
   const studyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !user || !activeMembership) return null;
@@ -104,10 +108,10 @@ export default function StudyHistoryPage() {
 
   const { data: logs, isLoading: logsLoading } = useCollection<StudyLogDay>(studyLogsQuery);
 
-  const weekKey = selectedDateForPlan ? format(selectedDateForPlan, "yyyy-'W'II") : format(currentDate, "yyyy-'W'II");
+  const weekKey = selectedDateForPlan ? format(selectedDateForPlan, "yyyy-'W'II") : currentDate ? format(currentDate, "yyyy-'W'II") : '';
   
   const plansQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !activeMembership) return null;
+    if (!firestore || !user || !activeMembership || !weekKey) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items')
     );
@@ -158,15 +162,18 @@ export default function StudyHistoryPage() {
     return `${period} ${time}`;
   };
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const calendarData = useMemo(() => {
+    if (!currentDate) return { days: [], monthStart: null };
+    const start = startOfMonth(currentDate);
+    const end = endOfMonth(currentDate);
+    const calendarStart = startOfWeek(start, { weekStartsOn: 1 });
+    const calendarEnd = endOfWeek(end, { weekStartsOn: 1 });
 
-  const days = eachDayOfInterval({
-    start: calendarStart,
-    end: calendarEnd,
-  });
+    return {
+      days: eachDayOfInterval({ start: calendarStart, end: calendarEnd }),
+      monthStart: start
+    };
+  }, [currentDate]);
 
   const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -183,11 +190,11 @@ export default function StudyHistoryPage() {
     return 'bg-emerald-600 text-white shadow-inner';
   };
 
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+  const prevMonth = () => currentDate && setCurrentDate(subMonths(currentDate, 1));
+  const nextMonth = () => currentDate && setCurrentDate(addMonths(currentDate, 1));
 
   const monthTotalMinutes = useMemo(() => {
-    if (!logs) return 0;
+    if (!logs || !currentDate) return 0;
     return logs
       .filter(log => isSameMonth(new Date(log.dateKey), currentDate))
       .reduce((acc, log) => acc + log.totalMinutes, 0);
@@ -313,7 +320,7 @@ export default function StudyHistoryPage() {
   };
 
   const handleApplyToAllWeekdays = async () => {
-    if (!selectedDateForPlan || !firestore || !user || !activeMembership || dailyPlans.length === 0) return;
+    if (!selectedDateForPlan || !firestore || !user || !activeMembership || dailyPlans.length === 0 || !currentDate) return;
     
     setIsSubmitting(true);
     const weekday = getDay(selectedDateForPlan);
@@ -379,6 +386,10 @@ export default function StudyHistoryPage() {
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
 
+  if (!currentDate) {
+    return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
+  }
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -439,13 +450,13 @@ export default function StudyHistoryPage() {
               <div className="col-span-7 h-[400px] flex items-center justify-center">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
               </div>
-            ) : days.map((day, idx) => {
+            ) : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const log = logs?.find(l => l.dateKey === dateKey);
               const minutes = log?.totalMinutes || 0;
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               
-              const isCurrentMonth = isSameMonth(day, currentDate);
+              const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isToday = isSameDay(day, new Date());
               
               return (
@@ -513,7 +524,7 @@ export default function StudyHistoryPage() {
           </DialogHeader>
           
           <div className="max-h-[60vh] overflow-y-auto bg-background">
-            {dailyPlans.length === 0 && selectedDateForPlan && isBefore(selectedDateForPlan, startOfDay(new Date())) ? (
+            {selectedDateForPlan && dailyPlans.length === 0 && isBefore(selectedDateForPlan, startOfDay(new Date())) ? (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
                 <div className="bg-muted p-4 rounded-full">
                   <CalendarX className="h-10 w-10 text-muted-foreground" />
@@ -537,7 +548,7 @@ export default function StudyHistoryPage() {
                         if (!time && isActuallyPast) return null;
                         return (
                           <div key={tpl.title} className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
-                            <div className="flex items-center gap-3">
+                            <div className="items-center gap-3 flex">
                               <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
                                 <tpl.icon className="h-4 w-4 text-primary" />
                               </div>
@@ -675,7 +686,7 @@ export default function StudyHistoryPage() {
           </div>
           
           <DialogFooter className="p-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
-            {!isActuallyPast && dailyPlans.length > 0 && (
+            {!isActuallyPast && selectedDateForPlan && dailyPlans.length > 0 && (
               <Button 
                 variant="outline" 
                 className="w-full sm:w-auto gap-2 text-xs" 

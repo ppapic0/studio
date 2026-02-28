@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -40,9 +40,13 @@ export default function AttendancePage() {
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
   
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const dateKey = format(selectedDate, 'yyyy-MM-dd');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []);
+
+  const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
   // 1. Fetch all students in the center
@@ -57,7 +61,7 @@ export default function AttendancePage() {
 
   // 2. Fetch attendance records for the selected date
   const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
+    if (!firestore || !activeMembership || !dateKey) return null;
     return collection(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students');
   }, [firestore, activeMembership, dateKey]);
   const { data: attendanceRecords, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery, { enabled: isTeacherOrAdmin });
@@ -76,7 +80,7 @@ export default function AttendancePage() {
   };
 
   const handleStatusChange = async (studentId: string, status: AttendanceRecord['status']) => {
-      if (!firestore || !user || !activeMembership) return;
+      if (!firestore || !user || !activeMembership || !dateKey) return;
       
       const recordRef = doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students', studentId);
       const studentData = students?.find(s => s.id === studentId);
@@ -97,7 +101,7 @@ export default function AttendancePage() {
       await setDoc(recordRef, recordData, { merge: true });
   }
 
-  const isLoading = membersLoading || attendanceLoading;
+  const isLoading = !selectedDate || membersLoading || attendanceLoading;
 
   const attendanceMap = new Map(attendanceRecords?.map(r => [r.id, r]));
 
@@ -119,19 +123,21 @@ export default function AttendancePage() {
           <div>
             <CardTitle>학생 출석</CardTitle>
             <CardDescription>
-              {format(selectedDate, 'yyyy년 MM월 dd일')}의 출석을 관리하고 검토합니다.
+              {selectedDate ? format(selectedDate, 'yyyy년 MM월 dd일') : '날짜를 선택하세요'}의 출석을 관리하고 검토합니다.
             </CardDescription>
           </div>
-          <Input 
-            type="date" 
-            value={format(selectedDate, 'yyyy-MM-dd')}
-            onChange={(e) => setSelectedDate(new Date(e.target.value))}
-            className="w-[180px]"
-          />
+          {selectedDate && (
+            <Input 
+              type="date" 
+              value={format(selectedDate, 'yyyy-MM-dd')}
+              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+              className="w-[180px]"
+            />
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? <div className='flex justify-center p-8'><Loader2 className="h-8 w-8 animate-spin"/></div> :
+        {isLoading ? <div className='flex justify-center p-8'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
         <Table>
           <TableHeader>
             <TableRow>
