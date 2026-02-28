@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -85,9 +84,11 @@
       "description": "학부모 발송 리포트",
       "properties": {
         "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
         "content": { "type": "string" },
-        "status": { "type": "string" },
-        "dateKey": { "type": "string" }
+        "status": { "type": "string", "enum": ["draft", "sent"] },
+        "dateKey": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     }
   },
