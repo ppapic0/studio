@@ -112,26 +112,32 @@ export const registerStudent = functions.region(region).https.onCall(async (data
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   
-  const { studentId, centerId, password, displayName, schoolName, grade } = data;
+  const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
 
   const callerId = context.auth.uid;
 
   try {
+    // 1. 권한 확인
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
       throw new functions.https.HttpsError("permission-denied", "정보를 수정할 권한이 없습니다.");
     }
 
-    // 1. Auth 업데이트 (비밀번호가 있는 경우)
-    if (password) {
-      await admin.auth().updateUser(studentId, { password });
-    }
-    if (displayName) {
-      await admin.auth().updateUser(studentId, { displayName });
+    // 2. Auth 업데이트 (비밀번호/이름)
+    try {
+      const authUpdates: any = {};
+      if (password && password.length >= 6) authUpdates.password = password;
+      if (displayName) authUpdates.displayName = displayName;
+      
+      if (Object.keys(authUpdates).length > 0) {
+        await admin.auth().updateUser(studentId, authUpdates);
+      }
+    } catch (authError: any) {
+      throw new functions.https.HttpsError("internal", `인증 정보 수정 실패: ${authError.message}`);
     }
 
-    // 2. Firestore 업데이트
+    // 3. Firestore 업데이트 (Batch)
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
 
@@ -139,28 +145,32 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
     const memberRef = db.doc(`centers/${centerId}/members/${studentId}`);
 
-    const updateData: any = { updatedAt: timestamp };
-    if (displayName) updateData.displayName = displayName;
-    if (schoolName) updateData.schoolName = schoolName;
-
-    batch.update(userRef, updateData);
+    // (1) 전역 유저 프로필
+    const userUpdate: any = { updatedAt: timestamp };
+    if (displayName) userUpdate.displayName = displayName;
+    if (schoolName) userUpdate.schoolName = schoolName;
+    batch.set(userRef, userUpdate, { merge: true });
     
+    // (2) 학생 상세 프로필
     const studentUpdate: any = { updatedAt: timestamp };
     if (displayName) studentUpdate.name = displayName;
     if (schoolName) studentUpdate.schoolName = schoolName;
     if (grade) studentUpdate.grade = grade;
-    batch.update(studentRef, studentUpdate);
+    if (parentLinkCode !== undefined) studentUpdate.parentLinkCode = parentLinkCode;
+    batch.set(studentRef, studentUpdate, { merge: true });
 
+    // (3) 센터 멤버 정보
     if (displayName) {
-      batch.update(memberRef, { displayName, updatedAt: timestamp });
+      batch.set(memberRef, { displayName, updatedAt: timestamp }, { merge: true });
     }
 
     await batch.commit();
-    return { ok: true, message: "학생 정보가 업데이트되었습니다." };
+    return { ok: true, message: "학생 정보가 성공적으로 업데이트되었습니다." };
 
   } catch (error: any) {
+    console.error("[updateStudentAccount Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message);
+    throw new functions.https.HttpsError("internal", error.message || "데이터베이스 처리 중 오류가 발생했습니다.");
   }
 });
 

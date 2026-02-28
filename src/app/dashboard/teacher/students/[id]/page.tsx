@@ -1,11 +1,10 @@
-
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -42,21 +41,17 @@ import {
   Settings2,
   UserCheck,
   Lock,
-  Sparkles,
   Activity,
   Check,
   CalendarPlus,
   FileEdit,
-  History,
   MessageSquare,
   BarChart3,
-  MousePointer2,
   ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
 import { format, subDays, startOfDay } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ResponsiveContainer, 
@@ -65,17 +60,7 @@ import {
   Tooltip, 
   CartesianGrid, 
   AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  Cell, 
-  Radar, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  RadialBarChart,
-  RadialBar,
-  Legend
+  Area
 } from 'recharts';
 import { cn } from '@/lib/utils';
 
@@ -256,26 +241,38 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const handleUpdateInfo = async () => {
-    if (!functions || !centerId || !studentId || !firestore) return;
+    if (!functions || !centerId || !studentId) return;
+    
+    // 유효성 검사
+    if (!editForm.name.trim()) {
+      toast({ variant: "destructive", title: "수정 실패", description: "이름은 필수 입력 항목입니다." });
+      return;
+    }
+
     setIsUpdating(true);
     try {
-      // Auth 업데이트는 Cloud Function으로
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
-      await updateFn({
-        studentId, centerId, displayName: editForm.name,
-        schoolName: editForm.schoolName, grade: editForm.grade, password: editForm.password || undefined
+      const result: any = await updateFn({
+        studentId, 
+        centerId, 
+        displayName: editForm.name,
+        schoolName: editForm.schoolName, 
+        grade: editForm.grade, 
+        password: editForm.password.length >= 6 ? editForm.password : undefined,
+        parentLinkCode: editForm.parentLinkCode.trim() || null
       });
 
-      // Firestore의 StudentProfile 연동 코드 업데이트
-      await updateDoc(doc(firestore, 'centers', centerId, 'students', studentId), {
-        parentLinkCode: editForm.parentLinkCode,
-        updatedAt: serverTimestamp()
-      });
-
-      toast({ title: "정보 수정 완료" });
-      setIsEditModalOpen(false);
+      if (result.data?.ok) {
+        toast({ title: "정보 수정 완료", description: "학생의 모든 정보가 안전하게 업데이트되었습니다." });
+        setIsEditModalOpen(false);
+      }
     } catch (e: any) {
-      toast({ variant: "destructive", title: "수정 실패", description: e.message });
+      console.error("[handleUpdateInfo Error]", e);
+      toast({ 
+        variant: "destructive", 
+        title: "수정 실패", 
+        description: e.message || "서버 통신 중 오류가 발생했습니다." 
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -417,14 +414,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 value={editForm.parentLinkCode} 
                 placeholder="4자리 숫자" 
                 maxLength={4}
-                onChange={(e) => setEditForm({...editForm, parentLinkCode: e.target.value})} 
+                onChange={(e) => setEditForm({...editForm, parentLinkCode: e.target.value.replace(/[^0-9]/g, '')})} 
                 className="rounded-xl h-12 border-2 font-black tracking-[0.5em] text-center" 
               />
               <p className="text-[9px] font-bold text-muted-foreground">부모님이 가입할 때 필요한 코드입니다. 학생에게 전달해 주세요.</p>
             </div>
             <div className="grid gap-2 pt-4 border-t border-dashed">
               <Label className="text-[10px] font-black uppercase text-destructive flex items-center gap-1.5 ml-1"><Lock className="h-3 w-3" /> 비밀번호 재설정</Label>
-              <Input type="password" placeholder="새 비밀번호 입력 (공란 시 유지)" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} className="rounded-xl h-12 border-destructive/20 focus-visible:ring-destructive/10" />
+              <Input type="password" placeholder="새 비밀번호 입력 (6자 이상)" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} className="rounded-xl h-12 border-destructive/20 focus-visible:ring-destructive/10" />
             </div>
           </div>
           <DialogFooter>
