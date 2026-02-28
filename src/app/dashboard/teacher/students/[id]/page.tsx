@@ -1,10 +1,11 @@
+
 'use client';
 
 import { use, useState, useMemo, useEffect } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, addDoc, serverTimestamp, orderBy, limit, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where, addDoc, serverTimestamp, getDocs, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -102,7 +103,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // --- 데이터 조회 섹션 ---
+  // --- 데이터 조회 섹션 (인덱스 오류 방지를 위해 정렬 제거) ---
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId, 'students', studentId);
@@ -117,13 +118,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
-      orderBy('dateKey', 'desc'),
-      limit(30)
-    );
+    return collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
   }, [firestore, centerId, studentId]);
-  const { data: logs } = useCollection<StudyLogDay>(logsQuery);
+  const { data: rawLogs } = useCollection<StudyLogDay>(logsQuery);
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -145,20 +142,34 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'counselingLogs'),
-      where('studentId', '==', studentId),
-      orderBy('createdAt', 'desc')
+      where('studentId', '==', studentId)
     );
   }, [firestore, centerId, studentId]);
-  const { data: counselingLogs } = useCollection<CounselingLog>(counselingQuery);
+  const { data: rawCounselingLogs } = useCollection<CounselingLog>(counselingQuery);
 
-  // --- 통계 계산 ---
+  // --- 클라이언트 측 정렬 및 통계 계산 ---
+  const logs = useMemo(() => {
+    if (!rawLogs) return [];
+    return [...rawLogs].sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 30);
+  }, [rawLogs]);
+
+  const counselingLogs = useMemo(() => {
+    if (!rawCounselingLogs) return [];
+    return [...rawCounselingLogs].sort((a, b) => {
+      const timeA = a.createdAt?.toMillis() || 0;
+      const timeB = b.createdAt?.toMillis() || 0;
+      return timeB - timeA;
+    });
+  }, [rawCounselingLogs]);
+
   const stats = useMemo(() => {
-    if (!logs) return { today: 0, weeklyAvg: 0, monthlyAvg: 0, chartData: [] };
+    if (logs.length === 0) return { today: 0, weeklyAvg: 0, monthlyAvg: 0, chartData: [] };
     const todayLog = logs.find(l => l.dateKey === todayKey);
     const sevenDaysAgo = subDays(new Date(), 7);
     const weeklyLogs = logs.filter(l => new Date(l.dateKey) >= sevenDaysAgo);
     const weeklyAvg = weeklyLogs.length > 0 ? Math.round(weeklyLogs.reduce((acc, c) => acc + c.totalMinutes, 0) / 7) : 0;
-    const monthlyAvg = logs.length > 0 ? Math.round(logs.reduce((acc, c) => acc + c.totalMinutes, 0) / logs.length) : 0;
+    const monthlyAvg = Math.round(logs.reduce((acc, c) => acc + c.totalMinutes, 0) / logs.length);
+    
     const chartData = [...logs].reverse().map(l => ({
       name: format(new Date(l.dateKey), 'MM/dd'),
       hours: Number((l.totalMinutes / 60).toFixed(1))
@@ -207,11 +218,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId || !studentId) return;
     setIsUpdating(true);
     try {
-      const batch = [
-        updateDoc(doc(firestore, 'centers', centerId, 'members', studentId), { status, updatedAt: serverTimestamp() }),
-        updateDoc(doc(firestore, 'userCenters', studentId, 'centers', centerId), { status, updatedAt: serverTimestamp() })
-      ];
-      await Promise.all(batch);
+      await updateDoc(doc(firestore, 'centers', centerId, 'members', studentId), { status, updatedAt: serverTimestamp() });
+      await updateDoc(doc(firestore, 'userCenters', studentId, 'centers', centerId), { status, updatedAt: serverTimestamp() });
       toast({ title: "상태 변경 완료", description: `학생의 상태가 변경되었습니다.` });
       setIsStatusModalOpen(false);
     } catch (e: any) {
@@ -388,7 +396,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white ring-1 ring-border/50 flex flex-col">
             <CardHeader className="p-8 pb-4"><CardTitle className="text-xl font-black">상담 히스토리</CardTitle></CardHeader>
             <CardContent className="p-0 overflow-y-auto max-h-[500px] custom-scrollbar">
-              {!counselingLogs || counselingLogs.length === 0 ? (
+              {counselingLogs.length === 0 ? (
                 <div className="py-20 text-center opacity-30 italic font-black text-sm">상담 내역이 없습니다.</div>
               ) : (
                 <div className="divide-y">
