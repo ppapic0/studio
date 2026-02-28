@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 /**
  * AuthGuard - 사용자의 인증 상태와 센터 멤버십 정보를 확인하고 보호된 경로에 대한 접근을 관리합니다.
- * 하이드레이션 오류를 방지하기 위해 마운트 상태를 관리합니다.
+ * 하이드레이션 오류를 방지하기 위해 서버와 클라이언트의 초기 렌더링을 일치시킵니다.
  */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading: userLoading } = useUser();
@@ -85,12 +85,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [user, userLoading, firestore, pathname, router, setMemberships, setActiveMembership, setMembershipsLoading]);
 
-  // 하이드레이션 오류를 피하기 위해 컴포넌트가 마운트될 때까지 대기합니다.
+  // 하이드레이션 오류를 방지하기 위해 컴포넌트가 브라우저에 마운트될 때까지 서버와 동일한 HTML을 유지합니다.
   if (!mounted) {
+    // 서버 환경(SSR)에서 예상되는 구조와 정확히 일치시켜야 합니다.
+    if (pathname !== '/login' && pathname !== '/signup') {
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
     return <div className="min-h-screen bg-background" />;
   }
 
-  // 초기 체크(Auth + Membership) 중에는 로딩 화면 표시
+  // 초기 체크(Auth + Membership) 중에는 상세 로딩 화면 표시
   if (isCheckingInitial && pathname !== '/login' && pathname !== '/signup') {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
