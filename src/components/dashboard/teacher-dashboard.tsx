@@ -30,9 +30,19 @@ import {
   AlertCircle,
   Clock,
   MapPin,
-  Maximize2
+  Maximize2,
+  Zap,
+  Trophy,
+  ClipboardCheck,
+  CalendarDays,
+  Activity,
+  CircleDot,
+  CheckCircle2,
+  TrendingUp,
+  BarChart3,
+  Sparkles
 } from 'lucide-react';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
@@ -46,7 +56,7 @@ import {
   Timestamp,
   updateDoc
 } from 'firebase/firestore';
-import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, GrowthProgress, LeaderboardEntry, StudyPlanItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -57,11 +67,46 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  ResponsiveContainer, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  CartesianGrid, 
+  AreaChart, 
+  Area, 
+  BarChart, 
+  Bar, 
+  Cell, 
+  Radar, 
+  RadarChart, 
+  PolarGrid, 
+  PolarAngleAxis, 
+  RadialBarChart,
+  RadialBar,
+  Legend
+} from 'recharts';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
+
+// --- 프리미엄 차트 컴포넌트 ---
+const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 backdrop-blur-xl border-2 border-primary/10 p-4 rounded-2xl shadow-xl ring-1 ring-black/5">
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{label}</p>
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-black text-primary">{payload[0].value}</span>
+          <span className="text-[10px] font-bold text-primary/60">{unit}</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
@@ -72,14 +117,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isManagingSeatModalOpen, setIsManagingSeatModalOpen] = useState(false);
   
+  // 신규 팝업 상태
+  const [isDetailPopupOpen, setIsDetailOpen] = useState(false);
+  const [isPlanPopupOpen, setIsPlanOpen] = useState(false);
+  
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState<{id: string, seatNo: number} | null>(null);
   const [selectedSeatForManage, setSelectedSeatForManage] = useState<AttendanceCurrent | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const [isSaving, setIsSaving] = useState(false);
   const [tempLayout, setTempLayout] = useState<{ x: number, y: number, seatNo: number }[]>([]);
 
   const centerId = activeMembership?.id;
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const weekKey = format(new Date(), "yyyy-'W'II");
 
+  // 데이터 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
@@ -92,22 +145,55 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    const today = new Date();
+  // 팝업용 데이터 조회 (선택된 학생 기준)
+  const studentDetailRef = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedStudentId) return null;
+    return doc(firestore, 'centers', centerId, 'students', selectedStudentId);
+  }, [firestore, centerId, selectedStudentId]);
+  const { data: studentDetail } = useDoc<StudentProfile>(studentDetailRef);
+
+  const studentLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedStudentId) return null;
+    return collection(firestore, 'centers', centerId, 'studyLogs', selectedStudentId, 'days');
+  }, [firestore, centerId, selectedStudentId]);
+  const { data: studentLogs } = useCollection<StudyLogDay>(studentLogsQuery);
+
+  const studentProgressRef = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedStudentId) return null;
+    return doc(firestore, 'centers', centerId, 'growthProgress', selectedStudentId);
+  }, [firestore, centerId, selectedStudentId]);
+  const { data: studentProgress } = useDoc<GrowthProgress>(studentProgressRef);
+
+  const studentPlansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedStudentId) return null;
     return query(
-      collection(firestore, 'centers', centerId, 'counselingReservations'),
-      where('scheduledAt', '>=', Timestamp.fromDate(startOfDay(today))),
-      where('scheduledAt', '<=', Timestamp.fromDate(endOfDay(today))),
-      orderBy('scheduledAt', 'asc')
+      collection(firestore, 'centers', centerId, 'plans', selectedStudentId, 'weeks', weekKey, 'items'),
+      where('dateKey', '==', todayKey)
     );
-  }, [firestore, centerId]);
-  const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery, { enabled: isActive });
+  }, [firestore, centerId, selectedStudentId, weekKey, todayKey]);
+  const { data: studentPlans } = useCollection<StudyPlanItem>(studentPlansQuery);
 
   const unassignedStudents = useMemo(() => {
     if (!students) return [];
     return students.filter(s => !s.seatNo || s.seatNo === 0);
   }, [students]);
+
+  // 가공 데이터 (Detail용)
+  const detailStats = useMemo(() => {
+    if (!studentLogs) return { today: 0, weeklyAvg: 0, chartData: [] };
+    const todayLog = studentLogs.find(l => l.dateKey === todayKey);
+    const last7Days = studentLogs.slice(0, 7);
+    const weeklyAvg = last7Days.length > 0 ? Math.round(last7Days.reduce((acc, c) => acc + c.totalMinutes, 0) / 7) : 0;
+    
+    return {
+      today: todayLog?.totalMinutes || 0,
+      weeklyAvg,
+      chartData: studentLogs.slice(0, 14).reverse().map(l => ({
+        name: format(new Date(l.dateKey), 'MM/dd'),
+        hours: Number((l.totalMinutes / 60).toFixed(1))
+      }))
+    };
+  }, [studentLogs, todayKey]);
 
   const openLayoutEditor = () => {
     if (attendanceList && attendanceList.length > 0) {
@@ -249,7 +335,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-xs text-muted-foreground">좌석을 클릭하여 출결 상태를 즉시 관리하세요.</CardDescription>
+                <CardDescription className="font-bold text-xs text-muted-foreground">좌석을 클릭하여 학생 정보를 빠르게 조회하고 관리하세요.</CardDescription>
               </div>
               <div className="flex gap-2">
                 <Button 
@@ -305,6 +391,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         key={seat.id} 
                         onClick={() => {
                           if (occupant) {
+                            setSelectedStudentId(occupant.id);
                             setSelectedSeatForManage(seat);
                             setIsManagingSeatModalOpen(true);
                           } else {
@@ -382,6 +469,220 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
+      {/* 좌석 관리 퀵 컨트롤 */}
+      <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
+        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
+          {selectedSeatForManage && (
+            <>
+              <div className={cn(
+                "p-8 text-white relative overflow-hidden",
+                selectedSeatForManage.status === 'studying' ? "bg-emerald-600" : 
+                selectedSeatForManage.studentId && selectedSeatForManage.status === 'absent' ? "bg-rose-600" : 
+                "bg-primary"
+              )}>
+                <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
+                  <Armchair className="h-32 w-32" />
+                </div>
+                <DialogHeader className="relative z-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Quick Control</Badge>
+                    <span className="text-white/60 font-bold text-xs">{selectedSeatForManage.seatNo}번 좌석</span>
+                  </div>
+                  <DialogTitle className="text-4xl font-black tracking-tighter">
+                    {students?.find(s => s.id === selectedSeatForManage.studentId)?.name || '학생 정보 없음'}
+                  </DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold text-lg">
+                    현재 상태: <span className="text-white underline underline-offset-4">{
+                      selectedSeatForManage.status === 'studying' ? '학습 중' :
+                      selectedSeatForManage.status === 'away' ? '외출 중' :
+                      selectedSeatForManage.status === 'break' ? '휴식 중' : '미입실'
+                    }</span>
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button onClick={() => handleStatusUpdate('studying')} className="h-14 rounded-2xl font-black bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-100 gap-2">
+                    <Clock className="h-4 w-4" /> 입실/학습
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('away')} className="h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-100 gap-2">
+                    <MapPin className="h-4 w-4" /> 외출 처리
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('break')} className="h-14 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-100 gap-2">
+                    <Maximize2 className="h-4 w-4" /> 휴식 처리
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-14 rounded-2xl font-black border-2 border-rose-200 text-rose-600 hover:bg-rose-50 gap-2">
+                    <AlertCircle className="h-4 w-4" /> 퇴실 처리
+                  </Button>
+                </div>
+
+                <div className="pt-4 border-t border-dashed flex flex-col gap-2">
+                  <Button 
+                    variant="secondary" 
+                    className="w-full h-12 rounded-xl font-black gap-2 transition-all active:scale-95" 
+                    onClick={() => {
+                      setIsManagingSeatModalOpen(false);
+                      setIsDetailOpen(true);
+                    }}
+                  >
+                    <BarChart3 className="h-4 w-4" /> 상세정보 리포트 보기
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-12 rounded-xl font-black gap-2 transition-all active:scale-95" 
+                    onClick={() => {
+                      setIsManagingSeatModalOpen(false);
+                      setIsPlanOpen(true);
+                    }}
+                  >
+                    <ClipboardCheck className="h-4 w-4" /> 학습계획 확인하기
+                  </Button>
+                </div>
+              </div>
+              <DialogFooter className="p-6 bg-muted/10">
+                <Button variant="ghost" onClick={() => setIsManagingSeatModalOpen(false)} className="w-full rounded-xl font-black">닫기</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* [POPUP 1] 학생 상세 정보 리포트 */}
+      <Dialog open={isDetailPopupOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[3rem] p-0 border-none shadow-2xl">
+          <div className="bg-primary p-10 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-10 opacity-10">
+              <Zap className="h-40 w-40" />
+            </div>
+            <DialogHeader className="relative z-10">
+              <div className="flex items-center gap-3 mb-2">
+                <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Analytical Report</Badge>
+                <span className="text-white/60 font-bold text-xs">{studentDetail?.seatNo}번 좌석</span>
+              </div>
+              <DialogTitle className="text-4xl font-black tracking-tighter">{studentDetail?.name} 학생 심층 분석</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold text-lg">최근 14일간의 학습 데이터와 성장 지표입니다.</DialogDescription>
+            </DialogHeader>
+          </div>
+          
+          <div className="p-8 space-y-8 bg-white">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: '오늘 학습', val: `${Math.floor(detailStats.today / 60)}h ${detailStats.today % 60}m`, icon: Clock, color: 'text-emerald-500' },
+                { label: '주간 평균', val: `${Math.floor(detailStats.weeklyAvg / 60)}h ${detailStats.weeklyAvg % 60}m`, icon: TrendingUp, color: 'text-blue-500' },
+                { label: '마스터리', val: `Lv.${studentProgress?.level || 1}`, icon: Zap, color: 'text-purple-500' },
+                { label: '시즌 랭킹', val: '준비 중', icon: Trophy, color: 'text-amber-500' }
+              ].map((stat, i) => (
+                <div key={i} className="p-4 rounded-3xl bg-muted/20 border border-border/50 flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase">{stat.label}</span>
+                    <stat.icon className={cn("h-3 w-3", stat.color)} />
+                  </div>
+                  <span className="text-xl font-black tracking-tight">{stat.val}</span>
+                </div>
+              ))}
+            </div>
+
+            <Card className="rounded-[2rem] border-none shadow-lg overflow-hidden bg-muted/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-black flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" /> 최근 학습 몰입 추이
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px] pt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={detailStats.chartData}>
+                    <defs>
+                      <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
+                    <YAxis fontSize={10} fontWeight="900" axisLine={false} tickLine={false} unit="h" />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(0,0,0,0.03)'}} />
+                    <Bar dataKey="hours" fill="url(#barGrad)" radius={[10, 10, 0, 0]} barSize={35} animationDuration={1500} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+          <DialogFooter className="p-6 bg-muted/10">
+            <Button onClick={() => setIsDetailOpen(false)} className="w-full rounded-2xl h-14 font-black shadow-xl">분석 리포트 닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* [POPUP 2] 학습 계획 확인 */}
+      <Dialog open={isPlanPopupOpen} onOpenChange={setIsPlanOpen}>
+        <DialogContent className="max-w-lg rounded-[3rem] p-0 border-none shadow-2xl overflow-hidden">
+          <div className="bg-emerald-600 p-10 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-10 opacity-10">
+              <ClipboardCheck className="h-40 w-40" />
+            </div>
+            <DialogHeader className="relative z-10">
+              <div className="flex items-center gap-3 mb-2">
+                <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Study Planner</Badge>
+                <span className="text-white/60 font-bold text-xs">{studentDetail?.name} 학생</span>
+              </div>
+              <DialogTitle className="text-4xl font-black tracking-tighter">오늘의 학습 계획</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold text-lg">{format(new Date(), 'yyyy년 M월 d일 (EEEE)')}</DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-6 bg-white max-h-[500px] overflow-y-auto custom-scrollbar">
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                <CircleDot className="h-3 w-3 text-emerald-500" /> 자습 To-do 리스트
+              </h4>
+              <div className="grid gap-3">
+                {!studentPlans || studentPlans.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground/40 italic text-sm font-bold border-2 border-dashed rounded-3xl">작성된 계획이 없습니다.</div>
+                ) : (
+                  studentPlans.filter(p => p.category === 'study' || !p.category).map((task) => (
+                    <div key={task.id} className="flex items-center gap-4 p-4 rounded-2xl border-2 border-border/50 bg-muted/5 group">
+                      <div className={cn(
+                        "h-6 w-6 rounded-lg flex items-center justify-center border-2 transition-all",
+                        task.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-muted-foreground/30"
+                      )}>
+                        {task.done && <Check className="h-4 w-4" />}
+                      </div>
+                      <span className={cn(
+                        "flex-1 font-bold text-sm transition-all",
+                        task.done ? "line-through text-muted-foreground opacity-50" : "text-foreground"
+                      )}>{task.title}</span>
+                      {task.done && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-dashed">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                <Clock className="h-3 w-3 text-emerald-500" /> 생활 시간표
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                {studentPlans?.filter(p => p.category === 'schedule').map((task) => {
+                  const [title, time] = task.title.split(': ');
+                  return (
+                    <div key={task.id} className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 flex flex-col gap-0.5">
+                      <span className="text-[9px] font-black text-emerald-700/60 uppercase">{title}</span>
+                      <span className="text-base font-black text-emerald-900">{time}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="p-6 bg-muted/10">
+            <Button onClick={() => setIsPlanOpen(false)} className="w-full rounded-2xl h-14 font-black shadow-xl bg-emerald-600 hover:bg-emerald-700">확인 완료</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 도면 편집 모달 */}
       <Dialog open={isLayoutModalOpen} onOpenChange={setIsLayoutModalOpen}>
         <DialogContent className="max-w-[98vw] lg:max-w-7xl h-[95vh] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col">
           <DialogHeader className="p-6 sm:p-10 bg-primary text-primary-foreground shrink-0 relative">
@@ -487,69 +788,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <DialogFooter className="p-6 bg-muted/10 border-t">
             <Button variant="ghost" onClick={() => setIsAssignModalOpen(false)} className="w-full rounded-2xl font-black h-14 text-base">닫기</Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
-        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
-          {selectedSeatForManage && (
-            <>
-              <div className={cn(
-                "p-8 text-white relative overflow-hidden",
-                selectedSeatForManage.status === 'studying' ? "bg-emerald-600" : 
-                selectedSeatForManage.studentId && selectedSeatForManage.status === 'absent' ? "bg-rose-600" : 
-                "bg-primary"
-              )}>
-                <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
-                  <Armchair className="h-32 w-32" />
-                </div>
-                <DialogHeader className="relative z-10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Quick Control</Badge>
-                    <span className="text-white/60 font-bold text-xs">{selectedSeatForManage.seatNo}번 좌석</span>
-                  </div>
-                  <DialogTitle className="text-4xl font-black tracking-tighter">
-                    {students?.find(s => s.id === selectedSeatForManage.studentId)?.name || '학생 정보 없음'}
-                  </DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold text-lg">
-                    현재 상태: <span className="text-white underline underline-offset-4">{
-                      selectedSeatForManage.status === 'studying' ? '학습 중' :
-                      selectedSeatForManage.status === 'away' ? '외출 중' :
-                      selectedSeatForManage.status === 'break' ? '휴식 중' : '미입실'
-                    }</span>
-                  </DialogDescription>
-                </DialogHeader>
-              </div>
-
-              <div className="p-8 space-y-6">
-                <div className="grid grid-cols-2 gap-3">
-                  <Button onClick={() => handleStatusUpdate('studying')} className="h-14 rounded-2xl font-black bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-100 gap-2">
-                    <Clock className="h-4 w-4" /> 입실/학습
-                  </Button>
-                  <Button onClick={() => handleStatusUpdate('away')} className="h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-100 gap-2">
-                    <MapPin className="h-4 w-4" /> 외출 처리
-                  </Button>
-                  <Button onClick={() => handleStatusUpdate('break')} className="h-14 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-100 gap-2">
-                    <Maximize2 className="h-4 w-4" /> 휴식 처리
-                  </Button>
-                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-14 rounded-2xl font-black border-2 border-rose-200 text-rose-600 hover:bg-rose-50 gap-2">
-                    <AlertCircle className="h-4 w-4" /> 퇴실 처리
-                  </Button>
-                </div>
-
-                <div className="pt-4 border-t border-dashed">
-                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black text-primary hover:bg-primary/5 gap-2" asChild>
-                    <Link href={`/dashboard/teacher/students/${selectedSeatForManage.studentId}`}>
-                      학생 상세 분석 보기 <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-              <DialogFooter className="p-6 bg-muted/10">
-                <Button variant="ghost" onClick={() => setIsManagingSeatModalOpen(false)} className="w-full rounded-xl font-black">닫기</Button>
-              </DialogFooter>
-            </>
-          )}
         </DialogContent>
       </Dialog>
     </div>
