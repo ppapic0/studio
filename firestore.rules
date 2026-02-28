@@ -12,9 +12,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/userCenters/$(uid)/centers/$(centerId)).data.role;
     }
 
+    function isCenterMember(centerId, uid) {
+      return exists(/databases/$(database)/documents/userCenters/$(uid)/centers/$(centerId));
+    }
+
     function hasRole(centerId, roles) {
       return isSignedIn() && 
-             exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)) &&
+             isCenterMember(centerId, request.auth.uid) &&
              getRole(centerId, request.auth.uid) in roles;
     }
 
@@ -31,17 +35,14 @@ service cloud.firestore {
 
       // 멤버 정보
       match /members/{memberId} {
-        // 선생님/관리자는 목록 조회가 가능함
         allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
-        // 본인이거나 선생님/관리자면 단일 문서 조회가 가능함
         allow get: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        // 본인 가입 또는 선생님/관리자의 멤버 관리
         allow create, write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher'])); 
       }
 
-      // 실시간 출결 (좌석 도면용)
+      // 실시간 출결
       match /attendanceCurrent/{docId} {
-        allow read, list: if isSignedIn();
+        allow read, list: if isSignedIn() && isCenterMember(centerId, request.auth.uid);
         allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
@@ -60,8 +61,8 @@ service cloud.firestore {
       // 상담 예약
       match /counselingReservations/{resId} {
         allow get: if isSignedIn() && (resource.data.studentId == request.auth.uid || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow list: if isSignedIn() && (hasRole(centerId, ['teacher', 'centerAdmin']) || request.query.limit <= 100);
-        allow create: if isSignedIn();
+        allow list: if isSignedIn() && (hasRole(centerId, ['teacher', 'centerAdmin']) || (request.query.limit <= 100 && isCenterMember(centerId, request.auth.uid)));
+        allow create: if isSignedIn() && isCenterMember(centerId, request.auth.uid);
         allow update: if hasRole(centerId, ['teacher', 'centerAdmin']) || (isSignedIn() && resource.data.studentId == request.auth.uid);
       }
 
@@ -73,12 +74,13 @@ service cloud.firestore {
         allow update: if hasRole(centerId, ['centerAdmin']) || (hasRole(centerId, ['teacher']) && resource.data.teacherId == request.auth.uid);
       }
 
-      // 학부모 피드백 초안
-      match /parentFeedbackDrafts/{draftId} {
-        allow read, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+      // 일일 학생 통계
+      match /dailyStudentStats/{dateKey}/students/{studentId} {
+        allow get, read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
       }
 
-      // 학생별 세부 계획 경로
+      // 학습 계획
       match /plans/{studentId}/weeks/{weekId}/items/{itemId} {
         allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow create, write: if isSignedIn() && request.auth.uid == studentId;
@@ -88,24 +90,6 @@ service cloud.firestore {
       match /studyLogs/{studentId}/days/{dateKey} {
         allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
         allow create, write: if isSignedIn() && request.auth.uid == studentId;
-      }
-
-      // 일일 학생 통계 (대시보드 지표)
-      match /dailyStudentStats/{dateKey}/students/{studentId} {
-        allow get, read: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
-      }
-
-      // 출석 기록 (역사적 데이터)
-      match /attendanceRecords/{dateKey}/students/{studentId} {
-        allow read, get: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
-        allow write: if hasRole(centerId, ['teacher', 'centerAdmin']);
-      }
-
-      // 리더보드
-      match /leaderboards/{periodKey}/{metricType}/entries/{studentId} {
-        allow read, list: if isSignedIn();
       }
     }
 

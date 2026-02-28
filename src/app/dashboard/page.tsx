@@ -36,12 +36,18 @@ export default function DashboardPage() {
   const { activeMembership, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showRetry, setShowRetry] = useState(false);
+  const [showNoCenterUI, setShowNoCenterUI] = useState(false);
 
+  // 로딩이 끝났는데도 멤버십이 없으면 3초 후에 "센터 없음" UI를 보여줍니다.
   useEffect(() => {
-    const timer = setTimeout(() => setShowRetry(true), 5000);
+    let timer: NodeJS.Timeout;
+    if (!membershipsLoading && !activeMembership) {
+      timer = setTimeout(() => setShowNoCenterUI(true), 3000);
+    } else if (activeMembership) {
+      setShowNoCenterUI(false);
+    }
     return () => clearTimeout(timer);
-  }, [activeMembership]);
+  }, [membershipsLoading, activeMembership]);
 
   const form = useForm<z.infer<typeof inviteFormSchema>>({
     resolver: zodResolver(inviteFormSchema),
@@ -52,7 +58,6 @@ export default function DashboardPage() {
     if (!user || !functions) return;
     setIsSubmitting(true);
     try {
-      // 클라우드 함수 호출 (Asia-Northeast3 리전)
       const redeemFn = httpsCallable(functions, 'redeemInviteCode');
       const result: any = await redeemFn({ code: values.inviteCode });
       
@@ -67,7 +72,8 @@ export default function DashboardPage() {
     }
   }
 
-  if (membershipsLoading || (!activeMembership && !showRetry)) {
+  // 1. 정보를 불러오는 중일 때
+  if (membershipsLoading && !activeMembership) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
         <div className="relative">
@@ -76,13 +82,14 @@ export default function DashboardPage() {
         </div>
         <div className="text-center space-y-2">
           <p className="text-xl font-black text-primary tracking-tighter">정보를 동기화하고 있습니다</p>
-          <p className="text-sm font-bold text-muted-foreground italic">회원님의 센터 정보를 안전하게 불러오는 중입니다...</p>
+          <p className="text-sm font-bold text-muted-foreground italic">센터 정보를 안전하게 불러오는 중입니다...</p>
         </div>
       </div>
     );
   }
 
-  if (!activeMembership) {
+  // 2. 소속된 센터가 없을 때 (로딩 완료 후 잠시 대기 후 노출)
+  if (!activeMembership && showNoCenterUI) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
         <div className="space-y-4">
@@ -92,8 +99,8 @@ export default function DashboardPage() {
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tighter">소속된 센터가 없습니다</h1>
             <p className="text-muted-foreground font-bold max-w-sm mx-auto leading-relaxed">
-              회원가입 시 초대 코드를 정확히 입력하셨나요?<br/>
-              정보가 나타나지 않으면 '다시 확인'을 눌러주세요.
+              정보가 나타나지 않으면 '다시 확인'을 눌러주세요.<br/>
+              아직 가입 전이라면 초대 코드를 입력해 보세요.
             </p>
           </div>
         </div>
@@ -143,24 +150,34 @@ export default function DashboardPage() {
     );
   }
 
-  const userRole = activeMembership.role;
+  // 3. 멤버십이 확인되었을 때 (대시보드 표시)
+  if (activeMembership) {
+    const userRole = activeMembership.role;
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-4xl font-black tracking-tighter">
+            {user?.displayName}님, {userRole === 'teacher' ? '선생님' : '학생'} 대시보드
+          </h1>
+          <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none uppercase tracking-tighter">
+            {userRole}
+          </Badge>
+        </div>
+        <p className="text-muted-foreground font-bold italic mb-8 ml-1">센터의 데이터를 실시간으로 모니터링 중입니다.</p>
+        
+        <div className="flex flex-col gap-8">
+          <StudentDashboard isActive={userRole === 'student'} />
+          <TeacherDashboard isActive={userRole === 'teacher'} />
+          <AdminDashboard isActive={userRole === 'centerAdmin'} />
+        </div>
+      </div>
+    );
+  }
+
+  // 기본 상태 (로딩 중)
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3">
-        <h1 className="text-4xl font-black tracking-tighter">
-          {user?.displayName}님, {userRole === 'teacher' ? '선생님' : '학생'} 대시보드
-        </h1>
-        <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none uppercase tracking-tighter">
-          {userRole}
-        </Badge>
-      </div>
-      <p className="text-muted-foreground font-bold italic mb-8 ml-1">공부트랙 동백센터의 데이터를 실시간으로 모니터링 중입니다.</p>
-      
-      <div className="flex flex-col gap-8">
-        <StudentDashboard isActive={userRole === 'student'} />
-        <TeacherDashboard isActive={userRole === 'teacher'} />
-        <AdminDashboard isActive={userRole === 'centerAdmin'} />
-      </div>
+    <div className="flex flex-col h-[70vh] w-full items-center justify-center">
+      <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
     </div>
   );
 }
