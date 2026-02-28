@@ -89,8 +89,9 @@ export default function AppointmentsPage() {
   const isStaff = role === 'teacher' || role === 'centerAdmin';
 
   // --- 상담 예약 쿼리 ---
+  // 역할(role)이 확정된 후에만 쿼리를 생성하여 초기 로딩 시 보안 오류를 방지합니다.
   const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
@@ -101,13 +102,13 @@ export default function AppointmentsPage() {
     
     // 선생님/관리자는 전체 조회
     return query(baseRef, orderBy('scheduledAt', 'desc'));
-  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent]);
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, role]);
 
   const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery);
 
   // --- 상담 일지 쿼리 ---
   const notesQuery = useMemoFirebase(() => {
-    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
@@ -118,7 +119,7 @@ export default function AppointmentsPage() {
     
     // 선생님/관리자는 전체 조회
     return query(baseRef, orderBy('createdAt', 'desc'));
-  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent]);
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, role]);
 
   const { data: notes, isLoading: notesLoading } = useCollection<CounselingLog>(notesQuery);
 
