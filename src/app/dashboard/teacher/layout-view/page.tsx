@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -83,72 +84,40 @@ export default function LayoutViewPage() {
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-10">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-black tracking-tight flex items-center gap-2">
-            <Monitor className="h-8 w-8 text-primary" />
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2">
+            <Monitor className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             실시간 관제 커맨드 센터
           </h1>
-          <p className="text-muted-foreground font-bold">센터 내 모든 좌석의 실시간 상태를 감시하고 즉각적으로 대응합니다.</p>
+          <p className="text-xs font-bold text-muted-foreground">센터 내 모든 좌석의 실시간 상태를 감시하고 즉각적으로 대응합니다.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="rounded-xl font-bold h-12 gap-2 bg-white shadow-sm" onClick={() => window.location.reload()}>
+          <Button variant="outline" className="rounded-xl font-bold h-10 gap-2 bg-white shadow-sm" onClick={() => window.location.reload()}>
             <RefreshCw className="h-4 w-4" /> 새로고침
           </Button>
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="rounded-2xl border-none shadow-xl bg-emerald-50/50 ring-1 ring-emerald-500/20 overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-            <Users className="h-16 w-16" />
-          </div>
-          <CardContent className="p-6">
-            <span className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest">현재 학습 중</span>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-4xl font-black text-emerald-600">{studyingCount}</span>
-              <span className="text-xs font-bold text-emerald-600/40">명</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-none shadow-xl bg-rose-50/50 ring-1 ring-rose-500/20 overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform text-rose-600">
-            <AlertCircle className="h-16 w-16" />
-          </div>
-          <CardContent className="p-6">
-            <span className="text-[10px] font-black text-rose-600/60 uppercase tracking-widest">미입실/지각 의심</span>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-4xl font-black text-rose-600">{alertCount}</span>
-              <span className="text-xs font-bold text-rose-600/40">명</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-none shadow-xl bg-white ring-1 ring-border/50 overflow-hidden">
-          <CardContent className="p-6">
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">전체 좌석 점유</span>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-4xl font-black text-primary">{attendanceList?.filter(a => a.studentId).length || 0}</span>
-              <span className="text-xs font-bold text-muted-foreground">/ {attendanceList?.length || 0}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-none shadow-xl bg-white ring-1 ring-border/50 overflow-hidden">
-          <CardContent className="p-6">
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">실시간 가동률</span>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-4xl font-black text-primary">
-                {attendanceList && attendanceList.length > 0 
-                  ? Math.round((studyingCount / attendanceList.length) * 100) 
-                  : 0}%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: '현재 학습 중', val: studyingCount, color: 'text-emerald-600', icon: Users, bg: 'bg-emerald-50/50' },
+          { label: '미입실/지각 의심', val: alertCount, color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-50/50' },
+          { label: '전체 좌석 점유', val: attendanceList?.filter(a => a.studentId).length || 0, color: 'text-primary', icon: Armchair, bg: 'bg-white' },
+          { label: '실시간 가동률', val: `${attendanceList && attendanceList.length > 0 ? Math.round((studyingCount / attendanceList.length) * 100) : 0}%`, color: 'text-primary', icon: Monitor, bg: 'bg-white' }
+        ].map((item, i) => (
+          <Card key={i} className={cn("rounded-xl border-none shadow-lg overflow-hidden relative group", item.bg, i < 2 && "ring-1 ring-opacity-20", i === 0 && "ring-emerald-500", i === 1 && "ring-rose-500")}>
+            <CardContent className="p-4 sm:p-5">
+              <span className="text-[10px] font-black opacity-60 uppercase tracking-widest">{item.label}</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className={cn("text-xl sm:text-2xl font-black", item.color)}>{item.val}</span>
+                {typeof item.val === 'number' && <span className="text-[10px] font-bold opacity-40">명</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
-        <CardContent className="p-6 sm:p-14 bg-[#f8f9fa]">
+      <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
+        <CardContent className="p-4 sm:p-10 bg-[#f8f9fa]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-40 gap-4">
               <Loader2 className="animate-spin h-12 w-12 text-primary" />
@@ -160,14 +129,14 @@ export default function LayoutViewPage() {
               <p className="text-xl font-bold text-muted-foreground/40">배치된 좌석이 없습니다.</p>
             </div>
           ) : (
-            <div className="w-full overflow-auto custom-scrollbar bg-white rounded-[2.5rem] border shadow-2xl p-10 sm:p-16">
+            <div className="w-full overflow-auto custom-scrollbar bg-white rounded-[2rem] border shadow-2xl p-6 sm:p-12">
               <div 
-                className="grid gap-3 sm:gap-4 mx-auto relative"
+                className="grid gap-2 sm:gap-3 mx-auto relative"
                 style={{ 
-                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(45px, 60px))`, 
+                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(40px, 50px))`, 
                   width: 'fit-content',
-                  backgroundImage: 'radial-gradient(circle, #00000008 1.5px, transparent 1.5px)',
-                  backgroundSize: '30px 30px'
+                  backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
+                  backgroundSize: '20px 20px'
                 }}
               >
                 {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -176,7 +145,7 @@ export default function LayoutViewPage() {
                   const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                   const occupant = students?.find(s => s.id === seat?.studentId);
 
-                  if (!seat) return <div key={idx} className="w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] opacity-[0.01]" />;
+                  if (!seat) return <div key={idx} className="w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] opacity-[0.01]" />;
 
                   const isLateOrAbsent = seat.studentId && seat.status === 'absent';
 
@@ -188,29 +157,29 @@ export default function LayoutViewPage() {
                         setIsManaging(true);
                       }}
                       className={cn(
-                        "w-[45px] h-[45px] sm:w-[55px] sm:h-[55px] rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative cursor-pointer group border-solid",
-                        seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-110 z-10 animate-pulse-soft" : 
-                        isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700 shadow-[0_0_15px_rgba(244,63,94,0.2)]" :
-                        seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white shadow-lg" :
-                        seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white shadow-lg" : 
+                        "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative cursor-pointer group border-solid",
+                        seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white shadow-md scale-110 z-10 animate-pulse-soft" : 
+                        isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700 shadow-inner" :
+                        seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
+                        seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
                         occupant ? "bg-white border-primary/40 text-primary hover:border-primary" : "bg-white border-primary/10 text-muted-foreground/10 hover:border-primary/30"
                       )}
                     >
                       <span className={cn(
-                        "text-[8px] sm:text-[10px] font-black absolute top-1.5 left-2",
+                        "text-[7px] sm:text-[9px] font-black absolute top-1 left-1.5",
                         seat.status === 'studying' || seat.status === 'away' || seat.status === 'break' ? "opacity-60" : "opacity-30"
                       )}>{seat.seatNo}</span>
                       
                       <span className={cn(
-                        "text-[10px] sm:text-[12px] font-black truncate px-1 w-full text-center mt-1",
+                        "text-[9px] sm:text-[11px] font-black truncate px-1 w-full text-center mt-1",
                         isLateOrAbsent ? "text-rose-600" : ""
                       )}>
                         {occupant ? occupant.name : ''}
                       </span>
                       
                       {isLateOrAbsent && (
-                        <div className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-2 border-white animate-bounce">
-                          <AlertCircle className="h-3 w-3" />
+                        <div className="absolute -top-1 -right-1 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white animate-bounce">
+                          <AlertCircle className="h-2.5 w-2.5" />
                         </div>
                       )}
                     </div>
@@ -222,7 +191,7 @@ export default function LayoutViewPage() {
         </CardContent>
       </Card>
 
-      <footer className="flex flex-wrap gap-8 items-center justify-center p-8 bg-white rounded-[2.5rem] border shadow-sm ring-1 ring-border/50">
+      <footer className="flex flex-wrap gap-4 sm:gap-8 items-center justify-center p-6 bg-white rounded-[2rem] border shadow-sm ring-1 ring-border/50">
         {[
           { label: '집중 학습', color: 'bg-emerald-500', desc: '몰입 중' },
           { label: '미입실/지각', color: 'bg-rose-500', desc: '경고 상태' },
@@ -230,19 +199,18 @@ export default function LayoutViewPage() {
           { label: '휴식 중', color: 'bg-blue-500', desc: '공식 휴식' },
           { label: '빈 좌석', color: 'bg-white border-2 border-primary/10', desc: '배정 가능' }
         ].map((item) => (
-          <div key={item.label} className="flex items-center gap-3 bg-muted/20 px-4 py-2 rounded-2xl border border-border/50">
-            <div className={cn("w-5 h-5 rounded-lg shadow-sm", item.color)} />
+          <div key={item.label} className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-xl border border-border/50">
+            <div className={cn("w-3.5 h-3.5 rounded-md shadow-sm", item.color)} />
             <div className="flex flex-col leading-none">
-              <span className="text-[11px] font-black text-foreground">{item.label}</span>
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">{item.desc}</span>
+              <span className="text-[10px] font-black text-foreground">{item.label}</span>
+              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{item.desc}</span>
             </div>
           </div>
         ))}
       </footer>
 
-      {/* 좌석 관리 팝업 */}
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
-        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
+        <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
           {selectedSeat && (
             <>
               <div className={cn(

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -207,34 +208,34 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const alertCount = attendanceList?.filter(a => a.studentId && a.status === 'absent').length ?? 0;
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8 w-full">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2 text-primary">
-          <Monitor className="h-6 w-6 sm:h-8 sm:w-8" />
+    <div className="flex flex-col gap-6 w-full">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-black tracking-tight flex items-center gap-2 text-primary">
+          <Monitor className="h-6 w-6 text-primary" />
           실시간 관제 대시보드
         </h1>
-        <p className="text-sm font-bold text-muted-foreground">센터 내 학생들의 학습 및 출결 상태를 실시간으로 모니터링합니다.</p>
+        <p className="text-xs font-bold text-muted-foreground">센터 내 학생들의 학습 및 출결 상태를 실시간으로 모니터링합니다.</p>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {[
           { label: '현재 학습 중', val: studyingCount, color: 'text-emerald-600', icon: Users, sub: '실시간 몰입도' },
           { label: '미입실/지각', val: alertCount, color: 'text-rose-600', icon: AlertCircle, sub: '즉각 관리 대상' },
           { label: '외출/휴식', val: attendanceList?.filter(a => ['away', 'break'].includes(a.status)).length || 0, color: 'text-amber-600', icon: Clock, sub: '이동 중' },
           { label: '전체 배치 좌석', val: attendanceList?.length || 0, color: 'text-primary', icon: Armchair, sub: '관리 중인 좌석' }
         ].map((item, i) => (
-          <Card key={i} className="rounded-2xl border-none shadow-sm bg-white overflow-hidden group transition-all hover:shadow-md border border-border/50">
-            <CardHeader className="p-4 sm:p-6 pb-1 sm:pb-2">
+          <Card key={i} className="rounded-xl border-none shadow-sm bg-white overflow-hidden group transition-all hover:shadow-md border border-border/50">
+            <CardHeader className="p-3 pb-1">
               <div className="flex justify-between items-start">
-                <CardDescription className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-muted-foreground/60">{item.label}</CardDescription>
-                <div className={cn("p-1.5 sm:p-2 rounded-xl bg-opacity-5", item.color.replace('text-', 'bg-'))}>
-                  <item.icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", item.color)} />
+                <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{item.label}</CardDescription>
+                <div className={cn("p-1 rounded-lg bg-opacity-5", item.color.replace('text-', 'bg-'))}>
+                  <item.icon className={cn("h-3 w-3", item.color)} />
                 </div>
               </div>
-              <CardTitle className={cn("text-2xl sm:text-4xl font-black mt-1 sm:mt-2", item.color)}>{item.val}</CardTitle>
+              <CardTitle className={cn("text-xl font-black mt-0.5", item.color)}>{item.val}</CardTitle>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-              <div className="text-[9px] sm:text-[10px] font-bold text-muted-foreground/60 uppercase">{item.sub}</div>
+            <CardContent className="px-3 pb-2">
+              <div className="text-[8px] font-bold text-muted-foreground/60 uppercase">{item.sub}</div>
             </CardContent>
           </Card>
         ))}
@@ -489,7 +490,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
 
-      {/* 좌석 직접 관리 다이얼로그 추가 */}
       <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
         <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
           {selectedSeatForManage && (
