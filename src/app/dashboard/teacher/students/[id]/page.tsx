@@ -5,23 +5,20 @@ import { use, useState, useMemo, useEffect } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, addDoc, serverTimestamp, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { 
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -35,27 +32,19 @@ import {
   ArrowLeft, 
   Building2,
   TrendingUp,
-  Send,
-  History,
   Zap,
   Clock,
   Trophy,
-  BarChart3,
   CalendarDays,
-  Target,
   ChevronRight,
   Settings2,
   UserCheck,
-  UserX,
   Lock,
   Sparkles,
-  MousePointer2,
-  Info,
-  Activity,
-  Award
+  Activity
 } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, CounselingLog, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
 import { format, subDays, startOfDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -73,7 +62,6 @@ import {
   RadarChart, 
   PolarGrid, 
   PolarAngleAxis, 
-  PolarRadiusAxis,
   RadialBarChart,
   RadialBar,
   Legend
@@ -154,12 +142,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: student, isLoading: studentLoading } = useDoc<StudentProfile>(studentRef);
 
-  const memberRef = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return doc(firestore, 'centers', centerId, 'members', studentId);
-  }, [firestore, centerId, studentId]);
-  const { data: membership } = useDoc<CenterMembership>(memberRef);
-
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
@@ -181,15 +163,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     );
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
-
-  const counselingQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'counselingLogs'),
-      where('studentId', '==', studentId)
-    );
-  }, [firestore, centerId, studentId]);
-  const { data: rawCounselingLogs } = useCollection<CounselingLog>(counselingQuery);
 
   // --- 데이터 가공 ---
   const logs = useMemo(() => {
@@ -256,7 +229,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       case 'rank':
         return [
           { name: '본인', value: rankEntry?.[0]?.value || 0, fill: 'hsl(var(--primary))' },
-          { name: '센터 평균', value: 85, fill: 'hsl(var(--muted))' } // 가상의 평균 데이터
+          { name: '센터 평균', value: 85, fill: 'hsl(var(--muted))' }
         ];
       default:
         return null;
@@ -528,7 +501,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </DialogContent>
       </Dialog>
 
-      {/* 정보 수정 및 상태 변경 모달은 기존 로직 유지 */}
+      {/* 정보 수정 모달 */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
           <DialogHeader>
