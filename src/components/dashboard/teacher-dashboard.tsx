@@ -75,24 +75,14 @@ import {
   YAxis, 
   Tooltip, 
   CartesianGrid, 
-  AreaChart, 
-  Area, 
   BarChart, 
-  Bar, 
-  Cell, 
-  Radar, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  RadialBarChart,
-  RadialBar,
-  Legend
+  Bar
 } from 'recharts';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
 
-// --- 프리미엄 차트 컴포넌트 ---
+// --- 프리미엄 차트 툴팁 컴포넌트 ---
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -117,7 +107,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isManagingSeatModalOpen, setIsManagingSeatModalOpen] = useState(false);
   
-  // 신규 팝업 상태
   const [isDetailPopupOpen, setIsDetailOpen] = useState(false);
   const [isPlanPopupOpen, setIsPlanOpen] = useState(false);
   
@@ -132,20 +121,39 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const weekKey = format(new Date(), "yyyy-'W'II");
 
-  // 데이터 조회
+  // --- 1. 학생 목록 조회 ---
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
+  // --- 2. 실시간 출결 상태 조회 ---
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 팝업용 데이터 조회 (선택된 학생 기준)
+  // --- 3. 오늘 상담 예약 조회 ---
+  const appointmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    const todayDate = new Date();
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingReservations'),
+      where('scheduledAt', '>=', Timestamp.fromDate(startOfDay(todayDate))),
+      where('scheduledAt', '<=', Timestamp.fromDate(endOfDay(todayDate)))
+    );
+  }, [firestore, centerId]);
+  const { data: rawAppointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery, { enabled: isActive });
+
+  const appointments = useMemo(() => {
+    if (!rawAppointments) return [];
+    // 클라이언트 측 정렬 (복합 인덱스 오류 방지)
+    return [...rawAppointments].sort((a, b) => a.scheduledAt?.toMillis() - b.scheduledAt?.toMillis());
+  }, [rawAppointments]);
+
+  // --- 4. 팝업용 데이터 조회 (선택된 학생 기준) ---
   const studentDetailRef = useMemoFirebase(() => {
     if (!firestore || !centerId || !selectedStudentId) return null;
     return doc(firestore, 'centers', centerId, 'students', selectedStudentId);
@@ -178,12 +186,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return students.filter(s => !s.seatNo || s.seatNo === 0);
   }, [students]);
 
-  // 가공 데이터 (Detail용)
+  // 분석 데이터 가공
   const detailStats = useMemo(() => {
     if (!studentLogs) return { today: 0, weeklyAvg: 0, chartData: [] };
     const todayLog = studentLogs.find(l => l.dateKey === todayKey);
-    const last7Days = studentLogs.slice(0, 7);
-    const weeklyAvg = last7Days.length > 0 ? Math.round(last7Days.reduce((acc, c) => acc + c.totalMinutes, 0) / 7) : 0;
+    const last7DaysLogs = studentLogs.slice(0, 7);
+    const weeklyAvg = last7DaysLogs.length > 0 ? Math.round(last7DaysLogs.reduce((acc, c) => acc + c.totalMinutes, 0) / 7) : 0;
     
     return {
       today: todayLog?.totalMinutes || 0,
@@ -195,6 +203,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [studentLogs, todayKey]);
 
+  // --- 레이아웃 에디터 로직 ---
   const openLayoutEditor = () => {
     if (attendanceList && attendanceList.length > 0) {
       const sorted = [...attendanceList].sort((a, b) => a.seatNo - b.seatNo);
@@ -469,7 +478,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 좌석 관리 퀵 컨트롤 */}
+      {/* 좌석 관리 퀵 컨트롤 팝업 */}
       <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
         <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
           {selectedSeatForManage && (
@@ -690,7 +699,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <X className="h-8 w-8" />
             </Button>
             <DialogTitle className="text-2xl sm:text-4xl font-black tracking-tighter">도면 배치 에디터</DialogTitle>
-            <DialogDescription className="text-primary-foreground/60 font-bold text-xs sm:text-lg mt-2">격자를 클릭하여 좌석을 배치하세요. 실선 갈색으로 표시됩니다.</DialogDescription>
+            <DialogDescription className="text-primary-foreground/60 font-bold text-xs sm:text-lg mt-2">격자를 클릭하여 좌석을 배치하세요.</DialogDescription>
           </DialogHeader>
           <div className="p-4 sm:p-10 bg-background overflow-hidden flex flex-col gap-6 flex-1">
             <div className="flex flex-col sm:flex-row items-center justify-between p-5 bg-muted/20 rounded-[1.5rem] border border-dashed border-primary/20 gap-4 shrink-0">
@@ -742,6 +751,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
 
+      {/* 좌석 배정 모달 */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
         <DialogContent className="sm:max-w-lg rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
           <DialogHeader className="p-8 bg-primary text-primary-foreground">
