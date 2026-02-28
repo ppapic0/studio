@@ -53,31 +53,35 @@ export default function StudentListPage() {
   });
 
   const centerId = activeMembership?.id;
+  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
-  // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회 (멤버십 기반으로 신뢰도 향상)
+  // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회 (권한이 있을 때만 쿼리 실행)
   const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isTeacherOrAdmin) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'), 
       where('role', '==', 'student'),
       orderBy('displayName', 'asc')
     );
-  }, [firestore, centerId]);
-  const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery);
+  }, [firestore, centerId, isTeacherOrAdmin]);
+  
+  const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isTeacherOrAdmin });
 
-  // 2. 학생 상세 프로필 조회 (학교, 학년 등 추가 정보용)
+  // 2. 학생 상세 프로필 조회
   const studentsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isTeacherOrAdmin) return null;
     return collection(firestore, 'centers', centerId, 'students');
-  }, [firestore, centerId]);
-  const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery);
+  }, [firestore, centerId, isTeacherOrAdmin]);
+  
+  const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isTeacherOrAdmin });
 
   // 3. 실시간 출결 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isTeacherOrAdmin) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId]);
-  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
+  }, [firestore, centerId, isTeacherOrAdmin]);
+  
+  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
   // 데이터 통합 및 필터링
   const filteredStudents = studentMembers?.filter(member => {
@@ -138,6 +142,19 @@ export default function StudentListPage() {
       default: return <Badge variant="outline">미입실</Badge>;
     }
   };
+
+  if (!isTeacherOrAdmin) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>접근 권한 없음</CardTitle>
+            <CardDescription>선생님 또는 관리자 계정만 이 페이지를 볼 수 있습니다.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

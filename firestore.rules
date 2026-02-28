@@ -8,7 +8,6 @@ service cloud.firestore {
     }
 
     // 사용자의 역할을 역인덱스(userCenters)에서 가져옵니다.
-    // 이는 members 컬렉션을 쿼리할 때 발생하는 권한 오류를 방지하기 위함입니다.
     function getRole(centerId, uid) {
       return get(/databases/$(database)/documents/userCenters/$(uid)/centers/$(centerId)).data.role;
     }
@@ -32,8 +31,11 @@ service cloud.firestore {
 
       // 멤버 정보
       match /members/{memberId} {
-        // 본인 정보이거나, 해당 센터의 선생님/관리자면 읽기 가능
-        allow read: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        // 선생님/관리자는 목록 조회가 가능함
+        allow list: if isSignedIn() && hasRole(centerId, ['teacher', 'centerAdmin']);
+        // 본인이거나 선생님/관리자면 단일 문서 조회가 가능함
+        allow get: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['teacher', 'centerAdmin']));
+        
         // 본인 가입 또는 선생님/관리자의 멤버 관리
         allow create, write: if isSignedIn() && (request.auth.uid == memberId || hasRole(centerId, ['centerAdmin', 'teacher'])); 
       }
