@@ -84,13 +84,13 @@ export default function AppointmentsPage() {
   const isStudent = role === 'student';
   const isStaff = role === 'teacher' || role === 'centerAdmin';
 
-  // --- 상담 예약 쿼리 (학생은 본인 데이터만 필터링) ---
+  // --- 상담 예약 쿼리 ---
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
     if (isStudent) {
-      // 보안 규칙 리스트(List) 허용을 위해 필터링 필수
+      // 보안 규칙 충족을 위해 반드시 본인 studentId로 필터링
       return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
     }
     if (isStaff) {
@@ -102,18 +102,14 @@ export default function AppointmentsPage() {
 
   const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 (학생은 본인 데이터만 필터링) ---
+  // --- 상담 일지 쿼리 ---
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
     if (isStudent) {
-      // 보안 규칙 리스트(List) 허용을 위해 필터링 필수
-      return query(
-        baseRef, 
-        where('studentId', '==', user.uid), 
-        orderBy('createdAt', 'desc')
-      );
+      // 보안 규칙 충족을 위해 반드시 본인 studentId로 필터링
+      return query(baseRef, where('studentId', '==', user.uid), orderBy('createdAt', 'desc'));
     }
     if (isStaff) {
       return query(baseRef, orderBy('createdAt', 'desc'));

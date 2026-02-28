@@ -8,7 +8,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getMembership(centerId) {
+    // [중요] 재귀 방지를 위해 getMembership은 단순히 데이터를 가져오는 역할만 수행
+    function getMembershipData(centerId) {
       return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data;
     }
 
@@ -17,8 +18,7 @@ service cloud.firestore {
     }
 
     function isStaff(centerId) {
-      // getMembership 내부에서 이미 exists와 유사한 체크를 하므로 멤버십 데이터의 role을 직접 확인
-      return isSignedIn() && getMembership(centerId).role in ['teacher', 'centerAdmin'];
+      return isMember(centerId) && getMembershipData(centerId).role in ['teacher', 'centerAdmin'];
     }
 
     // --- 유저 프로필 ---
@@ -27,10 +27,12 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- 유저별 센터 역인덱스 (재귀 방지를 위해 단순화) ---
+    // --- 유저별 센터 역인덱스 (재귀 발생의 핵심 지점이므로 가장 단순하게 유지) ---
     match /userCenters/{userId}/centers/{centerId} {
-      // 본인은 항상 자신의 가입 정보를 읽을 수 있어야 함 (isStaff 체크 제거로 재귀 방지)
-      allow read: if isSignedIn() && (request.auth.uid == userId || exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)));
+      // 본인은 항상 자신의 가입 정보를 읽을 수 있어야 함
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      // 선생님이 학생을 등록할 때 등의 상황을 위해 멤버 존재 여부로 확인 (재귀 함수 호출 금지)
+      allow read: if isSignedIn() && exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid));
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
@@ -38,7 +40,7 @@ service cloud.firestore {
     match /centers/{centerId} {
       allow get: if isMember(centerId);
       
-      // 선생님/관리자는 해당 센터의 모든 하위 데이터를 읽고 쓸 수 있음
+      // 선생님/관리자 전용 접근 권한
       match /{allSubcollections=**} {
         allow read, write: if isStaff(centerId);
       }
@@ -52,13 +54,12 @@ service cloud.firestore {
         allow write: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
       }
 
-      // 학습 계획: 본인 것만 쓰기 가능, 읽기는 본인 및 스태프
+      // 학습 계획 및 로그
       match /plans/{studentId}/weeks/{week}/items/{itemId} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      // 학습 로그: 본인 것만 쓰기 가능, 읽기는 본인 및 스태프
       match /studyLogs/{studentId}/days/{date} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
         allow write: if isSignedIn() && request.auth.uid == studentId;
@@ -69,6 +70,7 @@ service cloud.firestore {
         allow write: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
       }
 
+      // 성과 통계 및 리포트
       match /dailyStudentStats/{date}/students/{studentId} {
         allow read: if isMember(centerId) && (request.auth.uid == studentId || isStaff(centerId));
       }
@@ -81,14 +83,15 @@ service cloud.firestore {
         allow read: if isMember(centerId);
       }
       
-      // 상담 예약: 학생은 자신의 예약만 조회/생성/수정 가능
+      // --- 상담 관리 (보안 강화) ---
+      // 예약: 본인 기록만 list/get 가능, 생성은 본인만, 수정은 본인/스태프
       match /counselingReservations/{id} {
-        allow read: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid) || (resource == null && request.resource.data.studentId == request.auth.uid));
+        allow read: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid));
         allow create: if isMember(centerId) && request.resource.data.studentId == request.auth.uid;
         allow update, delete: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid));
       }
       
-      // 상담 일지: 본인 또는 선생님만 조회 가능
+      // 일지: 학생은 본인 것만 list/get 가능, 쓰기는 스태프만
       match /counselingLogs/{id} {
         allow read: if isMember(centerId) && (isStaff(centerId) || (resource != null && resource.data.studentId == request.auth.uid));
         allow write: if isStaff(centerId);
