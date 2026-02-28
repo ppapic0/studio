@@ -106,6 +106,31 @@
         "studyTimeGrowthRate": { "type": "number" },
         "riskDetected": { "type": "boolean" }
       }
+    },
+    "CounselingReservation": {
+      "title": "CounselingReservation",
+      "type": "object",
+      "description": "상담 예약 및 요청 정보",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["requested", "confirmed", "done", "canceled"] },
+        "studentNote": { "type": "string", "description": "학생이 작성한 상담 요청 사유" },
+        "teacherNote": { "type": "string", "description": "선생님이 작성한 예약 메모" }
+      }
+    },
+    "CounselingLog": {
+      "title": "CounselingLog",
+      "type": "object",
+      "description": "상담 진행 기록",
+      "properties": {
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "type": { "type": "string", "enum": ["academic", "life", "career"] },
+        "content": { "type": "string" },
+        "improvement": { "type": "string" }
+      }
     }
   },
   "auth": {
@@ -157,11 +182,11 @@
       "description": "실시간 좌석 및 출결 상태"
     },
     "/centers/{centerId}/counselingReservations/{resId}": {
-      "schema": { "type": "object" },
+      "schema": { "$ref": "#/entities/CounselingReservation" },
       "description": "상담 예약 데이터"
     },
     "/centers/{centerId}/counselingLogs/{logId}": {
-      "schema": { "type": "object" },
+      "schema": { "$ref": "#/entities/CounselingLog" },
       "description": "상담 일지 기록"
     }
   }

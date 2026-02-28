@@ -20,8 +20,7 @@ service cloud.firestore {
       return isMember(centerId) && getRole(centerId) in ['teacher', 'centerAdmin'];
     }
 
-    // --- [CRITICAL] 선생님/관리자 전능 권한 (Owner) ---
-    // 센터 내의 모든 데이터는 스태프라면 무조건 읽고 쓸 수 있음
+    // --- [CRITICAL] 선생님/관리자 전능 권한 ---
     match /centers/{centerId}/{allSubcollections=**} {
       allow read, write: if isStaff(centerId);
     }
@@ -29,7 +28,7 @@ service cloud.firestore {
     // --- 유저 프로필 ---
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isStaff('learning-lab-dongbaek'));
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
     // --- 유저별 센터 역인덱스 ---
@@ -38,13 +37,7 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // --- 초대 코드 ---
-    match /inviteCodes/{code} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    // --- 개별 접근 규칙 (학생/학부모용) ---
+    // --- 개별 접근 규칙 ---
     match /centers/{centerId} {
       allow read: if isMember(centerId);
       
@@ -72,32 +65,36 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      // 일일 성과 지표 (추가됨)
       match /dailyStudentStats/{date}/students/{studentId} {
         allow read: if isMember(centerId) && (request.auth.uid == studentId || isStaff(centerId));
       }
 
-      // 리포트 접근 (추가됨)
       match /dailyReports/{reportId} {
         allow read: if isMember(centerId);
       }
       
-      // 상담 및 출결 정보 (추가됨)
       match /attendanceCurrent/{id} {
         allow read: if isMember(centerId);
       }
       
+      // 상담 예약 규칙 보강
       match /counselingReservations/{id} {
         allow read: if isMember(centerId);
-        allow write: if isMember(centerId);
+        allow create: if isMember(centerId) && request.resource.data.studentId == request.auth.uid;
+        allow update, delete: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
       }
       
       match /counselingLogs/{id} {
-        allow read: if isMember(centerId);
+        allow read: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
       }
     }
 
-    // --- 기타 시스템 와일드카드 ---
+    match /inviteCodes/{code} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 시스템 와일드카드
     match /{document=**} {
       allow read, write: if isSignedIn() && isStaff('learning-lab-dongbaek');
     }
