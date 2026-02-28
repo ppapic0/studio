@@ -77,7 +77,7 @@ export default function AppointmentsPage() {
   });
 
   useEffect(() => {
-    // 하이드레이션 오류 방지를 위해 클라이언트에서 날짜 설정
+    // 하이드레이션 오류 방지를 위해 클라이언트 마운트 후 날짜 설정
     setRequestData(prev => ({ ...prev, date: format(new Date(), 'yyyy-MM-dd') }));
   }, []);
 
@@ -86,14 +86,15 @@ export default function AppointmentsPage() {
   const isStaff = role === 'teacher' || role === 'centerAdmin';
 
   // --- 상담 예약 쿼리 ---
-  // 학생은 반드시 본인 studentId로 필터링해야 보안 규칙을 통과함
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
+    // 학생은 반드시 본인 studentId 필터링 필수 (보안 규칙 준수)
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
     }
+    // 선생님/관리자는 전체 조회
     if (isStaff) {
       return query(baseRef, orderBy('scheduledAt', 'desc'));
     }
@@ -104,14 +105,15 @@ export default function AppointmentsPage() {
   const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery);
 
   // --- 상담 일지 쿼리 ---
-  // 학생은 반드시 본인 studentId로 필터링해야 보안 규칙을 통과함
   const notesQuery = useMemoFirebase(() => {
     if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
+    // 학생은 반드시 본인 studentId 필터링 필수 (보안 규칙 준수)
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('createdAt', 'desc'));
     }
+    // 선생님/관리자는 전체 조회
     if (isStaff) {
       return query(baseRef, orderBy('createdAt', 'desc'));
     }
