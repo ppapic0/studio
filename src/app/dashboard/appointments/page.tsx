@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -62,7 +63,7 @@ export default function AppointmentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // 하이드레이션 오류 방지를 위한 클라이언트 측 날짜 초기화
+    // Prevent hydration error by setting date on mount
     setAptDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
 
@@ -70,12 +71,11 @@ export default function AppointmentsPage() {
   const isStudent = activeMembership?.role === 'student';
   const roleConfirmed = !!activeMembership?.role;
 
-  // 1. 상담 예약 쿼리 (인덱스 문제를 피하기 위해 orderBy 제거 및 지연 로딩)
+  // 1. Reservations Query (Remove orderBy to avoid index requirement during dev)
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user || !roleConfirmed) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingReservations');
     
-    // 학생은 본인의 데이터만, 교사/관리자는 전체 데이터 조회
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid));
     }
@@ -84,7 +84,7 @@ export default function AppointmentsPage() {
 
   const { data: rawReservations, isLoading: resLoading } = useCollection<CounselingReservation>(reservationsQuery);
 
-  // 2. 상담 일지 쿼리 (인덱스 문제를 피하기 위해 orderBy 제거 및 지연 로딩)
+  // 2. Logs Query
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user || !roleConfirmed) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingLogs');
@@ -97,7 +97,7 @@ export default function AppointmentsPage() {
 
   const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
 
-  // 클라이언트 측 정렬 (인덱스 없이도 최신순 보장)
+  // Client-side sort to ensure latest items first without needing composite index
   const reservations = useMemo(() => {
     if (!rawReservations) return [];
     return [...rawReservations].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));

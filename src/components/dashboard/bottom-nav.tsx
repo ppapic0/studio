@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -8,22 +9,23 @@ import {
   CalendarDays, 
   ClipboardCheck, 
   MessageCircle,
-  GraduationCap,
   Armchair,
   FileText,
   Settings,
-  Users
+  Users,
+  Trophy
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 
 export function BottomNav() {
-  const { activeMembership } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const pathname = usePathname();
 
   if (!activeMembership) return null;
 
   const role = activeMembership.role;
+  const isForcedMobile = viewMode === 'mobile';
 
   const navItems: Record<string, { href: string; label: string; icon: any }[]> = {
     student: [
@@ -52,7 +54,10 @@ export function BottomNav() {
   const currentNav = navItems[role] || [];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-border/50 h-16 md:hidden">
+    <div className={cn(
+      "z-50 bg-white/80 backdrop-blur-lg border-t border-border/50 h-16 transition-all duration-500",
+      isForcedMobile ? "absolute bottom-0 left-0 right-0" : "fixed bottom-0 left-0 right-0 md:hidden"
+    )}>
       <nav className="flex items-center justify-around h-full px-2">
         {currentNav.map((item) => {
           const isActive = pathname === item.href;
@@ -61,7 +66,7 @@ export function BottomNav() {
               key={item.href} 
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 min-w-[60px] h-full transition-all active:scale-90",
+                "flex flex-col items-center justify-center gap-1 min-w-[60px] h-full transition-all active:scale-90 relative",
                 isActive ? "text-primary" : "text-muted-foreground/60"
               )}
             >

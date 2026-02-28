@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
@@ -10,14 +11,21 @@ export type CenterMembership = {
   status: 'active' | 'pending' | 'inactive';
   joinedAt: any;
   displayName?: string;
+  linkedStudentIds?: string[];
 };
+
+export type ViewMode = 'responsive' | 'mobile';
 
 interface AppContextType {
   memberships: CenterMembership[];
   activeMembership: CenterMembership | null;
   membershipsLoading: boolean;
   
-  // Timer Global State (Static references only to prevent re-render loops)
+  // View Mode
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+
+  // Timer Global State
   isTimerActive: boolean;
   setIsTimerActive: (active: boolean) => void;
   startTime: number | null;
@@ -34,13 +42,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
+  
+  const [viewMode, setViewModeState] = useState<ViewMode>('responsive');
 
-  // Timer States (Only keep start times, remove secondsElapsed which causes 1s re-renders)
+  // Timer States
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
   const activeMembershipRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Load view mode from local storage
+    const savedMode = localStorage.getItem('app_view_mode') as ViewMode;
+    if (savedMode) setViewModeState(savedMode);
+  }, []);
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    localStorage.setItem('app_view_mode', mode);
+  };
 
   useEffect(() => {
     if (!user || !firestore) {
@@ -78,7 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  // Timer Persistence Sync (Only on start/stop)
+  // Timer Persistence Sync
   useEffect(() => {
     const savedStartTime = localStorage.getItem('study_start_time');
     const savedCheckTime = localStorage.getItem('study_last_check_time');
@@ -102,6 +123,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     memberships,
     activeMembership,
     membershipsLoading,
+    viewMode,
+    setViewMode,
     isTimerActive,
     setIsTimerActive,
     startTime,
@@ -112,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     memberships, 
     activeMembership, 
     membershipsLoading, 
+    viewMode,
     isTimerActive, 
     startTime, 
     lastActiveCheckTime
