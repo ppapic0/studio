@@ -88,14 +88,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   // 하이드레이션 오류를 방지하기 위해 컴포넌트가 브라우저에 마운트될 때까지 서버와 동일한 HTML을 유지합니다.
   if (!mounted) {
     // 서버 환경(SSR)에서 예상되는 구조와 정확히 일치시켜야 합니다.
+    // bg-background와 text-primary를 제거하여 서버의 기본 렌더링 값과 맞춥니다.
     if (pathname !== '/login' && pathname !== '/signup') {
       return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex h-screen w-full items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       );
     }
-    return <div className="min-h-screen bg-background" />;
+    return <div className="min-h-screen" />;
   }
 
   // 초기 체크(Auth + Membership) 중에는 상세 로딩 화면 표시
