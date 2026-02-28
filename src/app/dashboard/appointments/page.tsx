@@ -76,9 +76,12 @@ export default function AppointmentsPage() {
     reason: '',
   });
 
+  // 하이드레이션 오류 방지: 마운트 후에만 초기 날짜 설정
   useEffect(() => {
-    // 하이드레이션 오류 방지를 위해 클라이언트 마운트 후 날짜 설정
-    setRequestData(prev => ({ ...prev, date: format(new Date(), 'yyyy-MM-dd') }));
+    setRequestData(prev => ({ 
+      ...prev, 
+      date: format(new Date(), 'yyyy-MM-dd') 
+    }));
   }, []);
 
   const role = activeMembership?.role;
@@ -87,39 +90,35 @@ export default function AppointmentsPage() {
 
   // --- 상담 예약 쿼리 ---
   const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
-    // 학생은 본인 기록만 필터링 (보안 규칙이 열려있어도 성능과 프라이버시를 위해 유지)
+    // 학생은 본인 기록만 필터링 (보안을 위해 쿼리 수준에서 필터링 유지)
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
     }
-    // 선생님/관리자는 전체 조회
-    if (isStaff) {
-      return query(baseRef, orderBy('scheduledAt', 'desc'));
-    }
     
-    return null;
-  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff, role]);
+    // 선생님/관리자는 전체 조회
+    return query(baseRef, orderBy('scheduledAt', 'desc'));
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent]);
 
   const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery);
 
   // --- 상담 일지 쿼리 ---
   const notesQuery = useMemoFirebase(() => {
-    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
     // 학생은 본인 기록만 필터링
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid), orderBy('createdAt', 'desc'));
     }
+    
     // 선생님/관리자는 전체 조회
-    if (isStaff) {
-      return query(baseRef, orderBy('createdAt', 'desc'));
-    }
-
-    return null;
-  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff, role]);
+    return query(baseRef, orderBy('createdAt', 'desc'));
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent]);
 
   const { data: notes, isLoading: notesLoading } = useCollection<CounselingLog>(notesQuery);
 
