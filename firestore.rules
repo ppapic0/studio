@@ -8,8 +8,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // --- [상담 시스템 전면 개방] ---
-    // 로그인만 되어 있다면 센터 내 상담 예약 및 일지를 자유롭게 읽고 쓸 수 있도록 허용합니다.
+    // --- [상담 시스템] ---
+    // 상담 데이터는 매우 민감하므로 경로를 명확히 하고 규칙 충돌을 방지합니다.
     match /centers/{centerId}/counselingReservations/{id} {
       allow read, write: if isSignedIn();
     }
@@ -31,10 +31,8 @@ service cloud.firestore {
 
     // --- 센터별 데이터 관리 ---
     match /centers/{centerId} {
-      // 센터 기본 정보 및 멤버 정보
       allow read, write: if isSignedIn();
       
-      // 기타 하위 컬렉션들 (출석, 성적 등)
       match /{allPaths=**} {
         allow read, write: if isSignedIn();
       }

@@ -1,67 +1,305 @@
+
 'use client';
 
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle 
+  CardTitle, 
+  CardDescription 
 } from '@/components/ui/card';
 import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { 
+  MessageSquare, 
+  Calendar, 
+  Clock, 
+  User, 
+  CheckCircle2, 
+  History, 
+  Plus, 
+  Loader2,
   FileText,
-  AlertCircle,
-  XCircle
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react';
+import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useAppContext } from '@/contexts/app-context';
+import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { collection, query, where, addDoc, serverTimestamp, orderBy, Timestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { CounselingReservation, CounselingLog, WithId } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
-/**
- * @fileOverview 모든 Firestore 쿼리를 제거한 정적 디버깅 페이지입니다.
- * 이 페이지에서도 보안 오류가 발생한다면 상위 레이아웃이나 다른 컴포넌트의 문제일 가능성이 높습니다.
- */
 export default function AppointmentsPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { activeMembership } = useAppContext();
+  const { toast } = useToast();
+
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [aptDate, setAptDate] = useState('');
+  const [aptTime, setAptTime] = useState('14:00');
+  const [studentNote, setStudentNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setAptDate(format(new Date(), 'yyyy-MM-dd'));
+  }, []);
+
+  const centerId = activeMembership?.id;
+  const isStudent = activeMembership?.role === 'student';
+  const isStaff = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+
+  // 1. 상담 예약 쿼리 (역할에 따른 필터링)
+  const reservationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !activeMembership || !user) return null;
+    const baseRef = collection(firestore, 'centers', centerId, 'counselingReservations');
+    
+    if (isStudent) {
+      // 학생은 본인의 것만 조회
+      return query(baseRef, where('studentId', '==', user.uid), orderBy('scheduledAt', 'desc'));
+    }
+    // 관리자/교사는 전체 조회
+    return query(baseRef, orderBy('scheduledAt', 'desc'));
+  }, [firestore, centerId, activeMembership?.role, user?.uid]);
+
+  const { data: reservations, isLoading: resLoading } = useCollection<CounselingReservation>(reservationsQuery);
+
+  // 2. 상담 일지 쿼리 (역할에 따른 필터링)
+  const logsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !activeMembership || !user) return null;
+    const baseRef = collection(firestore, 'centers', centerId, 'counselingLogs');
+    
+    if (isStudent) {
+      return query(baseRef, where('studentId', '==', user.uid), orderBy('createdAt', 'desc'));
+    }
+    return query(baseRef, orderBy('createdAt', 'desc'));
+  }, [firestore, centerId, activeMembership?.role, user?.uid]);
+
+  const { data: logs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
+
+  const handleRequestAppointment = async () => {
+    if (!firestore || !centerId || !user || !activeMembership) return;
+    if (!aptDate) {
+      toast({ variant: "destructive", title: "날짜를 선택해 주세요." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const scheduledAt = new Date(`${aptDate}T${aptTime}`);
+      await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: centerId,
+        scheduledAt: Timestamp.fromDate(scheduledAt),
+        status: 'requested',
+        studentNote: studentNote.trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({ title: "상담 신청이 완료되었습니다." });
+      setIsRequestModalOpen(false);
+      setStudentNote('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "신청 실패", description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'requested': return <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100">승인 대기</Badge>;
+      case 'confirmed': return <Badge className="bg-emerald-500">예약 확정</Badge>;
+      case 'done': return <Badge variant="outline" className="opacity-50">상담 완료</Badge>;
+      case 'canceled': return <Badge variant="destructive">취소됨</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 pb-20">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-4xl font-black tracking-tighter">상담 및 피드백 (진단 모드)</h1>
-          <p className="text-sm font-bold text-muted-foreground ml-1">현재 모든 데이터 조회를 중단하고 권한 오류를 테스트 중입니다.</p>
+          <h1 className="text-4xl font-black tracking-tighter">상담 및 피드백</h1>
+          <p className="text-sm font-bold text-muted-foreground ml-1">선생님과 함께 학습 전략을 점검하고 성장을 계획하세요.</p>
         </div>
+        {isStudent && (
+          <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="rounded-2xl font-black gap-2 h-14 px-8 shadow-xl interactive-button">
+                <Plus className="h-5 w-5" /> 새 상담 신청
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
+              <div className="bg-primary p-8 text-white relative">
+                <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+                  <MessageSquare className="h-24 w-24" />
+                </div>
+                <DialogHeader className="relative z-10">
+                  <DialogTitle className="text-3xl font-black tracking-tighter">상담 희망 일시</DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold">선생님과 일정을 조율하기 위한 신청 단계입니다.</DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground">희망 날짜</label>
+                    <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground">희망 시간</label>
+                    <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground">상담 요청 내용 (선택)</label>
+                  <Textarea 
+                    placeholder="고민이나 질문하고 싶은 내용을 미리 적어주시면 더 깊이 있는 상담이 가능합니다." 
+                    value={studentNote}
+                    onChange={(e) => setStudentNote(e.target.value)}
+                    className="rounded-xl min-h-[100px] resize-none"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="p-6 bg-muted/20 border-t">
+                <Button onClick={handleRequestAppointment} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">
+                  {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청하기'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      <div className="grid gap-8 md:grid-cols-3">
-        <div className="md:col-span-2">
+      <Tabs defaultValue="reservations" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 rounded-full h-16 p-1.5 bg-muted/30 border border-border/50 shadow-inner max-w-md mx-auto mb-10">
+          <TabsTrigger value="reservations" className="rounded-full font-black data-[state=active]:bg-white data-[state=active]:shadow-lg gap-2">
+            <Calendar className="h-4 w-4" /> {isStudent ? '나의 예약' : '상담 예약 현황'}
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="rounded-full font-black data-[state=active]:bg-white data-[state=active]:shadow-lg gap-2">
+            <FileText className="h-4 w-4" /> 상담 일지 이력
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="reservations" className="space-y-6">
           <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-muted/30 border-b p-6 sm:p-8">
               <CardTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
-                <FileText className="h-6 w-6 text-primary" /> 상담 기록 조회 테스트
+                <History className="h-6 w-6 text-primary" /> 상담 신청 및 예약 내역
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="py-20 border-2 border-dashed rounded-3xl flex flex-col items-center gap-3 opacity-30">
-                <XCircle className="h-10 w-10 text-muted-foreground" />
-                <span className="text-xs font-black uppercase tracking-widest text-center">
-                  진단을 위해 모든 데이터 쿼리가 비활성화되었습니다.
-                </span>
-              </div>
+            <CardContent className="p-0">
+              {resLoading ? (
+                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>
+              ) : !reservations || reservations.length === 0 ? (
+                <div className="py-20 text-center flex flex-col items-center gap-4 text-muted-foreground/40">
+                  <div className="p-6 rounded-full bg-muted/50 border-2 border-dashed">
+                    <Calendar className="h-12 w-12" />
+                  </div>
+                  <p className="font-black italic">상담 예약 내역이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {reservations.map((res) => (
+                    <div key={res.id} className="p-6 sm:p-8 flex items-center justify-between group hover:bg-muted/5 transition-colors">
+                      <div className="flex items-center gap-6">
+                        <div className="h-14 w-14 rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center">
+                          <span className="text-[10px] font-black text-primary/60 uppercase">{format(res.scheduledAt.toDate(), 'MMM')}</span>
+                          <span className="text-xl font-black text-primary leading-none">{format(res.scheduledAt.toDate(), 'd')}</span>
+                        </div>
+                        <div className="grid gap-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-black">{format(res.scheduledAt.toDate(), 'p')} 상담</h3>
+                            {getStatusBadge(res.status)}
+                          </div>
+                          <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                            <User className="h-3 w-3" /> {isStudent ? (res.teacherName || '배정 대기 중') : `${res.studentName} 학생`}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
+        </TabsContent>
 
-        <div className="flex flex-col gap-8">
-          <Card className="border-none shadow-lg rounded-[2rem] bg-accent/5 overflow-hidden">
-            <CardContent className="p-6 flex items-start gap-4">
-              <div className="p-2 bg-accent/10 rounded-xl">
-                <AlertCircle className="h-5 w-5 text-accent" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-black text-accent-foreground">테스트 안내</h4>
-                <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-                  이 화면에서도 여전히 "FirebaseError: Missing or insufficient permissions"가 뜬다면, 
-                  페이지 자체가 아니라 사이드바나 알림 센터 등 공통 영역에서 상담 데이터를 읽으려 시도하고 있는 것입니다.
-                </p>
-              </div>
+        <TabsContent value="logs" className="space-y-6">
+          <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden ring-1 ring-border/50">
+            <CardHeader className="bg-muted/30 border-b p-6 sm:p-8">
+              <CardTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
+                <CheckCircle2 className="h-6 w-6 text-emerald-500" /> 상담 피드백 및 결과
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {logsLoading ? (
+                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>
+              ) : !logs || logs.length === 0 ? (
+                <div className="py-20 text-center flex flex-col items-center gap-4 text-muted-foreground/40">
+                  <div className="p-6 rounded-full bg-muted/50 border-2 border-dashed">
+                    <FileText className="h-12 w-12" />
+                  </div>
+                  <p className="font-black italic">아직 기록된 상담 일지가 없습니다.</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {logs.map((log) => (
+                    <div key={log.id} className="p-8 space-y-4 group hover:bg-muted/5 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="rounded-lg font-black uppercase text-[10px] border-primary/20">
+                            {log.type === 'academic' ? '성적/학업' : log.type === 'life' ? '생활 습관' : '진로/진학'}
+                          </Badge>
+                          <span className="text-xs font-bold text-muted-foreground">{format(log.createdAt.toDate(), 'yyyy년 M월 d일')}</span>
+                        </div>
+                        <span className="text-[10px] font-black text-primary/40 uppercase tracking-widest">상담 완료</span>
+                      </div>
+                      <div className="space-y-3">
+                        <p className="text-base font-bold leading-relaxed text-foreground/80">{log.content}</p>
+                        {log.improvement && (
+                          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-start gap-3">
+                            <AlertCircle className="h-4 w-4 text-emerald-600 mt-0.5" />
+                            <div>
+                              <p className="text-[10px] font-black text-emerald-700 uppercase">개선 권고 사항</p>
+                              <p className="text-sm font-bold text-emerald-900">{log.improvement}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
