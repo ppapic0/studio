@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { Loader2, RefreshCw, Compass, ShieldAlert, Sparkles } from 'lucide-react';
+import { Loader2, RefreshCw, Compass, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -60,7 +60,7 @@ export default function DashboardPage() {
     }
   }
 
-  // 정보를 불러오는 중일 때
+  // 정보 동기화 중 (멤버십 데이터를 아직 못 가져온 경우)
   if (membershipsLoading) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
@@ -70,13 +70,13 @@ export default function DashboardPage() {
         </div>
         <div className="text-center space-y-2">
           <p className="text-xl font-black text-primary tracking-tighter">정보를 동기화하고 있습니다</p>
-          <p className="text-sm font-bold text-muted-foreground italic">데이터를 안전하게 연결하는 중...</p>
+          <p className="text-sm font-bold text-muted-foreground italic">데이터베이스 연결을 확인 중입니다...</p>
         </div>
       </div>
     );
   }
 
-  // 멤버십이 확인되었을 때 (대시보드 표시)
+  // 센터 멤버십이 성공적으로 확인된 경우
   if (activeMembership) {
     const userRole = activeMembership.role;
     return (
@@ -86,7 +86,7 @@ export default function DashboardPage() {
             {user?.displayName}님, 반가워요!
           </h1>
           <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none uppercase tracking-tighter">
-            {userRole}
+            {userRole === 'centerAdmin' ? '관리자' : userRole === 'teacher' ? '선생님' : '학생'}
           </Badge>
         </div>
         <p className="text-muted-foreground font-bold italic mb-8 ml-1">오늘의 학습 여정을 시작하세요.</p>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
     );
   }
 
-  // 소속된 센터가 없을 때 (로딩 완료 후에도 데이터가 없는 경우)
+  // 멤버십 로드가 끝났는데도 소속된 센터가 없는 경우 (예: 가입 오류 등)
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
       <div className="space-y-4">
@@ -110,8 +110,8 @@ export default function DashboardPage() {
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tighter">아직 소속된 센터가 없습니다</h1>
           <p className="text-muted-foreground font-bold max-w-sm mx-auto leading-relaxed">
-            가입 과정에서 문제가 있었나요? 다시 시도하거나<br/>
-            초대 코드를 입력해 보세요.
+            가입 과정에서 정보 전송이 늦어질 수 있습니다.<br/>
+            '다시 확인'을 누르거나 코드를 다시 입력해 보세요.
           </p>
         </div>
       </div>

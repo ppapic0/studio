@@ -66,7 +66,7 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     
-    if (values.role === 'student' && (!values.schoolName || values.schoolName.length < 3)) {
+    if (values.role === 'student' && (!values.schoolName || values.schoolName.length < 2)) {
       form.setError('schoolName', { message: '학교명을 입력해주세요.' });
       return;
     }
@@ -79,6 +79,7 @@ export function SignupForm() {
       const user = userCredential.user;
       await updateProfile(user, { displayName: values.displayName });
 
+      // MVP를 위해 고정된 센터 ID 사용
       const centerId = 'learning-lab-dongbaek'; 
       const timestamp = serverTimestamp();
 
@@ -86,7 +87,7 @@ export function SignupForm() {
       
       const batch = writeBatch(firestore);
 
-      // 1. 프로필
+      // 1. 프로필 정보 저장
       batch.set(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
@@ -96,7 +97,7 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 2. 센터 정보
+      // 2. 센터 기본 데이터 (없을 경우 생성)
       batch.set(doc(firestore, 'centers', centerId), {
         id: centerId,
         name: "공부트랙 동백센터",
@@ -105,7 +106,7 @@ export function SignupForm() {
         updatedAt: timestamp,
       }, { merge: true });
 
-      // 3. 멤버십 정보
+      // 3. 센터 내 멤버십 등록
       batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), {
         id: user.uid,
         centerId: centerId,
@@ -115,7 +116,7 @@ export function SignupForm() {
         displayName: values.displayName,
       });
 
-      // 4. 역인덱스
+      // 4. 사용자별 소속 센터 역인덱스 (중요: 대시보드 로딩용)
       batch.set(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
         id: centerId,
         centerId: centerId,
@@ -124,7 +125,7 @@ export function SignupForm() {
         joinedAt: timestamp,
       });
 
-      // 5. 학생 전용 데이터 초기화
+      // 5. 학생 전용 추가 데이터 초기화
       if (values.role === 'student') {
         batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
           id: user.uid,
@@ -150,9 +151,12 @@ export function SignupForm() {
       await batch.commit();
 
       setLoadingStatus('완료! 대시보드로 이동합니다.');
-      toast({ title: '가입 성공', description: '잠시 후 대시보드가 열립니다.' });
+      toast({ title: '가입 성공', description: '환영합니다! 대시보드로 연결됩니다.' });
       
-      router.replace('/dashboard');
+      // 상태 업데이트를 기다리기 위해 약간의 지연 후 이동
+      setTimeout(() => {
+        router.replace('/dashboard');
+      }, 500);
 
     } catch (error: any) {
       console.error('Signup Error:', error);
@@ -175,7 +179,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>이름</FormLabel>
-              <FormControl><Input placeholder="홍길동" {...field} /></FormControl>
+              <FormControl><Input placeholder="홍길동" {...field} disabled={isLoading} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -186,7 +190,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>이메일</FormLabel>
-              <FormControl><Input placeholder="name@example.com" {...field} /></FormControl>
+              <FormControl><Input placeholder="name@example.com" {...field} disabled={isLoading} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -197,7 +201,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>비밀번호</FormLabel>
-              <FormControl><Input type="password" {...field} /></FormControl>
+              <FormControl><Input type="password" {...field} disabled={isLoading} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -209,7 +213,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>가입 역할</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                 <FormControl>
                   <SelectTrigger className="h-12 rounded-xl border-2">
                     <SelectValue placeholder="역할을 선택하세요" />
@@ -232,7 +236,7 @@ export function SignupForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>소속 학교</FormLabel>
-                <FormControl><Input placeholder="예: 동백고등학교" {...field} className="h-12 rounded-xl border-2" /></FormControl>
+                <FormControl><Input placeholder="예: 동백고등학교" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -245,7 +249,7 @@ export function SignupForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>초대 코드</FormLabel>
-              <FormControl><Input placeholder="코드 입력" {...field} className="h-12 rounded-xl border-2" /></FormControl>
+              <FormControl><Input placeholder="코드 입력" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
               <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
                 {form.watch('role') === 'teacher' 
                   ? '💡 선생님용 테스트 코드: T0313' 

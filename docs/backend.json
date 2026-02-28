@@ -3,7 +3,7 @@
     "User": {
       "title": "User",
       "type": "object",
-      "description": "사용자의 핵심 프로필 정보",
+      "description": "사용자의 기본 프로필 정보",
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
@@ -16,52 +16,37 @@
     "Center": {
       "title": "Center",
       "type": "object",
-      "description": "공부트랙 센터 정보",
+      "description": "학습 센터 정보",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "subscriptionTier": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "subscriptionTier", "createdAt"]
+      "required": ["id", "name"]
     },
     "CenterMember": {
       "title": "CenterMember",
       "type": "object",
-      "description": "센터 내 사용자 역할 및 멤버십",
+      "description": "센터 소속 멤버 및 역할",
       "properties": {
+        "id": { "type": "string" },
+        "centerId": { "type": "string" },
         "role": { "type": "string", "enum": ["centerAdmin", "teacher", "student"] },
         "status": { "type": "string" },
         "joinedAt": { "type": "string", "format": "date-time" },
         "displayName": { "type": "string" }
       },
-      "required": ["role", "status", "joinedAt"]
+      "required": ["role", "status"]
     },
-    "Appointment": {
-      "title": "Appointment",
+    "StudyLogDay": {
+      "title": "StudyLogDay",
       "type": "object",
-      "description": "상담 예약 정보",
+      "description": "일일 학습 시간 기록",
       "properties": {
-        "centerId": { "type": "string" },
-        "studentId": { "type": "string" },
-        "studentName": { "type": "string" },
-        "scheduledAt": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["requested", "confirmed", "cancelled", "done"] },
-        "teacherNote": { "type": "string" }
-      }
-    },
-    "DailyStudentStat": {
-      "title": "DailyStudentStat",
-      "type": "object",
-      "description": "학생의 일일 성과 지표",
-      "properties": {
-        "centerId": { "type": "string" },
-        "studentId": { "type": "string" },
+        "totalMinutes": { "type": "number" },
         "dateKey": { "type": "string" },
-        "weeklyPlanCompletionRate": { "type": "number" },
-        "attendanceStreakDays": { "type": "number" },
-        "studyTimeGrowthRate": { "type": "number" },
-        "riskDetected": { "type": "boolean" }
+        "studentId": { "type": "string" }
       }
     }
   },
@@ -69,27 +54,25 @@
     "providers": ["password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": { "entityName": "User", "description": "사용자 프로필" }
-      },
-      {
-        "path": "/centers/{centerId}/members/{memberId}",
-        "definition": { "entityName": "CenterMember", "description": "센터 멤버 정보" }
-      },
-      {
-        "path": "/centers/{centerId}/counselingReservations/{resId}",
-        "definition": { "entityName": "Appointment", "description": "상담 예약" }
-      },
-      {
-        "path": "/centers/{centerId}/dailyStudentStats/{dateKey}/students/{studentId}",
-        "definition": { "entityName": "DailyStudentStat", "description": "일일 학생 통계" }
-      },
-      {
-        "path": "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}",
-        "definition": { "entityName": "StudyPlanItem", "description": "학습 계획 상세 항목" }
-      }
-    ]
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "전역 사용자 프로필"
+    },
+    "/centers/{centerId}": {
+      "schema": { "$ref": "#/entities/Center" },
+      "description": "센터 마스터 데이터"
+    },
+    "/centers/{centerId}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/CenterMember" },
+      "description": "센터별 멤버십 정보"
+    },
+    "/userCenters/{userId}/centers/{centerId}": {
+      "schema": { "$ref": "#/entities/CenterMember" },
+      "description": "사용자별 소속 센터 역인덱스 (로그인 가드용)"
+    },
+    "/centers/{centerId}/studyLogs/{studentId}/days/{dateKey}": {
+      "schema": { "$ref": "#/entities/StudyLogDay" },
+      "description": "학생별 학습 시간 로그"
+    }
   }
 }
