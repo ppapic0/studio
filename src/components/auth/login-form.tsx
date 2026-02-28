@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,7 +50,7 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      // AuthGuard가 상태 변화를 감지하여 리디렉션하도록 유도
+      // router.replace를 사용하여 인증 상태 변경 후 AuthGuard가 자연스럽게 대시보드로 이동시키도록 합니다.
       router.replace('/dashboard');
     } catch (error: any) {
       console.error('Login failed:', error);

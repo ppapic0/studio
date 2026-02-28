@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser } from '@/firebase';
@@ -8,13 +9,24 @@ import { useFirestore } from '@/firebase';
 import { CenterMembership, useAppContext } from '@/contexts/app-context';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * AuthGuard - 사용자의 인증 상태와 센터 멤버십 정보를 확인하고 보호된 경로에 대한 접근을 관리합니다.
+ * 하이드레이션 오류를 방지하기 위해 마운트 상태를 관리합니다.
+ */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading: userLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
   const { setMemberships, setActiveMembership, setMembershipsLoading } = useAppContext();
+  
+  // 하이드레이션 오류 방지를 위한 마운트 상태
+  const [mounted, setMounted] = useState(false);
   const [isCheckingInitial, setIsCheckingInitial] = useState(true);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // 1. Firebase Auth 인증 상태 확인 중이면 대기
@@ -73,10 +85,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [user, userLoading, firestore, pathname, router, setMemberships, setActiveMembership, setMembershipsLoading]);
 
+  // 하이드레이션 오류를 피하기 위해 컴포넌트가 마운트될 때까지 대기합니다.
+  if (!mounted) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
   // 초기 체크(Auth + Membership) 중에는 로딩 화면 표시
   if (isCheckingInitial && pathname !== '/login' && pathname !== '/signup') {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm font-bold text-muted-foreground animate-pulse">보안 세션을 확인하고 있습니다...</p>
       </div>
