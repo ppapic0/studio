@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -70,18 +71,22 @@ export default function AppointmentsPage() {
   const [isRequestOpen, setIsRequestOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestData, setRequestData] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: '',
     time: '14:00',
     reason: '',
   });
+
+  useEffect(() => {
+    setRequestData(prev => ({ ...prev, date: format(new Date(), 'yyyy-MM-dd') }));
+  }, []);
 
   const role = activeMembership?.role;
   const isStudent = role === 'student';
   const isStaff = role === 'teacher' || role === 'centerAdmin';
 
-  // --- 상담 예약 쿼리 ---
+  // --- 상담 예약 쿼리 (학생은 본인 데이터만 필터링) ---
   const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingReservations');
     
     if (isStudent) {
@@ -92,13 +97,13 @@ export default function AppointmentsPage() {
     }
     
     return null;
-  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff]);
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff, role]);
 
   const { data: appointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery);
 
-  // --- 상담 일지 쿼리 ---
+  // --- 상담 일지 쿼리 (학생은 본인 데이터만 필터링) ---
   const notesQuery = useMemoFirebase(() => {
-    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid) return null;
+    if (!firestore || membershipsLoading || !activeMembership?.id || !user?.uid || !role) return null;
     const baseRef = collection(firestore, 'centers', activeMembership.id, 'counselingLogs');
     
     if (isStudent) {
@@ -113,13 +118,13 @@ export default function AppointmentsPage() {
     }
 
     return null;
-  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff]);
+  }, [firestore, membershipsLoading, activeMembership?.id, user?.uid, isStudent, isStaff, role]);
 
   const { data: notes, isLoading: notesLoading } = useCollection<CounselingLog>(notesQuery);
 
   const handleRequestSubmit = () => {
-    if (!firestore || !user || !activeMembership || !requestData.reason.trim()) {
-      toast({ variant: "destructive", title: "상담 사유를 입력해 주세요." });
+    if (!firestore || !user || !activeMembership || !requestData.reason.trim() || !requestData.date) {
+      toast({ variant: "destructive", title: "모든 정보를 입력해 주세요." });
       return;
     }
     
@@ -142,7 +147,7 @@ export default function AppointmentsPage() {
       .then(() => {
         toast({ title: "상담 신청이 완료되었습니다." });
         setIsRequestOpen(false);
-        setRequestData({ ...requestData, reason: '' });
+        setRequestData(prev => ({ ...prev, reason: '' }));
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -238,7 +243,7 @@ export default function AppointmentsPage() {
         <Card className="md:col-span-2 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-border/50">
           <CardHeader className="bg-muted/30 border-b p-6 sm:p-8">
             <CardTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
-              <History className="h-6 w-6 text-primary" /> 상담 예약 현황
+              <History className="h-6 w-6 text-primary" /> 나의 상담 예약 현황
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -301,7 +306,7 @@ export default function AppointmentsPage() {
           <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="p-6 pb-4">
               <CardTitle className="text-xl font-black flex items-center gap-3">
-                <FileText className="h-5 w-5 text-primary" /> 최근 상담 일지
+                <FileText className="h-5 w-5 text-primary" /> 나의 상담 일지
               </CardTitle>
             </CardHeader>
             <CardContent className="px-6 pb-6 space-y-4">
@@ -328,7 +333,7 @@ export default function AppointmentsPage() {
                     {note.improvement && (
                       <div className="pt-3 border-t border-dashed border-primary/10">
                         <div className="flex items-center gap-1.5 text-[10px] font-black text-primary mb-1 uppercase tracking-widest">
-                          <CheckCircle2 className="h-3 w-3" /> 개선 과제
+                          <CheckCircle2 className="h-3 w-3" /> 선생님 피드백
                         </div>
                         <p className="text-xs font-bold text-primary/70">{note.improvement}</p>
                       </div>
@@ -347,7 +352,7 @@ export default function AppointmentsPage() {
               <div className="space-y-1">
                 <h4 className="text-sm font-black text-accent-foreground">상담 안내</h4>
                 <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-                  상담 신청은 선착순으로 확정됩니다. 급한 상담은 센터 사무실로 직접 문의해 주세요.
+                  본인의 상담 내역만 조회할 수 있습니다. 타인의 정보는 보호되며, 상담 신청은 선생님 승인 후 확정됩니다.
                 </p>
               </div>
             </CardContent>

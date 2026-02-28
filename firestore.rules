@@ -47,7 +47,7 @@ service cloud.firestore {
 
       match /students/{studentId} {
         allow read: if isMember(centerId);
-        allow write: if isSignedIn() && request.auth.uid == studentId;
+        allow write: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
       }
 
       // 학습 계획: 본인 것만 쓰기 가능, 읽기는 본인 및 스태프
@@ -64,7 +64,7 @@ service cloud.firestore {
 
       match /growthProgress/{studentId} {
         allow read: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
-        allow write: if isSignedIn() && request.auth.uid == studentId;
+        allow write: if isSignedIn() && (request.auth.uid == studentId || isStaff(centerId));
       }
 
       match /dailyStudentStats/{date}/students/{studentId} {
@@ -79,16 +79,17 @@ service cloud.firestore {
         allow read: if isMember(centerId);
       }
       
-      // 상담 예약: 신청은 본인만, 조회는 센터 멤버 전체 (현황 공유 목적)
+      // 상담 예약: 학생은 자신의 예약만 조회/생성/수정 가능
       match /counselingReservations/{id} {
-        allow read: if isMember(centerId);
+        allow read: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
         allow create: if isMember(centerId) && request.resource.data.studentId == request.auth.uid;
         allow update, delete: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
       }
       
-      // 상담 일지: 민감한 정보이므로 본인 또는 선생님만 조회 가능
+      // 상담 일지: 본인 또는 선생님만 조회 가능 (일지는 선생님만 작성)
       match /counselingLogs/{id} {
         allow read: if isMember(centerId) && (resource.data.studentId == request.auth.uid || isStaff(centerId));
+        allow write: if isStaff(centerId);
       }
     }
 
