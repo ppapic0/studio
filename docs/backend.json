@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -29,10 +30,11 @@
       "description": "센터 소속 멤버 역할 및 상태",
       "properties": {
         "id": { "type": "string" },
-        "role": { "type": "string", "enum": ["student", "teacher", "centerAdmin"] },
+        "role": { "type": "string", "enum": ["student", "teacher", "parent", "centerAdmin"] },
         "status": { "type": "string", "enum": ["active", "onHold", "withdrawn"] },
         "displayName": { "type": "string" },
-        "joinedAt": { "type": "string", "format": "date-time" }
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "linkedStudentIds": { "type": "array", "items": { "type": "string" } }
       }
     },
     "StudentProfile": {
@@ -45,7 +47,8 @@
         "grade": { "type": "string" },
         "schoolName": { "type": "string" },
         "seatNo": { "type": "number" },
-        "targetDailyMinutes": { "type": "number" }
+        "targetDailyMinutes": { "type": "number" },
+        "parentLinkCode": { "type": "string", "description": "부모님 연동용 4자리 코드" }
       }
     },
     "StudyPlanItem": {

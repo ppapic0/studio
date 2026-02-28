@@ -1,9 +1,11 @@
+
 'use client';
 
 import { useState } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
+import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2, RefreshCw, Compass, Sparkles } from 'lucide-react';
@@ -60,7 +62,6 @@ export default function DashboardPage() {
     }
   }
 
-  // 정보 동기화 중 (멤버십 데이터를 아직 못 가져온 경우)
   if (membershipsLoading) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
@@ -76,7 +77,6 @@ export default function DashboardPage() {
     );
   }
 
-  // 센터 멤버십이 성공적으로 확인된 경우
   if (activeMembership) {
     const userRole = activeMembership.role;
     return (
@@ -86,21 +86,23 @@ export default function DashboardPage() {
             {user?.displayName}님, 반가워요!
           </h1>
           <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none uppercase tracking-tighter">
-            {userRole === 'centerAdmin' ? '관리자' : userRole === 'teacher' ? '선생님' : '학생'}
+            {userRole === 'centerAdmin' ? '관리자' : userRole === 'teacher' ? '선생님' : userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
         </div>
-        <p className="text-muted-foreground font-bold italic mb-8 ml-1">오늘의 학습 여정을 시작하세요.</p>
+        <p className="text-muted-foreground font-bold italic mb-8 ml-1">
+          {userRole === 'parent' ? '자녀의 학습 여정을 함께하세요.' : '오늘의 학습 여정을 시작하세요.'}
+        </p>
         
         <div className="flex flex-col gap-8">
           <StudentDashboard isActive={userRole === 'student'} />
           <TeacherDashboard isActive={userRole === 'teacher'} />
           <AdminDashboard isActive={userRole === 'centerAdmin'} />
+          <ParentDashboard isActive={userRole === 'parent'} />
         </div>
       </div>
     );
   }
 
-  // 멤버십 로드가 끝났는데도 소속된 센터가 없는 경우 (예: 가입 오류 등)
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
       <div className="space-y-4">
@@ -117,19 +119,9 @@ export default function DashboardPage() {
       </div>
       
       <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <Button 
-          variant="outline" 
-          size="lg" 
-          className="flex-1 h-16 rounded-2xl text-lg font-black border-2 shadow-sm"
-          onClick={() => window.location.reload()}
-        >
-          <RefreshCw className="mr-2 h-5 w-5" /> 다시 확인
-        </Button>
-
+        <Button variant="outline" size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black border-2 shadow-sm" onClick={() => window.location.reload()}><RefreshCw className="mr-2 h-5 w-5" /> 다시 확인</Button>
         <Dialog>
-          <DialogTrigger asChild>
-            <Button size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black shadow-xl">초대 코드로 가입</Button>
-          </DialogTrigger>
+          <DialogTrigger asChild><Button size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black shadow-xl">초대 코드로 가입</Button></DialogTrigger>
           <DialogContent className="rounded-[2.5rem] p-8 border-none shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-3xl font-black tracking-tighter">초대 코드 입력</DialogTitle>
@@ -137,21 +129,14 @@ export default function DashboardPage() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onInviteSubmit)} className="space-y-6 pt-4">
-                <FormField
-                  name="inviteCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-black text-xs uppercase tracking-widest text-primary/70">코드를 입력하세요</FormLabel>
-                      <FormControl><Input placeholder="예: 0313" {...field} className="h-14 rounded-xl border-2 text-xl font-black tracking-widest" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">
-                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '멤버십 생성하기'}
-                  </Button>
-                </DialogFooter>
+                <FormField name="inviteCode" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-black text-xs uppercase tracking-widest text-primary/70">코드를 입력하세요</FormLabel>
+                    <FormControl><Input placeholder="예: 0313" {...field} className="h-14 rounded-xl border-2 text-xl font-black tracking-widest" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <DialogFooter><Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">{isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '멤버십 생성하기'}</Button></DialogFooter>
               </form>
             </Form>
           </DialogContent>

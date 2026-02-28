@@ -8,28 +8,30 @@ export interface User {
   displayName: string;
   email: string;
   profileImageUrl?: string;
-  schoolName?: string; // 소속 학교 추가
+  schoolName?: string; 
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
 export interface CenterMembership {
-  id: string; // This is the centerId
+  id: string; 
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
   status: 'active' | 'pending' | 'inactive';
   joinedAt: Timestamp;
   displayName?: string;
+  linkedStudentIds?: string[]; // 학부모용: 연결된 자녀 ID 목록
 }
 
 export interface StudentProfile {
   id: string;
   name: string;
   grade: string;
-  schoolName: string; // 소속 학교 필수
+  schoolName: string;
   seatNo: number;
   targetDailyMinutes: number;
   parentUids: string[];
   createdAt: Timestamp;
+  parentLinkCode?: string; // 부모님 연동용 4자리 코드
 }
 
 export interface AttendanceCurrent {
@@ -38,20 +40,9 @@ export interface AttendanceCurrent {
   status: "studying" | "away" | "break" | "absent";
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
-  gridX?: number; // X coordinate in layout grid
-  gridY?: number; // Y coordinate in layout grid
-  studentId?: string; // Currently occupied student
-}
-
-export interface StudyPlan {
-  studentId: string;
-  subject: string;
-  targetMinutes: number;
-  completedMinutes: number;
-  startDate: Timestamp;
-  endDate: Timestamp;
-  status: "active" | "completed";
-  teacherId: string;
+  gridX?: number; 
+  gridY?: number; 
+  studentId?: string; 
 }
 
 export interface CounselingLog {
@@ -71,21 +62,6 @@ export interface DailyReport {
   content: string;
   status: "draft" | "sent";
   studentName?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface Appointment {
-  centerId: string;
-  studentId: string;
-  studentName?: string;
-  teacherId?: string;
-  teacherName?: string;
-  startAt: Timestamp;
-  endAt: Timestamp;
-  status: 'requested' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-  createdByRole: 'student' | 'teacher' | 'centerAdmin';
-  teacherNote?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
