@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -78,6 +79,20 @@
         "rank": { "type": "number" },
         "value": { "type": "number" }
       }
+    },
+    "DailyReport": {
+      "title": "DailyReport",
+      "type": "object",
+      "description": "학부모에게 발송되는 일일 학습 리포트",
+      "properties": {
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "dateKey": { "type": "string" },
+        "content": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -107,6 +122,10 @@
     "/centers/{centerId}/leaderboards/{leaderboardId}/entries/{studentId}": {
       "schema": { "$ref": "#/entities/LeaderboardEntry" },
       "description": "시즌별 리더보드 항목 (leaderboardId 형식: YYYY-MM_metricType)"
+    },
+    "/centers/{centerId}/dailyReports/{reportId}": {
+      "schema": { "$ref": "#/entities/DailyReport" },
+      "description": "일일 학습 리포트 (reportId 형식: YYYY-MM-DD_studentId)"
     },
     "/userCenters/{userId}/centers/{centerId}": {
       "schema": { "$ref": "#/entities/CenterMember" },

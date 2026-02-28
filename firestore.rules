@@ -1,86 +1,79 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // [Helper] 로그인 여부 확인
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // [Helper] 해당 센터 멤버인지 확인
+    function getMembership(centerId) {
+      return get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data;
+    }
+
     function isCenterMember(centerId) {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)) ||
-        exists(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid))
-      );
+      return isSignedIn() && exists(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId));
     }
 
-    // [Helper] 해당 센터 관리자/선생님인지 확인
     function isStaff(centerId) {
-      return isSignedIn() && 
-        get(/databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId)).data.role in ['teacher', 'centerAdmin'];
+      return isCenterMember(centerId) && getMembership(centerId).role in ['teacher', 'centerAdmin'];
     }
 
-    // [User Profiles] 
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // [User Centers] 
     match /userCenters/{userId}/centers/{centerId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow write: if isSignedIn();
     }
 
-    // [Centers Master]
     match /centers/{centerId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn(); // 가입 시 초기 생성/업데이트 허용
+      allow create, update: if isSignedIn();
 
-      // [Members]
       match /members/{memberId} {
         allow read: if isCenterMember(centerId);
-        allow list: if isStaff(centerId) || isSignedIn();
+        allow list: if isStaff(centerId) || (isSignedIn() && request.auth.uid == memberId);
         allow write: if isSignedIn();
       }
 
-      // [Students Detail]
       match /students/{studentId} {
         allow read: if isCenterMember(centerId);
         allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
       }
 
-      // [Daily Stats & Logs]
-      match /dailyStudentStats/{date}/{document=**} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isSignedIn();
+      match /dailyStudentStats/{date}/students/{studentId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isStaff(centerId);
       }
       
-      match /studyLogs/{studentId}/{document=**} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      match /dailyReports/{reportId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == resource.data.studentId);
+        allow write: if isStaff(centerId);
       }
 
-      // [Plans]
-      match /plans/{studentId}/{document=**} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+      match /studyLogs/{studentId}/days/{date} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      // [Growth & Mastery]
+      match /plans/{studentId}/weeks/{week}/items/{itemId} {
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isSignedIn() && request.auth.uid == studentId;
+      }
+
       match /growthProgress/{studentId} {
-        allow read: if isCenterMember(centerId);
-        allow write: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow read: if isStaff(centerId) || (isSignedIn() && request.auth.uid == studentId);
+        allow write: if isSignedIn() && request.auth.uid == studentId;
       }
 
-      // [Leaderboards] - Adjusted structure to keep paths odd
-      match /leaderboards/{leaderboardId}/{allSubpaths=**} {
+      match /leaderboards/{leaderboardId}/entries/{studentId} {
         allow read: if isCenterMember(centerId);
         allow write: if isStaff(centerId);
       }
 
-      // [Counseling]
       match /counselingReservations/{resId} {
         allow read: if isCenterMember(centerId);
         allow write: if isCenterMember(centerId);
@@ -90,24 +83,21 @@ service cloud.firestore {
         allow write: if isStaff(centerId);
       }
 
-      // [Attendance Records]
-      match /attendanceRecords/{dateKey}/{document=**} {
+      match /attendanceRecords/{date}/students/{studentId} {
         allow read: if isCenterMember(centerId);
         allow write: if isStaff(centerId);
       }
       match /attendanceCurrent/{seatId} {
         allow read: if isCenterMember(centerId);
-        allow write: if isStaff(centerId) || isSignedIn();
+        allow write: if isStaff(centerId) || (isSignedIn() && seatId.hasPrefix('seat_'));
       }
     }
 
-    // [Invite Codes]
     match /inviteCodes/{code} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
 
-    // [Fallback] 
     match /{document=**} {
       allow read, write: if isSignedIn();
     }

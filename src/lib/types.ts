@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
@@ -63,12 +64,14 @@ export interface CounselingLog {
   createdAt: Timestamp;
 }
 
-export interface ParentFeedbackDraft {
+export interface DailyReport {
   studentId: string;
   teacherId: string;
-  yyyymmdd: string;
-  contentDraft: string;
-  status: "draft" | "final";
+  dateKey: string;
+  content: string;
+  status: "draft" | "sent";
+  studentName?: string;
+  createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
