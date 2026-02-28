@@ -28,6 +28,7 @@ import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   displayName: z.string().min(2, '이름은 2자 이상이어야 합니다.'),
@@ -36,16 +37,14 @@ const formSchema = z.object({
   role: z.enum(['student', 'teacher'], {
     required_error: '역할을 선택해주세요.',
   }),
-  schoolName: z.string().optional().refine((val) => {
-    // 학생일 때만 학교명 필수
-    return true; 
-  }, { message: '학교명을 입력해주세요.' }),
+  schoolName: z.string().optional(),
   inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
 });
 
 export function SignupForm() {
   const auth = useAuth();
   const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
@@ -67,9 +66,8 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     
-    // 추가 검증: 학생이면 학교명 필수
     if (values.role === 'student' && (!values.schoolName || values.schoolName.length < 3)) {
-      form.setError('schoolName', { message: '학교명을 풀네임으로 입력해주세요 (예: 000고등학교)' });
+      form.setError('schoolName', { message: '학교명을 입력해주세요.' });
       return;
     }
 
@@ -98,7 +96,7 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 2. 센터 정보 (Merge)
+      // 2. 센터 정보
       batch.set(doc(firestore, 'centers', centerId), {
         id: centerId,
         name: "공부트랙 동백센터",
@@ -117,7 +115,7 @@ export function SignupForm() {
         displayName: values.displayName,
       });
 
-      // 4. 역인덱스 (AuthGuard 감지용)
+      // 4. 역인덱스
       batch.set(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
         id: centerId,
         centerId: centerId,
@@ -126,13 +124,13 @@ export function SignupForm() {
         joinedAt: timestamp,
       });
 
-      // 5. 학생일 경우 상세 프로필 및 성장 로드맵 초기화
+      // 5. 학생 전용 데이터 초기화
       if (values.role === 'student') {
         batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
           id: user.uid,
           name: values.displayName,
           schoolName: values.schoolName || '',
-          grade: '고등학생', // 기본값
+          grade: '고등학생',
           seatNo: 0,
           targetDailyMinutes: 360,
           parentUids: [],
@@ -154,8 +152,7 @@ export function SignupForm() {
       setLoadingStatus('완료! 대시보드로 이동합니다.');
       toast({ title: '가입 성공', description: '잠시 후 대시보드가 열립니다.' });
       
-      // 즉시 새로고침 리디렉션
-      window.location.href = '/dashboard';
+      router.replace('/dashboard');
 
     } catch (error: any) {
       console.error('Signup Error:', error);
@@ -236,7 +233,6 @@ export function SignupForm() {
               <FormItem>
                 <FormLabel>소속 학교</FormLabel>
                 <FormControl><Input placeholder="예: 동백고등학교" {...field} className="h-12 rounded-xl border-2" /></FormControl>
-                <FormDescription className="text-[10px]">반드시 "OOO고등학교"까지 풀네임으로 적어주세요.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

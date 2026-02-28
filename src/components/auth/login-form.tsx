@@ -49,8 +49,8 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      // Force a hard redirect to refresh membership state completely
-      window.location.href = '/dashboard';
+      // AuthGuard가 상태 변화를 감지하여 리디렉션하도록 유도
+      router.replace('/dashboard');
     } catch (error: any) {
       console.error('Login failed:', error);
       let errorMessage = '오류가 발생했습니다. 다시 시도해 주세요.';
