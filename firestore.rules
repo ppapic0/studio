@@ -27,7 +27,7 @@ service cloud.firestore {
 
     match /centers/{centerId} {
       allow get: if isSignedIn();
-      allow create: if isSignedIn(); 
+      allow create, update: if isSignedIn(); 
 
       // 멤버 정보
       match /members/{memberId} {
@@ -48,14 +48,13 @@ service cloud.firestore {
       // 학생 상세 프로필
       match /students/{studentId} {
         allow read, list: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow create: if isSignedIn() && request.auth.uid == studentId; // 가입 시 본인 생성 허용
-        allow update, write: if hasRole(centerId, ['teacher', 'centerAdmin']);
+        allow create, update, write: if isSignedIn() && (request.auth.uid == studentId || hasRole(centerId, ['teacher', 'centerAdmin']));
       }
 
       // 성장 로드맵
       match /growthProgress/{uid} {
         allow read: if isSignedIn() && (request.auth.uid == uid || hasRole(centerId, ['teacher', 'centerAdmin']));
-        allow create, write: if isSignedIn() && request.auth.uid == uid;
+        allow create, update, write: if isSignedIn() && request.auth.uid == uid;
       }
       
       // 상담 예약

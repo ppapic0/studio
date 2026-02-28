@@ -19,6 +19,7 @@ import { useAuth } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -48,16 +49,19 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/app');
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Login failed:', error);
+      let errorMessage = '오류가 발생했습니다. 다시 시도해 주세요.';
+      
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
+      }
+
       toast({
         variant: 'destructive',
         title: '로그인 실패',
-        description:
-          error.code === 'auth/invalid-credential'
-            ? '이메일 또는 비밀번호가 올바르지 않습니다.'
-            : '오류가 발생했습니다. 다시 시도해 주세요.',
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -74,7 +78,7 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>이메일</FormLabel>
               <FormControl>
-                <Input placeholder="name@example.com" {...field} />
+                <Input placeholder="name@example.com" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -95,19 +99,24 @@ export function LoginForm() {
                 </Link>
               </div>
               <FormControl>
-                <Input type="password" {...field} />
+                <Input type="password" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoading}>
-          {isLoading ? '로그인 중...' : '로그인'}
+        <Button type="submit" className="w-full bg-accent hover:bg-accent/90 h-12 rounded-xl font-bold" disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              로그인 중...
+            </>
+          ) : '로그인'}
         </Button>
       </form>
       <div className="mt-4 text-center text-sm">
         계정이 없으신가요?{' '}
-        <Link href="/signup" className="underline">
+        <Link href="/signup" className="underline font-bold text-primary">
           가입하기
         </Link>
       </div>
