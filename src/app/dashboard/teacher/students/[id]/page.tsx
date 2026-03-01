@@ -1,3 +1,4 @@
+
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
@@ -50,7 +51,10 @@ import {
   ShieldCheck,
   Sparkles,
   Info,
-  History
+  History,
+  CheckCircle2,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
@@ -64,8 +68,6 @@ import {
   CartesianGrid, 
   AreaChart, 
   Area,
-  BarChart,
-  Bar
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -283,7 +285,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className={cn("flex flex-col gap-6 max-w-6xl mx-auto pb-20", isMobile ? "gap-4 px-1" : "gap-8")}>
-      {/* 헤더 섹션 */}
       <div className={cn("flex justify-between gap-4", isMobile ? "flex-col items-start" : "flex-row items-end")}>
         <div className="flex items-start gap-3 sm:gap-4 w-full">
           <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 mt-1" asChild>
@@ -307,7 +308,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* 통계 카드 섹션 */}
       <section className={cn("grid gap-3 sm:gap-4", isMobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-5")}>
         <StatAnalysisCard title="오늘 공부 시간" value={`${Math.floor(stats.today / 60)}h ${stats.today % 60}m`} subValue="목표 달성 트래킹" icon={Clock} colorClass="text-emerald-500" isMobile={isMobile} onClick={() => setActiveAnalysis('today')} />
         <StatAnalysisCard title="주간 평균" value={`${Math.floor(stats.weeklyAvg / 60)}h ${stats.weeklyAvg % 60}m`} subValue="최근 학습 리듬" icon={TrendingUp} colorClass="text-blue-500" isMobile={isMobile} onClick={() => setActiveAnalysis('weekly')} />
@@ -316,7 +316,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <StatAnalysisCard title="시즌 랭킹" value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '순위 밖'} subValue="센터 내 상대 위치" icon={Trophy} colorClass="text-rose-500" isMobile={isMobile} onClick={() => setActiveAnalysis('rank')} />
       </section>
 
-      {/* 분석 다이얼로그 */}
       <Dialog open={!!activeAnalysis} onOpenChange={(open) => !open && setActiveAnalysis(null)}>
         <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg", isMobile ? "max-w-[95vw]" : "")}>
           <div className={cn("p-8 text-white relative", 
@@ -463,32 +462,136 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
 
-        <TabsContent value="counseling" className="mt-6 space-y-6 sm:space-y-8">
+        <TabsContent value="counseling" className="mt-6 space-y-10">
+          {/* 액션 섹션: 새 예약 및 일지 작성 */}
           <div className="grid gap-6 md:grid-cols-2">
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
-              <CardHeader className="bg-blue-50/50 border-b pb-4 py-5 px-6">
-                <CardTitle className="flex items-center gap-2 text-lg font-black text-blue-700"><CalendarPlus className="h-5 w-5" /> 새 상담 예약</CardTitle>
+            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-blue-50/50 border-b p-6 sm:p-8">
+                <CardTitle className="flex items-center gap-2 text-lg font-black text-blue-700">
+                  <CalendarPlus className="h-5 w-5" /> 새 상담 예약
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Schedule Next Session</CardDescription>
               </CardHeader>
-              <CardContent className={cn("space-y-4", isMobile ? "p-5" : "p-8")}>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">예약 날짜</Label><Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-11 text-xs" /></div>
-                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">예약 시간</Label><Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-11 text-xs" /></div>
+              <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
+                    <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">시간</Label>
+                    <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
+                  </div>
                 </div>
-                <Input placeholder="상담 주제 / 메모" value={aptNote} onChange={(e) => setAptNote(e.target.value)} className="rounded-xl h-11 text-xs" />
-                <Button onClick={handleAddAppointment} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl text-sm">예약 확정하기</Button>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 주제</Label>
+                  <Input placeholder="메모할 내용을 입력하세요" value={aptNote} onChange={(e) => setAptNote(e.target.value)} className="rounded-xl h-12 border-2" />
+                </div>
+                <Button onClick={handleAddAppointment} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl text-base gap-2">
+                  예약 확정하기 <ChevronRight className="h-4 w-4" />
+                </Button>
               </CardContent>
             </Card>
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
-              <CardHeader className="bg-emerald-50/50 border-b pb-4 py-5 px-6">
-                <CardTitle className="flex items-center gap-2 text-lg font-black text-emerald-700"><FileEdit className="h-5 w-5" /> 상담 일지 작성</CardTitle>
+
+            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-emerald-50/50 border-b p-6 sm:p-8">
+                <CardTitle className="flex items-center gap-2 text-lg font-black text-emerald-700">
+                  <FileEdit className="h-5 w-5" /> 상담 일지 작성
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Record Counseling Feedback</CardDescription>
               </CardHeader>
-              <CardContent className={cn("space-y-4", isMobile ? "p-5" : "p-8")}>
-                <Select value={logType} onValueChange={(val: any) => setLogType(val)}><SelectTrigger className="rounded-xl h-11 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학업/성적</SelectItem><SelectItem value="life">생활 습관</SelectItem><SelectItem value="career">진로/진학</SelectItem></SelectContent></Select>
-                <Textarea placeholder="상담한 핵심 내용을 상세히 기록해 주세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[100px] text-xs" />
-                <Input placeholder="개선 권고 사항 (학생 과제)" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-11 text-xs" />
-                <Button onClick={handleAddCounselLog} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl text-sm">상담 일지 저장</Button>
+              <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 유형</Label>
+                  <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
+                    <SelectTrigger className="rounded-xl h-12 border-2 text-sm font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="academic">학업/성적</SelectItem>
+                      <SelectItem value="life">생활 습관</SelectItem>
+                      <SelectItem value="career">진로/진학</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 내용</Label>
+                  <Textarea placeholder="상담한 핵심 내용을 상세히 기록하세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[120px] text-sm font-bold border-2" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-emerald-700 ml-1 flex items-center gap-1.5"><Zap className="h-3 w-3 fill-current" /> 개선 권고 사항</Label>
+                  <Input placeholder="학생이 수행할 과제나 개선점" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-12 border-2 border-emerald-100 bg-emerald-50/20" />
+                </div>
+                <Button onClick={handleAddCounselLog} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl text-base">상담 일지 저장</Button>
               </CardContent>
             </Card>
+          </div>
+
+          {/* 히스토리 섹션: 전체 상담 피드 */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 px-2">
+              <History className="h-6 w-6 text-primary opacity-40" />
+              <h2 className="text-2xl font-black tracking-tighter">상담 히스토리</h2>
+              <Badge variant="outline" className="ml-auto font-black text-[10px] border-primary/20 opacity-60 px-3">{counselingLogs.length + appointments.length} 건</Badge>
+            </div>
+
+            <div className="grid gap-6">
+              {counselingLogs.length === 0 && appointments.length === 0 ? (
+                <div className="py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed flex flex-col items-center gap-4">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground opacity-10" />
+                  <p className="text-sm font-bold text-muted-foreground/40 italic">아직 기록된 상담 내역이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {/* 예정된 예약 강조 */}
+                  {appointments.filter(a => a.status === 'confirmed').map(apt => (
+                    <Card key={apt.id} className="rounded-3xl border-2 border-blue-100 bg-blue-50/20 shadow-sm overflow-hidden group">
+                      <CardContent className="p-6 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-5">
+                          <div className="h-12 w-12 rounded-2xl bg-blue-100 flex flex-col items-center justify-center shrink-0 border border-blue-200">
+                            <span className="text-[8px] font-black text-blue-600 uppercase leading-none">NEXT</span>
+                            <span className="text-lg font-black text-blue-700">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'd') : ''}</span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Upcoming Appointment</p>
+                            <h4 className="text-lg font-black tracking-tight">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'p') : ''} 상담 예약</h4>
+                            <p className="text-xs font-bold text-muted-foreground">{apt.teacherNote || '상담 주제 미입력'}</p>
+                          </div>
+                        </div>
+                        <Badge className="bg-blue-500 text-white font-black text-[10px] px-3 py-1 rounded-full border-none">예약 확정</Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {/* 과거 일지 목록 */}
+                  {counselingLogs.map((log) => (
+                    <Card key={log.id} className="rounded-3xl border-none shadow-md bg-white overflow-hidden ring-1 ring-border/50 hover:shadow-xl transition-all">
+                      <CardContent className="p-6 sm:p-8 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="rounded-lg font-black uppercase text-[9px] border-primary/10 text-primary/60">
+                              {log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로'}
+                            </Badge>
+                            <span className="text-[10px] font-bold text-muted-foreground">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd') : ''}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 opacity-30">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                            <span className="text-[8px] font-black uppercase">DONE</span>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <p className="text-sm font-bold text-foreground/80 leading-relaxed">{log.content}</p>
+                          {log.improvement && (
+                            <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-start gap-3">
+                              <AlertCircle className="h-3.5 w-3.5 text-emerald-600 mt-0.5" />
+                              <p className="text-xs font-bold text-emerald-900 leading-tight">{log.improvement}</p>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </TabsContent>
       </Tabs>
