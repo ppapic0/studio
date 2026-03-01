@@ -246,18 +246,18 @@ export function DashboardHeader() {
         </DropdownMenu>
       </div>
 
-      {/* 설정 다이얼로그 - 앱모드 대응 */}
+      {/* 설정 다이얼로그 - 앱모드 대응 (중앙 팝업) */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent className={cn(
           "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500",
-          isMobileView ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : ""
+          isMobileView ? "w-[90vw] max-w-[350px]" : ""
         )}>
-          <div className="bg-primary p-8 text-white relative overflow-hidden">
+          <div className={cn("bg-primary text-white relative overflow-hidden", isMobileView ? "p-6" : "p-8")}>
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogTitle className="text-2xl font-black tracking-tighter">프로필 설정</DialogTitle>
-            <DialogDescription className="text-white/60 font-bold mt-1">학교 및 학년 정보를 수정할 수 있습니다.</DialogDescription>
+            <DialogTitle className={cn("font-black tracking-tighter", isMobileView ? "text-xl" : "text-2xl")}>프로필 설정</DialogTitle>
+            <DialogDescription className="text-white/60 font-bold mt-1 text-xs">정보를 수정할 수 있습니다.</DialogDescription>
           </div>
-          <div className="p-8 space-y-6 bg-white">
+          <div className={cn("space-y-6 bg-white", isMobileView ? "p-6" : "p-8")}>
             <div className="grid gap-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label>
               <div className="relative">
@@ -282,80 +282,63 @@ export function DashboardHeader() {
               </div>
             )}
           </div>
-          <DialogFooter className="p-8 bg-muted/20 border-t">
+          <DialogFooter className={cn("bg-muted/20 border-t", isMobileView ? "p-6" : "p-8")}>
             <Button onClick={handleUpdateSettings} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
-              {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '변경 내용 저장'}
+              {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 지원/메뉴얼 다이얼로그 - 앱모드 대응 */}
+      {/* 지원/메뉴얼 다이얼로그 - 앱모드 대응 (중앙 팝업) */}
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
         <DialogContent className={cn(
           "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500",
-          isMobileView ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "max-h-[85vh]"
+          isMobileView ? "w-[95vw] max-w-[370px] h-[80vh]" : "max-h-[85vh]"
         )}>
-          <div className="bg-accent p-8 text-white shrink-0 relative overflow-hidden">
+          <div className={cn("bg-accent text-white shrink-0 relative overflow-hidden", isMobileView ? "p-6" : "p-8")}>
             <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
-            <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
-              <BookOpen className="h-8 w-8" /> 공부트랙 마스터 가이드
+            <DialogTitle className={cn("font-black tracking-tighter flex items-center gap-3", isMobileView ? "text-xl" : "text-3xl")}>
+              <BookOpen className="h-6 w-6" /> 가이드
             </DialogTitle>
-            <DialogDescription className="text-white/70 font-bold mt-1">효율적인 학습을 위한 앱 사용 메뉴얼입니다.</DialogDescription>
+            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">앱 사용 메뉴얼입니다.</DialogDescription>
           </div>
-          <div className="flex-1 overflow-y-auto p-8 space-y-10 bg-[#fafafa] custom-scrollbar">
+          <div className={cn("flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar", isMobileView ? "p-6" : "p-8")}>
             <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-xl text-primary">
-                <Zap className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙 엔진
+              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
+                <Zap className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
               </h4>
               <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-sm font-bold leading-relaxed text-foreground/80">
-                  대시보드 상단의 **[트랙 시작]** 버튼을 누르면 실시간 학습 몰입 엔진이 가동됩니다. 
-                  학습이 끝나면 **[트랙 종료]**를 눌러 기록을 저장하세요.
-                </p>
-                <div className="flex items-center gap-2 text-[10px] font-black text-amber-600 bg-amber-50 p-2 rounded-lg">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> 2시간 이상 활동이 없으면 세션이 자동 보호 모드로 전환됩니다.
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-xl text-primary">
-                <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 일일 계획 및 루틴
-              </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-sm font-bold leading-relaxed text-foreground/80">
-                  **[나의 학습 계획]** 메뉴에서 매일의 공부 To-do와 생활 루틴을 관리하세요. 
-                  '요일 반복 복사' 기능을 활용하면 일주일치 계획을 1초 만에 세울 수 있습니다.
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  대시보드 상단의 **[트랙 시작]** 버튼을 누르면 실시간 학습 몰입 엔진이 가동됩니다.
                 </p>
               </div>
             </section>
 
             <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-xl text-primary">
-                <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 전문가 상담 및 피드백
+              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
+                <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 계획 및 루틴
               </h4>
               <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-sm font-bold leading-relaxed text-foreground/80">
-                  고민이 생기면 언제든 **[상담 신청]**을 통해 선생님께 도움을 요청하세요. 
-                  선생님이 작성해주신 상담 일지는 **[상담 히스토리]**에서 다시 볼 수 있습니다.
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  **[나의 학습 계획]** 메뉴에서 매일의 공부 To-do와 생활 루틴을 관리하세요.
                 </p>
               </div>
             </section>
 
             <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-xl text-primary">
-                <GraduationCap className="h-5 w-5 text-accent fill-current" /> 4. 성장 로드맵 및 랭킹
+              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
+                <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 상담 및 피드백
               </h4>
               <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-sm font-bold leading-relaxed text-foreground/80">
-                  공부한 시간만큼 XP를 얻고 레벨업하세요! **[리더보드]**에서는 이번 달 센터 최고의 열정 챔피언들을 확인할 수 있습니다.
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  고민이 생기면 언제든 **[상담 신청]**을 통해 도움을 요청하세요.
                 </p>
               </div>
             </section>
           </div>
-          <div className="p-6 bg-white border-t shrink-0 flex justify-end">
-            <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">이해했습니다</Button>
+          <div className={cn("bg-white border-t shrink-0 flex justify-end", isMobileView ? "p-4" : "p-6")}>
+            <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">닫기</Button>
           </div>
         </DialogContent>
       </Dialog>
