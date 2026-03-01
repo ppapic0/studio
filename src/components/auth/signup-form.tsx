@@ -34,7 +34,7 @@ const formSchema = z.object({
   displayName: z.string().optional(), // 학부모는 자녀 이름 기반 자동 생성
   email: z.string().email('유효한 이메일을 입력해주세요.'),
   password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
-  role: z.enum(['student', 'teacher', 'parent'], {
+  role: z.enum(['student', 'teacher', 'parent', 'centerAdmin'], {
     required_error: '역할을 선택해주세요.',
   }),
   schoolName: z.string().optional(),
@@ -70,6 +70,12 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     
+    // 가입 코드 검증 (간이 방식 - 실제로는 Firestore inviteCodes 컬렉션 조회 필요)
+    if (values.role === 'centerAdmin' && values.inviteCode !== 'A0313') {
+      form.setError('inviteCode', { message: '관리자 가입 코드가 일치하지 않습니다.' });
+      return;
+    }
+
     // 추가 유효성 검사
     if (values.role === 'student') {
       if (!values.displayName || values.displayName.length < 2) {
@@ -88,6 +94,11 @@ export function SignupForm() {
 
     if (values.role === 'parent' && (!values.studentLinkCode || values.studentLinkCode.length !== 4)) {
       form.setError('studentLinkCode', { message: '자녀의 4자리 연동 코드를 입력해주세요.' });
+      return;
+    }
+
+    if ((values.role === 'teacher' || values.role === 'centerAdmin') && (!values.displayName || values.displayName.length < 2)) {
+      form.setError('displayName', { message: '이름을 입력해주세요.' });
       return;
     }
 
@@ -226,6 +237,7 @@ export function SignupForm() {
                   <SelectItem value="student">학생</SelectItem>
                   <SelectItem value="teacher">선생님</SelectItem>
                   <SelectItem value="parent">학부모</SelectItem>
+                  <SelectItem value="centerAdmin">센터 관리자</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -320,9 +332,14 @@ export function SignupForm() {
             <FormItem>
               <FormLabel className="font-bold">센터 가입 코드</FormLabel>
               <FormControl><Input placeholder="센터에서 제공받은 코드" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
-              {form.watch('role') !== 'teacher' && (
+              {(form.watch('role') === 'student' || form.watch('role') === 'parent') && (
                 <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
                   💡 가입 코드: 0313
+                </FormDescription>
+              )}
+              {form.watch('role') === 'centerAdmin' && (
+                <FormDescription className="text-[10px] font-black text-rose-600 bg-rose-50 p-2 rounded-lg">
+                  💡 관리자 전용 코드를 입력하세요. (A0313)
                 </FormDescription>
               )}
               <FormMessage />

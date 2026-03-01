@@ -1,4 +1,3 @@
-
 'use server';
 
 import { adminDb } from './firebase-admin';
@@ -15,6 +14,7 @@ export async function seedInitialData(uid: string, centerId: string) {
   // 1. 초대 코드 설정
   batch.set(adminDb.doc('inviteCodes/0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', maxUses: 999, usedCount: 0, createdAt: FieldValue.serverTimestamp() }, { merge: true });
   batch.set(adminDb.doc('inviteCodes/T0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'teacher', maxUses: 999, usedCount: 0, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+  batch.set(adminDb.doc('inviteCodes/A0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'centerAdmin', maxUses: 999, usedCount: 0, createdAt: FieldValue.serverTimestamp() }, { merge: true });
 
   // 2. 테스트용 학생 계정 리스트 (실제 UID가 있을 경우를 대비하여 하드코딩된 예시 UID들)
   // 사용자 환경에 따라 실제 가입된 학생들의 UID로 대체되거나 추가될 수 있습니다.
