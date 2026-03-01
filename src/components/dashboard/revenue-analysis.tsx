@@ -66,6 +66,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { syncDailyKpi } from '@/lib/finance-actions';
+import Link from 'next/link';
 
 export function RevenueAnalysis() {
   const firestore = useFirestore();
@@ -155,7 +156,6 @@ export function RevenueAnalysis() {
     const churnGradeChart = Object.entries(churnByGrade).map(([name, value]) => ({ name, value }));
 
     // 주의 학생 리스트 (Heuristic: 할인이 아예 없거나, 최근 업데이트가 오래된 학생 등)
-    // 실제로는 studyTimeGrowthRate 등으로 판단해야 하지만 멤버십 컴포넌트에서는 간단한 플래그로 보여줌
     const riskStudents = activeMembers.filter((m, i) => i % 5 === 0).slice(0, 3); // 샘플링 로직
 
     const now = new Date();
@@ -428,7 +428,7 @@ export function RevenueAnalysis() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-black uppercase tracking-widest">수납 구조</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[200px] flex items-center justify-center">
+                <CardContent className="h-[200px] flex items-center justify-center relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsPieChart>
                       <Pie
@@ -446,7 +446,7 @@ export function RevenueAnalysis() {
                   </ResponsiveContainer>
                   <div className="absolute flex flex-col items-center">
                     <span className="text-[10px] font-black text-muted-foreground uppercase">할인율</span>
-                    <span className="text-lg font-black">{Math.round((businessMetrics.revenuePieData[1].value / businessMetrics.activeCount) * 100)}%</span>
+                    <span className="text-lg font-black">{Math.round((businessMetrics.revenuePieData[1].value / (businessMetrics.activeCount || 1)) * 100)}%</span>
                   </div>
                 </CardContent>
               </Card>
@@ -494,20 +494,23 @@ export function RevenueAnalysis() {
                 </div>
                 <div className="grid gap-2">
                   {businessMetrics.riskStudents.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-rose-100 shadow-sm hover:shadow-md transition-all group">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center font-black text-rose-600 border border-rose-100 group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                          {s.displayName?.charAt(0)}
+                    <Link key={s.id} href={`/dashboard/teacher/students/${s.id}`}>
+                      <div className="flex items-center justify-between p-4 rounded-2xl bg-white border border-rose-100 shadow-sm hover:shadow-md hover:border-rose-300 transition-all group cursor-pointer active:scale-[0.98]">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center font-black text-rose-600 border border-rose-100 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                            {s.displayName?.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black">{s.displayName}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground">학습 데이터 분석하기</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-black">{s.displayName}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground">최근 성취도 소폭 하락</p>
+                        <div className="flex items-center gap-2 text-rose-400 group-hover:text-rose-600 transition-colors">
+                          <span className="text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all">Study Data</span>
+                          <ArrowRight className="h-4 w-4" />
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="rounded-full hover:bg-rose-50 text-rose-400 group-hover:text-rose-600">
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -672,15 +675,15 @@ export function RevenueAnalysis() {
                     return (
                       <TableRow key={student.id} className="hover:bg-muted/5 transition-all duration-300 h-24 group">
                         <TableCell className="pl-10">
-                          <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10">
+                          <Link href={`/dashboard/teacher/students/${student.id}`} className="flex items-center gap-4 cursor-pointer">
+                            <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
                               {student.displayName?.charAt(0) || 'S'}
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-black text-sm group-hover:text-primary transition-colors">{student.displayName || '학생'}</span>
+                              <span className="font-black text-sm group-hover:text-primary transition-colors underline-offset-4 group-hover:underline">{student.displayName || '학생'}</span>
                               <span className="text-[10px] font-bold text-muted-foreground">{profile?.grade || '학년 미정'}</span>
                             </div>
-                          </div>
+                          </Link>
                         </TableCell>
                         <TableCell>
                           <Badge className={cn(
