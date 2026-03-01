@@ -16,7 +16,8 @@ import {
   MessageCircle,
   GraduationCap,
   Armchair,
-  FileText
+  FileText,
+  History
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -41,6 +42,11 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/teacher/layout-view', label: '좌석 도면', icon: Armchair },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
     { href: '/dashboard/appointments', label: '상담 관리', icon: MessageCircle },
+    { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
+  ],
+  parent: [
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard/study-history', label: '학습 시간', icon: History },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   centerAdmin: [
