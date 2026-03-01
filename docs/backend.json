@@ -131,6 +131,16 @@
         "content": { "type": "string" },
         "improvement": { "type": "string" }
       }
+    },
+    "ParentAiCache": {
+      "title": "ParentAiCache",
+      "type": "object",
+      "description": "학부모 대시보드용 AI 분석 캐시",
+      "properties": {
+        "content": { "type": "object" },
+        "dateKey": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -188,6 +198,10 @@
     "/centers/{centerId}/counselingLogs/{logId}": {
       "schema": { "$ref": "#/entities/CounselingLog" },
       "description": "상담 일지 기록"
+    },
+    "/centers/{centerId}/parentAiCache/{studentId}/days/{dateKey}": {
+      "schema": { "$ref": "#/entities/ParentAiCache" },
+      "description": "학부모용 AI 분석 결과 캐시 데이터"
     }
   }
 }

@@ -110,3 +110,9 @@ export interface DailyStudentStat {
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
+
+export interface ParentAiCache {
+  content: any;
+  dateKey: string;
+  createdAt: Timestamp;
+}
