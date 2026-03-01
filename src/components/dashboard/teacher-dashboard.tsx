@@ -27,7 +27,8 @@ import {
   CheckCircle2,
   BarChart3,
   ArrowRight,
-  Activity
+  Activity,
+  Zap
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -106,6 +107,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return [...rawAppointments].sort((a, b) => (a.scheduledAt?.toMillis() || 0) - (b.scheduledAt?.toMillis() || 0));
   }, [rawAppointments]);
 
+  // 유효 좌석 구역 계산 - 패딩을 0으로 설정하여 크기 확보
   const seatBounds = useMemo(() => {
     if (!attendanceList || attendanceList.length === 0) return null;
     
@@ -119,13 +121,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     });
 
-    const padding = 1;
-    return {
-      minX: Math.max(0, minX - padding),
-      maxX: Math.min(GRID_WIDTH - 1, maxX + padding),
-      minY: Math.max(0, minY - padding),
-      maxY: Math.min(GRID_HEIGHT - 1, maxY + padding),
-    };
+    return { minX, maxX, minY, maxY };
   }, [attendanceList]);
 
   const gridDimensions = useMemo(() => {
@@ -270,13 +266,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       <div className={cn("grid gap-6", isMobileView ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
         <Card className={cn("rounded-[2rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50", isMobileView ? "" : "lg:col-span-2")}>
-          <CardHeader className={cn("bg-muted/5 border-b", isMobileView ? "p-5" : "sm:p-8")}>
+          <CardHeader className={cn("bg-muted/5 border-b", isMobileView ? "p-4" : "sm:p-8")}>
             <div className={cn("flex justify-between gap-4", isMobileView ? "flex-col" : "sm:flex-row sm:items-center")}>
               <div className="space-y-1">
-                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep whitespace-nowrap">
+                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter whitespace-nowrap">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">유효 구역 중심 스마트 뷰</CardDescription>
+                <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground uppercase tracking-widest">Live Matrix View</CardDescription>
               </div>
               <div className={cn("flex flex-row gap-2 w-full sm:w-auto")}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
@@ -288,23 +284,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-2 sm:p-6 bg-[#fdfdfd] overflow-hidden">
+          <CardContent className={cn("bg-[#fdfdfd] overflow-hidden", isMobileView ? "p-1" : "p-6")}>
             {attendanceLoading ? (
-              <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+              <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
             ) : !attendanceList || attendanceList.length === 0 ? (
               <div className="py-20 text-center flex flex-col items-center gap-4 bg-muted/5 rounded-[2rem] border-2 border-dashed">
                 <Armchair className="h-12 w-12 text-muted-foreground opacity-10" />
-                <p className="text-xs font-bold text-muted-foreground/40">배치된 좌석이 없습니다.</p>
+                <p className="text-xs font-bold text-muted-foreground/40 italic">배치된 좌석이 없습니다.</p>
               </div>
             ) : (
-              <div className="w-full bg-white rounded-[1.5rem] border shadow-inner overflow-hidden p-3 sm:p-6">
+              <div className={cn("w-full bg-white rounded-[1.5rem] border shadow-inner overflow-hidden", isMobileView ? "p-2" : "p-6")}>
                 <div 
-                  className="grid gap-1.5 sm:gap-2 w-full mx-auto relative"
+                  className={cn("grid w-full mx-auto relative", isMobileView ? "gap-1" : "gap-2")}
                   style={{ 
                     gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(0, 1fr))`,
                     gridAutoRows: '1fr',
-                    backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
-                    backgroundSize: '16px 16px'
                   }}
                 >
                   {Array.from({ length: gridDimensions.rows * gridDimensions.cols }).map((_, idx) => {
@@ -315,6 +309,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                     if (!seat) return <div key={idx} className="aspect-square opacity-0" />;
 
+                    const isStudying = seat.status === 'studying';
                     const isLateOrAbsent = seat.studentId && seat.status === 'absent';
 
                     return (
@@ -331,30 +326,30 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "aspect-square rounded-lg sm:rounded-xl border-2 flex flex-col items-center justify-center transition-all relative cursor-pointer group shadow-sm active:scale-95",
-                          seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft" : 
-                          isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
+                          "aspect-square rounded-md sm:rounded-xl border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-xs active:scale-90",
+                          isStudying ? "bg-emerald-500 border-emerald-600 text-white" : 
+                          isLateOrAbsent ? "bg-rose-50 border-rose-400 text-rose-700" :
                           seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
                           seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
-                          occupant ? "bg-white border-primary/40 text-primary" : "bg-white border-primary/5 text-muted-foreground/10 hover:border-primary/30"
+                          occupant ? "bg-white border-primary/20 text-primary" : "bg-white border-primary/5 text-muted-foreground/10 hover:border-primary/20"
                         )}
                       >
                         <span className={cn(
                           "font-black absolute top-0.5 left-1 leading-none",
-                          isMobileView ? "text-[6px]" : "text-[9px]",
-                          seat.status === 'studying' || seat.status === 'away' || seat.status === 'break' ? "opacity-60" : "opacity-30"
+                          isMobileView ? "text-[5px]" : "text-[9px]",
+                          isStudying || seat.status === 'away' || seat.status === 'break' ? "opacity-60" : "opacity-30"
                         )}>{seat.seatNo}</span>
                         
                         <span className={cn(
-                          "font-black truncate px-0.5 w-full text-center leading-tight tracking-tighter",
-                          isMobileView ? "text-[8px]" : "text-[11px]"
+                          "font-black truncate w-full text-center leading-none tracking-tighter px-0.5",
+                          isMobileView ? "text-[10px]" : "text-[13px]"
                         )}>
                           {occupant ? occupant.name : ''}
                         </span>
                         
-                        {isLateOrAbsent && (
-                          <div className="absolute -top-1 -right-1 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white">
-                            <div className="rounded-full bg-white w-1.5 h-1.5" />
+                        {isStudying && (
+                          <div className="absolute bottom-0.5">
+                            <Activity className={cn("animate-pulse stroke-[3px]", isMobileView ? "h-1 w-1" : "h-3 w-3")} />
                           </div>
                         )}
                       </div>
@@ -368,7 +363,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
         <Card className="rounded-[2rem] border-none shadow-xl bg-white flex flex-col ring-1 ring-border/50 overflow-hidden">
           <CardHeader className="p-6 sm:p-8">
-            <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2">
+            <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2 text-primary">
               <MessageSquare className="h-5 w-5 text-primary" /> 오늘 상담 현황
             </CardTitle>
             <CardDescription className="font-bold text-[10px] opacity-60 uppercase tracking-widest">Appointment List</CardDescription>
@@ -411,7 +406,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <div className="bg-primary p-6 text-white shrink-0">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black">좌석 도면 편집기</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold text-xs sm:text-sm">그리드를 터치하여 좌석을 배치하세요. (가로 스크롤 가능)</DialogDescription>
+              <DialogDescription className="text-white/70 font-bold text-xs sm:text-sm">그리드를 터치하여 좌석을 배치하세요.</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 overflow-auto bg-[#fafafa] p-4 sm:p-10 custom-scrollbar">
@@ -419,8 +414,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               className="grid gap-1 mx-auto bg-white p-4 rounded-3xl shadow-inner border border-border/50 relative"
               style={{ 
                 gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`,
-                width: GRID_WIDTH * (isMobileView ? 20 : 40),
-                minWidth: isMobileView ? GRID_WIDTH * 18 : 'none'
+                width: GRID_WIDTH * (isMobileView ? 18 : 40),
+                minWidth: isMobileView ? GRID_WIDTH * 16 : 'none'
               }}
             >
               {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -432,11 +427,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     key={idx}
                     onClick={() => handleGridClick(x, y)}
                     className={cn(
-                      "aspect-square rounded-md sm:rounded-lg border flex items-center justify-center cursor-pointer transition-all",
+                      "aspect-square rounded-sm sm:rounded-lg border flex items-center justify-center cursor-pointer transition-all",
                       seat ? "bg-primary text-white border-primary shadow-lg scale-90" : "bg-white border-muted hover:bg-primary/5"
                     )}
                   >
-                    {seat && <span className="text-[8px] sm:text-[10px] font-black">{seat.seatNo}</span>}
+                    {seat && <span className="text-[7px] sm:text-[10px] font-black">{seat.seatNo}</span>}
                   </div>
                 );
               })}
