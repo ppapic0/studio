@@ -514,8 +514,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 오늘의 몰입 카드 - 앱 모드에서도 가독성 있게 조정 */}
-      <div className={cn("grid gap-4", isMobile ? "px-1" : "sm:grid-cols-2 lg:grid-cols-4")}>
+      {/* 핵심 지표 그리드 */}
+      <div className={cn("grid gap-4", isMobile ? "px-1 grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-4")}>
         <Card className="border-none shadow-md bg-white ring-1 ring-black/[0.03] rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden">
           <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-2 px-6 pt-6" : "pb-2 px-6 pt-6")}>
             <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-xs" : "text-xs")}>오늘의 몰입</CardTitle>
@@ -528,10 +528,53 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <p className="font-bold text-muted-foreground/60 text-[10px] mt-2">일일 권장량 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
           </CardContent>
         </Card>
+
+        {/* 웹 전용 카드들 */}
+        {!isMobile && (
+          <>
+            <GamifiedStatCard 
+              title="시즌계획 완수" 
+              icon={ClipboardCheck} 
+              value={`${Math.round((dailyStat?.weeklyPlanCompletionRate || 0) * 100)}%`} 
+              numericValue={(dailyStat?.weeklyPlanCompletionRate || 0) * 100}
+              dailyValue={todayCompletionRate}
+              evolution="최근 7일 평균" 
+              isLoading={dailyStatLoading} 
+              type="completion"
+              gameTitle="계획 정복자"
+              isMobile={isMobile}
+            />
+            <GamifiedStatCard 
+              title="출석 완료" 
+              icon={CalendarClock} 
+              value={`${dailyStat?.attendanceStreakDays || 0}일`} 
+              numericValue={dailyStat?.attendanceStreakDays || 0}
+              dailyValue={totalMinutes}
+              dailyUnit="분"
+              evolution="이번 달 누적" 
+              isLoading={dailyStatLoading} 
+              type="attendance"
+              gameTitle="꾸준함의 화신"
+              isMobile={isMobile}
+            />
+            <GamifiedStatCard 
+              title="성장 지수" 
+              icon={TrendingUp} 
+              value={`x${(dailyStat?.studyTimeGrowthRate || 0).toFixed(2)}`} 
+              numericValue={(dailyStat?.studyTimeGrowthRate || 0) * 100}
+              dailyValue={(dailyStat?.studyTimeGrowthRate || 0) * 100}
+              evolution="전주 대비 성장" 
+              isLoading={dailyStatLoading} 
+              type="growth"
+              gameTitle="성장의 아이콘"
+              isMobile={isMobile}
+            />
+          </>
+        )}
       </div>
 
-      {/* 오늘의 학습 계획 - 레이아웃 재정렬 및 최적화 */}
-      <div className={cn("grid gap-6", isMobile ? "px-1" : "lg:grid-cols-3")}>
+      <div className={cn("grid gap-6", isMobile ? "px-1 grid-cols-1" : "lg:grid-cols-3")}>
+        {/* 오늘의 학습 계획 */}
         <Card className={cn("border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "col-span-1" : "lg:col-span-2")}>
           <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-10")}>
             <div className={cn("flex flex-col gap-4", isMobile ? "items-start" : "sm:flex-row sm:items-center justify-between")}>
@@ -543,7 +586,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className={cn("flex flex-col gap-2.5", isMobile ? "w-full" : "items-end sm:w-auto")}>
                 <div className="flex items-center justify-between sm:justify-end gap-3">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Completed</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">달성 완료</span>
                   <Badge className="bg-primary text-white font-black px-2.5 py-0.5 rounded-md border-none shadow-sm text-[11px]">{Math.round(todayCompletionRate)}%</Badge>
                 </div>
                 <Progress value={todayCompletionRate} className="w-full sm:w-40 h-2 rounded-full bg-muted shadow-inner" />
@@ -598,6 +641,42 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             )}
           </CardContent>
         </Card>
+
+        {/* 웹 전용: 오늘의 루틴 */}
+        {!isMobile && (
+          <Card className="border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
+            <CardHeader className="bg-accent/5 border-b p-10">
+              <CardTitle className="font-black flex items-center gap-2 tracking-tighter text-accent">
+                <Timer className="h-8 w-8" /> 오늘의 루틴
+              </CardTitle>
+              <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-widest ml-0.5">Lifestyle Routine</CardDescription>
+            </CardHeader>
+            <CardContent className="p-10">
+              {scheduleItems.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground/40 font-black italic border-2 border-dashed rounded-[1.5rem]">
+                  등록된 루틴이 없습니다.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {scheduleItems.map((item) => {
+                    const [title, time] = item.title.split(': ');
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-5 rounded-[1.5rem] bg-muted/20 border-2 border-transparent hover:border-accent/20 transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 rounded-xl bg-white shadow-sm group-hover:bg-accent group-hover:text-white transition-colors">
+                            <CircleDot className="h-4 w-4" />
+                          </div>
+                          <span className="font-bold text-foreground/80">{title}</span>
+                        </div>
+                        <span className="font-mono font-black text-accent">{time || '-'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
