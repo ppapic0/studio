@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -179,6 +180,7 @@ export default function LeaderboardsPage() {
   const { activeMembership } = useAppContext();
   
   const isMember = !!activeMembership;
+  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const periodKey = format(new Date(), 'yyyy-MM');
 
   const completionQuery = useMemoFirebase(() => {
@@ -244,14 +246,21 @@ export default function LeaderboardsPage() {
 
       <Tabs defaultValue="completion" className="w-full">
         <div className="flex justify-center mb-12">
-          <TabsList className="grid grid-cols-3 bg-muted/30 p-2 rounded-[2rem] h-20 w-full max-w-3xl border border-border/50 shadow-inner">
-            <TabsTrigger value="completion" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-base uppercase tracking-tighter gap-2">
+          <TabsList className={cn(
+            "grid bg-muted/30 p-2 rounded-[2rem] h-20 w-full max-w-3xl border border-border/50 shadow-inner",
+            isTeacherOrAdmin ? "grid-cols-3" : "grid-cols-2"
+          )}>
+            <TabsTrigger value="completion" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
               <Star className="h-4 w-4 text-yellow-500" /> 계획완수 챔피언
             </TabsTrigger>
-            <TabsTrigger value="attendance" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-base uppercase tracking-tighter gap-2">
-              <Zap className="h-4 w-4 text-blue-500" /> 출석 챔피언
-            </TabsTrigger>
-            <TabsTrigger value="growth" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-base uppercase tracking-tighter gap-2">
+            
+            {isTeacherOrAdmin && (
+              <TabsTrigger value="attendance" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
+                <Zap className="h-4 w-4 text-blue-500" /> 출석 챔피언
+              </TabsTrigger>
+            )}
+
+            <TabsTrigger value="growth" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
               <TrendingUp className="h-4 w-4 text-emerald-500" /> 성장 챔피언
             </TabsTrigger>
           </TabsList>
@@ -266,15 +275,19 @@ export default function LeaderboardsPage() {
             metricType="completion"
           />
         </TabsContent>
-        <TabsContent value="attendance" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
-          <LeaderboardTab
-            title="출석 챔피언 (3H+)"
-            description="일일 3시간 이상 초몰입 학습을 가장 꾸준히 기록한 학생들입니다."
-            entries={consistencyEntries}
-            isLoading={consistencyLoading}
-            metricType="attendance"
-          />
-        </TabsContent>
+
+        {isTeacherOrAdmin && (
+          <TabsContent value="attendance" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
+            <LeaderboardTab
+              title="출석 챔피언 (공부시간)"
+              description="일일 3시간 이상 초몰입 학습을 가장 꾸준히 기록한 학생들입니다."
+              entries={consistencyEntries}
+              isLoading={consistencyLoading}
+              metricType="attendance"
+            />
+          </TabsContent>
+        )}
+
         <TabsContent value="growth" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
           <LeaderboardTab
             title="성장 챔피언"
