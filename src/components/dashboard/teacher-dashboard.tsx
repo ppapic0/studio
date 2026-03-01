@@ -78,7 +78,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [tempLayout, setTempLayout] = useState<{ x: number, y: number, seatNo: number }[]>([]);
 
   const centerId = activeMembership?.id;
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -108,7 +107,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return [...rawAppointments].sort((a, b) => (a.scheduledAt?.toMillis() || 0) - (b.scheduledAt?.toMillis() || 0));
   }, [rawAppointments]);
 
-  // [UI 핵심] 실제 좌석이 있는 구역만 계산하여 포커싱
+  // [UI 핵심] 실제 좌석이 있는 구역만 계산하여 포커싱 (Bounding Box Zoom)
   const seatBounds = useMemo(() => {
     if (!attendanceList || attendanceList.length === 0) return null;
     
@@ -122,7 +121,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     });
 
-    // 최소 여유 공간 확보 (너무 좁아지는 것 방지)
     const padding = 1;
     return {
       minX: Math.max(0, minX - padding),
@@ -277,10 +275,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <CardHeader className="bg-muted/5 border-b p-5 sm:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
-                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep">
+                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep whitespace-nowrap">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">실제 배치 영역을 포커싱하여 보여줍니다.</CardDescription>
+                <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">유효 구역 중심 스마트 뷰</CardDescription>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
@@ -340,7 +338,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                           seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
                           seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
-                          occupant ? "bg-white border-primary/40 text-primary" : "bg-white border-primary/5 text-muted-foreground/10 hover:border-primary/20"
+                          occupant ? "bg-white border-primary/40 text-primary" : "bg-white border-primary/5 text-muted-foreground/10 hover:border-primary/30"
                         )}
                       >
                         <span className={cn(
@@ -398,11 +396,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               ))
             )}
-            <Button asChild variant="ghost" className="w-full mt-2 font-black text-[10px] text-primary/60 hover:text-primary transition-all gap-1.5">
-              <Link href="/dashboard/appointments" className="flex items-center justify-center gap-1">
-                전체보기 <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Button>
+            <div className="pt-2 border-t border-dashed mt-auto">
+              <Button asChild variant="ghost" className="w-full font-black text-[10px] text-primary/60 hover:text-primary transition-all gap-1.5">
+                <Link href="/dashboard/appointments" className="flex items-center justify-center gap-1">
+                  전체보기 <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -413,7 +413,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <div className="bg-primary p-6 text-white shrink-0">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black">좌석 도면 편집기</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold">그리드를 클릭하여 좌석을 배치하거나 제거하세요.</DialogDescription>
+              <DialogDescription className="text-white/70 font-bold">네모난 좌석을 그리드에 배치하여 도면을 완성하세요.</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 overflow-auto bg-[#fafafa] p-4 sm:p-10">

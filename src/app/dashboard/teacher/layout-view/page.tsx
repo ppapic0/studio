@@ -56,7 +56,7 @@ export default function LayoutViewPage() {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
 
-  // [UI 핵심] 실제 좌석이 있는 구역만 계산하여 포커싱
+  // [UI 핵심] 실제 좌석이 있는 구역만 계산하여 포커싱 (Auto-Zoom)
   const seatBounds = useMemo(() => {
     if (!attendanceList || attendanceList.length === 0) return null;
     
@@ -105,7 +105,7 @@ export default function LayoutViewPage() {
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-10 px-1 sm:px-4">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2 text-primary">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-2 text-primary break-keep whitespace-nowrap">
             <Monitor className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             실시간 전체 도면
           </h1>
