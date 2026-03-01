@@ -554,7 +554,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
         
         <GamifiedStatCard 
-          title="출석 스트릭"
+          title="출석 완료"
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}

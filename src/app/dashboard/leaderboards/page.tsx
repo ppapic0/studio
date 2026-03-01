@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -32,6 +31,7 @@ import { LeaderboardEntry, WithId } from '@/lib/types';
 import { Loader2, Trophy, AlertCircle, Medal, Crown, Star, Flame, TrendingUp, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 type LeaderboardTabProps = {
   title: string;
@@ -42,6 +42,12 @@ type LeaderboardTabProps = {
 };
 
 function LeaderboardTab({ title, description, entries, isLoading, metricType }: LeaderboardTabProps) {
+  const filteredEntries = useMemo(() => {
+    if (!entries) return [];
+    // Only show top 3 ranks (including ties)
+    return entries.filter(entry => entry.rank <= 3);
+  }, [entries]);
+
   const getIcon = () => {
     switch(metricType) {
       case 'completion': return <Crown className="h-10 w-10 text-yellow-500 drop-shadow-lg" />;
@@ -94,7 +100,7 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType }: 
             <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
             <p className="font-black text-muted-foreground/40 italic uppercase tracking-widest">Calculating Rankings...</p>
           </div>
-        ) : !entries || entries.length === 0 ? (
+        ) : !filteredEntries || filteredEntries.length === 0 ? (
           <div className="text-center py-40 flex flex-col items-center gap-6">
             <div className="p-10 rounded-full bg-muted/20">
               <Trophy className="h-20 w-20 text-muted-foreground opacity-10" />
@@ -114,7 +120,7 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType }: 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {entries?.map((entry) => (
+            {filteredEntries.map((entry) => (
               <TableRow key={entry.id} className={cn(
                 "group transition-all duration-500 h-24 border-b", 
                 entry.rank === 1 ? "bg-yellow-50/30 hover:bg-yellow-50/50" : 
@@ -180,7 +186,6 @@ export default function LeaderboardsPage() {
   const { activeMembership } = useAppContext();
   
   const isMember = !!activeMembership;
-  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const periodKey = format(new Date(), 'yyyy-MM');
 
   const completionQuery = useMemoFirebase(() => {
@@ -188,7 +193,7 @@ export default function LeaderboardsPage() {
     return query(
       collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_completion`, 'entries'),
       orderBy('rank', 'asc'),
-      limit(20)
+      limit(50) // Fetch more to handle potential ties in top 3
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: completionEntries, isLoading: completionLoading } = useCollection<LeaderboardEntry>(completionQuery, { enabled: isMember });
@@ -198,7 +203,7 @@ export default function LeaderboardsPage() {
     return query(
       collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_attendance`, 'entries'),
       orderBy('rank', 'asc'),
-      limit(20)
+      limit(50)
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: consistencyEntries, isLoading: consistencyLoading } = useCollection<LeaderboardEntry>(consistencyQuery, { enabled: isMember });
@@ -208,7 +213,7 @@ export default function LeaderboardsPage() {
     return query(
       collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_growth`, 'entries'),
       orderBy('rank', 'asc'),
-      limit(20)
+      limit(50)
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: growthEntries, isLoading: growthLoading } = useCollection<LeaderboardEntry>(growthQuery, { enabled: isMember });
@@ -246,19 +251,14 @@ export default function LeaderboardsPage() {
 
       <Tabs defaultValue="completion" className="w-full">
         <div className="flex justify-center mb-12">
-          <TabsList className={cn(
-            "grid bg-muted/30 p-2 rounded-[2rem] h-20 w-full max-w-3xl border border-border/50 shadow-inner",
-            isTeacherOrAdmin ? "grid-cols-3" : "grid-cols-2"
-          )}>
+          <TabsList className="grid grid-cols-3 bg-muted/30 p-2 rounded-[2rem] h-20 w-full max-w-3xl border border-border/50 shadow-inner">
             <TabsTrigger value="completion" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
               <Star className="h-4 w-4 text-yellow-500" /> 계획완수 챔피언
             </TabsTrigger>
             
-            {isTeacherOrAdmin && (
-              <TabsTrigger value="attendance" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
-                <Zap className="h-4 w-4 text-blue-500" /> 출석 챔피언
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="attendance" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
+              <Zap className="h-4 w-4 text-blue-500" /> 출석 챔피언
+            </TabsTrigger>
 
             <TabsTrigger value="growth" className="rounded-[1.5rem] font-black data-[state=active]:bg-white data-[state=active]:shadow-2xl transition-all text-sm sm:text-base uppercase tracking-tighter gap-2">
               <TrendingUp className="h-4 w-4 text-emerald-500" /> 성장 챔피언
@@ -276,17 +276,15 @@ export default function LeaderboardsPage() {
           />
         </TabsContent>
 
-        {isTeacherOrAdmin && (
-          <TabsContent value="attendance" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
-            <LeaderboardTab
-              title="출석 챔피언 (공부시간)"
-              description="일일 3시간 이상 초몰입 학습을 가장 꾸준히 기록한 학생들입니다."
-              entries={consistencyEntries}
-              isLoading={consistencyLoading}
-              metricType="attendance"
-            />
-          </TabsContent>
-        )}
+        <TabsContent value="attendance" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
+          <LeaderboardTab
+            title="출석 챔피언 (공부시간)"
+            description="일일 3시간 이상 초몰입 학습을 가장 꾸준히 기록한 학생들입니다."
+            entries={consistencyEntries}
+            isLoading={consistencyLoading}
+            metricType="attendance"
+          />
+        </TabsContent>
 
         <TabsContent value="growth" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
           <LeaderboardTab
