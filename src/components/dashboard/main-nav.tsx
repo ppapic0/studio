@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -17,7 +16,8 @@ import {
   GraduationCap,
   Armchair,
   FileText,
-  History
+  History,
+  DollarSign
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/teacher/layout-view', label: '좌석 도면', icon: Armchair },
     { href: '/dashboard/appointments', label: '상담 현황', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
-    { href: '/dashboard/analytics', label: '센터 분석', icon: BarChart3 },
+    { href: '/dashboard/revenue', label: '수익 분석', icon: DollarSign },
     { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
   ],
 };

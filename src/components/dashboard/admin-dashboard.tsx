@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -13,43 +12,26 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Users, 
-  ClipboardCheck, 
   TrendingUp, 
   Armchair, 
   AlertTriangle, 
-  CheckCircle, 
-  BarChart as BarChartIcon, 
   Loader2, 
   Flame, 
   Clock, 
   ArrowUpRight, 
   ArrowDownRight,
-  Target,
   Zap,
   ShieldAlert,
   MessageSquare,
-  DollarSign,
-  HeartHandshake,
   Activity,
-  ChevronRight
+  ChevronRight,
+  HeartHandshake
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  BarChart as RechartsBarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  CartesianGrid,
-  AreaChart,
-  Area,
-  Cell
-} from 'recharts';
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, CounselingLog } from '@/lib/types';
+import { collection, query, where } from 'firebase/firestore';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -332,40 +314,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 3️⃣ 매출 및 부모 신뢰 KPI */}
-      <section className="grid gap-6 md:grid-cols-2">
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 flex flex-col justify-between group overflow-hidden relative">
-          <DollarSign className="absolute -right-4 -bottom-4 h-24 w-24 opacity-5 rotate-12 group-hover:scale-110 transition-transform" />
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-black tracking-tighter">운영 수익 지표</CardTitle>
-              <Badge variant="secondary" className="font-black text-[10px]">BUSINESS KPI</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <p className="text-[10px] font-black text-muted-foreground uppercase">재등록률</p>
-                <div className="text-4xl font-black text-primary">92%</div>
-                <p className="text-[9px] font-bold text-emerald-600 mt-1 flex items-center"><ArrowUpRight className="h-3 w-3" /> 2% 상승</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-muted-foreground uppercase">평균 체류 기간</p>
-                <div className="text-4xl font-black text-primary">7.4<span className="text-lg opacity-40 ml-1">개월</span></div>
-                <p className="text-[9px] font-bold text-muted-foreground mt-1">LTV 최적화 상태</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-8 flex gap-3">
-            <div className="flex-1 p-3 rounded-xl bg-muted/30 border">
-              <p className="text-[8px] font-black text-muted-foreground uppercase">이달의 이탈률</p>
-              <p className="text-sm font-black text-rose-600">4.2%</p>
-            </div>
-            <div className="flex-1 p-3 rounded-xl bg-muted/30 border">
-              <p className="text-[8px] font-black text-muted-foreground uppercase">신규 등록</p>
-              <p className="text-sm font-black text-emerald-600">12명</p>
-            </div>
-          </div>
-        </Card>
-
+      {/* 3️⃣ 부모 신뢰 KPI (홈 화면 유지) */}
+      <section className="grid gap-6 md:grid-cols-1">
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 flex flex-col justify-between group overflow-hidden relative">
           <HeartHandshake className="absolute -right-4 -bottom-4 h-24 w-24 opacity-5 rotate-12 group-hover:scale-110 transition-transform" />
           <div className="space-y-6">
