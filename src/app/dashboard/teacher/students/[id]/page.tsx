@@ -1,4 +1,3 @@
-
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
@@ -59,7 +58,8 @@ import {
   PieChart as PieChartIcon,
   Crown,
   Medal,
-  Star
+  Star,
+  RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
@@ -180,7 +180,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const rankingQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const periodKey = format(new Date(), 'yyyy-MM');
-    // 계획 완수 기준 랭킹을 대표로 조회
     return query(collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_completion`, 'entries'), where('studentId', '==', studentId));
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
