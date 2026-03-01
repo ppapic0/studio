@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -13,7 +12,8 @@ import {
   FileText,
   Settings,
   Users,
-  Trophy
+  Trophy,
+  GraduationCap
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -39,14 +39,14 @@ export function BottomNav() {
       { href: '/dashboard/teacher', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
       { href: '/dashboard/teacher/layout-view', label: '도면', icon: Armchair },
-      { href: '/dashboard/attendance', label: '출석', icon: Users },
+      { href: '/dashboard/teacher/students', label: '관리', icon: GraduationCap },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
     centerAdmin: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
       { href: '/dashboard/teacher/layout-view', label: '도면', icon: Armchair },
-      { href: '/dashboard/attendance', label: '출석', icon: Users },
+      { href: '/dashboard/teacher/students', label: '관리', icon: GraduationCap },
       { href: '/dashboard/settings/invites', label: '설정', icon: Settings },
     ],
   };
