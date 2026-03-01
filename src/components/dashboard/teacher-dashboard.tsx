@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { 
   Armchair, 
-  Users, 
   Loader2, 
   Settings2,
   Monitor,
@@ -194,12 +193,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
       <header className="flex flex-col gap-1 px-1">
         <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>
-          센터 관제 홈
+          실시간 관제 홈
         </h1>
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-60">Real-time Command Center</p>
       </header>
 
-      {/* 퀵 지표 섹션 - 앱 스타일 */}
+      {/* 퀵 지표 섹션 */}
       <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-4")}>
         {[
           { label: '학습 중', val: attendanceList?.filter(a => a.status === 'studying').length || 0, color: 'text-emerald-600', icon: Activity, bg: 'bg-emerald-50/50' },
@@ -218,22 +217,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </div>
 
       <div className="grid gap-6">
-        {/* 좌석 상황판 - 앱 스타일 */}
+        {/* 좌석 상황판 */}
         <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50">
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-8")}>
-            <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
-              <div className="space-y-1">
-                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep">
-                  <Armchair className="h-5 w-5 text-primary" /> 실시간 좌석 도면
+            <div className={cn("flex justify-between gap-4 items-center", isMobile ? "flex-row" : "flex-row")}>
+              <div className="space-y-1 min-w-0">
+                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter whitespace-nowrap">
+                  <Armchair className="h-5 w-5 text-primary shrink-0" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-widest">Live Matrix Monitoring</CardDescription>
+                <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:block">Live Matrix Monitoring</CardDescription>
               </div>
-              <div className="flex flex-row gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" className="flex-1 rounded-2xl font-black h-12 px-6 shadow-sm gap-2" asChild>
+              <div className="flex flex-row gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="rounded-2xl font-black h-10 px-4 shadow-sm gap-2" asChild>
                   <Link href="/dashboard/teacher/layout-view"><Maximize2 className="h-4 w-4" /> 전체화면</Link>
                 </Button>
                 {!isMobile && (
-                  <Button variant="outline" size="sm" className="flex-1 rounded-2xl font-black h-12 px-6 shadow-sm gap-2" onClick={openLayoutEditor}>
+                  <Button variant="outline" size="sm" className="rounded-2xl font-black h-10 px-4 shadow-sm gap-2" onClick={openLayoutEditor}>
                     <Settings2 className="h-4 w-4" /> 도면 편집
                   </Button>
                 )}
@@ -277,8 +276,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           occupant ? "bg-white border-primary/20 text-primary" : "bg-white border-primary/5 text-muted-foreground/5 hover:border-primary/20"
                         )}
                       >
-                        <span className={cn("font-black absolute top-0.5 left-0.5 leading-none text-[6px] sm:text-[8px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
-                        <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-0.5", isMobile ? "text-[10px]" : "text-[12px]")}>{occupant?.name}</span>
+                        {isMobile ? (
+                          <span className={cn("font-black text-[10px] leading-none", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
+                        ) : (
+                          <>
+                            <span className={cn("font-black absolute top-0.5 left-0.5 leading-none text-[6px] sm:text-[8px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
+                            <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-0.5 text-[12px]")}>{occupant?.name}</span>
+                          </>
+                        )}
                         {isStudying && <div className="absolute bottom-0.5"><Activity className={cn("animate-pulse stroke-[3px]", isMobile ? "h-1 w-1" : "h-2 w-2")} /></div>}
                       </div>
                     );
@@ -289,7 +294,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 오늘 상담 일정 - 상담 페이지 스타일로 개편 */}
+        {/* 오늘 상담 일정 */}
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-8")}>
             <div className="flex items-center justify-between">
@@ -339,7 +344,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 모달 시스템 - 앱 최적화 */}
+      {/* 모달 시스템 */}
       <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 translate-x-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "rounded-[2.5rem] sm:max-w-md")}>
           {selectedSeatForManage && (

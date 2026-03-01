@@ -102,12 +102,11 @@ export default function LayoutViewPage() {
 
   return (
     <div className={cn("flex flex-col w-full max-w-[1600px] mx-auto pb-24 min-h-screen transition-all", isMobile ? "gap-4 px-1 pt-1" : "gap-8 px-6 py-10")}>
-      {/* 프리미엄 헤더 - 앱 모드 대응 */}
       <header className={cn("flex justify-between items-center bg-white/80 backdrop-blur-xl border shadow-xl", isMobile ? "p-4 rounded-[1.5rem]" : "p-8 rounded-[2.5rem]")}>
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Monitor className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
-            <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-4xl")}>실시간 관제</h1>
+            <h1 className={cn("font-black tracking-tighter text-primary whitespace-nowrap", isMobile ? "text-xl" : "text-4xl")}>실시간 관제</h1>
             <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">LIVE</span>
@@ -120,7 +119,6 @@ export default function LayoutViewPage() {
         </Button>
       </header>
 
-      {/* 실시간 현황 카드 - 상담 페이지 스타일 동기화 */}
       <div className={cn("grid gap-3", isMobile ? "grid-cols-2 px-1" : "grid-cols-4")}>
         {[
           { label: '학습 중', val: stats.studying, color: 'text-emerald-600', icon: Activity, bg: 'bg-emerald-50/50' },
@@ -138,7 +136,6 @@ export default function LayoutViewPage() {
         ))}
       </div>
 
-      {/* 도면 영역 - 제로 마진 최적화 */}
       <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50 relative flex-1 flex flex-col group">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent pointer-events-none" />
         <CardContent className={cn("relative z-10 flex items-center justify-center flex-1", isMobile ? "p-0" : "p-10")}>
@@ -200,7 +197,6 @@ export default function LayoutViewPage() {
         </CardContent>
       </Card>
 
-      {/* 상태 안내 레전드 - 모바일 최적화 */}
       <section className="bg-white/60 backdrop-blur-xl rounded-[2rem] p-3 border shadow-lg flex flex-wrap gap-2 justify-center items-center ring-1 ring-border/50">
         {[
           { label: '학습', color: 'bg-emerald-500' },
@@ -216,7 +212,6 @@ export default function LayoutViewPage() {
         ))}
       </section>
 
-      {/* 관리 바텀 시트 - 앱 모드 전용 */}
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
         <DialogContent className={cn("border-none shadow-[0_-20px_80px_rgba(0,0,0,0.2)] p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 translate-x-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "rounded-[2.5rem] sm:max-w-md")}>
           {selectedSeat && (
