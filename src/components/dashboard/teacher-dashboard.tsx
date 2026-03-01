@@ -278,12 +278,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </CardTitle>
                 <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">유효 구역 중심 스마트 뷰</CardDescription>
               </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
                   <Link href="/dashboard/teacher/layout-view">전체화면</Link>
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 gap-1.5 border-primary/10 text-[11px] bg-white" onClick={openLayoutEditor}>
-                  <Settings2 className="h-3.5 w-3.5" /> 편집
+                <Button variant="outline" size="sm" className="w-full sm:w-auto rounded-xl font-black border-2 h-10 px-4 gap-1.5 border-primary/10 text-[11px] bg-white" onClick={openLayoutEditor}>
+                  <Settings2 className="h-3.5 w-3.5" /> 도면 편집
                 </Button>
               </div>
             </div>
