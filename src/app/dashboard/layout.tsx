@@ -1,4 +1,3 @@
-
 'use client';
 
 import { MainNav } from '@/components/dashboard/main-nav';
@@ -19,7 +18,7 @@ export default function DashboardLayout({
   return (
     <div className={cn(
       "min-h-screen w-full bg-background transition-all duration-500",
-      isForcedMobile ? "flex flex-col items-center bg-[#f0f0f0] py-4 sm:py-10" : "grid md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]"
+      isForcedMobile ? "flex flex-col items-center bg-[#e5e5e5] py-6 sm:py-12" : "grid md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]"
     )}>
       {/* Sidebar - Desktop/Tablet Mode */}
       {!isForcedMobile && (
@@ -33,12 +32,12 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Phone Simulation */}
       <div className={cn(
-        "flex flex-col min-h-screen transition-all duration-500 shadow-2xl relative",
+        "flex flex-col transition-all duration-700 relative",
         isForcedMobile 
-          ? "w-[390px] h-[844px] bg-background rounded-[3rem] overflow-hidden border-[8px] border-white ring-1 ring-black/5 text-[13px] leading-tight" 
-          : "w-full"
+          ? "w-[390px] h-[844px] bg-background rounded-[3.5rem] overflow-hidden border-[12px] border-[#1a1a1a] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] ring-1 ring-black/10" 
+          : "w-full min-h-screen"
       )}>
         {/* Header */}
         <DashboardHeader />
@@ -46,7 +45,7 @@ export default function DashboardLayout({
         {/* Scrollable Content */}
         <main className={cn(
           "flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto",
-          isForcedMobile ? "p-4 pb-24" : "p-4 md:p-6 lg:p-8 max-w-[1400px] pb-24 md:pb-8"
+          isForcedMobile ? "p-5 pb-28 pt-2" : "p-4 md:p-6 lg:p-8 max-w-[1400px] pb-24 md:pb-8"
         )}>
           {children}
         </main>
@@ -56,6 +55,11 @@ export default function DashboardLayout({
 
         {/* Bottom Nav */}
         <BottomNav />
+        
+        {/* Mobile Home Indicator Simulation */}
+        {isForcedMobile && (
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-black/10 rounded-full z-[60]" />
+        )}
       </div>
     </div>
   );
