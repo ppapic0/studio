@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -22,22 +21,17 @@ import {
   DollarSign, 
   Users, 
   TrendingUp, 
-  Calendar, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  UserPlus,
-  Loader2,
-  CalendarDays,
+  CalendarDays, 
   Sparkles,
   PieChart,
-  ArrowRight,
   ChevronRight,
   Edit2,
   Save,
   X,
   History,
   Search,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -54,19 +48,10 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { CenterMembership } from '@/lib/types';
-import { format, eachMonthOfInterval, subMonths, isSameMonth } from 'date-fns';
+import { format, eachMonthOfInterval, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 
 export function RevenueAnalysis() {
@@ -76,7 +61,7 @@ export function RevenueAnalysis() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
 
-  // 상태 관리
+  // 1. 모든 상태(useState) 훅을 최상단에 배치
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [activeDrillDown, setActiveDrillDown] = useState<'revenue' | 'active' | 'churn' | null>(null);
   const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
@@ -84,7 +69,7 @@ export function RevenueAnalysis() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 데이터 조회
+  // 2. 데이터 조회 훅
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -93,9 +78,9 @@ export function RevenueAnalysis() {
     );
   }, [firestore, centerId]);
   
-  const { data: rawMembers, isLoading } = useCollection<CenterMembership>(membersQuery);
+  const { data: rawMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery);
 
-  // 데이터 가공 및 정렬
+  // 3. 데이터 가공 훅(useMemo)
   const businessMetrics = useMemo(() => {
     if (!rawMembers) return null;
 
@@ -108,7 +93,6 @@ export function RevenueAnalysis() {
     const activeCount = members.filter(m => m.status === 'active').length;
     const churnCount = members.filter(m => m.status === 'withdrawn').length;
     
-    // 개별 설정된 수강료 합산 (없으면 기본 350,000원)
     const estimatedMonthlyRevenue = members
       .filter(m => m.status === 'active')
       .reduce((acc, m) => acc + (m.monthlyFee || 350000), 0);
@@ -141,22 +125,18 @@ export function RevenueAnalysis() {
     };
   }, [rawMembers]);
 
-  // 필터링된 멤버 리스트 (타임라인용)
   const filteredTimelineMembers = useMemo(() => {
     if (!businessMetrics) return [];
     let list = businessMetrics.allMembers;
 
-    // 1. 차트 선택 월 필터링
     if (selectedMonth) {
       list = list.filter(m => m.joinedAt && format(m.joinedAt.toDate(), 'yyyy-MM') === selectedMonth);
     }
 
-    // 2. 검색어 필터링
     if (searchTerm) {
       list = list.filter(m => m.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
     }
 
-    // 3. 드릴다운 상태 필터링
     if (activeDrillDown === 'active') {
       list = list.filter(m => m.status === 'active');
     } else if (activeDrillDown === 'churn') {
@@ -166,7 +146,7 @@ export function RevenueAnalysis() {
     return list;
   }, [businessMetrics, selectedMonth, searchTerm, activeDrillDown]);
 
-  // 수강료 수정 핸들러
+  // 4. 이벤트 핸들러
   const handleUpdateFee = async (studentId: string) => {
     if (!firestore || !centerId) return;
     setIsUpdating(true);
@@ -189,7 +169,8 @@ export function RevenueAnalysis() {
     }
   };
 
-  if (isLoading || (membersQuery && !businessMetrics)) {
+  // 5. 조건부 렌더링 - 훅 호출 이후에 수행하여 훅 규칙 준수
+  if (isMembersLoading || !businessMetrics) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
@@ -198,11 +179,9 @@ export function RevenueAnalysis() {
     );
   }
 
-  if (!businessMetrics) return null;
-
   return (
     <div className="space-y-8 pb-32 animate-in fade-in duration-1000">
-      {/* 1. 수익 하이라이트 & 드릴다운 */}
+      {/* KPI 카드 섹션 */}
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
         <Card 
           onClick={() => setActiveDrillDown(activeDrillDown === 'revenue' ? null : 'revenue')}
@@ -279,7 +258,7 @@ export function RevenueAnalysis() {
         </Card>
       </div>
 
-      {/* 2. 신규 등록 추이 차트 (그래프 클릭 시 하단 필터링 연동) */}
+      {/* 신규 등록 추이 차트 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
           <div className="flex justify-between items-center">
@@ -335,7 +314,7 @@ export function RevenueAnalysis() {
         </CardContent>
       </Card>
 
-      {/* 3. 학생 등록 타임라인 & 수익 설정 (Interactive Table) */}
+      {/* 학생 등록 타임라인 & 수강료 관리 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
           <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-start" : "flex-row")}>
@@ -452,7 +431,7 @@ export function RevenueAnalysis() {
         </div>
       </Card>
 
-      {/* 4. 운영 통찰 전략 제언 */}
+      {/* 전략 제언 섹션 */}
       <section className="bg-primary rounded-[3rem] p-12 text-white relative overflow-hidden shadow-2xl">
         <Sparkles className="absolute -top-10 -right-10 h-64 w-64 opacity-5 rotate-12" />
         <div className="relative z-10 grid gap-10 lg:grid-cols-2 items-center">
