@@ -47,6 +47,7 @@ export function BottomNav() {
     parent: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard/study-history', label: '학습시간', icon: History },
+      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
       { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
     ],
     centerAdmin: [

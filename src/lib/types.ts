@@ -1,4 +1,3 @@
-
 import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
@@ -158,13 +157,31 @@ export interface AttendanceCurrent {
 }
 
 export interface CounselingLog {
+  id: string;
   studentId: string;
+  studentName: string;
   teacherId: string;
+  teacherName: string;
   type: "academic" | "life" | "career";
   content: string;
   improvement: string;
   attachedStudySummary?: { yyyymmdd: string, totalMinutes: number };
   createdAt: Timestamp;
+  reservationId?: string;
+}
+
+export interface CounselingReservation {
+  id: string;
+  studentId: string;
+  studentName: string;
+  teacherId: string;
+  teacherName: string;
+  scheduledAt: Timestamp;
+  status: 'requested' | 'confirmed' | 'done' | 'canceled';
+  studentNote?: string;
+  teacherNote?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface DailyReport {

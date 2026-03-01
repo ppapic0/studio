@@ -49,6 +49,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   parent: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/study-history', label: '학습 시간', icon: History },
+    { href: '/dashboard/appointments', label: '상담 내역', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
   ],
   centerAdmin: [

@@ -52,7 +52,8 @@ import {
   UserCheck,
   Check,
   X,
-  FileEdit
+  FileEdit,
+  GraduationCap
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -91,45 +92,62 @@ export default function AppointmentsPage() {
 
   const centerId = activeMembership?.id;
   const isStudent = activeMembership?.role === 'student';
+  const isParent = activeMembership?.role === 'parent';
   const isStaff = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+  const isAdmin = activeMembership?.role === 'centerAdmin';
+  const linkedStudentIds = activeMembership?.linkedStudentIds || [];
   const roleConfirmed = !!activeMembership?.role;
 
+  // 상담 희망 선생님 목록 (원장 및 특정 관리 계정 제외)
   const teachersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'),
-      where('role', 'in', ['teacher', 'centerAdmin'])
+      where('role', '==', 'teacher')
     );
   }, [firestore, centerId]);
   const { data: allStaff } = useCollection<CenterMembership>(teachersQuery);
 
   const filteredTeachers = useMemo(() => {
     if (!allStaff) return [];
-    return allStaff.filter(t => 
-      t.displayName !== '동백센터관리자' && 
-      t.role !== 'centerAdmin' 
-    );
+    return allStaff.filter(t => t.displayName !== '동백센터관리자');
   }, [allStaff]);
 
+  // 예약 내역 쿼리 (역할별 필터링)
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user || !roleConfirmed) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingReservations');
+    
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid));
     }
-    return query(baseRef);
-  }, [firestore, centerId, roleConfirmed, isStudent, user?.uid]);
+    if (isParent && linkedStudentIds.length > 0) {
+      return query(baseRef, where('studentId', 'in', linkedStudentIds));
+    }
+    if (isStaff) {
+      return query(baseRef); // 관리자와 선생님은 센터 내 모든 상담 조회
+    }
+    return null;
+  }, [firestore, centerId, roleConfirmed, isStudent, isParent, isStaff, user?.uid, linkedStudentIds]);
 
   const { data: rawReservations, isLoading: resLoading } = useCollection<CounselingReservation>(reservationsQuery);
 
+  // 상담 일지 쿼리 (역할별 필터링)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user || !roleConfirmed) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingLogs');
+    
     if (isStudent) {
       return query(baseRef, where('studentId', '==', user.uid));
     }
-    return query(baseRef);
-  }, [firestore, centerId, roleConfirmed, isStudent, user?.uid]);
+    if (isParent && linkedStudentIds.length > 0) {
+      return query(baseRef, where('studentId', 'in', linkedStudentIds));
+    }
+    if (isStaff) {
+      return query(baseRef); // 관리자와 선생님은 모든 일지 조회
+    }
+    return null;
+  }, [firestore, centerId, roleConfirmed, isStudent, isParent, isStaff, user?.uid, linkedStudentIds]);
 
   const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
 
@@ -224,7 +242,9 @@ export default function AppointmentsPage() {
     try {
       const logData = {
         studentId: selectedResForLog.studentId,
+        studentName: selectedResForLog.studentName || '학생',
         teacherId: user.uid,
+        teacherName: user.displayName || '선생님',
         type: logType,
         content: logContent.trim(),
         improvement: logImprovement.trim(),
@@ -262,7 +282,9 @@ export default function AppointmentsPage() {
       <header className={cn("flex justify-between items-center", isMobile ? "flex-col gap-4 items-start" : "flex-row")}>
         <div className="space-y-1">
           <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-3xl" : "text-4xl")}>상담 및 피드백</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Appointment & Feedback Center</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
+            {isAdmin ? 'All Center Appointments' : 'Appointment & Feedback Center'}
+          </p>
         </div>
         {isStudent && (
           <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
@@ -370,7 +392,8 @@ export default function AppointmentsPage() {
                             {getStatusBadge(res.status)}
                           </div>
                           <p className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 truncate">
-                            <User className="h-3.5 w-3.5 opacity-40 shrink-0" /> {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생`}
+                            <User className="h-3.5 w-3.5 opacity-40 shrink-0" /> 
+                            {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생 (담당: ${res.teacherName})`}
                           </p>
                         </div>
                       </div>
@@ -423,7 +446,7 @@ export default function AppointmentsPage() {
                   {logs.map((log) => (
                     <div key={log.id} className="p-6 sm:p-10 space-y-5 hover:bg-muted/5 transition-colors">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                           <Badge variant="outline" className="rounded-lg font-black uppercase text-[9px] sm:text-[10px] px-2 py-1 border-primary/20 text-primary">
                             {log.type === 'academic' ? '성적/학업' : log.type === 'life' ? '생활 습관' : '진로/진학'}
                           </Badge>
@@ -431,6 +454,11 @@ export default function AppointmentsPage() {
                             <Clock className="h-3 w-3 opacity-40" />
                             {log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd') : ''}
                           </span>
+                          {!isStudent && (
+                            <Badge variant="secondary" className="font-black text-[9px] gap-1.5 px-2 py-0.5">
+                              <GraduationCap className="h-3 w-3" /> {log.studentName} 학생
+                            </Badge>
+                          )}
                         </div>
                         <span className="text-[8px] font-black text-primary/30 uppercase tracking-[0.3em] hidden sm:inline">Counseling Verified</span>
                       </div>
@@ -457,7 +485,7 @@ export default function AppointmentsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* 상담 일지 작성 모달 (확정 예약 클릭 시) */}
+      {/* 상담 일지 작성 모달 */}
       <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
           <div className="bg-emerald-600 p-8 text-white relative">
