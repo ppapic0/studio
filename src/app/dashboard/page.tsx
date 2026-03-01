@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -27,6 +26,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
+import { cn } from '@/lib/utils';
 
 const inviteFormSchema = z.object({
   inviteCode: z.string().min(1, '코드를 입력해주세요.'),
@@ -35,9 +35,10 @@ const inviteFormSchema = z.object({
 export default function DashboardPage() {
   const { user } = useUser();
   const functions = useFunctions();
-  const { activeMembership, membershipsLoading } = useAppContext();
+  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMobile = viewMode === 'mobile';
 
   const form = useForm<z.infer<typeof inviteFormSchema>>({
     resolver: zodResolver(inviteFormSchema),
@@ -81,17 +82,14 @@ export default function DashboardPage() {
     const userRole = activeMembership.role;
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <h1 className="text-4xl font-black tracking-tighter">
+        <div className="flex items-center gap-2 mb-4">
+          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>
             {user?.displayName}님, 반가워요!
           </h1>
-          <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none uppercase tracking-tighter">
+          <Badge variant="secondary" className="h-6 px-2 rounded-full font-black bg-primary text-white border-none text-[10px] uppercase tracking-tighter">
             {userRole === 'centerAdmin' ? '관리자' : userRole === 'teacher' ? '선생님' : userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
         </div>
-        <p className="text-muted-foreground font-bold italic mb-8 ml-1">
-          {userRole === 'parent' ? '자녀의 학습 여정을 함께하세요.' : '오늘의 학습 여정을 시작하세요.'}
-        </p>
         
         <div className="flex flex-col gap-8">
           <StudentDashboard isActive={userRole === 'student'} />
