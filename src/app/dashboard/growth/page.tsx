@@ -108,7 +108,7 @@ function SystemGuideDialog() {
                 <Target className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-blue-900">집중력 (Focus)</p>
-                  <p className="text-[10px] font-bold text-blue-700/70">몰입 1,000분(약 16.6시간)당 1점. 6시간 공부 시 약 0.36점을 얻습니다.</p>
+                  <p className="text-[10px] font-bold text-blue-700/70">몰입 1,000분당 1점. 6시간 공부 시 약 0.36점을 얻습니다.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
@@ -122,14 +122,14 @@ function SystemGuideDialog() {
                 <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-amber-900">목표달성 (Achievement)</p>
-                  <p className="text-[10px] font-bold text-amber-700/70">플래너 To-do 항목을 하나 완료할 때마다 0.05점이 상승합니다.</p>
+                  <p className="text-[10px] font-bold text-amber-700/70">플래너 To-do 항목 하나당 0.05점이 상승합니다.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-rose-50 border border-rose-100">
                 <ShieldCheck className="h-5 w-5 text-rose-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-rose-900">회복력 (Resilience)</p>
-                  <p className="text-[10px] font-bold text-rose-700/70">6시간 이상의 초몰입 세션을 성공하면 0.5점이 부여됩니다.</p>
+                  <p className="text-[10px] font-bold text-rose-700/70">6시간 이상 초몰입 세션 성공 시 0.5점이 부여됩니다.</p>
                 </div>
               </div>
             </div>
@@ -140,10 +140,10 @@ function SystemGuideDialog() {
               <Zap className="h-4 w-4 fill-current" /> 경험치(XP)와 곡선형 성장
             </h4>
             <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 text-[11px] font-bold leading-relaxed text-muted-foreground">
-              - **1분 몰입 = 1 XP** (기본)<br/>
+              - **1분 몰입 = 1 XP**<br/>
               - 초반 레벨업은 빠르며, 후반으로 갈수록 요구 XP가 증가합니다.<br/>
-              - **레벨 1 목표**: 1,000 XP (약 2일 소요)<br/>
-              - **레벨 29 목표**: 9,400 XP (약 19일 소요)<br/>
+              - **레벨 1**: 1,000 XP (약 2일)<br/>
+              - **레벨 29**: 9,400 XP (약 19일)<br/>
               - 총 300일간 하루 평균 500 XP를 모아야 Lv.30에 도달합니다.
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function GrowthPage() {
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
 
   return (
-    <div className={cn("flex flex-col pb-24", isMobile ? "gap-5 px-0" : "gap-8")}>
+    <div className={cn("flex flex-col pb-24", isMobile ? "gap-4 px-0" : "gap-8")}>
       <header className={cn("flex flex-col", isMobile ? "gap-1 px-1" : "gap-2")}>
         <div className="flex items-center gap-3">
           <div className={cn("bg-primary rounded-2xl shadow-lg shadow-primary/20 flex items-center justify-center", isMobile ? "p-2" : "p-2.5")}>
@@ -281,32 +281,32 @@ export default function GrowthPage() {
         </div>
         <div className="flex items-center gap-2 ml-1">
           <Badge variant="outline" className={cn("border-primary/20 text-primary font-bold px-2 py-0.5", isMobile ? "text-[9px]" : "text-xs")}>CORE ROADMAP</Badge>
-          <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[11px]" : "text-sm")}>곡선형 마스터리 시스템</p>
+          <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>곡선형 마스터리 시스템</p>
         </div>
       </header>
 
       {/* 핵심 스탯 그리드 */}
-      <section className={cn("grid gap-3.5", isMobile ? "grid-cols-2" : "md:grid-cols-2 lg:grid-cols-4")}>
+      <section className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-2 lg:grid-cols-4")}>
         {Object.entries(STAT_CONFIG).map(([key, config]) => {
           const val = stats[key as keyof typeof stats] || 0;
           const Icon = config.icon;
           return (
             <Card key={key} className="border-none bg-white shadow-md overflow-hidden group rounded-[1.5rem] sm:rounded-[2rem]">
-              <CardHeader className={cn("space-y-1", isMobile ? "p-5 pb-2" : "p-6 pb-3")}>
+              <CardHeader className={cn("space-y-1", isMobile ? "p-4 pb-2" : "p-6 pb-3")}>
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className={cn("font-black text-muted-foreground/60 leading-none mb-1.5", isMobile ? "text-[9px]" : "text-xs")}>{config.sub}</span>
-                    <span className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-base", config.color)}>{config.label}</span>
+                    <span className={cn("font-black text-muted-foreground/60 leading-none mb-1", isMobile ? "text-[8px]" : "text-xs")}>{config.sub}</span>
+                    <span className={cn("font-black tracking-tight", isMobile ? "text-xs" : "text-base", config.color)}>{config.label}</span>
                   </div>
-                  <Icon className={cn("opacity-20 group-hover:opacity-100 transition-all group-hover:scale-110", isMobile ? "h-4.5 w-4.5" : "h-5 w-5", config.color)} />
+                  <Icon className={cn("opacity-20 group-hover:opacity-100 transition-all group-hover:scale-110", isMobile ? "h-4 w-4" : "h-5 w-5", config.color)} />
                 </div>
-                <div className="flex items-baseline gap-1 pt-2">
-                  <span className={cn("font-black tabular-nums", isMobile ? "text-2xl" : "text-2xl")}>{val.toFixed(1)}점</span>
-                  <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>/ 100</span>
+                <div className="flex items-baseline gap-1 pt-1.5">
+                  <span className={cn("font-black tabular-nums", isMobile ? "text-xl" : "text-2xl")}>{val.toFixed(1)}</span>
+                  <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[8px]" : "text-xs")}>/ 100</span>
                 </div>
               </CardHeader>
-              <CardContent className={cn("space-y-2", isMobile ? "px-5 pb-5" : "px-6 pb-6")}>
-                <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner">
+              <CardContent className={cn("space-y-2", isMobile ? "px-4 pb-4" : "px-6 pb-6")}>
+                <div className="relative h-1.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
                   <div 
                     className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", config.bg)}
                     style={{ width: `${Math.min(100, val)}%` }}
@@ -319,33 +319,33 @@ export default function GrowthPage() {
       </section>
 
       {/* 분석 섹션 */}
-      <Card className={cn("border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-2xl rounded-[2.5rem] overflow-hidden relative group", isMobile ? "p-6" : "p-8")}>
+      <Card className={cn("border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-2xl rounded-[2rem] overflow-hidden relative group", isMobile ? "p-5" : "p-8")}>
         <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-700">
-          <TrendingUp className={cn(isMobile ? "h-32 w-32" : "h-40 w-40")} />
+          <TrendingUp className={cn(isMobile ? "h-24 w-24" : "h-40 w-40")} />
         </div>
-        <CardHeader className={cn("relative z-10 p-0 mb-6")}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Sparkles className="h-4 w-4 text-amber-400 fill-current" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Insight Analysis</span>
+        <CardHeader className={cn("relative z-10 p-0 mb-5")}>
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-3 w-3 text-amber-400 fill-current" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60">Insight Analysis</span>
           </div>
-          <CardTitle className={cn("font-black", isMobile ? "text-2xl" : "text-xl")}>
+          <CardTitle className={cn("font-black", isMobile ? "text-xl" : "text-xl")}>
             성장 페이스 분석
           </CardTitle>
-          <CardDescription className="text-primary-foreground/60 font-bold">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} XP</CardDescription>
+          <CardDescription className="text-primary-foreground/60 font-bold text-[10px] sm:text-xs">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} XP</CardDescription>
         </CardHeader>
         <CardContent className={cn("relative z-10 p-0")}>
-          <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+          <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
             {[
               { label: '여정 진행', val: daysSpent, unit: '일차' },
               { label: '일일 목표', val: 360, unit: '분/일' },
               { label: '남은 일수', val: estimatedDaysToMax > 0 ? estimatedDaysToMax : '-', unit: '일 예상', highlight: true },
               { label: '보너스', val: `x${totalMultiplier.toFixed(2)}`, unit: '합산', success: true }
             ].map((item, i) => (
-              <div key={i} className="bg-white/10 backdrop-blur-md p-4 rounded-[1.5rem] border border-white/10 flex flex-col justify-center">
-                <p className="text-[9px] font-black uppercase opacity-60 mb-1.5">{item.label}</p>
-                <div className="flex items-baseline gap-1">
-                  <span className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-2xl", item.highlight ? "text-amber-400" : item.success ? "text-emerald-400" : "")}>{item.val}</span>
-                  <span className="text-[9px] font-bold opacity-60 ml-0.5">{item.unit}</span>
+              <div key={i} className="bg-white/10 backdrop-blur-md p-3.5 rounded-[1.25rem] border border-white/10 flex flex-col justify-center">
+                <p className="text-[8px] font-black uppercase opacity-60 mb-1">{item.label}</p>
+                <div className="flex items-baseline gap-0.5">
+                  <span className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl", item.highlight ? "text-amber-400" : item.success ? "text-emerald-400" : "")}>{item.val}</span>
+                  <span className="text-[8px] font-bold opacity-60 ml-0.5">{item.unit}</span>
                 </div>
               </div>
             ))}
@@ -354,44 +354,44 @@ export default function GrowthPage() {
       </Card>
 
       {/* 마스터리 로드맵 메인 섹션 */}
-      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] sm:rounded-[3rem] shadow-2xl relative overflow-hidden", isMobile ? "p-6" : "p-10")}>
+      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 shadow-2xl relative overflow-hidden", isMobile ? "p-4 rounded-[2rem]" : "p-10 rounded-[3rem]")}>
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
         
-        <div className={cn("flex flex-col justify-between gap-6 mb-8 relative z-10", isMobile ? "" : "md:flex-row md:items-center")}>
-          <div className="space-y-1.5">
-            <h2 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-2xl" : "text-2xl")}>
+        <div className={cn("flex flex-col justify-between gap-5 mb-6 relative z-10", isMobile ? "" : "md:flex-row md:items-center")}>
+          <div className="space-y-1">
+            <h2 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
               마스터리 로드맵
-              <Badge variant="secondary" className="bg-primary text-white border-none font-black px-2.5 py-0.5 text-[10px]">PREMIUM</Badge>
+              <Badge variant="secondary" className="bg-primary text-white border-none font-black px-2 py-0.5 text-[8px] sm:text-[10px]">PREMIUM</Badge>
             </h2>
-            <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[11px]" : "text-sm")}>Lv.30은 상위 0.1%의 증거입니다.</p>
+            <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>Lv.30은 상위 0.1%의 증거입니다.</p>
           </div>
           
-          <div className={cn("bg-white p-4 rounded-[2rem] flex items-center gap-5 border border-border/50 shadow-xl", isMobile ? "w-full" : "min-w-[280px]")}>
+          <div className={cn("bg-white p-3 rounded-[1.5rem] flex items-center gap-3 border border-border/50 shadow-xl", isMobile ? "w-full" : "min-w-[280px]")}>
             <div className="relative flex items-center justify-center shrink-0">
-              <svg className={cn("transform -rotate-90", isMobile ? "h-14 w-14" : "h-16 w-16")}>
-                <circle cx={isMobile ? "28" : "32"} cy={isMobile ? "28" : "32"} r={isMobile ? "24" : "28"} stroke="currentColor" strokeWidth="5" fill="transparent" className="text-muted/30" />
-                <circle cx={isMobile ? "28" : "32"} cy={isMobile ? "28" : "32"} r={isMobile ? "24" : "28"} stroke="currentColor" strokeWidth="5" fill="transparent" className="text-primary" 
+              <svg className={cn("transform -rotate-90", isMobile ? "h-12 w-12" : "h-16 w-16")}>
+                <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted/30" />
+                <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" 
                   style={{ 
-                    strokeDasharray: isMobile ? 150.7 : 175.8, 
-                    strokeDashoffset: (isMobile ? 150.7 : 175.8) - ((isMobile ? 150.7 : 175.8) * (progress?.currentXp || 0) / currentLevelThreshold) 
+                    strokeDasharray: isMobile ? 125.6 : 175.8, 
+                    strokeDashoffset: (isMobile ? 125.6 : 175.8) - ((isMobile ? 125.6 : 175.8) * (progress?.currentXp || 0) / currentLevelThreshold) 
                   }} 
                 />
               </svg>
               <div className="absolute flex flex-col items-center leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase mb-0.5">LV</span>
-                <span className={cn("font-black text-primary", isMobile ? "text-xl" : "text-xl")}>{progress?.level || 1}</span>
+                <span className="text-[7px] font-black text-muted-foreground uppercase mb-0.5">LV</span>
+                <span className={cn("font-black text-primary", isMobile ? "text-lg" : "text-xl")}>{progress?.level || 1}</span>
               </div>
             </div>
-            <div className="flex-1 flex flex-col gap-2 min-w-0">
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
               <div className="flex justify-between items-end">
-                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Progress</span>
-                <span className="text-[10px] font-black tabular-nums">{(progress?.currentXp || 0).toLocaleString()} XP</span>
+                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Progress</span>
+                <span className="text-[9px] font-black tabular-nums">{(progress?.currentXp || 0).toLocaleString()} XP</span>
               </div>
-              <Progress value={((progress?.currentXp || 0) / currentLevelThreshold) * 100} className="h-1.5 rounded-full shadow-inner" />
+              <Progress value={((progress?.currentXp || 0) / currentLevelThreshold) * 100} className="h-1 rounded-full shadow-inner" />
               <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-primary/60">Lv.{MAX_LEVEL}</span>
-                <span className="text-[9px] font-black text-muted-foreground flex items-center gap-1">
-                  <Star className="h-2.5 w-2.5 fill-current" /> MASTER
+                <span className="text-[8px] font-black text-primary/60">Lv.{MAX_LEVEL}</span>
+                <span className="text-[8px] font-black text-muted-foreground flex items-center gap-1">
+                  <Star className="h-2 w-2 fill-current" /> MASTER
                 </span>
               </div>
             </div>
@@ -399,23 +399,23 @@ export default function GrowthPage() {
         </div>
 
         <Tabs defaultValue="focus" className="w-full relative z-10" onValueChange={(val) => setActiveBranch(val as any)}>
-          <TabsList className={cn("grid grid-cols-4 bg-muted/30 p-1.5 rounded-[1.25rem] border border-border/50 shadow-inner mb-8", isMobile ? "h-14" : "h-16")}>
-            <TabsTrigger value="focus" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-blue-600 text-[11px] sm:text-xs">
-              <Target className="h-4 w-4" /> <span className="hidden xs:inline">집중</span>
+          <TabsList className={cn("grid grid-cols-4 bg-muted/30 p-1 rounded-xl border border-border/50 shadow-inner mb-6", isMobile ? "h-12" : "h-16")}>
+            <TabsTrigger value="focus" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-blue-600 text-[10px] sm:text-xs">
+              <Target className="h-3.5 w-3.5" /> <span className="hidden sm:inline">집중</span>
             </TabsTrigger>
-            <TabsTrigger value="consistency" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-emerald-600 text-[11px] sm:text-xs">
-              <RefreshCw className="h-4 w-4" /> <span className="hidden xs:inline">꾸준</span>
+            <TabsTrigger value="consistency" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-emerald-600 text-[10px] sm:text-xs">
+              <RefreshCw className="h-3.5 w-3.5" /> <span className="hidden sm:inline">꾸준</span>
             </TabsTrigger>
-            <TabsTrigger value="achievement" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-amber-600 text-[11px] sm:text-xs">
-              <CheckCircle2 className="h-4 w-4" /> <span className="hidden xs:inline">성취</span>
+            <TabsTrigger value="achievement" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-amber-600 text-[10px] sm:text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">성취</span>
             </TabsTrigger>
-            <TabsTrigger value="resilience" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-rose-600 text-[11px] sm:text-xs">
-              <ShieldCheck className="h-4 w-4" /> <span className="hidden xs:inline">회복</span>
+            <TabsTrigger value="resilience" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-rose-600 text-[10px] sm:text-xs">
+              <ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">회복</span>
             </TabsTrigger>
           </TabsList>
 
-          <div className={cn("grid gap-8 items-start", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
-            <div className={cn("flex flex-col gap-6", isMobile ? "lg:col-span-12 items-center" : "lg:col-span-7")}>
+          <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
+            <div className={cn("flex flex-col gap-4", isMobile ? "lg:col-span-12 items-center" : "lg:col-span-7")}>
               {MOCK_SKILLS.filter(s => s.branch === activeBranch).map((skill, idx) => {
                 const isUnlocked = !!progress?.skills?.[skill.id];
                 const canUnlock = !isUnlocked && stats[activeBranch] >= (skill.unlockCondition.value || 0);
@@ -425,7 +425,7 @@ export default function GrowthPage() {
                   <div key={skill.id} className="relative flex flex-col items-center w-full">
                     {idx < 4 && (
                       <div className={cn(
-                        "absolute top-full w-0.5 h-6 border-l-2 border-dashed transition-colors duration-500",
+                        "absolute top-full w-0.5 h-4 border-l-2 border-dashed transition-colors duration-500",
                         isUnlocked ? "border-primary/50" : "border-muted"
                       )} />
                     )}
@@ -433,27 +433,27 @@ export default function GrowthPage() {
                     <Card 
                       onClick={() => setSelectedSkillId(skill.id)}
                       className={cn(
-                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full rounded-[1.75rem]",
-                        isSelected ? "border-primary ring-4 ring-primary/10 scale-105 z-10 shadow-2xl" : "border-border/50",
-                        isUnlocked ? "bg-white shadow-lg" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60",
+                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full rounded-[1.5rem]",
+                        isSelected ? "border-primary ring-4 ring-primary/10 scale-[1.02] z-10 shadow-xl" : "border-border/50",
+                        isUnlocked ? "bg-white shadow-md" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60",
                         isMobile ? "max-w-full" : "max-w-[360px]"
                       )}
                     >
-                      <CardHeader className={cn("flex flex-row items-center gap-4", isMobile ? "p-5" : "p-5")}>
+                      <CardHeader className={cn("flex flex-row items-center gap-3", isMobile ? "p-4" : "p-5")}>
                         <div className={cn(
-                          "rounded-2xl transition-all duration-700 flex items-center justify-center shrink-0",
-                          isMobile ? "p-3 h-11 w-11" : "p-3 h-12 w-12",
+                          "rounded-xl transition-all duration-700 flex items-center justify-center shrink-0",
+                          isMobile ? "p-2.5 h-10 w-10" : "p-3 h-12 w-12",
                           isUnlocked ? "bg-primary text-white shadow-lg" : canUnlock ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                         )}>
-                          {isUnlocked ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                          {isUnlocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                         </div>
-                        <div className="grid gap-1 min-w-0 flex-1">
-                          <CardTitle className={cn("font-black leading-tight truncate", isMobile ? "text-base" : "text-base")}>{skill.name}</CardTitle>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
+                        <div className="grid gap-0.5 min-w-0 flex-1">
+                          <CardTitle className={cn("font-black leading-tight truncate", isMobile ? "text-sm" : "text-base")}>{skill.name}</CardTitle>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
                             {isUnlocked ? `Mastery Unlocked` : canUnlock ? "해금 가능" : "잠겨있음"}
                           </span>
                         </div>
-                        {isUnlocked && <Star className="ml-auto h-4 w-4 text-amber-400 fill-current" />}
+                        {isUnlocked && <Star className="ml-auto h-3.5 w-3.5 text-amber-400 fill-current" />}
                       </CardHeader>
                     </Card>
                   </div>
@@ -464,51 +464,51 @@ export default function GrowthPage() {
             <div className={cn("h-full", isMobile ? "lg:col-span-12" : "lg:col-span-5")}>
               {selectedSkill ? (
                 <Card className={cn(
-                  "border-none bg-primary text-primary-foreground shadow-2xl rounded-[2.5rem] overflow-hidden transform-gpu",
+                  "border-none bg-primary text-primary-foreground shadow-2xl rounded-[2rem] overflow-hidden transform-gpu",
                   !isMobile && "sticky top-24"
                 )}>
-                  <CardHeader className={cn(isMobile ? "p-8 pb-4" : "p-8 pb-4")}>
-                    <Badge className="w-fit mb-3 bg-white/20 hover:bg-white/30 text-white border-none font-black text-[9px] uppercase tracking-[0.2em] px-3 py-1">
+                  <CardHeader className={cn(isMobile ? "p-6 pb-3" : "p-8 pb-4")}>
+                    <Badge className="w-fit mb-2 bg-white/20 hover:bg-white/30 text-white border-none font-black text-[8px] uppercase tracking-[0.2em] px-2 py-0.5">
                       {STAT_CONFIG[activeBranch].label} PATH
                     </Badge>
-                    <CardTitle className={cn("font-black tracking-tighter mb-2", isMobile ? "text-3xl" : "text-3xl")}>{selectedSkill.name}</CardTitle>
-                    <p className={cn("font-bold leading-relaxed opacity-80", isMobile ? "text-sm" : "text-sm")}>{selectedSkill.description}</p>
+                    <CardTitle className={cn("font-black tracking-tighter mb-1", isMobile ? "text-2xl" : "text-3xl")}>{selectedSkill.name}</CardTitle>
+                    <p className={cn("font-bold leading-relaxed opacity-80", isMobile ? "text-xs" : "text-sm")}>{selectedSkill.description}</p>
                   </CardHeader>
-                  <CardContent className={cn("space-y-6", isMobile ? "p-8" : "p-8")}>
-                    <div className="space-y-3">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Unlock Requirement</h4>
-                      <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl border border-white/10">
-                        <div className="flex items-center gap-3">
-                          <SelectedBranchIcon className="h-4 w-4 opacity-60" />
-                          <span className="text-xs font-black">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
+                  <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
+                    <div className="space-y-2">
+                      <h4 className="text-[9px] font-black uppercase tracking-widest opacity-60">Unlock Requirement</h4>
+                      <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
+                        <div className="flex items-center gap-2">
+                          <SelectedBranchIcon className="h-3.5 w-3.5 opacity-60" />
+                          <span className="text-[11px] font-black">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
                         </div>
                         {(stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-400 fill-current" />
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-current" />
                         ) : (
-                          <span className="text-[11px] font-black opacity-60">{(stats[activeBranch] || 0).toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
+                          <span className="text-[10px] font-black opacity-60">{(stats[activeBranch] || 0).toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
                         )}
                       </div>
                     </div>
 
-                    <div className="pt-2 flex flex-col gap-3">
-                      <Button asChild className="w-full h-14 rounded-2xl bg-white text-primary hover:bg-white/90 font-black text-base shadow-xl gap-2 active:scale-95 transition-all">
-                        <Link href={selectedSkill.link}>지금 수행하기 <ArrowRight className="ml-auto h-4 w-4" /></Link>
+                    <div className="pt-1 flex flex-col gap-2.5">
+                      <Button asChild className="w-full h-12 rounded-xl bg-white text-primary hover:bg-white/90 font-black text-sm shadow-xl gap-2 active:scale-95 transition-all">
+                        <Link href={selectedSkill.link}>지금 수행하기 <ArrowRight className="ml-auto h-3.5 w-3.5" /></Link>
                       </Button>
 
                       {!!progress?.skills?.[selectedSkill.id] ? (
-                        <div className="flex items-center justify-center gap-2 text-white/40 font-black text-[10px] uppercase tracking-widest py-2">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Mastery Active
+                        <div className="flex items-center justify-center gap-2 text-white/40 font-black text-[9px] uppercase tracking-widest py-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Mastery Active
                         </div>
                       ) : (stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
                         <Button 
                           onClick={() => handleUnlockSkill(selectedSkill.id)}
-                          className="w-full h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-base shadow-xl gap-2"
+                          className="w-full h-12 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-sm shadow-xl gap-2"
                         >
-                          <Unlock className="h-4 w-4" /> 지금 해금하기
+                          <Unlock className="h-3.5 w-3.5" /> 지금 해금하기
                         </Button>
                       ) : (
-                        <Button disabled className="w-full h-14 rounded-2xl bg-white/10 text-white/40 font-black text-base border border-white/5 gap-2">
-                          <Lock className="h-4 w-4" /> 조건 미충족
+                        <Button disabled className="w-full h-12 rounded-xl bg-white/10 text-white/40 font-black text-sm border border-white/5 gap-2">
+                          <Lock className="h-3.5 w-3.5" /> 조건 미충족
                         </Button>
                       )}
                     </div>
