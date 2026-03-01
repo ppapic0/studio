@@ -16,8 +16,10 @@ import {
   updateDoc, 
   deleteDoc, 
   writeBatch,
+  increment,
+  setDoc
 } from 'firebase/firestore';
-import { StudyLogDay, StudyPlanItem, WithId } from '@/lib/types';
+import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress } from '@/lib/types';
 import { 
   format, 
   startOfMonth, 
@@ -53,7 +55,8 @@ import {
   Sparkles,
   Activity,
   PlusCircle,
-  CalendarCheck
+  CalendarCheck,
+  CircleDot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -131,67 +134,68 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
 
   return (
     <div className={cn(
-      "flex flex-col transition-all border group relative bg-white",
-      isMobile ? "p-4 rounded-[1.25rem] border-border/50" : "p-5 rounded-2xl hover:border-primary/30"
+      "flex flex-col transition-all border group relative bg-white shadow-sm hover:shadow-md",
+      isMobile ? "p-4 rounded-[1.5rem] border-border/40" : "p-5 rounded-2xl hover:border-primary/30"
     )}>
       <div className="flex items-center gap-3">
         <div className={cn(
-          "rounded-xl transition-all duration-500 shrink-0",
-          isMobile ? "bg-primary/5 p-2" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
+          "rounded-xl transition-all duration-500 shrink-0 flex items-center justify-center",
+          isMobile ? "bg-primary/5 p-2.5" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
         )}>
-          <Icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+          <Icon className={cn(isMobile ? "h-4 w-4 text-primary" : "h-5 w-5")} />
         </div>
         
         <div className="flex-1 min-w-0">
-          <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
-          <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest leading-none">Routine Item</span>
+          <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-sm" : "text-base")}>{titlePart}</Label>
         </div>
 
-        {isPast ? (
-          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[10px]">
-            {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
-          </Badge>
-        ) : (
-          <div className="flex items-center gap-0.5 bg-muted/30 p-1 rounded-xl border border-border/20">
-             <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[50px] text-[9px]" : "w-[65px] text-xs")}>
-                 <SelectValue />
-               </SelectTrigger>
-               <SelectContent className="rounded-xl border-none shadow-2xl">
-                 <SelectItem value="오전">오전</SelectItem>
-                 <SelectItem value="오후">오후</SelectItem>
-               </SelectContent>
-             </Select>
+        <div className="flex items-center gap-1">
+          {isPast ? (
+            <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[10px] px-2 py-1">
+              {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
+            </Badge>
+          ) : (
+            <div className="flex items-center gap-0.5 bg-muted/20 p-1 rounded-xl border border-border/30">
+               <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
+                 <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7 shadow-none", isMobile ? "w-[52px] text-[10px]" : "w-[65px] text-xs")}>
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent className="rounded-xl border-none shadow-2xl">
+                   <SelectItem value="오전">오전</SelectItem>
+                   <SelectItem value="오후">오후</SelectItem>
+                 </SelectContent>
+               </Select>
 
-             <div className="w-px h-3 bg-border/50 mx-0.5" />
+               <div className="w-px h-3 bg-border/50 mx-0.5" />
 
-             <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[35px] text-[10px]" : "w-[50px] text-sm")}>
-                 <SelectValue />
-               </SelectTrigger>
-               <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
-                 {HOURS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-               </SelectContent>
-             </Select>
+               <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
+                 <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7 shadow-none", isMobile ? "w-[38px] text-[11px]" : "w-[50px] text-sm")}>
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
+                   {HOURS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                 </SelectContent>
+               </Select>
 
-             <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
+               <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
 
-             <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[35px] text-[10px]" : "w-[50px] text-sm")}>
-                 <SelectValue />
-               </SelectTrigger>
-               <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
-                 {MINUTES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-               </SelectContent>
-             </Select>
-          </div>
-        )}
-        
-        {!isPast && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all shrink-0" onClick={() => onDelete(item)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+               <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
+                 <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7 shadow-none", isMobile ? "w-[38px] text-[11px]" : "w-[50px] text-sm")}>
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
+                   {MINUTES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                 </SelectContent>
+               </Select>
+            </div>
+          )}
+          
+          {!isPast && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all shrink-0 ml-1" onClick={() => onDelete(item)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -330,9 +334,20 @@ export default function StudyHistoryPage() {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !selectedDateForPlan) return;
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id), {
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    
+    await updateDoc(itemRef, {
       done: !item.done, doneAt: !item.done ? serverTimestamp() : null, updatedAt: serverTimestamp(),
     });
+
+    if (!item.done) {
+      const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+      setDoc(progressRef, {
+        stats: { achievement: increment(0.05) },
+        currentXp: increment(10),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
@@ -564,10 +579,10 @@ export default function StudyHistoryPage() {
                       {studyTasks.map((task) => (
                         <div key={task.id} className={cn(
                           "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
-                          task.done ? "bg-emerald-50/50 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
+                          task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
                         )}>
                           <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
-                          <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                          <Label htmlFor={task.id} className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
                           {!isActuallyPast && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
                               <Trash2 className="h-4 w-4" />
@@ -578,20 +593,20 @@ export default function StudyHistoryPage() {
                     </div>
                     {!isActuallyPast && (
                       <div className="pt-4">
-                        <div className="relative flex items-center bg-white border-2 border-emerald-100 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1 shadow-sm">
+                        <div className="relative flex items-center bg-white border-2 border-emerald-100 rounded-[1.5rem] group focus-within:border-emerald-500 transition-all p-1 shadow-md">
                           <Input 
                             placeholder="공부 계획 추가..." 
                             value={newStudyTask} 
                             onChange={(e) => setNewStudyTask(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting} 
-                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10 text-sm" 
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm" 
                           />
                           <Button 
                             size="icon" 
                             onClick={() => handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting || !newStudyTask.trim()} 
-                            className="h-9 w-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"
+                            className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg mr-0.5"
                           >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
@@ -605,10 +620,10 @@ export default function StudyHistoryPage() {
                       {personalTasks.map((task) => (
                         <div key={task.id} className={cn(
                           "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
-                          task.done ? "bg-amber-50/50 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
+                          task.done ? "bg-amber-50/20 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
                         )}>
                           <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500" />
-                          <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                          <Label htmlFor={task.id} className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
                           {!isActuallyPast && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
                               <Trash2 className="h-4 w-4" />
@@ -619,21 +634,21 @@ export default function StudyHistoryPage() {
                     </div>
                     {!isActuallyPast && (
                       <div className="pt-4">
-                        <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1 shadow-sm">
+                        <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-[1.5rem] group focus-within:border-amber-500 transition-all p-1 shadow-md">
                           <Input 
                             placeholder="개인 일정 추가..." 
                             value={newPersonalTask} 
                             onChange={(e) => setNewPersonalTask(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting} 
-                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10 text-sm" 
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm" 
                           />
                           <Button 
                             variant="outline" 
                             size="icon" 
                             onClick={() => handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting || !newPersonalTask.trim()} 
-                            className="h-9 w-9 rounded-xl border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0"
+                            className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0 shadow-lg mr-0.5"
                           >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
