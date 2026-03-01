@@ -47,7 +47,7 @@ import {
   Timestamp,
   updateDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -84,18 +84,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = activeMembership?.id;
 
+  // 1. 모든 학생 상세 프로필
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
+  // 2. 학생들의 멤버십 정보 (상태 확인용)
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
+  }, [firestore, centerId]);
+  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+
+  // 3. 실시간 좌석 현황
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
+  // 4. 오늘 상담 예약
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const todayDate = new Date();
@@ -109,7 +119,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const appointments = useMemo(() => {
     if (!rawAppointments) return [];
-    return [...rawAppointments].sort((a, b) => (a.scheduledAt?.toMillis() || 0) - (b.scheduledAt?.toMillis() || 0));
+    return [...rawAppointments].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
   }, [rawAppointments]);
 
   const seatBounds = useMemo(() => {
@@ -134,11 +144,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [seatBounds]);
 
+  // 배정되지 않은 재원생만 필터링
   const unassignedStudents = useMemo(() => {
-    if (!students) return [];
-    return students.filter(s => !s.seatNo || s.seatNo === 0)
-      .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [students, searchTerm]);
+    if (!students || !studentMembers) return [];
+    return students.filter(s => {
+      const membership = studentMembers.find(m => m.id === s.id);
+      const isActiveMember = membership?.status === 'active';
+      const hasNoSeat = !s.seatNo || s.seatNo === 0;
+      return isActiveMember && hasNoSeat;
+    }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [students, studentMembers, searchTerm]);
 
   const openLayoutEditor = () => {
     if (attendanceList && attendanceList.length > 0) {
@@ -414,7 +429,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 {studentsLoading ? (
                   <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary/20" /></div>
                 ) : unassignedStudents.length === 0 ? (
-                  <div className="py-10 text-center text-muted-foreground/40 font-bold italic text-xs">배정 가능한 학생이 없습니다.</div>
+                  <div className="py-10 text-center text-muted-foreground/40 font-bold italic text-xs">배정 가능한 재원생이 없습니다.</div>
                 ) : (
                   unassignedStudents.map((student) => (
                     <div 

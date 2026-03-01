@@ -5,7 +5,7 @@ import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, doc, updateDoc, serverTimestamp, query, where, collectionGroup, writeBatch } from 'firebase/firestore';
-import { type StudentProfile, type AttendanceCurrent, type StudyLogDay } from '@/lib/types';
+import { type StudentProfile, type AttendanceCurrent, type StudyLogDay, type CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
   Armchair, 
@@ -65,21 +65,28 @@ export default function LayoutViewPage() {
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
 
-  // 1. 모든 학생 프로필 조회
+  // 1. 모든 학생 상세 프로필
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'students');
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery);
 
-  // 2. 실시간 좌석 상태 조회
+  // 2. 학생들의 멤버십 정보 (상태 확인용)
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
+  }, [firestore, centerId]);
+  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery);
+
+  // 3. 실시간 좌석 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
 
-  // 3. 오늘 모든 학생의 학습 로그 조회
+  // 4. 오늘 모든 학생의 학습 로그 조회
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(
@@ -112,11 +119,16 @@ export default function LayoutViewPage() {
     };
   }, [seatBounds]);
 
+  // 배정되지 않은 재원생만 필터링
   const unassignedStudents = useMemo(() => {
-    if (!students) return [];
-    return students.filter(s => !s.seatNo || s.seatNo === 0)
-      .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [students, searchTerm]);
+    if (!students || !studentMembers) return [];
+    return students.filter(s => {
+      const membership = studentMembers.find(m => m.id === s.id);
+      const isActiveMember = membership?.status === 'active';
+      const hasNoSeat = !s.seatNo || s.seatNo === 0;
+      return isActiveMember && hasNoSeat;
+    }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [students, studentMembers, searchTerm]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -384,7 +396,7 @@ export default function LayoutViewPage() {
                 {studentsLoading ? (
                   <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary/20" /></div>
                 ) : unassignedStudents.length === 0 ? (
-                  <div className="py-10 text-center text-muted-foreground/40 font-bold italic text-xs">배정 가능한 학생이 없습니다.</div>
+                  <div className="py-10 text-center text-muted-foreground/40 font-bold italic text-xs">배정 가능한 재원생이 없습니다.</div>
                 ) : (
                   unassignedStudents.map((student) => (
                     <div 
