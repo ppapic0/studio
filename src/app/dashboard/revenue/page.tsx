@@ -54,7 +54,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/select';
+} from '@/components/ui/select';
 import { format, startOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
