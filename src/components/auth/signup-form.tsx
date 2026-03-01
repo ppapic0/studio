@@ -320,9 +320,11 @@ export function SignupForm() {
             <FormItem>
               <FormLabel className="font-bold">센터 가입 코드</FormLabel>
               <FormControl><Input placeholder="센터에서 제공받은 코드" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
-              <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
-                {form.watch('role') === 'teacher' ? '💡 선생님 테스트 코드: T0313' : '💡 학생/학부모 테스트 코드: 0313'}
-              </FormDescription>
+              {form.watch('role') !== 'teacher' && (
+                <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
+                  💡 가입 코드: 0313
+                </FormDescription>
+              )}
               <FormMessage />
             </FormItem>
           )}
