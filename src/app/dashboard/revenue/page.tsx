@@ -55,11 +55,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format, startOfMonth, subMonths, eachMonthOfInterval, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, startOfMonth, subMonths, eachMonthOfInterval, endOfMonth, eachDayOfInterval, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
-import { syncRecentKpis, syncMonthKpis } from '@/lib/finance-actions';
+import { syncMonthKpis } from '@/lib/finance-actions';
 
 export default function RevenuePage() {
   const { activeMembership, viewMode, membershipsLoading } = useAppContext();
@@ -288,7 +288,7 @@ export default function RevenuePage() {
           </p>
           <div className="flex justify-between items-end">
             <div>
-              <h3 className="text-4xl font-black tracking-tighter text-primary">₩{Math.round((todayKpi?.totalRevenue || 0) / (todayKpi?.activeStudentCount || 1)).toLocaleString()}</h3>
+              <h3 className="text-4xl font-black tracking-tighter text-primary">₩{todayKpi && todayKpi.activeStudentCount > 0 ? Math.round((todayKpi.totalRevenue || 0) / todayKpi.activeStudentCount).toLocaleString() : '0'}</h3>
               <p className="text-[10px] font-bold text-muted-foreground mt-1">재수생 포함 실질 1일 수강료</p>
             </div>
             <div className="bg-blue-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><PieChart className="h-6 w-6 text-blue-600" /></div>
