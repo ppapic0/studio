@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -70,9 +71,9 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     
-    // 가입 코드 검증 (간이 방식 - 실제로는 Firestore inviteCodes 컬렉션 조회 필요)
+    // 가입 코드 검증 (관리자 코드는 노출하지 않고 내부적으로만 체크)
     if (values.role === 'centerAdmin' && values.inviteCode !== 'A0313') {
-      form.setError('inviteCode', { message: '관리자 가입 코드가 일치하지 않습니다.' });
+      form.setError('inviteCode', { message: '관리자 가입 코드가 올바르지 않습니다.' });
       return;
     }
 
@@ -318,7 +319,7 @@ export function SignupForm() {
               <FormItem>
                 <FormLabel className="flex items-center gap-2 font-bold">자녀 연동 코드 <UserCheck className="h-3 w-3 text-primary" /></FormLabel>
                 <FormControl><Input placeholder="자녀가 설정한 4자리 숫자" maxLength={4} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
-                <FormDescription className="text-[10px] font-bold">자녀에게 물어보고 4자리 코드를 입력해 주세요. (가입 후 이름이 자동으로 설정됩니다.)</FormDescription>
+                <FormDescription className="text-[10px] font-bold">자녀에게 물어보고 4자리 코드를 입력해 주세요.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -339,7 +340,7 @@ export function SignupForm() {
               )}
               {form.watch('role') === 'centerAdmin' && (
                 <FormDescription className="text-[10px] font-black text-rose-600 bg-rose-50 p-2 rounded-lg">
-                  💡 관리자 전용 코드를 입력하세요. (A0313)
+                  💡 관리자 전용 코드를 입력하세요.
                 </FormDescription>
               )}
               <FormMessage />
