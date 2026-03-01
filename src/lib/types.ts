@@ -20,6 +20,7 @@ export interface CenterMembership {
   joinedAt: Timestamp;
   displayName?: string;
   linkedStudentIds?: string[]; // 학부모용: 연결된 자녀 ID 목록
+  monthlyFee?: number; // 학생별 설정된 월 수강료
 }
 
 export interface StudentProfile {

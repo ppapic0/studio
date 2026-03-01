@@ -1,12 +1,15 @@
+
 'use client';
 
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useAppContext } from '@/contexts/app-context';
 import { redirect } from 'next/navigation';
-import { Loader2, Compass } from 'lucide-react';
+import { Loader2, Compass, DollarSign, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function RevenuePage() {
-  const { activeMembership, membershipsLoading } = useAppContext();
+  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
+  const isMobile = viewMode === 'mobile';
 
   // 멤버십 정보 로딩 중 처리
   if (membershipsLoading) {
@@ -34,14 +37,27 @@ export default function RevenuePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-headline font-bold tracking-tight">
-          수익 및 운영 분석
-        </h1>
-        <p className="text-muted-foreground">센터의 비즈니스 성과와 학생 등록 추이를 모니터링합니다.</p>
-      </div>
-      <div className="mt-6">
+    <div className={cn("flex flex-col gap-8 w-full max-w-[1400px] mx-auto", isMobile ? "px-1" : "px-4 py-6")}>
+      <header className={cn("flex justify-between items-end", isMobile ? "px-2" : "")}>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-primary/60">
+            <DollarSign className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Business Intelligence</span>
+          </div>
+          <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-3xl" : "text-5xl")}>
+            수익 및 비즈니스 분석
+          </h1>
+          <p className="text-sm font-bold text-muted-foreground/70 mt-2">센터의 실시간 재무 지표와 학생 생애 가치를 추적합니다.</p>
+        </div>
+        {!isMobile && (
+          <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
+            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            <span className="text-[10px] font-black text-primary uppercase tracking-widest">Live Forecast Active</span>
+          </div>
+        )}
+      </header>
+
+      <div className="mt-4">
         <RevenueAnalysis />
       </div>
     </div>

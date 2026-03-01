@@ -34,7 +34,8 @@
         "status": { "type": "string", "enum": ["active", "onHold", "withdrawn"] },
         "displayName": { "type": "string" },
         "joinedAt": { "type": "string", "format": "date-time" },
-        "linkedStudentIds": { "type": "array", "items": { "type": "string" } }
+        "linkedStudentIds": { "type": "array", "items": { "type": "string" } },
+        "monthlyFee": { "type": "number", "description": "학생별 설정된 월 수강료" }
       }
     },
     "StudentProfile": {
@@ -185,7 +186,7 @@
     },
     "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}": {
       "schema": { "$ref": "#/entities/DailyStudentStat" },
-      "description": "학생별 일일 성과 지표 통계"
+      "description": "학생별 일일 성과 통계"
     },
     "/centers/{centerId}/attendanceCurrent/{seatId}": {
       "schema": { "type": "object" },
