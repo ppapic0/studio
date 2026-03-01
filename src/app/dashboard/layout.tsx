@@ -18,7 +18,7 @@ export default function DashboardLayout({
   return (
     <div className={cn(
       "min-h-screen w-full bg-background transition-all duration-500",
-      isForcedMobile ? "flex flex-col items-center bg-[#f0f0f0] py-8" : "grid md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]"
+      isForcedMobile ? "flex flex-col items-center bg-[#f0f0f0] py-4 sm:py-8" : "grid md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]"
     )}>
       {/* Sidebar - Desktop/Tablet Mode */}
       {!isForcedMobile && (
@@ -35,7 +35,9 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <div className={cn(
         "flex flex-col min-h-screen transition-all duration-500",
-        isForcedMobile ? "w-full max-w-[430px] aspect-[9/19.5] bg-background shadow-[0_0_100px_rgba(0,0,0,0.1)] rounded-[3rem] overflow-hidden border-[8px] border-white relative" : "w-full"
+        isForcedMobile 
+          ? "w-full max-w-[430px] aspect-[9/19.5] bg-background shadow-[0_40px_100px_rgba(0,0,0,0.2)] rounded-[3rem] overflow-hidden border-[8px] border-white relative ring-1 ring-black/5" 
+          : "w-full"
       )}>
         {/* Header - Always visible but responsive */}
         <DashboardHeader />
@@ -43,7 +45,7 @@ export default function DashboardLayout({
         {/* Scrollable Content */}
         <main className={cn(
           "flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto",
-          isForcedMobile ? "p-4 pb-24" : "p-4 md:p-6 lg:p-8 max-w-[1400px] pb-24 md:pb-8"
+          isForcedMobile ? "p-5 pb-24" : "p-4 md:p-6 lg:p-8 max-w-[1400px] pb-24 md:pb-8"
         )}>
           {children}
         </main>
