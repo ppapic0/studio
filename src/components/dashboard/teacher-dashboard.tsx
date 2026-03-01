@@ -204,12 +204,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           { label: '외출/휴식', val: attendanceList?.filter(a => ['away', 'break'].includes(a.status)).length || 0, color: 'text-amber-600', icon: Clock },
           { label: '배치 좌석', val: attendanceList?.length || 0, color: 'text-primary', icon: Armchair }
         ].map((item, i) => (
-          <Card key={i} className="rounded-2xl border shadow-sm bg-white overflow-hidden p-3 flex flex-col gap-1">
+          <Card key={i} className="rounded-2xl border shadow-sm bg-white overflow-hidden p-4 flex flex-col gap-2">
             <div className="flex justify-between items-center">
-              <span className="text-[9px] font-black uppercase text-muted-foreground/60">{item.label}</span>
-              <item.icon className={cn("h-3 w-3", item.color)} />
+              <span className="text-[10px] font-black uppercase text-muted-foreground/60">{item.label}</span>
+              <item.icon className={cn("h-4 w-4", item.color)} />
             </div>
-            <div className={cn("text-xl font-black", item.color)}>{item.val}</div>
+            <div className={cn("text-3xl font-black tracking-tighter", item.color)}>{item.val}</div>
           </Card>
         ))}
       </div>
@@ -225,11 +225,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="flex flex-row gap-2 w-full sm:w-auto">
               <Button variant="outline" size="sm" className="flex-1 rounded-xl font-black h-10 px-4 text-[11px]" asChild><Link href="/dashboard/teacher/layout-view">전체화면</Link></Button>
-              <Button variant="outline" size="sm" className="flex-1 rounded-xl font-black h-10 px-4 gap-1.5 text-[11px]" onClick={openLayoutEditor}><Settings2 className="h-3.5 w-3.5" /> 도면 편집</Button>
+              {!isMobileView && (
+                <Button variant="outline" size="sm" className="flex-1 rounded-xl font-black h-10 px-4 gap-1.5 text-[11px]" onClick={openLayoutEditor}><Settings2 className="h-3.5 w-3.5" /> 도면 편집</Button>
+              )}
             </div>
           </div>
         </CardHeader>
-        <CardContent className={cn("bg-[#fafafa]", isMobileView ? "p-1" : "p-6")}>
+        <CardContent className={cn("bg-[#fafafa]", isMobileView ? "p-0" : "p-6")}>
           {attendanceLoading ? (
             <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
           ) : !attendanceList || attendanceList.length === 0 ? (
@@ -238,7 +240,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <p className="text-xs font-bold text-muted-foreground/40 italic">배치된 좌석이 없습니다.</p>
             </div>
           ) : (
-            <div className={cn("w-full bg-white rounded-2xl border shadow-inner", isMobileView ? "p-1" : "p-4")}>
+            <div className={cn("w-full bg-white rounded-none border-none shadow-none relative", isMobileView ? "p-0" : "p-4 rounded-2xl border shadow-inner")}>
               <div 
                 className="grid w-full gap-1 mx-auto relative"
                 style={{ gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(0, 1fr))` }}
