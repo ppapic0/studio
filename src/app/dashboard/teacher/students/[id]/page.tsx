@@ -464,15 +464,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         <TabsContent value="counseling" className="mt-6 space-y-10">
           {/* 액션 섹션: 새 예약 및 일지 작성 */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+          <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
+            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50 flex flex-col">
               <CardHeader className="bg-blue-50/50 border-b p-6 sm:p-8">
                 <CardTitle className="flex items-center gap-2 text-lg font-black text-blue-700">
                   <CalendarPlus className="h-5 w-5" /> 새 상담 예약
                 </CardTitle>
                 <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Schedule Next Session</CardDescription>
               </CardHeader>
-              <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
+              <CardContent className={cn("space-y-5 flex-1", isMobile ? "p-6" : "p-8")}>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
@@ -493,14 +493,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50 flex flex-col">
               <CardHeader className="bg-emerald-50/50 border-b p-6 sm:p-8">
                 <CardTitle className="flex items-center gap-2 text-lg font-black text-emerald-700">
                   <FileEdit className="h-5 w-5" /> 상담 일지 작성
                 </CardTitle>
                 <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Record Counseling Feedback</CardDescription>
               </CardHeader>
-              <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
+              <CardContent className={cn("space-y-5 flex-1", isMobile ? "p-6" : "p-8")}>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 유형</Label>
                   <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
