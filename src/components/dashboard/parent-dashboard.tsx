@@ -53,39 +53,41 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [summary, setSummary] = useState<ParentSummaryOutput | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [today, setToday] = useState<Date | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
+    setToday(new Date());
   }, []);
 
   const studentId = activeMembership?.linkedStudentIds?.[0];
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
-  const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-  const weekKey = today ? format(new Date(), "yyyy-'W'II") : '';
+  const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
+  const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+  const weekKey = today ? format(today, "yyyy-'W'II") : '';
 
   // 1. 자녀의 전체 통계 데이터
   const studentStatRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentId) return null;
+    if (!firestore || !activeMembership || !studentId || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', studentId);
   }, [firestore, activeMembership, studentId, todayKey]);
   const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef, { enabled: isActive && !!studentId });
 
   // 2. 자녀의 오늘/어제 공부 시간 로그
   const todayStudyLogRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentId) return null;
+    if (!firestore || !activeMembership || !studentId || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentId, 'days', todayKey);
   }, [firestore, activeMembership, studentId, todayKey]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(todayStudyLogRef, { enabled: isActive && !!studentId });
 
   const yesterdayStudyLogRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentId) return null;
+    if (!firestore || !activeMembership || !studentId || !yesterdayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentId, 'days', yesterdayKey);
   }, [firestore, activeMembership, studentId, yesterdayKey]);
   const { data: yesterdayStudyLog } = useDoc<StudyLogDay>(yesterdayStudyLogRef, { enabled: isActive && !!studentId });
 
   // 3. 자녀의 오늘 계획 (등/하원 시간 추출용)
   const todayPlansQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentId) return null;
+    if (!firestore || !activeMembership || !studentId || !weekKey || !todayKey) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', weekKey, 'items'),
       where('dateKey', '==', todayKey),
@@ -96,19 +98,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   // 4. 자녀의 어제 계획 (등/하원 기록 추출용)
   const yesterdayPlansQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentId) return null;
-    const yestWeekKey = format(subDays(new Date(), 1), "yyyy-'W'II");
+    if (!firestore || !activeMembership || !studentId || !today || !yesterdayKey) return null;
+    const yestWeekKey = format(subDays(today, 1), "yyyy-'W'II");
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', yestWeekKey, 'items'),
       where('dateKey', '==', yesterdayKey),
       where('category', '==', 'schedule')
     );
-  }, [firestore, activeMembership, studentId, yesterdayKey]);
+  }, [firestore, activeMembership, studentId, today, yesterdayKey]);
   const { data: yesterdayScheduleItems } = useCollection<StudyPlanItem>(yesterdayPlansQuery, { enabled: isActive && !!studentId });
 
   // 5. 선생님이 작성한 어제 리포트 (선생님의 한 마디)
   const yesterdayReportRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentId) return null;
+    if (!firestore || !activeMembership || !studentId || !yesterdayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${yesterdayKey}_${studentId}`);
   }, [firestore, activeMembership, studentId, yesterdayKey]);
   const { data: yesterdayReport } = useDoc<DailyReport>(yesterdayReportRef, { enabled: isActive && !!studentId });
@@ -130,7 +132,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [todayScheduleItems, yesterdayScheduleItems]);
 
   useEffect(() => {
-    if (!isActive || !studentId || !isMounted || !firestore || !activeMembership) return;
+    if (!isActive || !studentId || !isMounted || !firestore || !activeMembership || !today || !todayKey || !yesterdayKey) return;
 
     const fetchSummary = async () => {
         setSummaryLoading(true);
@@ -148,7 +150,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
           // 2. 캐시가 없으면 어제 데이터를 분석하여 AI 호출
           let yestCompletion = 0;
-          const yestWeekKey = format(subDays(new Date(), 1), "yyyy-'W'II");
+          const yestWeekKey = format(subDays(today, 1), "yyyy-'W'II");
           const yestPlansRef = collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', yestWeekKey, 'items');
           const snap = await getDocs(query(yestPlansRef, where('dateKey', '==', yesterdayKey)));
           const items = snap.docs.map(d => d.data() as StudyPlanItem);
@@ -188,7 +190,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
     
     fetchSummary();
-  }, [isActive, studentId, studentStat, yesterdayStudyLog, isMounted, firestore, activeMembership, todayKey, yesterdayKey]);
+  }, [isActive, studentId, studentStat, yesterdayStudyLog, isMounted, firestore, activeMembership, today, todayKey, yesterdayKey]);
 
   if (!isActive) return null;
   
