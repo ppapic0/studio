@@ -518,70 +518,76 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      <div className={cn("grid gap-3 sm:gap-6", isMobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4")}>
+      {/* 통계 그리드: 앱 모드에서는 '오늘의 몰입'만 표시하고 나머지는 숨김 */}
+      <div className={cn("grid gap-3 sm:gap-6", isMobile ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-4")}>
         <Card className="border-none shadow-md bg-white ring-1 ring-black/[0.03] rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden">
-          <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-1 px-3.5 pt-3.5" : "pb-2 px-6 pt-6")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[8px]" : "text-xs")}>오늘의 몰입</CardTitle>
+          <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-1 px-5 pt-5" : "pb-2 px-6 pt-6")}>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-xs" : "text-xs")}>오늘의 몰입</CardTitle>
             <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary/40" />
           </CardHeader>
-          <CardContent className={isMobile ? "px-3.5 pb-3.5" : "px-6 pb-6"}>
-            <div className={cn("font-black tracking-tighter text-primary whitespace-nowrap", isMobile ? "text-xl" : "text-3xl")}>
-              {h}<span className="text-[9px] sm:text-[10px] ml-0.5 opacity-40 font-bold">h</span> {m}<span className="text-[9px] sm:text-[10px] ml-0.5 opacity-40 font-bold">m</span>
+          <CardContent className={isMobile ? "px-5 pb-5" : "px-6 pb-6"}>
+            <div className={cn("font-black tracking-tighter text-primary whitespace-nowrap", isMobile ? "text-3xl" : "text-3xl")}>
+              {h}<span className="text-sm ml-0.5 opacity-40 font-bold">h</span> {m}<span className="text-sm ml-0.5 opacity-40 font-bold">m</span>
             </div>
-            <p className={cn("font-bold text-muted-foreground/60 truncate", isMobile ? "text-[7px] mt-1" : "text-[10px] mt-2")}>일일 권장량 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
+            <p className={cn("font-bold text-muted-foreground/60 truncate", isMobile ? "text-xs mt-2" : "text-[10px] mt-2")}>일일 권장량 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
           </CardContent>
         </Card>
 
-        <GamifiedStatCard 
-          title="시즌 계획 완수"
-          icon={ClipboardCheck}
-          value={`${Math.round(completionRate)}%`}
-          numericValue={completionRate}
-          dailyValue={todayCompletionRate}
-          isLoading={dailyStatLoading}
-          type="completion"
-          gameTitle="완수 마스터리"
-          evolution="지난주 대비 +2%"
-          isMobile={isMobile}
-        />
-        
-        <GamifiedStatCard 
-          title="출석 완료"
-          icon={Zap}
-          value={`${attendanceDays} 일`}
-          numericValue={attendanceDays}
-          dailyValue={totalMinutes}
-          dailyUnit="분"
-          isLoading={dailyStatLoading}
-          type="attendance"
-          gameTitle="성실의 정점"
-          evolution="상위 5% 페이스"
-          isMobile={isMobile}
-        />
+        {!isMobile && (
+          <>
+            <GamifiedStatCard 
+              title="시즌 계획 완수"
+              icon={ClipboardCheck}
+              value={`${Math.round(completionRate)}%`}
+              numericValue={completionRate}
+              dailyValue={todayCompletionRate}
+              isLoading={dailyStatLoading}
+              type="completion"
+              gameTitle="완수 마스터리"
+              evolution="지난주 대비 +2%"
+              isMobile={isMobile}
+            />
+            
+            <GamifiedStatCard 
+              title="출석 완료"
+              icon={Zap}
+              value={`${attendanceDays} 일`}
+              numericValue={attendanceDays}
+              dailyValue={totalMinutes}
+              dailyUnit="분"
+              isLoading={dailyStatLoading}
+              type="attendance"
+              gameTitle="성실의 정점"
+              evolution="상위 5% 페이스"
+              isMobile={isMobile}
+            />
 
-        <GamifiedStatCard 
-          title="성장 지수"
-          icon={TrendingUp}
-          value={`${Math.round(growthRate)}%`}
-          numericValue={growthRate}
-          dailyValue={growthRate}
-          isLoading={dailyStatLoading}
-          type="growth"
-          gameTitle="성장 챔피언"
-          evolution="Lv.30 도전 중"
-          isMobile={isMobile}
-        />
+            <GamifiedStatCard 
+              title="성장 지수"
+              icon={TrendingUp}
+              value={`${Math.round(growthRate)}%`}
+              numericValue={growthRate}
+              dailyValue={growthRate}
+              isLoading={dailyStatLoading}
+              type="growth"
+              gameTitle="성장 챔피언"
+              evolution="Lv.30 도전 중"
+              isMobile={isMobile}
+            />
+          </>
+        )}
       </div>
 
-      <div className={cn("grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-3 items-start")}>
-        <Card className="lg:col-span-2 border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-5" : "p-10")}>
+      {/* 하단 그리드: 앱 모드에서는 '오늘의 루틴'을 숨기고 '학습 계획'을 전면에 배치 */}
+      <div className={cn("grid gap-6 sm:gap-8", isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
+        <Card className={cn("border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "col-span-1" : "lg:col-span-2")}>
+          <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-10")}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-1">
-                <CardTitle className={cn("font-black flex items-center gap-2 tracking-tighter whitespace-nowrap", isMobile ? "text-lg" : "text-3xl")}>
+                <CardTitle className={cn("font-black flex items-center gap-2 tracking-tighter whitespace-nowrap", isMobile ? "text-2xl" : "text-3xl")}>
                   <ListTodo className="h-6 w-6 sm:h-8 sm:w-8 text-primary" /> 오늘의 학습 계획
                 </CardTitle>
-                <CardDescription className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest ml-0.5">Daily Study Matrix</CardDescription>
+                <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-widest ml-0.5">Daily Study Matrix</CardDescription>
               </div>
               <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
                 <div className="flex items-center gap-2">
@@ -592,7 +598,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className={isMobile ? "p-5" : "p-10"}>
+          <CardContent className={isMobile ? "p-6" : "p-10"}>
             {plansLoading ? (
               <div className="flex justify-center py-16"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
             ) : studyTasks.length === 0 ? (
@@ -605,11 +611,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             ) : (
               <div className="grid gap-3">
-                {studyTasks.slice(0, 6).map((task) => (
+                {studyTasks.slice(0, 10).map((task) => (
                   <div 
                     key={task.id} 
                     className={cn(
-                      "flex items-center gap-3.5 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
+                      "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
                       task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent hover:border-primary/10 hover:shadow-lg shadow-sm"
                     )}
                   >
@@ -617,13 +623,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       id={task.id} 
                       checked={task.done} 
                       onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)}
-                      className="h-5 w-5 rounded-md border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shrink-0"
+                      className="h-6 w-6 rounded-md border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shrink-0"
                     />
                     <Label 
                       htmlFor={task.id}
                       className={cn(
                         "flex-1 font-bold transition-all duration-500 leading-tight",
-                        isMobile ? "text-xs" : "text-base",
+                        isMobile ? "text-sm" : "text-base",
                         task.done ? "line-through text-muted-foreground/40 italic" : "text-foreground"
                       )}
                     >
@@ -631,16 +637,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </Label>
                     {task.done && (
                       <div className="flex items-center gap-1.5 animate-in zoom-in duration-500 shrink-0">
-                        {!isMobile && <span className="text-[8px] font-black text-emerald-600 uppercase">완료</span>}
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                       </div>
                     )}
                   </div>
                 ))}
-                {studyTasks.length > 6 && (
-                  <Button asChild variant="ghost" className="w-full mt-4 h-10 rounded-xl font-black text-[10px] text-primary/40 hover:text-primary transition-all gap-1">
+                {studyTasks.length > 10 && (
+                  <Button asChild variant="ghost" className="w-full mt-4 h-12 rounded-xl font-black text-xs text-primary/40 hover:text-primary transition-all gap-1">
                     <Link href="/dashboard/plan">
-                      전체 {studyTasks.length}개 계획 보기 <ChevronRight className="h-3 w-3" />
+                      전체 {studyTasks.length}개 계획 보기 <ChevronRight className="h-4 w-4" />
                     </Link>
                   </Button>
                 )}
@@ -649,42 +654,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white flex flex-col ring-1 ring-black/[0.03] overflow-hidden">
-          <CardHeader className={isMobile ? "p-5" : "p-10"}>
-            <CardTitle className={cn("font-black flex items-center gap-2 tracking-tighter whitespace-nowrap", isMobile ? "text-lg" : "text-2xl")}>
-              <CalendarClock className="h-6 w-6 sm:h-7 sm:w-7 text-primary" /> 오늘의 루틴
-            </CardTitle>
-            <CardDescription className="font-bold text-[9px] opacity-40 uppercase tracking-widest ml-0.5">Routine Summary</CardDescription>
-          </CardHeader>
-          <CardContent className={cn("pb-8 flex-1", isMobile ? "px-5" : "px-10")}>
-            {scheduleItems.length === 0 ? (
-              <div className="h-full py-16 text-center text-muted-foreground/30 text-[10px] font-black border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 bg-[#fafafa]">
-                <Timer className="h-8 w-8 opacity-10" />
-                <span>기록된 시간표가 없습니다.</span>
-              </div>
-            ) : (
-              <div className="space-y-3.5">
-                {scheduleItems.map((item) => {
-                  const [title, time] = item.title.split(': ');
-                  return (
-                    <div key={item.id} className="flex items-center justify-between p-4 rounded-[1.25rem] bg-[#fafafa] border border-border/50 group hover:bg-white hover:shadow-xl transition-all duration-500">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary/5 p-2 rounded-lg">
-                          <CircleDot className="h-3.5 w-3.5 text-primary/60" />
+        {!isMobile && (
+          <Card className="border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white flex flex-col ring-1 ring-black/[0.03] overflow-hidden">
+            <CardHeader className="p-10">
+              <CardTitle className="font-black flex items-center gap-2 tracking-tighter whitespace-nowrap text-2xl">
+                <CalendarClock className="h-7 w-7 text-primary" /> 오늘의 루틴
+              </CardTitle>
+              <CardDescription className="font-bold text-[9px] opacity-40 uppercase tracking-widest ml-0.5">Routine Summary</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-8 px-10 flex-1">
+              {scheduleItems.length === 0 ? (
+                <div className="h-full py-16 text-center text-muted-foreground/30 text-[10px] font-black border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 bg-[#fafafa]">
+                  <Timer className="h-8 w-8 opacity-10" />
+                  <span>기록된 시간표가 없습니다.</span>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {scheduleItems.map((item) => {
+                    const [title, time] = item.title.split(': ');
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-4 rounded-[1.25rem] bg-[#fafafa] border border-border/50 group hover:bg-white hover:shadow-xl transition-all duration-500">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-primary/5 p-2 rounded-lg">
+                            <CircleDot className="h-3.5 w-3.5 text-primary/60" />
+                          </div>
+                          <span className="text-sm font-black text-foreground/80 whitespace-nowrap">{title}</span>
                         </div>
-                        <span className="text-[11px] sm:text-sm font-black text-foreground/80 whitespace-nowrap">{title}</span>
+                        <span className="text-xs font-black font-mono text-primary bg-white px-3 py-1 rounded-lg shadow-sm border border-black/[0.02] whitespace-nowrap">{time || '-'}</span>
                       </div>
-                      <span className="text-[10px] sm:text-xs font-black font-mono text-primary bg-white px-3 py-1 rounded-lg shadow-sm border border-black/[0.02] whitespace-nowrap">{time || '-'}</span>
-                    </div>
-                  );
-                })}
-                <Button asChild variant="ghost" className="w-full mt-4 h-10 rounded-xl font-black text-[9px] text-primary/30 hover:text-primary transition-all uppercase tracking-widest">
-                  <Link href="/dashboard/plan">루틴 관리하기</Link>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                  <Button asChild variant="ghost" className="w-full mt-4 h-10 rounded-xl font-black text-[9px] text-primary/30 hover:text-primary transition-all uppercase tracking-widest">
+                    <Link href="/dashboard/plan">루틴 관리하기</Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
