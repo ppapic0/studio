@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -21,17 +22,19 @@ import {
   CalendarCheck,
   ArrowUpRight,
   Activity,
-  Sparkles
+  Sparkles,
+  History,
+  ArrowRightLeft
 } from 'lucide-react';
 import { ResponsiveContainer, Bar, XAxis, YAxis, Tooltip, BarChart as RechartsBarChart, CartesianGrid } from 'recharts';
 import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { type DailyStudentStat, type StudyLogDay, type StudyPlanItem } from '@/lib/types';
 import { generateParentSummary, type ParentSummaryOutput, type ParentSummaryInput } from '@/ai/flows/parent-receives-weekly-summary';
 import { Skeleton } from '../ui/skeleton';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 
@@ -57,6 +60,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const studentId = activeMembership?.linkedStudentIds?.[0];
   const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
   const weekKey = format(new Date(), "yyyy-'W'II");
 
   // 1. 자녀의 전체 통계 데이터
@@ -66,15 +70,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership, studentId, todayKey]);
   const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef, { enabled: isActive && !!studentId });
 
-  // 2. 자녀의 오늘 공부 시간 로그
-  const studyLogRef = useMemoFirebase(() => {
+  // 2. 자녀의 오늘/어제 공부 시간 로그
+  const todayStudyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentId) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentId, 'days', todayKey);
   }, [firestore, activeMembership, studentId, todayKey]);
-  const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive && !!studentId });
+  const { data: todayStudyLog } = useDoc<StudyLogDay>(todayStudyLogRef, { enabled: isActive && !!studentId });
+
+  const yesterdayStudyLogRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !studentId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentId, 'days', yesterdayKey);
+  }, [firestore, activeMembership, studentId, yesterdayKey]);
+  const { data: yesterdayStudyLog } = useDoc<StudyLogDay>(yesterdayStudyLogRef, { enabled: isActive && !!studentId });
 
   // 3. 자녀의 오늘 계획 (등/하원 시간 추출용)
-  const plansQuery = useMemoFirebase(() => {
+  const todayPlansQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentId) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', weekKey, 'items'),
@@ -82,36 +92,64 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       where('category', '==', 'schedule')
     );
   }, [firestore, activeMembership, studentId, weekKey, todayKey]);
-  const { data: scheduleItems } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive && !!studentId });
+  const { data: todayScheduleItems } = useCollection<StudyPlanItem>(todayPlansQuery, { enabled: isActive && !!studentId });
+
+  // 4. 자녀의 어제 계획 (등/하원 기록 추출용)
+  const yesterdayPlansQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !studentId) return null;
+    const yestWeekKey = format(subDays(new Date(), 1), "yyyy-'W'II");
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', yestWeekKey, 'items'),
+      where('dateKey', '==', yesterdayKey),
+      where('category', '==', 'schedule')
+    );
+  }, [firestore, activeMembership, studentId, yesterdayKey]);
+  const { data: yesterdayScheduleItems } = useCollection<StudyPlanItem>(yesterdayPlansQuery, { enabled: isActive && !!studentId });
 
   const attendanceTimes = useMemo(() => {
-    if (!scheduleItems) return { in: '--:--', out: '--:--' };
-    const inItem = scheduleItems.find(item => item.title.includes('등원'));
-    const outItem = scheduleItems.find(item => item.title.includes('하원'));
-    return {
-      in: inItem ? inItem.title.split(': ')[1] || '--:--' : '--:--',
-      out: outItem ? outItem.title.split(': ')[1] || '--:--' : '--:--',
+    const extract = (items: StudyPlanItem[] | null) => {
+      if (!items) return { in: '--:--', out: '--:--' };
+      const inItem = items.find(item => item.title.includes('등원'));
+      const outItem = items.find(item => item.title.includes('하원'));
+      return {
+        in: inItem ? inItem.title.split(': ')[1] || '--:--' : '--:--',
+        out: outItem ? outItem.title.split(': ')[1] || '--:--' : '--:--',
+      };
     };
-  }, [scheduleItems]);
+    return {
+      today: extract(todayScheduleItems || null),
+      yesterday: extract(yesterdayScheduleItems || null)
+    };
+  }, [todayScheduleItems, yesterdayScheduleItems]);
 
   useEffect(() => {
-    if (!isActive || !studentId || !studentStat || studentStatLoading) {
-        if (!studentId) setSummaryLoading(false);
-        return;
-    }
+    if (!isActive || !studentId || !isMounted) return;
 
     const fetchSummary = async () => {
         setSummaryLoading(true);
         try {
+          // 전날 데이터를 가져오기 위해 직접 쿼리 (studentStat이 오늘거라 부족할 수 있음)
+          let yestCompletion = 0;
+          if (firestore && activeMembership) {
+            const yestPlansRef = collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', format(subDays(new Date(), 1), "yyyy-'W'II"), 'items');
+            const snap = await getDocs(query(yestPlansRef, where('dateKey', '==', yesterdayKey)));
+            const items = snap.docs.map(d => d.data() as StudyPlanItem);
+            const studyItems = items.filter(i => i.category === 'study' || !i.category);
+            if (studyItems.length > 0) {
+              yestCompletion = Math.round((studyItems.filter(i => i.done).length / studyItems.length) * 100);
+            }
+          }
+
           const input: ParentSummaryInput = {
             studentName: '자녀',
-            completionRate: Math.round((studentStat.weeklyPlanCompletionRate || 0) * 100),
+            completionRate: yestCompletion || Math.round((studentStat?.weeklyPlanCompletionRate || 0) * 100),
             completionRateTrend: 0,
             attendanceRate: 100,
             attendanceTrend: 0,
-            studyTimeGrowth: studentStat.studyTimeGrowthRate || 0,
-            recentAchievements: [],
-            potentialRisks: studentStat.riskDetected ? ['학습 불균형 또는 위험 요소가 감지되었습니다.'] : [],
+            studyTimeGrowth: studentStat?.studyTimeGrowthRate || 0,
+            recentAchievements: yesterdayStudyLog && yesterdayStudyLog.totalMinutes >= 360 ? ['어제 6시간 이상의 초몰입 학습을 달성했습니다.'] : [],
+            potentialRisks: studentStat?.riskDetected ? ['최근 학습 리듬이 다소 불규칙합니다.'] : [],
+            parentFeedbackContext: "전날 학습 데이터를 기반으로 한 AI 자동 분석 리포트입니다."
           };
           const result = await generateParentSummary(input);
           setSummary(result);
@@ -124,7 +162,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
     
     fetchSummary();
-  }, [isActive, studentId, studentStat, studentStatLoading]);
+  }, [isActive, studentId, studentStat, yesterdayStudyLog, isMounted]);
 
   if (!isActive) return null;
   
@@ -141,55 +179,73 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }
   
   const isLoading = studentStatLoading || summaryLoading;
-  const totalMins = todayStudyLog?.totalMinutes || 0;
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
+  const todayMins = todayStudyLog?.totalMinutes || 0;
+  const yestMins = yesterdayStudyLog?.totalMinutes || 0;
 
   return (
     <div className={cn("grid gap-6", isMobile ? "px-1" : "px-0")}>
-      {/* 1. 실시간 학습 현황 섹션 (사용자 요청 반영) */}
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500">
+      {/* 1. 실시간/전날 학습 현황 섹션 */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* 오늘 현황 */}
+        <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500 relative">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
           <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-              <Zap className="h-3 w-3 text-emerald-500 fill-current" /> 오늘 총 몰입
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center justify-between">
+              <span className="flex items-center gap-2"><Zap className="h-3 w-3 text-emerald-500 fill-current" /> 오늘 총 몰입</span>
+              <Badge variant="secondary" className="text-[8px] bg-emerald-50 text-emerald-600 border-none font-black px-1.5 py-0">LIVE</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-black tracking-tighter text-primary">{h}</span>
+              <span className="text-4xl font-black tracking-tighter text-primary">{Math.floor(todayMins / 60)}</span>
               <span className="text-sm font-bold text-muted-foreground/60 mr-2">h</span>
-              <span className="text-4xl font-black tracking-tighter text-primary">{m}</span>
+              <span className="text-4xl font-black tracking-tighter text-primary">{todayMins % 60}</span>
               <span className="text-sm font-bold text-muted-foreground/60">m</span>
             </div>
-            <p className="text-[9px] font-bold text-muted-foreground mt-2">일일 학습 목표 360분 기준</p>
+            <div className="flex items-center justify-between mt-3">
+               <div className="grid gap-0.5">
+                 <span className="text-[8px] font-black text-blue-600 uppercase">등원</span>
+                 <span className="text-base font-black tracking-tight">{attendanceTimes.today.in}</span>
+               </div>
+               <div className="h-6 w-px bg-muted mx-3" />
+               <div className="grid gap-0.5 text-right">
+                 <span className="text-[8px] font-black text-muted-foreground uppercase">하원 예정</span>
+                 <span className="text-base font-black tracking-tight">{attendanceTimes.today.out}</span>
+               </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
+        {/* 어제 기록 */}
+        <Card className="rounded-[1.5rem] border-none shadow-md bg-muted/20 overflow-hidden group hover:shadow-xl transition-all duration-500 relative">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400" />
           <CardHeader className="pb-2">
             <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-              <MapPin className="h-3 w-3 text-blue-500" /> 오늘 출결 기록
+              <History className="h-3 w-3 text-slate-500" /> 어제 학습 요약
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="grid gap-0.5">
-                <span className="text-[8px] font-black text-blue-600 uppercase">등원</span>
-                <span className="text-xl font-black tracking-tight">{attendanceTimes.in}</span>
-              </div>
-              <div className="h-8 w-px bg-muted mx-4" />
-              <div className="grid gap-0.5 text-right">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">하원 예정</span>
-                <span className="text-xl font-black tracking-tight">{attendanceTimes.out}</span>
-              </div>
+            <div className="flex items-baseline gap-1 opacity-80">
+              <span className="text-3xl font-black tracking-tighter text-primary">{Math.floor(yestMins / 60)}</span>
+              <span className="text-xs font-bold text-muted-foreground/60 mr-2">h</span>
+              <span className="text-3xl font-black tracking-tighter text-primary">{yestMins % 60}</span>
+              <span className="text-xs font-bold text-muted-foreground/60">m</span>
+            </div>
+            <div className="flex items-center justify-between mt-3 opacity-80">
+               <div className="grid gap-0.5">
+                 <span className="text-[8px] font-black text-slate-500 uppercase">등원 기록</span>
+                 <span className="text-base font-black tracking-tight">{attendanceTimes.yesterday.in}</span>
+               </div>
+               <div className="h-6 w-px bg-muted mx-3" />
+               <div className="grid gap-0.5 text-right">
+                 <span className="text-[8px] font-black text-slate-500 uppercase">하원 기록</span>
+                 <span className="text-base font-black tracking-tight">{attendanceTimes.yesterday.out}</span>
+               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500">
+        <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500 relative hidden lg:block">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500" />
           <CardHeader className="pb-2">
             <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
@@ -219,11 +275,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           <div className="flex justify-between items-center">
             <div className="space-y-1">
               <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-primary" /> 주간 AI 정밀 분석
+                <Sparkles className="h-6 w-6 text-primary" /> 어제자 AI 정밀 분석
               </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Insight & Analysis</CardDescription>
+              <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Automated Insight & Analysis</CardDescription>
             </div>
-            <Badge variant="outline" className="font-black text-[10px] border-primary/20 px-3 py-1">Premium Report</Badge>
+            <Badge variant="outline" className="font-black text-[10px] border-primary/20 px-3 py-1">AI Generated</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-8 space-y-10">
@@ -237,7 +293,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           ) : summary ? (
             <>
               <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 relative group">
-                <div className="absolute -top-3 left-6 px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg shadow-lg">AI SUMMARY</div>
+                <div className="absolute -top-3 left-6 px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg shadow-lg">DAILY SUMMARY</div>
                 <p className="text-base font-bold leading-relaxed text-foreground/80 italic">"{summary.message}"</p>
               </div>
               
@@ -270,7 +326,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           ) : (
             <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
               <FileText className="h-16 w-16" />
-              <p className="font-black italic">충분한 학습 데이터가 쌓이면 분석이 시작됩니다.</p>
+              <p className="font-black italic">어제의 학습 데이터가 확인되지 않아 분석을 생성할 수 없습니다.</p>
             </div>
           )}
         </CardContent>
@@ -286,7 +342,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </CardHeader>
         <CardContent className="p-8">
            <div className="h-[350px] w-full">
-             {isLoading || !isMounted ? (
+             {!isMounted ? (
                <div className="h-full w-full bg-muted/5 animate-pulse rounded-2xl flex items-center justify-center">
                  <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/>
                </div>
