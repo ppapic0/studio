@@ -246,7 +246,7 @@ export function DashboardHeader() {
         </DropdownMenu>
       </div>
 
-      {/* 설정 다이얼로그 */}
+      {/* 설정 다이얼로그 - 앱모드 대응 */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent className={cn(
           "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500",
@@ -290,7 +290,7 @@ export function DashboardHeader() {
         </DialogContent>
       </Dialog>
 
-      {/* 지원/메뉴얼 다이얼로그 */}
+      {/* 지원/메뉴얼 다이얼로그 - 앱모드 대응 */}
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
         <DialogContent className={cn(
           "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500",

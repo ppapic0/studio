@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,7 +31,7 @@ import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
-  displayName: z.string().min(2, '이름은 2자 이상이어야 합니다.'),
+  displayName: z.string().optional(), // 학부모는 자녀 이름 기반 자동 생성
   email: z.string().email('유효한 이메일을 입력해주세요.'),
   password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
   role: z.enum(['student', 'teacher', 'parent'], {
@@ -73,6 +72,10 @@ export function SignupForm() {
     
     // 추가 유효성 검사
     if (values.role === 'student') {
+      if (!values.displayName || values.displayName.length < 2) {
+        form.setError('displayName', { message: '이름을 입력해주세요.' });
+        return;
+      }
       if (!values.schoolName || values.schoolName.length < 2) {
         form.setError('schoolName', { message: '학교명을 입력해주세요.' });
         return;
@@ -91,46 +94,68 @@ export function SignupForm() {
     setIsLoading(true);
     
     try {
-      setLoadingStatus('계정 생성 중...');
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
-      await updateProfile(user, { displayName: values.displayName });
-
       const centerId = 'learning-lab-dongbaek'; 
       const timestamp = serverTimestamp();
       const batch = writeBatch(firestore);
+      let finalDisplayName = values.displayName || '';
+      let linkedStudentId = '';
 
-      // 1. 프로필 정보 저장
+      // 1. 학부모 가입 시 자녀 정보 조회 및 닉네임 자동 생성
+      if (values.role === 'parent') {
+        setLoadingStatus('자녀 정보를 확인하고 있습니다...');
+        const studentsRef = collection(firestore, 'centers', centerId, 'students');
+        const q = query(studentsRef, where('parentLinkCode', '==', values.studentLinkCode));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const studentDoc = querySnapshot.docs[0];
+          linkedStudentId = studentDoc.id;
+          const studentData = studentDoc.data();
+          finalDisplayName = `${studentData.name} 학부모`;
+        } else {
+          setIsLoading(false);
+          setLoadingStatus('');
+          form.setError('studentLinkCode', { message: '해당 코드를 사용하는 학생을 찾을 수 없습니다.' });
+          return;
+        }
+      }
+
+      setLoadingStatus('계정 생성 중...');
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+      await updateProfile(user, { displayName: finalDisplayName });
+
+      // 2. 프로필 정보 저장
       batch.set(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
-        displayName: values.displayName,
+        displayName: finalDisplayName,
         schoolName: values.schoolName || '',
         createdAt: timestamp,
         updatedAt: timestamp,
       });
 
-      // 2. 센터 내 멤버십 등록 정보
+      // 3. 센터 내 멤버십 등록 정보
       const membershipData: any = {
         id: user.uid,
         centerId: centerId,
         role: values.role,
         status: "active",
         joinedAt: timestamp,
-        displayName: values.displayName,
+        displayName: finalDisplayName,
       };
 
-      // 3. 학생/학부모 역할별 추가 처리
+      // 4. 역할별 추가 처리
       if (values.role === 'student') {
         batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
           id: user.uid,
-          name: values.displayName,
+          name: finalDisplayName,
           schoolName: values.schoolName || '',
           grade: '고등학생',
           seatNo: 0,
           targetDailyMinutes: 360,
           parentUids: [],
-          parentLinkCode: values.parentLinkCode, // 연동 코드 저장
+          parentLinkCode: values.parentLinkCode,
           createdAt: timestamp,
         });
 
@@ -144,28 +169,11 @@ export function SignupForm() {
         });
       }
 
-      if (values.role === 'parent') {
-        setLoadingStatus('자녀 정보를 확인하고 있습니다...');
-        // 자녀 코드 매칭 시도
-        const studentsRef = collection(firestore, 'centers', centerId, 'students');
-        const q = query(studentsRef, where('parentLinkCode', '==', values.studentLinkCode));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const studentDoc = querySnapshot.docs[0];
-          const studentId = studentDoc.id;
-          membershipData.linkedStudentIds = [studentId];
-          
-          // 학생 문서에 부모 UID 추가
-          batch.update(doc(firestore, 'centers', centerId, 'students', studentId), {
-            parentUids: [user.uid]
-          });
-        } else {
-          setIsLoading(false);
-          setLoadingStatus('');
-          form.setError('studentLinkCode', { message: '해당 코드를 사용하는 학생을 찾을 수 없습니다.' });
-          return;
-        }
+      if (values.role === 'parent' && linkedStudentId) {
+        membershipData.linkedStudentIds = [linkedStudentId];
+        batch.update(doc(firestore, 'centers', centerId, 'students', linkedStudentId), {
+          parentUids: [user.uid]
+        });
       }
 
       batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), membershipData);
@@ -181,7 +189,7 @@ export function SignupForm() {
       await batch.commit();
 
       setLoadingStatus('완료! 대시보드로 이동합니다.');
-      toast({ title: '가입 성공', description: '환영합니다! 대시보드로 연결됩니다.' });
+      toast({ title: '가입 성공', description: `환영합니다, ${finalDisplayName}님!` });
       
       setTimeout(() => {
         router.replace('/dashboard');
@@ -204,44 +212,10 @@ export function SignupForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
         <FormField
           control={form.control}
-          name="displayName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>이름</FormLabel>
-              <FormControl><Input placeholder="홍길동" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>이메일</FormLabel>
-              <FormControl><Input placeholder="name@example.com" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>비밀번호</FormLabel>
-              <FormControl><Input type="password" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
           name="role"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>가입 역할</FormLabel>
+              <FormLabel className="font-bold">가입 역할</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                 <FormControl>
                   <SelectTrigger className="h-12 rounded-xl border-2">
@@ -259,6 +233,43 @@ export function SignupForm() {
           )}
         />
 
+        {selectedRole !== 'parent' && (
+          <FormField
+            control={form.control}
+            name="displayName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-bold">이름</FormLabel>
+                <FormControl><Input placeholder="홍길동" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-bold">이메일</FormLabel>
+              <FormControl><Input placeholder="name@example.com" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-bold">비밀번호</FormLabel>
+              <FormControl><Input type="password" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {selectedRole === 'student' && (
           <>
             <FormField
@@ -266,7 +277,7 @@ export function SignupForm() {
               name="schoolName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>소속 학교</FormLabel>
+                  <FormLabel className="font-bold">소속 학교</FormLabel>
                   <FormControl><Input placeholder="예: 동백고등학교" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -277,8 +288,8 @@ export function SignupForm() {
               name="parentLinkCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">부모님 연동 코드 <ShieldCheck className="h-3 w-3 text-primary" /></FormLabel>
-                  <FormControl><Input placeholder="4자리 숫자 (예: 1234)" maxLength={4} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
+                  <FormLabel className="flex items-center gap-2 font-bold">부모님 연동 코드 <ShieldCheck className="h-3 w-3 text-primary" /></FormLabel>
+                  <FormControl><Input placeholder="4자리 숫자" maxLength={4} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
                   <FormDescription className="text-[10px] font-bold">부모님이 가입하실 때 이 코드를 입력하면 자녀의 정보를 볼 수 있습니다.</FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -293,9 +304,9 @@ export function SignupForm() {
             name="studentLinkCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="flex items-center gap-2">자녀 연동 코드 <UserCheck className="h-3 w-3 text-primary" /></FormLabel>
+                <FormLabel className="flex items-center gap-2 font-bold">자녀 연동 코드 <UserCheck className="h-3 w-3 text-primary" /></FormLabel>
                 <FormControl><Input placeholder="자녀가 설정한 4자리 숫자" maxLength={4} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
-                <FormDescription className="text-[10px] font-bold">자녀에게 물어보고 4자리 코드를 입력해 주세요.</FormDescription>
+                <FormDescription className="text-[10px] font-bold">자녀에게 물어보고 4자리 코드를 입력해 주세요. (가입 후 이름이 자동으로 설정됩니다.)</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -307,7 +318,7 @@ export function SignupForm() {
           name="inviteCode"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>센터 가입 코드</FormLabel>
+              <FormLabel className="font-bold">센터 가입 코드</FormLabel>
               <FormControl><Input placeholder="센터에서 제공받은 코드" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
               <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
                 {form.watch('role') === 'teacher' ? '💡 선생님 테스트 코드: T0313' : '💡 학생/학부모 테스트 코드: 0313'}
