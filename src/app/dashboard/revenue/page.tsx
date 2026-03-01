@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, getDoc, limit, orderBy, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, doc, getDoc, limit, orderBy, setDoc, serverTimestamp } from 'firebase/firestore';
 import { KpiDaily, FinanceSettings, MonthlyFinance } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,6 @@ import {
   Calculator,
   CalendarDays,
   Sparkles,
-  ChevronRight,
   PieChart,
   Settings,
   Loader2,
@@ -80,8 +79,6 @@ export default function RevenuePage() {
   const [maintenance, setMaintenance] = useState<number>(0);
   const [otherCost, setOtherCost] = useState<number>(0);
 
-  const [penaltyType, setPenaltyType] = useState<'none' | 'rate' | 'fixed'>('none');
-  const [penaltyValue, setPenaltyValue] = useState<number>(0);
   const [discountOrder, setDiscountOrder] = useState<'rateFirst' | 'fixedFirst'>('rateFirst');
 
   // 월별 고정비 데이터 조회
@@ -112,10 +109,6 @@ export default function RevenuePage() {
   useEffect(() => {
     if (centerData?.financeSettings) {
       const settings = centerData.financeSettings as FinanceSettings;
-      setPenaltyType(settings.refundPolicy?.penaltyType || 'none');
-      setPenaltyValue(settings.refundPolicy?.penaltyType === 'rate' 
-        ? (settings.refundPolicy.penaltyRate || 0) * 100 
-        : (settings.refundPolicy?.penaltyFixed || 0));
       setDiscountOrder(settings.discountPolicy?.order?.[0] === 'rateFirst' ? 'rateFirst' : 'fixedFirst');
     }
   }, [centerData]);
@@ -148,7 +141,7 @@ export default function RevenuePage() {
     }
     return [...kpiHistory].reverse().map(k => ({
       name: k.date.substring(5).replace('-', '/'),
-      revenue: Math.round((k.totalRevenue || 0)), // 일일 발생 매출
+      revenue: Math.round((k.totalRevenue || 0)),
     }));
   }, [kpiHistory]);
 
@@ -163,14 +156,12 @@ export default function RevenuePage() {
         rent, labor, maintenance, other: otherCost,
         totalFixedCosts,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
 
       // 2. 공통 정책 저장
       const financeSettings: Partial<FinanceSettings> = {
         refundPolicy: {
-          penaltyType,
-          penaltyRate: penaltyType === 'rate' ? penaltyValue / 100 : undefined,
-          penaltyFixed: penaltyType === 'fixed' ? penaltyValue : undefined,
+          penaltyType: 'none',
           perDayRounding: 'floor'
         },
         discountPolicy: {
@@ -178,14 +169,16 @@ export default function RevenuePage() {
         }
       };
 
-      await updateDoc(doc(firestore, 'centers', centerId), {
+      // setDoc with merge to avoid update error if document doesn't exist
+      await setDoc(doc(firestore, 'centers', centerId), {
         financeSettings,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
 
       toast({ title: "재무 정책 및 비용이 저장되었습니다." });
       setIsSettingsOpen(false);
     } catch (e: any) {
+      console.error("Save Error:", e);
       toast({ variant: "destructive", title: "저장 실패", description: e.message });
     } finally {
       setIsSaving(false);
@@ -297,7 +290,7 @@ export default function RevenuePage() {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorRev" x1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                   </linearGradient>
@@ -406,46 +399,20 @@ export default function RevenuePage() {
               </div>
             </div>
 
-            {/* 환불 정책 */}
+            {/* 환불 정책 안내 */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 ml-1">
                 <RefreshCw className="h-4 w-4 text-rose-500" />
-                <h4 className="text-sm font-black text-rose-600 uppercase">환불 위약금 정책 (28일 일할 기본)</h4>
+                <h4 className="text-sm font-black text-rose-600 uppercase">환불 정책 (28일 일할 계산)</h4>
               </div>
-              <div className="p-5 rounded-2xl bg-rose-50/30 border border-rose-100 space-y-4">
-                <p className="text-[9px] font-bold text-rose-900/60 leading-relaxed mb-2">
-                  💡 모든 환불은 28일 기준 잔여 일수에 대해 일할 계산됩니다. 아래 설정은 일할 계산된 금액에서 차감할 추가 위약금입니다.
+              <div className="p-5 rounded-2xl bg-rose-50/30 border border-rose-100 space-y-2">
+                <p className="text-xs font-bold text-rose-900 leading-relaxed">
+                  💡 센터의 환불은 별도의 위약금 없이 **28일 기준 잔여 일수에 대해 100% 일할 계산**하여 지급됩니다.
                 </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {['none', 'rate', 'fixed'].map((type) => (
-                    <Button
-                      key={type}
-                      variant="outline"
-                      onClick={() => setPenaltyType(type as any)}
-                      className={cn(
-                        "h-12 rounded-xl font-black text-xs border-2 transition-all",
-                        penaltyType === type ? "bg-rose-500 border-rose-500 text-white shadow-lg" : "bg-white border-rose-100 text-rose-400"
-                      )}
-                    >
-                      {type === 'none' ? '없음' : type === 'rate' ? '정률(%)' : '정액(원)'}
-                    </Button>
-                  ))}
+                <div className="bg-white/50 p-3 rounded-xl border border-rose-100/50 mt-2">
+                  <p className="text-[10px] font-black text-rose-700/60 uppercase tracking-widest mb-1">환불 공식</p>
+                  <p className="text-[11px] font-bold text-rose-900">환불액 = 최종결제액 - (일일수강료 × 사용일수)</p>
                 </div>
-                {penaltyType !== 'none' && (
-                  <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                    <Label className="text-[10px] font-black text-rose-600/60 uppercase ml-1">
-                      {penaltyType === 'rate' ? '위약금 비율 (%)' : '위약금 정액 (₩)'}
-                    </Label>
-                    <div className="relative">
-                      {penaltyType === 'rate' ? (
-                        <Percent className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-rose-300" />
-                      ) : (
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-rose-300">₩</span>
-                      )}
-                      <Input type="number" value={penaltyValue} onChange={(e) => setPenaltyValue(Number(e.target.value))} className={cn("h-12 rounded-xl border-2 font-black text-lg", penaltyType === 'fixed' ? "pl-10" : "pr-10")} />
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

@@ -84,18 +84,15 @@ export async function createInvoice(centerId: string, studentId: string) {
 }
 
 /**
- * 환불 계산 및 요청 (28일 일할 계산)
+ * 환불 계산 및 요청 (28일 일할 계산 - 위약금 없음)
  */
 export async function requestRefund(centerId: string, invoiceId: string, reason: string) {
   const invoiceRef = adminDb.doc(`centers/${centerId}/invoices/${invoiceId}`);
-  const centerRef = adminDb.doc(`centers/${centerId}`);
+  const [invoiceSnap] = await Promise.all([invoiceRef.get()]);
   
-  const [invoiceSnap, centerSnap] = await Promise.all([invoiceRef.get(), centerRef.get()]);
   if (!invoiceSnap.exists) throw new Error('인보이스를 찾을 수 없습니다.');
   
   const invoice = invoiceSnap.data() as any;
-  const settings = centerSnap.data()?.financeSettings as FinanceSettings;
-  
   const now = new Date();
   const start = invoice.cycleStartDate.toDate();
   
@@ -106,14 +103,8 @@ export async function requestRefund(centerId: string, invoiceId: string, reason:
   const perDay = Math.floor(invoice.finalPrice / 28);
   const usedAmount = perDay * usedDays;
 
-  let penalty = 0;
-  if (settings?.refundPolicy.penaltyType === 'rate') {
-    penalty = Math.floor(invoice.finalPrice * (settings.refundPolicy.penaltyRate || 0));
-  } else if (settings?.refundPolicy.penaltyType === 'fixed') {
-    penalty = settings.refundPolicy.penaltyFixed || 0;
-  }
-
-  const refundAmount = Math.max(0, invoice.finalPrice - usedAmount - penalty);
+  // 위약금 없이 순수 일할 계산만 적용
+  const refundAmount = Math.max(0, invoice.finalPrice - usedAmount);
 
   const refundData = {
     invoiceId,
@@ -122,7 +113,7 @@ export async function requestRefund(centerId: string, invoiceId: string, reason:
     usedDays,
     perDay,
     usedAmount,
-    penalty,
+    penalty: 0,
     refundAmount,
     status: 'requested',
     reason,
@@ -158,13 +149,10 @@ export async function syncDailyKpi(centerId: string, dateStr: string) {
     const data = doc.data() as Invoice;
     const cycleEnd = data.cycleEndDate.toDate();
     
-    // Firestore where 쿼리 제한으로 인해 endDate는 메모리에서 필터링
     if (targetDate <= cycleEnd) {
-      // 일할 매출 = 최종 결제액 / 28일
       const dailyPrice = Math.floor(data.finalPrice / 28);
       dailyAccruedRevenue += dailyPrice;
       
-      // 할인액도 일할로 계산하여 통계에 반영 (옵션)
       data.discountsSnapshot.forEach(d => {
         totalDiscount += Math.floor(d.amount / 28);
       });
@@ -173,7 +161,6 @@ export async function syncDailyKpi(centerId: string, dateStr: string) {
     }
   });
 
-  // 2. 환불액 집계 (환불은 요청일에 전액 차감 또는 일할 차감 - 여기서는 요청일 기준 집계)
   const refundsSnap = await adminDb.collection(`centers/${centerId}/refunds`)
     .where('requestedAt', '>=', Timestamp.fromDate(startOfDay(targetDate)))
     .where('requestedAt', '<=', Timestamp.fromDate(endOfDay(targetDate)))
@@ -184,17 +171,16 @@ export async function syncDailyKpi(centerId: string, dateStr: string) {
     dailyTotalRefund += doc.data().refundAmount;
   });
 
-  // 3. 해당 월의 고정비 조회 (BEP 계산용)
   const monthKey = format(targetDate, 'yyyy-MM');
   const monthFinanceSnap = await adminDb.doc(`centers/${centerId}/financeMonthly/${monthKey}`).get();
   const monthlyFixedCosts = monthFinanceSnap.exists ? monthFinanceSnap.data()?.totalFixedCosts || 0 : 0;
   
   const avgFinalPrice = activeStudentCount > 0 ? dailyAccruedRevenue / activeStudentCount * 28 : 0;
-  const breakevenStudents = avgFinalPrice > 0 ? Math.ceil(monthlyFixedCosts / (avgFinalPrice)) : null;
+  const breakevenStudents = avgFinalPrice > 0 ? Math.ceil(monthlyFixedCosts / (avgFinalPrice / 28 * 30)) : null;
 
   const kpiData = {
     date: dateStr,
-    totalRevenue: dailyAccruedRevenue, // 오늘 하루의 실질 매출
+    totalRevenue: dailyAccruedRevenue,
     totalDiscount,
     totalRefund: dailyTotalRefund,
     activeStudentCount,
