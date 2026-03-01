@@ -136,109 +136,97 @@ function GamifiedStatCard({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="cursor-pointer group relative overflow-hidden transition-all duration-500 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] hover:-translate-y-1.5 active:scale-95 border-none shadow-md bg-white ring-1 ring-black/[0.03]">
-          <div className={cn("absolute top-0 left-0 w-1.5 h-full", rankData.current.iconColor.replace('text-', 'bg-'))} />
-          <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-1 px-4 pt-4" : "pb-2 px-6 pt-6")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors", isMobile ? "text-[9px]" : "text-xs")}>{title}</CardTitle>
-            <div className={cn("rounded-xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-12", isMobile ? "p-1.5" : "p-2", rankData.current.bg)}>
-              <Icon className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4", rankData.current.color)} />
+        <Card className="cursor-pointer group relative overflow-hidden transition-all duration-500 hover:shadow-xl active:scale-95 border-none shadow-md bg-white ring-1 ring-black/[0.03] rounded-[1.5rem] sm:rounded-[2rem]">
+          <div className={cn("absolute top-0 left-0 w-1 sm:w-1.5 h-full", rankData.current.iconColor.replace('text-', 'bg-'))} />
+          <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-1 px-3.5 pt-3.5" : "pb-2 px-6 pt-6")}>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors whitespace-nowrap", isMobile ? "text-[8px]" : "text-xs")}>{title}</CardTitle>
+            <div className={cn("rounded-lg transition-all duration-500 group-hover:scale-110", isMobile ? "p-1" : "p-2", rankData.current.bg)}>
+              <Icon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", rankData.current.color)} />
             </div>
           </CardHeader>
-          <CardContent className={isMobile ? "px-4 pb-4" : "px-6 pb-6"}>
+          <CardContent className={isMobile ? "px-3.5 pb-3.5" : "px-6 pb-6"}>
             {isLoading ? (
               <div className="space-y-2">
-                <Skeleton className="h-8 w-24 mt-1" />
-                <Skeleton className="h-4 w-32 mt-2" />
+                <Skeleton className="h-6 w-16 mt-1" />
+                <Skeleton className="h-3 w-20 mt-2" />
               </div>
             ) : (
               <>
-                <div className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-3xl")}>{value}</div>
-                <div className={cn("flex items-center gap-2 mt-2", isMobile ? "mt-1.5" : "mt-3")}>
-                   <Badge className={cn("font-black rounded-lg border-none shadow-sm", isMobile ? "text-[8px] px-1.5 py-0" : "text-[9px] px-2.5 py-0.5", rankData.current.bg, rankData.current.color)}>
+                <div className={cn("font-black tracking-tighter text-primary truncate", isMobile ? "text-xl" : "text-3xl")}>{value}</div>
+                <div className={cn("flex items-center gap-1.5 mt-1.5 flex-nowrap overflow-hidden", isMobile ? "mt-1" : "mt-3")}>
+                   <Badge className={cn("font-black rounded-md border-none shadow-sm shrink-0", isMobile ? "text-[7px] px-1 py-0" : "text-[9px] px-2 py-0.5", rankData.current.bg, rankData.current.color)}>
                      {rankData.current.name}
                    </Badge>
-                   <span className={cn("font-bold text-muted-foreground/60", isMobile ? "text-[8px]" : "text-[10px]")}>{evolution}</span>
+                   <span className={cn("font-bold text-muted-foreground/60 whitespace-nowrap truncate", isMobile ? "text-[7px]" : "text-[10px]")}>{evolution}</span>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
       </DialogTrigger>
-      <DialogContent className={cn("border-none shadow-2xl p-0 transition-all duration-500", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "sm:max-w-md rounded-[3rem]")}>
-        <div className={cn("relative", isMobile ? "p-8 pb-12" : "p-10")}>
+      <DialogContent className={cn("border-none shadow-2xl p-0 transition-all duration-500", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : "sm:max-w-md rounded-[3rem]")}>
+        <div className={cn("relative", isMobile ? "p-6 pb-10" : "p-10")}>
           <div className={cn("absolute top-0 left-0 w-full h-40 bg-gradient-to-b opacity-10 -z-10", rankData.current.bg.replace('bg-', 'from-'))} />
           
           <DialogHeader className="items-center text-center">
-            <div className={cn("mx-auto rounded-[2rem] shadow-2xl bg-white border-4 animate-float", isMobile ? "p-4 mb-4" : "p-6 mb-6", rankData.current.border)}>
-              <Trophy className={cn(isMobile ? "h-12 w-12" : "h-16 w-16", rankData.current.color)} />
+            <div className={cn("mx-auto rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl bg-white border-4 animate-float", isMobile ? "p-3 mb-3" : "p-6 mb-6", rankData.current.border)}>
+              <Trophy className={cn(isMobile ? "h-10 w-10" : "h-16 w-16", rankData.current.color)} />
             </div>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>{gameTitle}</DialogTitle>
-            <DialogDescription className={cn("mt-2 font-bold text-muted-foreground", isMobile ? "text-base" : "text-lg")}>
-              현재 시즌 등급: <span className={cn("font-black underline underline-offset-8 decoration-4", rankData.current.color)}>{rankData.current.name}</span>
+            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>{gameTitle}</DialogTitle>
+            <DialogDescription className={cn("mt-1.5 font-bold text-muted-foreground", isMobile ? "text-sm" : "text-lg")}>
+              현재 시즌 등급: <span className={cn("font-black underline underline-offset-4 decoration-2 sm:underline-offset-8 sm:decoration-4", rankData.current.color)}>{rankData.current.name}</span>
             </DialogDescription>
           </DialogHeader>
           
-          <div className={cn("space-y-8 py-8", isMobile ? "space-y-6 py-6" : "space-y-10 py-10")}>
-            <div className={cn("rounded-[2.5rem] bg-[#fafafa] border border-border/50 shadow-inner space-y-6", isMobile ? "p-6" : "p-8")}>
+          <div className={cn("space-y-6 py-6", isMobile ? "space-y-5 py-5" : "space-y-10 py-10")}>
+            <div className={cn("rounded-[2rem] bg-[#fafafa] border border-border/50 shadow-inner space-y-5", isMobile ? "p-5" : "p-8")}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-primary/5 p-2 rounded-xl">
-                    <Activity className="h-5 w-5 text-primary" />
+                <div className="flex items-center gap-2">
+                  <div className="bg-primary/5 p-1.5 rounded-lg">
+                    <Activity className="h-4 w-4 text-primary" />
                   </div>
-                  <span className="text-xs font-black uppercase tracking-[0.2em] text-primary/60">실시간 현황</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.1em] text-primary/60">실시간 현황</span>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className={cn("font-black text-primary font-mono tabular-nums", isMobile ? "text-2xl" : "text-3xl")}>{dailyValue.toFixed(0)}</span>
-                  <span className="text-xs font-black text-primary/40">{dailyUnit}</span>
+                  <span className={cn("font-black text-primary font-mono tabular-nums", isMobile ? "text-xl" : "text-3xl")}>{dailyValue.toFixed(0)}</span>
+                  <span className="text-[10px] font-black text-primary/40">{dailyUnit}</span>
                 </div>
               </div>
-              <div className="space-y-3">
-                <div className="relative h-4 w-full bg-white rounded-full overflow-hidden border shadow-sm">
+              <div className="space-y-2">
+                <div className="relative h-3 w-full bg-white rounded-full overflow-hidden border shadow-sm">
                   <div 
                     className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", rankData.current.iconColor.replace('text-', 'bg-'))}
                     style={{ width: `${Math.min(100, type === 'attendance' ? (dailyValue / 360) * 100 : dailyValue)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest px-1">
+                <div className="flex justify-between text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest px-0.5">
                   <span>시작</span>
                   <span>목표 {type === 'attendance' ? '360분' : '100%'}</span>
                 </div>
               </div>
             </div>
 
-            {type === 'attendance' && (
-              <div className="bg-rose-50/50 border-2 border-rose-100/50 text-rose-700 rounded-[2rem] p-6 flex items-start gap-4">
-                <div className="bg-white p-2 rounded-xl shadow-sm"><AlertCircle className="h-5 w-5 text-rose-500" /></div>
-                <div className="space-y-1">
-                  <p className="text-xs font-black uppercase tracking-widest">출석 인정 기준</p>
-                  <p className="text-[11px] leading-relaxed font-bold opacity-80">
-                    하루에 **3시간(180분)** 이상 학습 몰입을 달성한 날만 출석 등급에 반영됩니다.
-                  </p>
-                </div>
-              </div>
-            )}
-
             {rankData.next && (
-              <div className="space-y-5 px-2">
+              <div className="space-y-4 px-1">
                 <div className="flex justify-between items-end">
                   <div className="grid gap-0.5">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">다음 목표</span>
-                    <span className="text-base font-black">{rankData.next.name} 등급 도전 중</span>
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">다음 목표</span>
+                    <span className="text-sm font-black">{rankData.next.name} 등급 도전 중</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xl font-black font-mono tabular-nums text-primary">{rankData.currentValue.toFixed(1)}</span>
-                    <span className="text-xs font-black text-muted-foreground/40"> / {rankData.nextThreshold}</span>
+                    <span className="text-lg font-black font-mono tabular-nums text-primary">{rankData.currentValue.toFixed(1)}</span>
+                    <span className="text-[10px] font-black text-muted-foreground/40"> / {rankData.nextThreshold}</span>
                   </div>
                 </div>
                 <Progress 
                   value={Math.min(100, (rankData.currentValue / rankData.nextThreshold) * 100)} 
-                  className="h-3 rounded-full bg-muted shadow-inner" 
+                  className="h-2 rounded-full bg-muted shadow-inner" 
                 />
               </div>
             )}
           </div>
           
-          <Button onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()} className="w-full h-16 rounded-[1.5rem] font-black text-lg shadow-xl active:scale-95 transition-all">
+          <Button onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()} className="w-full h-14 rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all">
             몰입 시작하기
           </Button>
         </div>
@@ -464,48 +452,48 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const m = totalMinutes % 60;
 
   return (
-    <div className={cn("flex flex-col gap-8 pb-20", isMobile ? "gap-5" : "gap-8")}>
+    <div className={cn("flex flex-col gap-6 sm:gap-8 pb-20", isMobile ? "px-0.5" : "px-0")}>
       <AlertDialog open={showSessionAlert} onOpenChange={setShowSessionAlert}>
-        <AlertDialogContent className={cn("border-none shadow-2xl transition-all", isMobile ? "rounded-t-[3rem] rounded-b-none p-8 bottom-0 top-auto translate-y-0 fixed left-0 right-0 max-w-none" : "rounded-[3rem] p-10")}>
+        <AlertDialogContent className={cn("border-none shadow-2xl transition-all", isMobile ? "rounded-t-[2.5rem] rounded-b-none p-6 bottom-0 top-auto translate-y-0 fixed left-0 right-0 max-w-none" : "rounded-[3rem] p-10")}>
           <AlertDialogHeader>
-            <AlertDialogTitle className={cn("font-black flex items-center gap-3 tracking-tighter", isMobile ? "text-2xl" : "text-3xl")}>
-              <History className="h-8 w-8 text-primary" />
+            <AlertDialogTitle className={cn("font-black flex items-center gap-3 tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>
+              <History className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               세션 유지 확인
             </AlertDialogTitle>
-            <AlertDialogDescription className={cn("font-bold text-muted-foreground pt-4 leading-relaxed", isMobile ? "text-base" : "text-lg")}>
+            <AlertDialogDescription className={cn("font-bold text-muted-foreground pt-3 leading-relaxed", isMobile ? "text-sm" : "text-lg")}>
               장시간 활동이 감지되지 않았습니다. <br/>
-              <span className="text-destructive font-black underline underline-offset-4">{gracePeriod}초</span> 후 자동 종료됩니다.
+              <span className="text-destructive font-black underline underline-offset-2">{gracePeriod}초</span> 후 자동 종료됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8">
-            <AlertDialogAction onClick={() => { setShowSessionAlert(false); setLastActiveCheckTime(Date.now()); }} className="h-14 rounded-2xl font-black text-base px-8">학습 유지하기</AlertDialogAction>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogAction onClick={() => { setShowSessionAlert(false); setLastActiveCheckTime(Date.now()); }} className="h-12 sm:h-14 rounded-xl sm:rounded-2xl font-black text-sm sm:text-base px-8">학습 유지하기</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <section className={cn("group relative overflow-hidden bg-primary text-primary-foreground shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border-b-8 border-black/20 transition-all", isMobile ? "rounded-[2.5rem] p-6" : "rounded-[3rem] p-12")}>
-        <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 transition-transform duration-700 group-hover:scale-110">
-          <Zap className="h-64 w-64" />
+      <section className={cn("group relative overflow-hidden bg-primary text-primary-foreground shadow-2xl border-b-4 sm:border-b-8 border-black/20 transition-all", isMobile ? "rounded-[2rem] p-5 sm:p-6" : "rounded-[3rem] p-12")}>
+        <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-700 group-hover:scale-110">
+          <Zap className="h-48 w-48 sm:h-64 sm:w-64" />
         </div>
         
-        <div className={cn("relative z-10 flex flex-col items-center gap-8 text-center md:flex-row md:justify-between md:text-left", isMobile ? "gap-6" : "gap-8")}>
-          <div className={cn("space-y-4", isMobile ? "space-y-2" : "space-y-4")}>
-            <h2 className={cn("font-black tracking-tighter leading-tight", isMobile ? "text-2xl" : "text-5xl")}>
+        <div className={cn("relative z-10 flex flex-col items-center gap-6 sm:gap-8 text-center md:flex-row md:justify-between md:text-left")}>
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-nowrap", isMobile ? "text-xl" : "text-5xl")}>
               {isTimerActive ? "몰입의 정점에\n도착하셨네요!" : "오늘의 트랙을\n시작해볼까요?"}
             </h2>
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md w-fit px-5 py-2.5 rounded-[1.25rem] border border-white/10 mx-auto md:mx-0">
-              <Sparkles className="h-4 w-4 text-accent animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
+            <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md w-fit px-3.5 py-1.5 rounded-full border border-white/10 mx-auto md:mx-0">
+              <Sparkles className="h-3 w-3 text-accent animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-widest opacity-80 whitespace-nowrap">
                 실시간 학습 엔진 가동 중
               </span>
             </div>
           </div>
           
-          <div className={cn("flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto", isMobile ? "gap-4" : "gap-6")}>
+          <div className={cn("flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full md:w-auto", isMobile ? "mt-2" : "")}>
             {isTimerActive && (
-              <div className={cn("flex flex-col items-center bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 shadow-2xl", isMobile ? "px-6 py-4" : "px-10 py-6")}>
-                <span className="text-[8px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">진행 시간</span>
-                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-accent", isMobile ? "text-4xl" : "text-5xl")}>
+              <div className={cn("flex flex-col items-center bg-white/5 backdrop-blur-2xl rounded-[1.5rem] sm:rounded-[2.5rem] border border-white/10 shadow-2xl shrink-0", isMobile ? "px-5 py-3" : "px-10 py-6")}>
+                <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">진행 시간</span>
+                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-accent leading-none", isMobile ? "text-3xl" : "text-5xl")}>
                   {formatTime(localSeconds)}
                 </span>
               </div>
@@ -514,33 +502,33 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Button 
               size="lg" 
               className={cn(
-                "w-full rounded-[2rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 group",
-                isMobile ? "h-16 text-xl" : "h-20 px-12 text-2xl",
+                "w-full rounded-[1.5rem] sm:rounded-[2rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 group",
+                isMobile ? "h-14 text-lg" : "h-20 px-12 text-2xl",
                 isTimerActive ? "bg-destructive hover:bg-destructive/90" : "bg-accent hover:bg-accent/90"
               )}
               onClick={handleStudyStartStop}
             >
               {isTimerActive ? (
-                <>트랙 종료 <Square className="ml-3 h-6 w-6 fill-current" /></>
+                <>트랙 종료 <Square className="ml-2 h-5 w-5 sm:h-6 sm:w-6 fill-current" /></>
               ) : (
-                <>트랙 시작 <Play className="ml-3 h-6 w-6 fill-current" /></>
+                <>트랙 시작 <Play className="ml-2 h-5 w-5 sm:h-6 sm:w-6 fill-current" /></>
               )}
             </Button>
           </div>
         </div>
       </section>
 
-      <div className={cn("grid gap-4 sm:gap-6 lg:grid-cols-4", isMobile ? "grid-cols-2 gap-3" : "grid-cols-2")}>
-        <Card className="border-none shadow-md bg-white ring-1 ring-black/[0.03] rounded-[2rem] overflow-hidden">
-          <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-1 px-4 pt-4" : "pb-2 px-6 pt-6")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>오늘의 몰입</CardTitle>
-            <Clock className="h-4 w-4 text-primary/40" />
+      <div className={cn("grid gap-3 sm:gap-6", isMobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4")}>
+        <Card className="border-none shadow-md bg-white ring-1 ring-black/[0.03] rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden">
+          <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", isMobile ? "pb-1 px-3.5 pt-3.5" : "pb-2 px-6 pt-6")}>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[8px]" : "text-xs")}>오늘의 몰입</CardTitle>
+            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary/40" />
           </CardHeader>
-          <CardContent className={isMobile ? "px-4 pb-4" : "px-6 pb-6"}>
-            <div className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-3xl")}>
-              {h}<span className="text-[10px] ml-0.5 opacity-40">시간</span> {m}<span className="text-[10px] ml-0.5 opacity-40">분</span>
+          <CardContent className={isMobile ? "px-3.5 pb-3.5" : "px-6 pb-6"}>
+            <div className={cn("font-black tracking-tighter text-primary whitespace-nowrap", isMobile ? "text-xl" : "text-3xl")}>
+              {h}<span className="text-[9px] sm:text-[10px] ml-0.5 opacity-40 font-bold">h</span> {m}<span className="text-[9px] sm:text-[10px] ml-0.5 opacity-40 font-bold">m</span>
             </div>
-            <p className={cn("font-bold text-muted-foreground/60 mt-2", isMobile ? "text-[8px] mt-1" : "text-[10px]")}>일일 권장량 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
+            <p className={cn("font-bold text-muted-foreground/60 truncate", isMobile ? "text-[7px] mt-1" : "text-[10px] mt-2")}>일일 권장량 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
           </CardContent>
         </Card>
 
@@ -585,80 +573,74 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
       </div>
 
-      <div className={cn("grid gap-8 grid-cols-1 lg:grid-cols-3 items-start", isMobile ? "gap-6" : "gap-8")}>
-        <Card className="lg:col-span-2 border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-10")}>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="space-y-1.5">
-                <CardTitle className={cn("font-black flex items-center gap-3 tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>
-                  <ListTodo className="h-8 w-8 text-primary" /> 오늘의 학습 계획
+      <div className={cn("grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-3 items-start")}>
+        <Card className="lg:col-span-2 border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
+          <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-5" : "p-10")}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle className={cn("font-black flex items-center gap-2 tracking-tighter whitespace-nowrap", isMobile ? "text-lg" : "text-3xl")}>
+                  <ListTodo className="h-6 w-6 sm:h-8 sm:w-8 text-primary" /> 오늘의 학습 계획
                 </CardTitle>
-                <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-[0.2em] ml-1">Daily Study Matrix</CardDescription>
+                <CardDescription className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest ml-0.5">Daily Study Matrix</CardDescription>
               </div>
-              <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
-                <div className="flex items-center gap-2.5">
-                  <Badge className="bg-primary text-white font-black px-3 py-1 rounded-full border-none shadow-md">{Math.round(todayCompletionRate)}%</Badge>
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">달성 완료</span>
+              <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary text-white font-black px-2 py-0.5 rounded-md border-none shadow-sm text-[10px]">{Math.round(todayCompletionRate)}%</Badge>
+                  <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">달성 완료</span>
                 </div>
-                <Progress value={todayCompletionRate} className="w-full sm:w-40 h-2 rounded-full bg-muted shadow-inner" />
+                <Progress value={todayCompletionRate} className="w-full sm:w-32 h-1.5 rounded-full bg-muted shadow-inner" />
               </div>
             </div>
           </CardHeader>
-          <CardContent className={isMobile ? "p-6" : "p-10"}>
+          <CardContent className={isMobile ? "p-5" : "p-10"}>
             {plansLoading ? (
-              <div className="flex justify-center py-20"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>
+              <div className="flex justify-center py-16"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
             ) : studyTasks.length === 0 ? (
-              <div className="py-24 text-center flex flex-col items-center gap-6 bg-[#fafafa] rounded-[2.5rem] border-2 border-dashed border-border/50">
-                <div className="bg-white p-6 rounded-3xl shadow-sm border">
-                  <Sparkles className="h-12 w-12 text-primary opacity-10" />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-lg font-black text-muted-foreground/60 italic tracking-tight">오늘 등록된 계획이 없습니다.</p>
-                  <p className="text-xs font-bold text-muted-foreground/30 uppercase tracking-widest">오늘의 성공을 계획하세요</p>
-                </div>
-                <Button asChild variant="outline" size="lg" className="rounded-2xl font-black mt-4 border-2 px-10 h-14 hover:bg-primary hover:text-white transition-all shadow-sm">
+              <div className="py-16 text-center flex flex-col items-center gap-4 bg-[#fafafa] rounded-[1.5rem] border-2 border-dashed border-border/50">
+                <Sparkles className="h-8 w-8 text-primary opacity-10" />
+                <p className="text-sm font-black text-muted-foreground/60 italic tracking-tight">오늘 등록된 계획이 없습니다.</p>
+                <Button asChild variant="outline" size="sm" className="rounded-xl font-black mt-2 h-10 px-6 hover:bg-primary hover:text-white transition-all">
                   <Link href="/dashboard/plan">계획 수립하러 가기</Link>
                 </Button>
               </div>
             ) : (
-              <div className="grid gap-4">
+              <div className="grid gap-3">
                 {studyTasks.slice(0, 6).map((task) => (
                   <div 
                     key={task.id} 
                     className={cn(
-                      "flex items-center gap-5 p-5 rounded-3xl border-2 transition-all duration-500 group relative",
-                      isMobile ? "p-4 gap-3" : "p-5 gap-5",
-                      task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent hover:border-primary/10 hover:shadow-xl shadow-sm"
+                      "flex items-center gap-3.5 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
+                      task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent hover:border-primary/10 hover:shadow-lg shadow-sm"
                     )}
                   >
                     <Checkbox 
                       id={task.id} 
                       checked={task.done} 
                       onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)}
-                      className="h-6 w-6 rounded-xl border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm"
+                      className="h-5 w-5 rounded-md border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shrink-0"
                     />
                     <Label 
                       htmlFor={task.id}
                       className={cn(
-                        "flex-1 font-bold transition-all duration-500",
-                        isMobile ? "text-sm" : "text-base",
+                        "flex-1 font-bold transition-all duration-500 leading-tight",
+                        isMobile ? "text-xs" : "text-base",
                         task.done ? "line-through text-muted-foreground/40 italic" : "text-foreground"
                       )}
                     >
                       {task.title}
                     </Label>
                     {task.done && (
-                      <div className="absolute right-5 flex items-center gap-2 animate-in zoom-in duration-500">
-                        {!isMobile && <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">확인됨</span>}
-                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                      <div className="flex items-center gap-1.5 animate-in zoom-in duration-500 shrink-0">
+                        {!isMobile && <span className="text-[8px] font-black text-emerald-600 uppercase">완료</span>}
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                       </div>
                     )}
                   </div>
                 ))}
                 {studyTasks.length > 6 && (
-                  <Button asChild variant="ghost" className="w-full mt-6 h-12 rounded-2xl font-black text-xs text-primary/40 hover:text-primary transition-all gap-2">
+                  <Button asChild variant="ghost" className="w-full mt-4 h-10 rounded-xl font-black text-[10px] text-primary/40 hover:text-primary transition-all gap-1">
                     <Link href="/dashboard/plan">
-                      전체 {studyTasks.length}개 계획 보기 <ChevronRight className="h-4 w-4" />
+                      전체 {studyTasks.length}개 계획 보기 <ChevronRight className="h-3 w-3" />
                     </Link>
                   </Button>
                 )}
@@ -667,36 +649,36 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-2xl rounded-[3rem] bg-white flex flex-col ring-1 ring-black/[0.03] overflow-hidden">
-          <CardHeader className={isMobile ? "p-6" : "p-10"}>
-            <CardTitle className={cn("font-black flex items-center gap-3 tracking-tighter", isMobile ? "text-xl" : "text-2xl")}>
-              <CalendarClock className="h-7 w-7 text-primary" /> 오늘의 루틴
+        <Card className="border-none shadow-2xl rounded-[2rem] sm:rounded-[3rem] bg-white flex flex-col ring-1 ring-black/[0.03] overflow-hidden">
+          <CardHeader className={isMobile ? "p-5" : "p-10"}>
+            <CardTitle className={cn("font-black flex items-center gap-2 tracking-tighter whitespace-nowrap", isMobile ? "text-lg" : "text-2xl")}>
+              <CalendarClock className="h-6 w-6 sm:h-7 sm:w-7 text-primary" /> 오늘의 루틴
             </CardTitle>
-            <CardDescription className="font-bold text-[10px] opacity-40 uppercase tracking-[0.2em] ml-1">Routine Summary</CardDescription>
+            <CardDescription className="font-bold text-[9px] opacity-40 uppercase tracking-widest ml-0.5">Routine Summary</CardDescription>
           </CardHeader>
-          <CardContent className={cn("pb-10 flex-1", isMobile ? "px-6" : "px-10")}>
+          <CardContent className={cn("pb-8 flex-1", isMobile ? "px-5" : "px-10")}>
             {scheduleItems.length === 0 ? (
-              <div className="h-full py-20 text-center text-muted-foreground/30 text-xs font-black border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-[#fafafa]">
-                <Timer className="h-10 w-10 opacity-10" />
+              <div className="h-full py-16 text-center text-muted-foreground/30 text-[10px] font-black border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 bg-[#fafafa]">
+                <Timer className="h-8 w-8 opacity-10" />
                 <span>기록된 시간표가 없습니다.</span>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-3.5">
                 {scheduleItems.map((item) => {
                   const [title, time] = item.title.split(': ');
                   return (
-                    <div key={item.id} className="flex items-center justify-between p-5 rounded-[1.75rem] bg-[#fafafa] border border-border/50 group hover:bg-white hover:shadow-xl transition-all duration-500 hover:-translate-x-1">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-primary/5 p-2.5 rounded-xl group-hover:bg-primary/10 transition-colors">
-                          <CircleDot className="h-4 w-4 text-primary/60" />
+                    <div key={item.id} className="flex items-center justify-between p-4 rounded-[1.25rem] bg-[#fafafa] border border-border/50 group hover:bg-white hover:shadow-xl transition-all duration-500">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/5 p-2 rounded-lg">
+                          <CircleDot className="h-3.5 w-3.5 text-primary/60" />
                         </div>
-                        <span className="text-sm font-black text-foreground/80">{title}</span>
+                        <span className="text-[11px] sm:text-sm font-black text-foreground/80 whitespace-nowrap">{title}</span>
                       </div>
-                      <span className="text-xs font-black font-mono text-primary bg-white px-4 py-1.5 rounded-xl shadow-sm ring-1 ring-black/[0.02]">{time || '-'}</span>
+                      <span className="text-[10px] sm:text-xs font-black font-mono text-primary bg-white px-3 py-1 rounded-lg shadow-sm border border-black/[0.02] whitespace-nowrap">{time || '-'}</span>
                     </div>
                   );
                 })}
-                <Button asChild variant="ghost" className="w-full mt-6 h-12 rounded-2xl font-black text-[10px] text-primary/30 hover:text-primary transition-all uppercase tracking-widest">
+                <Button asChild variant="ghost" className="w-full mt-4 h-10 rounded-xl font-black text-[9px] text-primary/30 hover:text-primary transition-all uppercase tracking-widest">
                   <Link href="/dashboard/plan">루틴 관리하기</Link>
                 </Button>
               </div>
