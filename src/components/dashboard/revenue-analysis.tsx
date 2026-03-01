@@ -32,7 +32,8 @@ import {
   Search,
   Filter,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -62,7 +63,6 @@ export function RevenueAnalysis() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
 
-  // 1. 모든 상태(useState) 훅을 최상단에 배치
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [activeDrillDown, setActiveDrillDown] = useState<'revenue' | 'active' | 'churn' | null>(null);
   const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
@@ -70,7 +70,6 @@ export function RevenueAnalysis() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 2. 데이터 조회 훅
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -81,7 +80,6 @@ export function RevenueAnalysis() {
   
   const { data: rawMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery);
 
-  // 3. 데이터 가공 훅(useMemo)
   const businessMetrics = useMemo(() => {
     if (!rawMembers) return null;
 
@@ -94,12 +92,10 @@ export function RevenueAnalysis() {
     const activeCount = members.filter(m => m.status === 'active').length;
     const churnCount = members.filter(m => m.status === 'withdrawn').length;
     
-    // 개별 학생의 monthlyFee 합산 (없을 경우 기본값 350,000원 적용)
     const estimatedMonthlyRevenue = members
       .filter(m => m.status === 'active')
       .reduce((acc, m) => acc + (m.monthlyFee || 350000), 0);
 
-    // 최근 12개월간의 등록 추이 (과거 데이터 탐색 범위 확대)
     const now = new Date();
     const months = eachMonthOfInterval({
       start: subMonths(now, 11),
@@ -132,17 +128,14 @@ export function RevenueAnalysis() {
     if (!businessMetrics) return [];
     let list = businessMetrics.allMembers;
 
-    // 그래프 월 선택 필터
     if (selectedMonth) {
       list = list.filter(m => m.joinedAt && format(m.joinedAt.toDate(), 'yyyy-MM') === selectedMonth);
     }
 
-    // 이름 검색 필터
     if (searchTerm) {
       list = list.filter(m => m.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
     }
 
-    // KPI 카드 드릴다운 필터
     if (activeDrillDown === 'active') {
       list = list.filter(m => m.status === 'active');
     } else if (activeDrillDown === 'churn') {
@@ -152,7 +145,6 @@ export function RevenueAnalysis() {
     return list;
   }, [businessMetrics, selectedMonth, searchTerm, activeDrillDown]);
 
-  // 4. 이벤트 핸들러
   const handleUpdateFee = async (studentId: string) => {
     if (!firestore || !centerId) return;
     
@@ -170,7 +162,6 @@ export function RevenueAnalysis() {
         updatedAt: serverTimestamp()
       });
 
-      // 사용자 역인덱스 정보도 업데이트 (필요한 경우)
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
       await updateDoc(userCenterRef, {
         monthlyFee: fee,
@@ -186,7 +177,6 @@ export function RevenueAnalysis() {
     }
   };
 
-  // 로딩 중이거나 데이터가 없을 때의 UI 처리를 JSX 내부에서 수행 (Hook 에러 방지)
   if (isMembersLoading || !businessMetrics) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
@@ -198,7 +188,6 @@ export function RevenueAnalysis() {
 
   return (
     <div className="space-y-8 pb-32 animate-in fade-in duration-1000">
-      {/* KPI 카드 섹션 - 인터랙티브 드릴다운 */}
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
         <Card 
           onClick={() => setActiveDrillDown(activeDrillDown === 'revenue' ? null : 'revenue')}
@@ -278,7 +267,6 @@ export function RevenueAnalysis() {
         </Card>
       </div>
 
-      {/* 신규 등록 추이 차트 - 필터 연동 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
           <div className="flex justify-between items-center">
@@ -308,7 +296,7 @@ export function RevenueAnalysis() {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" fontSize={11} fontWeight="900" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" fontSize={11} fontWith="900" axisLine={false} tickLine={false} />
                 <YAxis fontSize={11} fontWeight="900" axisLine={false} tickLine={false} />
                 <Tooltip 
                   cursor={{fill: 'rgba(0,0,0,0.02)'}}
@@ -334,7 +322,6 @@ export function RevenueAnalysis() {
         </CardContent>
       </Card>
 
-      {/* 학생 등록 타임라인 & 수강료 관리 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
           <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-start" : "flex-row")}>
@@ -463,7 +450,6 @@ export function RevenueAnalysis() {
         </div>
       </Card>
 
-      {/* 전략 제언 섹션 */}
       <section className="bg-primary rounded-[3rem] p-12 text-white relative overflow-hidden shadow-2xl">
         <Sparkles className="absolute -top-10 -right-10 h-64 w-64 opacity-5 rotate-12" />
         <div className="relative z-10 grid gap-10 lg:grid-cols-2 items-center">
