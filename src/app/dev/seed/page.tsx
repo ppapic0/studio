@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { seedInitialData } from '@/lib/membership-actions';
 import { useToast } from '@/hooks/use-toast';
@@ -11,19 +11,20 @@ import { Loader2, Database } from 'lucide-react';
 
 export default function SeedPage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   const [isSeeding, setIsSeeding] = useState(false);
 
   const handleSeed = async () => {
-    if (!user || !activeMembership) {
+    if (!user || !activeMembership || !firestore) {
       toast({ variant: 'destructive', title: '로그인 및 센터 가입이 필요합니다.' });
       return;
     }
 
     setIsSeeding(true);
     try {
-      const result = await seedInitialData(user.uid, activeMembership.id);
+      const result = await seedInitialData(firestore, user.uid, activeMembership.id);
       if (result.ok) {
         toast({ title: '시딩 성공', description: '초기 데이터가 주입되었습니다.' });
       }

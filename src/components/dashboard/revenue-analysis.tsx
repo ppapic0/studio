@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -49,7 +48,7 @@ import {
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { CenterMembership, StudentProfile } from '@/lib/types';
 import { format, eachMonthOfInterval, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -83,7 +82,7 @@ export function RevenueAnalysis() {
   
   const { data: rawMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery);
 
-  // 학생 프로필 정보 조회 (학년별 가격 결정용)
+  // 학생 프로필 정보 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'students');
@@ -106,7 +105,6 @@ export function RevenueAnalysis() {
       .filter(m => m.status === 'active')
       .reduce((acc, m) => {
         if (m.monthlyFee) return acc + m.monthlyFee;
-        // 기본가 로직: N수생 54만, 재학생 39만
         const profile = studentsProfiles?.find(p => p.id === m.id);
         const base = profile?.grade?.includes('N수생') ? 540000 : 390000;
         return acc + base;
@@ -190,7 +188,7 @@ export function RevenueAnalysis() {
       ]);
 
       const todayStr = format(new Date(), 'yyyy-MM-dd');
-      await syncDailyKpi(centerId, todayStr);
+      await syncDailyKpi(firestore, centerId, todayStr);
 
       toast({ title: "수강료 업데이트 완료" });
       setEditingFeeId(null);
@@ -211,12 +209,9 @@ export function RevenueAnalysis() {
     const profile = studentsProfiles?.find(p => p.id === studentId);
     const base = profile?.grade?.includes('N수생') ? 540000 : 390000;
     
-    let currentFee = member.monthlyFee || base;
     const isTutoring = type === 'tutoring' ? !member.tutoringDiscount : !!member.tutoringDiscount;
     const isSibling = type === 'sibling' ? !member.siblingDiscount : !!member.siblingDiscount;
 
-    // 할인이 켜지면 차감, 꺼지면 복구
-    // 순서: 정률(형제) -> 정액(과외) 추천이나 여기서는 단순 증감으로 처리
     let nextFee = base;
     if (isSibling) nextFee = Math.floor(nextFee * 0.95);
     if (isTutoring) nextFee -= 50000;
@@ -239,7 +234,7 @@ export function RevenueAnalysis() {
       ]);
 
       const todayStr = format(new Date(), 'yyyy-MM-dd');
-      await syncDailyKpi(centerId, todayStr);
+      await syncDailyKpi(firestore, centerId, todayStr);
 
       toast({ title: "할인 정책 적용 완료" });
     } catch (e: any) {

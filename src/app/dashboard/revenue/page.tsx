@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -25,7 +24,6 @@ import {
   PieChart,
   Settings,
   Loader2,
-  Info,
   RefreshCw,
   Percent,
   Wallet,
@@ -56,7 +54,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/select';
 import { format, startOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
@@ -76,12 +74,12 @@ export default function RevenuePage() {
 
   // 재무 데이터 자동 동기화
   useEffect(() => {
-    if (!centerId || isSyncing) return;
+    if (!centerId || !firestore || isSyncing) return;
     
     const triggerSync = async () => {
       setIsSyncing(true);
       try {
-        await syncRecentKpis(centerId);
+        await syncRecentKpis(firestore, centerId);
       } catch (e) {
         console.error("KPI Sync Error:", e);
       } finally {
@@ -90,7 +88,7 @@ export default function RevenuePage() {
     };
 
     triggerSync();
-  }, [centerId]);
+  }, [centerId, firestore]);
 
   // 재무 설정 - 고정비 항목별 상태
   const [selectedFinanceMonth, setSelectedFinanceMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -193,7 +191,7 @@ export default function RevenuePage() {
       }, { merge: true });
 
       // 고정비 변경 시 즉시 오늘 KPI 재동기화
-      await syncRecentKpis(centerId);
+      await syncRecentKpis(firestore, centerId);
 
       toast({ title: "재무 정책 및 비용이 저장되었습니다." });
       setIsSettingsOpen(false);
@@ -234,7 +232,7 @@ export default function RevenuePage() {
           <p className="text-sm font-bold text-muted-foreground/70 mt-2">일할 계산 방식의 정밀한 센터 수익성을 관리합니다.</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => syncRecentKpis(centerId!)} variant="ghost" className="rounded-2xl font-black gap-2 h-12 border-2 border-dashed">
+          <Button onClick={() => centerId && syncRecentKpis(firestore, centerId)} variant="ghost" className="rounded-2xl font-black gap-2 h-12 border-2 border-dashed">
             <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> 데이터 수동 동기화
           </Button>
           <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
