@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -56,7 +55,6 @@ import {
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
 
-// --- 프리미엄 차트 툴팁 ---
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -74,9 +72,10 @@ const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
 
 export default function LayoutViewPage() {
   const firestore = useFirestore();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const centerId = activeMembership?.id;
+  const isMobile = viewMode === 'mobile';
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const weekKey = format(new Date(), "yyyy-'W'II");
 
@@ -167,30 +166,30 @@ export default function LayoutViewPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-10">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2 text-primary">
             <Monitor className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             실시간 관제 커맨드 센터
           </h1>
-          <p className="text-xs font-bold text-muted-foreground">센터 내 모든 좌석의 실시간 상태를 감시하고 즉각적으로 대응합니다.</p>
+          <p className="text-[10px] sm:text-xs font-bold text-muted-foreground">센터 내 모든 좌석의 실시간 상태를 감시하고 즉각적으로 대응합니다.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="rounded-xl font-bold h-10 gap-2 bg-white shadow-sm" onClick={() => window.location.reload()}>
+          <Button variant="outline" className="rounded-xl font-black h-10 gap-2 bg-white shadow-sm text-xs" onClick={() => window.location.reload()}>
             <RefreshCw className="h-4 w-4" /> 새로고침
           </Button>
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4")}>
         {[
           { label: '현재 학습 중', val: studyingCount, color: 'text-emerald-600', icon: Users, bg: 'bg-emerald-50/50' },
           { label: '미입실/지각', val: alertCount, color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-50/50' },
           { label: '전체 좌석 점유', val: attendanceList?.filter(a => a.studentId).length || 0, color: 'text-primary', icon: Armchair, bg: 'bg-white' },
           { label: '실시간 가동률', val: `${attendanceList && attendanceList.length > 0 ? Math.round((studyingCount / attendanceList.length) * 100) : 0}%`, color: 'text-primary', icon: Monitor, bg: 'bg-white' }
         ].map((item, i) => (
-          <Card key={i} className={cn("rounded-xl border-none shadow-lg overflow-hidden relative group", item.bg, i < 2 && "ring-1 ring-opacity-20", i === 0 && "ring-emerald-500", i === 1 && "ring-rose-500")}>
-            <CardContent className="p-3 sm:p-4">
+          <Card key={i} className={cn("rounded-2xl border-none shadow-lg overflow-hidden relative group", item.bg, i < 2 && "ring-1 ring-opacity-20", i === 0 && "ring-emerald-500", i === 1 && "ring-rose-500")}>
+            <CardContent className="p-4">
               <span className="text-[10px] font-black opacity-60 uppercase tracking-widest">{item.label}</span>
               <div className="flex items-baseline gap-1 mt-0.5">
                 <span className={cn("text-xl sm:text-2xl font-black", item.color)}>{item.val}</span>
@@ -205,8 +204,8 @@ export default function LayoutViewPage() {
         <CardContent className="p-4 sm:p-10 bg-[#f8f9fa]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-40 gap-4">
-              <Loader2 className="animate-spin h-12 w-12 text-primary" />
-              <p className="font-bold text-muted-foreground">실시간 관제 시스템 연결 중...</p>
+              <Loader2 className="animate-spin h-12 w-12 text-primary opacity-20" />
+              <p className="font-bold text-muted-foreground animate-pulse">실시간 관제 시스템 연결 중...</p>
             </div>
           ) : !attendanceList || attendanceList.length === 0 ? (
             <div className="py-40 text-center flex flex-col items-center gap-4">
@@ -214,7 +213,7 @@ export default function LayoutViewPage() {
               <p className="text-xl font-bold text-muted-foreground/40">배치된 좌석이 없습니다.</p>
             </div>
           ) : (
-            <div className="w-full overflow-auto custom-scrollbar bg-white rounded-[2rem] border shadow-2xl p-6 sm:p-12">
+            <div className="w-full overflow-x-auto custom-scrollbar bg-white rounded-[2rem] border shadow-2xl p-6 sm:p-12">
               <div 
                 className="grid gap-2 sm:gap-3 mx-auto relative"
                 style={{ 
@@ -245,9 +244,9 @@ export default function LayoutViewPage() {
                         setIsManaging(true);
                       }}
                       className={cn(
-                        "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative cursor-pointer group border-solid",
-                        seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white shadow-md scale-110 z-10 animate-pulse-soft" : 
-                        isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700 shadow-inner" :
+                        "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative cursor-pointer group shadow-sm",
+                        seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft z-10" : 
+                        isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                         seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
                         seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
                         occupant ? "bg-white border-primary/40 text-primary hover:border-primary" : "bg-white border-primary/10 text-muted-foreground/10 hover:border-primary/30"
@@ -259,14 +258,14 @@ export default function LayoutViewPage() {
                       )}>{seat.seatNo}</span>
                       
                       <span className={cn(
-                        "text-[9px] sm:text-[11px] font-black truncate px-1 w-full text-center mt-1",
+                        "text-[9px] sm:text-[11px] font-black truncate px-1 w-full text-center mt-1 leading-tight",
                         isLateOrAbsent ? "text-rose-600" : ""
                       )}>
                         {occupant ? occupant.name : ''}
                       </span>
                       
                       {isLateOrAbsent && (
-                        <div className="absolute -top-1 -right-1 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white animate-bounce">
+                        <div className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-2 border-white animate-bounce">
                           <AlertCircle className="h-2.5 w-2.5" />
                         </div>
                       )}
@@ -287,7 +286,7 @@ export default function LayoutViewPage() {
           { label: '휴식 중', color: 'bg-blue-500', desc: '공식 휴식' },
           { label: '빈 좌석', color: 'bg-white border-2 border-primary/10', desc: '배정 가능' }
         ].map((item) => (
-          <div key={item.label} className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-xl border border-border/50">
+          <div key={item.label} className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-xl border border-border/50 shadow-inner">
             <div className={cn("w-3.5 h-3.5 rounded-md shadow-sm", item.color)} />
             <div className="flex flex-col leading-none">
               <span className="text-[10px] font-black text-foreground">{item.label}</span>
@@ -298,7 +297,7 @@ export default function LayoutViewPage() {
       </footer>
 
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
-        <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
+        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl p-0 overflow-hidden">
           {selectedSeat && (
             <>
               <div className={cn(
@@ -319,7 +318,7 @@ export default function LayoutViewPage() {
                     {students?.find(s => s.id === selectedSeat.studentId)?.name || '공석'}
                   </DialogTitle>
                   <DialogDescription className="text-white/70 font-bold text-lg">
-                    현재 상태: <span className="text-white underline underline-offset-4">{
+                    현재 상태: <span className="text-white underline underline-offset-4 decoration-2">{
                       selectedSeat.status === 'studying' ? '학습 중' :
                       selectedSeat.status === 'away' ? '외출 중' :
                       selectedSeat.status === 'break' ? '휴식 중' : '미입실'
@@ -330,16 +329,16 @@ export default function LayoutViewPage() {
 
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-2 gap-3">
-                  <Button onClick={() => handleStatusUpdate('studying')} className="h-14 rounded-2xl font-black bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-100 gap-2">
+                  <Button onClick={() => handleStatusUpdate('studying')} className="h-14 rounded-2xl font-black bg-emerald-500 hover:bg-emerald-600 shadow-lg text-sm gap-2">
                     <Clock className="h-4 w-4" /> 입실/학습
                   </Button>
-                  <Button onClick={() => handleStatusUpdate('away')} className="h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-100 gap-2">
+                  <Button onClick={() => handleStatusUpdate('away')} className="h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 shadow-lg text-sm gap-2">
                     <MapPin className="h-4 w-4" /> 외출 처리
                   </Button>
-                  <Button onClick={() => handleStatusUpdate('break')} className="h-14 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-100 gap-2">
+                  <Button onClick={() => handleStatusUpdate('break')} className="h-14 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 shadow-lg text-sm gap-2">
                     <Maximize2 className="h-4 w-4" /> 휴식 처리
                   </Button>
-                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-14 rounded-2xl font-black border-2 border-rose-200 text-rose-600 hover:bg-rose-50 gap-2">
+                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-14 rounded-2xl font-black border-2 border-rose-200 text-rose-600 text-sm gap-2">
                     <AlertCircle className="h-4 w-4" /> 퇴실 처리
                   </Button>
                 </div>
@@ -354,7 +353,7 @@ export default function LayoutViewPage() {
                         setIsDetailOpen(true);
                       }}
                     >
-                      <BarChart3 className="h-4 w-4" /> 상세정보 리포트 보기
+                      <BarChart3 className="h-4 w-4" /> 상세 분석 리포트
                     </Button>
                     <Button 
                       variant="outline" 
@@ -364,7 +363,7 @@ export default function LayoutViewPage() {
                         setIsPlanOpen(true);
                       }}
                     >
-                      <ClipboardCheck className="h-4 w-4" /> 학습계획 확인하기
+                      <ClipboardCheck className="h-4 w-4" /> 학습계획 확인
                     </Button>
                   </div>
                 )}
@@ -374,140 +373,6 @@ export default function LayoutViewPage() {
               </DialogFooter>
             </>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 학생 상세 정보 리포트 팝업 */}
-      <Dialog open={isDetailPopupOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[3rem] p-0 border-none shadow-2xl">
-          <div className="bg-primary p-10 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-10 opacity-10">
-              <Zap className="h-40 w-40" />
-            </div>
-            <DialogHeader className="relative z-10">
-              <div className="flex items-center gap-3 mb-2">
-                <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Analytical Report</Badge>
-                <span className="text-white/60 font-bold text-xs">{studentDetail?.seatNo}번 좌석</span>
-              </div>
-              <DialogTitle className="text-4xl font-black tracking-tighter">{studentDetail?.name} 학생 심층 분석</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold text-lg">최근 14일간의 학습 데이터와 성장 지표입니다.</DialogDescription>
-            </DialogHeader>
-          </div>
-          
-          <div className="p-8 space-y-8 bg-white">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: '오늘 학습', val: `${Math.floor(detailStats.today / 60)}h ${detailStats.today % 60}m`, icon: Clock, color: 'text-emerald-500' },
-                { label: '주간 평균', val: `${Math.floor(detailStats.weeklyAvg / 60)}h ${detailStats.weeklyAvg % 60}m`, icon: TrendingUp, color: 'text-blue-500' },
-                { label: '마스터리', val: `Lv.${studentProgress?.level || 1}`, icon: Zap, color: 'text-purple-500' },
-                { label: '시즌 랭킹', val: '준비 중', icon: Trophy, color: 'text-amber-500' }
-              ].map((stat, i) => (
-                <div key={i} className="p-4 rounded-3xl bg-muted/20 border border-border/50 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase">{stat.label}</span>
-                    <stat.icon className={cn("h-3 w-3", stat.color)} />
-                  </div>
-                  <span className="text-xl font-black tracking-tight">{stat.val}</span>
-                </div>
-              ))}
-            </div>
-
-            <Card className="rounded-[2rem] border-none shadow-lg overflow-hidden bg-muted/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" /> 최근 학습 몰입 추이
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[300px] pt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={detailStats.chartData}>
-                    <defs>
-                      <linearGradient id="barGradLayout" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1} />
-                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                    <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
-                    <YAxis fontSize={10} fontWeight="900" axisLine={false} tickLine={false} unit="h" />
-                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(0,0,0,0.03)'}} />
-                    <Bar dataKey="hours" fill="url(#barGradLayout)" radius={[10, 10, 0, 0]} barSize={35} animationDuration={1500} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-          <DialogFooter className="p-6 bg-muted/10">
-            <Button onClick={() => setIsDetailOpen(false)} className="w-full rounded-2xl h-14 font-black shadow-xl">분석 리포트 닫기</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 학습 계획 확인 팝업 */}
-      <Dialog open={isPlanPopupOpen} onOpenChange={setIsPlanOpen}>
-        <DialogContent className="max-w-lg rounded-[3rem] p-0 border-none shadow-2xl overflow-hidden">
-          <div className="bg-emerald-600 p-10 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-10 opacity-10">
-              <ClipboardCheck className="h-40 w-40" />
-            </div>
-            <DialogHeader className="relative z-10">
-              <div className="flex items-center gap-3 mb-2">
-                <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase">Study Planner</Badge>
-                <span className="text-white/60 font-bold text-xs">{studentDetail?.name} 학생</span>
-              </div>
-              <DialogTitle className="text-4xl font-black tracking-tighter">오늘의 학습 계획</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold text-lg">{format(new Date(), 'yyyy년 M월 d일')}</DialogDescription>
-            </DialogHeader>
-          </div>
-
-          <div className="p-8 space-y-6 bg-white max-h-[500px] overflow-y-auto custom-scrollbar">
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                <CircleDot className="h-3 w-3 text-emerald-500" /> 자습 To-do 리스트
-              </h4>
-              <div className="grid gap-3">
-                {!studentPlans || studentPlans.length === 0 ? (
-                  <div className="py-10 text-center text-muted-foreground/40 italic text-sm font-bold border-2 border-dashed rounded-3xl">작성된 계획이 없습니다.</div>
-                ) : (
-                  studentPlans.filter(p => p.category === 'study' || !p.category).map((task) => (
-                    <div key={task.id} className="flex items-center gap-4 p-4 rounded-2xl border-2 border-border/50 bg-muted/5 group">
-                      <div className={cn(
-                        "h-6 w-6 rounded-lg flex items-center justify-center border-2 transition-all",
-                        task.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-muted-foreground/30"
-                      )}>
-                        {task.done && <Check className="h-4 w-4" />}
-                      </div>
-                      <span className={cn(
-                        "flex-1 font-bold text-sm transition-all",
-                        task.done ? "line-through text-muted-foreground opacity-50" : "text-foreground"
-                      )}>{task.title}</span>
-                      {task.done && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-4 border-t border-dashed">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                <Clock className="h-3 w-3 text-emerald-500" /> 생활 시간표
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {studentPlans?.filter(p => p.category === 'schedule').map((task) => {
-                  const [title, time] = task.title.split(': ');
-                  return (
-                    <div key={task.id} className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 flex flex-col gap-0.5">
-                      <span className="text-[9px] font-black text-emerald-700/60 uppercase">{title}</span>
-                      <span className="text-base font-black text-emerald-900">{time}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="p-6 bg-muted/10">
-            <Button onClick={() => setIsPlanOpen(false)} className="w-full rounded-2xl h-14 font-black shadow-xl bg-emerald-600 hover:bg-emerald-700">확인 완료</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
