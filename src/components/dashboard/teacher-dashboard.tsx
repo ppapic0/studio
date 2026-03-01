@@ -54,7 +54,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { format, startOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import { 
   ResponsiveContainer, 
   XAxis, 
@@ -334,7 +334,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <div 
                   className="grid gap-0.5 sm:gap-1.5 w-full mx-auto relative"
                   style={{ 
-                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `repeat(20, minmax(0, 1fr))`,
                     backgroundImage: 'radial-gradient(circle, #00000005 1px, transparent 1px)',
                     backgroundSize: isMobile ? '10px 10px' : '14px 16px'
                   }}
