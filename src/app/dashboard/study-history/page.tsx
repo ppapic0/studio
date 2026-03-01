@@ -65,7 +65,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/dialog";
+} from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -540,42 +540,79 @@ export default function StudyHistoryPage() {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="study" className="mt-0 space-y-4">
-                    {studyTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-4 p-5 rounded-[2rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
-                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-7 w-7 rounded-xl border-2" />
-                        <Label htmlFor={task.id} className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
-                        {!isActuallyPast && (
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                            <Trash2 className="h-5 w-5" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                  <TabsContent value="study" className="mt-0 space-y-6">
+                    <div className="grid gap-3">
+                      {studyTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-4 p-4 rounded-[1.5rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
+                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2" />
+                          <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                          {!isActuallyPast && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                     {!isActuallyPast && (
-                      <div className="flex items-center gap-3 pt-4 relative">
-                        <Input placeholder="오늘 할 자습 과제 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="rounded-[1.25rem] h-14 border-dashed border-2 font-bold text-sm pl-5 pr-14" />
-                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="absolute right-2 h-10 w-10 rounded-xl shrink-0 shadow-lg"><Plus className="h-6 w-6" /></Button>
+                      <div className="flex items-center gap-2 pt-4 relative group">
+                        <div className="relative flex-1">
+                          <Input 
+                            placeholder="공부 계획 추가..." 
+                            value={newStudyTask} 
+                            onChange={(e) => setNewStudyTask(e.target.value)} 
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} 
+                            disabled={isSubmitting} 
+                            className="rounded-2xl h-14 border-dashed border-2 pl-5 pr-14 font-bold text-sm bg-muted/5 focus-visible:ring-primary/10 transition-all" 
+                          />
+                          <Button 
+                            size="icon" 
+                            onClick={() => handleAddTask(newStudyTask, 'study')} 
+                            disabled={isSubmitting || !newStudyTask.trim()} 
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-11 w-11 rounded-xl shrink-0 shadow-lg"
+                          >
+                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6" />}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </TabsContent>
 
-                  <TabsContent value="personal" className="mt-0 space-y-4">
-                    {personalTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-4 p-5 rounded-[2rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
-                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-7 w-7 rounded-xl border-2" />
-                        <Label htmlFor={task.id} className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
-                        {!isActuallyPast && (
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                            <Trash2 className="h-5 w-5" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                  <TabsContent value="personal" className="mt-0 space-y-6">
+                    <div className="grid gap-3">
+                      {personalTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-4 p-4 rounded-[1.5rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
+                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2" />
+                          <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                          {!isActuallyPast && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                     {!isActuallyPast && (
-                      <div className="flex items-center gap-3 pt-4 relative">
-                        <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="rounded-[1.25rem] h-14 border-dashed border-2 font-bold text-sm pl-5 pr-14" />
-                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="absolute right-2 h-10 w-10 rounded-xl border-2 shrink-0 shadow-sm"><Plus className="h-6 w-6 text-primary" /></Button>
+                      <div className="flex items-center gap-2 pt-4 relative group">
+                        <div className="relative flex-1">
+                          <Input 
+                            placeholder="개인 일정 추가..." 
+                            value={newPersonalTask} 
+                            onChange={(e) => setNewPersonalTask(e.target.value)} 
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} 
+                            disabled={isSubmitting} 
+                            className="rounded-2xl h-14 border-dashed border-2 pl-5 pr-14 font-bold text-sm bg-muted/5 focus-visible:ring-primary/10 transition-all" 
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleAddTask(newPersonalTask, 'personal')} 
+                            disabled={isSubmitting || !newPersonalTask.trim()} 
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-11 w-11 rounded-xl border-2 shrink-0 shadow-sm bg-white"
+                          >
+                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6 text-primary" />}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </TabsContent>

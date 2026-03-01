@@ -612,8 +612,8 @@ export default function StudyPlanPage() {
                   </TabsTrigger>
                 </TabsList>
               </CardHeader>
-              <CardContent className={cn("min-h-[450px]", isMobile ? "p-6" : "p-12")}>
-                <TabsContent value="study" className="mt-0 space-y-8">
+              <CardContent className={cn("min-h-[450px]", isMobile ? "p-5" : "p-12")}>
+                <TabsContent value="study" className="mt-0 space-y-6">
                   <div className="space-y-4">
                     {isLoading ? (
                       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -626,10 +626,10 @@ export default function StudyPlanPage() {
                          <p className="text-lg font-black italic tracking-tighter">기록된 계획이 없습니다.</p>
                       </div>
                     ) : (
-                      <div className="grid gap-3.5">
+                      <div className="grid gap-3">
                         {studyTasks.map((task) => (
                           <div key={task.id} className={cn(
-                            "flex items-center gap-5 p-5 rounded-[2rem] border-2 transition-all duration-500 group relative",
+                            "flex items-center gap-4 p-4 rounded-[1.5rem] border-2 transition-all duration-500 group relative",
                             task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent hover:border-primary/10 shadow-sm"
                           )}>
                             <Checkbox 
@@ -637,13 +637,13 @@ export default function StudyPlanPage() {
                               checked={task.done} 
                               onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
                               disabled={isPast}
-                              className="h-7 w-7 rounded-xl border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shrink-0"
+                              className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shrink-0"
                             />
                             <Label 
                               htmlFor={task.id}
                               className={cn(
-                                "flex-1 font-bold leading-relaxed transition-all duration-500",
-                                isMobile ? "text-base" : "text-lg",
+                                "flex-1 font-bold leading-tight transition-all duration-500",
+                                isMobile ? "text-sm" : "text-lg",
                                 !isPast && "cursor-pointer",
                                 task.done && "line-through text-muted-foreground/40 italic"
                               )}
@@ -651,8 +651,8 @@ export default function StudyPlanPage() {
                               {task.title}
                             </Label>
                             {!isPast && (
-                              <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full shrink-0" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                                <Trash2 className="h-5 w-5" />
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full shrink-0" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
@@ -661,29 +661,37 @@ export default function StudyPlanPage() {
                     )}
                     
                     {!isPast && (
-                      <div className="flex items-center gap-3 pt-6 relative group">
-                        <Input 
-                          placeholder="어떤 공부를 시작할까요?" 
-                          value={newStudyTask}
-                          onChange={(e) => setNewStudyTask(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
-                          disabled={isSubmitting}
-                          className="rounded-[1.5rem] border-dashed border-2 h-16 pl-6 pr-16 font-bold text-base shadow-inner bg-muted/5 focus-visible:ring-primary/10 transition-all"
-                        />
-                        <Button 
-                          size="icon" 
-                          onClick={() => handleAddTask(newStudyTask, 'study')} 
-                          disabled={isSubmitting || !newStudyTask.trim()} 
-                          className="absolute right-2 h-12 w-12 rounded-[1rem] shadow-xl active:scale-95 bg-primary hover:bg-primary/90 transition-all"
-                        >
-                          {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6" />}
-                        </Button>
+                      <div className="flex items-center gap-2 pt-4 relative group">
+                        <div className="relative flex-1">
+                          <Input 
+                            placeholder="공부 계획 추가..." 
+                            value={newStudyTask}
+                            onChange={(e) => setNewStudyTask(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
+                            disabled={isSubmitting}
+                            className={cn(
+                              "rounded-2xl border-dashed border-2 pl-5 pr-14 font-bold bg-muted/5 focus-visible:ring-primary/10 transition-all",
+                              isMobile ? "h-14 text-sm" : "h-16 text-base"
+                            )}
+                          />
+                          <Button 
+                            size="icon" 
+                            onClick={() => handleAddTask(newStudyTask, 'study')} 
+                            disabled={isSubmitting || !newStudyTask.trim()} 
+                            className={cn(
+                              "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl shadow-xl active:scale-95 bg-primary hover:bg-primary/90 transition-all",
+                              isMobile ? "h-11 w-11" : "h-13 w-13"
+                            )}
+                          >
+                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6" />}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
                 </TabsContent>
 
-                <TabsContent value="personal" className="mt-0 space-y-8">
+                <TabsContent value="personal" className="mt-0 space-y-6">
                   <div className="space-y-4">
                     {isLoading ? (
                       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -696,10 +704,10 @@ export default function StudyPlanPage() {
                          <p className="text-lg font-black italic tracking-tighter">기록된 일정이 없습니다.</p>
                       </div>
                     ) : (
-                      <div className="grid gap-3.5">
+                      <div className="grid gap-3">
                         {personalTasks.map((task) => (
                           <div key={task.id} className={cn(
-                            "flex items-center gap-5 p-5 rounded-[2rem] border-2 transition-all duration-500 group relative",
+                            "flex items-center gap-4 p-4 rounded-[1.5rem] border-2 transition-all duration-500 group relative",
                             task.done ? "bg-amber-50/20 border-amber-100/50" : "bg-white border-transparent hover:border-primary/10 shadow-sm"
                           )}>
                             <Checkbox 
@@ -707,13 +715,13 @@ export default function StudyPlanPage() {
                               checked={task.done} 
                               onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
                               disabled={isPast}
-                              className="h-7 w-7 rounded-xl border-2 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 shadow-sm shrink-0"
+                              className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 shadow-sm shrink-0"
                             />
                             <Label 
                               htmlFor={task.id}
                               className={cn(
-                                "flex-1 font-bold leading-relaxed transition-all duration-500",
-                                isMobile ? "text-base" : "text-lg",
+                                "flex-1 font-bold leading-tight transition-all duration-500",
+                                isMobile ? "text-sm" : "text-lg",
                                 !isPast && "cursor-pointer",
                                 task.done && "line-through text-muted-foreground/40 italic"
                               )}
@@ -721,8 +729,8 @@ export default function StudyPlanPage() {
                               {task.title}
                             </Label>
                             {!isPast && (
-                              <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full shrink-0" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                                <Trash2 className="h-5 w-5" />
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full shrink-0" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
@@ -731,30 +739,38 @@ export default function StudyPlanPage() {
                     )}
                     
                     {!isPast && (
-                      <div className="flex items-center gap-3 pt-6 relative group">
-                        <Input 
-                          placeholder="개인적인 약속이나 일정을 적어주세요" 
-                          value={newPersonalTask}
-                          onChange={(e) => setNewPersonalTask(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
-                          disabled={isSubmitting}
-                          className="rounded-[1.5rem] border-dashed border-2 h-16 pl-6 pr-16 font-bold text-base shadow-inner bg-muted/5 focus-visible:ring-primary/10 transition-all"
-                        />
-                        <Button 
-                          variant="outline"
-                          size="icon" 
-                          onClick={() => handleAddTask(newPersonalTask, 'personal')} 
-                          disabled={isSubmitting || !newPersonalTask.trim()} 
-                          className="absolute right-2 h-12 w-12 rounded-[1rem] border-2 shadow-sm bg-white hover:bg-muted/10 transition-all"
-                        >
-                          {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6 text-primary" />}
-                        </Button>
+                      <div className="flex items-center gap-2 pt-4 relative group">
+                        <div className="relative flex-1">
+                          <Input 
+                            placeholder="개인 일정 추가..." 
+                            value={newPersonalTask}
+                            onChange={(e) => setNewPersonalTask(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
+                            disabled={isSubmitting}
+                            className={cn(
+                              "rounded-2xl border-dashed border-2 pl-5 pr-14 font-bold bg-muted/5 focus-visible:ring-primary/10 transition-all",
+                              isMobile ? "h-14 text-sm" : "h-16 text-base"
+                            )}
+                          />
+                          <Button 
+                            variant="outline"
+                            size="icon" 
+                            onClick={() => handleAddTask(newPersonalTask, 'personal')} 
+                            disabled={isSubmitting || !newPersonalTask.trim()} 
+                            className={cn(
+                              "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl border-2 shadow-sm bg-white hover:bg-muted/10 transition-all",
+                              isMobile ? "h-11 w-11" : "h-13 w-13"
+                            )}
+                          >
+                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6 text-primary" />}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
                 </TabsContent>
               </CardContent>
-              <div className="p-8 bg-muted/5 border-t flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className={cn("bg-muted/5 border-t flex flex-col sm:flex-row items-center justify-between gap-6", isMobile ? "p-6" : "p-8")}>
                 <div className="flex items-center gap-3 bg-white/50 backdrop-blur-sm px-5 py-2 rounded-2xl border shadow-sm">
                   <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                   <p className="text-[11px] font-black text-primary/70 uppercase tracking-widest">
@@ -765,7 +781,7 @@ export default function StudyPlanPage() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="rounded-[1.25rem] gap-2.5 text-[11px] font-black h-12 px-6 border-2 shadow-xl hover:bg-primary hover:text-white transition-all active:scale-95 group" 
+                    className="rounded-[1.25rem] gap-2.5 text-[11px] font-black h-12 px-6 border-2 shadow-xl hover:bg-primary hover:text-white transition-all active:scale-95 group w-full sm:w-auto" 
                     onClick={handleApplyToAllWeekdays}
                     disabled={isSubmitting || !dailyPlans || dailyPlans.length === 0}
                   >
