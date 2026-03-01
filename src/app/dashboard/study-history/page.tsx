@@ -50,9 +50,11 @@ import {
   Copy,
   Info,
   CalendarX,
-  CalendarDays
+  CalendarDays,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -74,6 +76,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 const SCHEDULE_TEMPLATES = [
   { title: '등원 시간', icon: MapPin },
