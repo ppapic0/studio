@@ -226,55 +226,72 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [studentMembership]);
 
   const handleAddAppointment = () => {
-    if (!firestore || !centerId || !student || !currentUser || !aptDate || !aptTime) {
-      toast({ variant: "destructive", title: "정보 부족", description: "날짜와 시간을 입력해 주세요." });
+    if (!firestore || !centerId) {
+      toast({ variant: "destructive", title: "시스템 오류", description: "센터 정보를 불러올 수 없습니다." });
+      return;
+    }
+    if (!currentUser) {
+      toast({ variant: "destructive", title: "인증 오류", description: "로그인 정보를 확인할 수 없습니다." });
+      return;
+    }
+    if (!student) {
+      toast({ variant: "destructive", title: "정보 로딩 중", description: "학생 정보를 불러오는 중입니다. 잠시만 기다려주세요." });
+      return;
+    }
+    if (!aptDate || !aptTime) {
+      toast({ variant: "destructive", title: "입력 부족", description: "상담 날짜와 시간을 모두 선택해 주세요." });
       return;
     }
 
     setIsSubmitting(true);
     
-    // 안전한 날짜 생성을 위해 파싱
-    const [year, month, day] = aptDate.split('-').map(Number);
-    const [hours, minutes] = aptTime.split(':').map(Number);
-    const scheduledDate = new Date(year, month - 1, day, hours, minutes);
+    try {
+      const [year, month, day] = aptDate.split('-').map(Number);
+      const [hours, minutes] = aptTime.split(':').map(Number);
+      const scheduledDate = new Date(year, month - 1, day, hours, minutes);
 
-    if (isNaN(scheduledDate.getTime())) {
-      toast({ variant: "destructive", title: "날짜 형식 오류" });
-      setIsSubmitting(false);
-      return;
-    }
-
-    const data = {
-      centerId,
-      studentId,
-      studentName: student.name,
-      teacherId: currentUser.uid,
-      teacherName: currentUser.displayName || '선생님',
-      scheduledAt: Timestamp.fromDate(scheduledDate),
-      status: 'confirmed',
-      teacherNote: aptNote.trim(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    const colRef = collection(firestore, 'centers', centerId, 'counselingReservations');
-    
-    addDoc(colRef, data)
-      .then(() => {
-        toast({ title: "상담 예약 완료" });
-        setAptNote('');
-      })
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: `${colRef.path}/{newId}`,
-          operation: 'create',
-          requestResourceData: data,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
+      if (isNaN(scheduledDate.getTime())) {
+        toast({ variant: "destructive", title: "날짜 형식 오류", description: "유효하지 않은 날짜 형식입니다." });
         setIsSubmitting(false);
-      });
+        return;
+      }
+
+      const data = {
+        centerId,
+        studentId,
+        studentName: student.name,
+        teacherId: currentUser.uid,
+        teacherName: currentUser.displayName || '선생님',
+        scheduledAt: Timestamp.fromDate(scheduledDate),
+        status: 'confirmed',
+        teacherNote: aptNote.trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const colRef = collection(firestore, 'centers', centerId, 'counselingReservations');
+      
+      addDoc(colRef, data)
+        .then(() => {
+          toast({ title: "상담 예약 완료", description: `${format(scheduledDate, 'M월 d일 HH:mm')} 예약이 확정되었습니다.` });
+          setAptNote('');
+        })
+        .catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: `${colRef.path}/{newId}`,
+            operation: 'create',
+            requestResourceData: data,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        })
+        .finally(() => {
+          setIsSubmitting(false);
+        });
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "처리 오류", description: "예약 처리 중 오류가 발생했습니다." });
+      setIsSubmitting(false);
+    }
   };
 
   const handleAddCounselLog = () => {
@@ -414,7 +431,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <div className="h-[200px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={activeAnalysis === 'monthly' ? stats.chartData : stats.weeklyChartData}>
-                        <defs><linearGradient id="dialogColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
+                        <defs><linearGradient id="dialogColor" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
                         <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
                         <YAxis hide />
