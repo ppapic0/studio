@@ -165,14 +165,14 @@ export default function LayoutViewPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-10">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-10 px-1 sm:px-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2 text-primary">
             <Monitor className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             실시간 관제 커맨드 센터
           </h1>
-          <p className="text-[10px] sm:text-xs font-bold text-muted-foreground">센터 내 모든 좌석의 실시간 상태를 감시하고 즉각적으로 대응합니다.</p>
+          <p className="text-[10px] sm:text-xs font-bold text-muted-foreground">가로 스크롤 없이 전체 좌석을 조망합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="rounded-xl font-black h-10 gap-2 bg-white shadow-sm text-xs" onClick={() => window.location.reload()}>
@@ -181,27 +181,8 @@ export default function LayoutViewPage() {
         </div>
       </header>
 
-      <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4")}>
-        {[
-          { label: '현재 학습 중', val: studyingCount, color: 'text-emerald-600', icon: Users, bg: 'bg-emerald-50/50' },
-          { label: '미입실/지각', val: alertCount, color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-50/50' },
-          { label: '전체 좌석 점유', val: attendanceList?.filter(a => a.studentId).length || 0, color: 'text-primary', icon: Armchair, bg: 'bg-white' },
-          { label: '실시간 가동률', val: `${attendanceList && attendanceList.length > 0 ? Math.round((studyingCount / attendanceList.length) * 100) : 0}%`, color: 'text-primary', icon: Monitor, bg: 'bg-white' }
-        ].map((item, i) => (
-          <Card key={i} className={cn("rounded-2xl border-none shadow-lg overflow-hidden relative group", item.bg, i < 2 && "ring-1 ring-opacity-20", i === 0 && "ring-emerald-500", i === 1 && "ring-rose-500")}>
-            <CardContent className="p-4">
-              <span className="text-[10px] font-black opacity-60 uppercase tracking-widest">{item.label}</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className={cn("text-xl sm:text-2xl font-black", item.color)}>{item.val}</span>
-                {typeof item.val === 'number' && <span className="text-[10px] font-bold opacity-40">명</span>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
-        <CardContent className="p-4 sm:p-10 bg-[#f8f9fa]">
+      <Card className="rounded-[2rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
+        <CardContent className="p-2 sm:p-10 bg-[#f8f9fa]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-40 gap-4">
               <Loader2 className="animate-spin h-12 w-12 text-primary opacity-20" />
@@ -213,12 +194,11 @@ export default function LayoutViewPage() {
               <p className="text-xl font-bold text-muted-foreground/40">배치된 좌석이 없습니다.</p>
             </div>
           ) : (
-            <div className="w-full overflow-x-auto custom-scrollbar bg-white rounded-[2rem] border shadow-2xl p-6 sm:p-12">
+            <div className="w-full overflow-hidden bg-white rounded-[2rem] border shadow-2xl p-2 sm:p-12">
               <div 
-                className="grid gap-2 sm:gap-3 mx-auto relative"
+                className="grid gap-0.5 sm:gap-2 w-full mx-auto relative"
                 style={{ 
-                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(40px, 50px))`, 
-                  width: 'fit-content',
+                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`, 
                   backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
                   backgroundSize: '20px 20px'
                 }}
@@ -229,7 +209,7 @@ export default function LayoutViewPage() {
                   const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                   const occupant = students?.find(s => s.id === seat?.studentId);
 
-                  if (!seat) return <div key={idx} className="w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] opacity-[0.01]" />;
+                  if (!seat) return <div key={idx} className="aspect-square opacity-[0.01]" />;
 
                   const isLateOrAbsent = seat.studentId && seat.status === 'absent';
 
@@ -244,7 +224,7 @@ export default function LayoutViewPage() {
                         setIsManaging(true);
                       }}
                       className={cn(
-                        "w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all duration-500 relative cursor-pointer group shadow-sm",
+                        "aspect-square rounded-sm sm:rounded-xl border sm:border-2 flex flex-col items-center justify-center transition-all duration-500 relative cursor-pointer group shadow-sm",
                         seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft z-10" : 
                         isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                         seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
@@ -253,20 +233,21 @@ export default function LayoutViewPage() {
                       )}
                     >
                       <span className={cn(
-                        "text-[7px] sm:text-[9px] font-black absolute top-1 left-1.5",
-                        seat.status === 'studying' || seat.status === 'away' || seat.status === 'break' ? "opacity-60" : "opacity-30"
+                        "font-black absolute top-0.5 left-0.5 opacity-40 leading-none",
+                        isMobile ? "text-[5px]" : "text-[9px]"
                       )}>{seat.seatNo}</span>
                       
                       <span className={cn(
-                        "text-[9px] sm:text-[11px] font-black truncate px-1 w-full text-center mt-1 leading-tight",
+                        "font-black truncate px-0.5 w-full text-center mt-0.5 leading-tight",
+                        isMobile ? "text-[6px]" : "text-[11px]",
                         isLateOrAbsent ? "text-rose-600" : ""
                       )}>
                         {occupant ? occupant.name : ''}
                       </span>
                       
                       {isLateOrAbsent && (
-                        <div className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-2 border-white animate-bounce">
-                          <AlertCircle className="h-2.5 w-2.5" />
+                        <div className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-white">
+                          <div className={cn("rounded-full bg-white", isMobile ? "w-0.5 h-0.5" : "w-1 h-1")} />
                         </div>
                       )}
                     </div>
@@ -278,20 +259,17 @@ export default function LayoutViewPage() {
         </CardContent>
       </Card>
 
-      <footer className="flex flex-wrap gap-4 sm:gap-8 items-center justify-center p-6 bg-white rounded-[2rem] border shadow-sm ring-1 ring-border/50">
+      <footer className="flex flex-wrap gap-2 sm:gap-8 items-center justify-center p-4 sm:p-6 bg-white rounded-[2rem] border shadow-sm ring-1 ring-border/50">
         {[
-          { label: '집중 학습', color: 'bg-emerald-500', desc: '몰입 중' },
-          { label: '미입실/지각', color: 'bg-rose-500', desc: '경고 상태' },
-          { label: '외출 중', color: 'bg-amber-500', desc: '일시 이탈' },
-          { label: '휴식 중', color: 'bg-blue-500', desc: '공식 휴식' },
-          { label: '빈 좌석', color: 'bg-white border-2 border-primary/10', desc: '배정 가능' }
+          { label: '학습', color: 'bg-emerald-500' },
+          { label: '미입실', color: 'bg-rose-500' },
+          { label: '외출', color: 'bg-amber-500' },
+          { label: '휴식', color: 'bg-blue-500' },
+          { label: '빈자리', color: 'bg-white border border-primary/10' }
         ].map((item) => (
-          <div key={item.label} className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-xl border border-border/50 shadow-inner">
-            <div className={cn("w-3.5 h-3.5 rounded-md shadow-sm", item.color)} />
-            <div className="flex flex-col leading-none">
-              <span className="text-[10px] font-black text-foreground">{item.label}</span>
-              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{item.desc}</span>
-            </div>
+          <div key={item.label} className="flex items-center gap-1.5 bg-muted/20 px-2 py-1 rounded-lg border border-border/50">
+            <div className={cn("w-2.5 h-2.5 rounded-sm shadow-sm", item.color)} />
+            <span className="text-[9px] font-black text-foreground uppercase">{item.label}</span>
           </div>
         ))}
       </footer>
@@ -317,56 +295,24 @@ export default function LayoutViewPage() {
                   <DialogTitle className="text-4xl font-black tracking-tighter">
                     {students?.find(s => s.id === selectedSeat.studentId)?.name || '공석'}
                   </DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold text-lg">
-                    현재 상태: <span className="text-white underline underline-offset-4 decoration-2">{
-                      selectedSeat.status === 'studying' ? '학습 중' :
-                      selectedSeat.status === 'away' ? '외출 중' :
-                      selectedSeat.status === 'break' ? '휴식 중' : '미입실'
-                    }</span>
-                  </DialogDescription>
                 </DialogHeader>
               </div>
 
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-2 gap-3">
                   <Button onClick={() => handleStatusUpdate('studying')} className="h-14 rounded-2xl font-black bg-emerald-500 hover:bg-emerald-600 shadow-lg text-sm gap-2">
-                    <Clock className="h-4 w-4" /> 입실/학습
+                    <Clock className="h-4 w-4" /> 입실
                   </Button>
                   <Button onClick={() => handleStatusUpdate('away')} className="h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 shadow-lg text-sm gap-2">
-                    <MapPin className="h-4 w-4" /> 외출 처리
+                    <MapPin className="h-4 w-4" /> 외출
                   </Button>
                   <Button onClick={() => handleStatusUpdate('break')} className="h-14 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 shadow-lg text-sm gap-2">
-                    <Maximize2 className="h-4 w-4" /> 휴식 처리
+                    <Maximize2 className="h-4 w-4" /> 휴식
                   </Button>
                   <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-14 rounded-2xl font-black border-2 border-rose-200 text-rose-600 text-sm gap-2">
-                    <AlertCircle className="h-4 w-4" /> 퇴실 처리
+                    <AlertCircle className="h-4 w-4" /> 퇴실
                   </Button>
                 </div>
-
-                {selectedSeat.studentId && (
-                  <div className="pt-4 border-t border-dashed flex flex-col gap-2">
-                    <Button 
-                      variant="secondary" 
-                      className="w-full h-12 rounded-xl font-black gap-2 transition-all active:scale-95" 
-                      onClick={() => {
-                        setIsManaging(false);
-                        setIsDetailOpen(true);
-                      }}
-                    >
-                      <BarChart3 className="h-4 w-4" /> 상세 분석 리포트
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full h-12 rounded-xl font-black gap-2 transition-all active:scale-95" 
-                      onClick={() => {
-                        setIsManaging(false);
-                        setIsPlanOpen(true);
-                      }}
-                    >
-                      <ClipboardCheck className="h-4 w-4" /> 학습계획 확인
-                    </Button>
-                  </div>
-                )}
               </div>
               <DialogFooter className="p-6 bg-muted/10">
                 <Button variant="ghost" onClick={() => setIsManaging(false)} className="w-full rounded-xl font-black">닫기</Button>

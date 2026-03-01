@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -17,30 +16,18 @@ import {
   Users, 
   Loader2, 
   Settings2,
-  Save,
-  Trash2,
-  X,
-  Plus,
-  ArrowRight,
   Monitor,
   MessageSquare,
   ChevronRight,
-  UserPlus,
-  Check,
   AlertCircle,
   Clock,
   MapPin,
   Maximize2,
-  Zap,
-  Trophy,
-  ClipboardCheck,
-  CalendarDays,
-  Activity,
   CircleDot,
   CheckCircle2,
   TrendingUp,
   BarChart3,
-  Sparkles
+  ArrowRight
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -56,7 +43,7 @@ import {
   Timestamp,
   updateDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, GrowthProgress, LeaderboardEntry, StudyPlanItem } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, GrowthProgress, StudyPlanItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -67,8 +54,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { format, startOfDay, endOfDay, subDays } from 'date-fns';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, startOfDay } from 'date-fns';
 import { 
   ResponsiveContainer, 
   XAxis, 
@@ -166,20 +152,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', centerId, 'growthProgress', selectedStudentId);
   }, [firestore, centerId, selectedStudentId]);
   const { data: studentProgress } = useDoc<GrowthProgress>(studentProgressRef);
-
-  const studentPlansQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !selectedStudentId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'plans', selectedStudentId, 'weeks', weekKey, 'items'),
-      where('dateKey', '==', todayKey)
-    );
-  }, [firestore, centerId, selectedStudentId, weekKey, todayKey]);
-  const { data: studentPlans } = useCollection<StudyPlanItem>(studentPlansQuery);
-
-  const unassignedStudents = useMemo(() => {
-    if (!students) return [];
-    return students.filter(s => !s.seatNo || s.seatNo === 0);
-  }, [students]);
 
   const detailStats = useMemo(() => {
     if (!studentLogs) return { today: 0, weeklyAvg: 0, chartData: [] };
@@ -296,7 +268,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const alertCount = attendanceList?.filter(a => a.studentId && a.status === 'absent').length ?? 0;
 
   return (
-    <div className="flex flex-col gap-5 w-full overflow-x-hidden">
+    <div className="flex flex-col gap-5 w-full">
       <div className="flex flex-col gap-1 px-1">
         <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2 text-primary">
           <Monitor className="h-5 w-5 text-primary" />
@@ -332,27 +304,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
         <Card className={cn("rounded-[2rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50", isMobile ? "" : "lg:col-span-2")}>
           <CardHeader className="bg-muted/5 border-b p-5 sm:p-8">
-            <div className={cn(
-              "flex items-start justify-between gap-4",
-              isMobile ? "flex-col" : "flex-row sm:items-center"
-            )}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
-                <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">좌석을 클릭하여 관리하세요.</CardDescription>
+                <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">가로 스크롤 없이 전체 좌석을 조망합니다.</CardDescription>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
                   <Link href="/dashboard/teacher/layout-view">전체화면</Link>
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 gap-1.5 border-primary/10 text-[11px] bg-white" onClick={openLayoutEditor}>
-                  <Settings2 className="h-3.5 w-3.5" /> 도면 편집
+                  <Settings2 className="h-3.5 w-3.5" /> 편집
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 bg-[#fdfdfd] overflow-hidden">
+          <CardContent className="p-2 sm:p-6 bg-[#fdfdfd] overflow-hidden">
             {attendanceLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
             ) : !attendanceList || attendanceList.length === 0 ? (
@@ -361,16 +330,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <p className="text-xs font-bold text-muted-foreground/40">좌석이 없습니다.</p>
               </div>
             ) : (
-              <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
+              <div className="w-full bg-white rounded-[1.5rem] border shadow-inner overflow-hidden p-2 sm:p-6">
                 <div 
-                  className={cn(
-                    "grid gap-1.5 mx-auto p-4 sm:p-8 bg-white rounded-[1.5rem] border shadow-inner relative transition-transform origin-top-left",
-                    isMobile ? "scale-[0.85] w-fit" : "w-fit"
-                  )}
+                  className="grid gap-0.5 sm:gap-1.5 w-full mx-auto relative"
                   style={{ 
-                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(28px, 34px))`, 
+                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`,
                     backgroundImage: 'radial-gradient(circle, #00000005 1px, transparent 1px)',
-                    backgroundSize: '14px 16px'
+                    backgroundSize: isMobile ? '10px 10px' : '14px 16px'
                   }}
                 >
                   {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -379,7 +345,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                     const occupant = students?.find(s => s.id === seat?.studentId);
 
-                    if (!seat) return <div key={idx} className="w-[28px] h-[28px] opacity-[0.01]" />;
+                    if (!seat) return <div key={idx} className="aspect-square opacity-[0.01]" />;
 
                     const isLateOrAbsent = seat.studentId && seat.status === 'absent';
 
@@ -397,7 +363,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "w-[28px] h-[28px] sm:w-[32px] sm:h-[32px] rounded-lg border flex flex-col items-center justify-center transition-all relative cursor-pointer group shadow-sm",
+                          "aspect-square rounded-sm sm:rounded-lg border flex flex-col items-center justify-center transition-all relative cursor-pointer group shadow-sm",
                           seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft" : 
                           isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                           seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
@@ -405,10 +371,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/20 text-muted-foreground/20 hover:border-primary/40"
                         )}
                       >
-                        <span className="text-[6px] sm:text-[7px] font-black absolute top-0.5 left-1 opacity-40">{seat.seatNo}</span>
-                        <span className="text-[7px] sm:text-[8px] font-black truncate px-0.5 w-full text-center mt-1 leading-none">
+                        <span className={cn(
+                          "font-black absolute top-0.5 left-0.5 opacity-40 leading-none",
+                          isMobile ? "text-[5px]" : "text-[7px]"
+                        )}>{seat.seatNo}</span>
+                        
+                        <span className={cn(
+                          "font-black truncate px-0.5 w-full text-center mt-0.5 leading-none",
+                          isMobile ? "text-[6px]" : "text-[8px]"
+                        )}>
                           {occupant ? occupant.name : ''}
                         </span>
+                        
+                        {isLateOrAbsent && (
+                          <div className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-white">
+                            <div className={cn("rounded-full bg-white", isMobile ? "w-0.5 h-0.5" : "w-1 h-1")} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -479,80 +458,26 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   <Button onClick={() => handleStatusUpdate('studying')} className="h-12 rounded-xl font-black bg-emerald-500 shadow-lg text-sm gap-2">
-                    <Clock className="h-4 w-4" /> 입실/학습
+                    <Clock className="h-4 w-4" /> 입실
                   </Button>
                   <Button onClick={() => handleStatusUpdate('away')} className="h-12 rounded-xl font-black bg-amber-500 shadow-lg text-sm gap-2">
-                    <MapPin className="h-4 w-4" /> 외출 처리
+                    <MapPin className="h-4 w-4" /> 외출
                   </Button>
                   <Button onClick={() => handleStatusUpdate('break')} className="h-12 rounded-xl font-black bg-blue-500 shadow-lg text-sm gap-2">
-                    <Maximize2 className="h-4 w-4" /> 휴식 처리
+                    <Maximize2 className="h-4 w-4" /> 휴식
                   </Button>
                   <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-12 rounded-xl font-black border-2 border-rose-200 text-rose-600 text-sm gap-2">
-                    <AlertCircle className="h-4 w-4" /> 퇴실 처리
+                    <AlertCircle className="h-4 w-4" /> 퇴실
                   </Button>
                 </div>
                 <div className="pt-2 border-t border-dashed flex flex-col gap-2">
                   <Button variant="secondary" className="w-full h-11 rounded-xl font-black gap-2 text-xs" onClick={() => { setIsManagingSeatModalOpen(false); setIsDetailOpen(true); }}>
                     <BarChart3 className="h-4 w-4" /> 분석 리포트
                   </Button>
-                  <Button variant="outline" className="w-full h-11 rounded-xl font-black gap-2 text-xs" onClick={() => { setIsManagingSeatModalOpen(false); setIsPlanOpen(true); }}>
-                    <ClipboardCheck className="h-4 w-4" /> 학습계획
-                  </Button>
                 </div>
               </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 분석 리포트 팝업 */}
-      <Dialog open={isDetailPopupOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-0 border-none shadow-2xl">
-          <div className="bg-primary p-8 text-white">
-            <DialogHeader>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge className="bg-white/20 text-white border-none font-black text-[9px] uppercase">Analysis</Badge>
-                <span className="text-white/60 font-bold text-[10px]">{studentDetail?.seatNo}번 좌석</span>
-              </div>
-              <DialogTitle className="text-3xl font-black tracking-tighter">{studentDetail?.name} 학생 분석</DialogTitle>
-            </DialogHeader>
-          </div>
-          <div className="p-6 space-y-6 bg-white">
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: '오늘 학습', val: `${Math.floor(detailStats.today / 60)}h ${detailStats.today % 60}m`, icon: Clock, color: 'text-emerald-500' },
-                { label: '주간 평균', val: `${Math.floor(detailStats.weeklyAvg / 60)}h ${detailStats.weeklyAvg % 60}m`, icon: TrendingUp, color: 'text-blue-500' }
-              ].map((stat, i) => (
-                <div key={i} className="p-3.5 rounded-2xl bg-muted/20 border border-border/50 flex flex-col gap-0.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black text-muted-foreground uppercase">{stat.label}</span>
-                    <stat.icon className={cn("h-3 w-3", stat.color)} />
-                  </div>
-                  <span className="text-lg font-black">{stat.val}</span>
-                </div>
-              ))}
-            </div>
-            <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-muted/5 h-[250px] p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={detailStats.chartData}>
-                  <defs>
-                    <linearGradient id="barGradDash" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1} />
-                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                  <XAxis dataKey="name" fontSize={9} fontWeight="900" axisLine={false} tickLine={false} />
-                  <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} unit="h" />
-                  <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(0,0,0,0.03)'}} />
-                  <Bar dataKey="hours" fill="url(#barGradDash)" radius={[6, 6, 0, 0]} barSize={25} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          </div>
-          <DialogFooter className="p-4 bg-muted/10">
-            <Button onClick={() => setIsDetailOpen(false)} className="w-full rounded-xl h-12 font-black shadow-lg">닫기</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
