@@ -68,9 +68,9 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
-import { doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { StudentProfile } from '@/lib/types';
+import { StudentProfile, User as UserType } from '@/lib/types';
 
 export function DashboardHeader() {
   const { user } = useUser();
@@ -89,17 +89,25 @@ export function DashboardHeader() {
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
 
+  // 1. 전역 사용자 프로필 조회
+  const userRef = (firestore && user) ? doc(firestore, 'users', user.uid) : null;
+  const { data: userProfile } = useDoc<UserType>(userRef as any);
+
+  // 2. 센터 내 학생 프로필 조회
   const studentRef = (firestore && activeMembership && user) 
     ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
     : null;
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
 
+  // 데이터 로딩 시 폼 초기값 설정
   useEffect(() => {
     if (studentProfile) {
       setSchoolName(studentProfile.schoolName || '');
       setGrade(studentProfile.grade || '');
+    } else if (userProfile) {
+      setSchoolName(userProfile.schoolName || '');
     }
-  }, [studentProfile]);
+  }, [studentProfile, userProfile]);
 
   const handleSignOut = async () => {
     if (!auth) return;
@@ -117,21 +125,31 @@ export function DashboardHeader() {
     try {
       const batch = writeBatch(firestore);
       
-      // 1. 전역 프로필 업데이트
-      const userRef = doc(firestore, 'users', user.uid);
-      batch.update(userRef, { schoolName, updatedAt: serverTimestamp() });
+      const commonUpdate = {
+        schoolName: schoolName.trim(),
+        updatedAt: serverTimestamp()
+      };
+
+      // 1. 전역 프로필 업데이트 (set merge 사용하여 문서가 없으면 생성)
+      const uRef = doc(firestore, 'users', user.uid);
+      batch.set(uRef, commonUpdate, { merge: true });
 
       // 2. 센터 내 학생 프로필 업데이트
       if (activeMembership.role === 'student') {
         const sRef = doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-        batch.update(sRef, { schoolName, grade, updatedAt: serverTimestamp() });
+        batch.set(sRef, {
+          ...commonUpdate,
+          grade: grade,
+          name: user.displayName || '학생' // 필수 필드 보완
+        }, { merge: true });
       }
 
       await batch.commit();
       toast({ title: "정보가 성공적으로 업데이트되었습니다." });
       setIsSettingsOpen(false);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "업데이트 실패", description: e.message });
+      console.error("Settings Update Error:", e);
+      toast({ variant: "destructive", title: "업데이트 실패", description: e.message || "서버 통신 중 오류가 발생했습니다." });
     } finally {
       setIsUpdating(false);
     }
