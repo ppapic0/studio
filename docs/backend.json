@@ -17,130 +17,81 @@
     "Center": {
       "title": "Center",
       "type": "object",
-      "description": "학습 센터 정보",
+      "description": "학습 센터 정보 및 재무 설정",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "subscriptionTier": { "type": "string" }
+        "financeSettings": {
+          "type": "object",
+          "properties": {
+            "fixedCosts": { "type": "number", "description": "월 고정비 총액" },
+            "refundPolicy": {
+              "type": "object",
+              "properties": {
+                "penaltyType": { "type": "string", "enum": ["none", "rate", "fixed"] },
+                "penaltyRate": { "type": "number" },
+                "penaltyFixed": { "type": "number" }
+              }
+            },
+            "discountPolicy": {
+              "type": "object",
+              "properties": {
+                "order": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
       }
     },
-    "CenterMember": {
-      "title": "CenterMember",
+    "Pricing": {
+      "title": "Pricing",
       "type": "object",
-      "description": "센터 소속 멤버 역할 및 상태",
+      "description": "시즌/학생타입별 28일 기준 기본가",
       "properties": {
-        "id": { "type": "string" },
-        "role": { "type": "string", "enum": ["student", "teacher", "parent", "centerAdmin"] },
-        "status": { "type": "string", "enum": ["active", "onHold", "withdrawn"] },
-        "displayName": { "type": "string" },
-        "joinedAt": { "type": "string", "format": "date-time" },
-        "linkedStudentIds": { "type": "array", "items": { "type": "string" } },
-        "monthlyFee": { "type": "number", "description": "학생별 설정된 월 수강료" }
+        "productId": { "type": "string" },
+        "season": { "type": "string", "enum": ["semester", "vacation"] },
+        "studentType": { "type": "string", "enum": ["student", "n_student"] },
+        "basePrice": { "type": "number" },
+        "isActive": { "type": "boolean" }
       }
     },
-    "StudentProfile": {
-      "title": "StudentProfile",
+    "Invoice": {
+      "title": "Invoice",
       "type": "object",
-      "description": "학생 상세 교육 정보",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "grade": { "type": "string" },
-        "schoolName": { "type": "string" },
-        "seatNo": { "type": "number" },
-        "targetDailyMinutes": { "type": "number" },
-        "parentLinkCode": { "type": "string", "description": "부모님 연동용 4자리 코드" }
-      }
-    },
-    "StudyPlanItem": {
-      "title": "StudyPlanItem",
-      "type": "object",
-      "description": "일일 학습 계획 항목",
-      "properties": {
-        "title": { "type": "string" },
-        "done": { "type": "boolean" },
-        "dateKey": { "type": "string" },
-        "category": { "type": "string" }
-      }
-    },
-    "StudyLogDay": {
-      "title": "StudyLogDay",
-      "type": "object",
-      "description": "일일 누적 학습 시간",
-      "properties": {
-        "totalMinutes": { "type": "number" },
-        "dateKey": { "type": "string" }
-      }
-    },
-    "GrowthProgress": {
-      "title": "GrowthProgress",
-      "type": "object",
-      "description": "학생 성장 레벨 및 스탯",
-      "properties": {
-        "level": { "type": "number" },
-        "currentXp": { "type": "number" },
-        "stats": { "type": "object" }
-      }
-    },
-    "DailyReport": {
-      "title": "DailyReport",
-      "type": "object",
-      "description": "학부모 발송 리포트",
+      "description": "결제 영수증 스냅샷",
       "properties": {
         "studentId": { "type": "string" },
-        "studentName": { "type": "string" },
-        "content": { "type": "string" },
-        "status": { "type": "string", "enum": ["draft", "sent"] },
-        "dateKey": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "cycleStartDate": { "type": "string", "format": "date" },
+        "cycleEndDate": { "type": "string", "format": "date" },
+        "basePriceSnapshot": { "type": "number" },
+        "discountsSnapshot": { "type": "array" },
+        "finalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["issued", "paid", "refunded", "void"] },
+        "paidAt": { "type": "string", "format": "date-time" }
       }
     },
-    "DailyStudentStat": {
-      "title": "DailyStudentStat",
+    "Refund": {
+      "title": "Refund",
       "type": "object",
-      "description": "학생별 일일 성과 통계",
+      "description": "환불 처리 기록",
       "properties": {
-        "todayPlanCompletionRate": { "type": "number" },
-        "totalStudyMinutes": { "type": "number" },
-        "attendanceStreakDays": { "type": "number" },
-        "weeklyPlanCompletionRate": { "type": "number" },
-        "studyTimeGrowthRate": { "type": "number" },
-        "riskDetected": { "type": "boolean" }
+        "invoiceId": { "type": "string" },
+        "usedDays": { "type": "number" },
+        "penalty": { "type": "number" },
+        "refundAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["requested", "approved", "paid"] }
       }
     },
-    "CounselingReservation": {
-      "title": "CounselingReservation",
+    "KpiDaily": {
+      "title": "KpiDaily",
       "type": "object",
-      "description": "상담 예약 및 요청 정보",
+      "description": "일별 재무 지표 집계",
       "properties": {
-        "studentId": { "type": "string" },
-        "studentName": { "type": "string" },
-        "scheduledAt": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["requested", "confirmed", "done", "canceled"] },
-        "studentNote": { "type": "string", "description": "학생이 작성한 상담 요청 사유" },
-        "teacherNote": { "type": "string", "description": "선생님이 작성한 예약 메모" }
-      }
-    },
-    "CounselingLog": {
-      "title": "CounselingLog",
-      "type": "object",
-      "description": "상담 진행 기록",
-      "properties": {
-        "studentId": { "type": "string" },
-        "teacherId": { "type": "string" },
-        "type": { "type": "string", "enum": ["academic", "life", "career"] },
-        "content": { "type": "string" },
-        "improvement": { "type": "string" }
-      }
-    },
-    "ParentAiCache": {
-      "title": "ParentAiCache",
-      "type": "object",
-      "description": "학부모 대시보드용 AI 분석 캐시",
-      "properties": {
-        "content": { "type": "object" },
-        "dateKey": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "totalRevenue": { "type": "number" },
+        "totalDiscount": { "type": "number" },
+        "totalRefund": { "type": "number" },
+        "activeStudentCount": { "type": "number" },
+        "breakevenStudents": { "type": "number" }
       }
     }
   },
@@ -148,61 +99,21 @@
     "providers": ["password"]
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": { "$ref": "#/entities/User" },
-      "description": "전역 사용자 프로필"
+    "/centers/{centerId}/pricing/{pricingId}": {
+      "schema": { "$ref": "#/entities/Pricing" },
+      "description": "가격 매트릭스"
     },
-    "/userCenters/{userId}/centers/{centerId}": {
-      "schema": { "$ref": "#/entities/CenterMember" },
-      "description": "사용자별 가입 센터 정보"
+    "/centers/{centerId}/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "결제 내역"
     },
-    "/centers/{centerId}": {
-      "schema": { "$ref": "#/entities/Center" },
-      "description": "센터 기본 데이터"
+    "/centers/{centerId}/refunds/{refundId}": {
+      "schema": { "$ref": "#/entities/Refund" },
+      "description": "환불 내역"
     },
-    "/centers/{centerId}/members/{memberId}": {
-      "schema": { "$ref": "#/entities/CenterMember" },
-      "description": "센터 내 역할 및 상태 관리"
-    },
-    "/centers/{centerId}/students/{studentId}": {
-      "schema": { "$ref": "#/entities/StudentProfile" },
-      "description": "학생 상세 관리 프로필"
-    },
-    "/centers/{centerId}/plans/{studentId}/weeks/{weekId}/items/{itemId}": {
-      "schema": { "$ref": "#/entities/StudyPlanItem" },
-      "description": "학생별 학습 계획"
-    },
-    "/centers/{centerId}/studyLogs/{studentId}/days/{dateKey}": {
-      "schema": { "$ref": "#/entities/StudyLogDay" },
-      "description": "학생별 일일 학습 시간 로그"
-    },
-    "/centers/{centerId}/growthProgress/{studentId}": {
-      "schema": { "$ref": "#/entities/GrowthProgress" },
-      "description": "학생 성장 시스템 데이터"
-    },
-    "/centers/{centerId}/dailyReports/{reportId}": {
-      "schema": { "$ref": "#/entities/DailyReport" },
-      "description": "일일 학습 리포트 기록"
-    },
-    "/centers/{centerId}/dailyStudentStats/{date}/students/{studentId}": {
-      "schema": { "$ref": "#/entities/DailyStudentStat" },
-      "description": "학생별 일일 성과 통계"
-    },
-    "/centers/{centerId}/attendanceCurrent/{seatId}": {
-      "schema": { "type": "object" },
-      "description": "실시간 좌석 및 출결 상태"
-    },
-    "/centers/{centerId}/counselingReservations/{resId}": {
-      "schema": { "$ref": "#/entities/CounselingReservation" },
-      "description": "상담 예약 데이터"
-    },
-    "/centers/{centerId}/counselingLogs/{logId}": {
-      "schema": { "$ref": "#/entities/CounselingLog" },
-      "description": "상담 일지 기록"
-    },
-    "/centers/{centerId}/parentAiCache/{studentId}/days/{dateKey}": {
-      "schema": { "$ref": "#/entities/ParentAiCache" },
-      "description": "학부모용 AI 분석 결과 캐시 데이터"
+    "/centers/{centerId}/kpiDaily/{date}": {
+      "schema": { "$ref": "#/entities/KpiDaily" },
+      "description": "일별 KPI 통계"
     }
   }
 }

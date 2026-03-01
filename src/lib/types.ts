@@ -19,8 +19,84 @@ export interface CenterMembership {
   status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;
-  linkedStudentIds?: string[]; // 학부모용: 연결된 자녀 ID 목록
-  monthlyFee?: number; // 학생별 설정된 월 수강료
+  linkedStudentIds?: string[];
+  monthlyFee?: number;
+}
+
+export interface FinanceSettings {
+  fixedCosts: number;
+  refundPolicy: {
+    penaltyType: 'none' | 'rate' | 'fixed';
+    penaltyRate?: number;
+    penaltyFixed?: number;
+    perDayRounding: 'floor' | 'round';
+  };
+  discountPolicy: {
+    order: ('rateFirst' | 'fixedFirst')[];
+  };
+}
+
+export interface PricingMatrix {
+  productId: string;
+  season: 'semester' | 'vacation';
+  studentType: 'student' | 'n_student';
+  basePrice: number;
+  isActive: boolean;
+  updatedAt: Timestamp;
+}
+
+export interface DiscountSnapshot {
+  type: 'tutoring' | 'sibling' | 'coupon';
+  method: 'fixed' | 'rate';
+  value: number;
+  amount: number;
+  order: number;
+}
+
+export interface Invoice {
+  studentId: string;
+  studentName: string;
+  cycleStartDate: Timestamp;
+  cycleEndDate: Timestamp;
+  priceSnapshot: {
+    productId: string;
+    season: string;
+    studentType: string;
+    basePrice: number;
+  };
+  discountsSnapshot: DiscountSnapshot[];
+  finalPrice: number;
+  status: 'issued' | 'paid' | 'refunded' | 'void';
+  issuedAt: Timestamp;
+  paidAt?: Timestamp;
+  metadata?: any;
+}
+
+export interface RefundRecord {
+  invoiceId: string;
+  studentId: string;
+  requestedAt: Timestamp;
+  approvedAt?: Timestamp;
+  usedDays: number;
+  perDay: number;
+  usedAmount: number;
+  penalty: number;
+  refundAmount: number;
+  status: 'requested' | 'approved' | 'paid';
+  reason?: string;
+}
+
+export interface KpiDaily {
+  date: string;
+  totalRevenue: number;
+  totalDiscount: number;
+  totalRefund: number;
+  paidInvoiceCount: number;
+  refundedInvoiceCount: number;
+  activeStudentCount: number;
+  avgFinalPrice: number;
+  breakevenStudents: number | null;
+  updatedAt: Timestamp;
 }
 
 export interface StudentProfile {
@@ -32,7 +108,18 @@ export interface StudentProfile {
   targetDailyMinutes: number;
   parentUids: string[];
   createdAt: Timestamp;
-  parentLinkCode?: string; // 부모님 연동용 4자리 코드
+  parentLinkCode?: string;
+  flags?: {
+    tutoringDiscountEnabled: boolean;
+    siblingDiscountEnabled: boolean;
+    siblingGroupId?: string;
+  };
+  currentEnrollment?: {
+    productId: string;
+    season: 'semester' | 'vacation';
+    studentType: 'student' | 'n_student';
+    cycleStartDate: Timestamp;
+  };
 }
 
 export interface AttendanceCurrent {
