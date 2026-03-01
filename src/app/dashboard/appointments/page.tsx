@@ -82,7 +82,7 @@ export default function AppointmentsPage() {
   const isStudent = activeMembership?.role === 'student';
   const roleConfirmed = !!activeMembership?.role;
 
-  // 선생님 목록 조회
+  // 선생님 목록 조회 (기본적으로 teacher, centerAdmin을 가져온 후 클라이언트에서 필터링)
   const teachersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -90,7 +90,16 @@ export default function AppointmentsPage() {
       where('role', 'in', ['teacher', 'centerAdmin'])
     );
   }, [firestore, centerId]);
-  const { data: teachers } = useCollection<CenterMembership>(teachersQuery);
+  const { data: allStaff } = useCollection<CenterMembership>(teachersQuery);
+
+  // 사용자의 요청에 따른 선생님 목록 필터링
+  const filteredTeachers = useMemo(() => {
+    if (!allStaff) return [];
+    return allStaff.filter(t => 
+      t.displayName !== '동백센터관리자' && // 특정 관리자 계정 제외
+      t.role !== 'centerAdmin' // 원장은 선생 목록에서 제외
+    );
+  }, [allStaff]);
 
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user || !roleConfirmed) return null;
@@ -149,7 +158,7 @@ export default function AppointmentsPage() {
         return;
       }
 
-      const teacher = teachers?.find(t => t.id === selectedTeacherId);
+      const teacher = filteredTeachers?.find(t => t.id === selectedTeacherId);
 
       await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
         studentId: user.uid,
@@ -228,12 +237,12 @@ export default function AppointmentsPage() {
                       <SelectValue placeholder="선생님을 선택하세요" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-none shadow-2xl">
-                      {teachers?.map((t) => (
+                      {filteredTeachers.map((t) => (
                         <SelectItem key={t.id} value={t.id} className="font-bold py-2.5">
-                          {t.displayName} {t.role === 'centerAdmin' ? '(원장님)' : '(선생님)'}
+                          {t.displayName} (선생님)
                         </SelectItem>
                       ))}
-                      {!teachers?.length && <p className="p-4 text-center text-xs font-bold opacity-40">선생님 목록을 불러오는 중...</p>}
+                      {!filteredTeachers.length && <p className="p-4 text-center text-xs font-bold opacity-40">선택 가능한 선생님이 없습니다.</p>}
                     </SelectContent>
                   </Select>
                 </div>
