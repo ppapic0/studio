@@ -131,13 +131,13 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
 
   return (
     <div className={cn(
-      "flex flex-col transition-all border group relative",
-      isMobile ? "p-4 rounded-[1.5rem] bg-white shadow-sm border-border/50" : "p-5 rounded-2xl bg-white hover:border-primary/30"
+      "flex flex-col transition-all border group relative bg-white",
+      isMobile ? "p-4 rounded-[1.25rem] border-border/50" : "p-5 rounded-2xl hover:border-primary/30"
     )}>
       <div className="flex items-center gap-3">
         <div className={cn(
           "rounded-xl transition-all duration-500 shrink-0",
-          isMobile ? "bg-primary/5 p-2.5" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
+          isMobile ? "bg-primary/5 p-2" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
         )}>
           <Icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </div>
@@ -152,9 +152,9 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
             {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
-          <div className="flex items-center gap-0.5 bg-muted/20 p-1 rounded-xl border border-border/30">
+          <div className="flex items-center gap-0.5 bg-muted/30 p-1 rounded-xl border border-border/20">
              <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[55px] text-[10px]" : "w-[65px] text-xs")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[50px] text-[9px]" : "w-[65px] text-xs")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -163,10 +163,10 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
                </SelectContent>
              </Select>
 
-             <div className="w-px h-3.5 bg-border/50 mx-0.5" />
+             <div className="w-px h-3 bg-border/50 mx-0.5" />
 
              <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[35px] text-[10px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -177,7 +177,7 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
              <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
 
              <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[35px] text-[10px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -377,7 +377,7 @@ export default function StudyHistoryPage() {
           <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>학습 기록</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-60">Study Logs & History Matrix</p>
         </div>
-        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border shadow-xl ring-1 ring-black/[0.03]">
+        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border shadow-xl">
            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={prevMonth}><ChevronLeft className="h-5 w-5" /></Button>
            <span className="font-black text-sm min-w-[120px] text-center tracking-tight">{format(currentDate, 'yyyy년 M월')}</span>
            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={nextMonth}><ChevronRight className="h-5 w-5" /></Button>
@@ -408,7 +408,7 @@ export default function StudyHistoryPage() {
         </Card>
 
         {!isMobile && (
-          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8 flex flex-col justify-center gap-6 ring-1 ring-black/[0.03]">
+          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8 flex flex-col justify-center gap-6">
             <div className="space-y-2">
               <h3 className="font-black text-sm uppercase tracking-widest text-primary/40 flex items-center gap-2">
                 <Sparkles className="h-4 w-4" /> Mastery Tip
@@ -422,7 +422,7 @@ export default function StudyHistoryPage() {
         )}
       </div>
 
-      <Card className="border-none shadow-[0_30px_80px_rgba(0,0,0,0.08)] rounded-[3rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
+      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white">
         <CardContent className="p-0">
           <div className="grid grid-cols-7 border-b bg-muted/10">
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
@@ -446,7 +446,7 @@ export default function StudyHistoryPage() {
                   key={dateKey} 
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
-                    "p-2 sm:p-4 border-r border-b relative group transition-all cursor-pointer hover:z-20 hover:scale-[1.02] hover:shadow-2xl",
+                    "p-2 sm:p-4 border-r border-b relative group transition-all cursor-pointer hover:z-20 hover:scale-[1.02] hover:shadow-2xl bg-white",
                     isMobile ? "aspect-square" : "min-h-[130px]",
                     !isCurrentMonth ? "bg-muted/5 opacity-10" : getHeatmapColor(minutes),
                     isToday && "ring-4 ring-inset ring-primary/20 z-10"
@@ -476,14 +476,14 @@ export default function StudyHistoryPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-5 items-center px-6 py-4 bg-white/80 backdrop-blur-md border shadow-xl rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ring-1 ring-black/[0.03]">
+      <div className="flex flex-wrap gap-5 items-center px-6 py-4 bg-white/80 backdrop-blur-md border shadow-xl rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
          <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" /><span>3시간 몰입 달성</span></div>
          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary/30" /><span>계획 수립 완료</span></div>
          <div className="ml-auto flex items-center gap-2"><Info className="h-4 w-4" /><span>날짜를 클릭해 상세 로그를 확인하세요.</span></div>
       </div>
 
       <Dialog open={!!selectedDateForPlan} onOpenChange={(open) => !open && setSelectedDateForPlan(null)}>
-        <DialogContent className={cn("border-none shadow-[0_-20px_100px_rgba(0,0,0,0.2)] p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "sm:max-w-xl rounded-[3.5rem]")}>
+        <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "sm:max-w-xl rounded-[3.5rem]")}>
           <div className="bg-primary p-10 text-white relative overflow-hidden">
             <Sparkles className="absolute top-0 right-0 p-10 h-48 w-48 opacity-10 rotate-12" />
             <DialogHeader className="relative z-10">
@@ -564,7 +564,7 @@ export default function StudyHistoryPage() {
                       {studyTasks.map((task) => (
                         <div key={task.id} className={cn(
                           "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
-                          task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
+                          task.done ? "bg-emerald-50/50 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
                         )}>
                           <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
                           <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
@@ -578,20 +578,20 @@ export default function StudyHistoryPage() {
                     </div>
                     {!isActuallyPast && (
                       <div className="pt-4">
-                        <div className="relative flex items-center bg-white border-2 border-dashed border-emerald-200 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1.5 shadow-sm">
+                        <div className="relative flex items-center bg-white border-2 border-emerald-100 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1 shadow-sm">
                           <Input 
                             placeholder="공부 계획 추가..." 
                             value={newStudyTask} 
                             onChange={(e) => setNewStudyTask(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting} 
-                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm" 
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10 text-sm" 
                           />
                           <Button 
                             size="icon" 
                             onClick={() => handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting || !newStudyTask.trim()} 
-                            className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"
+                            className="h-9 w-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"
                           >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
@@ -605,7 +605,7 @@ export default function StudyHistoryPage() {
                       {personalTasks.map((task) => (
                         <div key={task.id} className={cn(
                           "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
-                          task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
+                          task.done ? "bg-amber-50/50 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
                         )}>
                           <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500" />
                           <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
@@ -619,21 +619,21 @@ export default function StudyHistoryPage() {
                     </div>
                     {!isActuallyPast && (
                       <div className="pt-4">
-                        <div className="relative flex items-center bg-white border-2 border-dashed border-amber-200 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1.5 shadow-sm">
+                        <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1 shadow-sm">
                           <Input 
                             placeholder="개인 일정 추가..." 
                             value={newPersonalTask} 
                             onChange={(e) => setNewPersonalTask(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting} 
-                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm" 
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10 text-sm" 
                           />
                           <Button 
                             variant="outline" 
                             size="icon" 
                             onClick={() => handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting || !newPersonalTask.trim()} 
-                            className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0"
+                            className="h-9 w-9 rounded-xl border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0"
                           >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>

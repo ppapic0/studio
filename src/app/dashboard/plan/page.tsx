@@ -49,7 +49,8 @@ import {
   Activity,
   PlusCircle,
   CheckCircle2,
-  CalendarCheck
+  CalendarCheck,
+  ChevronRight
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -139,13 +140,13 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
 
   return (
     <div className={cn(
-      "flex flex-col transition-all border group relative",
-      isMobile ? "p-4 rounded-[1.5rem] bg-white shadow-sm border-border/50" : "p-5 rounded-2xl bg-white hover:border-primary/30"
+      "flex flex-col transition-all border group relative bg-white",
+      isMobile ? "p-4 rounded-[1.25rem] border-border/50" : "p-5 rounded-2xl hover:border-primary/30"
     )}>
       <div className="flex items-center gap-3">
         <div className={cn(
           "rounded-xl transition-all duration-500 shrink-0",
-          isMobile ? "bg-primary/5 p-2.5" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
+          isMobile ? "bg-primary/5 p-2" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
         )}>
           <Icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </div>
@@ -160,9 +161,9 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
             {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
-          <div className="flex items-center gap-0.5 bg-muted/20 p-1 rounded-xl border border-border/30">
+          <div className="flex items-center gap-0.5 bg-muted/30 p-1 rounded-xl border border-border/20">
              <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[55px] text-[10px]" : "w-[65px] text-xs")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[50px] text-[9px]" : "w-[65px] text-xs")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -171,10 +172,10 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
                </SelectContent>
              </Select>
 
-             <div className="w-px h-3.5 bg-border/50 mx-0.5" />
+             <div className="w-px h-3 bg-border/50 mx-0.5" />
 
              <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[35px] text-[10px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -185,7 +186,7 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
              <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
 
              <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-7", isMobile ? "w-[35px] text-[10px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -512,7 +513,7 @@ export default function StudyPlanPage() {
       </div>
 
       <div className={cn("grid gap-8", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
-        <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile ? "md:col-span-12" : "md:col-span-5")}>
+        <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white", isMobile ? "md:col-span-12" : "md:col-span-5")}>
           <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-8")}>
             <div className="flex items-center justify-between">
               <div className="space-y-1">
@@ -600,7 +601,7 @@ export default function StudyPlanPage() {
 
         <div className={cn(isMobile ? "md:col-span-12" : "md:col-span-7")}>
           <Tabs defaultValue="study" className="w-full">
-            <Card className="border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
+            <Card className="border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden">
               <CardHeader className="p-0 border-b bg-muted/10">
                 <TabsList className="w-full justify-start rounded-none bg-transparent h-20 p-0 gap-0">
                   <TabsTrigger 
@@ -617,7 +618,7 @@ export default function StudyPlanPage() {
                   </TabsTrigger>
                 </TabsList>
               </CardHeader>
-              <CardContent className={cn("min-h-[450px]", isMobile ? "p-5" : "p-10")}>
+              <CardContent className={cn("min-h-[450px] bg-[#fafafa]", isMobile ? "p-5" : "p-10")}>
                 <TabsContent value="study" className="mt-0 space-y-6">
                   <div className="space-y-4">
                     {isLoading ? (
@@ -635,7 +636,7 @@ export default function StudyPlanPage() {
                         {studyTasks.map((task) => (
                           <div key={task.id} className={cn(
                             "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
-                            task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
+                            task.done ? "bg-emerald-50/50 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
                           )}>
                             <Checkbox 
                               id={task.id} 
@@ -667,7 +668,7 @@ export default function StudyPlanPage() {
                     
                     {!isPast && (
                       <div className="pt-4">
-                        <div className="relative flex items-center bg-white border-2 border-dashed border-emerald-200 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1.5 shadow-sm">
+                        <div className="relative flex items-center bg-white border-2 border-emerald-100 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1 shadow-sm">
                           <Input 
                             placeholder="공부 계획 추가..." 
                             value={newStudyTask}
@@ -675,15 +676,15 @@ export default function StudyPlanPage() {
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
                             disabled={isSubmitting}
                             className={cn(
-                              "border-none bg-transparent shadow-none focus-visible:ring-0 font-bold",
-                              isMobile ? "h-11 text-sm" : "h-12 text-base"
+                              "border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10",
+                              isMobile ? "text-sm" : "text-base"
                             )}
                           />
                           <Button 
                             size="icon" 
                             onClick={() => handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting || !newStudyTask.trim()} 
-                            className="rounded-xl h-10 w-10 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg active:scale-95 transition-all"
+                            className="rounded-xl h-9 w-9 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg active:scale-95 transition-all"
                           >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
@@ -710,7 +711,7 @@ export default function StudyPlanPage() {
                         {personalTasks.map((task) => (
                           <div key={task.id} className={cn(
                             "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
-                            task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
+                            task.done ? "bg-amber-50/50 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
                           )}>
                             <Checkbox 
                               id={task.id} 
@@ -742,7 +743,7 @@ export default function StudyPlanPage() {
                     
                     {!isPast && (
                       <div className="pt-4">
-                        <div className="relative flex items-center bg-white border-2 border-dashed border-amber-200 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1.5 shadow-sm">
+                        <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1 shadow-sm">
                           <Input 
                             placeholder="개인 일정 추가..." 
                             value={newPersonalTask}
@@ -750,8 +751,8 @@ export default function StudyPlanPage() {
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
                             disabled={isSubmitting}
                             className={cn(
-                              "border-none bg-transparent shadow-none focus-visible:ring-0 font-bold",
-                              isMobile ? "h-11 text-sm" : "h-12 text-base"
+                              "border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10",
+                              isMobile ? "text-sm" : "text-base"
                             )}
                           />
                           <Button 
@@ -759,7 +760,7 @@ export default function StudyPlanPage() {
                             size="icon" 
                             onClick={() => handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting || !newPersonalTask.trim()} 
-                            className="rounded-xl h-10 w-10 border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0 shadow-sm active:scale-95 transition-all"
+                            className="rounded-xl h-9 w-9 border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0 shadow-sm active:scale-95 transition-all"
                           >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
@@ -769,7 +770,7 @@ export default function StudyPlanPage() {
                   </div>
                 </TabsContent>
               </CardContent>
-              <div className={cn("bg-muted/5 border-t flex flex-col sm:flex-row items-center justify-between gap-6", isMobile ? "p-6" : "p-8")}>
+              <div className={cn("bg-muted/10 border-t flex flex-col sm:flex-row items-center justify-between gap-6", isMobile ? "p-6" : "p-8")}>
                 <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-5 py-2.5 rounded-2xl border shadow-sm ring-1 ring-black/[0.02]">
                   <CalendarCheck className="h-4 w-4 text-primary animate-pulse" />
                   <p className="text-[11px] font-black text-primary/70 uppercase tracking-widest">
@@ -780,7 +781,7 @@ export default function StudyPlanPage() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="rounded-[1.25rem] gap-2.5 text-[11px] font-black h-12 px-6 border-2 shadow-xl hover:bg-primary hover:text-white transition-all active:scale-95 group w-full sm:w-auto" 
+                    className="rounded-[1.25rem] gap-2.5 text-[11px] font-black h-12 px-6 border-2 shadow-sm hover:bg-primary hover:text-white transition-all active:scale-95 group w-full sm:w-auto" 
                     onClick={handleApplyToAllWeekdays}
                     disabled={isSubmitting || !dailyPlans || dailyPlans.length === 0}
                   >
