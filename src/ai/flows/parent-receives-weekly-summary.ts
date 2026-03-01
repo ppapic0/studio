@@ -54,11 +54,9 @@ const parentSummaryPrompt = ai.definePrompt({
 학생 이름: {{{studentName}}}
 
 주간 성과 지표:
-- 계획 완수율: {{{completionRate}}}%
-- 계획 완수율 추세 (지난주 대비): {{#if completionRateTrend}}{{{completionRateTrend}}}% {{#if (gt completionRateTrend 0)}}상승{{else if (lt completionRateTrend 0)}}하락{{else}}변동 없음{{/if}}{{else}}해당 없음{{/if}}
-- 출석률: {{{attendanceRate}}}%
-- 출석률 추세 (지난주 대비): {{#if attendanceTrend}}{{{attendanceTrend}}}% {{#if (gt attendanceTrend 0)}}상승{{else if (lt attendanceTrend 0)}}하락{{else}}변동 없음{{/if}}{{else}}해당 없음{{/if}}
-- 학습 시간 성장률 (이전 기간 대비): {{#if studyTimeGrowth}}x{{{studyTimeGrowth}}}{{#if (gt studyTimeGrowth 0)}} (성장){{else if (lt studyTimeGrowth 0)}} (감소){{else}} (안정){{/if}}{{else}}해당 없음{{/if}}
+- 계획 완수율: {{{completionRate}}}% (지난주 대비 변화: {{{completionRateTrend}}}%)
+- 출석률: {{{attendanceRate}}}% (지난주 대비 변화: {{{attendanceTrend}}}%)
+- 학습 시간 성장률 (이전 기간 대비): x{{{studyTimeGrowth}}}
 
 최근 성취/긍정적 관찰:
 {{#if recentAchievements}}
@@ -88,7 +86,7 @@ const parentSummaryPrompt = ai.definePrompt({
 `,
   config: {
     safetySettings: [
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }, // 학생 성과와 관련된 내용이라면 더 많은 유연성을 허용하지만, 여전히 모니터링됩니다.
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
