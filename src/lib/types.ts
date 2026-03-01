@@ -16,7 +16,7 @@ export interface User {
 export interface CenterMembership {
   id: string; 
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
-  status: 'active' | 'pending' | 'inactive';
+  status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;
   linkedStudentIds?: string[]; // 학부모용: 연결된 자녀 ID 목록

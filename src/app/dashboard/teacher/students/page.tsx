@@ -12,7 +12,21 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { Search, UserPlus, GraduationCap, ChevronRight, Loader2, Armchair, Building2, Mail, Lock } from 'lucide-react';
+import { 
+  Search, 
+  UserPlus, 
+  GraduationCap, 
+  ChevronRight, 
+  Loader2, 
+  Armchair, 
+  Building2, 
+  Mail, 
+  Lock,
+  UserCheck,
+  UserMinus,
+  PauseCircle,
+  Users
+} from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -32,6 +46,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,6 +61,7 @@ export default function StudentListPage() {
   const functions = useFunctions();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusTab, setStatusTab] = useState<string>('active');
   
   const isMobile = viewMode === 'mobile';
 
@@ -93,6 +114,10 @@ export default function StudentListPage() {
     
     return studentMembers
       .filter(member => {
+        // 상태 필터링
+        if (member.status !== statusTab) return false;
+
+        // 검색어 필터링
         const profile = studentsProfiles?.find(p => p.id === member.id);
         return (
           member.displayName?.toLowerCase().includes(search) || 
@@ -101,7 +126,16 @@ export default function StudentListPage() {
         );
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-  }, [studentMembers, studentsProfiles, searchTerm]);
+  }, [studentMembers, studentsProfiles, searchTerm, statusTab]);
+
+  const counts = useMemo(() => {
+    if (!studentMembers) return { active: 0, onHold: 0, withdrawn: 0 };
+    return {
+      active: studentMembers.filter(m => m.status === 'active').length,
+      onHold: studentMembers.filter(m => m.status === 'onHold').length,
+      withdrawn: studentMembers.filter(m => m.status === 'withdrawn').length,
+    };
+  }, [studentMembers]);
 
   const handleAddStudent = async () => {
     if (!centerId || !functions) {
@@ -236,88 +270,111 @@ export default function StudentListPage() {
         </Dialog>
       </header>
 
-      <div className={cn("relative group", isMobile ? "px-1" : "")}>
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-        <Input 
-          placeholder="이름, 학교 또는 좌석 번호로 검색..." 
-          className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all", isMobile ? "h-14 text-base" : "h-16 text-lg")}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
+        <TabsList className={cn("grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border border-border/50 shadow-inner", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
+          <TabsTrigger value="active" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all">
+            <UserCheck className="h-4 w-4" /> 
+            <span className="hidden sm:inline">재원생</span>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-emerald-50 text-emerald-600">{counts.active}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="onHold" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all">
+            <PauseCircle className="h-4 w-4" /> 
+            <span className="hidden sm:inline">휴학생</span>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-amber-50 text-amber-600">{counts.onHold}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="withdrawn" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all">
+            <UserMinus className="h-4 w-4" /> 
+            <span className="hidden sm:inline">퇴원생</span>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-slate-100 text-slate-600">{counts.withdrawn}</Badge>
+          </TabsTrigger>
+        </TabsList>
 
-      {membersLoading ? (
-        <div className="flex flex-col items-center justify-center py-40 gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-          <p className="font-black text-muted-foreground/40 uppercase tracking-[0.2em] italic">Accessing Student Records...</p>
+        <div className={cn("relative group mb-6", isMobile ? "px-1" : "")}>
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+          <Input 
+            placeholder="이름, 학교 또는 좌석 번호로 검색..." 
+            className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all", isMobile ? "h-14 text-base" : "h-16 text-lg")}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-      ) : filteredStudents.length === 0 ? (
-        <div className="text-center py-32 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
-          <Search className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" />
-          <p className="font-black text-muted-foreground/40 uppercase">등록된 학생이 없습니다.</p>
-        </div>
-      ) : (
-        <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-2 lg:grid-cols-3")}>
-          {filteredStudents.map((member) => {
-            const profile = studentsProfiles?.find(p => p.id === member.id);
-            const attendance = attendanceList?.find(a => a.studentId === member.id);
-            
-            return (
-              <Link key={member.id} href={`/dashboard/teacher/students/${member.id}`}>
-                <Card className="rounded-[2rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden bg-white ring-1 ring-border/50">
-                  <div className={cn(
-                    "h-1.5 w-full transition-colors duration-500",
-                    attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
-                  )} />
-                  <CardContent className={isMobile ? "p-5" : "p-6"}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="relative">
-                          <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50">
-                            <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
-                              {member.displayName?.charAt(0) || 'S'}
-                            </AvatarFallback>
-                          </Avatar>
-                          {attendance?.status === 'studying' && (
-                            <div className="absolute -top-1 -right-1">
-                              <Activity className="h-4 w-4 text-emerald-500 animate-pulse" />
+
+        {membersLoading ? (
+          <div className="flex flex-col items-center justify-center py-40 gap-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
+            <p className="font-black text-muted-foreground/40 uppercase tracking-[0.2em] italic">Accessing Student Records...</p>
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="text-center py-32 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
+            <Users className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" />
+            <p className="font-black text-muted-foreground/40 uppercase">해당 상태의 학생이 없습니다.</p>
+          </div>
+        ) : (
+          <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-2 lg:grid-cols-3")}>
+            {filteredStudents.map((member) => {
+              const profile = studentsProfiles?.find(p => p.id === member.id);
+              const attendance = attendanceList?.find(a => a.studentId === member.id);
+              
+              return (
+                <Link key={member.id} href={`/dashboard/teacher/students/${member.id}`}>
+                  <Card className={cn(
+                    "rounded-[2rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden bg-white ring-1 ring-border/50",
+                    member.status === 'withdrawn' && "opacity-60 grayscale"
+                  )}>
+                    <div className={cn(
+                      "h-1.5 w-full transition-colors duration-500",
+                      attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
+                    )} />
+                    <CardContent className={isMobile ? "p-5" : "p-6"}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="relative">
+                            <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50">
+                              <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
+                                {member.displayName?.charAt(0) || 'S'}
+                              </AvatarFallback>
+                            </Avatar>
+                            {attendance?.status === 'studying' && member.status === 'active' && (
+                              <div className="absolute -top-1 -right-1">
+                                <Activity className="h-4 w-4 text-emerald-500 animate-pulse" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>
+                              {member.status === 'active' && getStatusBadge(attendance?.status)}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>
-                            {getStatusBadge(attendance?.status)}
-                          </div>
-                          <div className="flex flex-col text-[10px] font-bold text-muted-foreground leading-tight">
-                            <span className="truncate">{profile?.schoolName || '학교 정보 없음'}</span>
-                            <span className="opacity-60">{profile?.grade || '학년 정보 없음'}</span>
+                            <div className="flex flex-col text-[10px] font-bold text-muted-foreground leading-tight">
+                              <span className="truncate">{profile?.schoolName || '학교 정보 없음'}</span>
+                              <span className="opacity-60">{profile?.grade || '학년 정보 없음'}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                        <ChevronRight className="h-5 w-5" />
-                      </div>
-                    </div>
-                    
-                    <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-white shadow-sm">
-                          <Armchair className="h-3.5 w-3.5 text-primary/60" />
+                        <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+                          <ChevronRight className="h-5 w-5" />
                         </div>
-                        <span className="text-xs font-black text-primary/80">
-                          {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
-                        </span>
                       </div>
-                      <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Manage Data</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+                      
+                      <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-white shadow-sm">
+                            <Armchair className="h-3.5 w-3.5 text-primary/60" />
+                          </div>
+                          <span className="text-xs font-black text-primary/80">
+                            {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Manage Data</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </Tabs>
     </div>
   );
 }
