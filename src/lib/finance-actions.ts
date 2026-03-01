@@ -161,7 +161,7 @@ export async function requestRefund(db: Firestore, centerId: string, invoiceId: 
 export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: string) {
   const targetDate = startOfDay(new Date(dateStr));
 
-  // 1. 현재 센터의 모든 '재원생' 조회 (재수생 포함)
+  // 1. 현재 센터의 모든 '재원생' 조회
   const membersQuery = query(
     collection(db, `centers/${centerId}/members`),
     where('role', '==', 'student'),
@@ -175,7 +175,7 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
   membersSnap.forEach(doc => {
     const data = doc.data();
     const monthlyFee = data.monthlyFee || 390000; // 기본가 39만 가정
-    const dailyFee = Math.floor(monthlyFee / 28);
+    const dailyFee = Math.floor(monthlyFee / 28); // 28일 기준 일할
     
     dailyAccruedRevenue += dailyFee;
     activeStudentCount++;
@@ -186,9 +186,11 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
   const monthFinanceSnap = await getDoc(doc(db, 'centers', centerId, 'financeMonthly', monthKey));
   const monthlyFixedCosts = monthFinanceSnap.exists() ? monthFinanceSnap.data()?.totalFixedCosts || 0 : 0;
   
-  // 3. 손익분기점(BEP) 학생 수 계산
+  // 3. 손익분기점(BEP) 학생 수 계산 (28일 주기 기준)
   const avgDailyFee = activeStudentCount > 0 ? dailyAccruedRevenue / activeStudentCount : 0;
-  const breakevenStudents = avgDailyFee > 0 ? Math.ceil(monthlyFixedCosts / (avgDailyFee * 30)) : null;
+  const breakevenStudents = (avgDailyFee > 0 && monthlyFixedCosts > 0) 
+    ? Math.ceil(monthlyFixedCosts / (avgDailyFee * 28)) 
+    : null;
 
   const kpiData = {
     date: dateStr,

@@ -81,6 +81,7 @@ export function DashboardHeader() {
   const { viewMode, setViewMode, activeMembership } = useAppContext();
 
   const isMobileView = viewMode === 'mobile';
+  const isAdmin = activeMembership?.role === 'centerAdmin';
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -191,18 +192,21 @@ export function DashboardHeader() {
       )}
 
       <div className="relative ml-auto flex items-center gap-2">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={cn(
-            "rounded-full transition-all",
-            isMobileView ? "bg-primary text-white" : "text-muted-foreground"
-          )}
-          onClick={toggleViewMode}
-          title={isMobileView ? "데스크톱 모드로 전환" : "앱 모드 시뮬레이션"}
-        >
-          {isMobileView ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
-        </Button>
+        {/* 관리자가 아닐 때만 앱 모드 시뮬레이션 버튼 표시 */}
+        {!isAdmin && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn(
+              "rounded-full transition-all",
+              isMobileView ? "bg-primary text-white" : "text-muted-foreground"
+            )}
+            onClick={toggleViewMode}
+            title={isMobileView ? "데스크톱 모드로 전환" : "앱 모드 시뮬레이션"}
+          >
+            {isMobileView ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+          </Button>
+        )}
 
         <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground">
           <Bell className="h-5 w-5" />

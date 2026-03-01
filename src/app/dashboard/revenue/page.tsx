@@ -150,6 +150,22 @@ export default function RevenuePage() {
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayKpi = useMemo(() => kpiHistory?.find(k => k.date === todayStr) || kpiHistory?.[kpiHistory.length - 1], [kpiHistory, todayStr]);
+  
+  // 손익분기점(BEP) 실시간 계산
+  const calculatedBep = useMemo(() => {
+    if (!todayKpi || todayKpi.activeStudentCount === 0 || !monthlyFinanceData?.totalFixedCosts) return null;
+    
+    // 현재 인원당 평균 일일 매출액
+    const avgDailyFee = todayKpi.totalRevenue / todayKpi.activeStudentCount;
+    if (avgDailyFee <= 0) return null;
+
+    // 한 달(28일) 동안 한 학생이 내는 평균 수강료
+    const avgMonthlyFee = avgDailyFee * 28;
+    
+    // 월 고정비 / 평균 수강료 = 손익분기점 학생 수
+    return Math.ceil(monthlyFinanceData.totalFixedCosts / avgMonthlyFee);
+  }, [todayKpi, monthlyFinanceData]);
+
   const yesterdayKpi = useMemo(() => {
     const yStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     return kpiHistory?.find(k => k.date === yStr);
@@ -204,6 +220,7 @@ export default function RevenuePage() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      // 고정비가 바뀌었으므로 KPI 다시 동기화
       await syncMonthKpis(firestore, centerId, currentChartMonth);
 
       toast({ title: "재무 정책 및 비용이 저장되었습니다." });
@@ -275,7 +292,7 @@ export default function RevenuePage() {
           </p>
           <div className="flex justify-between items-end">
             <div>
-              <h3 className="text-4xl font-black tracking-tighter text-primary">{todayKpi?.breakevenStudents || '-'}<span className="text-lg opacity-40 ml-1">명</span></h3>
+              <h3 className="text-4xl font-black tracking-tighter text-primary">{calculatedBep || '-'}<span className="text-lg opacity-40 ml-1">명</span></h3>
               <p className="text-[10px] font-bold text-muted-foreground mt-1">{selectedFinanceMonth} 고정비 기준</p>
             </div>
             <div className="bg-amber-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><Target className="h-6 w-6 text-amber-600" /></div>
