@@ -27,6 +27,13 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   MessageSquare, 
   Calendar, 
@@ -41,14 +48,15 @@ import {
   AlertCircle,
   Sparkles,
   CalendarPlus,
-  ArrowRight
+  ArrowRight,
+  UserCheck
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { CounselingReservation, CounselingLog } from '@/lib/types';
+import { CounselingReservation, CounselingLog, CenterMembership } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -63,6 +71,7 @@ export default function AppointmentsPage() {
   const [aptDate, setAptDate] = useState('');
   const [aptTime, setAptTime] = useState('14:00');
   const [studentNote, setStudentNote] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -72,6 +81,16 @@ export default function AppointmentsPage() {
   const centerId = activeMembership?.id;
   const isStudent = activeMembership?.role === 'student';
   const roleConfirmed = !!activeMembership?.role;
+
+  // 선생님 목록 조회
+  const teachersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'members'),
+      where('role', 'in', ['teacher', 'centerAdmin'])
+    );
+  }, [firestore, centerId]);
+  const { data: teachers } = useCollection<CenterMembership>(teachersQuery);
 
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user || !roleConfirmed) return null;
@@ -111,12 +130,15 @@ export default function AppointmentsPage() {
       toast({ variant: "destructive", title: "날짜를 선택해 주세요." });
       return;
     }
+    if (!selectedTeacherId) {
+      toast({ variant: "destructive", title: "선생님을 선택해 주세요." });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const scheduledAt = new Date(`${aptDate}T${aptTime}`);
       
-      // 과거 시간 체크
       if (scheduledAt < new Date()) {
         toast({ 
           variant: "destructive", 
@@ -127,10 +149,14 @@ export default function AppointmentsPage() {
         return;
       }
 
+      const teacher = teachers?.find(t => t.id === selectedTeacherId);
+
       await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
         studentId: user.uid,
         studentName: user.displayName || '학생',
         centerId: centerId,
+        teacherId: selectedTeacherId,
+        teacherName: teacher?.displayName || '선생님',
         scheduledAt: Timestamp.fromDate(scheduledAt),
         status: 'requested',
         studentNote: studentNote.trim(),
@@ -141,6 +167,7 @@ export default function AppointmentsPage() {
       toast({ title: "상담 신청 완료" });
       setIsRequestModalOpen(false);
       setStudentNote('');
+      setSelectedTeacherId('');
     } catch (e: any) {
       toast({ variant: "destructive", title: "신청 실패", description: e.message });
     } finally {
@@ -172,15 +199,15 @@ export default function AppointmentsPage() {
                 <CalendarPlus className="h-5 w-5" /> 새 상담 신청
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-md")}>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[380px]" : "sm:max-w-md")}>
               <div className="bg-primary p-10 text-white relative">
                 <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
                 <DialogHeader>
-                  <DialogTitle className="text-3xl font-black tracking-tighter">상담 신청</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1">원하시는 상담 일시를 선택해 주세요.</DialogDescription>
+                  <DialogTitle className="text-3xl font-black tracking-tighter text-left">상담 신청</DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
                 </DialogHeader>
               </div>
-              <div className="p-8 space-y-6 bg-white">
+              <div className="p-8 space-y-6 bg-white max-h-[60vh] overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
@@ -191,13 +218,33 @@ export default function AppointmentsPage() {
                     <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
+                    <UserCheck className="h-3 w-3" /> 상담 희망 선생님
+                  </label>
+                  <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
+                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                      <SelectValue placeholder="선생님을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      {teachers?.map((t) => (
+                        <SelectItem key={t.id} value={t.id} className="font-bold py-2.5">
+                          {t.displayName} {t.role === 'centerAdmin' ? '(원장님)' : '(선생님)'}
+                        </SelectItem>
+                      ))}
+                      {!teachers?.length && <p className="p-4 text-center text-xs font-bold opacity-40">선생님 목록을 불러오는 중...</p>}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 요청 내용 (선택)</label>
                   <Textarea 
                     placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요." 
                     value={studentNote}
                     onChange={(e) => setStudentNote(e.target.value)}
-                    className="rounded-xl min-h-[120px] resize-none text-sm font-bold border-2"
+                    className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
                   />
                 </div>
               </div>
