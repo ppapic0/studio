@@ -1,4 +1,3 @@
-
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
@@ -120,6 +119,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const hasInitializedForm = useRef(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [aptDate, setAptDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [aptTime, setAptTime] = useState('14:00');
@@ -429,16 +433,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <Badge variant="outline" className="text-[10px] font-black">{activeAnalysis === 'monthly' ? '최근 30일' : '최근 7일'}</Badge>
                   </div>
                   <div className="h-[200px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activeAnalysis === 'monthly' ? stats.chartData : stats.weeklyChartData}>
-                        <defs><linearGradient id="dialogColor" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                        <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
-                        <YAxis hide />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#dialogColor)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                    {isMounted ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={activeAnalysis === 'monthly' ? stats.chartData : stats.weeklyChartData}>
+                          <defs><linearGradient id="dialogColor" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                          <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
+                          <YAxis hide />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#dialogColor)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="w-full h-full bg-muted/10 animate-pulse rounded-lg" />
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -524,16 +532,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardHeader>
             <CardContent className={cn(isMobile ? "p-4" : "p-8")}>
               <div className={cn("w-full", isMobile ? "h-[250px]" : "h-[350px]")}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs><linearGradient id="colorH" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
-                    <YAxis fontSize={10} fontWeight="900" axisLine={false} tickLine={false} unit="h" />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" strokeWidth={4} fillOpacity={1} fill="url(#colorH)" animationDuration={1500} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {isMounted ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs><linearGradient id="colorH" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
+                      <YAxis fontSize={10} fontWeight="900" axisLine={false} tickLine={false} unit="h" />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" strokeWidth={4} fillOpacity={1} fill="url(#colorH)" animationDuration={1500} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full bg-muted/10 animate-pulse rounded-lg" />
+                )}
               </div>
             </CardContent>
           </Card>

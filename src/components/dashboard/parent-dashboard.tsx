@@ -32,6 +32,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const [summary, setSummary] = useState<ParentSummaryOutput | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const studentId = activeMembership?.linkedStudentIds?.[0];
 
@@ -156,35 +161,39 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-           {isLoading ? <div className="flex h-[300px] w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin"/></div> :
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsBarChart data={chartData}>
-              <XAxis
-                dataKey="name"
-                stroke="hsl(var(--foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="hsl(var(--foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}%`}
-              />
-              <Tooltip
-                cursor={{ fill: 'hsl(var(--muted))' }}
-                contentStyle={{ 
-                  background: 'hsl(var(--background))',
-                  borderColor: 'hsl(var(--border))'
-                }}
-              />
-              <Bar dataKey="completion" name="완수율" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="attendance" name="출석률" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-            </RechartsBarChart>
-          </ResponsiveContainer>
-          }
+           <div className="h-[300px] w-full flex items-center justify-center">
+             {isLoading || !isMounted ? (
+               <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/>
+             ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={chartData}>
+                  <XAxis
+                    dataKey="name"
+                    stroke="hsl(var(--foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="hsl(var(--foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value}%`}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                    contentStyle={{ 
+                      background: 'hsl(var(--background))',
+                      borderColor: 'hsl(var(--border))'
+                    }}
+                  />
+                  <Bar dataKey="completion" name="완수율" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="attendance" name="출석률" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+             )}
+          </div>
         </CardContent>
       </Card>
     </div>

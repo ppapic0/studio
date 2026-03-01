@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -7,8 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { BarChart, Users, ClipboardCheck, TrendingUp, Armchair, AlertTriangle, CheckCircle, BarChart as RechartsBarChartIcon } from 'lucide-react';
-import { ResponsiveContainer, BarChart as RechartsBarChart, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { Users, ClipboardCheck, TrendingUp, Armchair, AlertTriangle, CheckCircle, BarChart as BarChartIcon } from 'lucide-react';
+import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 const monthlyStatsData = [
     { month: '1월', attendance: 92, completion: 85 },
@@ -20,6 +21,12 @@ const monthlyStatsData = [
 ];
 
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   if (!isActive) {
     return null;
   }
@@ -74,34 +81,40 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             <CardDescription>지난 6개월간의 주요 지표입니다.</CardDescription>
         </CardHeader>
         <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-                <RechartsBarChart data={monthlyStatsData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                 <XAxis
-                  dataKey="month"
-                  stroke="hsl(var(--foreground))"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="hsl(var(--foreground))"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted))' }}
-                  contentStyle={{ 
-                    background: 'hsl(var(--background))',
-                    borderColor: 'hsl(var(--border))'
-                  }}
-                />
-                <Bar dataKey="attendance" name="출석률" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="completion" name="완수율" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                </RechartsBarChart>
-            </ResponsiveContainer>
+            <div className="h-[350px] w-full">
+              {isMounted ? (
+                <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart data={monthlyStatsData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                     <XAxis
+                      dataKey="month"
+                      stroke="hsl(var(--foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'hsl(var(--muted))' }}
+                      contentStyle={{ 
+                        background: 'hsl(var(--background))',
+                        borderColor: 'hsl(var(--border))'
+                      }}
+                    />
+                    <Bar dataKey="attendance" name="출석률" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="completion" name="완수율" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                    </RechartsBarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full bg-muted/10 animate-pulse rounded-lg" />
+              )}
+            </div>
         </CardContent>
       </Card>
       <div className="grid gap-4 md:grid-cols-2">
