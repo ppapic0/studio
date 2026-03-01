@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -116,6 +115,18 @@ export default function AppointmentsPage() {
     setIsSubmitting(true);
     try {
       const scheduledAt = new Date(`${aptDate}T${aptTime}`);
+      
+      // 과거 시간 체크
+      if (scheduledAt < new Date()) {
+        toast({ 
+          variant: "destructive", 
+          title: "예약 불가", 
+          description: "현재 시간보다 이전으로는 신청할 수 없습니다." 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
         studentId: user.uid,
         studentName: user.displayName || '학생',

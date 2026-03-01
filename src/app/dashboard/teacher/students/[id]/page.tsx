@@ -96,7 +96,7 @@ function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMo
       <CardHeader className={cn("pb-1 flex flex-row items-center justify-between", isMobile ? "px-3 pt-3" : "px-6 pt-6")}>
         <CardTitle className={cn("font-black text-muted-foreground uppercase", isMobile ? "text-[8px]" : "text-[10px]")}>{title}</CardTitle>
         <div className={cn("rounded-lg bg-opacity-10", isMobile ? "p-1.5" : "p-2", colorClass.replace('text-', 'bg-'))}>
-          <Icon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", colorClass)} />
+          <Icon className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4", colorClass)} />
         </div>
       </CardHeader>
       <CardContent className={cn(isMobile ? "px-3 pb-3" : "px-6 pb-6")}>
@@ -258,6 +258,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         return;
       }
 
+      // 과거 시간 체크
+      if (scheduledDate < new Date()) {
+        toast({ 
+          variant: "destructive", 
+          title: "예약 불가", 
+          description: "과거 시간으로는 예약할 수 없습니다." 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       // 프로필이 아직 로딩 중일 수 있으므로 멤버십 정보에서 이름을 우선적으로 가져옵니다.
       const studentName = student?.name || studentMembership?.displayName || '학생';
 
@@ -326,7 +337,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           path: `${colRef.path}/{newId}`,
           operation: 'create',
           requestResourceData: data,
-        }));
+          // operation type is 'create' for addDoc
+        } as any));
       })
       .finally(() => {
         setIsSubmitting(false);
