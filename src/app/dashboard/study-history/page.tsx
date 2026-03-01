@@ -81,6 +81,74 @@ const SCHEDULE_TEMPLATES = [
   { title: '학원 시간', icon: Clock },
 ];
 
+function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
+  const found = scheduleItems.find((p: any) => p.title.startsWith(tpl.title));
+  const time24h = found ? found.title.split(': ')[1] : '';
+  
+  const from24h = (t: string) => {
+    if (!t || !t.includes(':')) return { time: '', period: '오전' as const };
+    let [h, m] = t.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return { time: '', period: '오전' as const };
+    const p = h >= 12 ? '오후' : '오전';
+    let h12 = h % 12 || 12;
+    return { time: `${h12.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`, period: p };
+  };
+
+  const initial = from24h(time24h);
+  const [localTime, setLocalTime] = useState(initial.time);
+  const [localPeriod, setLocalPeriod] = useState(initial.period);
+
+  useEffect(() => {
+    const remote = from24h(time24h);
+    setLocalTime(remote.time);
+    setLocalPeriod(remote.period);
+  }, [time24h]);
+
+  const handleBlur = () => {
+    if (localTime !== initial.time) {
+      onUpdate(tpl.title, localTime, localPeriod);
+    }
+  };
+
+  const handlePeriodChange = (newP: any) => {
+    setLocalPeriod(newP);
+    onUpdate(tpl.title, localTime, newP);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
+      <div className="flex items-center gap-3">
+        <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
+          <tpl.icon className="h-4 w-4 text-primary" />
+        </div>
+        <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
+        {isPast ? (
+          <span className="font-mono font-bold text-primary">{localTime ? `${localPeriod} ${localTime}` : '-'}</span>
+        ) : (
+          <div className="flex items-center gap-2">
+             <Select value={localPeriod} onValueChange={handlePeriodChange}>
+               <SelectTrigger className="w-[75px] h-9 text-xs border-none bg-transparent font-bold">
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="오전">오전</SelectItem>
+                 <SelectItem value="오후">오후</SelectItem>
+               </SelectContent>
+             </Select>
+             <Input 
+              placeholder="00:00"
+              className="w-16 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold"
+              value={localTime}
+              onChange={(e) => setLocalTime(e.target.value)}
+              onBlur={handleBlur}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function StudyHistoryPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -139,27 +207,6 @@ export default function StudyHistoryPage() {
     if (period === '오전' && hours === 12) hours = 0;
     
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-  };
-
-  const from24h = (time24h: string) => {
-    if (!time24h || !time24h.includes(':')) return { time: '', period: '오전' as const };
-    let [hours, mins] = time24h.split(':').map(Number);
-    if (isNaN(hours) || isNaN(mins)) return { time: '', period: '오전' as const };
-
-    const period = hours >= 12 ? '오후' : '오전';
-    let hours12 = hours % 12;
-    if (hours12 === 0) hours12 = 12;
-    
-    return { 
-      time: `${hours12.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`, 
-      period 
-    };
-  };
-
-  const formatDisplayTime = (timeStr: string) => {
-    if (!timeStr || !timeStr.includes(':')) return '-';
-    const { time, period } = from24h(timeStr);
-    return `${period} ${time}`;
   };
 
   const calendarData = useMemo(() => {
@@ -377,12 +424,6 @@ export default function StudyHistoryPage() {
     }
   };
 
-  const getScheduleParts = (title: string) => {
-    const found = scheduleItems.find(p => p.title.startsWith(title));
-    const time24h = found ? found.title.split(': ')[1] : '';
-    return from24h(time24h);
-  };
-
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
 
@@ -535,52 +576,23 @@ export default function StudyHistoryPage() {
             ) : (
               <Tabs defaultValue="schedule" className="w-full">
                 <TabsList className="grid w-full grid-cols-3 rounded-none bg-muted/50 p-0 h-12">
-                  <TabsTrigger value="schedule" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">시간표</TabsTrigger>
-                  <TabsTrigger value="study" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">자습 To-do</TabsTrigger>
-                  <TabsTrigger value="personal" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all">개인 일정</TabsTrigger>
+                  <TabsTrigger value="schedule" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all font-bold">시간표</TabsTrigger>
+                  <TabsTrigger value="study" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all font-bold">자습 To-do</TabsTrigger>
+                  <TabsTrigger value="personal" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all font-bold">개인 일정</TabsTrigger>
                 </TabsList>
 
                 <div className="p-6 space-y-6">
                   <TabsContent value="schedule" className="mt-0 space-y-4">
                     <div className="grid gap-4">
-                      {SCHEDULE_TEMPLATES.map((tpl) => {
-                        const { time, period } = getScheduleParts(tpl.title);
-                        if (!time && isActuallyPast) return null;
-                        return (
-                          <div key={tpl.title} className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
-                            <div className="items-center gap-3 flex">
-                              <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
-                                <tpl.icon className="h-4 w-4 text-primary" />
-                              </div>
-                              <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
-                              {isActuallyPast && time ? (
-                                <span className="font-mono font-bold text-primary">{formatDisplayTime(to24h(time, period))}</span>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <Select 
-                                    value={period} 
-                                    onValueChange={(val: any) => handleUpdateSchedule(tpl.title, time, val)}
-                                  >
-                                    <SelectTrigger className="w-[70px] h-9 text-xs border-none bg-transparent font-bold">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="오전">오전</SelectItem>
-                                      <SelectItem value="오후">오후</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <Input 
-                                    placeholder="00:00"
-                                    className="w-16 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold"
-                                    value={time}
-                                    onChange={(e) => handleUpdateSchedule(tpl.title, e.target.value, period)}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {SCHEDULE_TEMPLATES.map((tpl) => (
+                        <ScheduleItemRow 
+                          key={tpl.title}
+                          tpl={tpl}
+                          scheduleItems={scheduleItems}
+                          onUpdate={handleUpdateSchedule}
+                          isPast={isActuallyPast}
+                        />
+                      ))}
                       {isActuallyPast && scheduleItems.length === 0 && (
                         <p className="text-center text-sm text-muted-foreground py-4">기록된 시간표가 없습니다.</p>
                       )}
@@ -600,7 +612,8 @@ export default function StudyHistoryPage() {
                           <Label 
                             htmlFor={task.id}
                             className={cn(
-                              "flex-1 text-sm font-medium cursor-pointer transition-all",
+                              "flex-1 text-sm font-medium transition-all",
+                              !isActuallyPast && "cursor-pointer",
                               task.done && "line-through text-muted-foreground opacity-60"
                             )}
                           >
@@ -647,7 +660,8 @@ export default function StudyHistoryPage() {
                           <Label 
                             htmlFor={task.id}
                             className={cn(
-                              "flex-1 text-sm font-medium cursor-pointer",
+                              "flex-1 text-sm font-medium transition-all",
+                              !isActuallyPast && "cursor-pointer",
                               task.done && "line-through text-muted-foreground opacity-60"
                             )}
                           >
