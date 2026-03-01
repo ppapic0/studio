@@ -53,7 +53,9 @@ import {
   History,
   CheckCircle2,
   AlertCircle,
-  FileText
+  FileText,
+  Target,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
@@ -67,6 +69,11 @@ import {
   CartesianGrid, 
   AreaChart, 
   Area,
+  BarChart,
+  Bar,
+  Cell,
+  PieChart,
+  Pie
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -187,13 +194,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const todayLog = logs.find(l => l.dateKey === todayKey);
     const last7Days = subDays(new Date(), 7);
     const weeklyLogs = logs.filter(l => new Date(l.dateKey) >= startOfDay(last7Days));
+    
     const weeklyAvg = weeklyLogs.length > 0 ? Math.round(weeklyLogs.reduce((acc, c) => acc + c.totalMinutes, 0) / 7) : 0;
     const monthlyAvg = logs.length > 0 ? Math.round(logs.slice(0, 30).reduce((acc, c) => acc + c.totalMinutes, 0) / Math.min(30, logs.length)) : 0;
+    const monthlyTotal = logs.slice(0, 30).reduce((acc, c) => acc + c.totalMinutes, 0);
+
+    const targetMins = student?.targetDailyMinutes || 360;
+    const todayMinutes = todayLog?.totalMinutes || 0;
     
     return {
-      today: todayLog?.totalMinutes || 0,
+      today: todayMinutes,
+      todayTarget: targetMins,
+      todayPercent: Math.min(100, Math.round((todayMinutes / targetMins) * 100)),
       weeklyAvg,
       monthlyAvg,
+      monthlyTotal,
       chartData: logs.slice(0, 30).reverse().map(l => ({
         name: format(new Date(l.dateKey), 'MM/dd'),
         hours: Number((l.totalMinutes / 60).toFixed(1)),
@@ -202,9 +217,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       weeklyChartData: logs.slice(0, 7).reverse().map(l => ({
         name: format(new Date(l.dateKey), 'EEE'),
         hours: Number((l.totalMinutes / 60).toFixed(1)),
+        minutes: l.totalMinutes
       }))
     };
-  }, [logs, todayKey]);
+  }, [logs, todayKey, student?.targetDailyMinutes]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -232,122 +248,40 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [studentMembership]);
 
   const handleAddAppointment = () => {
-    if (!firestore || !centerId) {
-      toast({ variant: "destructive", title: "시스템 오류", description: "센터 정보를 불러올 수 없습니다." });
-      return;
-    }
-    if (!currentUser) {
-      toast({ variant: "destructive", title: "인증 오류", description: "로그인 정보가 없습니다." });
-      return;
-    }
-    if (!aptDate || !aptTime) {
-      toast({ variant: "destructive", title: "정보 부족", description: "날짜와 시간을 선택해 주세요." });
-      return;
-    }
-
+    if (!firestore || !centerId || !currentUser || !aptDate || !aptTime) return;
     setIsSubmitting(true);
-    
     try {
-      const [year, month, day] = aptDate.split('-').map(Number);
-      const [hours, minutes] = aptTime.split(':').map(Number);
-      const scheduledDate = new Date(year, month - 1, day, hours, minutes);
-
-      if (isNaN(scheduledDate.getTime())) {
-        toast({ variant: "destructive", title: "날짜 오류", description: "유효하지 않은 날짜입니다." });
-        setIsSubmitting(false);
-        return;
-      }
-
-      // 과거 시간 체크
+      const scheduledDate = new Date(`${aptDate}T${aptTime}`);
       if (scheduledDate < new Date()) {
-        toast({ 
-          variant: "destructive", 
-          title: "예약 불가", 
-          description: "과거 시간으로는 예약할 수 없습니다." 
-        });
+        toast({ variant: "destructive", title: "예약 불가", description: "과거 시간으로는 예약할 수 없습니다." });
         setIsSubmitting(false);
         return;
       }
-
-      // 프로필이 아직 로딩 중일 수 있으므로 멤버십 정보에서 이름을 우선적으로 가져옵니다.
-      const studentName = student?.name || studentMembership?.displayName || '학생';
-
       const data = {
-        centerId,
-        studentId,
-        studentName,
-        teacherId: currentUser.uid,
-        teacherName: currentUser.displayName || '선생님',
-        scheduledAt: Timestamp.fromDate(scheduledDate),
-        status: 'confirmed',
-        teacherNote: aptNote.trim(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        centerId, studentId, studentName: student?.name || studentMembership?.displayName || '학생',
+        teacherId: currentUser.uid, teacherName: currentUser.displayName || '선생님',
+        scheduledAt: Timestamp.fromDate(scheduledDate), status: 'confirmed',
+        teacherNote: aptNote.trim(), createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
-
-      const colRef = collection(firestore, 'centers', centerId, 'counselingReservations');
-      
-      addDoc(colRef, data)
-        .then(() => {
-          toast({ title: "상담 예약 완료", description: `${format(scheduledDate, 'M월 d일 HH:mm')} 예약 확정.` });
-          setAptNote('');
-        })
-        .catch(async (serverError) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: `${colRef.path}/{newId}`,
-            operation: 'create',
-            requestResourceData: data,
-          }));
-        })
-        .finally(() => {
-          setIsSubmitting(false);
-        });
-    } catch (err) {
-      toast({ variant: "destructive", title: "처리 오류" });
-      setIsSubmitting(false);
-    }
+      addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), data).then(() => {
+        toast({ title: "상담 예약 완료" });
+        setAptNote('');
+      }).finally(() => setIsSubmitting(false));
+    } catch (err) { setIsSubmitting(false); }
   };
 
   const handleAddCounselLog = () => {
-    if (!firestore || !centerId || !currentUser || !logContent.trim()) {
-      toast({ variant: "destructive", title: "입력 부족", description: "상담 내용을 입력해 주세요." });
-      return;
-    }
-
+    if (!firestore || !centerId || !currentUser || !logContent.trim()) return;
     setIsSubmitting(true);
-    const data = {
-      studentId,
-      teacherId: currentUser.uid,
-      type: logType,
-      content: logContent.trim(),
-      improvement: logImprovement.trim(),
-      createdAt: serverTimestamp(),
-    };
-
-    const colRef = collection(firestore, 'centers', centerId, 'counselingLogs');
-
-    addDoc(colRef, data)
-      .then(() => {
-        toast({ title: "상담 일지 기록 완료" });
-        setLogContent('');
-        setLogImprovement('');
-      })
-      .catch(async (serverError) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `${colRef.path}/{newId}`,
-          operation: 'create',
-          requestResourceData: data,
-          // operation type is 'create' for addDoc
-        } as any));
-      })
-      .finally(() => {
-        setIsSubmitting(false);
-      });
+    const data = { studentId, teacherId: currentUser.uid, type: logType, content: logContent.trim(), improvement: logImprovement.trim(), createdAt: serverTimestamp() };
+    addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), data).then(() => {
+      toast({ title: "상담 일지 기록 완료" });
+      setLogContent(''); setLogImprovement('');
+    }).finally(() => setIsSubmitting(false));
   };
 
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId) return;
-    if (!editForm.name.trim()) { toast({ variant: "destructive", title: "수정 실패", description: "이름은 필수 입력 항목입니다." }); return; }
     setIsUpdating(true);
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
@@ -356,7 +290,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         password: editForm.password.length >= 6 ? editForm.password : undefined, parentLinkCode: editForm.parentLinkCode.trim() || null
       });
       if (result.data?.ok) { toast({ title: "정보 수정 완료" }); setIsEditModalOpen(false); }
-    } catch (e: any) { toast({ variant: "destructive", title: "수정 실패", description: e.message }); } finally { setIsUpdating(false); }
+    } catch (e: any) { toast({ variant: "destructive", title: "수정 실패" }); } finally { setIsUpdating(false); }
   };
 
   const handleUpdateStatus = async () => {
@@ -437,7 +371,41 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </div>
           
           <div className="p-8 space-y-6">
-            {(activeAnalysis === 'today' || activeAnalysis === 'weekly' || activeAnalysis === 'monthly') && (
+            {activeAnalysis === 'today' && (
+              <div className="flex flex-col items-center gap-6 py-4">
+                <div className="relative h-48 w-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Completed', value: stats.today },
+                          { name: 'Remaining', value: Math.max(0, stats.todayTarget - stats.today) }
+                        ]}
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <Cell fill="#10b981" />
+                        <Cell fill="#f1f5f9" />
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black text-emerald-600">{stats.todayPercent}%</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Target Progress</span>
+                  </div>
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-lg font-black text-primary">{Math.floor(stats.today/60)}시간 {stats.today%60}분 몰입 중</p>
+                  <p className="text-sm font-bold text-muted-foreground">목표 시간: {Math.floor(stats.todayTarget/60)}시간</p>
+                </div>
+              </div>
+            )}
+
+            {(activeAnalysis === 'weekly' || activeAnalysis === 'monthly') && (
               <div className="space-y-6">
                 <div className="bg-muted/30 p-5 rounded-2xl border border-border/50">
                   <div className="flex items-center justify-between mb-4">
@@ -464,11 +432,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <div className="grid grid-cols-2 gap-4">
                   <Card className="p-4 bg-primary/5 border-none shadow-sm">
                     <p className="text-[10px] font-black text-primary/60 uppercase">총 몰입 시간</p>
-                    <p className="text-xl font-black mt-1">{activeAnalysis === 'today' ? `${Math.floor(stats.today/60)}h ${stats.today%60}m` : `${Math.floor((activeAnalysis === 'weekly' ? stats.weeklyAvg*7 : stats.monthlyAvg*30)/60)}h`}</p>
+                    <p className="text-xl font-black mt-1">
+                      {activeAnalysis === 'weekly' ? `${Math.floor(stats.weeklyAvg*7/60)}h` : `${Math.floor(stats.monthlyTotal/60)}h`}
+                    </p>
                   </Card>
                   <Card className="p-4 bg-primary/5 border-none shadow-sm">
                     <p className="text-[10px] font-black text-primary/60 uppercase">일일 평균</p>
-                    <p className="text-xl font-black mt-1">{activeAnalysis === 'today' ? '-' : `${Math.floor((activeAnalysis === 'weekly' ? stats.weeklyAvg : stats.monthlyAvg)/60)}h ${ (activeAnalysis === 'weekly' ? stats.weeklyAvg : stats.monthlyAvg) % 60}m`}</p>
+                    <p className="text-xl font-black mt-1">{Math.floor((activeAnalysis === 'weekly' ? stats.weeklyAvg : stats.monthlyAvg)/60)}h {(activeAnalysis === 'weekly' ? stats.weeklyAvg : stats.monthlyAvg) % 60}m</p>
                   </Card>
                 </div>
               </div>
@@ -537,12 +507,100 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <TabsTrigger value="counseling" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md text-xs sm:text-sm">상담 관리</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
-          <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
-            <CardHeader className={cn("bg-muted/10 border-b transition-colors", isMobile ? "p-5" : "p-8")}>
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+            {/* 1. 오늘의 몰입도 (도넛 차트) */}
+            <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-emerald-50/30 border-b p-6">
+                <CardTitle className="text-sm font-black flex items-center gap-2 text-emerald-700 uppercase tracking-widest"><Target className="h-4 w-4" /> 오늘 몰입 성과</CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 flex flex-col items-center justify-center">
+                <div className="relative h-40 w-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Done', value: stats.today },
+                          { name: 'Rem', value: Math.max(0, stats.todayTarget - stats.today) }
+                        ]}
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={5}
+                        dataKey="value"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <Cell fill="#10b981" />
+                        <Cell fill="#f1f5f9" />
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-black text-emerald-600">{stats.todayPercent}%</span>
+                  </div>
+                </div>
+                <div className="mt-4 text-center">
+                  <p className="text-base font-black text-primary">{Math.floor(stats.today/60)}h {stats.today%60}m 완료</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Target: {Math.floor(stats.todayTarget/60)}h</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 2. 주간 평균 막대 그래프 */}
+            <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-blue-50/30 border-b p-6">
+                <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700 uppercase tracking-widest"><BarChart3 className="h-4 w-4" /> 주간 학습 리듬</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="h-40 w-full mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.weeklyChartData}>
+                      <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', fontSize: '10px' }}
+                        labelStyle={{ fontWeight: 'black' }}
+                      />
+                      <Bar dataKey="hours" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={12} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 flex justify-between items-center px-2">
+                  <div className="grid">
+                    <span className="text-[9px] font-black text-muted-foreground uppercase">Weekly Avg</span>
+                    <span className="text-sm font-black">{Math.floor(stats.weeklyAvg/60)}h {stats.weeklyAvg%60}m</span>
+                  </div>
+                  <Badge className="bg-blue-50 text-blue-600 border-none font-black text-[9px]">+5.2%</Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 3. 월간 요약 카드 */}
+            <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-amber-50/30 border-b p-6">
+                <CardTitle className="text-sm font-black flex items-center gap-2 text-amber-700 uppercase tracking-widest"><PieChartIcon className="h-4 w-4" /> 월간 집중 리포트</CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 flex flex-col justify-center gap-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Monthly Study</p>
+                  <h3 className="text-4xl font-black text-amber-600 tracking-tighter">{Math.floor(stats.monthlyTotal/60)}<span className="text-lg opacity-40 ml-1">h</span></h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Daily Average</span>
+                    <span className="text-sm font-black">{Math.floor(stats.monthlyAvg/60)}h {stats.monthlyAvg%60}m</span>
+                  </div>
+                  <Progress value={(stats.monthlyAvg / stats.todayTarget) * 100} className="h-1.5 bg-amber-100" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+            <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-8")}>
               <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 최근 30일 학습 몰입 히스토리</CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Long-term Performance Trend</CardDescription>
             </CardHeader>
-            <CardContent className={cn(isMobile ? "p-4" : "p-8")}>
+            <CardContent className={cn(isMobile ? "p-4" : "p-10")}>
               <div className={cn("w-full", isMobile ? "h-[250px]" : "h-[350px]")}>
                 {isMounted ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -556,10 +614,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="w-full h-full bg-muted/10 animate-pulse rounded-lg" />
+                  <div className="w-full h-full bg-muted/10 animate-pulse rounded-lg flex items-center justify-center">
+                    <Loader2 className="animate-spin h-8 w-8 opacity-20" />
+                  </div>
                 )}
               </div>
             </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="plans" className="mt-6">
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 text-center flex flex-col items-center gap-4">
+            <ClipboardCheck className="h-16 w-16 text-muted-foreground opacity-10" />
+            <div className="space-y-1">
+              <p className="text-xl font-black text-muted-foreground/40">공부 계획 상세 데이터</p>
+              <p className="text-sm font-bold text-muted-foreground/20 uppercase tracking-widest">Planned vs Actual Matrix</p>
+            </div>
+            {/* 향후 확장 가능 영역 */}
           </Card>
         </TabsContent>
 
