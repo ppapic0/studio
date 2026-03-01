@@ -26,6 +26,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { 
   Loader2, 
   Plus, 
   Trash2, 
@@ -39,7 +47,8 @@ import {
   Sparkles,
   ChevronRight,
   ListTodo,
-  Activity
+  Activity,
+  PlusCircle
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -75,23 +84,11 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
-const SCHEDULE_TEMPLATES = [
-  { title: '등원 시간', icon: MapPin },
-  { title: '하원 시간', icon: School },
-  { title: '점심 시간', icon: Coffee },
-  { title: '저녁 시간', icon: Coffee },
-  { title: '학원 시간', icon: Clock },
-];
-
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
-/**
- * 시간표 항목의 로컬 상태를 관리하는 컴포넌트 (선택형 UI)
- */
-function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast, isMobile }: any) {
-  const found = scheduleItems.find((p: any) => p.title.startsWith(tpl.title));
-  const time24h = found ? found.title.split(': ')[1] : '';
+function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any) {
+  const [titlePart, timePart] = item.title.split(': ');
   
   const from24h = (t: string) => {
     if (!t || !t.includes(':')) return { hour: '09', minute: '00', period: '오전' as const };
@@ -106,17 +103,17 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast, isMobile }: any
     };
   };
 
-  const initial = from24h(time24h);
+  const initial = from24h(timePart);
   const [localHour, setLocalHour] = useState(initial.hour);
   const [localMinute, setLocalMinute] = useState(initial.minute);
   const [localPeriod, setLocalPeriod] = useState(initial.period);
 
   useEffect(() => {
-    const remote = from24h(time24h);
+    const remote = from24h(timePart);
     setLocalHour(remote.hour);
     setLocalMinute(remote.minute);
     setLocalPeriod(remote.period);
-  }, [time24h]);
+  }, [timePart]);
 
   const handleValueChange = (type: 'hour' | 'minute' | 'period', value: string) => {
     let h = localHour;
@@ -127,8 +124,17 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast, isMobile }: any
     if (type === 'minute') { m = value; setLocalMinute(value); }
     if (type === 'period') { p = value as any; setLocalPeriod(p); }
 
-    onUpdate(tpl.title, `${h}:${m}`, p);
+    onUpdateTime(item.id, titlePart, `${h}:${m}`, p);
   };
+
+  const getIcon = (title: string) => {
+    if (title.includes('등원')) return MapPin;
+    if (title.includes('하원')) return School;
+    if (title.includes('점심') || title.includes('저녁') || title.includes('식사')) return Coffee;
+    return Clock;
+  };
+
+  const Icon = getIcon(titlePart);
 
   return (
     <div className={cn(
@@ -140,13 +146,13 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast, isMobile }: any
           "rounded-xl transition-all duration-500",
           isMobile ? "bg-primary/5 p-2" : "bg-primary/10 p-2.5 group-hover:bg-primary group-hover:text-white"
         )}>
-          <tpl.icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+          <Icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </div>
-        <Label className={cn("flex-1 font-black tracking-tight", isMobile ? "text-xs" : "text-sm")}>{tpl.title}</Label>
+        <Label className={cn("flex-1 font-black tracking-tight truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         
         {isPast ? (
           <Badge variant="outline" className="font-mono font-black text-primary border-primary/20">
-            {time24h ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
+            {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
           <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-xl border border-border/50">
@@ -183,6 +189,12 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast, isMobile }: any
              </Select>
           </div>
         )}
+        
+        {!isPast && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDelete(item)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -198,7 +210,9 @@ export default function StudyPlanPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newPersonalTask, setNewPersonalTask] = useState('');
+  const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
   useEffect(() => {
     setSelectedDate(new Date());
@@ -235,14 +249,14 @@ export default function StudyPlanPage() {
 
   const { data: dailyPlans, isLoading } = useCollection<StudyPlanItem>(planItemsQuery, { enabled: isStudent });
 
-  const scheduleItems = dailyPlans?.filter(p => p.category === 'schedule') || [];
-  const personalTasks = dailyPlans?.filter(p => p.category === 'personal') || [];
-  const studyTasks = dailyPlans?.filter(p => p.category === 'study' || !p.category) || [];
+  const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
+  const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
+  const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
 
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
-    if (isNaN(hours) || iisNaN(mins)) return time12h;
+    if (isNaN(hours) || isNaN(mins)) return time12h;
     
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
@@ -250,7 +264,7 @@ export default function StudyPlanPage() {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  const handleAddTask = async (title: string, category: 'study' | 'personal') => {
+  const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule', defaultTime?: string) => {
     if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) return;
     
     setIsSubmitting(true);
@@ -266,10 +280,11 @@ export default function StudyPlanPage() {
     );
     
     try {
+      const finalTitle = category === 'schedule' ? `${title.trim()}: ${defaultTime || '09:00'}` : title.trim();
       await addDoc(itemsCollectionRef, {
-        title: title.trim(),
+        title: finalTitle,
         done: false,
-        weight: 1,
+        weight: category === 'schedule' ? 0 : 1,
         dateKey: selectedDateKey,
         category,
         studyPlanWeekId: weekKey,
@@ -279,7 +294,11 @@ export default function StudyPlanPage() {
         updatedAt: serverTimestamp(),
       });
       if (category === 'study') setNewStudyTask('');
-      else setNewPersonalTask('');
+      else if (category === 'personal') setNewPersonalTask('');
+      else {
+        setNewRoutineTitle('');
+        setIsRoutineModalOpen(false);
+      }
     } catch (error) {
       console.error("Error adding task:", error);
     } finally {
@@ -287,12 +306,11 @@ export default function StudyPlanPage() {
     }
   };
 
-  const handleUpdateSchedule = async (title: string, timeValue: string, periodValue: '오전' | '오후') => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
+  const handleUpdateScheduleTime = async (itemId: string, baseTitle: string, timeValue: string, periodValue: '오전' | '오후') => {
+    if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
     
     const formattedTime = to24h(timeValue, periodValue);
-    const existing = scheduleItems.find(p => p.title.startsWith(title));
-    const itemsCollectionRef = collection(
+    const docRef = doc(
       firestore,
       'centers',
       activeMembership.id,
@@ -300,29 +318,14 @@ export default function StudyPlanPage() {
       user.uid,
       'weeks',
       weekKey,
-      'items'
+      'items',
+      itemId
     );
 
-    if (existing) {
-      const docRef = doc(itemsCollectionRef, existing.id);
-      await updateDoc(docRef, {
-        title: `${title}: ${formattedTime}`,
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await addDoc(itemsCollectionRef, {
-        title: `${title}: ${formattedTime}`,
-        done: false,
-        weight: 0,
-        dateKey: selectedDateKey,
-        category: 'schedule',
-        studyPlanWeekId: weekKey,
-        centerId: activeMembership.id,
-        studentId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
+    await updateDoc(docRef, {
+      title: `${baseTitle}: ${formattedTime}`,
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
@@ -462,7 +465,6 @@ export default function StudyPlanPage() {
         </div>
       </header>
 
-      {/* 주간 날짜 선택 스트립 */}
       <div className={cn("grid grid-cols-7 gap-2", isMobile ? "px-1" : "gap-4")}>
         {weekDays.map((day) => {
           const isSelected = isSameDay(day, selectedDate);
@@ -505,30 +507,92 @@ export default function StudyPlanPage() {
       </div>
 
       <div className={cn("grid gap-8", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
-        {/* 일일 시간표 카드 */}
         <Card className={cn("border-none shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile ? "md:col-span-12" : "md:col-span-5")}>
           <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-10")}>
-            <CardTitle className={cn("flex items-center gap-3 font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-2xl")}>
-              <div className="bg-primary/5 p-2 rounded-xl"><Clock className="h-5 w-5 text-primary" /></div>
-              생활 루틴
-            </CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Daily Routine Management</CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className={cn("flex items-center gap-3 font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-2xl")}>
+                  <div className="bg-primary/5 p-2 rounded-xl"><Clock className="h-5 w-5 text-primary" /></div>
+                  생활 루틴
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Daily Routine Management</CardDescription>
+              </div>
+              {!isPast && (
+                <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 hover:text-primary transition-all">
+                      <PlusCircle className="h-6 w-6" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-[2rem] border-none shadow-2xl p-8">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-black tracking-tighter">새 루틴 추가</DialogTitle>
+                      <CardDescription className="font-bold pt-1">학원 시간이나 고정 일정을 추가해 보세요.</CardDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 pt-4">
+                      <div className="grid gap-2">
+                        <Label className="text-[10px] font-black uppercase text-primary/70 ml-1">루틴 이름</Label>
+                        <Input 
+                          placeholder="예: 영어 학원, 점심 시간" 
+                          value={newRoutineTitle} 
+                          onChange={(e) => setNewRoutineTitle(e.target.value)}
+                          className="h-14 rounded-xl border-2 font-bold"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {['점심', '저녁', '학원', '독서실'].map(tag => (
+                          <Badge 
+                            key={tag} 
+                            variant="secondary" 
+                            className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1.5 px-3 rounded-lg font-black"
+                            onClick={() => setNewRoutineTitle(tag)}
+                          >
+                            +{tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <DialogFooter className="pt-6">
+                      <Button 
+                        onClick={() => handleAddTask(newRoutineTitle, 'schedule')} 
+                        disabled={!newRoutineTitle.trim() || isSubmitting}
+                        className="w-full h-14 rounded-2xl font-black text-lg shadow-xl"
+                      >
+                        {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '루틴 생성하기'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </CardHeader>
           <CardContent className={cn("bg-[#fafafa] flex flex-col gap-3", isMobile ? "p-5" : "p-8")}>
-            {SCHEDULE_TEMPLATES.map((tpl) => (
-              <ScheduleItemRow 
-                key={tpl.title}
-                tpl={tpl}
-                scheduleItems={scheduleItems}
-                onUpdate={handleUpdateSchedule}
-                isPast={isPast}
-                isMobile={isMobile}
-              />
-            ))}
+            {isLoading ? (
+              <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
+            ) : scheduleItems.length === 0 ? (
+              <div className="py-10 text-center flex flex-col items-center gap-3 opacity-30 italic font-bold">
+                <Clock className="h-10 w-10" />
+                <p className="text-sm">설정된 루틴이 없습니다.</p>
+              </div>
+            ) : (
+              scheduleItems.sort((a,b) => {
+                const timeA = a.title.split(': ')[1] || '00:00';
+                const timeB = b.title.split(': ')[1] || '00:00';
+                return timeA.localeCompare(timeB);
+              }).map((item) => (
+                <ScheduleItemRow 
+                  key={item.id}
+                  item={item}
+                  onUpdateTime={handleUpdateScheduleTime}
+                  onDelete={handleDeleteTask}
+                  isPast={isPast}
+                  isMobile={isMobile}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
 
-        {/* 투두 리스트 영역 */}
         <div className={cn(isMobile ? "md:col-span-12" : "md:col-span-7")}>
           <Tabs defaultValue="study" className="w-full">
             <Card className="border-none shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">

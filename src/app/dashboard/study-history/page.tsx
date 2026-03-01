@@ -52,7 +52,8 @@ import {
   CalendarX,
   CalendarDays,
   Sparkles,
-  Activity
+  Activity,
+  PlusCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,7 +65,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/dialog";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -79,20 +80,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
-const SCHEDULE_TEMPLATES = [
-  { title: '등원 시간', icon: MapPin },
-  { title: '하원 시간', icon: School },
-  { title: '점심 시간', icon: Coffee },
-  { title: '저녁 시간', icon: Coffee },
-  { title: '학원 시간', icon: Clock },
-];
-
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
-function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
-  const found = scheduleItems.find((p: any) => p.title.startsWith(tpl.title));
-  const time24h = found ? found.title.split(': ')[1] : '';
+function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast }: any) {
+  const [titlePart, timePart] = item.title.split(': ');
   
   const from24h = (t: string) => {
     if (!t || !t.includes(':')) return { hour: '09', minute: '00', period: '오전' as const };
@@ -103,17 +95,17 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
     return { hour: h12.toString().padStart(2, '0'), minute: m.toString().padStart(2, '0'), period: p };
   };
 
-  const initial = from24h(time24h);
+  const initial = from24h(timePart);
   const [localHour, setLocalHour] = useState(initial.hour);
   const [localMinute, setLocalMinute] = useState(initial.minute);
   const [localPeriod, setLocalPeriod] = useState(initial.period);
 
   useEffect(() => {
-    const remote = from24h(time24h);
+    const remote = from24h(timePart);
     setLocalHour(remote.hour);
     setLocalMinute(remote.minute);
     setLocalPeriod(remote.period);
-  }, [time24h]);
+  }, [timePart]);
 
   const handleValueChange = (type: 'hour' | 'minute' | 'period', value: string) => {
     let h = localHour;
@@ -124,19 +116,28 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
     if (type === 'minute') { m = value; setLocalMinute(value); }
     if (type === 'period') { p = value as any; setLocalPeriod(p); }
 
-    onUpdate(tpl.title, `${h}:${m}`, p);
+    onUpdateTime(item.id, titlePart, `${h}:${m}`, p);
   };
+
+  const getIcon = (title: string) => {
+    if (title.includes('등원')) return MapPin;
+    if (title.includes('하원')) return School;
+    if (title.includes('점심') || title.includes('저녁') || title.includes('식사')) return Coffee;
+    return Clock;
+  };
+
+  const Icon = getIcon(titlePart);
 
   return (
     <div className="flex flex-col gap-2 bg-white p-3 rounded-2xl border shadow-sm group hover:border-primary/30 transition-all">
       <div className="flex items-center gap-3">
         <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-all">
-          <tpl.icon className="h-4 w-4" />
+          <Icon className="h-4 w-4" />
         </div>
-        <Label className="flex-1 font-black text-xs">{tpl.title}</Label>
+        <Label className="flex-1 font-black text-xs truncate">{titlePart}</Label>
         {isPast ? (
           <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 text-[10px]">
-            {localHour ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
+            {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
           <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-xl border">
@@ -169,6 +170,11 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
              </Select>
           </div>
         )}
+        {!isPast && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDelete(item)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -186,7 +192,9 @@ export default function StudyHistoryPage() {
   
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newPersonalTask, setNewPersonalTask] = useState('');
+  const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
   useEffect(() => {
     setCurrentDate(new Date());
@@ -220,9 +228,9 @@ export default function StudyHistoryPage() {
     return allPlans.filter(p => p.dateKey === selectedDateKey);
   }, [allPlans, selectedDateKey]);
 
-  const scheduleItems = dailyPlans.filter(p => p.category === 'schedule');
-  const personalTasks = dailyPlans.filter(p => p.category === 'personal');
-  const studyTasks = dailyPlans.filter(p => p.category === 'study' || !p.category);
+  const scheduleItems = useMemo(() => dailyPlans.filter(p => p.category === 'schedule'), [dailyPlans]);
+  const personalTasks = useMemo(() => dailyPlans.filter(p => p.category === 'personal'), [dailyPlans]);
+  const studyTasks = useMemo(() => dailyPlans.filter(p => p.category === 'study' || !p.category), [dailyPlans]);
 
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
@@ -271,36 +279,35 @@ export default function StudyHistoryPage() {
       .reduce((acc, log) => acc + log.totalMinutes, 0);
   }, [logs, currentDate]);
 
-  const handleAddTask = async (title: string, category: 'study' | 'personal') => {
+  const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule', defaultTime?: string) => {
     if (!firestore || !user || !activeMembership || !selectedDateForPlan || !title.trim()) return;
     setIsSubmitting(true);
     const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
     try {
+      const finalTitle = category === 'schedule' ? `${title.trim()}: ${defaultTime || '09:00'}` : title.trim();
       await addDoc(itemsCollectionRef, {
-        title: title.trim(), done: false, weight: 1, dateKey, category, studyPlanWeekId: weekKey,
+        title: finalTitle, done: false, weight: category === 'schedule' ? 0 : 1, dateKey, category, studyPlanWeekId: weekKey,
         centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
-      if (category === 'study') setNewStudyTask(''); else setNewPersonalTask('');
+      if (category === 'study') setNewStudyTask(''); 
+      else if (category === 'personal') setNewPersonalTask('');
+      else {
+        setNewRoutineTitle('');
+        setIsRoutineModalOpen(false);
+      }
     } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
   };
 
-  const handleUpdateSchedule = async (title: string, timeValue: string, periodValue: '오전' | '오후') => {
-    if (!firestore || !user || !activeMembership || !selectedDateForPlan) return;
-    const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
+  const handleUpdateScheduleTime = async (itemId: string, baseTitle: string, timeValue: string, periodValue: '오전' | '오후') => {
+    if (!selectedDateForPlan || !firestore || !user || !activeMembership) return;
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const formattedTime = to24h(timeValue, periodValue);
-    const existing = scheduleItems.find(p => p.title.startsWith(title));
-    const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
-    if (existing) {
-      await updateDoc(doc(itemsCollectionRef, existing.id), { title: `${title}: ${formattedTime}`, updatedAt: serverTimestamp() });
-    } else {
-      await addDoc(itemsCollectionRef, {
-        title: `${title}: ${formattedTime}`, done: false, weight: 0, dateKey, category: 'schedule', studyPlanWeekId: weekKey,
-        centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      });
-    }
+    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', itemId), { 
+      title: `${baseTitle}: ${formattedTime}`, 
+      updatedAt: serverTimestamp() 
+    });
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
@@ -486,9 +493,51 @@ export default function StudyHistoryPage() {
 
                 <div className="p-8 space-y-8">
                   <TabsContent value="schedule" className="mt-0 space-y-4">
-                    {SCHEDULE_TEMPLATES.map((tpl) => (
-                      <ScheduleItemRow key={tpl.title} tpl={tpl} scheduleItems={scheduleItems} onUpdate={handleUpdateSchedule} isPast={isActuallyPast} />
-                    ))}
+                    <div className="flex justify-between items-center px-1 mb-2">
+                      <h4 className="text-[10px] font-black uppercase text-primary/40 tracking-widest">Today's Routine</h4>
+                      {!isActuallyPast && (
+                        <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 rounded-lg font-black text-[10px] gap-1 hover:bg-primary/5">
+                              <Plus className="h-3 w-3" /> 추가
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="rounded-[2rem] border-none shadow-2xl p-8">
+                            <DialogHeader>
+                              <DialogTitle className="text-2xl font-black tracking-tighter">새 루틴 추가</DialogTitle>
+                              <DialogDescription className="font-bold pt-1">고정 일정을 추가하세요.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-6 pt-4">
+                              <div className="grid gap-2">
+                                <Label className="text-[10px] font-black uppercase text-primary/70 ml-1">루틴 이름</Label>
+                                <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-xl border-2 font-bold" />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {['점심', '저녁', '학원', '독서실'].map(tag => (
+                                  <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1.5 px-3 rounded-lg font-black" onClick={() => setNewRoutineTitle(tag)}>+{tag}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            <DialogFooter className="pt-6">
+                              <Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
+                                {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '루틴 생성하기'}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
+                    {scheduleItems.length === 0 ? (
+                      <p className="text-center py-6 text-xs font-bold text-muted-foreground/40 italic">등록된 루틴이 없습니다.</p>
+                    ) : (
+                      scheduleItems.sort((a,b) => {
+                        const timeA = a.title.split(': ')[1] || '00:00';
+                        const timeB = b.title.split(': ')[1] || '00:00';
+                        return timeA.localeCompare(timeB);
+                      }).map((item) => (
+                        <ScheduleItemRow key={item.id} item={item} onUpdateTime={handleUpdateScheduleTime} onDelete={handleDeleteTask} isPast={isActuallyPast} />
+                      ))
+                    )}
                   </TabsContent>
 
                   <TabsContent value="study" className="mt-0 space-y-4">
