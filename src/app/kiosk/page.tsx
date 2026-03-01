@@ -163,7 +163,7 @@ export default function KioskPage() {
         <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.4em] opacity-40">Analytical Track Engine Kiosk</p>
       </header>
 
-      <div className="w-full max-w-lg relative z-10">
+      <div className="w-full max-w-2xl relative z-10">
         {!showResults ? (
           <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
             <CardHeader className="bg-muted/5 border-b p-12 text-center">
@@ -221,69 +221,73 @@ export default function KioskPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in zoom-in-95 duration-500 max-w-3xl mx-auto">
-            <div className="bg-primary p-10 text-white relative">
-              <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-widest uppercase mb-2">Student Match</Badge>
-                  <CardTitle className="text-4xl font-black tracking-tighter">학생 확인</CardTitle>
-                </div>
-                <Button variant="ghost" onClick={resetKiosk} className="text-white hover:bg-white/10 rounded-full h-12 w-12 p-0">
-                  <X className="h-8 w-8" />
-                </Button>
-              </div>
-            </div>
-            <CardContent className="p-10 space-y-6">
-              {matchedStudents.map(student => {
-                const seat = attendanceList?.find(a => a.studentId === student.id);
-                const isStudying = seat?.status === 'studying';
+          <div className="grid gap-6 w-full animate-in zoom-in-95 duration-500">
+            {matchedStudents.map(student => {
+              const seat = attendanceList?.find(a => a.studentId === student.id);
+              const isStudying = seat?.status === 'studying';
 
-                return (
-                  <div key={student.id} className="p-8 rounded-[2.5rem] border-2 border-primary/10 bg-muted/5 flex flex-row items-center justify-between gap-8 group hover:bg-white hover:border-primary/30 hover:shadow-2xl transition-all duration-500">
-                    <div className="flex items-center gap-6 min-w-0">
-                      <div className={cn(
-                        "h-20 w-20 rounded-[2rem] flex items-center justify-center border-4 shadow-inner shrink-0 transition-all duration-700",
-                        isStudying ? "bg-emerald-500 border-emerald-100 text-white scale-105 shadow-emerald-200" : "bg-white border-muted text-primary/20"
-                      )}>
-                        {isStudying ? <Zap className="h-10 w-10 fill-current animate-pulse" /> : <Clock className="h-10 w-10" />}
-                      </div>
-                      <div className="text-left min-w-0">
-                        <h3 className="text-3xl font-black tracking-tighter truncate">{student.name}</h3>
-                        <p className="font-bold text-base text-muted-foreground mt-0.5 truncate">{student.schoolName} · {student.grade}</p>
-                        <div className="flex items-center gap-2 mt-3">
-                          <Badge variant="outline" className="rounded-xl font-black text-[10px] px-3 py-0.5 border-primary/20 text-primary bg-white shadow-sm">
-                            {seat ? `${seat.seatNo}번 좌석` : '좌석 미지정'}
-                          </Badge>
-                          {isStudying && <Badge className="bg-emerald-500 font-black text-[10px] px-3 py-0.5 border-none shadow-lg shadow-emerald-100">현재 학습 중</Badge>}
-                        </div>
-                      </div>
+              return (
+                <Card key={student.id} className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 relative group transition-all duration-500 hover:shadow-2xl">
+                  <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                    <Sparkles className="h-64 w-64 rotate-12" />
+                  </div>
+                  
+                  <CardContent className="p-12 sm:p-16 flex flex-col items-center text-center gap-10">
+                    {/* 상단 아이콘 */}
+                    <div className={cn(
+                      "h-32 w-32 rounded-[2.5rem] flex items-center justify-center border-4 shadow-inner transition-all duration-700",
+                      isStudying ? "bg-emerald-500 border-emerald-100 text-white scale-110 shadow-emerald-200" : "bg-white border-muted text-primary/20"
+                    )}>
+                      {isStudying ? <Zap className="h-16 w-16 fill-current animate-pulse" /> : <Clock className="h-16 w-16" />}
                     </div>
 
+                    {/* 중앙 텍스트 정보 (강조) */}
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center gap-2">
+                        <Badge variant="outline" className="rounded-xl font-black text-xs px-4 py-1 border-primary/20 text-primary bg-white shadow-sm mb-2">
+                          {seat ? `${seat.seatNo}번 좌석 배정됨` : '좌석 미배정'}
+                        </Badge>
+                        <h3 className="text-6xl font-black tracking-tighter text-primary">{student.name}</h3>
+                      </div>
+                      <p className="font-bold text-2xl text-muted-foreground opacity-80">{student.schoolName} · {student.grade}</p>
+                      
+                      {isStudying && (
+                        <div className="flex items-center justify-center gap-2 mt-4">
+                          <Badge className="bg-emerald-500 text-white font-black text-sm px-4 py-1.5 rounded-full border-none shadow-lg animate-bounce">
+                            현재 학습 중입니다
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 하단 대형 버튼 */}
                     <Button 
                       size="lg"
                       onClick={() => handleToggleStatus(student)}
                       className={cn(
-                        "h-20 px-10 rounded-3xl font-black text-xl gap-3 shadow-2xl transition-all active:scale-95 shrink-0",
+                        "w-full h-28 rounded-[2.5rem] font-black text-3xl gap-4 shadow-2xl transition-all active:scale-95",
                         isStudying ? "bg-rose-500 hover:bg-rose-600 shadow-rose-200" : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200"
                       )}
                     >
                       {isStudying ? (
-                        <>하원 완료 <LogOut className="h-6 w-6" /></>
+                        <>하원 (공부 종료) <LogOut className="h-10 w-10" /></>
                       ) : (
-                        <>학습 시작 <LogIn className="h-6 w-6" /></>
+                        <>입실 (공부 시작) <LogIn className="h-10 w-10" /></>
                       )}
                     </Button>
-                  </div>
-                );
-              })}
-            </CardContent>
-            <div className="p-8 bg-muted/20 border-t flex justify-center">
-              <p className="text-xs font-bold text-muted-foreground/60 flex items-center gap-2 italic">
-                <CheckCircle2 className="h-4 w-4" /> 핀번호가 일치하는 모든 자녀가 표시됩니다.
-              </p>
-            </div>
-          </Card>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            
+            <Button 
+              variant="ghost" 
+              onClick={resetKiosk}
+              className="mt-4 text-xl font-black text-muted-foreground/60 hover:text-primary transition-all gap-2"
+            >
+              <X className="h-6 w-6" /> 처음으로 돌아가기
+            </Button>
+          </div>
         )}
       </div>
 
