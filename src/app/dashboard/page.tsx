@@ -82,11 +82,11 @@ export default function DashboardPage() {
     const userRole = activeMembership.role;
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>
-            {user?.displayName}님, 반가워요!
+            {userRole === 'parent' ? `${user?.displayName} 학부모님, 반갑습니다!` : `${user?.displayName}님, 반가워요!`}
           </h1>
-          <Badge variant="secondary" className="h-6 px-2 rounded-full font-black bg-primary text-white border-none text-[10px] uppercase tracking-tighter">
+          <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none text-[11px] uppercase whitespace-nowrap shrink-0">
             {userRole === 'centerAdmin' ? '관리자' : userRole === 'teacher' ? '선생님' : userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
         </div>
