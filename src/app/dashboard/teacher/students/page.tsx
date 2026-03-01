@@ -36,12 +36,14 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 export default function StudentListPage() {
-  const { activeMembership } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
   const functions = useFunctions();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   
+  const isMobile = viewMode === 'mobile';
+
   // 신규 학생 등록 상태
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +59,6 @@ export default function StudentListPage() {
   const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
   // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회
-  // [FIX] orderBy를 제거하여 복합 인덱스 누락으로 인한 가짜 권한 오류를 방지합니다.
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin) return null;
     return query(
@@ -84,7 +85,7 @@ export default function StudentListPage() {
   
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
-  // 데이터 통합, 필터링 및 정렬 (인덱스 대신 프론트에서 처리)
+  // 데이터 통합, 필터링 및 정렬
   const filteredStudents = useMemo(() => {
     if (!studentMembers) return [];
     
@@ -143,10 +144,10 @@ export default function StudentListPage() {
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
-      case 'studying': return <Badge className="bg-emerald-500">공부중</Badge>;
-      case 'away': return <Badge variant="outline" className="text-amber-500 border-amber-500">외출중</Badge>;
-      case 'break': return <Badge variant="secondary">휴식중</Badge>;
-      default: return <Badge variant="outline">미입실</Badge>;
+      case 'studying': return <Badge className="bg-emerald-500 font-black text-[9px] h-5">공부중</Badge>;
+      case 'away': return <Badge variant="outline" className="text-amber-500 border-amber-500 font-black text-[9px] h-5">외출중</Badge>;
+      case 'break': return <Badge variant="secondary" className="font-black text-[9px] h-5">휴식중</Badge>;
+      default: return <Badge variant="outline" className="font-black text-[9px] h-5 opacity-40">미입실</Badge>;
     }
   };
 
@@ -164,54 +165,58 @@ export default function StudentListPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight flex items-center gap-2">
-            <GraduationCap className="h-8 w-8 text-primary" />
-            학생 관리
+    <div className={cn("flex flex-col", isMobile ? "gap-4 pb-20" : "gap-8")}>
+      <header className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "flex-row items-center")}>
+        <div className="flex flex-col gap-1">
+          <h1 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-2xl" : "text-4xl")}>
+            <GraduationCap className={cn("text-primary", isMobile ? "h-6 w-6" : "h-10 w-10")} />
+            학생 관리 센터
           </h1>
-          <p className="text-muted-foreground font-bold">센터에 등록된 모든 학생을 관리합니다.</p>
+          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>Student Roster & Management</p>
         </div>
         
         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
           <DialogTrigger asChild>
-            <Button className="rounded-xl font-black gap-2 h-12 shadow-lg interactive-button">
-              <UserPlus className="h-5 w-5" /> 신규 학생 등록
+            <Button className={cn("rounded-2xl font-black gap-2 shadow-lg interactive-button", isMobile ? "h-12 w-full" : "h-14 px-8 text-base")}>
+              <UserPlus className="h-5 w-5" /> 신규 학생 가입
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[2rem] sm:max-w-md max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tighter">신규 학생 가입 및 등록</DialogTitle>
-              <DialogDescription className="font-bold text-muted-foreground">선생님의 소속 센터({centerId})로 학생 계정을 생성합니다.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-5 py-4">
+          <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-md")}>
+            <div className={cn("bg-primary p-8 text-white relative overflow-hidden", isMobile ? "p-6" : "p-10")}>
+               <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+                 <UserPlus className={isMobile ? "h-20 w-20" : "h-32 w-32"} />
+               </div>
+               <DialogHeader className="relative z-10">
+                 <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-3xl")}>학생 등록</DialogTitle>
+                 <DialogDescription className="text-white/70 font-bold">센터에 학생 계정을 직접 생성합니다.</DialogDescription>
+               </DialogHeader>
+            </div>
+            
+            <div className={cn("grid gap-5 overflow-y-auto custom-scrollbar", isMobile ? "p-6 max-h-[calc(100vh-200px)]" : "p-8 max-h-[60vh]")}>
               <div className="grid gap-2">
-                <Label htmlFor="name" className="font-black text-xs uppercase text-primary/70">이름</Label>
-                <Input id="name" placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-11" />
+                <Label className="text-[10px] font-black uppercase text-primary/70">이름</Label>
+                <Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" />
               </div>
               
               <div className="grid gap-2">
-                <Label htmlFor="email" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Mail className="h-3 w-3" /> 이메일 (아이디)</Label>
-                <Input id="email" type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-11" />
+                <Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label>
+                <Input type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="pw" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Lock className="h-3 w-3" /> 비밀번호 (8자 이상)</Label>
-                <Input id="pw" type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-11" />
+                <Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label>
+                <Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="school" className="font-black text-xs uppercase text-primary/70 flex items-center gap-1.5"><Building2 className="h-3 w-3" /> 소속 학교</Label>
-                <Input id="school" placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-11" />
+                <Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label>
+                <Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="grade" className="font-black text-xs uppercase text-primary/70">학년</Label>
+                <Label className="text-[10px] font-black uppercase text-primary/70">학년</Label>
                 <Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}>
-                  <SelectTrigger className="rounded-xl h-11">
-                    <SelectValue placeholder="학년 선택" />
-                  </SelectTrigger>
+                  <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1학년">1학년</SelectItem>
                     <SelectItem value="2학년">2학년</SelectItem>
@@ -221,79 +226,90 @@ export default function StudentListPage() {
                 </Select>
               </div>
             </div>
-            <DialogFooter className="pt-4 border-t">
-              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg interactive-button">
-                {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '학생 계정 생성 및 등록'}
+            <DialogFooter className={cn("bg-muted/30 border-t", isMobile ? "p-6" : "p-8")}>
+              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}
               </Button>
+              {isMobile && <Button variant="ghost" onClick={() => setIsAddModalOpen(false)} className="w-full mt-2 font-bold">닫기</Button>}
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </header>
 
-      <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="이름, 학교 또는 좌석 번호로 검색..." 
-            className="pl-10 h-11 border-none focus-visible:ring-0 text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <div className={cn("relative group", isMobile ? "px-1" : "")}>
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+        <Input 
+          placeholder="이름, 학교 또는 좌석 번호로 검색..." 
+          className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all", isMobile ? "h-14 text-base" : "h-16 text-lg")}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {membersLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="font-bold text-muted-foreground">학생 데이터를 불러오고 있습니다...</p>
+        <div className="flex flex-col items-center justify-center py-40 gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
+          <p className="font-black text-muted-foreground/40 uppercase tracking-[0.2em] italic">Accessing Student Records...</p>
         </div>
-      ) : !filteredStudents || filteredStudents.length === 0 ? (
-        <div className="text-center py-20 bg-muted/20 rounded-[2rem] border-2 border-dashed">
-          <p className="font-bold text-muted-foreground">검색 결과가 없거나 등록된 학생이 없습니다.</p>
+      ) : filteredStudents.length === 0 ? (
+        <div className="text-center py-32 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
+          <Search className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" />
+          <p className="font-black text-muted-foreground/40 uppercase">등록된 학생이 없습니다.</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-2 lg:grid-cols-3")}>
           {filteredStudents.map((member) => {
             const profile = studentsProfiles?.find(p => p.id === member.id);
             const attendance = attendanceList?.find(a => a.studentId === member.id);
             
             return (
               <Link key={member.id} href={`/dashboard/teacher/students/${member.id}`}>
-                <Card className="rounded-3xl border-none shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden bg-white">
+                <Card className="rounded-[2rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden bg-white ring-1 ring-border/50">
                   <div className={cn(
-                    "h-2 w-full transition-colors",
+                    "h-1.5 w-full transition-colors duration-500",
                     attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
                   )} />
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-14 w-14 border-2 border-primary/10">
-                        <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
-                          {member.displayName?.charAt(0) || 'S'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-black truncate">{member.displayName}</h3>
-                          {getStatusBadge(attendance?.status)}
+                  <CardContent className={isMobile ? "p-5" : "p-6"}>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="relative">
+                          <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50">
+                            <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
+                              {member.displayName?.charAt(0) || 'S'}
+                            </AvatarFallback>
+                          </Avatar>
+                          {attendance?.status === 'studying' && (
+                            <div className="absolute -top-1 -right-1">
+                              <Activity className="h-4 w-4 text-emerald-500 animate-pulse" />
+                            </div>
+                          )}
                         </div>
-                        <div className="flex flex-col text-sm text-muted-foreground font-bold">
-                          <span className="flex items-center gap-1 text-[11px] text-primary/70">
-                            <Building2 className="h-3 w-3" /> {profile?.schoolName || '학교 정보 없음'}
-                          </span>
-                          <span>{profile?.grade || '정보 없음'}</span>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>
+                            {getStatusBadge(attendance?.status)}
+                          </div>
+                          <div className="flex flex-col text-[10px] font-bold text-muted-foreground leading-tight">
+                            <span className="truncate">{profile?.schoolName || '학교 정보 없음'}</span>
+                            <span className="opacity-60">{profile?.grade || '학년 정보 없음'}</span>
+                          </div>
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
+                      <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+                        <ChevronRight className="h-5 w-5" />
+                      </div>
                     </div>
                     
-                    <div className="mt-6 flex items-center justify-between p-3 bg-muted/30 rounded-2xl">
+                    <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
                       <div className="flex items-center gap-2">
-                        <Armchair className="h-4 w-4 text-primary/60" />
-                        <span className="text-sm font-black text-primary/80">
+                        <div className="p-1.5 rounded-lg bg-white shadow-sm">
+                          <Armchair className="h-3.5 w-3.5 text-primary/60" />
+                        </div>
+                        <span className="text-xs font-black text-primary/80">
                           {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
                         </span>
                       </div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">관리 페이지 이동</span>
+                      <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Manage Data</span>
                     </div>
                   </CardContent>
                 </Card>
