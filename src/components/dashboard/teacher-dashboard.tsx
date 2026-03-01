@@ -63,7 +63,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
-  const isMobile = viewMode === 'mobile';
+  const isMobileView = viewMode === 'mobile';
   
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -244,7 +244,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Real-time Command</p>
       </div>
 
-      <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4")}>
+      <div className={cn("grid gap-3", isMobileView ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4")}>
         {[
           { label: '현재 학습 중', val: studyingCount, color: 'text-emerald-600', icon: Users, sub: '실시간 몰입도' },
           { label: '미입실/지각', val: alertCount, color: 'text-rose-600', icon: AlertCircle, sub: '즉각 관리 대상' },
@@ -268,17 +268,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </div>
 
-      <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
-        <Card className={cn("rounded-[2rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50", isMobile ? "" : "lg:col-span-2")}>
-          <CardHeader className="bg-muted/5 border-b p-5 sm:p-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className={cn("grid gap-6", isMobileView ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
+        <Card className={cn("rounded-[2rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50", isMobileView ? "" : "lg:col-span-2")}>
+          <CardHeader className={cn("bg-muted/5 border-b", isMobileView ? "p-5" : "sm:p-8")}>
+            <div className={cn("flex justify-between gap-4", isMobileView ? "flex-col" : "sm:flex-row sm:items-center")}>
               <div className="space-y-1">
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep whitespace-nowrap">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
                 <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">유효 구역 중심 스마트 뷰</CardDescription>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <div className={cn("flex gap-2", isMobileView ? "flex-col w-full" : "sm:flex-row sm:w-auto")}>
                 <Button variant="outline" size="sm" className="w-full sm:w-auto rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
                   <Link href="/dashboard/teacher/layout-view">전체화면</Link>
                 </Button>
@@ -341,13 +341,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       >
                         <span className={cn(
                           "font-black absolute top-0.5 left-1 leading-none",
-                          isMobile ? "text-[6px]" : "text-[9px]",
+                          isMobileView ? "text-[6px]" : "text-[9px]",
                           seat.status === 'studying' || seat.status === 'away' || seat.status === 'break' ? "opacity-60" : "opacity-30"
                         )}>{seat.seatNo}</span>
                         
                         <span className={cn(
                           "font-black truncate px-0.5 w-full text-center leading-tight tracking-tighter",
-                          isMobile ? "text-[8px]" : "text-[11px]"
+                          isMobileView ? "text-[8px]" : "text-[11px]"
                         )}>
                           {occupant ? occupant.name : ''}
                         </span>
@@ -419,8 +419,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               className="grid gap-1 mx-auto bg-white p-4 rounded-3xl shadow-inner border border-border/50 relative"
               style={{ 
                 gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`,
-                width: GRID_WIDTH * (isMobile ? 20 : 40),
-                minWidth: isMobile ? GRID_WIDTH * 18 : 'none'
+                width: GRID_WIDTH * (isMobileView ? 20 : 40),
+                minWidth: isMobileView ? GRID_WIDTH * 18 : 'none'
               }}
             >
               {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
