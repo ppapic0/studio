@@ -75,9 +75,14 @@ export default function DailyReportsPage() {
   const [teacherNote, setTeacherNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // 재원생(active)이면서 역할이 student인 멤버만 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
+    return query(
+      collection(firestore, 'centers', centerId, 'members'), 
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
   }, [firestore, centerId]);
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery);
 
