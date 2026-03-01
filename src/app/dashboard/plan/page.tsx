@@ -38,7 +38,8 @@ import {
   CalendarDays,
   Sparkles,
   ChevronRight,
-  ListTodo
+  ListTodo,
+  Activity
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -72,6 +73,7 @@ import { ko } from 'date-fns/locale';
 import { type StudyPlanItem, type WithId } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 const SCHEDULE_TEMPLATES = [
   { title: '등원 시간', icon: MapPin },
@@ -144,7 +146,7 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast, isMobile }: any
         
         {isPast ? (
           <Badge variant="outline" className="font-mono font-black text-primary border-primary/20">
-            {localTime ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
+            {time24h ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
           <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-xl border border-border/50">
@@ -240,7 +242,7 @@ export default function StudyPlanPage() {
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
-    if (isNaN(hours) || isNaN(mins)) return time12h;
+    if (isNaN(hours) || iisNaN(mins)) return time12h;
     
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
