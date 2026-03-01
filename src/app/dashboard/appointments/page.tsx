@@ -208,7 +208,12 @@ export default function AppointmentsPage() {
         status,
         updatedAt: serverTimestamp()
       });
-      toast({ title: status === 'confirmed' ? "상담 승인 완료" : "상담 거절 완료" });
+      
+      let message = "";
+      if (status === 'confirmed') message = "상담 승인 완료";
+      else if (status === 'canceled') message = isStudent ? "상담 신청 취소 완료" : "상담 거절 완료";
+      
+      toast({ title: message });
     } catch (e: any) {
       toast({ variant: "destructive", title: "처리 실패" });
     } finally {
@@ -402,7 +407,18 @@ export default function AppointmentsPage() {
                             <FileEdit className="h-4 w-4" /> 일지 작성
                           </Button>
                         )}
-                        {!isStaff && <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                        {/* 학생 본인의 신청 취소 기능 */}
+                        {isStudent && (res.status === 'requested' || res.status === 'confirmed') && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleUpdateStatus(res.id, 'canceled')} 
+                            className="rounded-xl font-black border-rose-200 text-rose-600 hover:bg-rose-50 h-10 px-4 transition-all"
+                          >
+                            <X className="h-4 w-4" /> 신청 취소
+                          </Button>
+                        )}
+                        {!isStaff && !isStudent && <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
                           <ChevronRight className="h-5 w-5" />
                         </div>}
                       </div>
