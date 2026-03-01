@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { type StudentProfile, type AttendanceCurrent } from '@/lib/types';
+import { collection, doc, updateDoc, serverTimestamp, query, where, collectionGroup } from 'firebase/firestore';
+import { type StudentProfile, type AttendanceCurrent, type StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
   Armchair, 
@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
@@ -46,18 +47,38 @@ export default function LayoutViewPage() {
 
   const [selectedSeat, setSelectedSeat] = useState<AttendanceCurrent | null>(null);
   const [isManaging, setIsManaging] = useState(false);
+  const [today, setToday] = useState<Date | null>(null);
 
+  useEffect(() => {
+    setToday(new Date());
+  }, []);
+
+  const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
+
+  // 1. 모든 학생 프로필 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'students');
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery);
 
+  // 2. 실시간 좌석 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
+
+  // 3. 오늘 모든 학생의 학습 로그 조회 (컬렉션 그룹 쿼리)
+  const logsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return query(
+      collectionGroup(firestore, 'days'),
+      where('centerId', '==', centerId),
+      where('dateKey', '==', todayKey)
+    );
+  }, [firestore, centerId, todayKey]);
+  const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery);
 
   const seatBounds = useMemo(() => {
     if (!attendanceList || attendanceList.length === 0) return null;
@@ -99,6 +120,12 @@ export default function LayoutViewPage() {
       total: attendanceList.length
     };
   }, [attendanceList]);
+
+  const formatMinutes = (minutes: number) => {
+    const hh = Math.floor(minutes / 60);
+    const mm = minutes % 60;
+    return `${hh}h ${mm}m`;
+  };
 
   return (
     <div className={cn("flex flex-col w-full max-w-[1600px] mx-auto pb-24 min-h-screen transition-all", isMobile ? "gap-4 px-1 pt-1" : "gap-8 px-6 py-10")}>
@@ -163,6 +190,9 @@ export default function LayoutViewPage() {
                   const occupant = students?.find(s => s.id === seat?.studentId);
                   if (!seat) return <div key={idx} className="aspect-square opacity-0" />;
 
+                  const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
+                  const totalStudyTime = studentLog?.totalMinutes || 0;
+
                   const isStudying = seat.status === 'studying';
                   const isAlert = seat.studentId && seat.status === 'absent';
 
@@ -171,7 +201,7 @@ export default function LayoutViewPage() {
                       key={seat.id} 
                       onClick={() => { setSelectedSeat(seat); setIsManaging(true); }}
                       className={cn(
-                        "aspect-square rounded-lg sm:rounded-xl border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-[0.85] hover:z-20",
+                        "aspect-square rounded-lg sm:rounded-xl border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-[0.85] hover:z-20 p-1",
                         isStudying ? "bg-emerald-500 border-emerald-600 text-white shadow-xl shadow-emerald-500/20" : 
                         isAlert ? "bg-rose-50 border-rose-400 text-rose-700" :
                         seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20" :
@@ -180,14 +210,22 @@ export default function LayoutViewPage() {
                       )}
                     >
                       {isMobile ? (
-                        <span className={cn("font-black text-[11px] flex items-center justify-center", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
+                        <>
+                          <span className={cn("font-black text-[7px] absolute top-1 left-1", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white/60" : "text-primary/30")}>{seat.seatNo}</span>
+                          <span className={cn("font-black text-[9px] mt-1 tracking-tighter", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/80")}>
+                            {totalStudyTime > 0 ? formatMinutes(totalStudyTime) : '-'}
+                          </span>
+                        </>
                       ) : (
                         <>
                           <span className={cn("font-black absolute top-1 left-1.5 leading-none text-[8px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
-                          <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-1 text-base")}>{occupant?.name}</span>
+                          <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-1 text-[11px] mb-1")}>{occupant?.name}</span>
+                          <span className={cn("font-bold text-[10px] opacity-80 flex items-center gap-1", isStudying ? "text-white" : "text-primary/60")}>
+                            {totalStudyTime > 0 ? formatMinutes(totalStudyTime) : '0h 0m'}
+                            {isStudying && <Activity className="h-2 w-2 animate-pulse" />}
+                          </span>
                         </>
                       )}
-                      {isStudying && <Activity className={cn("animate-pulse stroke-[3px] mt-1", isMobile ? "h-2 w-2" : "h-4 w-4")} />}
                     </div>
                   );
                 })}

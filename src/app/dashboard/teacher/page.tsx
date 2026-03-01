@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, Timestamp, collectionGroup } from 'firebase/firestore';
 import { 
   Users, 
   Clock, 
@@ -21,7 +21,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
-import { AttendanceCurrent, StudentProfile } from '@/lib/types';
+import { AttendanceCurrent, StudentProfile, StudyLogDay } from '@/lib/types';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +31,13 @@ export default function TeacherHomePage() {
   const isMobile = viewMode === 'mobile';
 
   const centerId = activeMembership?.id;
+  const [today, setToday] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setToday(new Date());
+  }, []);
+
+  const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
 
   // 1. 오늘 출결 현황
   const attendanceQuery = useMemoFirebase(() => {
@@ -46,7 +53,18 @@ export default function TeacherHomePage() {
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery);
 
-  // 3. 오늘 상담 예약
+  // 3. 오늘 모든 학생의 학습 로그 조회 (공부 시간 표시용)
+  const logsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return query(
+      collectionGroup(firestore, 'days'),
+      where('centerId', '==', centerId),
+      where('dateKey', '==', todayKey)
+    );
+  }, [firestore, centerId, todayKey]);
+  const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery);
+
+  // 4. 오늘 상담 예약
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const todayDate = new Date();
@@ -70,6 +88,12 @@ export default function TeacherHomePage() {
     const alert = attendanceList?.filter(a => a.studentId && a.status === 'absent').length || 0;
     return { studying, alert };
   }, [attendanceList]);
+
+  const formatMinutes = (minutes: number) => {
+    const hh = Math.floor(minutes / 60);
+    const mm = minutes % 60;
+    return `${hh}h ${mm}m`;
+  };
 
   return (
     <div className={cn("flex flex-col gap-5 max-w-5xl mx-auto", isMobile ? "gap-4" : "gap-8")}>
@@ -111,7 +135,7 @@ export default function TeacherHomePage() {
                 <CardTitle className="text-base sm:text-lg font-black flex items-center gap-2">
                   <Armchair className="h-4 w-4 text-primary" /> 좌석 상황판
                 </CardTitle>
-                <CardDescription className="text-[9px] font-bold text-muted-foreground">실시간 좌석 점유 및 상태</CardDescription>
+                <CardDescription className="text-[9px] font-bold text-muted-foreground">실시간 좌석 점유 및 누적 학습 시간</CardDescription>
               </div>
               <Button asChild variant="ghost" size="sm" className="rounded-full h-7 px-3 text-[9px] font-black hover:bg-primary/5">
                 <Link href="/dashboard/teacher/layout-view">전체 보기</Link>
@@ -128,19 +152,35 @@ export default function TeacherHomePage() {
                 {students.map((student) => {
                   const seatId = `seat_${student.seatNo.toString().padStart(3, '0')}`;
                   const currentStatus = attendanceList?.find(a => a.id === seatId);
+                  const studentLog = todayLogs?.find(l => l.studentId === student.id);
+                  const totalMinutes = studentLog?.totalMinutes || 0;
+
                   const isStudying = currentStatus?.status === 'studying';
                   const isAway = currentStatus?.status === 'away' || currentStatus?.status === 'break';
 
                   return (
                     <Link key={student.id} href={`/dashboard/teacher/students/${student.id}`}>
                       <div className={cn(
-                        "aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 relative overflow-hidden group shadow-sm",
+                        "aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 relative overflow-hidden group shadow-sm p-1",
                         isStudying ? "bg-emerald-500 border-emerald-600 text-white" : 
                         isAway ? "bg-amber-500 border-amber-600 text-white" :
                         "bg-white border-muted-foreground/5 text-muted-foreground hover:border-primary/20"
                       )}>
                         <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAway ? "opacity-60" : "opacity-30")}>{student.seatNo}</span>
-                        <span className="text-[9px] font-black truncate px-0.5 w-full text-center leading-tight">{student.name}</span>
+                        
+                        {isMobile ? (
+                          <span className={cn("text-[8px] font-black tracking-tighter mt-1", isStudying || isAway ? "text-white" : "text-primary/80")}>
+                            {totalMinutes > 0 ? formatMinutes(totalMinutes) : '-'}
+                          </span>
+                        ) : (
+                          <>
+                            <span className="text-[9px] font-black truncate px-0.5 w-full text-center leading-tight mb-0.5">{student.name}</span>
+                            <span className={cn("text-[8px] font-bold opacity-80", isStudying || isAway ? "text-white" : "text-primary/60")}>
+                              {totalMinutes > 0 ? formatMinutes(totalMinutes) : '0h 0m'}
+                            </span>
+                          </>
+                        )}
+
                         {isStudying && (
                           <div className="absolute bottom-0.5 right-1">
                             <Activity className="h-1.5 w-1.5 animate-pulse" />
