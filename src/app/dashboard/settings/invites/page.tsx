@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -17,11 +18,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Loader2 } from 'lucide-react';
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { PlusCircle, Loader2, RefreshCw } from 'lucide-react';
+import { useCollection, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, doc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, query, where, updateDoc } from 'firebase/firestore';
 import { InviteCode } from '@/lib/types';
 import { format } from 'date-fns';
 import {
@@ -42,11 +43,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 
 export default function InviteCodesPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
+  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newCode, setNewCode] = useState({
@@ -64,6 +68,9 @@ export default function InviteCodesPage() {
   const { data: inviteCodes, isLoading } = useCollection<InviteCode>(inviteCodesQuery);
 
   const getStatus = (invite: InviteCode) => {
+    if (invite.isActive === false) {
+      return { text: '비활성', variant: 'outline' as const };
+    }
     if (invite.expiresAt && (invite.expiresAt as any).toDate() < new Date()) {
       return { text: '만료됨', variant: 'destructive' as const };
     }
@@ -83,17 +90,21 @@ export default function InviteCodesPage() {
     const codeId = newCode.code.trim();
     const codeRef = doc(firestore, 'inviteCodes', codeId);
 
-    try {
-        await setDoc(codeRef, {
-            intendedRole: newCode.role,
-            maxUses: Number(newCode.maxUses),
-            usedCount: 0,
-            expiresAt: expiresAt,
-            createdByUserId: user.uid,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            centerId: activeMembership.id,
-        });
+    const data = {
+      intendedRole: newCode.role,
+      maxUses: Number(newCode.maxUses),
+      usedCount: 0,
+      expiresAt: expiresAt,
+      isActive: true,
+      createdByUserId: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      centerId: activeMembership.id,
+    };
+
+    setDoc(codeRef, data, { merge: true })
+      .then(() => {
+        toast({ title: "초대 코드 생성 완료" });
         setIsDialogOpen(false);
         setNewCode({
           code: '',
@@ -101,117 +112,169 @@ export default function InviteCodesPage() {
           maxUses: 100,
           expiresInDays: 30,
         });
-    } catch(e) {
-        console.error("Failed to create invite code", e);
-    } finally {
+      })
+      .catch(async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: codeRef.path,
+          operation: 'write',
+          requestResourceData: data,
+        }));
+      })
+      .finally(() => {
         setIsCreating(false);
-    }
-  }
+      });
+  };
 
+  const handleToggleActive = (invite: InviteCode) => {
+    if (!firestore) return;
+    const nextState = invite.isActive === false ? true : false;
+    const codeRef = doc(firestore, 'inviteCodes', invite.id);
+
+    updateDoc(codeRef, { 
+      isActive: nextState,
+      updatedAt: serverTimestamp() 
+    }).catch(async (serverError) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: codeRef.path,
+        operation: 'update',
+        requestResourceData: { isActive: nextState },
+      }));
+    });
+  };
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+        <CardHeader className="flex flex-row items-center justify-between p-8 bg-muted/5 border-b">
           <div>
-            <CardTitle>초대 코드</CardTitle>
-            <CardDescription>
-              신규 회원 등록을 위한 초대 코드를 관리합니다.
+            <CardTitle className="text-2xl font-black tracking-tighter">초대 코드 관리</CardTitle>
+            <CardDescription className="font-bold text-xs uppercase tracking-widest opacity-60">
+              Center Access Codes & Invitations
             </CardDescription>
           </div>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <PlusCircle className="h-4 w-4" />
+            <Button size="lg" className="rounded-2xl font-black gap-2 shadow-lg">
+              <PlusCircle className="h-5 w-5" />
               새 코드 생성
             </Button>
           </DialogTrigger>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center p-20 gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Loading Codes...</p>
             </div>
           ) : (
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>코드</TableHead>
-                  <TableHead>역할</TableHead>
-                  <TableHead>사용 횟수</TableHead>
-                  <TableHead>만료일</TableHead>
-                  <TableHead>상태</TableHead>
+              <TableHeader className="bg-muted/10">
+                <TableRow className="hover:bg-transparent border-none h-14">
+                  <TableHead className="font-black text-[10px] uppercase pl-8">CODE</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase">ROLE</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase">USAGE</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase">EXPIRES</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase">STATUS</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase text-right pr-8">ACTIVE</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inviteCodes?.map((invite) => {
-                  const status = getStatus(invite);
-                  return (
-                    <TableRow key={invite.id}>
-                      <TableCell className="font-mono">{invite.id}</TableCell>
-                      <TableCell>{invite.intendedRole}</TableCell>
-                      <TableCell>{`${invite.usedCount}/${invite.maxUses}`}</TableCell>
-                      <TableCell>
-                        {invite.expiresAt ? format((invite.expiresAt as any).toDate(), 'yyyy-MM-dd') : '무기한'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={status.variant}>
-                          {status.text}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {inviteCodes?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-64 text-center">
+                      <div className="flex flex-col items-center gap-4 opacity-20">
+                        <RefreshCw className="h-12 w-12" />
+                        <p className="font-black italic">생성된 초대 코드가 없습니다.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  inviteCodes?.map((invite) => {
+                    const status = getStatus(invite);
+                    return (
+                      <TableRow key={invite.id} className="hover:bg-muted/5 transition-colors h-20 group">
+                        <TableCell className="pl-8">
+                          <code className="bg-primary/5 px-3 py-1.5 rounded-lg text-primary font-black tracking-widest text-sm border border-primary/10">
+                            {invite.id}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-black text-[10px] rounded-md border-primary/20 text-primary/60 uppercase">
+                            {invite.intendedRole}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-black text-sm">{invite.usedCount} / {invite.maxUses}</span>
+                            <div className="w-16 h-1 bg-muted rounded-full mt-1 overflow-hidden">
+                              <div className="h-full bg-primary" style={{ width: `${(invite.usedCount / invite.maxUses) * 100}%` }} />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-bold text-muted-foreground">
+                          {invite.expiresAt ? format((invite.expiresAt as any).toDate(), 'yyyy-MM-dd') : '무기한'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant} className="font-black text-[10px] shadow-sm border-none">
+                            {status.text}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right pr-8">
+                          <Switch 
+                            checked={invite.isActive !== false} 
+                            onCheckedChange={() => handleToggleActive(invite)}
+                            className="data-[state=checked]:bg-primary"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
-      <DialogContent className="sm:max-w-[425px]">
+
+      <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl p-8">
         <DialogHeader>
-          <DialogTitle>새 초대 코드 생성</DialogTitle>
-          <DialogDescription>
-            초대 코드의 세부 정보를 입력하세요. 이 코드가 문서 ID가 됩니다.
+          <DialogTitle className="text-3xl font-black tracking-tighter">새 초대 코드 생성</DialogTitle>
+          <DialogDescription className="font-bold text-sm text-muted-foreground pt-2">
+            코드 이름이 문서 ID로 사용됩니다. 중복되지 않게 입력하세요.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="code" className="text-right">
-              코드
-            </Label>
-            <Input id="code" value={newCode.code} onChange={(e) => setNewCode(c => ({...c, code: e.target.value}))} className="col-span-3" />
+        <div className="grid gap-6 py-6">
+          <div className="grid gap-2">
+            <Label htmlFor="code" className="text-[10px] font-black uppercase tracking-widest ml-1">초대 코드 이름</Label>
+            <Input id="code" value={newCode.code} onChange={(e) => setNewCode(c => ({...c, code: e.target.value}))} className="h-12 rounded-xl border-2 font-black tracking-widest" placeholder="예: DONGBAEK2025" />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="role" className="text-right">
-              역할
-            </Label>
+          <div className="grid gap-2">
+            <Label htmlFor="role" className="text-[10px] font-black uppercase tracking-widest ml-1">배정 역할</Label>
             <Select value={newCode.role} onValueChange={(value) => setNewCode(c => ({...c, role: value as any}))}>
-              <SelectTrigger className="col-span-3">
+              <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
                 <SelectValue placeholder="역할 선택" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="student">학생</SelectItem>
-                <SelectItem value="teacher">교사</SelectItem>
-                <SelectItem value="centerAdmin">센터 관리자</SelectItem>
+              <SelectContent className="rounded-xl border-none shadow-2xl">
+                <SelectItem value="student">학생 (Student)</SelectItem>
+                <SelectItem value="teacher">교사 (Teacher)</SelectItem>
+                <SelectItem value="centerAdmin">센터 관리자 (Admin)</SelectItem>
+                <SelectItem value="parent">학부모 (Parent)</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="maxUses" className="text-right">
-              최대 사용
-            </Label>
-            <Input id="maxUses" type="number" value={newCode.maxUses} onChange={(e) => setNewCode(c => ({...c, maxUses: Number(e.target.value)}))} className="col-span-3" />
-          </div>
-           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="expiresInDays" className="text-right">
-              만료 (일)
-            </Label>
-            <Input id="expiresInDays" type="number" value={newCode.expiresInDays} onChange={(e) => setNewCode(c => ({...c, expiresInDays: Number(e.target.value)}))} className="col-span-3" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="maxUses" className="text-[10px] font-black uppercase tracking-widest ml-1">최대 사용 횟수</Label>
+              <Input id="maxUses" type="number" value={newCode.maxUses} onChange={(e) => setNewCode(c => ({...c, maxUses: Number(e.target.value)}))} className="h-12 rounded-xl border-2 font-bold" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="expiresInDays" className="text-[10px] font-black uppercase tracking-widest ml-1">만료일 (일 단위)</Label>
+              <Input id="expiresInDays" type="number" value={newCode.expiresInDays} onChange={(e) => setNewCode(c => ({...c, expiresInDays: Number(e.target.value)}))} className="h-12 rounded-xl border-2 font-bold" />
+            </div>
           </div>
         </div>
         <DialogFooter>
-          <Button type="submit" onClick={handleCreateCode} disabled={isCreating}>
-            {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            생성
+          <Button type="submit" onClick={handleCreateCode} disabled={isCreating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
+            {isCreating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '초대 코드 생성 확정'}
           </Button>
         </DialogFooter>
       </DialogContent>

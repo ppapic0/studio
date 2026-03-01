@@ -1,3 +1,4 @@
+
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
@@ -193,6 +194,22 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       if (!inviteSnap.exists) throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다.");
       
       const inviteData = inviteSnap.data()!;
+      
+      // 비활성화 여부 확인
+      if (inviteData.isActive === false) {
+        throw new functions.https.HttpsError("failed-precondition", "비활성화된 초대 코드입니다.");
+      }
+
+      // 만료일 확인
+      if (inviteData.expiresAt && inviteData.expiresAt.toDate() < new Date()) {
+        throw new functions.https.HttpsError("failed-precondition", "만료된 초대 코드입니다.");
+      }
+
+      // 사용 횟수 확인
+      if (inviteData.usedCount >= inviteData.maxUses) {
+        throw new functions.https.HttpsError("failed-precondition", "사용 횟수가 초과된 초대 코드입니다.");
+      }
+
       const centerId = inviteData.centerId;
       const role = inviteData.intendedRole || 'student';
 
@@ -223,6 +240,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       return { ok: true, message: "센터 가입이 완료되었습니다." };
     });
   } catch (error: any) {
+    if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError("internal", error.message);
   }
 });

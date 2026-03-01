@@ -25,6 +25,19 @@ export interface CenterMembership {
   siblingDiscount?: boolean;
 }
 
+export interface InviteCode {
+  id: string;
+  centerId: string;
+  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  maxUses: number;
+  usedCount: number;
+  expiresAt: Timestamp | null;
+  isActive: boolean;
+  createdByUserId: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface MonthlyFinance {
   yearMonth: string; // YYYY-MM
   rent: number;
