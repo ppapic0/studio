@@ -2,7 +2,7 @@
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
-import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useFunctions, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
@@ -175,8 +175,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: rawCounselLogs } = useCollection<CounselingLog>(counselLogsQuery);
 
-  const appointments = useMemo(() => rawApts ? [...rawApts].sort((a, b) => b.scheduledAt?.toMillis() - a.scheduledAt?.toMillis()) : [], [rawApts]);
-  const counselingLogs = useMemo(() => rawCounselLogs ? [...rawCounselLogs].sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()) : [], [rawCounselLogs]);
+  const appointments = useMemo(() => rawApts ? [...rawApts].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0)) : [], [rawApts]);
+  const counselingLogs = useMemo(() => rawCounselLogs ? [...rawCounselLogs].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)) : [], [rawCounselLogs]);
   const logs = useMemo(() => rawLogs ? [...rawLogs].sort((a, b) => b.dateKey.localeCompare(a.dateKey)) : [], [rawLogs]);
 
   const stats = useMemo(() => {
@@ -225,33 +225,93 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (studentMembership) setStatusForm(studentMembership.status);
   }, [studentMembership]);
 
-  const handleAddAppointment = async () => {
-    if (!firestore || !centerId || !student || !currentUser) return;
+  const handleAddAppointment = () => {
+    if (!firestore || !centerId || !student || !currentUser || !aptDate || !aptTime) {
+      toast({ variant: "destructive", title: "정보 부족", description: "날짜와 시간을 입력해 주세요." });
+      return;
+    }
+
     setIsSubmitting(true);
-    try {
-      const scheduledAt = new Date(`${aptDate}T${aptTime}`);
-      await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
-        centerId, studentId, studentName: student.name, teacherId: currentUser.uid,
-        teacherName: currentUser.displayName || '선생님', scheduledAt: Timestamp.fromDate(scheduledAt),
-        status: 'confirmed', teacherNote: aptNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    
+    // 안전한 날짜 생성을 위해 파싱
+    const [year, month, day] = aptDate.split('-').map(Number);
+    const [hours, minutes] = aptTime.split(':').map(Number);
+    const scheduledDate = new Date(year, month - 1, day, hours, minutes);
+
+    if (isNaN(scheduledDate.getTime())) {
+      toast({ variant: "destructive", title: "날짜 형식 오류" });
+      setIsSubmitting(false);
+      return;
+    }
+
+    const data = {
+      centerId,
+      studentId,
+      studentName: student.name,
+      teacherId: currentUser.uid,
+      teacherName: currentUser.displayName || '선생님',
+      scheduledAt: Timestamp.fromDate(scheduledDate),
+      status: 'confirmed',
+      teacherNote: aptNote.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const colRef = collection(firestore, 'centers', centerId, 'counselingReservations');
+    
+    addDoc(colRef, data)
+      .then(() => {
+        toast({ title: "상담 예약 완료" });
+        setAptNote('');
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: `${colRef.path}/{newId}`,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-      toast({ title: "상담 예약 완료" });
-      setAptNote('');
-    } catch (e) { toast({ variant: "destructive", title: "예약 실패" }); } finally { setIsSubmitting(false); }
   };
 
-  const handleAddCounselLog = async () => {
-    if (!firestore || !centerId || !currentUser) return;
-    if (!logContent.trim()) { toast({ variant: "destructive", title: "내용을 입력해주세요." }); return; }
+  const handleAddCounselLog = () => {
+    if (!firestore || !centerId || !currentUser || !logContent.trim()) {
+      toast({ variant: "destructive", title: "입력 부족", description: "상담 내용을 입력해 주세요." });
+      return;
+    }
+
     setIsSubmitting(true);
-    try {
-      await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), {
-        studentId, teacherId: currentUser.uid, type: logType, content: logContent,
-        improvement: logImprovement, createdAt: serverTimestamp(),
+    const data = {
+      studentId,
+      teacherId: currentUser.uid,
+      type: logType,
+      content: logContent.trim(),
+      improvement: logImprovement.trim(),
+      createdAt: serverTimestamp(),
+    };
+
+    const colRef = collection(firestore, 'centers', centerId, 'counselingLogs');
+
+    addDoc(colRef, data)
+      .then(() => {
+        toast({ title: "상담 일지 기록 완료" });
+        setLogContent('');
+        setLogImprovement('');
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: `${colRef.path}/{newId}`,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-      toast({ title: "상담 일지 기록 완료" });
-      setLogContent(''); setLogImprovement('');
-    } catch (e) { toast({ variant: "destructive", title: "기록 실패" }); } finally { setIsSubmitting(false); }
   };
 
   const handleUpdateInfo = async () => {
@@ -449,7 +509,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <div className={cn("w-full", isMobile ? "h-[250px]" : "h-[350px]")}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs><linearGradient id="colorH" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
+                    <defs><linearGradient id="colorH" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                     <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
                     <YAxis fontSize={10} fontWeight="900" axisLine={false} tickLine={false} unit="h" />
@@ -463,7 +523,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
 
         <TabsContent value="counseling" className="mt-6 space-y-10">
-          {/* 액션 섹션: 새 예약 및 일지 작성 */}
           <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
             <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50 flex flex-col">
               <CardHeader className="bg-blue-50/50 border-b p-6 sm:p-8">
@@ -487,8 +546,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 주제</Label>
                   <Input placeholder="메모할 내용을 입력하세요" value={aptNote} onChange={(e) => setAptNote(e.target.value)} className="rounded-xl h-12 border-2" />
                 </div>
-                <Button onClick={handleAddAppointment} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl text-base gap-2">
-                  예약 확정하기 <ChevronRight className="h-4 w-4" />
+                <Button 
+                  onClick={handleAddAppointment} 
+                  disabled={isSubmitting} 
+                  className="w-full h-14 rounded-2xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl text-base gap-2 active:scale-95 transition-all"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '예약 확정하기'} <ChevronRight className="h-4 w-4" />
                 </Button>
               </CardContent>
             </Card>
@@ -520,12 +583,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Label className="text-[10px] font-black uppercase text-emerald-700 ml-1 flex items-center gap-1.5"><Zap className="h-3 w-3 fill-current" /> 개선 권고 사항</Label>
                   <Input placeholder="학생이 수행할 과제나 개선점" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-12 border-2 border-emerald-100 bg-emerald-50/20" />
                 </div>
-                <Button onClick={handleAddCounselLog} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl text-base">상담 일지 저장</Button>
+                <Button 
+                  onClick={handleAddCounselLog} 
+                  disabled={isSubmitting} 
+                  className="w-full h-14 rounded-2xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl text-base active:scale-95 transition-all"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 일지 저장'}
+                </Button>
               </CardContent>
             </Card>
           </div>
 
-          {/* 히스토리 섹션: 전체 상담 피드 */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 px-2">
               <History className="h-6 w-6 text-primary opacity-40" />
@@ -541,7 +609,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {/* 예정된 예약 강조 */}
                   {appointments.filter(a => a.status === 'confirmed').map(apt => (
                     <Card key={apt.id} className="rounded-3xl border-2 border-blue-100 bg-blue-50/20 shadow-sm overflow-hidden group">
                       <CardContent className="p-6 flex items-center justify-between gap-4">
@@ -561,7 +628,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </Card>
                   ))}
 
-                  {/* 과거 일지 목록 */}
                   {counselingLogs.map((log) => (
                     <Card key={log.id} className="rounded-3xl border-none shadow-md bg-white overflow-hidden ring-1 ring-border/50 hover:shadow-xl transition-all">
                       <CardContent className="p-6 sm:p-8 space-y-4">
@@ -596,7 +662,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
       </Tabs>
 
-      {/* 정보 수정 모달 */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className={cn("rounded-[2.5rem] sm:max-w-md border-none shadow-2xl", isMobile ? "max-w-[95vw] w-[95vw]" : "")}>
           <DialogHeader>
@@ -645,7 +710,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </DialogContent>
       </Dialog>
 
-      {/* 상태 변경 모달 */}
       <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
         <DialogContent className={cn("rounded-[2.5rem] sm:max-w-md border-none shadow-2xl", isMobile ? "max-w-[95vw] w-[95vw]" : "")}>
           <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">학생 상태 관리</DialogTitle></DialogHeader>
