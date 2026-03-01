@@ -296,7 +296,7 @@ export function RevenueAnalysis() {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" fontSize={11} fontWith="900" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" fontSize={11} axisLine={false} tickLine={false} />
                 <YAxis fontSize={11} fontWeight="900" axisLine={false} tickLine={false} />
                 <Tooltip 
                   cursor={{fill: 'rgba(0,0,0,0.02)'}}
@@ -329,7 +329,8 @@ export function RevenueAnalysis() {
               <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
                 <CalendarDays className="h-6 w-6 text-primary" /> 학생 등록 및 수강료 관리
               </CardTitle>
-              <CardDescription className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+              {/* Hydration fix: CardDescription(p) cannot contain Badge(div). Changed to div with same classes. */}
+              <div className="text-sm font-bold text-muted-foreground flex items-center gap-2">
                 {selectedMonth ? (
                   <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black">{selectedMonth} 등록 현황</Badge>
                 ) : activeDrillDown === 'active' ? (
@@ -341,7 +342,7 @@ export function RevenueAnalysis() {
                 )}
                 <span className="opacity-40">|</span>
                 <span>총 {filteredTimelineMembers.length}명</span>
-              </CardDescription>
+              </div>
             </div>
             <div className={cn("flex items-center gap-3", isMobile ? "w-full" : "")}>
               <div className="relative flex-1">
