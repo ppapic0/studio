@@ -585,7 +585,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="space-y-1.5">
                 <CardTitle className="text-2xl sm:text-3xl font-black flex items-center gap-3 tracking-tighter">
-                  <ListTodo className="h-8 w-8 text-primary" /> 오늘의 학습 매거진
+                  <ListTodo className="h-8 w-8 text-primary" /> 오늘의 학습 계획
                 </CardTitle>
                 <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-[0.2em] ml-1">Daily Study Matrix</CardDescription>
               </div>
