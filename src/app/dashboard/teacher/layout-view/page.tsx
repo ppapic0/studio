@@ -88,10 +88,18 @@ export default function LayoutViewPage() {
     } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); }
   };
 
-  const studyingCount = attendanceList?.filter(a => a.status === 'studying').length || 0;
+  const stats = useMemo(() => {
+    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
+    return {
+      studying: attendanceList.filter(a => a.status === 'studying').length,
+      absent: attendanceList.filter(a => a.studentId && a.status === 'absent').length,
+      away: attendanceList.filter(a => ['away', 'break'].includes(a.status)).length,
+      total: attendanceList.length
+    };
+  }, [attendanceList]);
 
   return (
-    <div className={cn("flex flex-col w-full max-w-[1600px] mx-auto pb-24 min-h-screen transition-all", isMobile ? "gap-2 px-1 pt-1" : "gap-6 px-6 py-6")}>
+    <div className={cn("flex flex-col w-full max-w-[1600px] mx-auto pb-24 min-h-screen transition-all", isMobile ? "gap-3 px-1 pt-1" : "gap-6 px-6 py-6")}>
       <header className={cn("flex justify-between items-center bg-white/80 backdrop-blur-xl border shadow-sm", isMobile ? "p-3 rounded-2xl" : "p-6 rounded-[2rem]")}>
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
@@ -99,19 +107,37 @@ export default function LayoutViewPage() {
             <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-base" : "text-2xl")}>실시간 관제</h1>
             <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 font-black text-[8px] animate-pulse">LIVE</Badge>
           </div>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{studyingCount}명 열공 중</span>
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{stats.studying}명 열공 중</span>
         </div>
         <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => window.location.reload()}><RefreshCw className="h-3.5 w-3.5 opacity-40" /></Button>
       </header>
 
-      <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50 relative flex-1 flex flex-col">
-        <CardContent className={cn("relative z-10 flex items-center justify-center flex-1", isMobile ? "p-1" : "p-6")}>
+      {/* 모바일에서 빈 공간을 채우는 현황 요약 카드 */}
+      <div className={cn("grid gap-2", isMobile ? "grid-cols-2 px-1" : "hidden")}>
+        {[
+          { label: '학습 중', val: stats.studying, color: 'text-emerald-600', icon: Activity, bg: 'bg-emerald-50/50' },
+          { label: '미입실', val: stats.absent, color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-50/50' },
+          { label: '외출/휴식', val: stats.away, color: 'text-amber-600', icon: Clock, bg: 'bg-amber-50/50' },
+          { label: '배치 좌석', val: stats.total, color: 'text-primary', icon: Armchair, bg: 'bg-muted/30' }
+        ].map((item, i) => (
+          <Card key={i} className={cn("rounded-xl border-none shadow-sm p-3 flex flex-col gap-1", item.bg)}>
+            <div className="flex justify-between items-center">
+              <span className="text-[8px] font-black uppercase opacity-60">{item.label}</span>
+              <item.icon className={cn("h-3 w-3", item.color)} />
+            </div>
+            <div className={cn("text-xl font-black tracking-tighter", item.color)}>{item.val}</div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="rounded-[2rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50 relative flex-1 flex flex-col">
+        <CardContent className={cn("relative z-10 flex items-center justify-center flex-1", isMobile ? "p-0" : "p-6")}>
           {studentsLoading || attendanceLoading ? (
             <div className="flex flex-col items-center gap-2"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /><p className="font-black text-[8px] uppercase">Loading Map...</p></div>
           ) : !attendanceList?.length ? (
             <div className="text-center opacity-20"><Armchair className="h-12 w-12 mx-auto mb-2" /><p className="text-xs font-black">No Seats</p></div>
           ) : (
-            <div className={cn("w-full bg-white rounded-2xl border shadow-2xl overflow-hidden relative", isMobile ? "p-1" : "p-8")}>
+            <div className={cn("w-full bg-white relative", isMobile ? "p-1" : "p-8 rounded-2xl border shadow-2xl")}>
               <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '20px 24px' }} />
               <div 
                 className="grid w-full mx-auto relative z-10 gap-1"
@@ -133,15 +159,21 @@ export default function LayoutViewPage() {
                       onClick={() => { setSelectedSeat(seat); setIsManaging(true); }}
                       className={cn(
                         "aspect-square rounded-md border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-90",
-                        isStudying ? "bg-emerald-500 border-emerald-600 text-white" : 
+                        isStudying ? "bg-emerald-500 border-emerald-600 text-white shadow-lg shadow-emerald-500/20" : 
                         isAlert ? "bg-rose-50 border-rose-400 text-rose-700" :
-                        seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
-                        occupant ? "bg-white border-primary/20 text-primary hover:border-primary/50" : "bg-muted/10 border-transparent"
+                        seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20" :
+                        occupant ? "bg-white border-primary/20 text-primary hover:border-primary/50" : "bg-muted/5 border-transparent"
                       )}
                     >
-                      <span className={cn("font-black absolute top-0.5 left-0.5 leading-none text-[6px] sm:text-[9px]", isStudying ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
-                      <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-0.5", isMobile ? "text-[10px]" : "text-[14px]")}>{occupant?.name}</span>
-                      {isStudying && <Activity className={cn("animate-pulse stroke-[3px] mt-0.5", isMobile ? "h-1.5 w-1.5" : "h-3 w-3")} />}
+                      {isMobile ? (
+                        <span className={cn("font-black text-[10px] leading-none", isStudying || seat.status === 'away' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
+                      ) : (
+                        <>
+                          <span className={cn("font-black absolute top-0.5 left-0.5 leading-none text-[7px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
+                          <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-0.5 text-[12px]")}>{occupant?.name}</span>
+                        </>
+                      )}
+                      {isStudying && <Activity className={cn("animate-pulse stroke-[3px] mt-0.5", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
                     </div>
                   );
                 })}
