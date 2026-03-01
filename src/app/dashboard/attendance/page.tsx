@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -27,12 +27,11 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, doc, serverTimestamp, setDoc, query, where } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
-import { AttendanceRecord, WithId, CenterMembership } from '@/lib/types';
+import { AttendanceRecord, CenterMembership } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AttendancePage() {
@@ -47,23 +46,24 @@ export default function AttendancePage() {
   }, []);
 
   const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const centerId = activeMembership?.id;
   const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
   // 1. Fetch all students in the center
   const studentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
+    if (!firestore || !centerId) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
+      collection(firestore, 'centers', centerId, 'members'),
       where('role', '==', 'student')
     );
-  }, [firestore, activeMembership]);
+  }, [firestore, centerId]);
   const { data: students, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery, { enabled: isTeacherOrAdmin });
 
   // 2. Fetch attendance records for the selected date
   const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !dateKey) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students');
-  }, [firestore, activeMembership, dateKey]);
+    if (!firestore || !centerId || !dateKey) return null;
+    return collection(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students');
+  }, [firestore, centerId, dateKey]);
   const { data: attendanceRecords, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
   const getBadgeVariant = (status: string) => {
@@ -80,16 +80,16 @@ export default function AttendancePage() {
   };
 
   const handleStatusChange = async (studentId: string, status: AttendanceRecord['status']) => {
-      if (!firestore || !user || !activeMembership || !dateKey) return;
+      if (!firestore || !user || !centerId || !dateKey) return;
       
-      const recordRef = doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', dateKey, 'students', studentId);
+      const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
       const studentData = students?.find(s => s.id === studentId);
 
       const recordData: Partial<AttendanceRecord> = {
           status,
           updatedAt: serverTimestamp() as any,
           confirmedByUserId: user.uid,
-          centerId: activeMembership.id,
+          centerId: centerId,
           studentId: studentId,
           dateKey: dateKey,
       };
@@ -103,7 +103,7 @@ export default function AttendancePage() {
 
   const isLoading = !selectedDate || membersLoading || attendanceLoading;
 
-  const attendanceMap = new Map(attendanceRecords?.map(r => [r.id, r]));
+  const attendanceMap = useMemo(() => new Map(attendanceRecords?.map(r => [r.id, r])), [attendanceRecords]);
 
   if (!isTeacherOrAdmin) {
     return (

@@ -55,9 +55,8 @@ import {
   FileEdit,
   GraduationCap
 } from 'lucide-react';
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { CounselingReservation, CounselingLog, CenterMembership } from '@/lib/types';
@@ -90,15 +89,19 @@ export default function AppointmentsPage() {
     setAptDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
 
+  // 종속성 안정화
   const centerId = activeMembership?.id;
-  const isStudent = activeMembership?.role === 'student';
-  const isParent = activeMembership?.role === 'parent';
-  const isStaff = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
-  const isAdmin = activeMembership?.role === 'centerAdmin';
-  const linkedStudentIds = activeMembership?.linkedStudentIds || [];
-  const roleConfirmed = !!activeMembership?.role;
+  const userRole = activeMembership?.role;
+  const studentUid = user?.uid;
+  const linkedStudentIds = useMemo(() => activeMembership?.linkedStudentIds || [], [activeMembership?.linkedStudentIds]);
+  const linkedIdsKey = JSON.stringify(linkedStudentIds);
 
-  // 상담 희망 선생님 목록 (원장 및 특정 관리 계정 제외)
+  const isStudent = userRole === 'student';
+  const isParent = userRole === 'parent';
+  const isStaff = userRole === 'teacher' || userRole === 'centerAdmin';
+  const isAdmin = userRole === 'centerAdmin';
+
+  // 상담 희망 선생님 목록
   const teachersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -113,41 +116,31 @@ export default function AppointmentsPage() {
     return allStaff.filter(t => t.displayName !== '동백센터관리자');
   }, [allStaff]);
 
-  // 예약 내역 쿼리 (역할별 필터링)
+  // 예약 내역 쿼리
   const reservationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !user || !roleConfirmed) return null;
+    if (!firestore || !centerId || !studentUid || !userRole) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingReservations');
     
-    if (isStudent) {
-      return query(baseRef, where('studentId', '==', user.uid));
-    }
-    if (isParent && linkedStudentIds.length > 0) {
-      return query(baseRef, where('studentId', 'in', linkedStudentIds));
-    }
-    if (isStaff) {
-      return query(baseRef); // 관리자와 선생님은 센터 내 모든 상담 조회
-    }
+    if (isStaff) return query(baseRef);
+    if (isStudent) return query(baseRef, where('studentId', '==', studentUid));
+    if (isParent && linkedStudentIds.length > 0) return query(baseRef, where('studentId', 'in', linkedStudentIds));
+    
     return null;
-  }, [firestore, centerId, roleConfirmed, isStudent, isParent, isStaff, user?.uid, linkedStudentIds]);
+  }, [firestore, centerId, studentUid, userRole, isStaff, isStudent, isParent, linkedIdsKey]);
 
   const { data: rawReservations, isLoading: resLoading } = useCollection<CounselingReservation>(reservationsQuery);
 
-  // 상담 일지 쿼리 (역할별 필터링)
+  // 상담 일지 쿼리
   const logsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !user || !roleConfirmed) return null;
+    if (!firestore || !centerId || !studentUid || !userRole) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingLogs');
     
-    if (isStudent) {
-      return query(baseRef, where('studentId', '==', user.uid));
-    }
-    if (isParent && linkedStudentIds.length > 0) {
-      return query(baseRef, where('studentId', 'in', linkedStudentIds));
-    }
-    if (isStaff) {
-      return query(baseRef); // 관리자와 선생님은 모든 일지 조회
-    }
+    if (isStaff) return query(baseRef);
+    if (isStudent) return query(baseRef, where('studentId', '==', studentUid));
+    if (isParent && linkedStudentIds.length > 0) return query(baseRef, where('studentId', 'in', linkedStudentIds));
+    
     return null;
-  }, [firestore, centerId, roleConfirmed, isStudent, isParent, isStaff, user?.uid, linkedStudentIds]);
+  }, [firestore, centerId, studentUid, userRole, isStaff, isStudent, isParent, linkedIdsKey]);
 
   const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
 
@@ -175,13 +168,8 @@ export default function AppointmentsPage() {
     setIsSubmitting(true);
     try {
       const scheduledAt = new Date(`${aptDate}T${aptTime}`);
-      
       if (scheduledAt < new Date()) {
-        toast({ 
-          variant: "destructive", 
-          title: "예약 불가", 
-          description: "현재 시간보다 이전으로는 신청할 수 없습니다." 
-        });
+        toast({ variant: "destructive", title: "예약 불가", description: "현재 시간보다 이전으로는 신청할 수 없습니다." });
         setIsSubmitting(false);
         return;
       }
@@ -222,7 +210,7 @@ export default function AppointmentsPage() {
       });
       toast({ title: status === 'confirmed' ? "상담 승인 완료" : "상담 거절 완료" });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "처리 실패", description: e.message });
+      toast({ variant: "destructive", title: "처리 실패" });
     } finally {
       setIsSubmitting(false);
     }
@@ -448,7 +436,7 @@ export default function AppointmentsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap items-center gap-3">
                           <Badge variant="outline" className="rounded-lg font-black uppercase text-[9px] sm:text-[10px] px-2 py-1 border-primary/20 text-primary">
-                            {log.type === 'academic' ? '성적/학업' : log.type === 'life' ? '생활 습관' : '진로/진학'}
+                            {log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로'}
                           </Badge>
                           <span className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5">
                             <Clock className="h-3 w-3 opacity-40" />
@@ -485,7 +473,6 @@ export default function AppointmentsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* 상담 일지 작성 모달 */}
       <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
           <div className="bg-emerald-600 p-8 text-white relative">
