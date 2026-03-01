@@ -51,6 +51,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ClipboardCheck,
+  Target,
   PieChart as PieChartIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -669,7 +670,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 { id: 'withdrawn', label: '퇴원생', color: 'text-muted-foreground', bg: 'bg-muted/30' },
               ].map((item) => (
                 <div key={item.id} onClick={() => setStatusForm(item.id)} className={cn("p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3", statusForm === item.id ? "border-primary bg-white shadow-lg scale-[1.02]" : "border-transparent bg-muted/10")}>
-                  <div className={cn("p-1.5 rounded-xl", statusForm === item.id ? "bg-primary text-white" : "bg-white")}>{statusForm === item.id && <Check className="h-4 w-4" />}</div>
+                  <div className={cn("p-1.5 rounded-xl", statusForm === item.id ? "bg-primary text-white" : "bg-white")}>{statusForm === item.id && <CheckCircle2 className="h-4 w-4" />}</div>
                   <span className={cn("font-black text-lg", item.color)}>{item.label}</span>
                 </div>
               ))}
