@@ -38,9 +38,9 @@
     },
     {
       "id": "login-background",
-      "description": "Background image for the login page",
-      "imageUrl": "https://images.unsplash.com/photo-1572382817039-2beeb0ce8dfc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxsaWJyYXJ5JTIwc3R1ZHl8ZW58MHx8fHwxNzcyMDE3ODc5fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "library study"
+      "description": "Dynamic running track representing growth and momentum",
+      "imageUrl": "https://images.unsplash.com/photo-1530541930197-ff16ac917b0e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxydW5uaW5nJTIwdHJhY2t8ZW58MHx8fHwxNzcyMjUyOTcwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "running track"
     }
   ]
 }
