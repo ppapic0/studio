@@ -4,7 +4,7 @@ import { use, useState, useMemo, useEffect, useRef } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -59,10 +59,12 @@ import {
   Crown,
   Medal,
   Star,
-  RefreshCw
+  RefreshCw,
+  Check,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation } from '@/lib/types';
 import { format, subDays, startOfDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -152,6 +154,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [logImprovement, setLogImprovement] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedResForLog, setSelectedResForLog] = useState<CounselingReservation | null>(null);
 
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -188,7 +192,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'counselingReservations'), where('studentId', '==', studentId));
   }, [firestore, centerId, studentId]);
-  const { data: rawApts } = useCollection<any>(aptsQuery);
+  const { data: rawApts } = useCollection<CounselingReservation>(aptsQuery);
 
   const counselLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -280,13 +284,53 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     } catch (err) { setIsSubmitting(false); }
   };
 
+  const handleUpdateAptStatus = async (resId: string, status: CounselingReservation['status']) => {
+    if (!firestore || !centerId) return;
+    setIsSubmitting(true);
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', resId), {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: status === 'confirmed' ? "승인 완료" : "거절 완료" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "상태 변경 실패" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenLogModalFromRes = (res: CounselingReservation) => {
+    setSelectedResForLog(res);
+    setLogContent('');
+    setLogImprovement('');
+    setLogType('academic');
+    setIsLogModalOpen(true);
+  };
+
   const handleAddCounselLog = () => {
     if (!firestore || !centerId || !currentUser || !logContent.trim()) return;
     setIsSubmitting(true);
-    const data = { studentId, teacherId: currentUser.uid, type: logType, content: logContent.trim(), improvement: logImprovement.trim(), createdAt: serverTimestamp() };
-    addDoc(collection(firestore, `centers/${centerId}/counselingLogs`), data).then(() => {
+    const data = { 
+      studentId, 
+      teacherId: currentUser.uid, 
+      type: logType, 
+      content: logContent.trim(), 
+      improvement: logImprovement.trim(), 
+      createdAt: serverTimestamp(),
+      reservationId: selectedResForLog?.id || null
+    };
+    
+    const logPromise = addDoc(collection(firestore, `centers/${centerId}/counselingLogs`), data);
+    const resPromise = selectedResForLog 
+      ? updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', selectedResForLog.id), { status: 'done', updatedAt: serverTimestamp() })
+      : Promise.resolve();
+
+    Promise.all([logPromise, resPromise]).then(() => {
       toast({ title: "상담 일지 기록 완료" });
       setLogContent(''); setLogImprovement('');
+      setIsLogModalOpen(false);
+      setSelectedResForLog(null);
     }).finally(() => setIsSubmitting(false));
   };
 
@@ -314,6 +358,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       toast({ title: "상태 변경 완료" });
       setIsStatusModalOpen(false);
     } catch (e) { toast({ variant: "destructive", title: "상태 변경 실패" }); } finally { setIsUpdating(false); }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'requested': return <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[10px]">승인 대기</Badge>;
+      case 'confirmed': return <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-sm">예약 확정</Badge>;
+      case 'done': return <Badge variant="outline" className="opacity-40 font-black text-[10px]">상담 완료</Badge>;
+      case 'canceled': return <Badge variant="destructive" className="font-black text-[10px]">취소됨</Badge>;
+      default: return <Badge variant="outline" className="font-black text-[10px]">{status}</Badge>;
+    }
   };
 
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
@@ -585,7 +639,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <Button 
                   onClick={handleAddCounselLog} 
-                  disabled={isSubmitting} 
+                  disabled={isSubmitting || !logContent.trim()} 
                   className="w-full h-14 rounded-2xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl text-base active:scale-95 transition-all"
                 >
                   {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 일지 저장'}
@@ -609,21 +663,41 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {appointments.filter(a => a.status === 'confirmed').map(apt => (
-                    <Card key={apt.id} className="rounded-3xl border-2 border-blue-100 bg-blue-50/20 shadow-sm overflow-hidden group">
+                  {appointments.map(apt => (
+                    <Card key={apt.id} className={cn(
+                      "rounded-3xl border-2 shadow-sm overflow-hidden group",
+                      apt.status === 'confirmed' ? "border-blue-100 bg-blue-50/20" : 
+                      apt.status === 'requested' ? "border-amber-100 bg-amber-50/20" : "opacity-60 grayscale bg-muted/5 border-muted"
+                    )}>
                       <CardContent className="p-6 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-5">
-                          <div className="h-12 w-12 rounded-2xl bg-blue-100 flex flex-col items-center justify-center shrink-0 border border-blue-200">
-                            <span className="text-[8px] font-black text-blue-600 uppercase leading-none">NEXT</span>
-                            <span className="text-lg font-black text-blue-700">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'd') : ''}</span>
+                          <div className={cn(
+                            "h-12 w-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border",
+                            apt.status === 'confirmed' ? "bg-blue-100 border-blue-200" : "bg-amber-100 border-amber-200"
+                          )}>
+                            <span className="text-[8px] font-black opacity-60 uppercase leading-none">DAY</span>
+                            <span className="text-lg font-black">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'd') : ''}</span>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Upcoming Appointment</p>
-                            <h4 className="text-lg font-black tracking-tight">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'p') : ''} 상담 예약</h4>
-                            <p className="text-xs font-bold text-muted-foreground">{apt.teacherNote || '상담 주제 미입력'}</p>
+                            <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-0.5">{apt.status === 'requested' ? 'Pending Request' : 'Scheduled Appointment'}</p>
+                            <h4 className="text-lg font-black tracking-tight">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'p') : ''} 상담</h4>
+                            <p className="text-xs font-bold text-muted-foreground">{apt.studentNote || apt.teacherNote || '상담 주제 미입력'}</p>
                           </div>
                         </div>
-                        <Badge className="bg-blue-500 text-white font-black text-[10px] px-3 py-1 rounded-full border-none">예약 확정</Badge>
+                        <div className="flex items-center gap-2">
+                          {apt.status === 'requested' && (
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleUpdateAptStatus(apt.id, 'confirmed')} className="rounded-xl font-black bg-emerald-500 h-9 px-3 gap-1"><Check className="h-3.5 w-3.5" /> 승인</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleUpdateAptStatus(apt.id, 'canceled')} className="rounded-xl font-black border-rose-200 text-rose-600 h-9 px-3 gap-1"><X className="h-3.5 w-3.5" /> 거절</Button>
+                            </div>
+                          )}
+                          {apt.status === 'confirmed' && (
+                            <Button size="sm" onClick={() => handleOpenLogModalFromRes(apt)} className="rounded-xl font-black bg-primary text-white h-9 px-4 gap-1.5 shadow-md">
+                              <FileEdit className="h-3.5 w-3.5" /> 일지 작성
+                            </Button>
+                          )}
+                          {apt.status !== 'requested' && apt.status !== 'confirmed' && getStatusBadge(apt.status)}
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -728,6 +802,44 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
           <DialogFooter><Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full rounded-2xl h-12 font-black shadow-xl text-base">{isUpdating ? <Loader2 className="animate-spin" /> : "학생 상태 업데이트 완료"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 상담 일지 작성 팝업 (예약 건 기반) */}
+      <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
+          <div className="bg-emerald-600 p-8 text-white relative">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tighter">상담 일지 작성</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold">상담 후 학생에게 전달할 피드백을 기록하세요.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-5 bg-white">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 유형</label>
+              <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
+                <SelectTrigger className="rounded-xl h-12 border-2 font-bold"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="academic">학업/성적</SelectItem>
+                  <SelectItem value="life">생활 습관</SelectItem>
+                  <SelectItem value="career">진로/진학</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 내용</label>
+              <Textarea placeholder="핵심 내용을 상세히 기록하세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[120px] text-sm font-bold border-2" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-emerald-700 ml-1">개선 권고 사항</label>
+              <Input placeholder="학생이 수행할 과제나 개선점" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-12 border-2" />
+            </div>
+          </div>
+          <DialogFooter className="p-8 bg-muted/30">
+            <Button onClick={handleAddCounselLog} disabled={isSubmitting || !logContent.trim()} className="w-full h-14 rounded-2xl font-black bg-emerald-600 text-white shadow-xl">
+              {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 완료 및 일지 저장'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

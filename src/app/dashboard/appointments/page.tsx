@@ -49,12 +49,15 @@ import {
   Sparkles,
   CalendarPlus,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  Check,
+  X,
+  FileEdit
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { CounselingReservation, CounselingLog, CenterMembership } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -68,10 +71,18 @@ export default function AppointmentsPage() {
 
   const isMobile = viewMode === 'mobile';
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedResForLog, setSelectedResForLog] = useState<CounselingReservation | null>(null);
+  
   const [aptDate, setAptDate] = useState('');
   const [aptTime, setAptTime] = useState('14:00');
   const [studentNote, setStudentNote] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  
+  const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
+  const [logContent, setLogContent] = useState('');
+  const [logImprovement, setLogImprovement] = useState('');
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -80,9 +91,9 @@ export default function AppointmentsPage() {
 
   const centerId = activeMembership?.id;
   const isStudent = activeMembership?.role === 'student';
+  const isStaff = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const roleConfirmed = !!activeMembership?.role;
 
-  // 선생님 목록 조회 (기본적으로 teacher, centerAdmin을 가져온 후 클라이언트에서 필터링)
   const teachersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -92,12 +103,11 @@ export default function AppointmentsPage() {
   }, [firestore, centerId]);
   const { data: allStaff } = useCollection<CenterMembership>(teachersQuery);
 
-  // 사용자의 요청에 따른 선생님 목록 필터링
   const filteredTeachers = useMemo(() => {
     if (!allStaff) return [];
     return allStaff.filter(t => 
-      t.displayName !== '동백센터관리자' && // 특정 관리자 계정 제외
-      t.role !== 'centerAdmin' // 원장은 선생 목록에서 제외
+      t.displayName !== '동백센터관리자' && 
+      t.role !== 'centerAdmin' 
     );
   }, [allStaff]);
 
@@ -179,6 +189,59 @@ export default function AppointmentsPage() {
       setSelectedTeacherId('');
     } catch (e: any) {
       toast({ variant: "destructive", title: "신청 실패", description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateStatus = async (resId: string, status: CounselingReservation['status']) => {
+    if (!firestore || !centerId) return;
+    setIsSubmitting(true);
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', resId), {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: status === 'confirmed' ? "상담 승인 완료" : "상담 거절 완료" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "처리 실패", description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenLogModal = (res: CounselingReservation) => {
+    setSelectedResForLog(res);
+    setLogContent('');
+    setLogImprovement('');
+    setLogType('academic');
+    setIsLogModalOpen(true);
+  };
+
+  const handleSaveCounselLog = async () => {
+    if (!firestore || !centerId || !user || !selectedResForLog || !logContent.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const logData = {
+        studentId: selectedResForLog.studentId,
+        teacherId: user.uid,
+        type: logType,
+        content: logContent.trim(),
+        improvement: logImprovement.trim(),
+        createdAt: serverTimestamp(),
+        reservationId: selectedResForLog.id
+      };
+
+      await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), logData);
+      await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', selectedResForLog.id), {
+        status: 'done',
+        updatedAt: serverTimestamp()
+      });
+
+      toast({ title: "상담 일지 저장 및 완료 처리됨" });
+      setIsLogModalOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "저장 실패" });
     } finally {
       setIsSubmitting(false);
     }
@@ -295,7 +358,7 @@ export default function AppointmentsPage() {
               ) : (
                 <div className="divide-y divide-muted/10">
                   {reservations.map((res) => (
-                    <div key={res.id} className="p-6 sm:p-8 flex items-center justify-between group hover:bg-muted/5 transition-colors">
+                    <div key={res.id} className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4">
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
                         <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:bg-primary transition-all duration-500 shadow-inner">
                           <span className="text-[8px] sm:text-[10px] font-black text-primary/60 uppercase group-hover:text-white/60 tracking-tighter">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'MMM') : ''}</span>
@@ -311,8 +374,26 @@ export default function AppointmentsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                        <ChevronRight className="h-5 w-5" />
+                      
+                      <div className="flex items-center gap-2">
+                        {isStaff && res.status === 'requested' && (
+                          <div className="flex gap-2 w-full sm:w-auto">
+                            <Button size="sm" onClick={() => handleUpdateStatus(res.id, 'confirmed')} className="rounded-xl font-black bg-emerald-500 hover:bg-emerald-600 gap-1.5 h-10 px-4">
+                              <Check className="h-4 w-4" /> 승인
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(res.id, 'canceled')} className="rounded-xl font-black border-rose-200 text-rose-600 hover:bg-rose-50 h-10 px-4">
+                              <X className="h-4 w-4" /> 거절
+                            </Button>
+                          </div>
+                        )}
+                        {isStaff && res.status === 'confirmed' && (
+                          <Button size="sm" onClick={() => handleOpenLogModal(res)} className="rounded-xl font-black bg-primary text-white gap-1.5 h-10 px-4 shadow-md">
+                            <FileEdit className="h-4 w-4" /> 일지 작성
+                          </Button>
+                        )}
+                        {!isStaff && <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                          <ChevronRight className="h-5 w-5" />
+                        </div>}
                       </div>
                     </div>
                   ))}
@@ -375,6 +456,44 @@ export default function AppointmentsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 상담 일지 작성 모달 (확정 예약 클릭 시) */}
+      <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
+          <div className="bg-emerald-600 p-8 text-white relative">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tighter">상담 일지 작성</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold">상담 후 피드백을 기록하세요.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-5 bg-white">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 유형</label>
+              <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
+                <SelectTrigger className="rounded-xl h-12 border-2 font-bold"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="academic">학업/성적</SelectItem>
+                  <SelectItem value="life">생활 습관</SelectItem>
+                  <SelectItem value="career">진로/진학</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 내용</label>
+              <Textarea placeholder="핵심 내용을 상세히 기록하세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[120px] text-sm font-bold border-2" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-emerald-700 ml-1">개선 권고 사항</label>
+              <Input placeholder="학생이 수행할 과제나 개선점" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-12 border-2" />
+            </div>
+          </div>
+          <DialogFooter className="p-8 bg-muted/30">
+            <Button onClick={handleSaveCounselLog} disabled={isSubmitting || !logContent.trim()} className="w-full h-14 rounded-2xl font-black bg-emerald-600 text-white shadow-xl">
+              {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 완료 및 일지 저장'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
