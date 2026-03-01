@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -86,6 +87,16 @@ import Link from 'next/link';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+
+const SUBJECTS = [
+  { id: 'kor', label: '국어', color: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600' },
+  { id: 'math', label: '수학', color: 'bg-blue-500', light: 'bg-blue-50', text: 'text-blue-600' },
+  { id: 'eng', label: '영어', color: 'bg-emerald-500', light: 'bg-emerald-50', text: 'text-emerald-600' },
+  { id: 'social', label: '사탐', color: 'bg-amber-500', light: 'bg-amber-50', text: 'text-amber-600' },
+  { id: 'science', label: '과탐', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-600' },
+  { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
+  { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
+];
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
@@ -229,6 +240,8 @@ export default function StudyHistoryPage() {
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
+  const [newStudySubject, setNewStudySubject] = useState('math');
+  const [newStudyMinutes, setNewStudyMinutes] = useState('60');
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -291,8 +304,26 @@ export default function StudyHistoryPage() {
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const colRef = collection(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items');
     try {
-      const finalTitle = category === 'schedule' ? `${title.trim()}: 09:00 ~ 10:00` : title.trim();
-      await addDoc(colRef, { title: finalTitle, done: false, weight: category === 'schedule' ? 0 : 1, dateKey, category, studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: targetUid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      const data: any = { 
+        title: title.trim(), 
+        done: false, 
+        weight: category === 'schedule' ? 0 : 1, 
+        dateKey, category, 
+        studyPlanWeekId: weekKey, 
+        centerId: activeMembership.id, 
+        studentId: targetUid, 
+        createdAt: serverTimestamp(), 
+        updatedAt: serverTimestamp() 
+      };
+
+      if (category === 'schedule') {
+        data.title = `${title.trim()}: 09:00 ~ 10:00`;
+      } else if (category === 'study') {
+        data.subject = newStudySubject;
+        data.targetMinutes = Number(newStudyMinutes) || 0;
+      }
+
+      await addDoc(colRef, data);
       if (category === 'study') setNewStudyTask(''); else if (category === 'personal') setNewPersonalTask(''); else { setNewRoutineTitle(''); setIsRoutineModalOpen(false); }
     } catch (e) { console.error(e); } finally { setIsSubmitting(false); }
   };
@@ -421,8 +452,36 @@ export default function StudyHistoryPage() {
                   {scheduleItems.length === 0 ? <p className="text-center py-6 text-[10px] font-bold text-muted-foreground/40 italic">등록된 루틴이 없습니다.</p> : scheduleItems.map(item => <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isActuallyPast} isMobile={isMobile} disabled={isParent} />)}
                 </TabsContent>
                 <TabsContent value="study" className="mt-0 space-y-3">
-                  {studyTasks.map(task => <div key={task.id} className={cn("flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all", task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} /><Label className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
-                  {!isActuallyPast && !isParent && <div className="relative flex items-center bg-white border-2 border-emerald-100 rounded-2xl p-1 shadow-sm"><Input placeholder="공부 계획 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} className="border-none shadow-none focus-visible:ring-0 font-bold h-9 text-xs" /><Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} className="h-8 w-8 rounded-xl bg-emerald-500"><Plus className="h-4 w-4" /></Button></div>}
+                  {studyTasks.map(task => {
+                    const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
+                    return (
+                      <div key={task.id} className={cn("flex items-start gap-3 p-3.5 rounded-2xl border-2 transition-all", task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white shadow-sm")}>
+                        <Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="mt-1" />
+                        <div className="flex-1 grid gap-1">
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("rounded-md font-black text-[8px] px-1.5 py-0 border-none", subj?.color, "text-white")}>{subj?.label}</Badge>
+                            {task.targetMinutes && <span className="text-[9px] font-black text-muted-foreground/40">{task.targetMinutes}분</span>}
+                          </div>
+                          <Label className={cn("text-sm font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!isActuallyPast && !isParent && (
+                    <div className="flex flex-col gap-3 p-4 rounded-2xl bg-white border-2 border-emerald-100 shadow-sm">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select value={newStudySubject} onValueChange={setNewStudySubject}>
+                          <SelectTrigger className="h-8 rounded-lg border-2 text-[10px] font-bold"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">{SUBJECTS.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-8 rounded-lg border-2 text-[10px] font-bold" />
+                      </div>
+                      <div className="relative flex items-center bg-muted/10 rounded-xl p-1">
+                        <Input placeholder="공부 계획 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} className="border-none shadow-none focus-visible:ring-0 font-bold h-8 text-[10px]" />
+                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} className="h-7 w-7 rounded-lg bg-emerald-500"><Plus className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
                 <TabsContent value="personal" className="mt-0 space-y-3">
                   {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all", task.done ? "bg-amber-50/20 border-emerald-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} /><Label className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}

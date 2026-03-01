@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -51,7 +52,9 @@ import {
   CheckCircle2,
   CalendarCheck,
   ChevronRight,
-  CircleDot
+  CircleDot,
+  BarChart3,
+  BookOpen
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -90,6 +93,16 @@ import { Badge } from '@/components/ui/badge';
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
+const SUBJECTS = [
+  { id: 'kor', label: '국어', color: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600' },
+  { id: 'math', label: '수학', color: 'bg-blue-500', light: 'bg-blue-50', text: 'text-blue-600' },
+  { id: 'eng', label: '영어', color: 'bg-emerald-500', light: 'bg-emerald-50', text: 'text-emerald-600' },
+  { id: 'social', label: '사탐', color: 'bg-amber-500', light: 'bg-amber-50', text: 'text-amber-600' },
+  { id: 'science', label: '과탐', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-600' },
+  { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
+  { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
+];
+
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
@@ -106,7 +119,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: an
     const parts = rangeStr?.split(' ~ ') || [];
     return {
       start: from24h(parts[0]),
-      end: from24h(parts[1] || parts[0]) // 종료시간 없으면 시작시간과 동일하게 초기화
+      end: from24h(parts[1] || parts[0]) 
     };
   };
 
@@ -227,6 +240,8 @@ export default function StudyPlanPage() {
   const isMobile = viewMode === 'mobile';
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
+  const [newStudySubject, setNewStudySubject] = useState('math');
+  const [newStudyMinutes, setNewStudyMinutes] = useState('60');
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -271,6 +286,18 @@ export default function StudyPlanPage() {
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
 
+  const studyTimeSummary = useMemo(() => {
+    const summary: Record<string, number> = {};
+    let total = 0;
+    studyTasks.forEach(task => {
+      const subject = task.subject || 'etc';
+      const mins = task.targetMinutes || 0;
+      summary[subject] = (summary[subject] || 0) + mins;
+      total += mins;
+    });
+    return { breakdown: summary, total };
+  }, [studyTasks]);
+
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
@@ -296,9 +323,8 @@ export default function StudyPlanPage() {
     );
     
     try {
-      const finalTitle = category === 'schedule' ? `${title.trim()}: 09:00 ~ 10:00` : title.trim();
-      await addDoc(itemsCollectionRef, {
-        title: finalTitle,
+      const data: any = {
+        title: title.trim(),
         done: false,
         weight: category === 'schedule' ? 0 : 1,
         dateKey: selectedDateKey,
@@ -308,10 +334,22 @@ export default function StudyPlanPage() {
         studentId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
-      if (category === 'study') setNewStudyTask('');
-      else if (category === 'personal') setNewPersonalTask('');
-      else {
+      };
+
+      if (category === 'schedule') {
+        data.title = `${title.trim()}: 09:00 ~ 10:00`;
+      } else if (category === 'study') {
+        data.subject = newStudySubject;
+        data.targetMinutes = Number(newStudyMinutes) || 0;
+      }
+
+      await addDoc(itemsCollectionRef, data);
+      
+      if (category === 'study') {
+        setNewStudyTask('');
+      } else if (category === 'personal') {
+        setNewPersonalTask('');
+      } else {
         setNewRoutineTitle('');
         setIsRoutineModalOpen(false);
       }
@@ -361,6 +399,7 @@ export default function StudyPlanPage() {
         dailyPlans.forEach(plan => {
           batch.set(doc(itemsCollectionRef), {
             title: plan.title, done: false, weight: plan.weight, dateKey: targetDateKey, category: plan.category || 'study',
+            subject: plan.subject || null, targetMinutes: plan.targetMinutes || 0,
             studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           });
         });
@@ -389,6 +428,38 @@ export default function StudyPlanPage() {
           {isPast && <Badge variant="destructive" className="rounded-full font-black text-[10px] px-3 py-1 shadow-lg">History Mode</Badge>}
         </div>
       </header>
+
+      {/* 학습 밸런스 요약 카드 */}
+      <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
+        <CardHeader className="p-6 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="bg-primary/5 p-1.5 rounded-lg"><BarChart3 className="h-4 w-4 text-primary" /></div>
+            <CardTitle className="text-sm font-black uppercase tracking-widest text-primary/60">학습 밸런스 요약</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 pt-2">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black tracking-tighter text-primary">{Math.floor(studyTimeSummary.total / 60)}h {studyTimeSummary.total % 60}m</span>
+              <span className="text-xs font-bold text-muted-foreground">총 계획 시간</span>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {SUBJECTS.map(subj => {
+                const plannedTime = studyTimeSummary.breakdown[subj.id] || 0;
+                if (plannedTime === 0) return null;
+                return (
+                  <div key={subj.id} className={cn("flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all", subj.light, subj.text, "border-transparent shadow-sm")}>
+                    <div className={cn("w-2 h-2 rounded-full", subj.color)} />
+                    <span className="text-[11px] font-black">{subj.label} {Math.floor(plannedTime / 60)}h {plannedTime % 60}m</span>
+                  </div>
+                );
+              })}
+              {studyTimeSummary.total === 0 && <p className="text-xs font-bold text-muted-foreground/40 italic py-2">학습 계획을 추가하여 시간 배분을 확인하세요.</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className={cn("grid grid-cols-7 gap-1.5 sm:gap-4", isMobile ? "px-0" : "px-0")}>
         {weekDays.map((day) => {
@@ -461,17 +532,46 @@ export default function StudyPlanPage() {
               <CardContent className={cn("bg-[#fafafa]", isMobile ? "p-5" : "p-8")}>
                 <TabsContent value="study" className="mt-0 space-y-4">
                   <div className="grid gap-3">
-                    {studyTasks.map((task) => (
-                      <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.5rem] border-2 transition-all group", task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm")}>
-                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
-                        <Label htmlFor={task.id} className={cn("flex-1 font-bold text-sm sm:text-base leading-tight transition-all", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
-                        {!isPast && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}><Trash2 className="h-4 w-4" /></Button>}
-                      </div>
-                    ))}
+                    {studyTasks.map((task) => {
+                      const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
+                      return (
+                        <div key={task.id} className={cn("flex items-start gap-4 p-5 rounded-[1.5rem] border-2 transition-all group", task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm")}>
+                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 mt-1" />
+                          <div className="flex-1 grid gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn("rounded-md font-black text-[9px] px-1.5 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
+                              {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/60 flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}분</span>}
+                            </div>
+                            <Label htmlFor={task.id} className={cn("font-bold text-sm sm:text-base leading-tight transition-all", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
+                          </div>
+                          {!isPast && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}><Trash2 className="h-4 w-4" /></Button>}
+                        </div>
+                      );
+                    })}
+                    
                     {!isPast && (
-                      <div className="relative flex items-center bg-white border-2 border-emerald-100 rounded-2xl p-1.5 shadow-sm mt-2">
-                        <Input placeholder="오늘 할 공부 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm sm:text-base" />
-                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl h-10 w-10 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"><Plus className="h-5 w-5" /></Button>
+                      <div className="flex flex-col gap-3 p-5 rounded-[1.5rem] bg-white border-2 border-emerald-100 shadow-sm mt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">과목 선택</Label>
+                            <Select value={newStudySubject} onValueChange={setNewStudySubject}>
+                              <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-none shadow-2xl">
+                                {SUBJECTS.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">목표 시간(분)</Label>
+                            <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-10 rounded-xl border-2 font-bold text-xs" />
+                          </div>
+                        </div>
+                        <div className="relative flex items-center bg-muted/20 rounded-2xl p-1.5">
+                          <Input placeholder="공부 할 일을 입력하세요..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm sm:text-base" />
+                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl h-10 w-10 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"><Plus className="h-5 w-5" /></Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -500,9 +600,11 @@ export default function StudyPlanPage() {
                   <p className="text-[11px] font-black text-primary/70 uppercase tracking-widest">{format(selectedDate, 'yyyy. MM. dd', { locale: ko })}</p>
                 </div>
                 {!isPast && (
-                  <Button variant="outline" size="sm" className="rounded-[1.25rem] gap-2 text-[11px] font-black h-11 px-6 border-2 shadow-sm w-full sm:w-auto bg-white" onClick={handleApplyToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
-                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Copy className="h-4 w-4" />} 이 요일 반복 복사
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" className="rounded-[1.25rem] gap-2 text-[11px] font-black h-11 px-6 border-2 shadow-sm bg-white" onClick={handleApplyToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Copy className="h-4 w-4" />} 이 요일 반복 복사
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>

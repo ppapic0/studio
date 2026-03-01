@@ -205,6 +205,8 @@ export interface StudyPlanItem {
   doneAt?: Timestamp;
   dateKey?: string;
   category?: 'schedule' | 'personal' | 'study';
+  subject?: string;
+  targetMinutes?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
