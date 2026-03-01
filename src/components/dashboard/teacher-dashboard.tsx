@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -30,7 +29,7 @@ import {
   ArrowRight,
   Activity
 } from 'lucide-react';
-import { useCollection, useFirestore, useDoc } from '@/firebase';
+import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
@@ -44,7 +43,7 @@ import {
   Timestamp,
   updateDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, GrowthProgress } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -107,7 +106,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return [...rawAppointments].sort((a, b) => (a.scheduledAt?.toMillis() || 0) - (b.scheduledAt?.toMillis() || 0));
   }, [rawAppointments]);
 
-  // [UI 핵심] 실제 좌석이 있는 구역만 계산하여 포커싱 (Bounding Box Zoom)
   const seatBounds = useMemo(() => {
     if (!attendanceList || attendanceList.length === 0) return null;
     
@@ -356,7 +354,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         
                         {isLateOrAbsent && (
                           <div className="absolute -top-1 -right-1 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white">
-                            <div className="rounded-full bg-white w-1 h-1" />
+                            <div className="rounded-full bg-white w-1.5 h-1.5" />
                           </div>
                         )}
                       </div>
@@ -409,19 +407,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       {/* 레이아웃 편집 다이얼로그 */}
       <Dialog open={isLayoutModalOpen} onOpenChange={setIsLayoutModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-4xl h-[90vh] flex flex-col p-0 rounded-[2.5rem] overflow-hidden border-none shadow-2xl">
+        <DialogContent className="max-w-[100vw] sm:max-w-4xl h-[100vh] sm:h-[90vh] flex flex-col p-0 rounded-none sm:rounded-[2.5rem] overflow-hidden border-none shadow-2xl">
           <div className="bg-primary p-6 text-white shrink-0">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black">좌석 도면 편집기</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold">네모난 좌석을 그리드에 배치하여 도면을 완성하세요.</DialogDescription>
+              <DialogDescription className="text-white/70 font-bold text-xs sm:text-sm">그리드를 터치하여 좌석을 배치하세요. (가로 스크롤 가능)</DialogDescription>
             </DialogHeader>
           </div>
-          <div className="flex-1 overflow-auto bg-[#fafafa] p-4 sm:p-10">
+          <div className="flex-1 overflow-auto bg-[#fafafa] p-4 sm:p-10 custom-scrollbar">
             <div 
-              className="grid gap-1 mx-auto bg-white p-4 rounded-3xl shadow-inner border border-border/50"
+              className="grid gap-1 mx-auto bg-white p-4 rounded-3xl shadow-inner border border-border/50 relative"
               style={{ 
                 gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`,
-                width: GRID_WIDTH * (isMobile ? 24 : 40),
+                width: GRID_WIDTH * (isMobile ? 20 : 40),
+                minWidth: isMobile ? GRID_WIDTH * 18 : 'none'
               }}
             >
               {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -433,19 +432,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     key={idx}
                     onClick={() => handleGridClick(x, y)}
                     className={cn(
-                      "aspect-square rounded-md border flex items-center justify-center cursor-pointer transition-all",
+                      "aspect-square rounded-md sm:rounded-lg border flex items-center justify-center cursor-pointer transition-all",
                       seat ? "bg-primary text-white border-primary shadow-lg scale-90" : "bg-white border-muted hover:bg-primary/5"
                     )}
                   >
-                    {seat && <span className="text-[10px] font-black">{seat.seatNo}</span>}
+                    {seat && <span className="text-[8px] sm:text-[10px] font-black">{seat.seatNo}</span>}
                   </div>
                 );
               })}
             </div>
           </div>
-          <DialogFooter className="p-6 bg-white border-t shrink-0">
-            <Button variant="outline" onClick={() => setIsLayoutModalOpen(false)} className="rounded-xl font-black">취소</Button>
-            <Button onClick={saveLayout} disabled={isSaving} className="rounded-xl font-black px-10 gap-2">
+          <DialogFooter className="p-6 bg-white border-t shrink-0 flex-row justify-between sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsLayoutModalOpen(false)} className="rounded-xl font-black flex-1 sm:flex-none">취소</Button>
+            <Button onClick={saveLayout} disabled={isSaving} className="rounded-xl font-black px-10 gap-2 flex-1 sm:flex-none">
               {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
               레이아웃 저장
             </Button>
