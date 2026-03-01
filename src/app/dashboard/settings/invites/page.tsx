@@ -150,7 +150,9 @@ export default function InviteCodesPage() {
                       <TableCell className="font-mono">{invite.id}</TableCell>
                       <TableCell>{invite.intendedRole}</TableCell>
                       <TableCell>{`${invite.usedCount}/${invite.maxUses}`}</TableCell>
-                      <TableCell>{format((invite.expiresAt as any).toDate(), 'yyyy-MM-dd')}</TableCell>
+                      <TableCell>
+                        {invite.expiresAt ? format((invite.expiresAt as any).toDate(), 'yyyy-MM-dd') : '무기한'}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={status.variant}>
                           {status.text}
