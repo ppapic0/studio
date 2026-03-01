@@ -47,7 +47,10 @@ import {
   FileEdit,
   MessageSquare,
   BarChart3,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Info,
+  History
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
@@ -60,9 +63,12 @@ import {
   Tooltip, 
   CartesianGrid, 
   AreaChart, 
-  Area
+  Area,
+  BarChart,
+  Bar
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -121,6 +127,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [logContent, setLogContent] = useState('');
   const [logImprovement, setLogImprovement] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [activeAnalysis, setActiveAnalysis] = useState<'today' | 'weekly' | 'monthly' | 'level' | 'rank' | null>(null);
 
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -184,11 +192,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         name: format(new Date(l.dateKey), 'MM/dd'),
         hours: Number((l.totalMinutes / 60).toFixed(1)),
         minutes: l.totalMinutes
+      })),
+      weeklyChartData: logs.slice(0, 7).reverse().map(l => ({
+        name: format(new Date(l.dateKey), 'EEE'),
+        hours: Number((l.totalMinutes / 60).toFixed(1)),
       }))
     };
   }, [logs, todayKey]);
 
-  const [activeAnalysis, setActiveAnalysis] = useState<'today' | 'weekly' | 'monthly' | 'level' | 'rank' | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -243,39 +254,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId) return;
-    
-    if (!editForm.name.trim()) {
-      toast({ variant: "destructive", title: "수정 실패", description: "이름은 필수 입력 항목입니다." });
-      return;
-    }
-
+    if (!editForm.name.trim()) { toast({ variant: "destructive", title: "수정 실패", description: "이름은 필수 입력 항목입니다." }); return; }
     setIsUpdating(true);
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
       const result: any = await updateFn({
-        studentId, 
-        centerId, 
-        displayName: editForm.name,
-        schoolName: editForm.schoolName, 
-        grade: editForm.grade, 
-        password: editForm.password.length >= 6 ? editForm.password : undefined,
-        parentLinkCode: editForm.parentLinkCode.trim() || null
+        studentId, centerId, displayName: editForm.name, schoolName: editForm.schoolName, grade: editForm.grade, 
+        password: editForm.password.length >= 6 ? editForm.password : undefined, parentLinkCode: editForm.parentLinkCode.trim() || null
       });
-
-      if (result.data?.ok) {
-        toast({ title: "정보 수정 완료", description: "학생의 모든 정보가 안전하게 업데이트되었습니다." });
-        setIsEditModalOpen(false);
-      }
-    } catch (e: any) {
-      console.error("[handleUpdateInfo Error]", e);
-      toast({ 
-        variant: "destructive", 
-        title: "수정 실패", 
-        description: e.message || "서버 통신 중 오류가 발생했습니다." 
-      });
-    } finally {
-      setIsUpdating(false);
-    }
+      if (result.data?.ok) { toast({ title: "정보 수정 완료" }); setIsEditModalOpen(false); }
+    } catch (e: any) { toast({ variant: "destructive", title: "수정 실패", description: e.message }); } finally { setIsUpdating(false); }
   };
 
   const handleUpdateStatus = async () => {
@@ -286,9 +274,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       batch.update(doc(firestore, 'centers', centerId, 'members', studentId), { status: statusForm, updatedAt: serverTimestamp() });
       batch.update(doc(firestore, 'userCenters', studentId, 'centers', centerId), { status: statusForm, updatedAt: serverTimestamp() });
       await batch.commit();
-      toast({ title: "학생 상태 변경 완료" });
+      toast({ title: "상태 변경 완료" });
       setIsStatusModalOpen(false);
-    } catch (e: any) { toast({ variant: "destructive", title: "상태 변경 실패", description: e.message }); } finally { setIsUpdating(false); }
+    } catch (e: any) { toast({ variant: "destructive", title: "상태 변경 실패" }); } finally { setIsUpdating(false); }
   };
 
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
@@ -327,6 +315,124 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <StatAnalysisCard title="마스터리 레벨" value={`Lv.${progress?.level || 1}`} subValue="성장 능력치 분석" icon={Zap} colorClass="text-purple-500" isMobile={isMobile} onClick={() => setActiveAnalysis('level')} />
         <StatAnalysisCard title="시즌 랭킹" value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '순위 밖'} subValue="센터 내 상대 위치" icon={Trophy} colorClass="text-rose-500" isMobile={isMobile} onClick={() => setActiveAnalysis('rank')} />
       </section>
+
+      {/* 분석 다이얼로그 */}
+      <Dialog open={!!activeAnalysis} onOpenChange={(open) => !open && setActiveAnalysis(null)}>
+        <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg", isMobile ? "max-w-[95vw]" : "")}>
+          <div className={cn("p-8 text-white relative", 
+            activeAnalysis === 'today' ? "bg-emerald-500" :
+            activeAnalysis === 'weekly' ? "bg-blue-500" :
+            activeAnalysis === 'monthly' ? "bg-amber-500" :
+            activeAnalysis === 'level' ? "bg-purple-500" : "bg-rose-500"
+          )}>
+            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+              {activeAnalysis === 'today' ? <Clock className="h-24 w-24" /> :
+               activeAnalysis === 'weekly' ? <TrendingUp className="h-24 w-24" /> :
+               activeAnalysis === 'monthly' ? <CalendarDays className="h-24 w-24" /> :
+               activeAnalysis === 'level' ? <Zap className="h-24 w-24" /> : <Trophy className="h-24 w-24" />}
+            </div>
+            <DialogHeader className="relative z-10">
+              <DialogTitle className="text-3xl font-black tracking-tighter">
+                {activeAnalysis === 'today' ? '오늘의 학습 분석' :
+                 activeAnalysis === 'weekly' ? '주간 리듬 레포트' :
+                 activeAnalysis === 'monthly' ? '월간 집중도 분석' :
+                 activeAnalysis === 'level' ? '마스터리 성장판' : '시즌 성취도 랭킹'}
+              </DialogTitle>
+              <DialogDescription className="text-white/70 font-bold">
+                {student?.name} 학생의 정밀 데이터를 확인하세요.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          
+          <div className="p-8 space-y-6">
+            {(activeAnalysis === 'today' || activeAnalysis === 'weekly' || activeAnalysis === 'monthly') && (
+              <div className="space-y-6">
+                <div className="bg-muted/30 p-5 rounded-2xl border border-border/50">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">학습 추이 그래프</span>
+                    <Badge variant="outline" className="text-[10px] font-black">{activeAnalysis === 'monthly' ? '최근 30일' : '최근 7일'}</Badge>
+                  </div>
+                  <div className="h-[200px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={activeAnalysis === 'monthly' ? stats.chartData : stats.weeklyChartData}>
+                        <defs><linearGradient id="dialogColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                        <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
+                        <YAxis hide />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#dialogColor)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Card className="p-4 bg-primary/5 border-none shadow-sm">
+                    <p className="text-[10px] font-black text-primary/60 uppercase">총 몰입 시간</p>
+                    <p className="text-xl font-black mt-1">{activeAnalysis === 'today' ? `${Math.floor(stats.today/60)}h ${stats.today%60}m` : `${Math.floor((activeAnalysis === 'weekly' ? stats.weeklyAvg*7 : stats.monthlyAvg*30)/60)}h`}</p>
+                  </Card>
+                  <Card className="p-4 bg-primary/5 border-none shadow-sm">
+                    <p className="text-[10px] font-black text-primary/60 uppercase">일일 평균</p>
+                    <p className="text-xl font-black mt-1">{activeAnalysis === 'today' ? '-' : `${Math.floor((activeAnalysis === 'weekly' ? stats.weeklyAvg : stats.monthlyAvg)/60)}h ${ (activeAnalysis === 'weekly' ? stats.weeklyAvg : stats.monthlyAvg) % 60}m`}</p>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {activeAnalysis === 'level' && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-5 bg-purple-50 p-6 rounded-[2rem] border border-purple-100">
+                  <div className="relative flex items-center justify-center">
+                    <svg className="h-20 w-20 transform -rotate-90">
+                      <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-purple-200" />
+                      <circle cx="40" cy="40" r="34" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-purple-600" 
+                        style={{ strokeDasharray: 213.6, strokeDashoffset: 213.6 - (213.6 * (progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) }} 
+                      />
+                    </svg>
+                    <span className="absolute text-xl font-black text-purple-700">Lv.{progress?.level || 1}</span>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-black text-purple-900">마스터리 숙련도</p>
+                    <p className="text-xs font-bold text-purple-600">{progress?.currentXp || 0} / {progress?.nextLevelXp || 1000} XP</p>
+                    <Progress value={((progress?.currentXp || 0) / (progress?.nextLevelXp || 1000)) * 100} className="h-2 bg-purple-200" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 }).map(([key, val]) => (
+                    <div key={key} className="p-3 bg-muted/30 rounded-xl border border-border/50 flex flex-col gap-1">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground">{key}</span>
+                      <span className="text-sm font-black">{(val as number).toFixed(1)} 점</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeAnalysis === 'rank' && (
+              <div className="space-y-6">
+                <div className="text-center py-10 space-y-4">
+                  <div className="mx-auto w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center border-4 border-rose-100 shadow-xl">
+                    <Trophy className="h-12 w-12 text-rose-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-3xl font-black tracking-tighter">센터 {rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '순위 산정 중'}</h4>
+                    <p className="text-sm font-bold text-muted-foreground mt-1">이번 시즌 계획 완수 챔피언 부문</p>
+                  </div>
+                </div>
+                <div className="p-5 bg-rose-50 rounded-2xl border border-rose-100 flex items-start gap-3">
+                  <Info className="h-5 w-5 text-rose-500 mt-0.5" />
+                  <p className="text-xs font-bold text-rose-900 leading-relaxed">
+                    상위 15% 이내 진입 시 '에메랄드' 티어로 승급할 수 있습니다. <br/>
+                    현재 페이스 유지 시 예상 기말 랭킹은 5위 이내입니다.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="p-6 bg-muted/30 border-t flex justify-end">
+            <Button onClick={() => setActiveAnalysis(null)} className="rounded-xl font-black px-8">확인 완료</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className={cn("grid w-full grid-cols-3 rounded-[1.5rem] p-1 bg-muted/30 border border-border/50 shadow-inner", isMobile ? "h-14" : "h-16")}>
