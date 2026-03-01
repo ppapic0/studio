@@ -53,7 +53,8 @@ import {
   Check,
   X,
   FileEdit,
-  GraduationCap
+  GraduationCap,
+  Filter
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -84,10 +85,22 @@ export default function AppointmentsPage() {
   const [logImprovement, setLogImprovement] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState<string>('all');
 
   useEffect(() => {
     setAptDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
+
+  // 시즌 판별 로직
+  const getSeasonName = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    if (month <= 2) return `${year - 1}년 겨울방학`;
+    if (month <= 6) return `${year}년 1학기`;
+    if (month <= 8) return `${year}년 여름방학`;
+    if (month <= 12) return `${year}년 2학기`;
+    return `${year}년 겨울방학`;
+  };
 
   // 종속성 안정화
   const centerId = activeMembership?.id;
@@ -149,10 +162,27 @@ export default function AppointmentsPage() {
     return [...rawReservations].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
   }, [rawReservations]);
 
-  const logs = useMemo(() => {
+  const availableSeasons = useMemo(() => {
     if (!rawLogs) return [];
-    return [...rawLogs].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    const seasons = new Set<string>();
+    rawLogs.forEach(log => {
+      if (log.createdAt) {
+        seasons.add(getSeasonName(log.createdAt.toDate()));
+      }
+    });
+    return Array.from(seasons).sort().reverse();
   }, [rawLogs]);
+
+  const filteredLogs = useMemo(() => {
+    if (!rawLogs) return [];
+    let list = [...rawLogs];
+    
+    if (selectedSeason !== 'all') {
+      list = list.filter(log => log.createdAt && getSeasonName(log.createdAt.toDate()) === selectedSeason);
+    }
+    
+    return list.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+  }, [rawLogs, selectedSeason]);
 
   const handleRequestAppointment = async () => {
     if (!firestore || !centerId || !user) return;
@@ -407,7 +437,6 @@ export default function AppointmentsPage() {
                             <FileEdit className="h-4 w-4" /> 일지 작성
                           </Button>
                         )}
-                        {/* 학생 본인의 신청 취소 기능 */}
                         {isStudent && (res.status === 'requested' || res.status === 'confirmed') && (
                           <Button 
                             size="sm" 
@@ -433,21 +462,41 @@ export default function AppointmentsPage() {
         <TabsContent value="logs" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-emerald-50/30 border-b p-6 sm:p-8">
-              <CardTitle className="text-xl font-black text-emerald-700 flex items-center gap-3">
-                <CheckCircle2 className="h-6 w-6 opacity-60" /> 피드백 및 결과 일지
-              </CardTitle>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <CardTitle className="text-xl font-black text-emerald-700 flex items-center gap-3">
+                  <CheckCircle2 className="h-6 w-6 opacity-60" /> 피드백 및 결과 일지
+                </CardTitle>
+                
+                {/* 시즌 필터 드롭다운 */}
+                <div className="flex items-center gap-2 w-full sm:w-auto bg-white/50 p-1.5 rounded-2xl border shadow-sm">
+                  <Filter className="h-3.5 w-3.5 text-emerald-600 ml-2" />
+                  <Select value={selectedSeason} onValueChange={setSelectedSeason}>
+                    <SelectTrigger className="h-9 w-full sm:w-[180px] border-none bg-transparent font-black text-xs shadow-none focus:ring-0">
+                      <SelectValue placeholder="시즌 선택" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      <SelectItem value="all" className="font-bold">전체 시즌 보기</SelectItem>
+                      {availableSeasons.map(season => (
+                        <SelectItem key={season} value={season} className="font-bold">
+                          {season}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {logsLoading ? (
                 <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
-              ) : logs.length === 0 ? (
+              ) : filteredLogs.length === 0 ? (
                 <div className="py-32 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
                   <FileText className="h-16 w-16 opacity-10" />
-                  기록된 일지가 없습니다.
+                  해당 시즌의 기록이 없습니다.
                 </div>
               ) : (
                 <div className="divide-y divide-muted/10">
-                  {logs.map((log) => (
+                  {filteredLogs.map((log) => (
                     <div key={log.id} className="p-6 sm:p-10 space-y-5 hover:bg-muted/5 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap items-center gap-3">
@@ -463,6 +512,9 @@ export default function AppointmentsPage() {
                               <GraduationCap className="h-3 w-3" /> {log.studentName} 학생
                             </Badge>
                           )}
+                          <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0.5">
+                            {log.createdAt ? getSeasonName(log.createdAt.toDate()) : ''}
+                          </Badge>
                         </div>
                         <span className="text-[8px] font-black text-primary/30 uppercase tracking-[0.3em] hidden sm:inline">Counseling Verified</span>
                       </div>
