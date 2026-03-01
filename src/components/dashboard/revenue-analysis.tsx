@@ -43,9 +43,9 @@ import {
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { CenterMembership } from '@/lib/types';
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
+import { format, eachMonthOfInterval, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export function RevenueAnalysis() {
@@ -54,20 +54,27 @@ export function RevenueAnalysis() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
 
-  // 1. 모든 학생 멤버십 데이터 조회 (등록 시기 분석용)
+  // 1. 모든 학생 멤버십 데이터 조회 (복합 색인 오류 방지를 위해 orderBy 제거 후 메모리 정렬)
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'), 
-      where('role', '==', 'student'),
-      orderBy('joinedAt', 'desc')
+      where('role', '==', 'student')
     );
   }, [firestore, centerId]);
-  const { data: members, isLoading } = useCollection<CenterMembership>(membersQuery);
+  
+  const { data: rawMembers, isLoading } = useCollection<CenterMembership>(membersQuery);
 
   // --- 비즈니스 지표 계산 ---
   const businessMetrics = useMemo(() => {
-    if (!members) return null;
+    if (!rawMembers) return null;
+
+    // 가입일 기준 내림차순 정렬 (클라이언트 측)
+    const members = [...rawMembers].sort((a, b) => {
+      const timeA = a.joinedAt?.toMillis() || 0;
+      const timeB = b.joinedAt?.toMillis() || 0;
+      return timeB - timeA;
+    });
 
     const activeCount = members.filter(m => m.status === 'active').length;
     const churnCount = members.filter(m => m.status === 'withdrawn').length;
@@ -102,16 +109,20 @@ export function RevenueAnalysis() {
       registrationTrend,
       allMembers: members
     };
-  }, [members]);
+  }, [rawMembers]);
 
-  if (isLoading || !businessMetrics) {
+  // 로딩 상태이거나 데이터가 아직 null일 때(초기 로드) 스피너 표시
+  if (isLoading || (membersQuery && !businessMetrics)) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-        <p className="font-black text-muted-foreground/40 uppercase tracking-widest">Analyzing Financial Data...</p>
+        <p className="font-black text-muted-foreground/40 uppercase tracking-widest">수익 데이터를 분석하고 있습니다...</p>
       </div>
     );
   }
+
+  // 데이터가 로드되었으나 아무도 없는 경우 (또는 에러 상황 대비)
+  if (!businessMetrics) return null;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-700">
@@ -220,23 +231,29 @@ export function RevenueAnalysis() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {businessMetrics.allMembers.slice(0, 50).map((student) => (
-                    <TableRow key={student.id} className="hover:bg-muted/5 transition-colors h-16">
-                      <TableCell className="pl-8 font-bold text-sm">{student.displayName || '학생'}</TableCell>
-                      <TableCell className="text-xs font-bold text-muted-foreground">
-                        {student.joinedAt ? format(student.joinedAt.toDate(), 'yyyy. MM. dd') : '데이터 없음'}
-                      </TableCell>
-                      <TableCell className="pr-8 text-right">
-                        <Badge className={cn(
-                          "font-black text-[10px] border-none",
-                          student.status === 'active' ? "bg-emerald-50 text-emerald-600" : 
-                          student.status === 'onHold' ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-600"
-                        )}>
-                          {student.status === 'active' ? '재원' : student.status === 'onHold' ? '휴학' : '퇴원'}
-                        </Badge>
-                      </TableCell>
+                  {businessMetrics.allMembers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic font-bold">등록된 학생이 없습니다.</TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    businessMetrics.allMembers.slice(0, 50).map((student) => (
+                      <TableRow key={student.id} className="hover:bg-muted/5 transition-colors h-16">
+                        <TableCell className="pl-8 font-bold text-sm">{student.displayName || '학생'}</TableCell>
+                        <TableCell className="text-xs font-bold text-muted-foreground">
+                          {student.joinedAt ? format(student.joinedAt.toDate(), 'yyyy. MM. dd') : '데이터 없음'}
+                        </TableCell>
+                        <TableCell className="pr-8 text-right">
+                          <Badge className={cn(
+                            "font-black text-[10px] border-none",
+                            student.status === 'active' ? "bg-emerald-50 text-emerald-600" : 
+                            student.status === 'onHold' ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-600"
+                          )}>
+                            {student.status === 'active' ? '재원' : student.status === 'onHold' ? '휴학' : '퇴원'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
