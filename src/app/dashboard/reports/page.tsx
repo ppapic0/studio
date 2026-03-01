@@ -42,7 +42,8 @@ import {
   TrendingUp,
   Calendar,
   CheckCircle2,
-  PenTool
+  PenTool,
+  Users
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
