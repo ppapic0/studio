@@ -27,7 +27,11 @@ import {
   Activity,
   ArrowRight,
   History,
-  Sparkles
+  Sparkles,
+  UserPlus,
+  UserMinus,
+  Search,
+  User
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -55,6 +59,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { format, startOfDay, endOfDay } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
@@ -71,7 +77,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState<{id: string, seatNo: number} | null>(null);
   const [selectedSeatForManage, setSelectedSeatForManage] = useState<AttendanceCurrent | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [isSaving, setIsSaving] = useState(false);
   const [tempLayout, setTempLayout] = useState<{ x: number, y: number, seatNo: number }[]>([]);
@@ -128,6 +134,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [seatBounds]);
 
+  const unassignedStudents = useMemo(() => {
+    if (!students) return [];
+    return students.filter(s => !s.seatNo || s.seatNo === 0)
+      .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [students, searchTerm]);
+
   const openLayoutEditor = () => {
     if (attendanceList && attendanceList.length > 0) {
       setTempLayout(attendanceList.map(a => ({ x: a.gridX || 0, y: a.gridY || 0, seatNo: a.seatNo })));
@@ -170,12 +182,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
-      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { seatNo: selectedSeatForAssign.seatNo, updatedAt: serverTimestamp() });
-      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeatForAssign.id), { studentId: student.id, updatedAt: serverTimestamp() });
+      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { 
+        seatNo: selectedSeatForAssign.seatNo, 
+        updatedAt: serverTimestamp() 
+      });
+      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeatForAssign.id), { 
+        studentId: student.id, 
+        status: 'absent',
+        updatedAt: serverTimestamp() 
+      });
       await batch.commit();
-      toast({ title: `${student.name} 학생 배정 완료` });
+      toast({ title: `${student.name} 학생을 ${selectedSeatForAssign.seatNo}번 좌석에 배정했습니다.` });
       setIsAssignModalOpen(false);
+      setSearchTerm('');
     } catch (e) { toast({ variant: "destructive", title: "배정 실패" }); } finally { setIsSaving(false); }
+  };
+
+  const unassignStudentFromSeat = async () => {
+    if (!firestore || !centerId || !selectedSeatForManage || !selectedSeatForManage.studentId) return;
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeatForManage.studentId), { 
+        seatNo: 0, 
+        updatedAt: serverTimestamp() 
+      });
+      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeatForManage.id), { 
+        studentId: null, 
+        status: 'absent',
+        updatedAt: serverTimestamp() 
+      });
+      await batch.commit();
+      toast({ title: "좌석 배정을 해제했습니다." });
+      setIsManagingSeatModalOpen(false);
+    } catch (e) { toast({ variant: "destructive", title: "해제 실패" }); } finally { setIsSaving(false); }
   };
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
@@ -266,7 +306,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     return (
                       <div 
                         key={seat.id} 
-                        onClick={() => occupant ? (setSelectedStudentId(occupant.id), setSelectedSeatForManage(seat), setIsManagingSeatModalOpen(true)) : (setSelectedSeatForAssign({id: seat.id, seatNo: seat.seatNo}), setIsAssignModalOpen(true))}
+                        onClick={() => occupant ? (setSelectedSeatForManage(seat), setIsManagingSeatModalOpen(true)) : (setSelectedSeatForAssign({id: seat.id, seatNo: seat.seatNo}), setIsAssignModalOpen(true))}
                         className={cn(
                           "aspect-square rounded-lg border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-90",
                           isStudying ? "bg-emerald-500 border-emerald-600 text-white shadow-lg shadow-emerald-500/20" : 
@@ -302,7 +342,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 text-primary tracking-tighter">
                   <MessageSquare className="h-5 w-5" /> 오늘 상담 현황
                 </CardTitle>
-                <CardDescription className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Active Appointments</CardDescription>
+                <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-widest">Active Appointments</CardDescription>
               </div>
               <Button asChild variant="ghost" className="rounded-full h-10 px-4 text-xs font-black gap-1.5 hover:bg-primary/5">
                 <Link href="/dashboard/appointments">전체 관리 <ArrowRight className="h-3 w-3" /></Link>
@@ -344,7 +384,67 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 모달 시스템 */}
+      {/* 학생 배정 모달 */}
+      <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+        <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 translate-x-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "rounded-[2.5rem] sm:max-w-md")}>
+          <div className="bg-primary p-8 text-white relative overflow-hidden">
+            <Sparkles className="absolute -top-10 -right-10 h-40 w-40 opacity-10 animate-pulse" />
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT {selectedSeatForAssign?.seatNo}</Badge>
+            </div>
+            <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
+              <UserPlus className="h-7 w-7 text-accent" /> 학생 좌석 배정
+            </DialogTitle>
+            <DialogDescription className="text-white/60 font-bold mt-1">이 좌석에 배정할 학생을 선택해 주세요.</DialogDescription>
+          </div>
+          
+          <div className="p-6 space-y-4 bg-white">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+              <Input 
+                placeholder="이름으로 찾기..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="rounded-xl border-2 pl-10 h-11 text-sm font-bold"
+              />
+            </div>
+            
+            <ScrollArea className="h-[300px] pr-4">
+              <div className="space-y-2">
+                {studentsLoading ? (
+                  <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary/20" /></div>
+                ) : unassignedStudents.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground/40 font-bold italic text-xs">배정 가능한 학생이 없습니다.</div>
+                ) : (
+                  unassignedStudents.map((student) => (
+                    <div 
+                      key={student.id} 
+                      onClick={() => assignStudentToSeat(student)}
+                      className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center justify-between group transition-all active:scale-95"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary">
+                          {student.name.charAt(0)}
+                        </div>
+                        <div className="grid gap-0.5">
+                          <span className="font-black text-sm">{student.name}</span>
+                          <span className="text-[10px] font-bold text-muted-foreground">{student.schoolName} · {student.grade}</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-40 transition-all" />
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter className="p-6 bg-muted/10 border-t">
+            <Button variant="ghost" onClick={() => setIsAssignModalOpen(false)} className="w-full h-12 rounded-xl font-black">취소</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 좌석 관리 모달 */}
       <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 translate-x-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "rounded-[2.5rem] sm:max-w-md")}>
           {selectedSeatForManage && (
@@ -361,9 +461,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   <Button onClick={() => handleStatusUpdate('break')} className="h-16 rounded-[1.5rem] font-black bg-blue-500 gap-2 shadow-lg hover:bg-blue-600 transition-all"><Maximize2 className="h-4 w-4" /> 휴식</Button>
                   <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-16 rounded-[1.5rem] font-black border-rose-200 text-rose-600 gap-2 hover:bg-rose-50 transition-all"><AlertCircle className="h-4 w-4" /> 퇴실</Button>
                 </div>
-                <Button variant="secondary" asChild className="w-full h-14 rounded-2xl font-black text-primary gap-3 mt-2">
-                  <Link href={`/dashboard/teacher/students/${selectedSeatForManage.studentId}`}>상세 리포트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-20" /></Link>
-                </Button>
+                
+                <div className="pt-4 border-t border-dashed space-y-3">
+                  <Button variant="secondary" asChild className="w-full h-14 rounded-2xl font-black text-primary gap-3">
+                    <Link href={`/dashboard/teacher/students/${selectedSeatForManage.studentId}`}>상세 리포트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-20" /></Link>
+                  </Button>
+                  <Button variant="ghost" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-rose-600 hover:bg-rose-50 gap-3">
+                    <UserMinus className="h-4 w-4" /> 좌석 배정 해제
+                  </Button>
+                </div>
               </div>
             </>
           )}
