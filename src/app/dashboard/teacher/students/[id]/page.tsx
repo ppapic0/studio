@@ -1,3 +1,4 @@
+
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
@@ -20,6 +21,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -54,7 +56,10 @@ import {
   Target,
   ShieldCheck,
   User,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Crown,
+  Medal,
+  Star
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog } from '@/lib/types';
@@ -95,9 +100,12 @@ const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   return null;
 };
 
-function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMobile }: any) {
-  return (
-    <Card className="border-none shadow-md overflow-hidden relative bg-white rounded-[1.5rem] sm:rounded-[2rem]">
+function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMobile, onClick, href }: any) {
+  const content = (
+    <Card className={cn(
+      "border-none shadow-md overflow-hidden relative bg-white rounded-[1.5rem] sm:rounded-[2rem] transition-all",
+      (onClick || href) && "hover:shadow-xl active:scale-95 cursor-pointer hover:bg-muted/5"
+    )}>
       <div className={cn("absolute top-0 left-0 w-1 h-full", colorClass.replace('text-', 'bg-'))} />
       <CardHeader className={cn("pb-1 flex flex-row items-center justify-between", isMobile ? "px-3 pt-3" : "px-6 pt-6")}>
         <CardTitle className={cn("font-black text-muted-foreground uppercase", isMobile ? "text-[8px]" : "text-[10px]")}>{title}</CardTitle>
@@ -111,6 +119,10 @@ function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMo
       </CardContent>
     </Card>
   );
+
+  if (href) return <Link href={href}>{content}</Link>;
+  if (onClick) return <div onClick={onClick}>{content}</div>;
+  return content;
 }
 
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -139,6 +151,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [logContent, setLogContent] = useState('');
   const [logImprovement, setLogImprovement] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
 
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -167,6 +180,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const rankingQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const periodKey = format(new Date(), 'yyyy-MM');
+    // 계획 완수 기준 랭킹을 대표로 조회
     return query(collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_completion`, 'entries'), where('studentId', '==', studentId));
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
@@ -336,8 +350,47 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <StatAnalysisCard title="오늘 공부 시간" value={`${Math.floor(stats.today / 60)}h ${stats.today % 60}m`} subValue="목표 달성 트래킹" icon={Clock} colorClass="text-emerald-500" isMobile={isMobile} />
         <StatAnalysisCard title="주간 평균" value={`${Math.floor(stats.weeklyAvg / 60)}h ${stats.weeklyAvg % 60}m`} subValue="최근 학습 리듬" icon={TrendingUp} colorClass="text-blue-500" isMobile={isMobile} />
         <StatAnalysisCard title="월간 평균" value={`${Math.floor(stats.monthlyAvg / 60)}h ${stats.monthlyAvg % 60}m`} subValue="장기 집중도 분석" icon={CalendarDays} colorClass="text-amber-500" isMobile={isMobile} />
-        <StatAnalysisCard title="마스터리 레벨" value={`Lv.${progress?.level || 1}`} subValue="성장 능력치 분석" icon={Zap} colorClass="text-purple-500" isMobile={isMobile} />
-        <StatAnalysisCard title="시즌 랭킹" value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '순위 밖'} subValue="센터 내 상대 위치" icon={Trophy} colorClass="text-rose-500" isMobile={isMobile} />
+        
+        <Dialog open={isMasteryModalOpen} onOpenChange={setIsMasteryModalOpen}>
+          <DialogTrigger asChild>
+            <StatAnalysisCard title="마스터리 레벨" value={`Lv.${progress?.level || 1}`} subValue="성장 능력치 분석" icon={Zap} colorClass="text-purple-500" isMobile={isMobile} onClick={() => setIsMasteryModalOpen(true)} />
+          </DialogTrigger>
+          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
+            <div className="bg-purple-600 p-8 text-white relative">
+              <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10 animate-pulse" />
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black tracking-tighter">학생 마스터리 분석</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold">성장의 4대 지표를 상세히 분석합니다.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="p-8 space-y-6 bg-white">
+              {[
+                { label: '집중력 (Focus)', val: progress?.stats?.focus || 0, icon: Target, color: 'text-blue-500' },
+                { label: '꾸준함 (Consistency)', val: progress?.stats?.consistency || 0, icon: RefreshCw, color: 'text-emerald-500' },
+                { label: '목표달성 (Achievement)', val: progress?.stats?.achievement || 0, icon: CheckCircle2, color: 'text-amber-500' },
+                { label: '회복력 (Resilience)', val: progress?.stats?.resilience || 0, icon: ShieldCheck, color: 'text-rose-500' },
+              ].map((stat, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-black uppercase">
+                    <span className="flex items-center gap-2"><stat.icon className={cn("h-3.5 w-3.5", stat.color)} /> {stat.label}</span>
+                    <span className={stat.color}>{stat.val.toFixed(1)} / 100</span>
+                  </div>
+                  <Progress value={stat.val} className="h-1.5" />
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <StatAnalysisCard 
+          title="시즌 랭킹" 
+          value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '산정 중'} 
+          subValue="센터 내 상대 위치" 
+          icon={Trophy} 
+          colorClass="text-rose-500" 
+          isMobile={isMobile} 
+          href="/dashboard/leaderboards"
+        />
       </section>
 
       <Tabs defaultValue="overview" className="w-full">
