@@ -279,8 +279,8 @@ export default function GrowthPage() {
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
 
   return (
-    <div className={cn("flex flex-col pb-20", isMobile ? "gap-4" : "gap-8")}>
-      <header className={cn("flex flex-col", isMobile ? "gap-1" : "gap-2")}>
+    <div className={cn("flex flex-col pb-20", isMobile ? "gap-4 px-1" : "gap-8")}>
+      <header className={cn("flex flex-col", isMobile ? "gap-1 px-1" : "gap-2")}>
         <div className="flex items-center gap-3">
           <div className={cn("bg-primary rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center", isMobile ? "p-1.5" : "p-2")}>
             <Zap className={cn("text-white fill-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
@@ -294,7 +294,7 @@ export default function GrowthPage() {
       </header>
 
       {/* 핵심 스탯 그리드 */}
-      <section className={cn("grid gap-3", isMobile ? "grid-cols-2 px-1" : "md:grid-cols-2 lg:grid-cols-4")}>
+      <section className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-2 lg:grid-cols-4")}>
         {Object.entries(STAT_CONFIG).map(([key, config]) => {
           const val = stats[key as keyof typeof stats] || 0;
           const Icon = config.icon;
@@ -327,7 +327,7 @@ export default function GrowthPage() {
       </section>
 
       {/* 분석 및 가이드 섹션 */}
-      <section className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
+      <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
         <Card className={cn("md:col-span-2 border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-xl rounded-[2rem] overflow-hidden relative group", isMobile ? "p-6" : "")}>
           <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-700">
             <TrendingUp className={cn(isMobile ? "h-24 w-24" : "h-40 w-40")} />
@@ -396,7 +396,7 @@ export default function GrowthPage() {
       </section>
 
       {/* 마스터리 로드맵 메인 섹션 */}
-      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] shadow-2xl relative overflow-hidden", isMobile ? "p-5" : "p-10")}>
+      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] shadow-2xl relative overflow-hidden", isMobile ? "p-4 sm:p-5" : "p-10")}>
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
@@ -409,7 +409,7 @@ export default function GrowthPage() {
             <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>Lv.30은 상위 0.1%의 증거입니다.</p>
           </div>
           
-          <div className={cn("bg-white p-4 rounded-[1.5rem] sm:rounded-[2rem] flex items-center gap-4 border border-border/50 shadow-xl min-w-[260px]", isMobile ? "mx-1" : "")}>
+          <div className={cn("bg-white p-4 rounded-[1.5rem] sm:rounded-[2rem] flex items-center gap-4 border border-border/50 shadow-xl min-w-[260px]", isMobile ? "" : "")}>
             <div className="relative flex items-center justify-center shrink-0">
               <svg className={cn("transform -rotate-90", isMobile ? "h-14 w-14" : "h-16 w-16")}>
                 <circle cx={isMobile ? "28" : "32"} cy={isMobile ? "28" : "32"} r={isMobile ? "24" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted/30" />
@@ -459,14 +459,14 @@ export default function GrowthPage() {
 
           <div className={cn("grid gap-8 items-start", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
             {/* 스킬 트리 뷰 */}
-            <div className={cn("flex flex-col gap-8", isMobile ? "lg:col-span-12" : "lg:col-span-7")}>
+            <div className={cn("flex flex-col gap-8", isMobile ? "lg:col-span-12 items-center" : "lg:col-span-7")}>
               {MOCK_SKILLS.filter(s => s.branch === activeBranch).map((skill, idx) => {
                 const isUnlocked = !!progress?.skills?.[skill.id];
                 const canUnlock = !isUnlocked && stats[activeBranch] >= (skill.unlockCondition.value || 0);
                 const isSelected = selectedSkillId === skill.id;
                 
                 return (
-                  <div key={skill.id} className="relative flex flex-col items-center">
+                  <div key={skill.id} className="relative flex flex-col items-center w-full">
                     {idx < 4 && (
                       <div className={cn(
                         "absolute top-full w-0.5 h-8 border-l-2 border-dashed transition-colors duration-500",
@@ -477,9 +477,10 @@ export default function GrowthPage() {
                     <Card 
                       onClick={() => setSelectedSkillId(skill.id)}
                       className={cn(
-                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full max-w-[360px] rounded-[1.25rem] sm:rounded-[1.5rem]",
+                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full rounded-[1.25rem] sm:rounded-[1.5rem]",
                         isSelected ? "border-primary ring-4 ring-primary/10 scale-105 z-10 shadow-2xl" : "border-border/50",
-                        isUnlocked ? "bg-white shadow-xl" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60"
+                        isUnlocked ? "bg-white shadow-xl" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60",
+                        isMobile ? "max-w-[320px]" : "max-w-[360px]"
                       )}
                     >
                       <CardHeader className={cn("flex flex-row items-center gap-3 p-4", isMobile ? "p-3.5" : "p-5")}>
