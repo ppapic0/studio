@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -321,7 +322,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-2 sm:p-6 bg-[#fdfdfd] overflow-hidden">
+          <CardContent className="p-1 sm:p-6 bg-[#fdfdfd] overflow-hidden">
             {attendanceLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
             ) : !attendanceList || attendanceList.length === 0 ? (
@@ -330,13 +331,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <p className="text-xs font-bold text-muted-foreground/40">좌석이 없습니다.</p>
               </div>
             ) : (
-              <div className="w-full bg-white rounded-[1.5rem] border shadow-inner overflow-hidden p-2 sm:p-6">
+              <div className="w-full bg-white rounded-[1.5rem] border shadow-inner overflow-hidden p-1.5 sm:p-6">
                 <div 
                   className="grid gap-0.5 sm:gap-1.5 w-full mx-auto relative"
                   style={{ 
                     gridTemplateColumns: `repeat(20, minmax(0, 1fr))`,
-                    backgroundImage: 'radial-gradient(circle, #00000005 1px, transparent 1px)',
-                    backgroundSize: isMobile ? '10px 10px' : '14px 16px'
+                    backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
+                    backgroundSize: isMobile ? '12px 12px' : '16px 16px'
                   }}
                 >
                   {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -363,28 +364,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "aspect-square rounded-sm sm:rounded-lg border flex flex-col items-center justify-center transition-all relative cursor-pointer group shadow-sm",
+                          "aspect-square rounded-md sm:rounded-xl border flex flex-col items-center justify-center transition-all relative cursor-pointer group shadow-sm",
                           seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft" : 
                           isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                           seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
                           seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
-                          occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/20 text-muted-foreground/20 hover:border-primary/40"
+                          occupant ? "bg-white border-primary/40 text-primary" : "bg-white border-primary/10 text-muted-foreground/10 hover:border-primary/30"
                         )}
                       >
                         <span className={cn(
                           "font-black absolute top-0.5 left-0.5 opacity-40 leading-none",
-                          isMobile ? "text-[5px]" : "text-[7px]"
+                          isMobile ? "text-[5px]" : "text-[8px]"
                         )}>{seat.seatNo}</span>
                         
                         <span className={cn(
-                          "font-black truncate px-0.5 w-full text-center mt-0.5 leading-none",
-                          isMobile ? "text-[6px]" : "text-[8px]"
+                          "font-black truncate px-0.5 w-full text-center mt-0.5 leading-none tracking-tighter",
+                          isMobile ? "text-[7px]" : "text-[10px]"
                         )}>
                           {occupant ? occupant.name : ''}
                         </span>
                         
                         {isLateOrAbsent && (
-                          <div className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-white">
+                          <div className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white">
                             <div className={cn("rounded-full bg-white", isMobile ? "w-0.5 h-0.5" : "w-1 h-1")} />
                           </div>
                         )}

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -55,21 +56,6 @@ import {
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
 
-const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white/95 backdrop-blur-xl border-2 border-primary/10 p-4 rounded-2xl shadow-xl">
-        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{label}</p>
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-black text-primary">{payload[0].value}</span>
-          <span className="text-[10px] font-bold text-primary/60">{unit}</span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
 export default function LayoutViewPage() {
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
@@ -77,14 +63,10 @@ export default function LayoutViewPage() {
   const centerId = activeMembership?.id;
   const isMobile = viewMode === 'mobile';
   const todayKey = format(new Date(), 'yyyy-MM-dd');
-  const weekKey = format(new Date(), "yyyy-'W'II");
 
   const [selectedSeat, setSelectedSeat] = useState<AttendanceCurrent | null>(null);
   const [isManaging, setIsManaging] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  
-  const [isDetailPopupOpen, setIsDetailOpen] = useState(false);
-  const [isPlanPopupOpen, setIsPlanOpen] = useState(false);
 
   // 데이터 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -99,54 +81,7 @@ export default function LayoutViewPage() {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
 
-  // 팝업용 데이터 조회
-  const studentDetailRef = useMemoFirebase(() => {
-    if (!firestore || !centerId || !selectedStudentId) return null;
-    return doc(firestore, 'centers', centerId, 'students', selectedStudentId);
-  }, [firestore, centerId, selectedStudentId]);
-  const { data: studentDetail } = useDoc<StudentProfile>(studentDetailRef);
-
-  const studentLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !selectedStudentId) return null;
-    return collection(firestore, 'centers', centerId, 'studyLogs', selectedStudentId, 'days');
-  }, [firestore, centerId, selectedStudentId]);
-  const { data: studentLogs } = useCollection<StudyLogDay>(studentLogsQuery);
-
-  const studentProgressRef = useMemoFirebase(() => {
-    if (!firestore || !centerId || !selectedStudentId) return null;
-    return doc(firestore, 'centers', centerId, 'growthProgress', selectedStudentId);
-  }, [firestore, centerId, selectedStudentId]);
-  const { data: studentProgress } = useDoc<GrowthProgress>(studentProgressRef);
-
-  const studentPlansQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !selectedStudentId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'plans', selectedStudentId, 'weeks', weekKey, 'items'),
-      where('dateKey', '==', todayKey)
-    );
-  }, [firestore, centerId, selectedStudentId, weekKey, todayKey]);
-  const { data: studentPlans } = useCollection<StudyPlanItem>(studentPlansQuery);
-
   const isLoading = studentsLoading || attendanceLoading;
-  
-  const studyingCount = attendanceList?.filter(a => a.status === 'studying').length ?? 0;
-  const alertCount = attendanceList?.filter(a => a.studentId && a.status === 'absent').length ?? 0;
-
-  const detailStats = useMemo(() => {
-    if (!studentLogs) return { today: 0, weeklyAvg: 0, chartData: [] };
-    const todayLog = studentLogs.find(l => l.dateKey === todayKey);
-    const last7Days = studentLogs.slice(0, 7);
-    const weeklyAvg = last7Days.length > 0 ? Math.round(last7Days.reduce((acc, c) => acc + c.totalMinutes, 0) / 7) : 0;
-    
-    return {
-      today: todayLog?.totalMinutes || 0,
-      weeklyAvg,
-      chartData: studentLogs.slice(0, 14).reverse().map(l => ({
-        name: format(new Date(l.dateKey), 'MM/dd'),
-        hours: Number((l.totalMinutes / 60).toFixed(1))
-      }))
-    };
-  }, [studentLogs, todayKey]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -172,7 +107,7 @@ export default function LayoutViewPage() {
             <Monitor className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             실시간 관제 커맨드 센터
           </h1>
-          <p className="text-[10px] sm:text-xs font-bold text-muted-foreground">가로 스크롤 없이 전체 좌석을 조망합니다.</p>
+          <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Full-scale Monitoring</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="rounded-xl font-black h-10 gap-2 bg-white shadow-sm text-xs" onClick={() => window.location.reload()}>
@@ -181,8 +116,8 @@ export default function LayoutViewPage() {
         </div>
       </header>
 
-      <Card className="rounded-[2rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
-        <CardContent className="p-2 sm:p-10 bg-[#f8f9fa]">
+      <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
+        <CardContent className="p-1 sm:p-10 bg-[#f8f9fa]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-40 gap-4">
               <Loader2 className="animate-spin h-12 w-12 text-primary opacity-20" />
@@ -194,13 +129,13 @@ export default function LayoutViewPage() {
               <p className="text-xl font-bold text-muted-foreground/40">배치된 좌석이 없습니다.</p>
             </div>
           ) : (
-            <div className="w-full overflow-hidden bg-white rounded-[2rem] border shadow-2xl p-2 sm:p-12">
+            <div className="w-full bg-white rounded-[2rem] border shadow-2xl p-1.5 sm:p-12 overflow-hidden">
               <div 
                 className="grid gap-0.5 sm:gap-2 w-full mx-auto relative"
                 style={{ 
-                  gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(0, 1fr))`, 
+                  gridTemplateColumns: `repeat(20, minmax(0, 1fr))`, 
                   backgroundImage: 'radial-gradient(circle, #00000008 1px, transparent 1px)',
-                  backgroundSize: '20px 20px'
+                  backgroundSize: isMobile ? '12px 12px' : '20px 20px'
                 }}
               >
                 {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -224,29 +159,28 @@ export default function LayoutViewPage() {
                         setIsManaging(true);
                       }}
                       className={cn(
-                        "aspect-square rounded-sm sm:rounded-xl border sm:border-2 flex flex-col items-center justify-center transition-all duration-500 relative cursor-pointer group shadow-sm",
+                        "aspect-square rounded-md sm:rounded-2xl border flex flex-col items-center justify-center transition-all duration-500 relative cursor-pointer group shadow-sm",
                         seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft z-10" : 
                         isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                         seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
                         seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white" : 
-                        occupant ? "bg-white border-primary/40 text-primary hover:border-primary" : "bg-white border-primary/10 text-muted-foreground/10 hover:border-primary/30"
+                        occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/10 text-muted-foreground/10 hover:border-primary/30"
                       )}
                     >
                       <span className={cn(
                         "font-black absolute top-0.5 left-0.5 opacity-40 leading-none",
-                        isMobile ? "text-[5px]" : "text-[9px]"
+                        isMobile ? "text-[5px]" : "text-[10px]"
                       )}>{seat.seatNo}</span>
                       
                       <span className={cn(
-                        "font-black truncate px-0.5 w-full text-center mt-0.5 leading-tight",
-                        isMobile ? "text-[6px]" : "text-[11px]",
-                        isLateOrAbsent ? "text-rose-600" : ""
+                        "font-black truncate px-0.5 w-full text-center mt-0.5 leading-none tracking-tighter",
+                        isMobile ? "text-[7px]" : "text-[12px]"
                       )}>
                         {occupant ? occupant.name : ''}
                       </span>
                       
                       {isLateOrAbsent && (
-                        <div className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border-white">
+                        <div className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white p-0.5 rounded-full shadow-lg border border-white">
                           <div className={cn("rounded-full bg-white", isMobile ? "w-0.5 h-0.5" : "w-1 h-1")} />
                         </div>
                       )}
@@ -267,9 +201,9 @@ export default function LayoutViewPage() {
           { label: '휴식', color: 'bg-blue-500' },
           { label: '빈자리', color: 'bg-white border border-primary/10' }
         ].map((item) => (
-          <div key={item.label} className="flex items-center gap-1.5 bg-muted/20 px-2 py-1 rounded-lg border border-border/50">
-            <div className={cn("w-2.5 h-2.5 rounded-sm shadow-sm", item.color)} />
-            <span className="text-[9px] font-black text-foreground uppercase">{item.label}</span>
+          <div key={item.label} className="flex items-center gap-1.5 bg-muted/20 px-3 py-1.5 rounded-xl border border-border/50 shadow-inner">
+            <div className={cn("w-3 h-3 rounded-md shadow-sm", item.color)} />
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">{item.label}</span>
           </div>
         ))}
       </footer>
