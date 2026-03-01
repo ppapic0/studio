@@ -80,7 +80,7 @@ type MetricType = 'completion' | 'attendance' | 'growth';
 const RANK_THRESHOLDS: Record<MetricType, number[]> = {
   completion: [98, 95, 92, 88, 84, 75, 60, 0],
   attendance: [26, 24, 22, 20, 18, 15, 10, 0],
-  growth: [50, 40, 30, 20, 10, 5, 0, -50],
+  growth: [150, 140, 130, 120, 110, 100, 50, 0], // 성장 수치에 따른 등급 임계치 (퍼센트 기준)
 };
 
 const AUTO_TERMINATE_SECONDS = 7200; 
@@ -560,7 +560,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <GamifiedStatCard 
               title="성장 지수" 
               icon={TrendingUp} 
-              value={`x${(dailyStat?.studyTimeGrowthRate || 0).toFixed(2)}`} 
+              value={`${Math.round((dailyStat?.studyTimeGrowthRate || 0) * 100)}%`} 
               numericValue={(dailyStat?.studyTimeGrowthRate || 0) * 100}
               dailyValue={(dailyStat?.studyTimeGrowthRate || 0) * 100}
               evolution="전주 대비 성장" 
