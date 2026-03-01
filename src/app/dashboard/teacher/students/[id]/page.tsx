@@ -52,6 +52,8 @@ import {
   AlertCircle,
   ClipboardCheck,
   Target,
+  ShieldCheck,
+  User,
   PieChart as PieChartIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -258,7 +260,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         scheduledAt: Timestamp.fromDate(scheduledDate), status: 'confirmed',
         teacherNote: aptNote.trim(), createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
-      addDoc(collection(firestore, 'centerId' && centerId ? `centers/${centerId}/counselingReservations` : 'counselingReservations'), data).then(() => {
+      addDoc(collection(firestore, `centers/${centerId}/counselingReservations`), data).then(() => {
         toast({ title: "상담 예약 완료" });
         setAptNote('');
       }).finally(() => setIsSubmitting(false));
@@ -269,7 +271,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId || !currentUser || !logContent.trim()) return;
     setIsSubmitting(true);
     const data = { studentId, teacherId: currentUser.uid, type: logType, content: logContent.trim(), improvement: logImprovement.trim(), createdAt: serverTimestamp() };
-    addDoc(collection(firestore, 'centerId' && centerId ? `centers/${centerId}/counselingLogs` : 'counselingLogs'), data).then(() => {
+    addDoc(collection(firestore, `centers/${centerId}/counselingLogs`), data).then(() => {
       toast({ title: "상담 일지 기록 완료" });
       setLogContent(''); setLogImprovement('');
     }).finally(() => setIsSubmitting(false));
@@ -347,7 +349,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-            {/* 1. 오늘의 몰입도 (도넛 차트) */}
             <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
               <CardHeader className="bg-emerald-50/30 border-b p-6">
                 <CardTitle className="text-sm font-black flex items-center gap-2 text-emerald-700 uppercase tracking-widest"><Target className="h-4 w-4" /> 오늘 몰입 성과</CardTitle>
@@ -384,7 +385,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            {/* 2. 주간 평균 막대 그래프 */}
             <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
               <CardHeader className="bg-blue-50/30 border-b p-6">
                 <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700 uppercase tracking-widest"><BarChart3 className="h-4 w-4" /> 주간 학습 리듬</CardTitle>
@@ -412,7 +412,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            {/* 3. 월간 요약 카드 */}
             <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
               <CardHeader className="bg-amber-50/30 border-b p-6">
                 <CardTitle className="text-sm font-black flex items-center gap-2 text-amber-700 uppercase tracking-widest"><PieChartIcon className="h-4 w-4" /> 월간 집중 리포트</CardTitle>
