@@ -33,7 +33,11 @@ import {
   Loader2,
   RefreshCw,
   Gift,
-  Users2
+  Users2,
+  AlertTriangle,
+  Clock,
+  ArrowRight,
+  BarChart3
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -50,7 +54,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { CenterMembership, StudentProfile } from '@/lib/types';
-import { format, eachMonthOfInterval, subMonths } from 'date-fns';
+import { format, eachMonthOfInterval, subMonths, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -100,7 +104,9 @@ export function RevenueAnalysis() {
 
     const activeCount = members.filter(m => m.status === 'active').length;
     const churnCount = members.filter(m => m.status === 'withdrawn').length;
+    const totalEver = members.length;
     
+    // 예상 월 매출 (재원생 기준)
     const estimatedMonthlyRevenue = members
       .filter(m => m.status === 'active')
       .reduce((acc, m) => {
@@ -109,6 +115,25 @@ export function RevenueAnalysis() {
         const base = profile?.grade?.includes('N수생') ? 540000 : 390000;
         return acc + base;
       }, 0);
+
+    // 이탈 분석 지표
+    const churnRate = totalEver > 0 ? (churnCount / totalEver) * 100 : 0;
+    
+    // 평균 재원 기간 (퇴원생 기준)
+    const withdrawnMembers = members.filter(m => m.status === 'withdrawn' && m.joinedAt && m.updatedAt);
+    const avgStayDays = withdrawnMembers.length > 0 
+      ? Math.round(withdrawnMembers.reduce((acc, m) => acc + differenceInDays(m.updatedAt.toDate(), m.joinedAt.toDate()), 0) / withdrawnMembers.length)
+      : 0;
+
+    // 학년별 이탈 분포
+    const churnByGrade = withdrawnMembers.reduce((acc: any, m) => {
+      const profile = studentsProfiles?.find(p => p.id === m.id);
+      const grade = profile?.grade || '미정';
+      acc[grade] = (acc[grade] || 0) + 1;
+      return acc;
+    }, {});
+
+    const churnGradeChart = Object.entries(churnByGrade).map(([name, value]) => ({ name, value }));
 
     const now = new Date();
     const months = eachMonthOfInterval({
@@ -132,9 +157,13 @@ export function RevenueAnalysis() {
     return {
       activeCount,
       churnCount,
+      churnRate,
+      avgStayDays,
+      churnGradeChart,
       estimatedMonthlyRevenue,
       registrationTrend,
-      allMembers: members
+      allMembers: members,
+      totalEver
     };
   }, [rawMembers, studentsProfiles]);
 
@@ -255,6 +284,7 @@ export function RevenueAnalysis() {
 
   return (
     <div className="space-y-8 pb-32 animate-in fade-in duration-1000">
+      {/* KPI 영역 */}
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
         <Card 
           onClick={() => setActiveDrillDown(activeDrillDown === 'revenue' ? null : 'revenue')}
@@ -276,7 +306,7 @@ export function RevenueAnalysis() {
             <div className="flex items-center justify-between mt-6">
               <Badge variant="secondary" className={cn("font-black text-[9px]", activeDrillDown === 'revenue' ? "bg-white/20 text-white" : "")}>REAL-TIME</Badge>
               <div className="flex items-center gap-1.5 opacity-40">
-                <span className="text-[10px] font-bold">학생별 상세 보기</span>
+                <span className="text-[10px] font-bold">상세 보기</span>
                 <ChevronRight className={cn("h-4 w-4 transition-all", activeDrillDown === 'revenue' ? "rotate-90" : "")} />
               </div>
             </div>
@@ -334,6 +364,67 @@ export function RevenueAnalysis() {
         </Card>
       </div>
 
+      {/* 심층 분석 패널 (이탈 관리 클릭 시 노출) */}
+      {activeDrillDown === 'churn' && (
+        <Card className="rounded-[2.5rem] border-none shadow-2xl bg-rose-50/30 overflow-hidden ring-1 ring-rose-100 animate-in slide-in-from-top-4 duration-500">
+          <CardHeader className="bg-white/50 border-b border-rose-100 p-8 sm:p-10">
+            <div className="flex items-center gap-3">
+              <div className="bg-rose-500 p-2 rounded-xl shadow-lg shadow-rose-200"><AlertTriangle className="h-5 w-5 text-white" /></div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-2xl font-black tracking-tighter text-rose-700">이탈 데이터 정밀 분석</CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-rose-600/60">Churn Insights & Prevention Strategy</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 sm:p-10">
+            <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
+              {/* 주요 이탈 지표 */}
+              <div className="md:col-span-4 grid grid-cols-1 gap-4">
+                <Card className="rounded-2xl border-none shadow-sm bg-white p-6">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">누적 이탈률</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-rose-600">{businessMetrics.churnRate.toFixed(1)}</span>
+                    <span className="text-sm font-bold opacity-40">%</span>
+                  </div>
+                  <p className="text-[9px] font-bold text-muted-foreground mt-3 leading-relaxed">전체 가입자 {businessMetrics.totalEver}명 중 {businessMetrics.churnCount}명이 이탈했습니다.</p>
+                </Card>
+                <Card className="rounded-2xl border-none shadow-sm bg-white p-6">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">평균 재원 기간</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-primary">{businessMetrics.avgStayDays}</span>
+                    <span className="text-sm font-bold opacity-40">일</span>
+                  </div>
+                  <p className="text-[9px] font-bold text-muted-foreground mt-3 leading-relaxed">이탈 학생들은 평균적으로 약 {Math.round(businessMetrics.avgStayDays / 28)}사이클을 수강했습니다.</p>
+                </Card>
+              </div>
+
+              {/* 학년별 이탈 비중 */}
+              <Card className="md:col-span-8 rounded-2xl border-none shadow-sm bg-white overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2"><BarChart3 className="h-3 w-3 text-rose-500" /> 학년별 이탈 분포</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[220px]">
+                  {businessMetrics.churnGradeChart.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={businessMetrics.churnGradeChart} layout="vertical" margin={{ left: 20, right: 40, top: 10, bottom: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0f0f0" />
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={11} fontWeight="bold" width={60} />
+                        <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)'}} />
+                        <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={24} fill="#f43f5e" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center opacity-20 italic text-xs font-bold">데이터가 부족합니다.</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 등록 추이 차트 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
           <div className="flex justify-between items-center">
@@ -341,7 +432,7 @@ export function RevenueAnalysis() {
               <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
                 <TrendingUp className="h-6 w-6 text-primary" /> 신규 등록 학생 추이 (12개월)
               </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Bar Chart Click to filter list below</CardDescription>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Bar Chart Click to filter list below</div>
             </div>
             {selectedMonth && (
               <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(null)} className="h-8 rounded-lg font-black text-[10px] gap-2 border bg-white shadow-sm hover:bg-rose-50 hover:text-rose-600">
@@ -384,6 +475,7 @@ export function RevenueAnalysis() {
         </CardContent>
       </Card>
 
+      {/* 리스트 영역 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
           <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-start" : "flex-row")}>
@@ -398,7 +490,7 @@ export function RevenueAnalysis() {
                   ) : activeDrillDown === 'active' ? (
                     <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-black">현재 재원생 목록</Badge>
                   ) : activeDrillDown === 'churn' ? (
-                    <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 font-black">이탈 학생 분석</Badge>
+                    <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 font-black">이탈 학생 명부</Badge>
                   ) : (
                     <span className="text-sm font-bold">전체 학생 타임라인</span>
                   )}
@@ -440,7 +532,7 @@ export function RevenueAnalysis() {
                     <TableCell colSpan={4} className="h-64 text-center">
                       <div className="flex flex-col items-center gap-4 opacity-20">
                         <History className="h-16 w-16" />
-                        <p className="font-black italic">해당 기간의 등록 데이터가 없습니다.</p>
+                        <p className="font-black italic">해당 조건의 데이터가 없습니다.</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -479,7 +571,7 @@ export function RevenueAnalysis() {
                               variant={student.tutoringDiscount ? "default" : "outline"} 
                               className={cn("h-8 rounded-lg font-black text-[10px] gap-1 px-2.5 transition-all active:scale-90", student.tutoringDiscount ? "bg-blue-500 hover:bg-blue-600" : "text-blue-600 border-blue-100 hover:bg-blue-50")}
                               onClick={() => handleToggleDiscount(student.id, 'tutoring')}
-                              disabled={isUpdating}
+                              disabled={isUpdating || student.status !== 'active'}
                             >
                               <Gift className="h-3 w-3" /> 과외 -5만
                             </Button>
@@ -488,7 +580,7 @@ export function RevenueAnalysis() {
                               variant={student.siblingDiscount ? "default" : "outline"} 
                               className={cn("h-8 rounded-lg font-black text-[10px] gap-1 px-2.5 transition-all active:scale-90", student.siblingDiscount ? "bg-emerald-500 hover:bg-emerald-600" : "text-emerald-600 border-emerald-100 hover:bg-emerald-50")}
                               onClick={() => handleToggleDiscount(student.id, 'sibling')}
-                              disabled={isUpdating}
+                              disabled={isUpdating || student.status !== 'active'}
                             >
                               <Users2 className="h-3 w-3" /> 형제 -5%
                             </Button>
@@ -513,17 +605,23 @@ export function RevenueAnalysis() {
                           ) : (
                             <div 
                               onClick={() => {
+                                if (student.status !== 'active') return;
                                 setEditingFeeId(student.id);
                                 setTempFeeValue(finalFee.toString());
                               }}
-                              className="flex items-center justify-end gap-2 cursor-pointer group/fee"
+                              className={cn(
+                                "flex items-center justify-end gap-2 transition-colors",
+                                student.status === 'active' ? "cursor-pointer group/fee" : "opacity-40"
+                              )}
                             >
                               <span className="font-black text-lg tabular-nums text-primary/80 group-hover/fee:text-primary transition-colors">
                                 ₩{finalFee.toLocaleString()}
                               </span>
-                              <div className="opacity-0 group-hover/fee:opacity-100 transition-all p-1.5 rounded-md bg-primary/5">
-                                <Edit2 className="h-3 w-3 text-primary" />
-                              </div>
+                              {student.status === 'active' && (
+                                <div className="opacity-0 group-hover/fee:opacity-100 transition-all p-1.5 rounded-md bg-primary/5">
+                                  <Edit2 className="h-3 w-3 text-primary" />
+                                </div>
+                              )}
                             </div>
                           )}
                         </TableCell>
