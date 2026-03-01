@@ -55,6 +55,7 @@ import {
   AlertCircle,
   FileText,
   Target,
+  ClipboardCheck,
   PieChart as PieChartIcon
 } from 'lucide-react';
 import Link from 'next/link';
