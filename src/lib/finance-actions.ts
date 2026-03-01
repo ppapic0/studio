@@ -11,7 +11,7 @@ import {
   Firestore,
   updateDoc
 } from 'firebase/firestore';
-import { addDays, format, startOfDay, subDays } from 'date-fns';
+import { addDays, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { DiscountSnapshot, FinanceSettings, PricingMatrix, StudentProfile } from './types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -161,7 +161,7 @@ export async function requestRefund(db: Firestore, centerId: string, invoiceId: 
 export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: string) {
   const targetDate = startOfDay(new Date(dateStr));
 
-  // 1. 현재 센터의 모든 '재원생' 조회
+  // 1. 현재 센터의 모든 '재원생' 조회 (재수생 포함)
   const membersQuery = query(
     collection(db, `centers/${centerId}/members`),
     where('role', '==', 'student'),
@@ -174,7 +174,7 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
 
   membersSnap.forEach(doc => {
     const data = doc.data();
-    const monthlyFee = data.monthlyFee || 350000;
+    const monthlyFee = data.monthlyFee || 390000; // 기본가 39만 가정
     const dailyFee = Math.floor(monthlyFee / 28);
     
     dailyAccruedRevenue += dailyFee;
@@ -221,6 +221,21 @@ export async function syncRecentKpis(db: Firestore, centerId: string) {
     const dateStr = format(subDays(today, i), 'yyyy-MM-dd');
     syncPromises.push(syncDailyKpi(db, centerId, dateStr));
   }
+
+  await Promise.all(syncPromises);
+  return { ok: true };
+}
+
+/**
+ * 특정 월의 모든 날짜에 대해 KPI를 동기화합니다.
+ */
+export async function syncMonthKpis(db: Firestore, centerId: string, yearMonth: string) {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = endOfMonth(startDate);
+  
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  const syncPromises = days.map(day => syncDailyKpi(db, centerId, format(day, 'yyyy-MM-dd')));
 
   await Promise.all(syncPromises);
   return { ok: true };

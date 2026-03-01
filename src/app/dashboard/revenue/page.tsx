@@ -55,11 +55,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format, startOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
+import { format, startOfMonth, subMonths, eachMonthOfInterval, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
-import { syncRecentKpis } from '@/lib/finance-actions';
+import { syncRecentKpis, syncMonthKpis } from '@/lib/finance-actions';
 
 export default function RevenuePage() {
   const { activeMembership, viewMode, membershipsLoading } = useAppContext();
@@ -72,6 +72,9 @@ export default function RevenuePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // 현재 차트 기준월 (3월로 고정)
+  const [currentChartMonth, setCurrentChartMonth] = useState('2025-03');
+
   // 재무 데이터 자동 동기화
   useEffect(() => {
     if (!centerId || !firestore || isSyncing) return;
@@ -79,7 +82,8 @@ export default function RevenuePage() {
     const triggerSync = async () => {
       setIsSyncing(true);
       try {
-        await syncRecentKpis(firestore, centerId);
+        // 매출이 시작된 3월 전체 데이터 동기화
+        await syncMonthKpis(firestore, centerId, currentChartMonth);
       } catch (e) {
         console.error("KPI Sync Error:", e);
       } finally {
@@ -88,7 +92,7 @@ export default function RevenuePage() {
     };
 
     triggerSync();
-  }, [centerId, firestore]);
+  }, [centerId, firestore, currentChartMonth]);
 
   // 재무 설정 - 고정비 항목별 상태
   const [selectedFinanceMonth, setSelectedFinanceMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -131,19 +135,25 @@ export default function RevenuePage() {
     }
   }, [centerData]);
 
+  // 차트 표시를 위한 월간 KPI 조회 (3월 전체)
   const kpiQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'kpiDaily'),
-      orderBy('date', 'desc'),
-      limit(30)
+      where('date', '>=', `${currentChartMonth}-01`),
+      where('date', '<=', `${currentChartMonth}-31`),
+      orderBy('date', 'asc')
     );
-  }, [firestore, centerId]);
+  }, [firestore, centerId, currentChartMonth]);
 
   const { data: kpiHistory, isLoading: isKpiLoading } = useCollection<KpiDaily>(kpiQuery);
 
-  const todayKpi = useMemo(() => kpiHistory?.[0], [kpiHistory]);
-  const yesterdayKpi = useMemo(() => kpiHistory?.[1], [kpiHistory]);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayKpi = useMemo(() => kpiHistory?.find(k => k.date === todayStr) || kpiHistory?.[kpiHistory.length - 1], [kpiHistory, todayStr]);
+  const yesterdayKpi = useMemo(() => {
+    const yStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    return kpiHistory?.find(k => k.date === yStr);
+  }, [kpiHistory]);
 
   const growth = useMemo(() => {
     if (!todayKpi || !yesterdayKpi || yesterdayKpi.totalRevenue === 0) return 0;
@@ -151,17 +161,21 @@ export default function RevenuePage() {
   }, [todayKpi, yesterdayKpi]);
 
   const chartData = useMemo(() => {
-    if (!kpiHistory || kpiHistory.length === 0) {
-      return Array.from({ length: 7 }).map((_, i) => ({
-        name: format(new Date(Date.now() - (6 - i) * 86400000), 'MM/dd'),
-        revenue: 0,
-      }));
-    }
-    return [...kpiHistory].reverse().map(k => ({
-      name: k.date.substring(5).replace('-', '/'),
-      revenue: Math.round((k.totalRevenue || 0)),
-    }));
-  }, [kpiHistory]);
+    const [year, month] = currentChartMonth.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = endOfMonth(startDate);
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+    return days.map(day => {
+      const dStr = format(day, 'yyyy-MM-dd');
+      const kpi = kpiHistory?.find(k => k.date === dStr);
+      return {
+        name: format(day, 'dd'),
+        revenue: kpi ? Math.round(kpi.totalRevenue || 0) : 0,
+        fullDate: format(day, 'MM/dd')
+      };
+    });
+  }, [kpiHistory, currentChartMonth]);
 
   const handleSaveSettings = async () => {
     if (!firestore || !centerId) return;
@@ -190,8 +204,7 @@ export default function RevenuePage() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      // 고정비 변경 시 즉시 오늘 KPI 재동기화
-      await syncRecentKpis(firestore, centerId);
+      await syncMonthKpis(firestore, centerId, currentChartMonth);
 
       toast({ title: "재무 정책 및 비용이 저장되었습니다." });
       setIsSettingsOpen(false);
@@ -232,8 +245,8 @@ export default function RevenuePage() {
           <p className="text-sm font-bold text-muted-foreground/70 mt-2">일할 계산 방식의 정밀한 센터 수익성을 관리합니다.</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => centerId && syncRecentKpis(firestore, centerId)} variant="ghost" className="rounded-2xl font-black gap-2 h-12 border-2 border-dashed">
-            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> 데이터 수동 동기화
+          <Button onClick={() => centerId && syncMonthKpis(firestore, centerId, currentChartMonth)} variant="ghost" className="rounded-2xl font-black gap-2 h-12 border-2 border-dashed">
+            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> {currentChartMonth} 데이터 동기화
           </Button>
           <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
             <Settings className="h-4 w-4" /> 재무 정책 및 비용 설정
@@ -271,12 +284,12 @@ export default function RevenuePage() {
 
         <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 group hover:shadow-2xl transition-all">
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
-            <PieChart className="h-3 w-3 text-blue-500" /> 일일 인당 매출
+            <PieChart className="h-3 w-3 text-blue-500" /> 평균 일일 인당 매출
           </p>
           <div className="flex justify-between items-end">
             <div>
               <h3 className="text-4xl font-black tracking-tighter text-primary">₩{Math.round((todayKpi?.totalRevenue || 0) / (todayKpi?.activeStudentCount || 1)).toLocaleString()}</h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1">실질 1일 수강료</p>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1">재수생 포함 실질 1일 수강료</p>
             </div>
             <div className="bg-blue-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><PieChart className="h-6 w-6 text-blue-600" /></div>
           </div>
@@ -301,11 +314,11 @@ export default function RevenuePage() {
           <div className="flex justify-between items-center">
             <div className="space-y-1">
               <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-                <TrendingUp className="h-6 w-6 text-primary" /> 일별 발생 매출 추이 (발생주의)
+                <TrendingUp className="h-6 w-6 text-primary" /> {currentChartMonth.replace('-', '년 ')}월 발생 매출 추이
               </CardTitle>
               <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Daily Accrued Revenue (Sum of Price/28 per active student)</CardDescription>
             </div>
-            <Badge variant="outline" className="font-black text-[10px] border-primary/20 bg-white">최근 30일 실질 매출</Badge>
+            <Badge variant="outline" className="font-black text-[10px] border-primary/20 bg-white">한 달 단위 매출 집계</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-8 sm:p-10">
@@ -322,8 +335,17 @@ export default function RevenuePage() {
                 <XAxis dataKey="name" fontSize={11} fontWeight="bold" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
                 <YAxis fontSize={11} fontWeight="900" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
-                  formatter={(value: number) => [`₩${value.toLocaleString()}`, "매출"]}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-4 rounded-2xl shadow-2xl border-none ring-1 ring-black/5">
+                          <p className="text-[10px] font-black text-muted-foreground uppercase mb-1">{currentChartMonth.replace('-', '/')} / {label}일</p>
+                          <p className="text-lg font-black text-primary">₩{Number(payload[0].value).toLocaleString()}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
                 />
                 <Area 
                   type="monotone" 
