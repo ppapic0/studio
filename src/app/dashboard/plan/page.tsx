@@ -45,10 +45,11 @@ import {
   CalendarX,
   CalendarDays,
   Sparkles,
-  ChevronRight,
   ListTodo,
   Activity,
-  PlusCircle
+  PlusCircle,
+  CheckCircle2,
+  CalendarCheck
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -138,26 +139,30 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
 
   return (
     <div className={cn(
-      "flex flex-col gap-2 transition-all border group",
-      isMobile ? "p-3 rounded-2xl bg-white shadow-sm border-primary/5" : "p-4 rounded-xl bg-muted/20 hover:border-primary/50"
+      "flex flex-col transition-all border group relative",
+      isMobile ? "p-4 rounded-[1.5rem] bg-white shadow-sm border-border/50" : "p-5 rounded-2xl bg-white hover:border-primary/30"
     )}>
       <div className="flex items-center gap-3">
         <div className={cn(
-          "rounded-xl transition-all duration-500",
-          isMobile ? "bg-primary/5 p-2" : "bg-primary/10 p-2.5 group-hover:bg-primary group-hover:text-white"
+          "rounded-xl transition-all duration-500 shrink-0",
+          isMobile ? "bg-primary/5 p-2.5" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
         )}>
           <Icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </div>
-        <Label className={cn("flex-1 font-black tracking-tight truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         
+        <div className="flex-1 min-w-0">
+          <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
+          <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest leading-none">Routine Item</span>
+        </div>
+
         {isPast ? (
-          <Badge variant="outline" className="font-mono font-black text-primary border-primary/20">
+          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[10px]">
             {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
-          <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-xl border border-border/50">
+          <div className="flex items-center gap-0.5 bg-muted/20 p-1 rounded-xl border border-border/30">
              <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-black px-2 focus:ring-0 focus:bg-white rounded-lg transition-all", isMobile ? "w-[65px] h-8 text-[10px]" : "w-[75px] h-9 text-xs")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[55px] text-[10px]" : "w-[65px] text-xs")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -166,10 +171,10 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
                </SelectContent>
              </Select>
 
-             <div className="w-px h-4 bg-border/50 mx-0.5" />
+             <div className="w-px h-3.5 bg-border/50 mx-0.5" />
 
              <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-2 focus:ring-0 focus:bg-white rounded-lg transition-all", isMobile ? "w-[50px] h-8 text-[11px]" : "w-[60px] h-9 text-sm")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -177,10 +182,10 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
                </SelectContent>
              </Select>
 
-             <span className="text-[10px] font-black opacity-30">:</span>
+             <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
 
              <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
-               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-2 focus:ring-0 focus:bg-white rounded-lg transition-all", isMobile ? "w-[50px] h-8 text-[11px]" : "w-[60px] h-9 text-sm")}>
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -191,7 +196,7 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
         )}
         
         {!isPast && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDelete(item)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all shrink-0" onClick={() => onDelete(item)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
@@ -474,9 +479,9 @@ export default function StudyPlanPage() {
               key={day.toISOString()}
               variant={isSelected ? "default" : "outline"}
               className={cn(
-                "flex flex-col transition-all duration-500 rounded-2xl sm:rounded-[2rem] border-2 h-auto",
-                isMobile ? "py-3 px-0" : "py-6 px-4",
-                isSelected ? "bg-primary border-primary shadow-[0_15px_35px_rgba(0,0,0,0.15)] scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
+                "flex flex-col transition-all duration-500 rounded-[1.5rem] sm:rounded-[2.5rem] border-2 h-auto py-4",
+                isMobile ? "px-0" : "px-4",
+                isSelected ? "bg-primary border-primary shadow-xl scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
                 isToday && !isSelected && "border-primary/30"
               )}
               onClick={() => setSelectedDate(day)}
@@ -490,14 +495,14 @@ export default function StudyPlanPage() {
               </span>
               <span className={cn(
                 "font-black tracking-tighter tabular-nums leading-none",
-                isMobile ? "text-xl" : "text-3xl",
+                isMobile ? "text-lg" : "text-2xl",
                 isSelected ? "text-white" : "text-primary"
               )}>
                 {format(day, 'd')}
               </span>
               {isToday && (
                 <div className={cn(
-                  "w-1.5 h-1.5 rounded-full mt-2 animate-pulse shadow-glow",
+                  "w-1 h-1 rounded-full mt-1.5",
                   isSelected ? "bg-accent" : "bg-primary"
                 )} />
               )}
@@ -507,15 +512,15 @@ export default function StudyPlanPage() {
       </div>
 
       <div className={cn("grid gap-8", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
-        <Card className={cn("border-none shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile ? "md:col-span-12" : "md:col-span-5")}>
-          <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-10")}>
+        <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile ? "md:col-span-12" : "md:col-span-5")}>
+          <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-6" : "p-8")}>
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <CardTitle className={cn("flex items-center gap-3 font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-2xl")}>
                   <div className="bg-primary/5 p-2 rounded-xl"><Clock className="h-5 w-5 text-primary" /></div>
                   생활 루틴
                 </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Daily Routine Management</CardDescription>
+                <CardDescription className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Routine Management</CardDescription>
               </div>
               {!isPast && (
                 <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
@@ -524,10 +529,10 @@ export default function StudyPlanPage() {
                       <PlusCircle className="h-6 w-6" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="rounded-[2rem] border-none shadow-2xl p-8">
+                  <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8">
                     <DialogHeader>
                       <DialogTitle className="text-2xl font-black tracking-tighter">새 루틴 추가</DialogTitle>
-                      <CardDescription className="font-bold pt-1">학원 시간이나 고정 일정을 추가해 보세요.</CardDescription>
+                      <CardDescription className="font-bold pt-1">고정 일정을 추가해 보세요.</CardDescription>
                     </DialogHeader>
                     <div className="space-y-6 pt-4">
                       <div className="grid gap-2">
@@ -566,13 +571,13 @@ export default function StudyPlanPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent className={cn("bg-[#fafafa] flex flex-col gap-3", isMobile ? "p-5" : "p-8")}>
+          <CardContent className={cn("bg-[#fafafa] flex flex-col gap-3.5", isMobile ? "p-5" : "p-8")}>
             {isLoading ? (
               <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
             ) : scheduleItems.length === 0 ? (
-              <div className="py-10 text-center flex flex-col items-center gap-3 opacity-30 italic font-bold">
-                <Clock className="h-10 w-10" />
-                <p className="text-sm">설정된 루틴이 없습니다.</p>
+              <div className="py-16 text-center flex flex-col items-center gap-3 opacity-20 italic font-black">
+                <Clock className="h-12 w-12" />
+                <p className="text-sm">등록된 루틴이 없습니다.</p>
               </div>
             ) : (
               scheduleItems.sort((a,b) => {
@@ -595,42 +600,42 @@ export default function StudyPlanPage() {
 
         <div className={cn(isMobile ? "md:col-span-12" : "md:col-span-7")}>
           <Tabs defaultValue="study" className="w-full">
-            <Card className="border-none shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
+            <Card className="border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
               <CardHeader className="p-0 border-b bg-muted/10">
                 <TabsList className="w-full justify-start rounded-none bg-transparent h-20 p-0 gap-0">
                   <TabsTrigger 
                     value="study" 
-                    className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary transition-all font-black text-xs sm:text-base uppercase tracking-widest"
+                    className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 transition-all font-black text-xs sm:text-base uppercase tracking-widest"
                   >
                     학습 To-do
                   </TabsTrigger>
                   <TabsTrigger 
                     value="personal" 
-                    className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary transition-all font-black text-xs sm:text-base uppercase tracking-widest"
+                    className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 data-[state=active]:text-amber-600 transition-all font-black text-xs sm:text-base uppercase tracking-widest"
                   >
                     개인 일정
                   </TabsTrigger>
                 </TabsList>
               </CardHeader>
-              <CardContent className={cn("min-h-[450px]", isMobile ? "p-5" : "p-12")}>
+              <CardContent className={cn("min-h-[450px]", isMobile ? "p-5" : "p-10")}>
                 <TabsContent value="study" className="mt-0 space-y-6">
                   <div className="space-y-4">
                     {isLoading ? (
                       <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] italic">Syncing Study Matrix...</p>
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] italic">Syncing Matrix...</p>
                       </div>
                     ) : studyTasks.length === 0 && isPast ? (
                       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground/20 gap-6">
                          <CalendarX className="h-20 w-20" />
-                         <p className="text-lg font-black italic tracking-tighter">기록된 계획이 없습니다.</p>
+                         <p className="text-lg font-black italic tracking-tighter">작성된 기록이 없습니다.</p>
                       </div>
                     ) : (
                       <div className="grid gap-3">
                         {studyTasks.map((task) => (
                           <div key={task.id} className={cn(
-                            "flex items-center gap-4 p-4 rounded-[1.5rem] border-2 transition-all duration-500 group relative",
-                            task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent hover:border-primary/10 shadow-sm"
+                            "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
+                            task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
                           )}>
                             <Checkbox 
                               id={task.id} 
@@ -661,8 +666,8 @@ export default function StudyPlanPage() {
                     )}
                     
                     {!isPast && (
-                      <div className="flex items-center gap-2 pt-4 relative group">
-                        <div className="relative flex-1">
+                      <div className="pt-4">
+                        <div className="relative flex items-center bg-white border-2 border-dashed border-emerald-200 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1.5 shadow-sm">
                           <Input 
                             placeholder="공부 계획 추가..." 
                             value={newStudyTask}
@@ -670,20 +675,17 @@ export default function StudyPlanPage() {
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
                             disabled={isSubmitting}
                             className={cn(
-                              "rounded-2xl border-dashed border-2 pl-5 pr-14 font-bold bg-muted/5 focus-visible:ring-primary/10 transition-all",
-                              isMobile ? "h-14 text-sm" : "h-16 text-base"
+                              "border-none bg-transparent shadow-none focus-visible:ring-0 font-bold",
+                              isMobile ? "h-11 text-sm" : "h-12 text-base"
                             )}
                           />
                           <Button 
                             size="icon" 
                             onClick={() => handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting || !newStudyTask.trim()} 
-                            className={cn(
-                              "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl shadow-xl active:scale-95 bg-primary hover:bg-primary/90 transition-all",
-                              isMobile ? "h-11 w-11" : "h-13 w-13"
-                            )}
+                            className="rounded-xl h-10 w-10 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg active:scale-95 transition-all"
                           >
-                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6" />}
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
                         </div>
                       </div>
@@ -696,7 +698,7 @@ export default function StudyPlanPage() {
                     {isLoading ? (
                       <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] italic">Accessing personal flow...</p>
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] italic">Loading Routine...</p>
                       </div>
                     ) : personalTasks.length === 0 && isPast ? (
                       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground/20 gap-6">
@@ -707,8 +709,8 @@ export default function StudyPlanPage() {
                       <div className="grid gap-3">
                         {personalTasks.map((task) => (
                           <div key={task.id} className={cn(
-                            "flex items-center gap-4 p-4 rounded-[1.5rem] border-2 transition-all duration-500 group relative",
-                            task.done ? "bg-amber-50/20 border-amber-100/50" : "bg-white border-transparent hover:border-primary/10 shadow-sm"
+                            "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
+                            task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
                           )}>
                             <Checkbox 
                               id={task.id} 
@@ -739,8 +741,8 @@ export default function StudyPlanPage() {
                     )}
                     
                     {!isPast && (
-                      <div className="flex items-center gap-2 pt-4 relative group">
-                        <div className="relative flex-1">
+                      <div className="pt-4">
+                        <div className="relative flex items-center bg-white border-2 border-dashed border-amber-200 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1.5 shadow-sm">
                           <Input 
                             placeholder="개인 일정 추가..." 
                             value={newPersonalTask}
@@ -748,8 +750,8 @@ export default function StudyPlanPage() {
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
                             disabled={isSubmitting}
                             className={cn(
-                              "rounded-2xl border-dashed border-2 pl-5 pr-14 font-bold bg-muted/5 focus-visible:ring-primary/10 transition-all",
-                              isMobile ? "h-14 text-sm" : "h-16 text-base"
+                              "border-none bg-transparent shadow-none focus-visible:ring-0 font-bold",
+                              isMobile ? "h-11 text-sm" : "h-12 text-base"
                             )}
                           />
                           <Button 
@@ -757,12 +759,9 @@ export default function StudyPlanPage() {
                             size="icon" 
                             onClick={() => handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting || !newPersonalTask.trim()} 
-                            className={cn(
-                              "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl border-2 shadow-sm bg-white hover:bg-muted/10 transition-all",
-                              isMobile ? "h-11 w-11" : "h-13 w-13"
-                            )}
+                            className="rounded-xl h-10 w-10 border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0 shadow-sm active:scale-95 transition-all"
                           >
-                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6 text-primary" />}
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
                         </div>
                       </div>
@@ -771,8 +770,8 @@ export default function StudyPlanPage() {
                 </TabsContent>
               </CardContent>
               <div className={cn("bg-muted/5 border-t flex flex-col sm:flex-row items-center justify-between gap-6", isMobile ? "p-6" : "p-8")}>
-                <div className="flex items-center gap-3 bg-white/50 backdrop-blur-sm px-5 py-2 rounded-2xl border shadow-sm">
-                  <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-5 py-2.5 rounded-2xl border shadow-sm ring-1 ring-black/[0.02]">
+                  <CalendarCheck className="h-4 w-4 text-primary animate-pulse" />
                   <p className="text-[11px] font-black text-primary/70 uppercase tracking-widest">
                     {format(selectedDate, 'yyyy. MM. dd (EEEE)', { locale: ko })}
                   </p>
@@ -795,7 +794,7 @@ export default function StudyPlanPage() {
         </div>
       </div>
       
-      <footer className="px-4 py-6">
+      <footer className="px-4 py-10">
         <div className="flex flex-wrap gap-6 items-center justify-center text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">
            <div className="flex items-center gap-2">
              <CalendarDays className="h-3.5 w-3.5" />

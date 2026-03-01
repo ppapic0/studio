@@ -40,7 +40,6 @@ import {
   Loader2, 
   Zap, 
   Plus, 
-  CalendarPlus, 
   Trash2, 
   Clock, 
   MapPin, 
@@ -53,7 +52,8 @@ import {
   CalendarDays,
   Sparkles,
   Activity,
-  PlusCircle
+  PlusCircle,
+  CalendarCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +65,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -83,7 +84,7 @@ import Link from 'next/link';
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
-function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast }: any) {
+function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
   const from24h = (t: string) => {
@@ -129,20 +130,31 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast }: any) {
   const Icon = getIcon(titlePart);
 
   return (
-    <div className="flex flex-col gap-2 bg-white p-3 rounded-2xl border shadow-sm group hover:border-primary/30 transition-all">
+    <div className={cn(
+      "flex flex-col transition-all border group relative",
+      isMobile ? "p-4 rounded-[1.5rem] bg-white shadow-sm border-border/50" : "p-5 rounded-2xl bg-white hover:border-primary/30"
+    )}>
       <div className="flex items-center gap-3">
-        <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-all">
-          <Icon className="h-4 w-4" />
+        <div className={cn(
+          "rounded-xl transition-all duration-500 shrink-0",
+          isMobile ? "bg-primary/5 p-2.5" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
+        )}>
+          <Icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </div>
-        <Label className="flex-1 font-black text-xs truncate">{titlePart}</Label>
+        
+        <div className="flex-1 min-w-0">
+          <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
+          <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest leading-none">Routine Item</span>
+        </div>
+
         {isPast ? (
-          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 text-[10px]">
+          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[10px]">
             {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
           </Badge>
         ) : (
-          <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-xl border">
+          <div className="flex items-center gap-0.5 bg-muted/20 p-1 rounded-xl border border-border/30">
              <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
-               <SelectTrigger className="w-[65px] h-8 text-[10px] border-none bg-transparent font-black px-2 focus:ring-0">
+               <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[55px] text-[10px]" : "w-[65px] text-xs")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -150,18 +162,22 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast }: any) {
                  <SelectItem value="오후">오후</SelectItem>
                </SelectContent>
              </Select>
-             <div className="w-px h-3 bg-border/50" />
+
+             <div className="w-px h-3.5 bg-border/50 mx-0.5" />
+
              <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
-               <SelectTrigger className="w-[45px] h-8 text-[11px] border-none bg-transparent font-mono font-black px-1 focus:ring-0">
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
                  {HOURS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                </SelectContent>
              </Select>
-             <span className="text-[10px] font-black opacity-30">:</span>
+
+             <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
+
              <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
-               <SelectTrigger className="w-[45px] h-8 text-[11px] border-none bg-transparent font-mono font-black px-1 focus:ring-0">
+               <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-lg transition-all h-8", isMobile ? "w-[40px] text-[11px]" : "w-[50px] text-sm")}>
                  <SelectValue />
                </SelectTrigger>
                <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
@@ -170,8 +186,9 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast }: any) {
              </Select>
           </div>
         )}
+        
         {!isPast && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDelete(item)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all shrink-0" onClick={() => onDelete(item)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
@@ -487,8 +504,8 @@ export default function StudyHistoryPage() {
               <Tabs defaultValue="schedule" className="w-full">
                 <TabsList className="grid w-full grid-cols-3 rounded-none h-16 bg-muted/20 p-0 border-b">
                   <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-sm transition-all tracking-widest">ROUTINE</TabsTrigger>
-                  <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-sm transition-all tracking-widest">STUDY</TabsTrigger>
-                  <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-sm transition-all tracking-widest">LIFE</TabsTrigger>
+                  <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-sm transition-all tracking-widest">STUDY</TabsTrigger>
+                  <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-sm transition-all tracking-widest">LIFE</TabsTrigger>
                 </TabsList>
 
                 <div className="p-8 space-y-8">
@@ -530,21 +547,26 @@ export default function StudyHistoryPage() {
                     {scheduleItems.length === 0 ? (
                       <p className="text-center py-6 text-xs font-bold text-muted-foreground/40 italic">등록된 루틴이 없습니다.</p>
                     ) : (
-                      scheduleItems.sort((a,b) => {
-                        const timeA = a.title.split(': ')[1] || '00:00';
-                        const timeB = b.title.split(': ')[1] || '00:00';
-                        return timeA.localeCompare(timeB);
-                      }).map((item) => (
-                        <ScheduleItemRow key={item.id} item={item} onUpdateTime={handleUpdateScheduleTime} onDelete={handleDeleteTask} isPast={isActuallyPast} />
-                      ))
+                      <div className="flex flex-col gap-3">
+                        {scheduleItems.sort((a,b) => {
+                          const timeA = a.title.split(': ')[1] || '00:00';
+                          const timeB = b.title.split(': ')[1] || '00:00';
+                          return timeA.localeCompare(timeB);
+                        }).map((item) => (
+                          <ScheduleItemRow key={item.id} item={item} onUpdateTime={handleUpdateScheduleTime} onDelete={handleDeleteTask} isPast={isActuallyPast} isMobile={isMobile} />
+                        ))}
+                      </div>
                     )}
                   </TabsContent>
 
                   <TabsContent value="study" className="mt-0 space-y-6">
                     <div className="grid gap-3">
                       {studyTasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-4 p-4 rounded-[1.5rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
-                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2" />
+                        <div key={task.id} className={cn(
+                          "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
+                          task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent hover:border-emerald-100 shadow-sm"
+                        )}>
+                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
                           <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
                           {!isActuallyPast && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
@@ -555,23 +577,23 @@ export default function StudyHistoryPage() {
                       ))}
                     </div>
                     {!isActuallyPast && (
-                      <div className="flex items-center gap-2 pt-4 relative group">
-                        <div className="relative flex-1">
+                      <div className="pt-4">
+                        <div className="relative flex items-center bg-white border-2 border-dashed border-emerald-200 rounded-[1.25rem] group focus-within:border-emerald-500 transition-all p-1.5 shadow-sm">
                           <Input 
                             placeholder="공부 계획 추가..." 
                             value={newStudyTask} 
                             onChange={(e) => setNewStudyTask(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting} 
-                            className="rounded-2xl h-14 border-dashed border-2 pl-5 pr-14 font-bold text-sm bg-muted/5 focus-visible:ring-primary/10 transition-all" 
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm" 
                           />
                           <Button 
                             size="icon" 
                             onClick={() => handleAddTask(newStudyTask, 'study')} 
                             disabled={isSubmitting || !newStudyTask.trim()} 
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-11 w-11 rounded-xl shrink-0 shadow-lg"
+                            className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"
                           >
-                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6" />}
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
                         </div>
                       </div>
@@ -581,8 +603,11 @@ export default function StudyHistoryPage() {
                   <TabsContent value="personal" className="mt-0 space-y-6">
                     <div className="grid gap-3">
                       {personalTasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-4 p-4 rounded-[1.5rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
-                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2" />
+                        <div key={task.id} className={cn(
+                          "flex items-center gap-4 p-4 rounded-[1.25rem] border-2 transition-all duration-500 group relative",
+                          task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent hover:border-amber-100 shadow-sm"
+                        )}>
+                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500" />
                           <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
                           {!isActuallyPast && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
@@ -593,24 +618,24 @@ export default function StudyHistoryPage() {
                       ))}
                     </div>
                     {!isActuallyPast && (
-                      <div className="flex items-center gap-2 pt-4 relative group">
-                        <div className="relative flex-1">
+                      <div className="pt-4">
+                        <div className="relative flex items-center bg-white border-2 border-dashed border-amber-200 rounded-[1.25rem] group focus-within:border-amber-500 transition-all p-1.5 shadow-sm">
                           <Input 
                             placeholder="개인 일정 추가..." 
                             value={newPersonalTask} 
                             onChange={(e) => setNewPersonalTask(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting} 
-                            className="rounded-2xl h-14 border-dashed border-2 pl-5 pr-14 font-bold text-sm bg-muted/5 focus-visible:ring-primary/10 transition-all" 
+                            className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm" 
                           />
                           <Button 
                             variant="outline" 
                             size="icon" 
                             onClick={() => handleAddTask(newPersonalTask, 'personal')} 
                             disabled={isSubmitting || !newPersonalTask.trim()} 
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-11 w-11 rounded-xl border-2 shrink-0 shadow-sm bg-white"
+                            className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 hover:bg-amber-50 shrink-0"
                           >
-                            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6 text-primary" />}
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                           </Button>
                         </div>
                       </div>
