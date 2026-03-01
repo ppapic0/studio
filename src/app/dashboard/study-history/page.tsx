@@ -51,7 +51,8 @@ import {
   Info,
   CalendarX,
   CalendarDays,
-  Sparkles
+  Sparkles,
+  Activity
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -86,67 +87,86 @@ const SCHEDULE_TEMPLATES = [
   { title: '학원 시간', icon: Clock },
 ];
 
+const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+
 function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
   const found = scheduleItems.find((p: any) => p.title.startsWith(tpl.title));
   const time24h = found ? found.title.split(': ')[1] : '';
   
   const from24h = (t: string) => {
-    if (!t || !t.includes(':')) return { time: '', period: '오전' as const };
+    if (!t || !t.includes(':')) return { hour: '09', minute: '00', period: '오전' as const };
     let [h, m] = t.split(':').map(Number);
-    if (isNaN(h) || isNaN(m)) return { time: '', period: '오전' as const };
+    if (isNaN(h) || isNaN(m)) return { hour: '09', minute: '00', period: '오전' as const };
     const p = h >= 12 ? '오후' : '오전';
     let h12 = h % 12 || 12;
-    return { time: `${h12.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`, period: p };
+    return { hour: h12.toString().padStart(2, '0'), minute: m.toString().padStart(2, '0'), period: p };
   };
 
   const initial = from24h(time24h);
-  const [localTime, setLocalTime] = useState(initial.time);
+  const [localHour, setLocalHour] = useState(initial.hour);
+  const [localMinute, setLocalMinute] = useState(initial.minute);
   const [localPeriod, setLocalPeriod] = useState(initial.period);
 
   useEffect(() => {
     const remote = from24h(time24h);
-    setLocalTime(remote.time);
+    setLocalHour(remote.hour);
+    setLocalMinute(remote.minute);
     setLocalPeriod(remote.period);
   }, [time24h]);
 
-  const handleBlur = () => {
-    if (localTime !== initial.time) {
-      onUpdate(tpl.title, localTime, localPeriod);
-    }
-  };
+  const handleValueChange = (type: 'hour' | 'minute' | 'period', value: string) => {
+    let h = localHour;
+    let m = localMinute;
+    let p = localPeriod;
 
-  const handlePeriodChange = (newP: any) => {
-    setLocalPeriod(newP);
-    onUpdate(tpl.title, localTime, newP);
+    if (type === 'hour') { h = value; setLocalHour(value); }
+    if (type === 'minute') { m = value; setLocalMinute(value); }
+    if (type === 'period') { p = value as any; setLocalPeriod(p); }
+
+    onUpdate(tpl.title, `${h}:${m}`, p);
   };
 
   return (
-    <div className="flex flex-col gap-1.5 bg-muted/20 p-2.5 rounded-xl border group hover:border-primary/50 transition-all">
+    <div className="flex flex-col gap-2 bg-white p-3 rounded-2xl border shadow-sm group hover:border-primary/30 transition-all">
       <div className="flex items-center gap-3">
-        <div className="bg-primary/10 p-1.5 rounded-lg group-hover:bg-primary/20 transition-colors">
-          <tpl.icon className="h-3.5 w-3.5 text-primary" />
+        <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-all">
+          <tpl.icon className="h-4 w-4" />
         </div>
-        <Label className="flex-1 font-bold text-xs">{tpl.title}</Label>
+        <Label className="flex-1 font-black text-xs">{tpl.title}</Label>
         {isPast ? (
-          <span className="font-mono font-bold text-primary text-xs">{localTime ? `${localPeriod} ${localTime}` : '-'}</span>
+          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 text-[10px]">
+            {localHour ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
+          </Badge>
         ) : (
-          <div className="flex items-center gap-1.5">
-             <Select value={localPeriod} onValueChange={handlePeriodChange}>
-               <SelectTrigger className="w-[65px] h-8 text-[10px] border-none bg-transparent font-bold px-1">
+          <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-xl border">
+             <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
+               <SelectTrigger className="w-[65px] h-8 text-[10px] border-none bg-transparent font-black px-2 focus:ring-0">
                  <SelectValue />
                </SelectTrigger>
-               <SelectContent>
+               <SelectContent className="rounded-xl border-none shadow-2xl">
                  <SelectItem value="오전">오전</SelectItem>
                  <SelectItem value="오후">오후</SelectItem>
                </SelectContent>
              </Select>
-             <Input 
-              placeholder="00:00"
-              className="w-14 h-8 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold text-xs"
-              value={localTime}
-              onChange={(e) => setLocalTime(e.target.value)}
-              onBlur={handleBlur}
-            />
+             <div className="w-px h-3 bg-border/50" />
+             <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
+               <SelectTrigger className="w-[45px] h-8 text-[11px] border-none bg-transparent font-mono font-black px-1 focus:ring-0">
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
+                 {HOURS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+               </SelectContent>
+             </Select>
+             <span className="text-[10px] font-black opacity-30">:</span>
+             <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
+               <SelectTrigger className="w-[45px] h-8 text-[11px] border-none bg-transparent font-mono font-black px-1 focus:ring-0">
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
+                 {MINUTES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+               </SelectContent>
+             </Select>
           </div>
         )}
       </div>
@@ -327,61 +347,68 @@ export default function StudyHistoryPage() {
   if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
   return (
-    <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-20", isMobile ? "gap-4 px-1" : "gap-6")}>
-      <header className={cn("flex justify-between items-center", isMobile ? "flex-col gap-3 px-1" : "flex-row")}>
-        <div className="flex flex-col gap-0.5">
-          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-3xl")}>학습 기록</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Study Logs & History</p>
+    <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-20", isMobile ? "gap-4 px-1" : "gap-10")}>
+      <header className={cn("flex justify-between items-center", isMobile ? "flex-col gap-4 px-1" : "flex-row")}>
+        <div className="flex flex-col gap-1">
+          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>학습 기록</h1>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-60">Study Logs & History Matrix</p>
         </div>
-        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border shadow-sm">
-           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-           <span className="font-black text-sm min-w-[100px] text-center">{format(currentDate, 'yyyy년 M월')}</span>
-           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
+        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border shadow-xl ring-1 ring-black/[0.03]">
+           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={prevMonth}><ChevronLeft className="h-5 w-5" /></Button>
+           <span className="font-black text-sm min-w-[120px] text-center tracking-tight">{format(currentDate, 'yyyy년 M월')}</span>
+           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={nextMonth}><ChevronRight className="h-5 w-5" /></Button>
         </div>
       </header>
 
-      <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-        <Card className="md:col-span-2 border-none shadow-xl bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-[2rem] overflow-hidden relative group p-6">
-          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform group-hover:scale-110"><CalendarDays className="h-32 w-32" /></div>
-          <div className="relative z-10 flex flex-col gap-4">
+      <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+        <Card className="md:col-span-2 border-none shadow-2xl bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-[2.5rem] overflow-hidden relative group p-8">
+          <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 transition-transform duration-700 group-hover:scale-110"><CalendarDays className="h-40 w-40" /></div>
+          <div className="relative z-10 flex flex-col gap-6">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Monthly Summary</span>
-              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5">이번 달 총 몰입</Badge>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+                <Activity className="h-3 w-3 text-accent animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Monthly Summary</span>
+              </div>
+              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-3 py-1 rounded-lg">이번 달 총 몰입</Badge>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-6xl")}>{formatMinutes(monthTotalMinutes)}</span>
-              <span className="text-sm font-bold opacity-60">총 학습 완료</span>
+            <div className="flex items-baseline gap-3">
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-7xl")}>{formatMinutes(monthTotalMinutes)}</span>
+              <span className="text-lg font-bold opacity-60">총 학습 완료</span>
             </div>
-            <div className="flex gap-4 mt-2">
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-400 rounded-sm" /><span className="text-[10px] font-bold">8시간+</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm" /><span className="text-[10px] font-bold">3시간+</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-white/20 rounded-sm border border-white/10" /><span className="text-[10px] font-bold">기록 없음</span></div>
+            <div className="flex gap-5 mt-2">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-400 rounded-sm shadow-sm" /><span className="text-[11px] font-black opacity-80">8시간+</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-200 rounded-sm shadow-sm" /><span className="text-[11px] font-black opacity-80">3시간+</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-white/20 rounded-sm border border-white/10 shadow-sm" /><span className="text-[11px] font-black opacity-80">기록 없음</span></div>
             </div>
           </div>
         </Card>
 
         {!isMobile && (
-          <Card className="rounded-[2rem] border-none shadow-xl bg-white p-6 flex flex-col justify-center gap-4">
-            <div className="space-y-1">
-              <h3 className="font-black text-sm uppercase tracking-widest text-muted-foreground">Mastery Tip</h3>
-              <p className="text-xs font-bold leading-relaxed text-foreground/70">매일 3시간 이상 학습 시 <Zap className="inline h-3 w-3 text-yellow-500 fill-yellow-500" /> 아이콘을 획득하며 마스터리 경험치가 대폭 상승합니다.</p>
+          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8 flex flex-col justify-center gap-6 ring-1 ring-black/[0.03]">
+            <div className="space-y-2">
+              <h3 className="font-black text-sm uppercase tracking-widest text-primary/40 flex items-center gap-2">
+                <Sparkles className="h-4 w-4" /> Mastery Tip
+              </h3>
+              <p className="text-sm font-bold leading-relaxed text-foreground/70">
+                매일 3시간 이상 학습 시 <Zap className="inline h-3.5 w-3.5 text-yellow-500 fill-yellow-500" /> 아이콘을 획득하며 마스터리 경험치가 대폭 상승합니다.
+              </p>
             </div>
-            <Button asChild variant="outline" className="w-full rounded-xl font-black text-xs h-10 border-2"><Link href="/dashboard/growth">마스터리 보러가기</Link></Button>
+            <Button asChild className="w-full rounded-2xl font-black text-sm h-14 shadow-lg active:scale-95 transition-all"><Link href="/dashboard/growth">마스터리 보드 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>
           </Card>
         )}
       </div>
 
-      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
+      <Card className="border-none shadow-[0_30px_80px_rgba(0,0,0,0.08)] rounded-[3rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
         <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b bg-muted/5">
+          <div className="grid grid-cols-7 border-b bg-muted/10">
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
-              <div key={day} className={cn("py-3 text-center text-[10px] font-black uppercase tracking-widest", i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-muted-foreground")}>{day}</div>
+              <div key={day} className={cn("py-4 text-center text-[11px] font-black uppercase tracking-widest", i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-muted-foreground")}>{day}</div>
             ))}
           </div>
 
           <div className="grid grid-cols-7 auto-rows-fr">
             {logsLoading ? (
-              <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" /></div>
+              <div className="col-span-7 h-[400px] flex items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" /></div>
             ) : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const log = logs?.find(l => l.dateKey === dateKey);
@@ -395,27 +422,27 @@ export default function StudyHistoryPage() {
                   key={dateKey} 
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
-                    "p-1.5 sm:p-3 border-r border-b relative group transition-all cursor-pointer hover:z-20",
-                    isMobile ? "aspect-square" : "min-h-[110px]",
+                    "p-2 sm:p-4 border-r border-b relative group transition-all cursor-pointer hover:z-20 hover:scale-[1.02] hover:shadow-2xl",
+                    isMobile ? "aspect-square" : "min-h-[130px]",
                     !isCurrentMonth ? "bg-muted/5 opacity-10" : getHeatmapColor(minutes),
-                    isToday && "ring-2 ring-inset ring-primary z-10"
+                    isToday && "ring-4 ring-inset ring-primary/20 z-10"
                   )}
                 >
                   <div className="flex justify-between items-start">
-                    <span className={cn("text-[9px] sm:text-[10px] font-black leading-none", idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "")}>{format(day, 'd')}</span>
-                    <div className="flex flex-col items-end gap-0.5 sm:gap-1">
-                      {minutes >= 180 && <Zap className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-yellow-500 fill-yellow-500" />}
-                      {hasPlans && <div className="w-1 h-1 rounded-full bg-primary/40" />}
+                    <span className={cn("text-[10px] sm:text-xs font-black leading-none tabular-nums", idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "")}>{format(day, 'd')}</span>
+                    <div className="flex flex-col items-end gap-1 sm:gap-1.5">
+                      {minutes >= 180 && <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 fill-yellow-500 drop-shadow-sm" />}
+                      {hasPlans && <div className="w-1.5 h-1.5 rounded-full bg-primary/30" />}
                     </div>
                   </div>
                   {minutes > 0 && (
-                    <div className="mt-1 sm:mt-3 flex justify-center">
-                      <span className={cn("font-mono font-black tracking-tighter leading-none", isMobile ? "text-[10px]" : "text-lg")}>{formatMinutes(minutes)}</span>
+                    <div className="mt-2 sm:mt-5 flex justify-center">
+                      <span className={cn("font-mono font-black tracking-tighter leading-none text-primary", isMobile ? "text-[11px]" : "text-2xl")}>{formatMinutes(minutes)}</span>
                     </div>
                   )}
                   {isToday && (
-                    <div className="absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1.5">
-                      <span className={cn("font-black uppercase tracking-tighter bg-primary text-white px-1 rounded-sm", isMobile ? "text-[5px]" : "text-[7px]")}>Today</span>
+                    <div className="absolute bottom-1 right-1.5 sm:bottom-2 sm:right-3">
+                      <span className={cn("font-black uppercase tracking-[0.1em] bg-primary text-white px-1.5 py-0.5 rounded-md shadow-sm", isMobile ? "text-[6px]" : "text-[8px]")}>Today</span>
                     </div>
                   )}
                 </div>
@@ -425,81 +452,81 @@ export default function StudyHistoryPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-4 items-center px-4 py-3 bg-white border shadow-sm rounded-2xl text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
-         <div className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-yellow-500 fill-yellow-500" /><span>3시간 몰입 성공</span></div>
-         <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-primary/40" /><span>계획 수립됨</span></div>
-         <div className="ml-auto flex items-center gap-1"><Info className="h-3 w-3" /><span>날짜를 클릭하여 상세 기록을 관리하세요.</span></div>
+      <div className="flex flex-wrap gap-5 items-center px-6 py-4 bg-white/80 backdrop-blur-md border shadow-xl rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ring-1 ring-black/[0.03]">
+         <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" /><span>3시간 몰입 달성</span></div>
+         <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary/30" /><span>계획 수립 완료</span></div>
+         <div className="ml-auto flex items-center gap-2"><Info className="h-4 w-4" /><span>날짜를 클릭해 상세 로그를 확인하세요.</span></div>
       </div>
 
       <Dialog open={!!selectedDateForPlan} onOpenChange={(open) => !open && setSelectedDateForPlan(null)}>
-        <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : "sm:max-w-lg rounded-[3rem]")}>
-          <div className="bg-primary p-8 text-white relative">
-            <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
-                <ClipboardList className="h-6 w-6" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEE)', {locale: ko})}
+        <DialogContent className={cn("border-none shadow-[0_-20px_100px_rgba(0,0,0,0.2)] p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "sm:max-w-xl rounded-[3.5rem]")}>
+          <div className="bg-primary p-10 text-white relative overflow-hidden">
+            <Sparkles className="absolute top-0 right-0 p-10 h-48 w-48 opacity-10 rotate-12" />
+            <DialogHeader className="relative z-10">
+              <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
+                <ClipboardList className="h-8 w-8 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}
               </DialogTitle>
-              <DialogDescription className="text-white/60 font-bold mt-1">학습 및 생활 루틴 상세 현황</DialogDescription>
+              <DialogDescription className="text-white/60 font-bold mt-2 text-base">당신의 성장 데이터와 일일 리포트입니다.</DialogDescription>
             </DialogHeader>
           </div>
           
-          <div className={cn("bg-[#fafafa]", isMobile ? "max-h-[60vh] overflow-y-auto" : "max-h-[500px] overflow-y-auto")}>
+          <div className={cn("bg-[#fafafa] custom-scrollbar", isMobile ? "max-h-[60vh] overflow-y-auto" : "max-h-[600px] overflow-y-auto")}>
             {selectedDateForPlan && dailyPlans.length === 0 && isActuallyPast ? (
-              <div className="py-20 text-center flex flex-col items-center gap-4 opacity-30">
-                <CalendarX className="h-12 w-12" />
-                <p className="font-black italic text-sm">작성된 기록이 없습니다.</p>
+              <div className="py-24 text-center flex flex-col items-center gap-6 opacity-30">
+                <CalendarX className="h-20 w-20" />
+                <p className="font-black italic text-lg tracking-tight">작성된 기록이 발견되지 않았습니다.</p>
               </div>
             ) : (
               <Tabs defaultValue="schedule" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-12 bg-muted/30 p-0 border-b">
-                  <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-primary font-black text-xs transition-all">시간표</TabsTrigger>
-                  <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-primary font-black text-xs transition-all">자습</TabsTrigger>
-                  <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-primary font-black text-xs transition-all">개인</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-16 bg-muted/20 p-0 border-b">
+                  <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-sm transition-all tracking-widest">ROUTINE</TabsTrigger>
+                  <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-sm transition-all tracking-widest">STUDY</TabsTrigger>
+                  <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-sm transition-all tracking-widest">LIFE</TabsTrigger>
                 </TabsList>
 
-                <div className="p-6 space-y-6">
-                  <TabsContent value="schedule" className="mt-0 space-y-3">
+                <div className="p-8 space-y-8">
+                  <TabsContent value="schedule" className="mt-0 space-y-4">
                     {SCHEDULE_TEMPLATES.map((tpl) => (
                       <ScheduleItemRow key={tpl.title} tpl={tpl} scheduleItems={scheduleItems} onUpdate={handleUpdateSchedule} isPast={isActuallyPast} />
                     ))}
                   </TabsContent>
 
-                  <TabsContent value="study" className="mt-0 space-y-3">
+                  <TabsContent value="study" className="mt-0 space-y-4">
                     {studyTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white shadow-sm group">
-                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="rounded-md border-2" />
-                        <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                      <div key={task.id} className="flex items-center gap-4 p-5 rounded-[2rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
+                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-7 w-7 rounded-xl border-2" />
+                        <Label htmlFor={task.id} className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
                         {!isActuallyPast && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                            <Trash2 className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                            <Trash2 className="h-5 w-5" />
                           </Button>
                         )}
                       </div>
                     ))}
                     {!isActuallyPast && (
-                      <div className="flex items-center gap-2 pt-2">
-                        <Input placeholder="오늘 할 자습 과제 입력..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="rounded-xl h-11 border-2 font-bold text-sm" />
-                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl h-11 w-11 shrink-0"><Plus className="h-5 w-5" /></Button>
+                      <div className="flex items-center gap-3 pt-4 relative">
+                        <Input placeholder="오늘 할 자습 과제 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="rounded-[1.25rem] h-14 border-dashed border-2 font-bold text-sm pl-5 pr-14" />
+                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="absolute right-2 h-10 w-10 rounded-xl shrink-0 shadow-lg"><Plus className="h-6 w-6" /></Button>
                       </div>
                     )}
                   </TabsContent>
 
-                  <TabsContent value="personal" className="mt-0 space-y-3">
+                  <TabsContent value="personal" className="mt-0 space-y-4">
                     {personalTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white shadow-sm group">
-                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="rounded-md border-2" />
-                        <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                      <div key={task.id} className="flex items-center gap-4 p-5 rounded-[2rem] border-2 bg-white shadow-sm group hover:shadow-xl transition-all">
+                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="h-7 w-7 rounded-xl border-2" />
+                        <Label htmlFor={task.id} className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
                         {!isActuallyPast && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                            <Trash2 className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-full" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                            <Trash2 className="h-5 w-5" />
                           </Button>
                         )}
                       </div>
                     ))}
                     {!isActuallyPast && (
-                      <div className="flex items-center gap-2 pt-2">
-                        <Input placeholder="공부 외 개인 일정 입력..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="rounded-xl h-11 border-2 font-bold text-sm" />
-                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl h-11 w-11 border-2 shrink-0"><Plus className="h-5 w-5" /></Button>
+                      <div className="flex items-center gap-3 pt-4 relative">
+                        <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="rounded-[1.25rem] h-14 border-dashed border-2 font-bold text-sm pl-5 pr-14" />
+                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="absolute right-2 h-10 w-10 rounded-xl border-2 shrink-0 shadow-sm"><Plus className="h-6 w-6 text-primary" /></Button>
                       </div>
                     )}
                   </TabsContent>
@@ -508,14 +535,14 @@ export default function StudyHistoryPage() {
             )}
           </div>
           
-          <DialogFooter className="p-6 bg-white border-t flex-col gap-2">
+          <DialogFooter className="p-8 bg-white border-t flex-col gap-3">
             {!isActuallyPast && selectedDateForPlan && dailyPlans.length > 0 && (
-              <Button variant="outline" className="w-full h-12 rounded-xl gap-2 text-xs font-black border-2" onClick={handleApplyToAllWeekdays} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Copy className="h-4 w-4" />}
+              <Button variant="outline" className="w-full h-14 rounded-2xl gap-3 text-sm font-black border-2 shadow-sm hover:bg-primary hover:text-white transition-all active:scale-95" onClick={handleApplyToAllWeekdays} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin"/> : <Copy className="h-5 w-5" />}
                 이 일정을 매주 {weekdayName}에 반복 설정
               </Button>
             )}
-            <Button variant="ghost" className="w-full h-12 rounded-xl font-black text-xs" onClick={() => setSelectedDateForPlan(null)}>닫기</Button>
+            <Button variant="ghost" className="w-full h-12 rounded-2xl font-black text-sm text-muted-foreground" onClick={() => setSelectedDateForPlan(null)}>닫기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
