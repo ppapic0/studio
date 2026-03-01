@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -55,6 +56,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { syncDailyKpi } from '@/lib/finance-actions';
 
 export function RevenueAnalysis() {
   const firestore = useFirestore();
@@ -167,6 +169,10 @@ export function RevenueAnalysis() {
         monthlyFee: fee,
         updatedAt: serverTimestamp()
       });
+
+      // 수강료 변경 시 즉시 오늘 KPI 재계산
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      await syncDailyKpi(centerId, todayStr);
 
       toast({ title: "수강료 업데이트 완료" });
       setEditingFeeId(null);
@@ -329,7 +335,6 @@ export function RevenueAnalysis() {
               <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
                 <CalendarDays className="h-6 w-6 text-primary" /> 학생 등록 및 수강료 관리
               </CardTitle>
-              {/* Hydration fix: CardDescription(p) cannot contain Badge(div). Changed to div with same classes. */}
               <div className="text-sm font-bold text-muted-foreground flex items-center gap-2">
                 {selectedMonth ? (
                   <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black">{selectedMonth} 등록 현황</Badge>

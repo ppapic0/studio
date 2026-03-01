@@ -3,7 +3,7 @@
 
 import { adminDb } from './firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { addDays, format, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import { addDays, format, startOfDay, subDays } from 'date-fns';
 import { DiscountSnapshot, FinanceSettings, PricingMatrix, StudentProfile, Invoice } from './types';
 
 /**
@@ -57,7 +57,7 @@ export async function createInvoice(centerId: string, studentId: string) {
 
   const finalPrice = Math.max(0, currentPrice);
   const startDate = enrollment.cycleStartDate.toDate();
-  const endDate = addDays(startDate, 27); // 28일 사이클 (start + 27일)
+  const endDate = addDays(startDate, 27); 
 
   const invoiceData = {
     studentId,
@@ -84,11 +84,11 @@ export async function createInvoice(centerId: string, studentId: string) {
 }
 
 /**
- * 환불 계산 및 요청 (28일 일할 계산 - 위약금 없음)
+ * 환불 계산 및 요청 (28일 일할 계산)
  */
 export async function requestRefund(centerId: string, invoiceId: string, reason: string) {
   const invoiceRef = adminDb.doc(`centers/${centerId}/invoices/${invoiceId}`);
-  const [invoiceSnap] = await Promise.all([invoiceRef.get()]);
+  const invoiceSnap = await invoiceRef.get();
   
   if (!invoiceSnap.exists) throw new Error('인보이스를 찾을 수 없습니다.');
   
@@ -102,8 +102,6 @@ export async function requestRefund(centerId: string, invoiceId: string, reason:
 
   const perDay = Math.floor(invoice.finalPrice / 28);
   const usedAmount = perDay * usedDays;
-
-  // 위약금 없이 순수 일할 계산만 적용
   const refundAmount = Math.max(0, invoice.finalPrice - usedAmount);
 
   const refundData = {
@@ -129,65 +127,64 @@ export async function requestRefund(centerId: string, invoiceId: string, reason:
 
 /**
  * 발생주의 방식의 Daily KPI 집계
- * 해당 날짜를 포함하는 모든 인보이스의 일할 매출을 합산합니다.
+ * 해당 날짜에 '재원' 중인 모든 학생의 수강료를 일할(1/28)로 합산합니다.
  */
 export async function syncDailyKpi(centerId: string, dateStr: string) {
   const targetDate = startOfDay(new Date(dateStr));
-  const targetTimestamp = Timestamp.fromDate(targetDate);
 
-  // 1. 해당 날짜가 사이클 내에 포함된 모든 유료 인보이스 조회
-  const invoicesSnap = await adminDb.collection(`centers/${centerId}/invoices`)
-    .where('status', '==', 'paid')
-    .where('cycleStartDate', '<=', targetTimestamp)
+  // 1. 현재 센터의 모든 '재원생' 조회
+  const membersSnap = await adminDb.collection(`centers/${centerId}/members`)
+    .where('role', '==', 'student')
+    .where('status', '==', 'active')
     .get();
 
   let dailyAccruedRevenue = 0;
-  let totalDiscount = 0;
   let activeStudentCount = 0;
 
-  invoicesSnap.forEach(doc => {
-    const data = doc.data() as Invoice;
-    const cycleEnd = data.cycleEndDate.toDate();
+  membersSnap.forEach(doc => {
+    const data = doc.data();
+    // 설정된 개별 수강료가 없으면 기본값 350,000원 적용
+    const monthlyFee = data.monthlyFee || 350000;
+    const dailyFee = Math.floor(monthlyFee / 28);
     
-    if (targetDate <= cycleEnd) {
-      const dailyPrice = Math.floor(data.finalPrice / 28);
-      dailyAccruedRevenue += dailyPrice;
-      
-      data.discountsSnapshot.forEach(d => {
-        totalDiscount += Math.floor(d.amount / 28);
-      });
-      
-      activeStudentCount++;
-    }
+    dailyAccruedRevenue += dailyFee;
+    activeStudentCount++;
   });
 
-  const refundsSnap = await adminDb.collection(`centers/${centerId}/refunds`)
-    .where('requestedAt', '>=', Timestamp.fromDate(startOfDay(targetDate)))
-    .where('requestedAt', '<=', Timestamp.fromDate(endOfDay(targetDate)))
-    .get();
-
-  let dailyTotalRefund = 0;
-  refundsSnap.forEach(doc => {
-    dailyTotalRefund += doc.data().refundAmount;
-  });
-
+  // 2. 월별 고정비 가져오기 (BEP 계산용)
   const monthKey = format(targetDate, 'yyyy-MM');
   const monthFinanceSnap = await adminDb.doc(`centers/${centerId}/financeMonthly/${monthKey}`).get();
   const monthlyFixedCosts = monthFinanceSnap.exists ? monthFinanceSnap.data()?.totalFixedCosts || 0 : 0;
   
-  const avgFinalPrice = activeStudentCount > 0 ? dailyAccruedRevenue / activeStudentCount * 28 : 0;
-  const breakevenStudents = avgFinalPrice > 0 ? Math.ceil(monthlyFixedCosts / (avgFinalPrice / 28 * 30)) : null;
+  // 3. 손익분기점(BEP) 학생 수 계산
+  // BEP = 월 고정비 / (인당 평균 일일 수강료 * 30일)
+  const avgDailyFee = activeStudentCount > 0 ? dailyAccruedRevenue / activeStudentCount : 0;
+  const breakevenStudents = avgDailyFee > 0 ? Math.ceil(monthlyFixedCosts / (avgDailyFee * 30)) : null;
 
   const kpiData = {
     date: dateStr,
     totalRevenue: dailyAccruedRevenue,
-    totalDiscount,
-    totalRefund: dailyTotalRefund,
     activeStudentCount,
-    avgFinalPrice,
     breakevenStudents,
     updatedAt: FieldValue.serverTimestamp()
   };
 
   await adminDb.doc(`centers/${centerId}/kpiDaily/${dateStr}`).set(kpiData, { merge: true });
+  return { ok: true };
+}
+
+/**
+ * 최근 30일간의 모든 KPI를 동기화합니다. (차트 데이터 복구용)
+ */
+export async function syncRecentKpis(centerId: string) {
+  const today = new Date();
+  const syncPromises = [];
+
+  for (let i = 0; i < 30; i++) {
+    const dateStr = format(subDays(today, i), 'yyyy-MM-dd');
+    syncPromises.push(syncDailyKpi(centerId, dateStr));
+  }
+
+  await Promise.all(syncPromises);
+  return { ok: true };
 }

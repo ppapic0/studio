@@ -61,6 +61,7 @@ import { format, startOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
+import { syncRecentKpis } from '@/lib/finance-actions';
 
 export default function RevenuePage() {
   const { activeMembership, viewMode, membershipsLoading } = useAppContext();
@@ -71,6 +72,25 @@ export default function RevenuePage() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // 재무 데이터 자동 동기화
+  useEffect(() => {
+    if (!centerId || isSyncing) return;
+    
+    const triggerSync = async () => {
+      setIsSyncing(true);
+      try {
+        await syncRecentKpis(centerId);
+      } catch (e) {
+        console.error("KPI Sync Error:", e);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    triggerSync();
+  }, [centerId]);
 
   // 재무 설정 - 고정비 항목별 상태
   const [selectedFinanceMonth, setSelectedFinanceMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -149,7 +169,6 @@ export default function RevenuePage() {
     if (!firestore || !centerId) return;
     setIsSaving(true);
     try {
-      // 1. 월별 고정비 저장
       const totalFixedCosts = rent + labor + maintenance + otherCost;
       await setDoc(doc(firestore, 'centers', centerId, 'financeMonthly', selectedFinanceMonth), {
         yearMonth: selectedFinanceMonth,
@@ -158,7 +177,6 @@ export default function RevenuePage() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      // 2. 공통 정책 저장
       const financeSettings: Partial<FinanceSettings> = {
         refundPolicy: {
           penaltyType: 'none',
@@ -169,11 +187,13 @@ export default function RevenuePage() {
         }
       };
 
-      // setDoc with merge to avoid update error if document doesn't exist
       await setDoc(doc(firestore, 'centers', centerId), {
         financeSettings,
         updatedAt: serverTimestamp()
       }, { merge: true });
+
+      // 고정비 변경 시 즉시 오늘 KPI 재동기화
+      await syncRecentKpis(centerId);
 
       toast({ title: "재무 정책 및 비용이 저장되었습니다." });
       setIsSettingsOpen(false);
@@ -213,9 +233,14 @@ export default function RevenuePage() {
           </h1>
           <p className="text-sm font-bold text-muted-foreground/70 mt-2">일할 계산 방식의 정밀한 센터 수익성을 관리합니다.</p>
         </div>
-        <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
-          <Settings className="h-4 w-4" /> 재무 정책 및 비용 설정
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => syncRecentKpis(centerId!)} variant="ghost" className="rounded-2xl font-black gap-2 h-12 border-2 border-dashed">
+            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> 데이터 수동 동기화
+          </Button>
+          <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
+            <Settings className="h-4 w-4" /> 재무 정책 및 비용 설정
+          </Button>
+        </div>
       </header>
 
       <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-4")}>
