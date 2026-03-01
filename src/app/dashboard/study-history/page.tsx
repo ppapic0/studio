@@ -395,24 +395,29 @@ export default function StudyHistoryPage() {
                   key={dateKey} 
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
-                    "min-h-[85px] sm:min-h-[110px] p-2 border-r border-b relative group transition-all cursor-pointer hover:z-20",
+                    "p-1.5 sm:p-3 border-r border-b relative group transition-all cursor-pointer hover:z-20",
+                    isMobile ? "aspect-square" : "min-h-[110px]",
                     !isCurrentMonth ? "bg-muted/5 opacity-10" : getHeatmapColor(minutes),
                     isToday && "ring-2 ring-inset ring-primary z-10"
                   )}
                 >
                   <div className="flex justify-between items-start">
-                    <span className={cn("text-[10px] font-black", idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "")}>{format(day, 'd')}</span>
-                    <div className="flex flex-col items-end gap-1">
-                      {minutes >= 180 && <Zap className="h-2.5 w-2.5 text-yellow-500 fill-yellow-500" />}
+                    <span className={cn("text-[9px] sm:text-[10px] font-black leading-none", idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "")}>{format(day, 'd')}</span>
+                    <div className="flex flex-col items-end gap-0.5 sm:gap-1">
+                      {minutes >= 180 && <Zap className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-yellow-500 fill-yellow-500" />}
                       {hasPlans && <div className="w-1 h-1 rounded-full bg-primary/40" />}
                     </div>
                   </div>
                   {minutes > 0 && (
-                    <div className="mt-3 flex justify-center">
-                      <span className={cn("font-mono font-black tracking-tighter leading-none", isMobile ? "text-xs" : "text-lg")}>{formatMinutes(minutes)}</span>
+                    <div className="mt-1 sm:mt-3 flex justify-center">
+                      <span className={cn("font-mono font-black tracking-tighter leading-none", isMobile ? "text-[10px]" : "text-lg")}>{formatMinutes(minutes)}</span>
                     </div>
                   )}
-                  {isToday && <div className="absolute bottom-1 right-1.5"><span className="text-[7px] font-black uppercase tracking-tighter bg-primary text-white px-1 rounded-sm">Today</span></div>}
+                  {isToday && (
+                    <div className="absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1.5">
+                      <span className={cn("font-black uppercase tracking-tighter bg-primary text-white px-1 rounded-sm", isMobile ? "text-[5px]" : "text-[7px]")}>Today</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
