@@ -90,7 +90,7 @@ import { Badge } from '@/components/ui/badge';
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
-function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any) {
+function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
   const from24h = (t: string) => {
@@ -102,28 +102,47 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
     return { hour: h12.toString().padStart(2, '0'), minute: m.toString().padStart(2, '0'), period: p };
   };
 
-  const initial = from24h(timePart);
-  const [localHour, setLocalHour] = useState(initial.hour);
-  const [localMinute, setLocalMinute] = useState(initial.minute);
-  const [localPeriod, setLocalPeriod] = useState(initial.period);
+  const parseRange = (rangeStr: string) => {
+    const parts = rangeStr?.split(' ~ ') || [];
+    return {
+      start: from24h(parts[0]),
+      end: from24h(parts[1] || parts[0]) // 종료시간 없으면 시작시간과 동일하게 초기화
+    };
+  };
+
+  const initialRange = parseRange(timePart);
+  const [sHour, setSHour] = useState(initialRange.start.hour);
+  const [sMin, setSMin] = useState(initialRange.start.minute);
+  const [sPer, setSPer] = useState(initialRange.start.period);
+  const [eHour, setEHour] = useState(initialRange.end.hour);
+  const [eMin, setEMin] = useState(initialRange.end.minute);
+  const [ePer, setEPer] = useState(initialRange.end.period);
 
   useEffect(() => {
-    const remote = from24h(timePart);
-    setLocalHour(remote.hour);
-    setLocalMinute(remote.minute);
-    setLocalPeriod(remote.period);
+    const remote = parseRange(timePart);
+    setSHour(remote.start.hour);
+    setSMin(remote.start.minute);
+    setSPer(remote.start.period);
+    setEHour(remote.end.hour);
+    setEMin(remote.end.minute);
+    setEPer(remote.end.period);
   }, [timePart]);
 
-  const handleValueChange = (type: 'hour' | 'minute' | 'period', value: string) => {
-    let h = localHour;
-    let m = localMinute;
-    let p = localPeriod;
+  const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
+    let nextSH = sHour, nextSM = sMin, nextSP = sPer;
+    let nextEH = eHour, nextEM = eMin, nextEP = ePer;
 
-    if (type === 'hour') { h = value; setLocalHour(value); }
-    if (type === 'minute') { m = value; setLocalMinute(value); }
-    if (type === 'period') { p = value as any; setLocalPeriod(p); }
+    if (type === 's') {
+      if (field === 'h') { nextSH = val; setSHour(val); }
+      if (field === 'm') { nextSM = val; setSMin(val); }
+      if (field === 'p') { nextSP = val as any; setSPer(val as any); }
+    } else {
+      if (field === 'h') { nextEH = val; setEHour(val); }
+      if (field === 'm') { nextEM = val; setEMin(val); }
+      if (field === 'p') { nextEP = val as any; setEPer(val as any); }
+    }
 
-    onUpdateTime(item.id, titlePart, `${h}:${m}`, p);
+    onUpdateRange(item.id, titlePart, { h: nextSH, m: nextSM, p: nextSP }, { h: nextEH, m: nextEM, p: nextEP });
   };
 
   const getIcon = (title: string) => {
@@ -135,70 +154,65 @@ function ScheduleItemRow({ item, onUpdateTime, onDelete, isPast, isMobile }: any
 
   const Icon = getIcon(titlePart);
 
+  const TimePicker = ({ type, h, m, p }: any) => (
+    <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
+      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)}>
+        <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[42px] text-[9px]" : "w-[55px] text-xs")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-none shadow-2xl">
+          <SelectItem value="오전">오전</SelectItem>
+          <SelectItem value="오후">오후</SelectItem>
+        </SelectContent>
+      </Select>
+      <div className="w-px h-2 bg-border/50 mx-0.5" />
+      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)}>
+        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[30px] text-[10px]" : "w-[45px] text-sm")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="max-h-[200px]">{HOURS.map(hour => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}</SelectContent>
+      </Select>
+      <span className="text-[9px] font-black opacity-30 px-0.5">:</span>
+      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)}>
+        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[30px] text-[10px]" : "w-[45px] text-sm")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="max-h-[200px]">{MINUTES.map(min => <SelectItem key={min} value={min}>{min}</SelectItem>)}</SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <div className={cn(
-      "flex flex-col transition-all border group relative bg-white shadow-sm hover:shadow-md w-full mx-auto",
-      isMobile ? "p-4 rounded-[1.5rem] border-border/40" : "p-5 rounded-2xl hover:border-primary/30"
+      "flex flex-col transition-all border group relative bg-white shadow-sm hover:shadow-md w-full",
+      isMobile ? "p-3 rounded-[1.25rem] border-border/40" : "p-5 rounded-2xl hover:border-primary/30"
     )}>
-      <div className="flex items-center gap-3">
-        <div className={cn(
-          "rounded-xl transition-all duration-500 shrink-0 flex items-center justify-center",
-          isMobile ? "bg-primary/5 p-2.5" : "bg-primary/10 p-3 group-hover:bg-primary group-hover:text-white"
-        )}>
-          <Icon className={cn(isMobile ? "h-4.5 w-4.5 text-primary" : "h-5 w-5")} />
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={cn("rounded-lg shrink-0 flex items-center justify-center", isMobile ? "bg-primary/5 p-1.5" : "bg-primary/10 p-2")}>
+            <Icon className={cn(isMobile ? "h-3.5 w-3.5 text-primary" : "h-4 w-4")} />
+          </div>
+          <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         </div>
-        
-        <div className="flex-1 min-w-0">
-          <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-sm" : "text-base")}>{titlePart}</Label>
-        </div>
+        {!isPast && (
+          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDelete(item)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {isPast ? (
-            <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[10px] px-2 py-1">
-              {timePart ? `${localPeriod} ${localHour}:${localMinute}` : '-'}
-            </Badge>
-          ) : (
-            <div className="flex items-center bg-muted/20 p-1 rounded-xl border border-border/30">
-               <Select value={localPeriod} onValueChange={(v) => handleValueChange('period', v)}>
-                 <SelectTrigger className={cn("border-none bg-transparent font-black px-1.5 focus:ring-0 focus:bg-white rounded-md transition-all h-7 shadow-none", isMobile ? "w-[50px] text-[10px]" : "w-[65px] text-xs")}>
-                   <SelectValue />
-                 </SelectTrigger>
-                 <SelectContent className="rounded-xl border-none shadow-2xl">
-                   <SelectItem value="오전">오전</SelectItem>
-                   <SelectItem value="오후">오후</SelectItem>
-                 </SelectContent>
-               </Select>
-
-               <div className="w-px h-3 bg-border/50 mx-1" />
-
-               <Select value={localHour} onValueChange={(v) => handleValueChange('hour', v)}>
-                 <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-md transition-all h-7 shadow-none", isMobile ? "w-[35px] text-xs" : "w-[50px] text-sm")}>
-                   <SelectValue />
-                 </SelectTrigger>
-                 <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
-                   {HOURS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                 </SelectContent>
-               </Select>
-
-               <span className="text-[10px] font-black opacity-30 px-0.5">:</span>
-
-               <Select value={localMinute} onValueChange={(v) => handleValueChange('minute', v)}>
-                 <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1.5 focus:ring-0 focus:bg-white rounded-md transition-all h-7 shadow-none", isMobile ? "w-[35px] text-xs" : "w-[50px] text-sm")}>
-                   <SelectValue />
-                 </SelectTrigger>
-                 <SelectContent className="rounded-xl border-none shadow-2xl max-h-[200px]">
-                   {MINUTES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                 </SelectContent>
-               </Select>
-            </div>
-          )}
-          
-          {!isPast && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all shrink-0 ml-1" onClick={() => onDelete(item)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+      <div className="flex items-center gap-1.5 w-full justify-start sm:justify-start">
+        {isPast ? (
+          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[9px] px-2 py-1">
+            {timePart || '--:--'}
+          </Badge>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <TimePicker type="s" h={sHour} m={sMin} p={sPer} />
+            <span className="text-[10px] font-black text-muted-foreground/40">~</span>
+            <TimePicker type="e" h={eHour} m={eMin} p={ePer} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -266,7 +280,7 @@ export default function StudyPlanPage() {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule', defaultTime?: string) => {
+  const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {
     if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) return;
     
     setIsSubmitting(true);
@@ -282,7 +296,7 @@ export default function StudyPlanPage() {
     );
     
     try {
-      const finalTitle = category === 'schedule' ? `${title.trim()}: ${defaultTime || '09:00'}` : title.trim();
+      const finalTitle = category === 'schedule' ? `${title.trim()}: 09:00 ~ 10:00` : title.trim();
       await addDoc(itemsCollectionRef, {
         title: finalTitle,
         done: false,
@@ -308,11 +322,13 @@ export default function StudyPlanPage() {
     }
   };
 
-  const handleUpdateScheduleTime = async (itemId: string, baseTitle: string, timeValue: string, periodValue: '오전' | '오후') => {
+  const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
-    const formattedTime = to24h(timeValue, periodValue);
+    const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
+    const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
+    const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
     const docRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', itemId);
-    await updateDoc(docRef, { title: `${baseTitle}: ${formattedTime}`, updatedAt: serverTimestamp() });
+    await updateDoc(docRef, { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
@@ -426,7 +442,7 @@ export default function StudyPlanPage() {
           <CardContent className={cn("bg-[#fafafa] flex flex-col gap-4", isMobile ? "p-5" : "p-8")}>
             {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className="py-16 text-center opacity-20 italic font-black text-sm">등록된 루틴이 없습니다.</div> :
               scheduleItems.sort((a,b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00')).map((item) => (
-                <ScheduleItemRow key={item.id} item={item} onUpdateTime={handleUpdateScheduleTime} onDelete={handleDeleteTask} isPast={isPast} isMobile={isMobile} />
+                <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isPast} isMobile={isMobile} />
               ))
             }
           </CardContent>
