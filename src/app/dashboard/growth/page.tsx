@@ -178,17 +178,16 @@ export default function GrowthPage() {
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-  }, [firestore, activeMembership?.id, targetUid]); // Only depend on membership ID
+  }, [firestore, activeMembership?.id, targetUid]);
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
 
-  // 현재 레벨에 따른 목표 경험치 실시간 계산
   const currentLevelThreshold = useMemo(() => {
     if (!progress) return 1000;
     return getNextLevelXp(Number(progress.level) || 1);
   }, [progress?.level]);
 
-  // 자동 레벨업 로직
+  // 자동 레벨업 로직 안정화
   useEffect(() => {
     if (progress && progressRef && progress.currentXp >= currentLevelThreshold && !isLevelingUp.current) {
       isLevelingUp.current = true;
@@ -206,16 +205,17 @@ export default function GrowthPage() {
           title: "🎉 레벨 업!",
           description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다.`,
         });
+      }).catch(err => {
+        console.error("Level up error:", err);
       }).finally(() => {
-        // Delay resetting to allow firestore snapshot to arrive
+        // 소폭 지연을 주어 Firestore 스냅샷이 안정화되고 중복 업데이트가 방지되도록 합니다.
         setTimeout(() => {
           isLevelingUp.current = false;
         }, 1000);
       });
     }
-  }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold]); // Remove unstable toast
+  }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold]); 
 
-  // 실시간 마스터리 보너스 계산
   const totalMultiplier = useMemo(() => {
     if (!progress?.skills) return 1.0;
     let multiplier = 1.0;
@@ -269,7 +269,6 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
-  // 누적 XP 대략적 계산
   const calculateTotalXpSpent = (lvl: number) => {
     let sum = 0;
     for(let i=1; i<lvl; i++) sum += getNextLevelXp(i);

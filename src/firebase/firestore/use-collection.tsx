@@ -83,22 +83,29 @@ export function useCollection<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      (error: FirestoreError) => {
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+      (err: FirestoreError) => {
+        // 권한 오류인 경우에만 전역 에러 리스너를 실행하여 개발 overlay를 띄웁니다.
+        if (err.code === 'permission-denied') {
+          const path: string =
+            memoizedTargetRefOrQuery.type === 'collection'
+              ? (memoizedTargetRefOrQuery as CollectionReference).path
+              : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
 
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        })
+          const contextualError = new FirestorePermissionError({
+            operation: 'list',
+            path,
+          })
 
-        setError(contextualError)
+          setError(contextualError)
+          errorEmitter.emit('permission-error', contextualError);
+        } else {
+          // 기타 오류(시간 동기화 등)는 무시하거나 콘솔에만 출력하여 앱 중단을 방지합니다.
+          setError(err);
+          console.warn("Firestore Listener Warning:", err.message);
+        }
+        
         setData(null)
         setIsLoading(false)
-
-        errorEmitter.emit('permission-error', contextualError);
       }
     );
 

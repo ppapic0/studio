@@ -69,17 +69,24 @@ export function useDoc<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      (error: FirestoreError) => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'get',
-          path: memoizedDocRef.path,
-        })
+      (err: FirestoreError) => {
+        // 권한 오류인 경우에만 전역 에러 리스너를 실행합니다.
+        if (err.code === 'permission-denied') {
+          const contextualError = new FirestorePermissionError({
+            operation: 'get',
+            path: memoizedDocRef.path,
+          })
 
-        setError(contextualError)
+          setError(contextualError)
+          errorEmitter.emit('permission-error', contextualError);
+        } else {
+          // 기타 오류(시간 동기화 등)는 콘솔에만 출력합니다.
+          setError(err);
+          console.warn("Firestore Doc Listener Warning:", err.message);
+        }
+        
         setData(null)
         setIsLoading(false)
-
-        errorEmitter.emit('permission-error', contextualError);
       }
     );
 

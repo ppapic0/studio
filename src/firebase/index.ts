@@ -18,8 +18,6 @@ import { getFunctions, Functions } from 'firebase/functions';
 
 /**
  * 프로젝트 전역 싱글톤 Firebase 서비스 인스턴스
- * - Firestore는 반드시 initializeFirestore로만 생성(설정 강제)
- * - getFirestore(app) 사용 금지: 설정(host/ssl) 다른 인스턴스가 생길 수 있음
  */
 let firebaseApp: FirebaseApp | null = null;
 let firestore: Firestore | null = null;
@@ -41,18 +39,12 @@ function ensureApp(): FirebaseApp {
 function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
-  // ✅ 항상 initializeFirestore로만 생성해서 host/ssl 강제
+  // 기본 호스트 및 SSL 설정을 SDK에 위임하여 시간 동기화 오류 가능성을 낮춥니다.
   firestore = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
-    host: 'firestore.googleapis.com',
-    ssl: true,
   });
-
-  // ✅ 디버그(브라우저 콘솔에서 확인)
-  // @ts-ignore
-  console.log('[DEBUG] Firestore host:', firestore?._settings?.host, 'ssl:', firestore?._settings?.ssl);
 
   return firestore;
 }
@@ -83,7 +75,6 @@ export function initializeFirebase() {
 
 /**
  * (호환용) 앱 인스턴스로부터 SDK를 가져오는 함수
- * - Firestore는 getFirestore()로 만들지 말고 ensureFirestore() 사용
  */
 export function getSdks(app: FirebaseApp) {
   const db = ensureFirestore(app);
