@@ -33,6 +33,7 @@ import {
   isBefore,
   startOfDay
 } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -48,7 +49,8 @@ import {
   ClipboardList,
   Copy,
   Info,
-  CalendarX
+  CalendarX,
+  CalendarDays
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -116,18 +118,18 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
   };
 
   return (
-    <div className="flex flex-col gap-1.5 bg-muted/20 p-3 rounded-xl border group hover:border-primary/50 transition-all">
+    <div className="flex flex-col gap-1.5 bg-muted/20 p-2.5 rounded-xl border group hover:border-primary/50 transition-all">
       <div className="flex items-center gap-3">
-        <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors">
-          <tpl.icon className="h-4 w-4 text-primary" />
+        <div className="bg-primary/10 p-1.5 rounded-lg group-hover:bg-primary/20 transition-colors">
+          <tpl.icon className="h-3.5 w-3.5 text-primary" />
         </div>
-        <Label className="flex-1 font-bold text-sm">{tpl.title}</Label>
+        <Label className="flex-1 font-bold text-xs">{tpl.title}</Label>
         {isPast ? (
-          <span className="font-mono font-bold text-primary">{localTime ? `${localPeriod} ${localTime}` : '-'}</span>
+          <span className="font-mono font-bold text-primary text-xs">{localTime ? `${localPeriod} ${localTime}` : '-'}</span>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
              <Select value={localPeriod} onValueChange={handlePeriodChange}>
-               <SelectTrigger className="w-[75px] h-9 text-xs border-none bg-transparent font-bold">
+               <SelectTrigger className="w-[65px] h-8 text-[10px] border-none bg-transparent font-bold px-1">
                  <SelectValue />
                </SelectTrigger>
                <SelectContent>
@@ -137,7 +139,7 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
              </Select>
              <Input 
               placeholder="00:00"
-              className="w-16 h-9 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold"
+              className="w-14 h-8 text-center bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary shadow-sm p-0 font-mono font-bold text-xs"
               value={localTime}
               onChange={(e) => setLocalTime(e.target.value)}
               onBlur={handleBlur}
@@ -152,9 +154,10 @@ function ScheduleItemRow({ tpl, scheduleItems, onUpdate, isPast }: any) {
 export default function StudyHistoryPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   
+  const isMobile = viewMode === 'mobile';
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);
   
@@ -202,10 +205,8 @@ export default function StudyHistoryPage() {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
     if (isNaN(hours) || isNaN(mins)) return time12h;
-    
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
-    
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
@@ -232,8 +233,8 @@ export default function StudyHistoryPage() {
     if (minutes === 0) return 'bg-white';
     if (minutes < 60) return 'bg-emerald-50 text-emerald-700';
     if (minutes < 180) return 'bg-emerald-100 text-emerald-800';
-    if (minutes < 300) return 'bg-emerald-300 text-emerald-900';
-    if (minutes < 480) return 'bg-emerald-500 text-white';
+    if (minutes < 300) return 'bg-emerald-200 text-emerald-900';
+    if (minutes < 480) return 'bg-emerald-400 text-white';
     return 'bg-emerald-600 text-white shadow-inner';
   };
 
@@ -249,81 +250,32 @@ export default function StudyHistoryPage() {
 
   const handleAddTask = async (title: string, category: 'study' | 'personal') => {
     if (!firestore || !user || !activeMembership || !selectedDateForPlan || !title.trim()) return;
-    
     setIsSubmitting(true);
     const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    
-    const itemsCollectionRef = collection(
-      firestore,
-      'centers',
-      activeMembership.id,
-      'plans',
-      user.uid,
-      'weeks',
-      weekKey,
-      'items'
-    );
-    
+    const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
     try {
       await addDoc(itemsCollectionRef, {
-        title: title.trim(),
-        done: false,
-        weight: 1,
-        dateKey,
-        category,
-        studyPlanWeekId: weekKey,
-        centerId: activeMembership.id,
-        studentId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        title: title.trim(), done: false, weight: 1, dateKey, category, studyPlanWeekId: weekKey,
+        centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
-      if (category === 'study') setNewStudyTask('');
-      else setNewPersonalTask('');
-    } catch (error) {
-      console.error("Error adding task:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+      if (category === 'study') setNewStudyTask(''); else setNewPersonalTask('');
+    } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
   };
 
   const handleUpdateSchedule = async (title: string, timeValue: string, periodValue: '오전' | '오후') => {
     if (!firestore || !user || !activeMembership || !selectedDateForPlan) return;
-    
     const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const formattedTime = to24h(timeValue, periodValue);
     const existing = scheduleItems.find(p => p.title.startsWith(title));
-
-    const itemsCollectionRef = collection(
-      firestore,
-      'centers',
-      activeMembership.id,
-      'plans',
-      user.uid,
-      'weeks',
-      weekKey,
-      'items'
-    );
-
+    const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
     if (existing) {
-      const docRef = doc(itemsCollectionRef, existing.id);
-      await updateDoc(docRef, {
-        title: `${title}: ${formattedTime}`,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(doc(itemsCollectionRef, existing.id), { title: `${title}: ${formattedTime}`, updatedAt: serverTimestamp() });
     } else {
       await addDoc(itemsCollectionRef, {
-        title: `${title}: ${formattedTime}`,
-        done: false,
-        weight: 0,
-        dateKey,
-        category: 'schedule',
-        studyPlanWeekId: weekKey,
-        centerId: activeMembership.id,
-        studentId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        title: `${title}: ${formattedTime}`, done: false, weight: 0, dateKey, category: 'schedule', studyPlanWeekId: weekKey,
+        centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
     }
   };
@@ -331,172 +283,107 @@ export default function StudyHistoryPage() {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !selectedDateForPlan) return;
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const itemRef = doc(
-      firestore,
-      'centers',
-      activeMembership.id,
-      'plans',
-      user.uid,
-      'weeks',
-      weekKey,
-      'items',
-      item.id
-    );
-    await updateDoc(itemRef, {
-      done: !item.done,
-      doneAt: !item.done ? serverTimestamp() : null,
-      updatedAt: serverTimestamp(),
+    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id), {
+      done: !item.done, doneAt: !item.done ? serverTimestamp() : null, updatedAt: serverTimestamp(),
     });
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !selectedDateForPlan) return;
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const itemRef = doc(
-      firestore,
-      'centers',
-      activeMembership.id,
-      'plans',
-      user.uid,
-      'weeks',
-      weekKey,
-      'items',
-      item.id
-    );
-    await deleteDoc(itemRef);
+    await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id));
   };
 
   const handleApplyToAllWeekdays = async () => {
     if (!selectedDateForPlan || !firestore || !user || !activeMembership || dailyPlans.length === 0 || !currentDate) return;
-    
     setIsSubmitting(true);
     const weekday = getDay(selectedDateForPlan);
-    const monthDates = eachDayOfInterval({
-      start: startOfMonth(currentDate),
-      end: endOfMonth(currentDate)
-    });
-    
-    const targetDates = monthDates.filter(d => getDay(d) === weekday && !isSameDay(d, selectedDateForPlan));
+    const targetDates = eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) })
+      .filter(d => getDay(d) === weekday && !isSameDay(d, selectedDateForPlan));
     const batch = writeBatch(firestore);
-
     try {
       for (const targetDate of targetDates) {
         const targetDateKey = format(targetDate, 'yyyy-MM-dd');
         const targetWeekKey = format(targetDate, "yyyy-'W'II");
-        
-        const itemsCollectionRef = collection(
-          firestore,
-          'centers',
-          activeMembership.id,
-          'plans',
-          user.uid,
-          'weeks',
-          targetWeekKey,
-          'items'
-        );
-
+        const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', targetWeekKey, 'items');
         dailyPlans.forEach(plan => {
-          const newDocRef = doc(itemsCollectionRef);
-          batch.set(newDocRef, {
-            title: plan.title,
-            done: false,
-            weight: plan.weight,
-            dateKey: targetDateKey,
-            category: plan.category || 'study',
-            studyPlanWeekId: targetWeekKey,
-            centerId: activeMembership.id,
-            studentId: user.uid,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+          batch.set(doc(itemsCollectionRef), {
+            title: plan.title, done: false, weight: plan.weight, dateKey: targetDateKey, category: plan.category || 'study',
+            studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           });
         });
       }
-
       await batch.commit();
-      toast({
-        title: "일정 복사 완료",
-        description: `이번 달 모든 ${format(selectedDateForPlan, 'EEEE')}에 계획이 복사되었습니다.`,
-      });
-    } catch (error) {
-      console.error("Error copying plans:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+      toast({ title: "일정 복사 완료", description: `이번 달 모든 ${format(selectedDateForPlan, 'EEEE', {locale: ko})}에 계획이 복사되었습니다.` });
+    } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
   };
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
-  const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE') : '';
+  const weekdayName = selectedDateForPlan ? format(selectedDateForPlan, 'EEEE', {locale: ko}) : '';
 
-  if (!currentDate) {
-    return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
-  }
+  if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-headline font-bold">학습 기록</h1>
-          <p className="text-muted-foreground">날짜를 클릭하여 그날의 학습 현황을 확인하거나 새로운 계획을 세워보세요.</p>
+    <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-20", isMobile ? "gap-4 px-1" : "gap-6")}>
+      <header className={cn("flex justify-between items-center", isMobile ? "flex-col gap-3 px-1" : "flex-row")}>
+        <div className="flex flex-col gap-0.5">
+          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-3xl")}>학습 기록</h1>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Study Logs & History</p>
         </div>
-        <div className="flex items-center gap-4 bg-card p-1 rounded-xl border shadow-sm">
-           <Button variant="ghost" size="icon" onClick={prevMonth}>
-             <ChevronLeft className="h-5 w-5" />
-           </Button>
-           <span className="font-bold text-lg min-w-[120px] text-center">
-             {format(currentDate, 'yyyy년 M월')}
-           </span>
-           <Button variant="ghost" size="icon" onClick={nextMonth}>
-             <ChevronRight className="h-5 w-5" />
-           </Button>
+        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border shadow-sm">
+           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+           <span className="font-black text-sm min-w-[100px] text-center">{format(currentDate, 'yyyy년 M월')}</span>
+           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
         </div>
+      </header>
+
+      <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+        <Card className="md:col-span-2 border-none shadow-xl bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-[2rem] overflow-hidden relative group p-6">
+          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform group-hover:scale-110"><CalendarDays className="h-32 w-32" /></div>
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Monthly Summary</span>
+              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5">이번 달 총 몰입</Badge>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-6xl")}>{formatMinutes(monthTotalMinutes)}</span>
+              <span className="text-sm font-bold opacity-60">총 학습 완료</span>
+            </div>
+            <div className="flex gap-4 mt-2">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-400 rounded-sm" /><span className="text-[10px] font-bold">8시간+</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm" /><span className="text-[10px] font-bold">3시간+</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-white/20 rounded-sm border border-white/10" /><span className="text-[10px] font-bold">기록 없음</span></div>
+            </div>
+          </div>
+        </Card>
+
+        {!isMobile && (
+          <Card className="rounded-[2rem] border-none shadow-xl bg-white p-6 flex flex-col justify-center gap-4">
+            <div className="space-y-1">
+              <h3 className="font-black text-sm uppercase tracking-widest text-muted-foreground">Mastery Tip</h3>
+              <p className="text-xs font-bold leading-relaxed text-foreground/70">매일 3시간 이상 학습 시 <Zap className="inline h-3 w-3 text-yellow-500 fill-yellow-500" /> 아이콘을 획득하며 마스터리 경험치가 대폭 상승합니다.</p>
+            </div>
+            <Button asChild variant="outline" className="w-full rounded-xl font-black text-xs h-10 border-2"><Link href="/dashboard/growth">마스터리 보러가기</Link></Button>
+          </Card>
+        )}
       </div>
 
-      <Card className="border-none shadow-xl overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b pb-4">
-           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-             <div className="flex flex-wrap items-center gap-4">
-               <div className="flex items-center gap-1.5">
-                 <div className="w-3 h-3 bg-emerald-600 rounded-sm" />
-                 <span className="text-[10px] font-medium">8시간+</span>
-               </div>
-               <div className="flex items-center gap-1.5">
-                 <div className="w-3 h-3 bg-emerald-300 rounded-sm" />
-                 <span className="text-[10px] font-medium">3시간+</span>
-               </div>
-               <div className="flex items-center gap-1.5 text-muted-foreground/60">
-                 <div className="w-3 h-3 bg-white border rounded-sm" />
-                 <span className="text-[10px] font-medium">기록 없음</span>
-               </div>
-             </div>
-             <div className="flex items-baseline gap-2">
-               <span className="text-sm text-muted-foreground">이달의 총 학습 몰입:</span>
-               <span className="text-2xl font-bold text-primary">{formatMinutes(monthTotalMinutes)}</span>
-             </div>
-           </div>
-        </CardHeader>
+      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
         <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b bg-muted/10">
+          <div className="grid grid-cols-7 border-b bg-muted/5">
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
-              <div key={day} className={cn(
-                "py-3 text-center text-[11px] font-bold uppercase tracking-wider",
-                i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-muted-foreground"
-              )}>
-                {day}
-              </div>
+              <div key={day} className={cn("py-3 text-center text-[10px] font-black uppercase tracking-widest", i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-muted-foreground")}>{day}</div>
             ))}
           </div>
 
           <div className="grid grid-cols-7 auto-rows-fr">
             {logsLoading ? (
-              <div className="col-span-7 h-[400px] flex items-center justify-center">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              </div>
+              <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" /></div>
             ) : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const log = logs?.find(l => l.dateKey === dateKey);
               const minutes = log?.totalMinutes || 0;
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
-              
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isToday = isSameDay(day, new Date());
               
@@ -505,46 +392,24 @@ export default function StudyHistoryPage() {
                   key={dateKey} 
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
-                    "min-h-[90px] sm:min-h-[110px] p-2 border-r border-b relative group transition-all cursor-pointer hover:ring-2 hover:ring-primary/30 hover:z-20",
-                    !isCurrentMonth ? "bg-muted/10 opacity-20" : getHeatmapColor(minutes),
+                    "min-h-[85px] sm:min-h-[110px] p-2 border-r border-b relative group transition-all cursor-pointer hover:z-20",
+                    !isCurrentMonth ? "bg-muted/5 opacity-10" : getHeatmapColor(minutes),
                     isToday && "ring-2 ring-inset ring-primary z-10"
                   )}
                 >
                   <div className="flex justify-between items-start">
-                    <span className={cn(
-                      "text-xs font-bold",
-                      idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : 
-                      idx % 7 === 6 && isCurrentMonth ? "text-red-600" : ""
-                    )}>
-                      {format(day, 'd')}
-                    </span>
+                    <span className={cn("text-[10px] font-black", idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "")}>{format(day, 'd')}</span>
                     <div className="flex flex-col items-end gap-1">
-                      {minutes >= 180 && (
-                        <Zap className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                      )}
-                      {hasPlans && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                      )}
+                      {minutes >= 180 && <Zap className="h-2.5 w-2.5 text-yellow-500 fill-yellow-500" />}
+                      {hasPlans && <div className="w-1 h-1 rounded-full bg-primary/40" />}
                     </div>
                   </div>
-                  
                   {minutes > 0 && (
-                    <div className="mt-3 flex flex-col items-center justify-center">
-                      <span className="text-base sm:text-xl font-mono font-extrabold tracking-tighter">
-                        {formatMinutes(minutes)}
-                      </span>
+                    <div className="mt-3 flex justify-center">
+                      <span className={cn("font-mono font-black tracking-tighter leading-none", isMobile ? "text-xs" : "text-lg")}>{formatMinutes(minutes)}</span>
                     </div>
                   )}
-
-                  {isToday && (
-                    <div className="absolute bottom-1 right-1.5">
-                       <span className="text-[9px] font-bold uppercase tracking-tighter bg-primary text-white px-1 rounded">Today</span>
-                    </div>
-                  )}
-                  
-                  <div className="absolute bottom-1 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <CalendarPlus className="h-3 w-3 text-muted-foreground" />
-                  </div>
+                  {isToday && <div className="absolute bottom-1 right-1.5"><span className="text-[7px] font-black uppercase tracking-tighter bg-primary text-white px-1 rounded-sm">Today</span></div>}
                 </div>
               );
             })}
@@ -552,184 +417,100 @@ export default function StudyHistoryPage() {
         </CardContent>
       </Card>
 
+      <div className="flex flex-wrap gap-4 items-center px-4 py-3 bg-white border shadow-sm rounded-2xl text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
+         <div className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-yellow-500 fill-yellow-500" /><span>3시간 몰입 성공</span></div>
+         <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-primary/40" /><span>계획 수립됨</span></div>
+         <div className="ml-auto flex items-center gap-1"><Info className="h-3 w-3" /><span>날짜를 클릭하여 상세 기록을 관리하세요.</span></div>
+      </div>
+
       <Dialog open={!!selectedDateForPlan} onOpenChange={(open) => !open && setSelectedDateForPlan(null)}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl">
-          <DialogHeader className="p-6 bg-primary text-primary-foreground">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <ClipboardList className="h-6 w-6" />
-              {selectedDateForPlan && format(selectedDateForPlan, 'yyyy년 M월 d일')} 현황
-            </DialogTitle>
-            <DialogDescription className="text-primary-foreground/80 text-sm">
-              기록된 학습 및 생활 계획을 확인하세요.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : "sm:max-w-lg rounded-[3rem]")}>
+          <div className="bg-primary p-8 text-white relative">
+            <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
+                <ClipboardList className="h-6 w-6" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEE)', {locale: ko})}
+              </DialogTitle>
+              <DialogDescription className="text-white/60 font-bold mt-1">학습 및 생활 루틴 상세 현황</DialogDescription>
+            </DialogHeader>
+          </div>
           
-          <div className="max-h-[60vh] overflow-y-auto bg-background">
-            {selectedDateForPlan && dailyPlans.length === 0 && isBefore(selectedDateForPlan, startOfDay(new Date())) ? (
-              <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
-                <div className="bg-muted p-4 rounded-full">
-                  <CalendarX className="h-10 w-10 text-muted-foreground" />
-                </div>
-                <p className="text-lg font-medium text-muted-foreground">당일 작성한 계획이 없습니다.</p>
-                <p className="text-sm text-muted-foreground/60">학습 계획을 미리 세워 루틴을 관리해보세요.</p>
+          <div className={cn("bg-[#fafafa]", isMobile ? "max-h-[60vh] overflow-y-auto" : "max-h-[500px] overflow-y-auto")}>
+            {selectedDateForPlan && dailyPlans.length === 0 && isActuallyPast ? (
+              <div className="py-20 text-center flex flex-col items-center gap-4 opacity-30">
+                <CalendarX className="h-12 w-12" />
+                <p className="font-black italic text-sm">작성된 기록이 없습니다.</p>
               </div>
             ) : (
               <Tabs defaultValue="schedule" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 rounded-none bg-muted/50 p-0 h-12">
-                  <TabsTrigger value="schedule" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all font-bold">시간표</TabsTrigger>
-                  <TabsTrigger value="study" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all font-bold">자습 To-do</TabsTrigger>
-                  <TabsTrigger value="personal" className="data-[state=active]:bg-background rounded-none border-b-2 border-transparent data-[state=active]:border-primary transition-all font-bold">개인 일정</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-12 bg-muted/30 p-0 border-b">
+                  <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-primary font-black text-xs transition-all">시간표</TabsTrigger>
+                  <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-primary font-black text-xs transition-all">자습</TabsTrigger>
+                  <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-primary font-black text-xs transition-all">개인</TabsTrigger>
                 </TabsList>
 
                 <div className="p-6 space-y-6">
-                  <TabsContent value="schedule" className="mt-0 space-y-4">
-                    <div className="grid gap-4">
-                      {SCHEDULE_TEMPLATES.map((tpl) => (
-                        <ScheduleItemRow 
-                          key={tpl.title}
-                          tpl={tpl}
-                          scheduleItems={scheduleItems}
-                          onUpdate={handleUpdateSchedule}
-                          isPast={isActuallyPast}
-                        />
-                      ))}
-                      {isActuallyPast && scheduleItems.length === 0 && (
-                        <p className="text-center text-sm text-muted-foreground py-4">기록된 시간표가 없습니다.</p>
-                      )}
-                    </div>
+                  <TabsContent value="schedule" className="mt-0 space-y-3">
+                    {SCHEDULE_TEMPLATES.map((tpl) => (
+                      <ScheduleItemRow key={tpl.title} tpl={tpl} scheduleItems={scheduleItems} onUpdate={handleUpdateSchedule} isPast={isActuallyPast} />
+                    ))}
                   </TabsContent>
 
-                  <TabsContent value="study" className="mt-0 space-y-4">
-                    <div className="space-y-3">
-                      {studyTasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10 group hover:shadow-sm transition-all">
-                          <Checkbox 
-                            id={task.id} 
-                            checked={task.done} 
-                            onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                            disabled={isActuallyPast}
-                          />
-                          <Label 
-                            htmlFor={task.id}
-                            className={cn(
-                              "flex-1 text-sm font-medium transition-all",
-                              !isActuallyPast && "cursor-pointer",
-                              task.done && "line-through text-muted-foreground opacity-60"
-                            )}
-                          >
-                            {task.title}
-                          </Label>
-                          {!isActuallyPast && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      {!isActuallyPast && (
-                        <div className="flex items-center gap-2 pt-2">
-                          <Input 
-                            placeholder="오늘 할 자습 과제 입력..." 
-                            value={newStudyTask}
-                            onChange={(e) => setNewStudyTask(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')}
-                            disabled={isSubmitting}
-                            className="rounded-xl border-dashed"
-                          />
-                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl">
-                            <Plus className="h-4 w-4" />
+                  <TabsContent value="study" className="mt-0 space-y-3">
+                    {studyTasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white shadow-sm group">
+                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="rounded-md border-2" />
+                        <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                        {!isActuallyPast && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        </div>
-                      )}
-                      {isActuallyPast && studyTasks.length === 0 && (
-                         <p className="text-center text-sm text-muted-foreground py-4">기록된 자습 내용이 없습니다.</p>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    ))}
+                    {!isActuallyPast && (
+                      <div className="flex items-center gap-2 pt-2">
+                        <Input placeholder="오늘 할 자습 과제 입력..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="rounded-xl h-11 border-2 font-bold text-sm" />
+                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl h-11 w-11 shrink-0"><Plus className="h-5 w-5" /></Button>
+                      </div>
+                    )}
                   </TabsContent>
 
-                  <TabsContent value="personal" className="mt-0 space-y-4">
-                     <div className="space-y-3">
-                      {personalTasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-accent/5 group hover:shadow-sm transition-all">
-                          <Checkbox 
-                            id={task.id} 
-                            checked={task.done} 
-                            onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                            disabled={isActuallyPast}
-                          />
-                          <Label 
-                            htmlFor={task.id}
-                            className={cn(
-                              "flex-1 text-sm font-medium transition-all",
-                              !isActuallyPast && "cursor-pointer",
-                              task.done && "line-through text-muted-foreground opacity-60"
-                            )}
-                          >
-                            {task.title}
-                          </Label>
-                          {!isActuallyPast && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      {!isActuallyPast && (
-                        <div className="flex items-center gap-2 pt-2">
-                          <Input 
-                            placeholder="공부 외 개인 일정 입력..." 
-                            value={newPersonalTask}
-                            onChange={(e) => setNewPersonalTask(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
-                            disabled={isSubmitting}
-                            className="rounded-xl border-dashed"
-                          />
-                          <Button size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl" variant="outline">
-                            <Plus className="h-4 w-4" />
+                  <TabsContent value="personal" className="mt-0 space-y-3">
+                    {personalTasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white shadow-sm group">
+                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast} className="rounded-md border-2" />
+                        <Label htmlFor={task.id} className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through text-muted-foreground opacity-40")}>{task.title}</Label>
+                        {!isActuallyPast && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        </div>
-                      )}
-                      {isActuallyPast && personalTasks.length === 0 && (
-                         <p className="text-center text-sm text-muted-foreground py-4">기록된 개인 일정이 없습니다.</p>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    ))}
+                    {!isActuallyPast && (
+                      <div className="flex items-center gap-2 pt-2">
+                        <Input placeholder="공부 외 개인 일정 입력..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="rounded-xl h-11 border-2 font-bold text-sm" />
+                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl h-11 w-11 border-2 shrink-0"><Plus className="h-5 w-5" /></Button>
+                      </div>
+                    )}
                   </TabsContent>
                 </div>
               </Tabs>
             )}
           </div>
           
-          <DialogFooter className="p-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
+          <DialogFooter className="p-6 bg-white border-t flex-col gap-2">
             {!isActuallyPast && selectedDateForPlan && dailyPlans.length > 0 && (
-              <Button 
-                variant="outline" 
-                className="w-full sm:w-auto gap-2 text-xs" 
-                onClick={handleApplyToAllWeekdays}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Copy className="h-3 w-3" />}
-                이 일정을 이번 달 모든 {weekdayName}에 복사
+              <Button variant="outline" className="w-full h-12 rounded-xl gap-2 text-xs font-black border-2" onClick={handleApplyToAllWeekdays} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Copy className="h-4 w-4" />}
+                이 일정을 매주 {weekdayName}에 반복 설정
               </Button>
             )}
-            <Button variant="ghost" className="w-full sm:w-auto text-xs" onClick={() => setSelectedDateForPlan(null)}>닫기</Button>
+            <Button variant="ghost" className="w-full h-12 rounded-xl font-black text-xs" onClick={() => setSelectedDateForPlan(null)}>닫기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <div className="flex flex-wrap gap-4 items-center px-4 py-3 bg-muted/30 rounded-lg text-[11px] text-muted-foreground">
-         <div className="flex items-center gap-1.5">
-           <Zap className="h-3 w-3 text-yellow-500" />
-           <span>3시간 이상 학습 성공</span>
-         </div>
-         <div className="flex items-center gap-1.5">
-           <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-           <span>학습 계획 수립됨</span>
-         </div>
-         <div className="ml-auto flex items-center gap-1">
-           <Info className="h-3 w-3" />
-           <span>날짜를 클릭하여 체계적인 일별 학습 현황을 관리하세요.</span>
-         </div>
-      </div>
     </div>
   );
 }

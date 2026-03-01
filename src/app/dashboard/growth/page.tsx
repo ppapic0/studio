@@ -28,7 +28,6 @@ import {
   RefreshCw, 
   CheckCircle2, 
   ShieldCheck, 
-  Info,
   Trophy,
   Crown,
   Medal,
@@ -38,37 +37,31 @@ import {
   Sparkles,
   ArrowUpCircle,
   Flame,
-  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
-// 확장된 20개 스킬 로드맵
 const MOCK_SKILLS: (SkillNode & { link: string })[] = [
-  // --- FOCUS BRANCH ---
   { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { xp: 1.03 }, iconKey: 'Target', link: '/dashboard' },
   { id: 'f2', branch: 'focus', name: '방해 금지', description: '중단 없는 세션 5회 연속 달성 시 해금됩니다.', maxLevel: 1, prerequisites: ['f1'], unlockCondition: { stat: 'focus', value: 25 }, effects: { xp: 1.05 }, iconKey: 'Target', link: '/dashboard' },
   { id: 'f3', branch: 'focus', name: '몰입의 강도', description: '평균 집중도 90% 이상을 일주일간 유지하세요.', maxLevel: 3, prerequisites: ['f2'], unlockCondition: { stat: 'focus', value: 45 }, effects: { xp: 1.08 }, iconKey: 'Flame', link: '/dashboard' },
   { id: 'f4', branch: 'focus', name: '하이퍼 포커스', description: '3시간 이상의 초몰입 세션을 성공적으로 마쳤습니다.', maxLevel: 5, prerequisites: ['f3'], unlockCondition: { stat: 'focus', value: 70 }, effects: { xp: 1.12 }, iconKey: 'Zap', link: '/dashboard' },
   { id: 'f5', branch: 'focus', name: '몰입의 대가', description: '어떤 환경에서도 즉시 몰입 상태에 진입할 수 있습니다.', maxLevel: 1, prerequisites: ['f4'], unlockCondition: { stat: 'focus', value: 95 }, effects: { xp: 1.20 }, iconKey: 'Crown', link: '/dashboard' },
 
-  // --- CONSISTENCY BRANCH ---
   { id: 'c1', branch: 'consistency', name: '작심삼일 타파', description: '3일 동안 멈추지 않고 학습을 기록했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'consistency', value: 10 }, effects: { xp: 1.03 }, iconKey: 'RefreshCw', link: '/dashboard' },
   { id: 'c2', branch: 'consistency', name: '일주일의 기적', description: '7일 연속 출석 시 주간 보너스가 강화됩니다.', maxLevel: 1, prerequisites: ['c1'], unlockCondition: { stat: 'consistency', value: 25 }, effects: { xp: 1.07 }, iconKey: 'Medal', link: '/dashboard' },
   { id: 'c3', branch: 'consistency', name: '루틴 정착', description: '30일 중 25일 이상 학습을 완료하는 습관을 형성합니다.', maxLevel: 3, prerequisites: ['c2'], unlockCondition: { stat: 'consistency', value: 50 }, effects: { xp: 1.10 }, iconKey: 'RefreshCw', link: '/dashboard' },
   { id: 'c4', branch: 'consistency', name: '철의 의지', description: '100일 연속 학습이라는 경이로운 기록에 도전하세요.', maxLevel: 1, prerequisites: ['c3'], unlockCondition: { stat: 'consistency', value: 80 }, effects: { xp: 1.15 }, iconKey: 'Flame', link: '/dashboard' },
   { id: 'c5', branch: 'consistency', name: '습관의 화신', description: '학습이 일상의 숨쉬기처럼 자연스러운 단계입니다.', maxLevel: 1, prerequisites: ['c4'], unlockCondition: { stat: 'consistency', value: 98 }, effects: { xp: 1.25 }, iconKey: 'Crown', link: '/dashboard' },
 
-  // --- ACHIEVEMENT BRANCH ---
   { id: 'a1', branch: 'achievement', name: '오늘 완벽', description: '오늘 설정한 자습 To-do를 100% 달성했습니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'achievement', value: 15 }, effects: { xp: 1.05 }, iconKey: 'CheckCircle2', link: '/dashboard/plan' },
   { id: 'a2', branch: 'achievement', name: '과목 밸런스', description: '3개 이상의 과목을 편식 없이 고르게 학습했습니다.', maxLevel: 1, prerequisites: ['a1'], unlockCondition: { stat: 'achievement', value: 30 }, effects: { xp: 1.08 }, iconKey: 'Target', link: '/dashboard/plan' },
   { id: 'a3', branch: 'achievement', name: '주간 정복자', description: '한 주간 모든 목표 달성률 95% 이상을 기록하세요.', maxLevel: 3, prerequisites: ['a2'], unlockCondition: { stat: 'achievement', value: 55 }, effects: { xp: 1.12 }, iconKey: 'Trophy', link: '/dashboard/plan' },
   { id: 'a4', branch: 'achievement', name: '전략적 플래너', description: '자신에게 딱 맞는 학습량을 스스로 설계하고 달성합니다.', maxLevel: 1, prerequisites: ['a3'], unlockCondition: { stat: 'achievement', value: 75 }, effects: { xp: 1.18 }, iconKey: 'Zap', link: '/dashboard/plan' },
   { id: 'a5', branch: 'achievement', name: '성취의 정점', description: '설정한 모든 원대한 목표를 현실로 만들어냅니다.', maxLevel: 1, prerequisites: ['a4'], unlockCondition: { stat: 'achievement', value: 95 }, effects: { xp: 1.30 }, iconKey: 'Crown', link: '/dashboard/plan' },
 
-  // --- RESILIENCE BRANCH ---
   { id: 'r1', branch: 'resilience', name: '빠른 회복', description: '슬럼프 감지 후 2일 이내에 다시 학습을 시작했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'resilience', value: 15 }, effects: { xp: 1.05 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
   { id: 'r2', branch: 'resilience', name: '역전의 발판', description: '성적이 하락한 과목에 더 많은 시간을 투자하여 극복합니다.', maxLevel: 1, prerequisites: ['r1'], unlockCondition: { stat: 'resilience', value: 35 }, effects: { xp: 1.08 }, iconKey: 'RefreshCw', link: '/dashboard/study-history' },
   { id: 'r3', branch: 'resilience', name: '강철 멘탈', description: '어떤 외부 유혹에도 흔들리지 않고 자리를 지킵니다.', maxLevel: 3, prerequisites: ['r2'], unlockCondition: { stat: 'resilience', value: 60 }, effects: { xp: 1.12 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
@@ -84,7 +77,6 @@ const STAT_CONFIG = {
 };
 
 const MAX_LEVEL = 30;
-// 곡선형 레벨업 공식: 1000 + (L-1)*300
 const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
 const TOTAL_MASTER_XP = 150000; 
 
@@ -328,11 +320,11 @@ export default function GrowthPage() {
 
       {/* 분석 및 가이드 섹션 */}
       <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-        <Card className={cn("md:col-span-2 border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-xl rounded-[2rem] overflow-hidden relative group", isMobile ? "p-6" : "")}>
+        <Card className={cn("md:col-span-2 border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-xl rounded-[2rem] overflow-hidden relative group", isMobile ? "p-5" : "")}>
           <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-700">
             <TrendingUp className={cn(isMobile ? "h-24 w-24" : "h-40 w-40")} />
           </div>
-          <CardHeader className={cn("relative z-10", isMobile ? "p-0 pb-4" : "pb-2")}>
+          <CardHeader className={cn("relative z-10", isMobile ? "p-0 pb-3" : "pb-2")}>
             <CardTitle className={cn("font-black flex items-center gap-2", isMobile ? "text-lg" : "text-xl")}>
               <Sparkles className="h-4 w-4 text-amber-400 fill-current" />
               성장 페이스 분석
@@ -340,14 +332,14 @@ export default function GrowthPage() {
             <CardDescription className="text-primary-foreground/60 font-bold">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} XP</CardDescription>
           </CardHeader>
           <CardContent className={cn("relative z-10 p-0", isMobile ? "" : "px-6 pb-6")}>
-            <div className={cn("grid gap-3 mt-2", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+            <div className={cn("grid gap-2 mt-2", isMobile ? "grid-cols-2" : "grid-cols-4")}>
               {[
                 { label: '여정 진행', val: daysSpent, unit: '일차' },
                 { label: '일일 목표', val: 360, unit: '분/일' },
                 { label: '남은 일수', val: estimatedDaysToMax > 0 ? estimatedDaysToMax : '-', unit: '일 예상', highlight: true },
                 { label: '보너스', val: `x${totalMultiplier.toFixed(2)}`, unit: '합산', success: true }
               ].map((item, i) => (
-                <div key={i} className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+                <div key={i} className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10 flex flex-col justify-center">
                   <p className="text-[8px] font-black uppercase opacity-60 mb-1">{item.label}</p>
                   <div className="flex items-baseline gap-1">
                     <span className={cn("font-black", isMobile ? "text-lg" : "text-2xl", item.highlight ? "text-amber-400" : item.success ? "text-emerald-400" : "")}>{item.val}</span>
@@ -356,22 +348,17 @@ export default function GrowthPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 p-3 bg-black/20 rounded-xl border border-white/5">
-              <p className={cn("font-bold leading-relaxed opacity-90", isMobile ? "text-[9px]" : "text-xs")}>
-                ⚠️ <span className="text-amber-400">곡선 성장:</span> 후반부 레벨업을 위해 스킬 해금 보너스를 획득하세요.
-              </p>
-            </div>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden flex flex-col">
-          <CardHeader className={cn(isMobile ? "p-6 pb-2" : "pb-2")}>
+          <CardHeader className={cn(isMobile ? "p-5 pb-2" : "pb-2")}>
             <CardTitle className={cn("font-black flex items-center gap-2", isMobile ? "text-base" : "text-lg")}>
               <Medal className="h-5 w-5 text-primary" />
               오늘의 성장판
             </CardTitle>
           </CardHeader>
-          <CardContent className={cn("flex-1 space-y-3", isMobile ? "p-6" : "")}>
+          <CardContent className={cn("flex-1 space-y-2.5", isMobile ? "p-5" : "")}>
             <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 group">
               <div className="bg-blue-100 p-1.5 rounded-lg shrink-0">
                 <Target className="h-3.5 w-3.5 text-blue-600" />
@@ -396,11 +383,10 @@ export default function GrowthPage() {
       </section>
 
       {/* 마스터리 로드맵 메인 섹션 */}
-      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] shadow-2xl relative overflow-hidden", isMobile ? "p-4 sm:p-5" : "p-10")}>
+      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] shadow-2xl relative overflow-hidden", isMobile ? "p-5" : "p-10")}>
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className={cn("flex flex-col justify-between gap-6 mb-8 relative z-10", isMobile ? "" : "md:flex-row md:items-center")}>
+        
+        <div className={cn("flex flex-col justify-between gap-4 mb-6 relative z-10", isMobile ? "" : "md:flex-row md:items-center")}>
           <div className="space-y-1">
             <h2 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
               마스터리 로드맵
@@ -409,20 +395,20 @@ export default function GrowthPage() {
             <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>Lv.30은 상위 0.1%의 증거입니다.</p>
           </div>
           
-          <div className={cn("bg-white p-4 rounded-[1.5rem] sm:rounded-[2rem] flex items-center gap-4 border border-border/50 shadow-xl min-w-[260px]", isMobile ? "" : "")}>
+          <div className={cn("bg-white p-3 rounded-[1.5rem] flex items-center gap-4 border border-border/50 shadow-xl", isMobile ? "w-full" : "min-w-[260px]")}>
             <div className="relative flex items-center justify-center shrink-0">
-              <svg className={cn("transform -rotate-90", isMobile ? "h-14 w-14" : "h-16 w-16")}>
-                <circle cx={isMobile ? "28" : "32"} cy={isMobile ? "28" : "32"} r={isMobile ? "24" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted/30" />
-                <circle cx={isMobile ? "28" : "32"} cy={isMobile ? "28" : "32"} r={isMobile ? "24" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" 
+              <svg className={cn("transform -rotate-90", isMobile ? "h-12 w-12" : "h-16 w-16")}>
+                <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted/30" />
+                <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" 
                   style={{ 
-                    strokeDasharray: isMobile ? 150.7 : 175.8, 
-                    strokeDashoffset: (isMobile ? 150.7 : 175.8) - ((isMobile ? 150.7 : 175.8) * (progress?.currentXp || 0) / currentLevelThreshold) 
+                    strokeDasharray: isMobile ? 125.6 : 175.8, 
+                    strokeDashoffset: (isMobile ? 125.6 : 175.8) - ((isMobile ? 125.6 : 175.8) * (progress?.currentXp || 0) / currentLevelThreshold) 
                   }} 
                 />
               </svg>
               <div className="absolute flex flex-col items-center leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">LV</span>
-                <span className={cn("font-black text-primary", isMobile ? "text-lg" : "text-xl")}>{progress?.level || 1}</span>
+                <span className="text-[7px] font-black text-muted-foreground uppercase">LV</span>
+                <span className={cn("font-black text-primary", isMobile ? "text-base" : "text-xl")}>{progress?.level || 1}</span>
               </div>
             </div>
             <div className="flex-1 flex flex-col gap-1.5 min-w-0">
@@ -430,7 +416,7 @@ export default function GrowthPage() {
                 <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">PROGRESS</span>
                 <span className="text-[8px] font-bold tabular-nums">{(progress?.currentXp || 0).toLocaleString()} XP</span>
               </div>
-              <Progress value={((progress?.currentXp || 0) / currentLevelThreshold) * 100} className="h-1.5 rounded-full shadow-inner" />
+              <Progress value={((progress?.currentXp || 0) / currentLevelThreshold) * 100} className="h-1 rounded-full shadow-inner" />
               <div className="flex justify-between items-center">
                 <span className="text-[8px] font-black text-primary/60">GOAL: Lv.{MAX_LEVEL}</span>
                 <span className="text-[8px] font-black text-muted-foreground flex items-center gap-1">
@@ -442,24 +428,23 @@ export default function GrowthPage() {
         </div>
 
         <Tabs defaultValue="focus" className="w-full relative z-10" onValueChange={(val) => setActiveBranch(val as any)}>
-          <TabsList className={cn("grid grid-cols-4 bg-muted/30 p-1 rounded-[1.25rem] border border-border/50 shadow-inner mb-6", isMobile ? "h-14" : "h-16")}>
-            <TabsTrigger value="focus" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-blue-600 text-[10px] sm:text-xs">
+          <TabsList className={cn("grid grid-cols-4 bg-muted/30 p-1 rounded-xl border border-border/50 shadow-inner mb-6", isMobile ? "h-12" : "h-16")}>
+            <TabsTrigger value="focus" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-blue-600 text-[10px] sm:text-xs">
               <Target className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden xs:inline">집중</span>
             </TabsTrigger>
-            <TabsTrigger value="consistency" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-emerald-600 text-[10px] sm:text-xs">
+            <TabsTrigger value="consistency" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-emerald-600 text-[10px] sm:text-xs">
               <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden xs:inline">꾸준</span>
             </TabsTrigger>
-            <TabsTrigger value="achievement" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-amber-600 text-[10px] sm:text-xs">
+            <TabsTrigger value="achievement" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-amber-600 text-[10px] sm:text-xs">
               <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden xs:inline">성취</span>
             </TabsTrigger>
-            <TabsTrigger value="resilience" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1.5 data-[state=active]:text-rose-600 text-[10px] sm:text-xs">
+            <TabsTrigger value="resilience" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-rose-600 text-[10px] sm:text-xs">
               <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden xs:inline">회복</span>
             </TabsTrigger>
           </TabsList>
 
-          <div className={cn("grid gap-8 items-start", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
-            {/* 스킬 트리 뷰 */}
-            <div className={cn("flex flex-col gap-8", isMobile ? "lg:col-span-12 items-center" : "lg:col-span-7")}>
+          <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
+            <div className={cn("flex flex-col gap-6", isMobile ? "lg:col-span-12 items-center" : "lg:col-span-7")}>
               {MOCK_SKILLS.filter(s => s.branch === activeBranch).map((skill, idx) => {
                 const isUnlocked = !!progress?.skills?.[skill.id];
                 const canUnlock = !isUnlocked && stats[activeBranch] >= (skill.unlockCondition.value || 0);
@@ -469,7 +454,7 @@ export default function GrowthPage() {
                   <div key={skill.id} className="relative flex flex-col items-center w-full">
                     {idx < 4 && (
                       <div className={cn(
-                        "absolute top-full w-0.5 h-8 border-l-2 border-dashed transition-colors duration-500",
+                        "absolute top-full w-0.5 h-6 border-l-2 border-dashed transition-colors duration-500",
                         isUnlocked ? "border-primary/50" : "border-muted"
                       )} />
                     )}
@@ -477,27 +462,27 @@ export default function GrowthPage() {
                     <Card 
                       onClick={() => setSelectedSkillId(skill.id)}
                       className={cn(
-                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full rounded-[1.25rem] sm:rounded-[1.5rem]",
-                        isSelected ? "border-primary ring-4 ring-primary/10 scale-105 z-10 shadow-2xl" : "border-border/50",
-                        isUnlocked ? "bg-white shadow-xl" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60",
+                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full rounded-2xl",
+                        isSelected ? "border-primary ring-4 ring-primary/10 scale-105 z-10 shadow-xl" : "border-border/50",
+                        isUnlocked ? "bg-white shadow-md" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60",
                         isMobile ? "max-w-[320px]" : "max-w-[360px]"
                       )}
                     >
-                      <CardHeader className={cn("flex flex-row items-center gap-3 p-4", isMobile ? "p-3.5" : "p-5")}>
+                      <CardHeader className={cn("flex flex-row items-center gap-3", isMobile ? "p-3.5" : "p-5")}>
                         <div className={cn(
                           "rounded-xl transition-all duration-700 flex items-center justify-center shrink-0",
-                          isMobile ? "p-2 h-10 w-10" : "p-3 h-12 w-12",
-                          isUnlocked ? "bg-primary text-white shadow-lg rotate-[360deg]" : canUnlock ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                          isMobile ? "p-2 h-9 w-9" : "p-3 h-12 w-12",
+                          isUnlocked ? "bg-primary text-white shadow-lg" : canUnlock ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                         )}>
-                          {isUnlocked ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                          {isUnlocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                         </div>
                         <div className="grid gap-0.5 min-w-0 flex-1">
-                          <CardTitle className={cn("font-black leading-tight truncate", isMobile ? "text-sm" : "text-base")}>{skill.name}</CardTitle>
-                          <span className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground/60">
+                          <CardTitle className={cn("font-black leading-tight truncate", isMobile ? "text-xs" : "text-base")}>{skill.name}</CardTitle>
+                          <span className="text-[8px] font-black uppercase tracking-tighter text-muted-foreground/60">
                             {isUnlocked ? `MASTERY LV.1` : canUnlock ? "해금 가능" : "잠김"}
                           </span>
                         </div>
-                        {isUnlocked && <Star className="ml-auto h-4 w-4 text-amber-400 fill-current animate-bounce" />}
+                        {isUnlocked && <Star className="ml-auto h-3 w-3 text-amber-400 fill-current" />}
                       </CardHeader>
                     </Card>
                   </div>
@@ -505,116 +490,64 @@ export default function GrowthPage() {
               })}
             </div>
 
-            {/* 스킬 상세 카드 */}
             <div className={cn("h-full", isMobile ? "lg:col-span-12" : "lg:col-span-5")}>
               {selectedSkill ? (
                 <Card className={cn(
-                  "border-none bg-primary text-primary-foreground shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden transform-gpu",
+                  "border-none bg-primary text-primary-foreground shadow-2xl rounded-[2rem] overflow-hidden transform-gpu",
                   !isMobile && "sticky top-24"
                 )}>
-                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none animate-float">
-                    <SelectedBranchIcon className={cn(isMobile ? "h-20 w-20" : "h-32 w-32")} />
-                  </div>
                   <CardHeader className={cn(isMobile ? "p-6 pb-2" : "p-8 pb-4")}>
-                    <Badge className="w-fit mb-3 bg-white/20 hover:bg-white/30 text-white border-none font-black backdrop-blur-sm text-[9px] uppercase tracking-widest px-3 py-1">
+                    <Badge className="w-fit mb-2 bg-white/20 hover:bg-white/30 text-white border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
                       {STAT_CONFIG[activeBranch].label} PATH
                     </Badge>
-                    <CardTitle className={cn("font-black tracking-tighter mb-2", isMobile ? "text-2xl" : "text-3xl")}>{selectedSkill.name}</CardTitle>
-                    <p className={cn("font-bold leading-relaxed opacity-80", isMobile ? "text-xs" : "text-sm")}>{selectedSkill.description}</p>
+                    <CardTitle className={cn("font-black tracking-tighter mb-1", isMobile ? "text-xl" : "text-3xl")}>{selectedSkill.name}</CardTitle>
+                    <p className={cn("font-bold leading-relaxed opacity-80", isMobile ? "text-[11px]" : "text-sm")}>{selectedSkill.description}</p>
                   </CardHeader>
-                  <CardContent className={cn("space-y-6", isMobile ? "p-6" : "p-8")}>
-                    <div className="space-y-3">
-                      <h4 className="text-[9px] font-black uppercase tracking-widest opacity-60">해금 조건</h4>
-                      <div className="flex items-center justify-between bg-white/10 p-3.5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                  <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
+                    <div className="space-y-2.5">
+                      <h4 className="text-[8px] font-black uppercase tracking-widest opacity-60">해금 조건</h4>
+                      <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
                         <div className="flex items-center gap-3">
-                          <div className="bg-white/20 p-1.5 rounded-lg shrink-0">
-                            <SelectedBranchIcon className="h-3.5 w-3.5" />
-                          </div>
-                          <span className="text-[11px] font-black">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
+                          <SelectedBranchIcon className="h-3.5 w-3.5 opacity-60" />
+                          <span className="text-[10px] font-black">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
                         </div>
                         {(stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
-                          <div className="flex items-center gap-1.5 text-emerald-400">
-                            <CheckCircle2 className="h-4 w-4 fill-current" />
-                          </div>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-current" />
                         ) : (
-                          <span className="text-[10px] font-black opacity-60">{(stats[activeBranch] || 0).toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
+                          <span className="text-[9px] font-black opacity-60">{(stats[activeBranch] || 0).toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
                         )}
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <h4 className="text-[9px] font-black uppercase tracking-widest opacity-60">마스터리 효과</h4>
-                      <div className="grid gap-2">
-                        {Object.entries(selectedSkill.effects).map(([key, val]) => (
-                          <div key={key} className="flex items-center justify-between group">
-                            <span className="text-[11px] font-bold opacity-80">XP 획득 배율</span>
-                            <span className="text-[11px] font-black text-emerald-400 flex items-center gap-1">
-                              <ArrowUpCircle className="h-3 w-3" />
-                              x{Number(val).toFixed(2)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex flex-col gap-3">
-                      <Button asChild className="w-full h-12 rounded-2xl bg-white text-primary hover:bg-white/90 font-black text-sm shadow-xl gap-2 active:scale-95 transition-all">
-                        <Link href={selectedSkill.link}>
-                          지금 수행하기
-                          <ArrowRight className="ml-auto h-4 w-4" />
-                        </Link>
+                    <div className="pt-2 flex flex-col gap-2">
+                      <Button asChild className="w-full h-11 rounded-xl bg-white text-primary hover:bg-white/90 font-black text-xs shadow-xl gap-2 active:scale-95 transition-all">
+                        <Link href={selectedSkill.link}>지금 수행하기 <ArrowRight className="ml-auto h-3 w-3" /></Link>
                       </Button>
 
                       {!!progress?.skills?.[selectedSkill.id] ? (
-                        <div className="flex flex-col items-center py-2">
-                           <div className="flex items-center gap-2 text-white/40 font-black text-[10px] uppercase tracking-widest">
-                             <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Mastery Unlocked
-                           </div>
+                        <div className="flex items-center justify-center gap-2 text-white/40 font-black text-[9px] uppercase tracking-widest py-1">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Mastery Unlocked
                         </div>
                       ) : (stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
                         <Button 
                           onClick={() => handleUnlockSkill(selectedSkill.id)}
-                          className="w-full h-12 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-sm shadow-xl gap-2 animate-pulse-soft"
+                          className="w-full h-11 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-xs shadow-xl gap-2"
                         >
-                          <Unlock className="h-4 w-4" /> 지금 해금하기
+                          <Unlock className="h-3 w-3" /> 지금 해금하기
                         </Button>
                       ) : (
-                        <Button disabled className="w-full h-12 rounded-2xl bg-white/10 text-white/40 font-black text-sm border border-white/5 gap-2">
-                          <Lock className="h-4 w-4" /> 조건 미충족
+                        <Button disabled className="w-full h-11 rounded-xl bg-white/10 text-white/40 font-black text-xs border border-white/5 gap-2">
+                          <Lock className="h-3 w-3" /> 조건 미충족
                         </Button>
                       )}
                     </div>
                   </CardContent>
                 </Card>
-              ) : (
-                <div className="h-[300px] flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-[2.5rem] border border-dashed border-border/50">
-                  <Trophy className="h-10 w-10 mb-3 opacity-20" />
-                  <p className="font-bold text-xs">노드를 선택하세요.</p>
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
         </Tabs>
       </section>
-
-      {/* 푸터 가이드 */}
-      <footer className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "sm:grid-cols-3")}>
-        {[
-          { icon: Medal, title: '궁극의 목표 Lv.30', desc: '상위 0.1%를 증명하세요.', color: 'text-primary' },
-          { icon: CalendarDays, title: '데이터 기반 성장', desc: '몰입 6시간이 성공의 기준.', color: 'text-amber-500' },
-          { icon: Crown, title: '곡선형 마스터리', desc: '후반부 돌파를 위해 스킬 해금 필수.', color: 'text-emerald-500' }
-        ].map((item, i) => (
-          <div key={i} className="flex gap-3 p-4 bg-muted/20 rounded-[1.5rem] border border-border/50 items-start hover:bg-white transition-all shadow-sm">
-            <div className="bg-white p-1.5 rounded-xl border border-border/50 shadow-sm shrink-0">
-              <item.icon className={cn("h-4 w-4", item.color)} />
-            </div>
-            <div>
-              <h5 className="font-black text-xs mb-0.5">{item.title}</h5>
-              <p className="text-[10px] font-bold text-muted-foreground leading-tight">{item.desc}</p>
-            </div>
-          </div>
-        ))}
-      </footer>
     </div>
   );
 }
