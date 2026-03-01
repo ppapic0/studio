@@ -138,6 +138,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: student, isLoading: studentLoading } = useDoc<StudentProfile>(studentRef);
 
+  const membershipRef = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return doc(firestore, 'centers', centerId, 'members', studentId);
+  }, [firestore, centerId, studentId]);
+  const { data: studentMembership } = useDoc<CenterMembership>(membershipRef);
+
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
@@ -156,12 +162,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return query(collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_completion`, 'entries'), where('studentId', '==', studentId));
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
-
-  const membershipRef = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return doc(firestore, 'centers', centerId, 'members', studentId);
-  }, [firestore, centerId, studentId]);
-  const { data: studentMembership } = useDoc<CenterMembership>(membershipRef);
 
   const aptsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -218,8 +218,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         parentLinkCode: student.parentLinkCode || ''
       });
       hasInitializedForm.current = true;
+    } else if (studentMembership && !hasInitializedForm.current) {
+      setEditForm(f => ({ ...f, name: studentMembership.displayName || '' }));
     }
-  }, [student]);
+  }, [student, studentMembership]);
 
   useEffect(() => {
     if (studentMembership) setStatusForm(studentMembership.status);
@@ -231,15 +233,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       return;
     }
     if (!currentUser) {
-      toast({ variant: "destructive", title: "인증 오류", description: "로그인 정보를 확인할 수 없습니다." });
-      return;
-    }
-    if (!student) {
-      toast({ variant: "destructive", title: "정보 로딩 중", description: "학생 정보를 불러오는 중입니다. 잠시만 기다려주세요." });
+      toast({ variant: "destructive", title: "인증 오류", description: "로그인 정보가 없습니다." });
       return;
     }
     if (!aptDate || !aptTime) {
-      toast({ variant: "destructive", title: "입력 부족", description: "상담 날짜와 시간을 모두 선택해 주세요." });
+      toast({ variant: "destructive", title: "정보 부족", description: "날짜와 시간을 선택해 주세요." });
       return;
     }
 
@@ -251,15 +249,18 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const scheduledDate = new Date(year, month - 1, day, hours, minutes);
 
       if (isNaN(scheduledDate.getTime())) {
-        toast({ variant: "destructive", title: "날짜 형식 오류", description: "유효하지 않은 날짜 형식입니다." });
+        toast({ variant: "destructive", title: "날짜 오류", description: "유효하지 않은 날짜입니다." });
         setIsSubmitting(false);
         return;
       }
 
+      // 프로필이 아직 로딩 중일 수 있으므로 멤버십 정보에서 이름을 우선적으로 가져옵니다.
+      const studentName = student?.name || studentMembership?.displayName || '학생';
+
       const data = {
         centerId,
         studentId,
-        studentName: student.name,
+        studentName,
         teacherId: currentUser.uid,
         teacherName: currentUser.displayName || '선생님',
         scheduledAt: Timestamp.fromDate(scheduledDate),
@@ -273,23 +274,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       
       addDoc(colRef, data)
         .then(() => {
-          toast({ title: "상담 예약 완료", description: `${format(scheduledDate, 'M월 d일 HH:mm')} 예약이 확정되었습니다.` });
+          toast({ title: "상담 예약 완료", description: `${format(scheduledDate, 'M월 d일 HH:mm')} 예약 확정.` });
           setAptNote('');
         })
         .catch(async (serverError) => {
-          const permissionError = new FirestorePermissionError({
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: `${colRef.path}/{newId}`,
             operation: 'create',
             requestResourceData: data,
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          }));
         })
         .finally(() => {
           setIsSubmitting(false);
         });
     } catch (err) {
-      console.error(err);
-      toast({ variant: "destructive", title: "처리 오류", description: "예약 처리 중 오류가 발생했습니다." });
+      toast({ variant: "destructive", title: "처리 오류" });
       setIsSubmitting(false);
     }
   };
@@ -319,12 +318,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         setLogImprovement('');
       })
       .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: `${colRef.path}/{newId}`,
           operation: 'create',
           requestResourceData: data,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       })
       .finally(() => {
         setIsSubmitting(false);
@@ -355,7 +353,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       await batch.commit();
       toast({ title: "상태 변경 완료" });
       setIsStatusModalOpen(false);
-    } catch (e: any) { toast({ variant: "destructive", title: "상태 변경 실패" }); } finally { setIsUpdating(false); }
+    } catch (e) { toast({ variant: "destructive", title: "상태 변경 실패" }); } finally { setIsUpdating(false); }
   };
 
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
@@ -369,13 +367,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Button>
           <div className="flex flex-col gap-1 min-w-0 flex-1">
             <div className={cn("flex flex-wrap items-center gap-2", isMobile ? "items-start" : "items-center")}>
-              <h1 className={cn("font-black tracking-tighter truncate leading-tight", isMobile ? "text-2xl" : "text-4xl")}>{student?.name} 학생</h1>
+              <h1 className={cn("font-black tracking-tighter truncate leading-tight", isMobile ? "text-2xl" : "text-4xl")}>
+                {student?.name || studentMembership?.displayName || '학생'}
+              </h1>
               <Badge className="bg-primary text-white px-2 py-0.5 rounded-full font-black text-[10px] whitespace-nowrap">{student?.seatNo || '미배정'}번 좌석</Badge>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-bold">
-              <span className="flex items-center gap-1 text-primary truncate max-w-[150px]"><Building2 className="h-3.5 w-3.5 shrink-0" /> {student?.schoolName}</span>
+              <span className="flex items-center gap-1 text-primary truncate max-w-[150px]"><Building2 className="h-3.5 w-3.5 shrink-0" /> {student?.schoolName || '학교 정보 없음'}</span>
               <span className="opacity-30">|</span>
-              <span>{student?.grade}</span>
+              <span>{student?.grade || '학년 정보 없음'}</span>
             </div>
           </div>
         </div>
@@ -415,7 +415,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                  activeAnalysis === 'level' ? '마스터리 성장판' : '시즌 성취도 랭킹'}
               </DialogTitle>
               <DialogDescription className="text-white/70 font-bold">
-                {student?.name} 학생의 정밀 데이터를 확인하세요.
+                {student?.name || studentMembership?.displayName} 학생의 정밀 데이터
               </DialogDescription>
             </DialogHeader>
           </div>
