@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   School,
   GraduationCap,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 import {
@@ -79,6 +80,7 @@ export function DashboardHeader() {
   const { toast } = useToast();
   const { viewMode, setViewMode, activeMembership } = useAppContext();
 
+  const isMobileView = viewMode === 'mobile';
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -176,12 +178,12 @@ export function DashboardHeader() {
           size="icon" 
           className={cn(
             "rounded-full transition-all",
-            viewMode === 'mobile' ? "bg-primary text-white" : "text-muted-foreground"
+            isMobileView ? "bg-primary text-white" : "text-muted-foreground"
           )}
           onClick={toggleViewMode}
-          title={viewMode === 'mobile' ? "데스크톱 모드로 전환" : "앱 모드 시뮬레이션"}
+          title={isMobileView ? "데스크톱 모드로 전환" : "앱 모드 시뮬레이션"}
         >
-          {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+          {isMobileView ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
         </Button>
 
         <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground">
@@ -189,12 +191,12 @@ export function DashboardHeader() {
           <span className="sr-only">알림 열기</span>
         </Button>
 
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size="icon"
-              className="overflow-hidden rounded-full border-2 border-primary/10 shadow-sm"
+              className="overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button"
             >
               <Avatar className="h-full w-full">
                 {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
@@ -202,17 +204,23 @@ export function DashboardHeader() {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-2xl border-none shadow-2xl min-w-[200px] p-2">
-            <DropdownMenuLabel className="font-black px-3 py-2">내 계정</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="rounded-2xl border-none shadow-2xl min-w-[200px] p-2 animate-in fade-in zoom-in duration-200">
+            <DropdownMenuLabel className="font-black px-3 py-2 text-xs uppercase tracking-widest opacity-60">내 계정 관리</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="font-bold rounded-xl cursor-pointer" onClick={() => setIsSettingsOpen(true)}>
+            <DropdownMenuItem 
+              className="font-bold rounded-xl cursor-pointer py-2.5" 
+              onSelect={(e) => { e.preventDefault(); setIsSettingsOpen(true); }}
+            >
               <Settings className="mr-2 h-4 w-4 opacity-40" /> 설정
             </DropdownMenuItem>
-            <DropdownMenuItem className="font-bold rounded-xl cursor-pointer" onClick={() => setIsSupportOpen(true)}>
+            <DropdownMenuItem 
+              className="font-bold rounded-xl cursor-pointer py-2.5" 
+              onSelect={(e) => { e.preventDefault(); setIsSupportOpen(true); }}
+            >
               <HelpCircle className="mr-2 h-4 w-4 opacity-40" /> 지원 및 메뉴얼
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut} className="font-black text-destructive rounded-xl cursor-pointer">
+            <DropdownMenuItem onClick={handleSignOut} className="font-black text-destructive rounded-xl cursor-pointer py-2.5">
               <LogOut className="mr-2 h-4 w-4" />
               로그아웃
             </DropdownMenuItem>
@@ -222,27 +230,31 @@ export function DashboardHeader() {
 
       {/* 설정 다이얼로그 */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
-          <div className="bg-primary p-8 text-white">
+        <DialogContent className={cn(
+          "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500",
+          isMobileView ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : ""
+        )}>
+          <div className="bg-primary p-8 text-white relative overflow-hidden">
+            <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
             <DialogTitle className="text-2xl font-black tracking-tighter">프로필 설정</DialogTitle>
             <DialogDescription className="text-white/60 font-bold mt-1">학교 및 학년 정보를 수정할 수 있습니다.</DialogDescription>
           </div>
-          <div className="p-8 space-y-6">
+          <div className="p-8 space-y-6 bg-white">
             <div className="grid gap-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label>
               <div className="relative">
                 <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/30" />
-                <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 pl-10 rounded-xl border-2" placeholder="학교명을 입력하세요" />
+                <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 pl-10 rounded-xl border-2 font-bold" placeholder="학교명을 입력하세요" />
               </div>
             </div>
             {activeMembership?.role === 'student' && (
               <div className="grid gap-2">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">현재 학년</Label>
                 <Select value={grade} onValueChange={setGrade}>
-                  <SelectTrigger className="h-12 rounded-xl border-2">
+                  <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
                     <SelectValue placeholder="학년 선택" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl border-none shadow-2xl">
                     <SelectItem value="1학년">1학년</SelectItem>
                     <SelectItem value="2학년">2학년</SelectItem>
                     <SelectItem value="3학년">3학년</SelectItem>
@@ -252,8 +264,8 @@ export function DashboardHeader() {
               </div>
             )}
           </div>
-          <DialogFooter className="p-8 bg-muted/20">
-            <Button onClick={handleUpdateSettings} disabled={isUpdating} className="w-full h-12 rounded-2xl font-black text-base shadow-xl">
+          <DialogFooter className="p-8 bg-muted/20 border-t">
+            <Button onClick={handleUpdateSettings} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
               {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '변경 내용 저장'}
             </Button>
           </DialogFooter>
@@ -262,8 +274,12 @@ export function DashboardHeader() {
 
       {/* 지원/메뉴얼 다이얼로그 */}
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
-        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl max-h-[85vh] flex flex-col">
-          <div className="bg-accent p-8 text-white shrink-0">
+        <DialogContent className={cn(
+          "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500",
+          isMobileView ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "max-h-[85vh]"
+        )}>
+          <div className="bg-accent p-8 text-white shrink-0 relative overflow-hidden">
+            <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
             <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
               <BookOpen className="h-8 w-8" /> 공부트랙 마스터 가이드
             </DialogTitle>
@@ -321,7 +337,7 @@ export function DashboardHeader() {
             </section>
           </div>
           <div className="p-6 bg-white border-t shrink-0 flex justify-end">
-            <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8">이해했습니다</Button>
+            <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">이해했습니다</Button>
           </div>
         </DialogContent>
       </Dialog>
