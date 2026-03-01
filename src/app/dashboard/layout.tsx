@@ -1,8 +1,10 @@
+
 'use client';
 
 import { MainNav } from '@/components/dashboard/main-nav';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { BottomNav } from '@/components/dashboard/bottom-nav';
+import { AppointmentNotifier } from '@/components/dashboard/appointment-notifier';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +50,9 @@ export default function DashboardLayout({
         )}>
           {children}
         </main>
+
+        {/* Global Notifiers */}
+        <AppointmentNotifier />
 
         {/* Bottom Nav */}
         <BottomNav />
