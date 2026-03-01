@@ -14,7 +14,6 @@ import {
   Clock,
   TrendingUp,
   Loader2,
-  MapPin,
   Play,
   Trophy,
   Zap,
@@ -53,18 +52,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDoc, useCollection, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
-import { format, startOfMonth, differenceInDays, addMonths } from 'date-fns';
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { format, startOfDay } from 'date-fns';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const RANKS = [
   { name: '챌린저', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', iconColor: 'text-purple-500' },
@@ -106,24 +104,6 @@ function getRankData(value: number, type: MetricType) {
     rankIndex,
     allThresholds: thresholds
   };
-}
-
-const TARGET_LAT = 37.2762;
-const TARGET_LON = 127.1522;
-const DISTANCE_THRESHOLD_KM = 1.0;
-
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; 
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
 }
 
 function GamifiedStatCard({ 
@@ -192,7 +172,7 @@ function GamifiedStatCard({
             </div>
             <DialogTitle className="text-4xl font-black tracking-tighter">{gameTitle}</DialogTitle>
             <DialogDescription className="text-lg mt-2 font-bold text-muted-foreground">
-              현재 시즌 티어: <span className={cn("font-black underline underline-offset-8 decoration-4", rankData.current.color)}>{rankData.current.name}</span>
+              현재 시즌 등급: <span className={cn("font-black underline underline-offset-8 decoration-4", rankData.current.color)}>{rankData.current.name}</span>
             </DialogDescription>
           </DialogHeader>
           
@@ -203,7 +183,7 @@ function GamifiedStatCard({
                   <div className="bg-primary/5 p-2 rounded-xl">
                     <Activity className="h-5 w-5 text-primary" />
                   </div>
-                  <span className="text-xs font-black uppercase tracking-[0.2em] text-primary/60">Today's Live Tracking</span>
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-primary/60">오늘의 실시간 달성 현황</span>
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-black text-primary font-mono tabular-nums">{dailyValue.toFixed(0)}</span>
@@ -218,8 +198,8 @@ function GamifiedStatCard({
                   />
                 </div>
                 <div className="flex justify-between text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest px-1">
-                  <span>Start</span>
-                  <span>Target {type === 'attendance' ? '360m' : '100%'}</span>
+                  <span>시작</span>
+                  <span>목표 {type === 'attendance' ? '360분' : '100%'}</span>
                 </div>
               </div>
             </div>
@@ -228,9 +208,9 @@ function GamifiedStatCard({
               <div className="bg-rose-50/50 border-2 border-rose-100/50 text-rose-700 rounded-[2rem] p-6 flex items-start gap-4">
                 <div className="bg-white p-2 rounded-xl shadow-sm"><AlertCircle className="h-5 w-5 text-rose-500" /></div>
                 <div className="space-y-1">
-                  <p className="text-xs font-black uppercase tracking-widest">Attendance Standards</p>
+                  <p className="text-xs font-black uppercase tracking-widest">출석 인정 기준</p>
                   <p className="text-[11px] leading-relaxed font-bold opacity-80">
-                    일일 **3시간(180분)** 이상 학습 몰입을 달성한 날만 출석 등급에 반영됩니다.
+                    하루에 **3시간(180분)** 이상 학습 몰입을 달성한 날만 출석 등급에 반영됩니다.
                   </p>
                 </div>
               </div>
@@ -240,8 +220,8 @@ function GamifiedStatCard({
               <div className="space-y-5 px-2">
                 <div className="flex justify-between items-end">
                   <div className="grid gap-0.5">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Next Achievement</span>
-                    <span className="text-base font-black">{rankData.next.name} 티어 도전 중</span>
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">다음 목표</span>
+                    <span className="text-base font-black">{rankData.next.name} 등급 도전 중</span>
                   </div>
                   <div className="text-right">
                     <span className="text-xl font-black font-mono tabular-nums text-primary">{rankData.currentValue.toFixed(1)}</span>
@@ -257,7 +237,7 @@ function GamifiedStatCard({
           </div>
           
           <Button onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()} className="w-full h-16 rounded-[1.5rem] font-black text-lg shadow-xl active:scale-95 transition-all">
-            목표 달성을 위해 몰입하기
+            트랙 완성을 위해 몰입하기
           </Button>
         </div>
       </DialogContent>
@@ -291,8 +271,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
 
   const [localSeconds, setLocalSeconds] = useState(0);
-  const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error'>('checking');
-  const [distance, setDistance] = useState<number | null>(null);
   const [showSessionAlert, setShowSessionAlert] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
 
@@ -321,7 +299,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
   }, [firestore, activeMembership, user, todayKey]);
-  const { data: todayStudyLog, isLoading: todayStudyLogLoading } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
+  const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const allPlansRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !weekKey || !todayKey) return null;
@@ -367,28 +345,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [showSessionAlert, gracePeriod]);
 
-  const checkLocation = useCallback(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      setLocationStatus('error');
-      return;
-    }
-
-    setLocationStatus('checking');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const dist = calculateDistance(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
-        setDistance(dist);
-        setLocationStatus(dist <= DISTANCE_THRESHOLD_KM ? 'inside' : 'outside');
-      },
-      () => setLocationStatus('error'),
-      { enableHighAccuracy: true }
-    );
-  }, []);
-
-  useEffect(() => {
-    if (isActive) checkLocation();
-  }, [isActive, checkLocation]);
-  
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !weekKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
@@ -477,14 +433,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setStartTime(null);
       setLastActiveCheckTime(null);
       setLocalSeconds(0);
-      toast({ title: "공부 종료 및 기록 완료" });
+      toast({ title: "트랙 종료 및 기록 완료" });
     } else {
       const now = Date.now();
       setStartTime(now);
       setLastActiveCheckTime(now);
       setIsTimerActive(true);
       setLocalSeconds(0);
-      toast({ title: "공부 모드 시작!" });
+      toast({ title: "학습 트랙을 시작합니다!" });
     }
   };
 
@@ -533,12 +489,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <div className="relative z-10 flex flex-col items-center gap-8 text-center md:flex-row md:justify-between md:text-left">
           <div className="space-y-4">
             <h2 className="text-3xl font-black tracking-tighter sm:text-5xl leading-tight">
-              {isTimerActive ? "몰입의 정점에\n도착하셨네요!" : "오늘의 마스터리를\n시작해볼까요?"}
+              {isTimerActive ? "몰입의 정점에\n도착하셨네요!" : "오늘의 트랙을\n시작해볼까요?"}
             </h2>
             <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md w-fit px-5 py-2.5 rounded-[1.25rem] border border-white/10">
-              <MapPin className={cn("h-4 w-4 text-accent", locationStatus === 'inside' && "animate-pulse")} />
+              <Sparkles className="h-4 w-4 text-accent animate-pulse" />
               <span className="text-xs font-black uppercase tracking-widest opacity-80">
-                {locationStatus === 'inside' ? "Study Center Authorized" : "Searching for Center..."}
+                실시간 학습 엔진 가동 중
               </span>
             </div>
           </div>
@@ -546,7 +502,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <div className="flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto">
             {isTimerActive && (
               <div className="flex flex-col items-center bg-white/5 backdrop-blur-2xl px-10 py-6 rounded-[2.5rem] border border-white/10 shadow-2xl">
-                <span className="text-10px font-black uppercase tracking-[0.3em] opacity-40 mb-1">Session Duration</span>
+                <span className="text-10px font-black uppercase tracking-[0.3em] opacity-40 mb-1">진행 시간</span>
                 <span className="text-5xl font-mono font-black tracking-tighter tabular-nums text-accent">
                   {formatTime(localSeconds)}
                 </span>
@@ -559,13 +515,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 "h-20 w-full rounded-[2rem] px-12 text-2xl font-black transition-all md:w-auto shadow-2xl active:scale-95 group",
                 isTimerActive ? "bg-destructive hover:bg-destructive/90" : "bg-accent hover:bg-accent/90"
               )}
-              disabled={!isTimerActive && locationStatus !== 'inside'}
               onClick={handleStudyStartStop}
             >
               {isTimerActive ? (
-                <>종료 및 저장 <Square className="ml-3 h-6 w-6 fill-current" /></>
+                <>트랙 종료 <Square className="ml-3 h-6 w-6 fill-current" /></>
               ) : (
-                <>몰입 시작 <Play className="ml-3 h-6 w-6 fill-current" /></>
+                <>트랙 시작 <Play className="ml-3 h-6 w-6 fill-current" /></>
               )}
             </Button>
           </div>
@@ -575,19 +530,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         <Card className="border-none shadow-md bg-white ring-1 ring-black/[0.03] rounded-[2rem] overflow-hidden">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">Today's Focus</CardTitle>
+            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">오늘의 몰입</CardTitle>
             <Clock className="h-4 w-4 text-primary/40" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black tracking-tighter text-primary">
-              {h}<span className="text-xs ml-0.5 opacity-40">h</span> {m}<span className="text-xs ml-0.5 opacity-40">m</span>
+              {h}<span className="text-xs ml-0.5 opacity-40">시간</span> {m}<span className="text-xs ml-0.5 opacity-40">분</span>
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground/60 mt-2">목표 시간 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
+            <p className="text-[10px] font-bold text-muted-foreground/60 mt-2">일일 권장량 대비 {Math.round((totalMinutes/360)*100)}% 달성</p>
           </CardContent>
         </Card>
 
         <GamifiedStatCard 
-          title="Season Completion"
+          title="시즌 계획 완수"
           icon={ClipboardCheck}
           value={`${Math.round(completionRate)}%`}
           numericValue={completionRate}
@@ -599,7 +554,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
         
         <GamifiedStatCard 
-          title="Attendance Streak"
+          title="출석 스트릭"
           icon={Zap}
           value={`${attendanceDays} 일`}
           numericValue={attendanceDays}
@@ -612,7 +567,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         />
 
         <GamifiedStatCard 
-          title="Growth Index"
+          title="성장 지수"
           icon={TrendingUp}
           value={`${Math.round(growthRate)}%`}
           numericValue={growthRate}
@@ -630,14 +585,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="space-y-1.5">
                 <CardTitle className="text-2xl sm:text-3xl font-black flex items-center gap-3 tracking-tighter">
-                  <ListTodo className="h-8 w-8 text-primary" /> 오늘 자습 계획
+                  <ListTodo className="h-8 w-8 text-primary" /> 오늘의 학습 매거진
                 </CardTitle>
                 <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-[0.2em] ml-1">Daily Study Matrix</CardDescription>
               </div>
               <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
                 <div className="flex items-center gap-2.5">
                   <Badge className="bg-primary text-white font-black px-3 py-1 rounded-full border-none shadow-md">{Math.round(todayCompletionRate)}%</Badge>
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Completed</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">달성 완료</span>
                 </div>
                 <Progress value={todayCompletionRate} className="w-full sm:w-40 h-2.5 rounded-full bg-muted shadow-inner" />
               </div>
@@ -653,7 +608,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className="space-y-2">
                   <p className="text-lg font-black text-muted-foreground/60 italic tracking-tight">오늘 등록된 계획이 없습니다.</p>
-                  <p className="text-xs font-bold text-muted-foreground/30 uppercase tracking-widest">Plan your success today</p>
+                  <p className="text-xs font-bold text-muted-foreground/30 uppercase tracking-widest">오늘의 성공을 계획하세요</p>
                 </div>
                 <Button asChild variant="outline" size="lg" className="rounded-2xl font-black mt-4 border-2 px-10 h-14 hover:bg-primary hover:text-white transition-all shadow-sm">
                   <Link href="/dashboard/plan">계획 수립하러 가기</Link>
@@ -686,7 +641,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </Label>
                     {task.done && (
                       <div className="absolute right-5 flex items-center gap-2 animate-in zoom-in duration-500">
-                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">Verified</span>
+                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">확인됨</span>
                         <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                       </div>
                     )}
@@ -707,7 +662,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <Card className="border-none shadow-2xl rounded-[3rem] bg-white flex flex-col ring-1 ring-black/[0.03] overflow-hidden">
           <CardHeader className="p-8 sm:p-10">
             <CardTitle className="text-2xl font-black flex items-center gap-3 tracking-tighter">
-              <CalendarClock className="h-7 w-7 text-primary" /> 생활 루틴
+              <CalendarClock className="h-7 w-7 text-primary" /> 오늘의 루틴
             </CardTitle>
             <CardDescription className="font-bold text-[10px] opacity-40 uppercase tracking-[0.2em] ml-1">Routine Summary</CardDescription>
           </CardHeader>
@@ -715,7 +670,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             {scheduleItems.length === 0 ? (
               <div className="h-full py-20 text-center text-muted-foreground/30 text-xs font-black border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-[#fafafa]">
                 <Timer className="h-10 w-10 opacity-10" />
-                <span>시간표가 없습니다.</span>
+                <span>기록된 시간표가 없습니다.</span>
               </div>
             ) : (
               <div className="space-y-5">
@@ -734,7 +689,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   );
                 })}
                 <Button asChild variant="ghost" className="w-full mt-6 h-12 rounded-2xl font-black text-[10px] text-primary/30 hover:text-primary transition-all uppercase tracking-widest">
-                  <Link href="/dashboard/plan">Edit My Routine</Link>
+                  <Link href="/dashboard/plan">루틴 관리하기</Link>
                 </Button>
               </div>
             )}
