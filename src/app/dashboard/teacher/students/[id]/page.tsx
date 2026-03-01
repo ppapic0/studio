@@ -82,19 +82,19 @@ const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   return null;
 };
 
-function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, onClick }: any) {
+function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMobile, onClick }: any) {
   return (
     <Card className="group cursor-pointer hover:shadow-xl transition-all border-none shadow-md overflow-hidden relative active:scale-95 bg-white" onClick={onClick}>
       <div className={cn("absolute top-0 left-0 w-1 h-full", colorClass.replace('text-', 'bg-'))} />
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-[10px] font-black text-muted-foreground uppercase">{title}</CardTitle>
-        <div className={cn("p-2 rounded-xl bg-opacity-10", colorClass.replace('text-', 'bg-'))}>
-          <Icon className={cn("h-4 w-4", colorClass)} />
+      <CardHeader className={cn("pb-1 flex flex-row items-center justify-between", isMobile ? "px-3 pt-3" : "px-6 pt-6")}>
+        <CardTitle className={cn("font-black text-muted-foreground uppercase", isMobile ? "text-[8px]" : "text-[10px]")}>{title}</CardTitle>
+        <div className={cn("rounded-lg bg-opacity-10", isMobile ? "p-1.5" : "p-2", colorClass.replace('text-', 'bg-'))}>
+          <Icon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", colorClass)} />
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-black tracking-tighter">{value}</div>
-        <p className="text-[9px] font-bold text-muted-foreground mt-1">{subValue}</p>
+      <CardContent className={cn(isMobile ? "px-3 pb-3" : "px-6 pb-6")}>
+        <div className={cn("font-black tracking-tighter", isMobile ? "text-lg leading-tight" : "text-2xl")}>{value}</div>
+        <p className={cn("font-bold text-muted-foreground mt-0.5", isMobile ? "text-[8px]" : "text-[9px]")}>{subValue}</p>
       </CardContent>
     </Card>
   );
@@ -103,11 +103,12 @@ function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, onCl
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = use(params);
   const { user: currentUser } = useUser();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
   const functions = useFunctions();
   const { toast } = useToast();
 
+  const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const hasInitializedForm = useRef(false);
@@ -243,7 +244,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId) return;
     
-    // 유효성 검사
     if (!editForm.name.trim()) {
       toast({ variant: "destructive", title: "수정 실패", description: "이름은 필수 입력 항목입니다." });
       return;
@@ -294,50 +294,54 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
   return (
-    <div className="flex flex-col gap-8 max-w-6xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="flex items-start gap-4">
-          <Button variant="ghost" size="icon" className="rounded-full h-12 w-12" asChild><Link href="/dashboard/teacher/students"><ArrowLeft className="h-6 w-6" /></Link></Button>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-4xl font-black tracking-tighter">{student?.name} 학생</h1>
-              <Badge className="bg-primary text-white px-3 py-1 rounded-full font-black text-xs">{student?.seatNo || '미배정'}번 좌석</Badge>
+    <div className={cn("flex flex-col gap-6 max-w-6xl mx-auto pb-20", isMobile ? "gap-4 px-1" : "gap-8")}>
+      {/* 헤더 섹션 */}
+      <div className={cn("flex justify-between gap-4", isMobile ? "flex-col items-start" : "flex-row items-end")}>
+        <div className="flex items-start gap-3 sm:gap-4 w-full">
+          <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 mt-1" asChild>
+            <Link href="/dashboard/teacher/students"><ArrowLeft className="h-5 w-5" /></Link>
+          </Button>
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className={cn("flex flex-wrap items-center gap-2", isMobile ? "items-start" : "items-center")}>
+              <h1 className={cn("font-black tracking-tighter truncate leading-tight", isMobile ? "text-2xl" : "text-4xl")}>{student?.name} 학생</h1>
+              <Badge className="bg-primary text-white px-2 py-0.5 rounded-full font-black text-[10px] whitespace-nowrap">{student?.seatNo || '미배정'}번 좌석</Badge>
             </div>
-            <div className="flex wrap items-center gap-3 text-sm text-muted-foreground font-bold">
-              <span className="flex items-center gap-1.5 text-primary"><Building2 className="h-4 w-4" /> {student?.schoolName}</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-bold">
+              <span className="flex items-center gap-1 text-primary truncate max-w-[150px]"><Building2 className="h-3.5 w-3.5 shrink-0" /> {student?.schoolName}</span>
               <span className="opacity-30">|</span>
               <span>{student?.grade}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-2xl font-black h-12 px-6 shadow-sm gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>
-          <Button className="rounded-2xl font-black h-12 px-6 shadow-lg gap-2" onClick={() => setIsStatusModalOpen(true)}><UserCheck className="h-4 w-4" /> 상태 변경</Button>
+        <div className={cn("flex gap-2 w-full sm:w-auto", isMobile ? "px-1" : "")}>
+          <Button variant="outline" className="rounded-2xl font-black h-11 flex-1 sm:px-6 shadow-sm gap-2 text-xs" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>
+          <Button className="rounded-2xl font-black h-11 flex-1 sm:px-6 shadow-lg gap-2 text-xs" onClick={() => setIsStatusModalOpen(true)}><UserCheck className="h-4 w-4" /> 상태 변경</Button>
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatAnalysisCard title="오늘 공부 시간" value={`${Math.floor(stats.today / 60)}h ${stats.today % 60}m`} subValue="목표 달성 트래킹" icon={Clock} colorClass="text-emerald-500" onClick={() => setActiveAnalysis('today')} />
-        <StatAnalysisCard title="주간 평균" value={`${Math.floor(stats.weeklyAvg / 60)}h ${stats.weeklyAvg % 60}m`} subValue="최근 학습 리듬" icon={TrendingUp} colorClass="text-blue-500" onClick={() => setActiveAnalysis('weekly')} />
-        <StatAnalysisCard title="월간 평균" value={`${Math.floor(stats.monthlyAvg / 60)}h ${stats.monthlyAvg % 60}m`} subValue="장기 집중도 분석" icon={CalendarDays} colorClass="text-amber-500" onClick={() => setActiveAnalysis('monthly')} />
-        <StatAnalysisCard title="마스터리 레벨" value={`Lv.${progress?.level || 1}`} subValue="성장 능력치 분석" icon={Zap} colorClass="text-purple-500" onClick={() => setActiveAnalysis('level')} />
-        <StatAnalysisCard title="시즌 랭킹" value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '순위 밖'} subValue="센터 내 상대 위치" icon={Trophy} colorClass="text-rose-500" onClick={() => setActiveAnalysis('rank')} />
+      {/* 통계 카드 섹션 */}
+      <section className={cn("grid gap-3 sm:gap-4", isMobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-5")}>
+        <StatAnalysisCard title="오늘 공부 시간" value={`${Math.floor(stats.today / 60)}h ${stats.today % 60}m`} subValue="목표 달성 트래킹" icon={Clock} colorClass="text-emerald-500" isMobile={isMobile} onClick={() => setActiveAnalysis('today')} />
+        <StatAnalysisCard title="주간 평균" value={`${Math.floor(stats.weeklyAvg / 60)}h ${stats.weeklyAvg % 60}m`} subValue="최근 학습 리듬" icon={TrendingUp} colorClass="text-blue-500" isMobile={isMobile} onClick={() => setActiveAnalysis('weekly')} />
+        <StatAnalysisCard title="월간 평균" value={`${Math.floor(stats.monthlyAvg / 60)}h ${stats.monthlyAvg % 60}m`} subValue="장기 집중도 분석" icon={CalendarDays} colorClass="text-amber-500" isMobile={isMobile} onClick={() => setActiveAnalysis('monthly')} />
+        <StatAnalysisCard title="마스터리 레벨" value={`Lv.${progress?.level || 1}`} subValue="성장 능력치 분석" icon={Zap} colorClass="text-purple-500" isMobile={isMobile} onClick={() => setActiveAnalysis('level')} />
+        <StatAnalysisCard title="시즌 랭킹" value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '순위 밖'} subValue="센터 내 상대 위치" icon={Trophy} colorClass="text-rose-500" isMobile={isMobile} onClick={() => setActiveAnalysis('rank')} />
       </section>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 rounded-[2rem] h-16 p-1.5 bg-muted/30 border border-border/50 shadow-inner">
-          <TabsTrigger value="overview" className="rounded-2xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg">학습 리포트</TabsTrigger>
-          <TabsTrigger value="plans" className="rounded-2xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg">공부 계획</TabsTrigger>
-          <TabsTrigger value="counseling" className="rounded-2xl font-black data-[state=active]:bg-white data-[state=active]:shadow-lg">상담 관리</TabsTrigger>
+        <TabsList className={cn("grid w-full grid-cols-3 rounded-[1.5rem] p-1 bg-muted/30 border border-border/50 shadow-inner", isMobile ? "h-14" : "h-16")}>
+          <TabsTrigger value="overview" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md text-xs sm:text-sm">학습 리포트</TabsTrigger>
+          <TabsTrigger value="plans" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md text-xs sm:text-sm">공부 계획</TabsTrigger>
+          <TabsTrigger value="counseling" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md text-xs sm:text-sm">상담 관리</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-8">
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
-            <CardHeader className="bg-muted/10 p-8 border-b transition-colors">
-              <CardTitle className="text-xl font-black flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 최근 30일 학습 몰입 히스토리</CardTitle>
+        <TabsContent value="overview" className="mt-6">
+          <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+            <CardHeader className={cn("bg-muted/10 border-b transition-colors", isMobile ? "p-5" : "p-8")}>
+              <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 최근 30일 학습 몰입 히스토리</CardTitle>
             </CardHeader>
-            <CardContent className="p-8">
-              <div className="h-[350px] w-full">
+            <CardContent className={cn(isMobile ? "p-4" : "p-8")}>
+              <div className={cn("w-full", isMobile ? "h-[250px]" : "h-[350px]")}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="colorH" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient></defs>
@@ -353,30 +357,30 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
 
-        <TabsContent value="counseling" className="mt-8 space-y-8">
+        <TabsContent value="counseling" className="mt-6 space-y-6 sm:space-y-8">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
-              <CardHeader className="bg-blue-50/50 border-b pb-6">
-                <CardTitle className="flex items-center gap-2 text-xl font-black text-blue-700"><CalendarPlus className="h-5 w-5" /> 새 상담 예약</CardTitle>
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-blue-50/50 border-b pb-4 py-5 px-6">
+                <CardTitle className="flex items-center gap-2 text-lg font-black text-blue-700"><CalendarPlus className="h-5 w-5" /> 새 상담 예약</CardTitle>
               </CardHeader>
-              <CardContent className="p-8 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">예약 날짜</Label><Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12" /></div>
-                  <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">예약 시간</Label><Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12" /></div>
+              <CardContent className={cn("space-y-4", isMobile ? "p-5" : "p-8")}>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">예약 날짜</Label><Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-11 text-xs" /></div>
+                  <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">예약 시간</Label><Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-11 text-xs" /></div>
                 </div>
-                <Input placeholder="상담 주제 / 메모" value={aptNote} onChange={(e) => setAptNote(e.target.value)} className="rounded-xl h-12" />
-                <Button onClick={handleAddAppointment} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl">예약 확정하기</Button>
+                <Input placeholder="상담 주제 / 메모" value={aptNote} onChange={(e) => setAptNote(e.target.value)} className="rounded-xl h-11 text-xs" />
+                <Button onClick={handleAddAppointment} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl text-sm">예약 확정하기</Button>
               </CardContent>
             </Card>
-            <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
-              <CardHeader className="bg-emerald-50/50 border-b pb-6">
-                <CardTitle className="flex items-center gap-2 text-xl font-black text-emerald-700"><FileEdit className="h-5 w-5" /> 상담 일지 작성</CardTitle>
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+              <CardHeader className="bg-emerald-50/50 border-b pb-4 py-5 px-6">
+                <CardTitle className="flex items-center gap-2 text-lg font-black text-emerald-700"><FileEdit className="h-5 w-5" /> 상담 일지 작성</CardTitle>
               </CardHeader>
-              <CardContent className="p-8 space-y-5">
-                <Select value={logType} onValueChange={(val: any) => setLogType(val)}><SelectTrigger className="rounded-xl h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학업/성적</SelectItem><SelectItem value="life">생활 습관</SelectItem><SelectItem value="career">진로/진학</SelectItem></SelectContent></Select>
-                <Textarea placeholder="상담한 핵심 내용을 상세히 기록해 주세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[120px]" />
-                <Input placeholder="개선 권고 사항 (학생 과제)" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-12" />
-                <Button onClick={handleAddCounselLog} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl">상담 일지 저장</Button>
+              <CardContent className={cn("space-y-4", isMobile ? "p-5" : "p-8")}>
+                <Select value={logType} onValueChange={(val: any) => setLogType(val)}><SelectTrigger className="rounded-xl h-11 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학업/성적</SelectItem><SelectItem value="life">생활 습관</SelectItem><SelectItem value="career">진로/진학</SelectItem></SelectContent></Select>
+                <Textarea placeholder="상담한 핵심 내용을 상세히 기록해 주세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className="rounded-xl min-h-[100px] text-xs" />
+                <Input placeholder="개선 권고 사항 (학생 과제)" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-11 text-xs" />
+                <Button onClick={handleAddCounselLog} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl text-sm">상담 일지 저장</Button>
               </CardContent>
             </Card>
           </div>
@@ -385,24 +389,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       {/* 정보 수정 모달 */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl">
+        <DialogContent className={cn("rounded-[2.5rem] sm:max-w-md border-none shadow-2xl", isMobile ? "max-w-[95vw] w-[95vw]" : "")}>
           <DialogHeader>
             <DialogTitle className="text-3xl font-black tracking-tighter">학생 정보 수정</DialogTitle>
-            <DialogDescription className="font-bold text-muted-foreground mt-1">학업 기본 정보 및 연동 코드를 업데이트합니다.</DialogDescription>
+            <DialogDescription className="font-bold text-muted-foreground mt-1 text-sm">학업 기본 정보 및 연동 코드를 업데이트합니다.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2">
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-1.5">
               <Label className="text-[10px] font-black uppercase text-primary/70">이름</Label>
-              <Input value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="rounded-xl h-12 border-2" />
+              <Input value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="rounded-xl h-11 border-2 text-sm" />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5">
               <Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label>
-              <Input value={editForm.schoolName} onChange={(e) => setEditForm({...editForm, schoolName: e.target.value})} className="rounded-xl h-12 border-2" />
+              <Input value={editForm.schoolName} onChange={(e) => setEditForm({...editForm, schoolName: e.target.value})} className="rounded-xl h-11 border-2 text-sm" />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5">
               <Label className="text-[10px] font-black uppercase text-primary/70">학년</Label>
               <Select value={editForm.grade} onValueChange={(val) => setEditForm({...editForm, grade: val})}>
-                <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="rounded-xl h-11 border-2 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent>
               </Select>
             </div>
@@ -415,17 +419,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 placeholder="4자리 숫자" 
                 maxLength={4}
                 onChange={(e) => setEditForm({...editForm, parentLinkCode: e.target.value.replace(/[^0-9]/g, '')})} 
-                className="rounded-xl h-12 border-2 font-black tracking-[0.5em] text-center" 
+                className="rounded-xl h-11 border-2 font-black tracking-[0.5em] text-center" 
               />
               <p className="text-[9px] font-bold text-muted-foreground">부모님이 가입할 때 필요한 코드입니다. 학생에게 전달해 주세요.</p>
             </div>
-            <div className="grid gap-2 pt-4 border-t border-dashed">
+            <div className="grid gap-1.5 pt-2 border-t border-dashed">
               <Label className="text-[10px] font-black uppercase text-destructive flex items-center gap-1.5 ml-1"><Lock className="h-3 w-3" /> 비밀번호 재설정</Label>
-              <Input type="password" placeholder="새 비밀번호 입력 (6자 이상)" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} className="rounded-xl h-12 border-destructive/20 focus-visible:ring-destructive/10" />
+              <Input type="password" placeholder="새 비밀번호 입력 (6자 이상)" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} className="rounded-xl h-11 border-destructive/20 focus-visible:ring-destructive/10 text-sm" />
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full rounded-2xl h-14 font-black shadow-xl text-lg">
+            <Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full rounded-2xl h-12 font-black shadow-xl text-base">
               {isUpdating ? <Loader2 className="animate-spin" /> : "변경 내용 저장"}
             </Button>
           </DialogFooter>
@@ -434,23 +438,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       {/* 상태 변경 모달 */}
       <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
-        <DialogContent className="rounded-[2.5rem] sm:max-w-md border-none shadow-2xl">
-          <DialogHeader><DialogTitle className="text-3xl font-black tracking-tighter">학생 상태 관리</DialogTitle></DialogHeader>
-          <div className="py-8 space-y-4">
-            <div className="grid gap-3">
+        <DialogContent className={cn("rounded-[2.5rem] sm:max-w-md border-none shadow-2xl", isMobile ? "max-w-[95vw] w-[95vw]" : "")}>
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">학생 상태 관리</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="grid gap-2">
               {[
                 { id: 'active', label: '재원생', color: 'text-emerald-600', bg: 'bg-emerald-50' },
                 { id: 'onHold', label: '휴학생', color: 'text-amber-600', bg: 'bg-amber-50' },
                 { id: 'withdrawn', label: '퇴원생', color: 'text-muted-foreground', bg: 'bg-muted/30' },
               ].map((item) => (
-                <div key={item.id} onClick={() => setStatusForm(item.id)} className={cn("p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-center gap-4", statusForm === item.id ? "border-primary bg-white shadow-xl scale-[1.03]" : "border-transparent bg-muted/10")}>
-                  <div className={cn("p-2 rounded-2xl", statusForm === item.id ? "bg-primary text-white" : "bg-white")}>{statusForm === item.id && <Check className="h-5 w-5" />}</div>
-                  <span className={cn("font-black text-xl", item.color)}>{item.label}</span>
+                <div key={item.id} onClick={() => setStatusForm(item.id)} className={cn("p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3", statusForm === item.id ? "border-primary bg-white shadow-lg scale-[1.02]" : "border-transparent bg-muted/10")}>
+                  <div className={cn("p-1.5 rounded-xl", statusForm === item.id ? "bg-primary text-white" : "bg-white")}>{statusForm === item.id && <Check className="h-4 w-4" />}</div>
+                  <span className={cn("font-black text-lg", item.color)}>{item.label}</span>
                 </div>
               ))}
             </div>
           </div>
-          <DialogFooter><Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full rounded-2xl h-14 font-black shadow-xl text-lg">{isUpdating ? <Loader2 className="animate-spin" /> : "학생 상태 업데이트 완료"}</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full rounded-2xl h-12 font-black shadow-xl text-base">{isUpdating ? <Loader2 className="animate-spin" /> : "학생 상태 업데이트 완료"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
