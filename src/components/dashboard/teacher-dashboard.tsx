@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -295,7 +296,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const alertCount = attendanceList?.filter(a => a.studentId && a.status === 'absent').length ?? 0;
 
   return (
-    <div className="flex flex-col gap-5 w-full">
+    <div className="flex flex-col gap-5 w-full overflow-x-hidden">
       <div className="flex flex-col gap-1 px-1">
         <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2 text-primary">
           <Monitor className="h-5 w-5 text-primary" />
@@ -331,24 +332,27 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
         <Card className={cn("rounded-[2rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50", isMobile ? "" : "lg:col-span-2")}>
           <CardHeader className="bg-muted/5 border-b p-5 sm:p-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className={cn(
+              "flex items-start justify-between gap-4",
+              isMobile ? "flex-col" : "flex-row sm:items-center"
+            )}>
               <div className="space-y-1">
-                <CardTitle className="text-lg sm:text-2xl font-black flex items-center gap-2">
+                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter break-keep">
                   <Armchair className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> 실시간 좌석 도면
                 </CardTitle>
                 <CardDescription className="font-bold text-[10px] sm:text-xs text-muted-foreground">좌석을 클릭하여 관리하세요.</CardDescription>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-9 px-3 text-[10px] border-primary/10" asChild>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 text-[11px] border-primary/10 bg-white" asChild>
                   <Link href="/dashboard/teacher/layout-view">전체화면</Link>
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-9 px-3 gap-1.5 border-primary/10 text-[10px]" onClick={openLayoutEditor}>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none rounded-xl font-black border-2 h-10 px-4 gap-1.5 border-primary/10 text-[11px] bg-white" onClick={openLayoutEditor}>
                   <Settings2 className="h-3.5 w-3.5" /> 도면 편집
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 bg-[#fdfdfd]">
+          <CardContent className="p-4 sm:p-6 bg-[#fdfdfd] overflow-hidden">
             {attendanceLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
             ) : !attendanceList || attendanceList.length === 0 ? (
@@ -357,14 +361,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <p className="text-xs font-bold text-muted-foreground/40">좌석이 없습니다.</p>
               </div>
             ) : (
-              <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
+              <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
                 <div 
-                  className="grid gap-1.5 mx-auto p-4 sm:p-6 bg-white rounded-[1.5rem] border shadow-inner relative"
+                  className={cn(
+                    "grid gap-1.5 mx-auto p-4 sm:p-8 bg-white rounded-[1.5rem] border shadow-inner relative transition-transform origin-top-left",
+                    isMobile ? "scale-[0.85] w-fit" : "w-fit"
+                  )}
                   style={{ 
-                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(32px, 38px))`, 
-                    width: 'fit-content',
-                    backgroundImage: 'radial-gradient(circle, #00000003 1px, transparent 1px)',
-                    backgroundSize: '16px 18px'
+                    gridTemplateColumns: `repeat(${GRID_WIDTH}, minmax(28px, 34px))`, 
+                    backgroundImage: 'radial-gradient(circle, #00000005 1px, transparent 1px)',
+                    backgroundSize: '14px 16px'
                   }}
                 >
                   {Array.from({ length: GRID_HEIGHT * GRID_WIDTH }).map((_, idx) => {
@@ -373,7 +379,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
                     const occupant = students?.find(s => s.id === seat?.studentId);
 
-                    if (!seat) return <div key={idx} className="w-[32px] h-[32px] opacity-[0.01]" />;
+                    if (!seat) return <div key={idx} className="w-[28px] h-[28px] opacity-[0.01]" />;
 
                     const isLateOrAbsent = seat.studentId && seat.status === 'absent';
 
@@ -391,7 +397,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "w-[32px] h-[32px] rounded-lg border flex flex-col items-center justify-center gap-0.5 transition-all relative cursor-pointer group shadow-sm",
+                          "w-[28px] h-[28px] sm:w-[32px] sm:h-[32px] rounded-lg border flex flex-col items-center justify-center transition-all relative cursor-pointer group shadow-sm",
                           seat.status === 'studying' ? "bg-emerald-500 border-emerald-600 text-white animate-pulse-soft" : 
                           isLateOrAbsent ? "bg-rose-50 border-rose-500 text-rose-700" :
                           seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white" :
@@ -399,8 +405,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           occupant ? "bg-white border-primary text-primary" : "bg-white border-primary/20 text-muted-foreground/20 hover:border-primary/40"
                         )}
                       >
-                        <span className="text-[7px] font-black absolute top-0.5 left-1 opacity-40">{seat.seatNo}</span>
-                        <span className="text-[8px] font-black truncate px-0.5 w-full text-center mt-1">
+                        <span className="text-[6px] sm:text-[7px] font-black absolute top-0.5 left-1 opacity-40">{seat.seatNo}</span>
+                        <span className="text-[7px] sm:text-[8px] font-black truncate px-0.5 w-full text-center mt-1 leading-none">
                           {occupant ? occupant.name : ''}
                         </span>
                       </div>
@@ -440,7 +446,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               ))
             )}
-            <Button asChild variant="ghost" className="w-full mt-2 font-black text-[10px] text-primary/60 hover:text-primary transition-colors">
+            <Button asChild variant="ghost" className="w-full mt-2 font-black text-[10px] text-primary/60 hover:text-primary transition-all gap-1.5">
               <Link href="/dashboard/appointments" className="flex items-center justify-center gap-1">
                 전체보기 <ArrowRight className="h-3 w-3" />
               </Link>
