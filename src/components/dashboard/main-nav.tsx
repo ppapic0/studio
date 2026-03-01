@@ -96,7 +96,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         <div className="bg-primary p-2 rounded-xl">
           <BookOpen className="h-6 w-6 text-white" />
         </div>
-        <span>공부트랙</span>
+        <span>집중트랙</span>
       </Link>
       {userNavItems.map((item) => (
         <Link 

@@ -25,7 +25,7 @@ export default function DashboardLayout({
         <div className="hidden border-r bg-card md:block sticky top-0 h-screen overflow-y-auto">
           <div className="flex h-full flex-col gap-2">
             <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-              <span className="text-lg font-black tracking-tighter text-primary">Mastery Track</span>
+              <span className="text-lg font-black tracking-tighter text-primary">집중트랙</span>
             </div>
             <MainNav />
           </div>

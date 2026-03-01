@@ -7,7 +7,7 @@ import { AppProvider } from '@/contexts/app-context';
 import { AuthGuard } from '@/components/auth/auth-guard';
 
 export const metadata: Metadata = {
-  title: '공부트랙 | 관리형 독서실',
+  title: '집중트랙 | 관리형 독서실',
   description: '집중 학습과 성장을 위한 프리미엄 플랫폼입니다.',
 };
 
