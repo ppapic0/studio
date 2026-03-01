@@ -31,10 +31,10 @@ import {
   X,
   History,
   Search,
-  Filter,
   Loader2,
-  ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Gift,
+  Users2
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -49,8 +49,8 @@ import {
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { CenterMembership } from '@/lib/types';
+import { collection, query, where, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { CenterMembership, StudentProfile } from '@/lib/types';
 import { format, eachMonthOfInterval, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -72,6 +72,7 @@ export function RevenueAnalysis() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 멤버십 정보 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -81,6 +82,13 @@ export function RevenueAnalysis() {
   }, [firestore, centerId]);
   
   const { data: rawMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery);
+
+  // 학생 프로필 정보 조회 (학년별 가격 결정용)
+  const studentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'students');
+  }, [firestore, centerId]);
+  const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery);
 
   const businessMetrics = useMemo(() => {
     if (!rawMembers) return null;
@@ -96,7 +104,13 @@ export function RevenueAnalysis() {
     
     const estimatedMonthlyRevenue = members
       .filter(m => m.status === 'active')
-      .reduce((acc, m) => acc + (m.monthlyFee || 350000), 0);
+      .reduce((acc, m) => {
+        if (m.monthlyFee) return acc + m.monthlyFee;
+        // 기본가 로직: N수생 54만, 재학생 39만
+        const profile = studentsProfiles?.find(p => p.id === m.id);
+        const base = profile?.grade?.includes('N수생') ? 540000 : 390000;
+        return acc + base;
+      }, 0);
 
     const now = new Date();
     const months = eachMonthOfInterval({
@@ -124,7 +138,7 @@ export function RevenueAnalysis() {
       registrationTrend,
       allMembers: members
     };
-  }, [rawMembers]);
+  }, [rawMembers, studentsProfiles]);
 
   const filteredTimelineMembers = useMemo(() => {
     if (!businessMetrics) return [];
@@ -147,11 +161,15 @@ export function RevenueAnalysis() {
     return list;
   }, [businessMetrics, selectedMonth, searchTerm, activeDrillDown]);
 
-  const handleUpdateFee = async (studentId: string) => {
+  const handleUpdateFee = async (studentId: string, customFee?: number) => {
     if (!firestore || !centerId) return;
     
-    const fee = parseInt(tempFeeValue.replace(/[^0-9]/g, ''));
-    if (isNaN(fee)) {
+    let fee = customFee;
+    if (fee === undefined) {
+      fee = parseInt(tempFeeValue.replace(/[^0-9]/g, ''));
+    }
+
+    if (isNaN(fee!)) {
       toast({ variant: "destructive", title: "금액 오류", description: "숫자만 입력해 주세요." });
       return;
     }
@@ -159,25 +177,73 @@ export function RevenueAnalysis() {
     setIsUpdating(true);
     try {
       const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
-      await updateDoc(memberRef, {
-        monthlyFee: fee,
-        updatedAt: serverTimestamp()
-      });
-
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
-      await updateDoc(userCenterRef, {
+      
+      const updateData = {
         monthlyFee: fee,
         updatedAt: serverTimestamp()
-      });
+      };
 
-      // 수강료 변경 시 즉시 오늘 KPI 재계산
+      await Promise.all([
+        setDoc(memberRef, updateData, { merge: true }),
+        setDoc(userCenterRef, updateData, { merge: true })
+      ]);
+
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       await syncDailyKpi(centerId, todayStr);
 
       toast({ title: "수강료 업데이트 완료" });
       setEditingFeeId(null);
     } catch (e: any) {
+      console.error("Fee update error:", e);
       toast({ variant: "destructive", title: "업데이트 실패", description: e.message });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleToggleDiscount = async (studentId: string, type: 'tutoring' | 'sibling') => {
+    if (!firestore || !centerId || !rawMembers) return;
+    
+    const member = rawMembers.find(m => m.id === studentId);
+    if (!member) return;
+
+    const profile = studentsProfiles?.find(p => p.id === studentId);
+    const base = profile?.grade?.includes('N수생') ? 540000 : 390000;
+    
+    let currentFee = member.monthlyFee || base;
+    const isTutoring = type === 'tutoring' ? !member.tutoringDiscount : !!member.tutoringDiscount;
+    const isSibling = type === 'sibling' ? !member.siblingDiscount : !!member.siblingDiscount;
+
+    // 할인이 켜지면 차감, 꺼지면 복구
+    // 순서: 정률(형제) -> 정액(과외) 추천이나 여기서는 단순 증감으로 처리
+    let nextFee = base;
+    if (isSibling) nextFee = Math.floor(nextFee * 0.95);
+    if (isTutoring) nextFee -= 50000;
+
+    setIsUpdating(true);
+    try {
+      const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
+      const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
+      
+      const updateData = {
+        monthlyFee: Math.max(0, nextFee),
+        tutoringDiscount: isTutoring,
+        siblingDiscount: isSibling,
+        updatedAt: serverTimestamp()
+      };
+
+      await Promise.all([
+        setDoc(memberRef, updateData, { merge: true }),
+        setDoc(userCenterRef, updateData, { merge: true })
+      ]);
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      await syncDailyKpi(centerId, todayStr);
+
+      toast({ title: "할인 정책 적용 완료" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "정책 적용 실패" });
     } finally {
       setIsUpdating(false);
     }
@@ -320,11 +386,6 @@ export function RevenueAnalysis() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex justify-center mt-6">
-            <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.3em] flex items-center gap-2">
-              <Sparkles className="h-3 w-3" /> 막대를 선택하여 과거 특정 시점의 등록 명부를 확인하세요.
-            </p>
-          </div>
         </CardContent>
       </Card>
 
@@ -336,17 +397,19 @@ export function RevenueAnalysis() {
                 <CalendarDays className="h-6 w-6 text-primary" /> 학생 등록 및 수강료 관리
               </CardTitle>
               <div className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                {selectedMonth ? (
-                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black">{selectedMonth} 등록 현황</Badge>
-                ) : activeDrillDown === 'active' ? (
-                  <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-black">현재 재원생 목록</Badge>
-                ) : activeDrillDown === 'churn' ? (
-                  <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 font-black">이탈 학생 분석</Badge>
-                ) : (
-                  '전체 학생 타임라인'
-                )}
-                <span className="opacity-40">|</span>
-                <span>총 {filteredTimelineMembers.length}명</span>
+                <div className="flex items-center gap-2">
+                  {selectedMonth ? (
+                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black">{selectedMonth} 등록 현황</Badge>
+                  ) : activeDrillDown === 'active' ? (
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-black">현재 재원생 목록</Badge>
+                  ) : activeDrillDown === 'churn' ? (
+                    <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 font-black">이탈 학생 분석</Badge>
+                  ) : (
+                    <span className="text-sm font-bold">전체 학생 타임라인</span>
+                  )}
+                  <span className="opacity-40">|</span>
+                  <span className="text-sm font-bold">총 {filteredTimelineMembers.length}명</span>
+                </div>
               </div>
             </div>
             <div className={cn("flex items-center gap-3", isMobile ? "w-full" : "")}>
@@ -371,8 +434,8 @@ export function RevenueAnalysis() {
               <TableHeader className="bg-muted/10 sticky top-0 z-20">
                 <TableRow className="hover:bg-transparent border-none h-14">
                   <TableHead className="font-black text-[10px] uppercase pl-10 w-[200px]">STUDENT NAME</TableHead>
-                  <TableHead className="font-black text-[10px] uppercase w-[150px]">REGISTERED AT</TableHead>
                   <TableHead className="font-black text-[10px] uppercase w-[120px]">STATUS</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase w-[180px]">DISCOUNTS</TableHead>
                   <TableHead className="font-black text-[10px] uppercase text-right pr-10">MONTHLY FEE (₩)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -387,100 +450,97 @@ export function RevenueAnalysis() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTimelineMembers.map((student) => (
-                    <TableRow key={student.id} className="hover:bg-muted/5 transition-all duration-300 h-20 group">
-                      <TableCell className="pl-10">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10">
-                            {student.displayName?.charAt(0) || 'S'}
-                          </div>
-                          <span className="font-black text-sm group-hover:text-primary transition-colors">{student.displayName || '학생'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs font-bold text-muted-foreground font-mono">
-                        {student.joinedAt ? format(student.joinedAt.toDate(), 'yyyy. MM. dd') : '데이터 없음'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          "font-black text-[10px] border-none shadow-sm",
-                          student.status === 'active' ? "bg-emerald-50 text-emerald-600" : 
-                          student.status === 'onHold' ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-600"
-                        )}>
-                          {student.status === 'active' ? '재원' : student.status === 'onHold' ? '휴학' : '퇴원'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="pr-10 text-right">
-                        {editingFeeId === student.id ? (
-                          <div className="flex items-center justify-end gap-2 animate-in slide-in-from-right-2 duration-300">
-                            <Input 
-                              autoFocus
-                              value={tempFeeValue}
-                              onChange={(e) => setTempFeeValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleUpdateFee(student.id);
-                                if (e.key === 'Escape') setEditingFeeId(null);
-                              }}
-                              className="h-10 w-[140px] text-right font-black text-sm border-primary/30"
-                            />
-                            <Button size="icon" onClick={() => handleUpdateFee(student.id)} disabled={isUpdating} className="h-10 w-10 rounded-lg bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"><Save className="h-4 w-4" /></Button>
-                            <Button size="icon" variant="ghost" onClick={() => setEditingFeeId(null)} className="h-10 w-10 rounded-lg"><X className="h-4 w-4" /></Button>
-                          </div>
-                        ) : (
-                          <div 
-                            onClick={() => {
-                              setEditingFeeId(student.id);
-                              setTempFeeValue((student.monthlyFee || 350000).toString());
-                            }}
-                            className="flex items-center justify-end gap-2 cursor-pointer group/fee"
-                          >
-                            <span className="font-black text-lg tabular-nums text-primary/80 group-hover/fee:text-primary transition-colors">
-                              ₩{(student.monthlyFee || 350000).toLocaleString()}
-                            </span>
-                            <div className="opacity-0 group-hover/fee:opacity-100 transition-all p-1.5 rounded-md bg-primary/5">
-                              <Edit2 className="h-3 w-3 text-primary" />
+                  filteredTimelineMembers.map((student) => {
+                    const profile = studentsProfiles?.find(p => p.id === student.id);
+                    const basePrice = profile?.grade?.includes('N수생') ? 540000 : 390000;
+                    const finalFee = student.monthlyFee !== undefined ? student.monthlyFee : basePrice;
+
+                    return (
+                      <TableRow key={student.id} className="hover:bg-muted/5 transition-all duration-300 h-24 group">
+                        <TableCell className="pl-10">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10">
+                              {student.displayName?.charAt(0) || 'S'}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-black text-sm group-hover:text-primary transition-colors">{student.displayName || '학생'}</span>
+                              <span className="text-[10px] font-bold text-muted-foreground">{profile?.grade || '학년 미정'}</span>
                             </div>
                           </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={cn(
+                            "font-black text-[10px] border-none shadow-sm",
+                            student.status === 'active' ? "bg-emerald-50 text-emerald-600" : 
+                            student.status === 'onHold' ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-600"
+                          )}>
+                            {student.status === 'active' ? '재원' : student.status === 'onHold' ? '휴학' : '퇴원'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              size="sm" 
+                              variant={student.tutoringDiscount ? "default" : "outline"} 
+                              className={cn("h-8 rounded-lg font-black text-[10px] gap-1 px-2.5 transition-all active:scale-90", student.tutoringDiscount ? "bg-blue-500 hover:bg-blue-600" : "text-blue-600 border-blue-100 hover:bg-blue-50")}
+                              onClick={() => handleToggleDiscount(student.id, 'tutoring')}
+                              disabled={isUpdating}
+                            >
+                              <Gift className="h-3 w-3" /> 과외 -5만
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant={student.siblingDiscount ? "default" : "outline"} 
+                              className={cn("h-8 rounded-lg font-black text-[10px] gap-1 px-2.5 transition-all active:scale-90", student.siblingDiscount ? "bg-emerald-500 hover:bg-emerald-600" : "text-emerald-600 border-emerald-100 hover:bg-emerald-50")}
+                              onClick={() => handleToggleDiscount(student.id, 'sibling')}
+                              disabled={isUpdating}
+                            >
+                              <Users2 className="h-3 w-3" /> 형제 -5%
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="pr-10 text-right">
+                          {editingFeeId === student.id ? (
+                            <div className="flex items-center justify-end gap-2 animate-in slide-in-from-right-2 duration-300">
+                              <Input 
+                                autoFocus
+                                value={tempFeeValue}
+                                onChange={(e) => setTempFeeValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleUpdateFee(student.id);
+                                  if (e.key === 'Escape') setEditingFeeId(null);
+                                }}
+                                className="h-10 w-[140px] text-right font-black text-sm border-primary/30"
+                              />
+                              <Button size="icon" onClick={() => handleUpdateFee(student.id)} disabled={isUpdating} className="h-10 w-10 rounded-lg bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"><Save className="h-4 w-4" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => setEditingFeeId(null)} className="h-10 w-10 rounded-lg"><X className="h-4 w-4" /></Button>
+                            </div>
+                          ) : (
+                            <div 
+                              onClick={() => {
+                                setEditingFeeId(student.id);
+                                setTempFeeValue(finalFee.toString());
+                              }}
+                              className="flex items-center justify-end gap-2 cursor-pointer group/fee"
+                            >
+                              <span className="font-black text-lg tabular-nums text-primary/80 group-hover/fee:text-primary transition-colors">
+                                ₩{finalFee.toLocaleString()}
+                              </span>
+                              <div className="opacity-0 group-hover/fee:opacity-100 transition-all p-1.5 rounded-md bg-primary/5">
+                                <Edit2 className="h-3 w-3 text-primary" />
+                              </div>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
-        <div className="bg-muted/10 border-t p-6 flex items-center justify-center">
-           <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.4em] flex items-center gap-3">
-             <DollarSign className="h-3.5 w-3.5" /> 수강료 금액을 클릭하면 학생별 개별 금액을 실시간으로 수정할 수 있습니다.
-           </p>
-        </div>
       </Card>
-
-      <section className="bg-primary rounded-[3rem] p-12 text-white relative overflow-hidden shadow-2xl">
-        <Sparkles className="absolute -top-10 -right-10 h-64 w-64 opacity-5 rotate-12" />
-        <div className="relative z-10 grid gap-10 lg:grid-cols-2 items-center">
-          <div className="space-y-6">
-            <Badge className="bg-white/20 text-white border-none font-black text-[9px] px-3 py-1 uppercase tracking-widest">Growth Intelligence</Badge>
-            <h4 className="text-4xl font-black tracking-tighter leading-tight">데이터 기반<br/>센터 성장 전략 리포트</h4>
-            <div className="h-1.5 w-20 bg-white/20 rounded-full" />
-            <p className="text-lg font-bold text-white/70 leading-relaxed max-w-md">
-              지난 12개월간의 등록 패턴과 현재 수익 구조를 분석하여 최적의 운영 방안을 제안합니다.
-            </p>
-          </div>
-          
-          <div className="grid gap-4">
-            {[
-              { label: '유입 분석', text: '최근 3개월간 신규 유입이 전년 동기 대비 15% 상승했습니다. 특히 방학 시즌 전 1개월 기점의 등록률이 가장 높습니다.' },
-              { label: '재무 건전성', text: '인당 평균 수강료(ARPU)가 안정적입니다. 수강료 개별 조정을 통해 장기 재원생을 위한 장학 혜택을 설계해 보세요.' },
-            ].map((insight, i) => (
-              <div key={i} className="bg-white/10 backdrop-blur-xl p-8 rounded-[2rem] border border-white/10 shadow-lg group hover:bg-white/20 transition-all">
-                <Badge className="mb-4 bg-white text-primary border-none font-black text-[9px] uppercase">{insight.label}</Badge>
-                <p className="text-sm font-bold leading-relaxed text-white/90">{insight.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

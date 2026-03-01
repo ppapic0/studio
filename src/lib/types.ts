@@ -21,6 +21,8 @@ export interface CenterMembership {
   displayName?: string;
   linkedStudentIds?: string[];
   monthlyFee?: number;
+  tutoringDiscount?: boolean;
+  siblingDiscount?: boolean;
 }
 
 export interface MonthlyFinance {
