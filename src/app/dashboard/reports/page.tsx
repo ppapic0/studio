@@ -40,7 +40,9 @@ import {
   Trophy,
   AlertCircle,
   TrendingUp,
-  Calendar
+  Calendar,
+  CheckCircle2,
+  PenTool
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -194,178 +196,216 @@ export default function DailyReportsPage() {
   }
 
   return (
-    <div className={cn("flex flex-col gap-6 max-w-6xl mx-auto pb-20 px-1", isMobile ? "gap-4" : "gap-8")}>
+    <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-20 px-1", isMobile ? "gap-4" : "gap-8")}>
       <header className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "flex-row items-center")}>
         <div className="flex flex-col gap-1">
-          <h1 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-xl" : "text-3xl")}>
-            <FileText className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
+          <h1 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-2xl" : "text-4xl")}>
+            <FileText className={cn("text-primary", isMobile ? "h-6 w-6" : "h-10 w-10")} />
             데일리 리포트 센터
           </h1>
-          <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px]" : "text-sm")}>전날의 학습 데이터를 분석합니다.</p>
+          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>Yesterday Analysis & Reports</p>
         </div>
         <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "")}>
           <div className="relative flex-1 sm:flex-none">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
             <Input 
               type="date" 
               value={dateKey}
               onChange={(e) => setSelectedDate(new Date(e.target.value))}
-              className={cn("font-black rounded-xl shadow-sm pl-9", isMobile ? "h-10 w-full text-xs" : "h-11 w-[180px]")}
+              className={cn("font-black rounded-[1.25rem] shadow-sm border-2 pl-11 focus-visible:ring-primary/20 transition-all", isMobile ? "h-12 w-full text-sm" : "h-14 w-[200px]")}
             />
           </div>
         </div>
       </header>
 
       <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-4")}>
-        <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isMobile ? "hidden" : "md:col-span-1")}>
-          <CardHeader className="bg-muted/30 border-b p-6 pb-4">
-            <CardTitle className="text-xs font-black flex items-center gap-2 uppercase tracking-widest opacity-60">
-              <Search className="h-3.5 w-3.5 text-primary" /> 학생 목록
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
-              <Input 
-                placeholder="이름 검색..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="rounded-xl border-2 pl-9 h-10 text-xs"
-              />
-            </div>
-            <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar max-h-[500px] pr-1">
-              {filteredStudents.map((student) => (
-                <div 
-                  key={student.id} 
-                  className="p-2.5 rounded-xl border-2 border-transparent hover:border-primary/20 hover:bg-primary/5 cursor-pointer flex items-center gap-3 transition-all active:scale-95"
-                  onClick={() => handleOpenWriteModal(student.id, student.displayName || '학생')}
-                >
-                  <Avatar className="h-8 w-8 border-2 border-white shadow-sm">
-                    <AvatarFallback className="bg-primary/5 text-primary font-black text-[10px]">{student.displayName?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <p className="text-[11px] font-black truncate flex-1">{student.displayName}</p>
-                  <ChevronRight className="h-3 w-3 opacity-20" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* 학생 목록 사이드바 - 데스크톱 전용 */}
+        {!isMobile && (
+          <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
+            <CardHeader className="bg-muted/30 border-b p-6">
+              <CardTitle className="text-xs font-black flex items-center gap-2 uppercase tracking-widest opacity-60">
+                <Users className="h-3.5 w-3.5 text-primary" /> 학생 빠른 찾기
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 p-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                <Input 
+                  placeholder="이름 검색..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="rounded-xl border-2 pl-10 h-11 text-xs font-bold"
+                />
+              </div>
+              <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar max-h-[500px] pr-1">
+                {filteredStudents.map((student) => (
+                  <div 
+                    key={student.id} 
+                    className="p-3 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center gap-3 transition-all active:scale-95"
+                    onClick={() => handleOpenWriteModal(student.id, student.displayName || '학생')}
+                  >
+                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50">
+                      <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{student.displayName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <p className="text-sm font-black truncate flex-1">{student.displayName}</p>
+                    <ChevronRight className="h-4 w-4 opacity-20" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className={cn("rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden", isMobile ? "col-span-1" : "md:col-span-3")}>
+        {/* 리포트 피드 - 앱 스타일 */}
+        <div className={cn("flex flex-col gap-4", isMobile ? "col-span-1" : "md:col-span-3")}>
           {isMobile && (
-            <div className="p-4 border-b bg-muted/10">
+            <div className="px-1 relative">
+               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-30" />
                <Input 
                 placeholder="학생 검색..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="rounded-xl h-10 text-xs"
+                className="rounded-2xl h-12 text-sm font-bold border-none shadow-xl pl-11 bg-white"
               />
             </div>
           )}
-          <CardContent className="p-0">
-            <div className="divide-y border-t border-muted/10">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-40 gap-4">
-                  <Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" />
-                  <p className="text-xs font-bold text-muted-foreground">데이터 로드 중...</p>
+
+          <div className="grid gap-4">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-40 gap-4">
+                <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
+                <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-[0.2em]">Syncing Reports...</p>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="py-20 text-center flex flex-col items-center gap-6 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
+                <Search className="h-16 w-16 text-muted-foreground opacity-10" />
+                <div className="space-y-1">
+                  <p className="text-xl font-black text-muted-foreground/40">학생을 찾을 수 없습니다.</p>
+                  <p className="text-sm font-bold text-muted-foreground/20 uppercase">Try another name</p>
                 </div>
-              ) : filteredStudents.length === 0 ? (
-                <div className="py-20 text-center flex flex-col items-center gap-4 text-muted-foreground/40">
-                  <Search className="h-12 w-12 opacity-10" />
-                  <p className="font-black italic text-[10px]">검색 결과가 없습니다.</p>
-                </div>
-              ) : filteredStudents.map((student) => {
-                const report = dailyReports?.find(r => r.studentId === student.id);
-                return (
-                  <div key={student.id} className={cn("flex items-center justify-between group hover:bg-muted/5 transition-colors", isMobile ? "p-4 gap-2" : "p-8")}>
-                    <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-                      <Avatar className={cn("ring-2 ring-muted/20 shrink-0", isMobile ? "h-10 w-10" : "h-16 w-16")}>
-                        <AvatarFallback className={cn("font-black", isMobile ? "text-xs" : "text-xl")}>{student.displayName?.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="grid gap-0.5 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-2xl")}>{student.displayName}</h3>
-                          {report?.status === 'sent' && (
-                            <Badge className="bg-emerald-500 text-white font-black px-1.5 py-0 rounded-md border-none text-[8px]">발송 완료</Badge>
+              </div>
+            ) : filteredStudents.map((student) => {
+              const report = dailyReports?.find(r => r.studentId === student.id);
+              const isSent = report?.status === 'sent';
+              
+              return (
+                <Card 
+                  key={student.id} 
+                  className={cn(
+                    "rounded-[2rem] border-none shadow-lg overflow-hidden group transition-all duration-500 active:scale-[0.98]",
+                    isSent ? "bg-emerald-50/30 ring-1 ring-emerald-100" : "bg-white ring-1 ring-border/50"
+                  )}
+                >
+                  <CardContent className={cn("p-0", isMobile ? "" : "")}>
+                    <div className={cn("flex items-center justify-between p-5 sm:p-8", isMobile ? "gap-3" : "gap-8")}>
+                      <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+                        <div className="relative">
+                          <Avatar className={cn("ring-4 transition-all duration-500", isSent ? "ring-emerald-500/20" : "ring-muted/20", isMobile ? "h-14 w-14" : "h-20 w-20")}>
+                            <AvatarFallback className={cn("font-black", isMobile ? "text-xl" : "text-3xl")}>{student.displayName?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          {isSent && (
+                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full shadow-lg border-2 border-white">
+                              <CheckCircle2 className="h-3 w-3 sm:h-4 w-4" />
+                            </div>
                           )}
                         </div>
-                        <p className="font-bold text-muted-foreground text-[9px]">
-                          {report ? `작성: ${format((report.updatedAt as any).toDate(), 'HH:mm')}` : "미작성"}
-                        </p>
+                        <div className="grid gap-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-3xl")}>{student.displayName}</h3>
+                            {isSent && (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter">Report Sent</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <p className="font-bold text-muted-foreground/60 text-[10px] sm:text-xs">
+                              {report ? `Last Edit: ${format((report.updatedAt as any).toDate(), 'HH:mm')}` : "Not Started Yet"}
+                            </p>
+                            {report?.status === 'draft' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                            )}
+                          </div>
+                        </div>
                       </div>
+                      <Button 
+                        onClick={() => handleOpenWriteModal(student.id, student.displayName || '학생')} 
+                        className={cn(
+                          "rounded-2xl font-black shrink-0 transition-all duration-300",
+                          isMobile ? "h-12 w-12 p-0 shadow-lg" : "h-16 px-10 text-base shadow-xl",
+                          isSent ? "bg-white text-emerald-600 border-2 border-emerald-100 hover:bg-emerald-50" : "bg-primary text-white hover:bg-primary/90"
+                        )}
+                      >
+                        {isMobile ? (
+                          isSent ? <CheckCircle2 className="h-6 w-6" /> : <PenTool className="h-6 w-6" />
+                        ) : (
+                          report ? '리포트 수정' : '리포트 작성'
+                        )}
+                      </Button>
                     </div>
-                    <Button 
-                      onClick={() => handleOpenWriteModal(student.id, student.displayName || '학생')} 
-                      size={isMobile ? "sm" : "default"}
-                      className={cn(
-                        "rounded-xl font-black shrink-0",
-                        isMobile ? "h-8 px-3 text-[10px]" : "h-14 px-8 text-sm",
-                        report?.status === 'sent' ? "bg-white text-primary border-2" : "bg-primary text-white"
-                      )}
-                    >
-                      {report ? '수정' : '작성'}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
+      {/* 리포트 작성 다이얼로그 - 상담 페이지 스타일 동기화 */}
       <Dialog open={isWriteModalOpen} onOpenChange={setIsWriteModalOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "w-full h-full max-w-none rounded-none" : "max-w-4xl h-[90vh]")}>
-          <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-5" : "p-10")}>
-            <div className="absolute top-0 right-0 p-10 opacity-10">
-              <Sparkles className={cn(isMobile ? "h-16 w-16" : "h-40 w-40")} />
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "max-w-4xl h-[90vh]")}>
+          <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-12")}>
+            <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
+              <Sparkles className={cn(isMobile ? "h-20 w-20" : "h-48 w-48")} />
             </div>
             <DialogHeader className="relative z-10">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <Badge className="bg-white/20 text-white border-none font-black text-[8px] tracking-widest uppercase">Premium AI Analysis</Badge>
-                <span className="text-white/60 font-bold text-[10px]">{dateKey}</span>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">Premium AI Analysis</Badge>
+                <span className="text-white/60 font-black text-[10px] tracking-widest">{dateKey}</span>
               </div>
-              <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-4xl")}>{selectedStudent?.name} 학생 리포트</DialogTitle>
+              <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-5xl")}>{selectedStudent?.name} 학생</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold text-sm sm:text-base mt-1">성장 데이터를 바탕으로 AI가 최적의 분석 리포트를 생성합니다.</DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-            <div className={cn("space-y-6", isMobile ? "p-4" : "p-10")}>
-              <div className={cn("grid gap-4 items-start", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
-                <Card className="rounded-2xl border-none shadow-sm bg-white ring-1 ring-border/50">
-                  <CardHeader className="bg-muted/30 pb-2 border-b py-3 px-4">
-                    <CardTitle className="text-[9px] font-black flex items-center gap-2 uppercase tracking-widest text-primary/70">
-                      <FileText className="h-3 w-3" /> 교사 관찰 노트
+            <div className={cn("space-y-8", isMobile ? "p-6" : "p-12")}>
+              {/* 교사 노트 & AI 실행 */}
+              <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "md:grid-cols-5")}>
+                <Card className={cn("rounded-[2rem] border-none shadow-xl bg-white ring-1 ring-border/50", isMobile ? "" : "md:col-span-3")}>
+                  <CardHeader className="bg-muted/10 pb-4 border-b py-5 px-6">
+                    <CardTitle className="text-[10px] font-black flex items-center gap-2 uppercase tracking-widest text-primary/70">
+                      <FileText className="h-4 w-4" /> 교사 특별 관찰 노트
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-4 space-y-3">
+                  <CardContent className="p-6 space-y-4">
                     <Textarea 
-                      placeholder="특이사항을 기록해 주세요. AI가 분석에 활용합니다." 
+                      placeholder="학습 태도나 특이사항을 기록해 주세요. AI 분석의 핵심 맥락으로 활용됩니다." 
                       value={teacherNote}
                       onChange={(e) => setTeacherNote(e.target.value)}
-                      className="min-h-[80px] rounded-xl border-2 font-bold text-[11px] resize-none"
+                      className="min-h-[100px] rounded-2xl border-2 font-bold text-sm resize-none shadow-inner"
                     />
                     <Button 
                       onClick={handleGenerateAiReport} 
                       disabled={aiLoading} 
-                      className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-10 font-black text-[11px] gap-2 shadow-sm"
+                      className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-base gap-3 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
                     >
-                      {aiLoading ? <Loader2 className="animate-spin h-3.5 w-3.5" /> : <Wand2 className="h-3.5 w-3.5" />}
-                      AI 분석 리포트 생성
+                      {aiLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5" />}
+                      AI 정밀 분석 리포트 생성
                     </Button>
                   </CardContent>
                 </Card>
 
                 {!isMobile && (
-                  <div className="space-y-2">
+                  <div className="md:col-span-2 grid gap-4">
                     {[
-                      { icon: TrendingUp, label: '7일 평균 비교', desc: '이전 성과 대조', color: 'text-blue-600', bg: 'bg-blue-50' },
-                      { icon: Trophy, label: '데이터 진단', desc: '10단계 분석', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { icon: TrendingUp, label: '최근 7일 비교', desc: '학습 추세 자동 대조', color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { icon: Trophy, label: '10단계 진단', desc: '정량적 성취 수준 분석', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { icon: Zap, label: '맞춤형 피드백', desc: '학생별 약점 보완 조언', color: 'text-amber-600', bg: 'bg-amber-50' },
                     ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-primary/5 shadow-sm">
-                        <div className={cn("p-1.5 rounded-lg", item.bg)}><item.icon className={cn("h-3.5 w-3.5", item.color)} /></div>
+                      <div key={i} className="flex items-center gap-4 p-4 rounded-[1.5rem] bg-white border border-primary/5 shadow-md hover:shadow-xl transition-all">
+                        <div className={cn("p-2.5 rounded-2xl", item.bg)}><item.icon className={cn("h-5 w-5", item.color)} /></div>
                         <div>
-                          <p className="text-[8px] font-black text-muted-foreground uppercase">{item.label}</p>
-                          <p className="text-[10px] font-bold">{item.desc}</p>
+                          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-0.5">{item.label}</p>
+                          <p className="text-xs font-bold">{item.desc}</p>
                         </div>
                       </div>
                     ))}
@@ -373,19 +413,24 @@ export default function DailyReportsPage() {
                 )}
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Label className="text-[9px] font-black uppercase text-primary/70 tracking-widest ml-1 flex items-center gap-2">
-                  <Zap className="h-3 w-3" /> 리포트 본문 편집
+              {/* 편집 영역 */}
+              <div className="flex flex-col gap-3">
+                <Label className="text-[10px] font-black uppercase text-primary/70 tracking-widest ml-2 flex items-center gap-2">
+                  <Zap className="h-4 w-4" /> 생성된 리포트 최종 검토 및 편집
                 </Label>
-                <div className="relative">
+                <div className="relative group">
                   <Textarea 
                     value={reportContent}
                     onChange={(e) => setReportContent(e.target.value)}
-                    className={cn("rounded-[1.5rem] border-2 border-muted font-bold leading-relaxed text-[13px] resize-none shadow-inner bg-white", isMobile ? "min-h-[350px] p-4" : "min-h-[450px] p-8")}
+                    className={cn(
+                      "rounded-[2.5rem] border-2 border-muted font-bold leading-relaxed text-base resize-none shadow-2xl bg-white group-hover:border-primary/20 focus-visible:ring-primary/10 transition-all",
+                      isMobile ? "min-h-[400px] p-6" : "min-h-[500px] p-10"
+                    )}
                   />
                   {!reportContent && !aiLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                      <p className="font-black text-xs sm:text-lg">AI 분석을 실행해 주세요.</p>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20 gap-4">
+                      <Sparkles className="h-16 w-16" />
+                      <p className="font-black text-xl tracking-tighter">AI 분석을 실행해 주세요.</p>
                     </div>
                   )}
                 </div>
@@ -393,14 +438,17 @@ export default function DailyReportsPage() {
             </div>
           </div>
 
-          <DialogFooter className={cn("bg-white border-t shrink-0", isMobile ? "p-4 flex-col gap-2" : "p-8 flex-row justify-between items-center")}>
-            <div className={cn("font-bold text-muted-foreground italic", isMobile ? "text-[8px] text-center" : "text-[10px]")}>
-              ※ 전날 데이터를 바탕으로 작성하는 것을 권장합니다.
-            </div>
-            <div className={cn("flex gap-2", isMobile ? "w-full" : "")}>
-              <Button variant="outline" className="rounded-xl h-11 px-4 font-black flex-1 sm:flex-none" onClick={() => handleSaveReport('draft')} disabled={isSaving}>임시 저장</Button>
-              <Button className="rounded-xl h-11 px-8 font-black gap-2 shadow-xl flex-1 sm:flex-none" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim()}>
-                <Send className="h-3.5 w-3.5" /> 최종 발송
+          <DialogFooter className={cn("bg-white border-t shrink-0 backdrop-blur-xl bg-white/80", isMobile ? "p-6 flex-col gap-3" : "p-10 flex-row justify-between items-center")}>
+            {!isMobile && (
+              <div className="font-bold text-muted-foreground italic text-xs flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                ※ 생성된 리포트를 한 번 더 확인 후 발송해 주세요.
+              </div>
+            )}
+            <div className={cn("flex gap-3", isMobile ? "w-full" : "")}>
+              <Button variant="outline" className="rounded-2xl h-14 px-8 font-black flex-1 sm:flex-none border-2 shadow-sm" onClick={() => handleSaveReport('draft')} disabled={isSaving}>임시 저장</Button>
+              <Button className="rounded-2xl h-14 px-12 font-black gap-3 shadow-xl flex-1 sm:flex-none active:scale-95 transition-all" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim()}>
+                <Send className="h-5 w-5" /> 학부모님께 최종 발송
               </Button>
             </div>
           </DialogFooter>
