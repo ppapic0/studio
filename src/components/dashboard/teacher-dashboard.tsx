@@ -220,9 +220,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         {/* 좌석 상황판 */}
         <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50">
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-8")}>
-            <div className={cn("flex justify-between gap-4 items-center", isMobile ? "flex-row" : "flex-row")}>
+            <div className="flex justify-between gap-4 items-center">
               <div className="space-y-1 min-w-0">
-                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter whitespace-nowrap">
+                <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter whitespace-nowrap break-keep">
                   <Armchair className="h-5 w-5 text-primary shrink-0" /> 실시간 좌석 도면
                 </CardTitle>
                 <CardDescription className="font-bold text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:block">Live Matrix Monitoring</CardDescription>
@@ -239,18 +239,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className={cn("bg-[#fafafa]", isMobile ? "p-0" : "p-6")}>
+          <CardContent className={cn("bg-[#fafafa]", isMobile ? "p-4" : "p-6")}>
             {attendanceLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
             ) : !attendanceList || attendanceList.length === 0 ? (
-              <div className="py-20 text-center flex flex-col items-center gap-4 bg-muted/5 rounded-3xl border-2 border-dashed mx-6 mb-6">
+              <div className="py-20 text-center flex flex-col items-center gap-4 bg-muted/5 rounded-3xl border-2 border-dashed">
                 <Armchair className="h-12 w-12 text-muted-foreground opacity-10" />
                 <p className="text-xs font-bold text-muted-foreground/40 italic">배치된 좌석이 없습니다.</p>
               </div>
             ) : (
-              <div className={cn("w-full bg-white relative", isMobile ? "p-0" : "p-6 rounded-3xl border shadow-inner")}>
+              <div className={cn("w-full bg-white relative", isMobile ? "p-2 rounded-2xl border" : "p-6 rounded-3xl border shadow-inner")}>
                 <div 
-                  className="grid w-full gap-1 mx-auto relative"
+                  className="grid w-full gap-1.5 mx-auto relative"
                   style={{ gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(0, 1fr))` }}
                 >
                   {Array.from({ length: gridDimensions.rows * gridDimensions.cols }).map((_, idx) => {
@@ -277,7 +277,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         )}
                       >
                         {isMobile ? (
-                          <span className={cn("font-black text-[10px] leading-none", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
+                          <span className={cn("font-black text-[11px] flex items-center justify-center", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
                         ) : (
                           <>
                             <span className={cn("font-black absolute top-0.5 left-0.5 leading-none text-[6px] sm:text-[8px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>

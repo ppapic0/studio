@@ -106,7 +106,7 @@ export default function LayoutViewPage() {
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Monitor className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
-            <h1 className={cn("font-black tracking-tighter text-primary whitespace-nowrap", isMobile ? "text-xl" : "text-4xl")}>실시간 관제</h1>
+            <h1 className={cn("font-black tracking-tighter text-primary whitespace-nowrap break-keep", isMobile ? "text-xl" : "text-4xl")}>실시간 관제</h1>
             <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">LIVE</span>
@@ -138,7 +138,7 @@ export default function LayoutViewPage() {
 
       <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50 relative flex-1 flex flex-col group">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent pointer-events-none" />
-        <CardContent className={cn("relative z-10 flex items-center justify-center flex-1", isMobile ? "p-0" : "p-10")}>
+        <CardContent className={cn("relative z-10 flex items-center justify-center flex-1", isMobile ? "p-4" : "p-10")}>
           {studentsLoading || attendanceLoading ? (
             <div className="flex flex-col items-center gap-4 py-40">
               <Loader2 className="animate-spin h-12 w-12 text-primary opacity-20" />
@@ -150,10 +150,10 @@ export default function LayoutViewPage() {
               <p className="text-sm font-black uppercase tracking-widest italic">No Seats Configured</p>
             </div>
           ) : (
-            <div className={cn("w-full bg-white relative", isMobile ? "p-0" : "p-10 rounded-[2rem] border shadow-2xl")}>
+            <div className={cn("w-full bg-white relative", isMobile ? "p-2 rounded-2xl border" : "p-10 rounded-[2rem] border shadow-2xl")}>
               <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
               <div 
-                className="grid w-full mx-auto relative z-10 gap-1 sm:gap-2"
+                className="grid w-full mx-auto relative z-10 gap-1.5 sm:gap-2"
                 style={{ gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(0, 1fr))` }}
               >
                 {Array.from({ length: gridDimensions.rows * gridDimensions.cols }).map((_, idx) => {
@@ -180,7 +180,7 @@ export default function LayoutViewPage() {
                       )}
                     >
                       {isMobile ? (
-                        <span className={cn("font-black text-sm leading-none", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
+                        <span className={cn("font-black text-[11px] flex items-center justify-center", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/40")}>{seat.seatNo}</span>
                       ) : (
                         <>
                           <span className={cn("font-black absolute top-1 left-1.5 leading-none text-[8px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
