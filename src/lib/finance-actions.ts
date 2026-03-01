@@ -3,8 +3,8 @@
 
 import { adminDb } from './firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { addDays, format, startOfDay } from 'date-fns';
-import { DiscountSnapshot, FinanceSettings, PricingMatrix, StudentProfile } from './types';
+import { addDays, format, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import { DiscountSnapshot, FinanceSettings, PricingMatrix, StudentProfile, Invoice } from './types';
 
 /**
  * 결제 인보이스 생성 로직 (28일 주기 스냅샷)
@@ -20,13 +20,11 @@ export async function createInvoice(centerId: string, studentId: string) {
   const enrollment = student.currentEnrollment;
   if (!enrollment) throw new Error('등록된 수강 정보가 없습니다.');
 
-  // 1. 기본가 조회
   const pricingId = `${enrollment.productId}_${enrollment.season}_${enrollment.studentType}`;
   const pricingSnap = await adminDb.doc(`centers/${centerId}/pricing/${pricingId}`).get();
   if (!pricingSnap.exists) throw new Error('해당 조건의 가격 설정이 없습니다.');
   const pricing = pricingSnap.data() as PricingMatrix;
 
-  // 2. 할인 적용
   const financeSettings = (centerSnap.data()?.financeSettings as FinanceSettings) || {
     discountPolicy: { order: ['rateFirst'] }
   };
@@ -51,7 +49,6 @@ export async function createInvoice(centerId: string, studentId: string) {
     }
   };
 
-  // 정책에 따른 순서 적용
   if (financeSettings.discountPolicy.order[0] === 'rateFirst') {
     applySibling(); applyTutoring();
   } else {
@@ -59,10 +56,8 @@ export async function createInvoice(centerId: string, studentId: string) {
   }
 
   const finalPrice = Math.max(0, currentPrice);
-
-  // 3. 인보이스 저장
   const startDate = enrollment.cycleStartDate.toDate();
-  const endDate = addDays(startDate, 28);
+  const endDate = addDays(startDate, 27); // 28일 사이클 (start + 27일)
 
   const invoiceData = {
     studentId,
@@ -104,16 +99,13 @@ export async function requestRefund(centerId: string, invoiceId: string, reason:
   const now = new Date();
   const start = invoice.cycleStartDate.toDate();
   
-  // 1. 사용 일수 계산 (0~28일)
   const diffTime = now.getTime() - start.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const usedDays = Math.min(28, Math.max(0, diffDays));
 
-  // 2. 금액 계산
   const perDay = Math.floor(invoice.finalPrice / 28);
   const usedAmount = perDay * usedDays;
 
-  // 3. 위약금 계산
   let penalty = 0;
   if (settings?.refundPolicy.penaltyType === 'rate') {
     penalty = Math.floor(invoice.finalPrice * (settings.refundPolicy.penaltyRate || 0));
@@ -145,51 +137,67 @@ export async function requestRefund(centerId: string, invoiceId: string, reason:
 }
 
 /**
- * Daily KPI 집계
+ * 발생주의 방식의 Daily KPI 집계
+ * 해당 날짜를 포함하는 모든 인보이스의 일할 매출을 합산합니다.
  */
 export async function syncDailyKpi(centerId: string, dateStr: string) {
-  const start = Timestamp.fromDate(startOfDay(new Date(dateStr)));
-  const end = Timestamp.fromDate(addDays(start.toDate(), 1));
+  const targetDate = startOfDay(new Date(dateStr));
+  const targetTimestamp = Timestamp.fromDate(targetDate);
 
+  // 1. 해당 날짜가 사이클 내에 포함된 모든 유료 인보이스 조회
   const invoicesSnap = await adminDb.collection(`centers/${centerId}/invoices`)
-    .where('paidAt', '>=', start)
-    .where('paidAt', '<', end)
+    .where('status', '==', 'paid')
+    .where('cycleStartDate', '<=', targetTimestamp)
     .get();
 
-  const refundsSnap = await adminDb.collection(`centers/${centerId}/refunds`)
-    .where('requestedAt', '>=', start)
-    .where('requestedAt', '<', end)
-    .get();
-
-  let totalRevenue = 0;
+  let dailyAccruedRevenue = 0;
   let totalDiscount = 0;
-  let paidCount = 0;
+  let activeStudentCount = 0;
 
   invoicesSnap.forEach(doc => {
-    const data = doc.data();
-    totalRevenue += data.finalPrice;
-    data.discountsSnapshot.forEach((d: any) => totalDiscount += d.amount);
-    paidCount++;
+    const data = doc.data() as Invoice;
+    const cycleEnd = data.cycleEndDate.toDate();
+    
+    // Firestore where 쿼리 제한으로 인해 endDate는 메모리에서 필터링
+    if (targetDate <= cycleEnd) {
+      // 일할 매출 = 최종 결제액 / 28일
+      const dailyPrice = Math.floor(data.finalPrice / 28);
+      dailyAccruedRevenue += dailyPrice;
+      
+      // 할인액도 일할로 계산하여 통계에 반영 (옵션)
+      data.discountsSnapshot.forEach(d => {
+        totalDiscount += Math.floor(d.amount / 28);
+      });
+      
+      activeStudentCount++;
+    }
   });
 
-  let totalRefund = 0;
+  // 2. 환불액 집계 (환불은 요청일에 전액 차감 또는 일할 차감 - 여기서는 요청일 기준 집계)
+  const refundsSnap = await adminDb.collection(`centers/${centerId}/refunds`)
+    .where('requestedAt', '>=', Timestamp.fromDate(startOfDay(targetDate)))
+    .where('requestedAt', '<=', Timestamp.fromDate(endOfDay(targetDate)))
+    .get();
+
+  let dailyTotalRefund = 0;
   refundsSnap.forEach(doc => {
-    totalRefund += doc.data().refundAmount;
+    dailyTotalRefund += doc.data().refundAmount;
   });
 
-  const centerSnap = await adminDb.doc(`centers/${centerId}`).get();
-  const fixedCosts = centerSnap.data()?.financeSettings?.fixedCosts || 0;
+  // 3. 해당 월의 고정비 조회 (BEP 계산용)
+  const monthKey = format(targetDate, 'yyyy-MM');
+  const monthFinanceSnap = await adminDb.doc(`centers/${centerId}/financeMonthly/${monthKey}`).get();
+  const monthlyFixedCosts = monthFinanceSnap.exists ? monthFinanceSnap.data()?.totalFixedCosts || 0 : 0;
   
-  const avgFinalPrice = paidCount > 0 ? totalRevenue / paidCount : 0;
-  const breakevenStudents = avgFinalPrice > 0 ? Math.ceil(fixedCosts / avgFinalPrice) : null;
+  const avgFinalPrice = activeStudentCount > 0 ? dailyAccruedRevenue / activeStudentCount * 28 : 0;
+  const breakevenStudents = avgFinalPrice > 0 ? Math.ceil(monthlyFixedCosts / (avgFinalPrice)) : null;
 
   const kpiData = {
     date: dateStr,
-    totalRevenue,
+    totalRevenue: dailyAccruedRevenue, // 오늘 하루의 실질 매출
     totalDiscount,
-    totalRefund,
-    paidInvoiceCount: paidCount,
-    refundedInvoiceCount: refundsSnap.size,
+    totalRefund: dailyTotalRefund,
+    activeStudentCount,
     avgFinalPrice,
     breakevenStudents,
     updatedAt: FieldValue.serverTimestamp()

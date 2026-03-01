@@ -23,8 +23,18 @@ export interface CenterMembership {
   monthlyFee?: number;
 }
 
+export interface MonthlyFinance {
+  yearMonth: string; // YYYY-MM
+  rent: number;
+  labor: number;
+  maintenance: number;
+  other: number;
+  totalFixedCosts: number;
+  updatedAt: Timestamp;
+}
+
 export interface FinanceSettings {
-  fixedCosts: number;
+  fixedCosts: number; // Legacy, replaced by monthly collection
   refundPolicy: {
     penaltyType: 'none' | 'rate' | 'fixed';
     penaltyRate?: number;
@@ -87,12 +97,11 @@ export interface RefundRecord {
 }
 
 export interface KpiDaily {
-  date: string;
-  totalRevenue: number;
+  date: string; // YYYY-MM-DD
+  totalRevenue: number; // Accrued daily revenue (Total / 28 per active invoice)
   totalDiscount: number;
   totalRefund: number;
   paidInvoiceCount: number;
-  refundedInvoiceCount: number;
   activeStudentCount: number;
   avgFinalPrice: number;
   breakevenStudents: number | null;

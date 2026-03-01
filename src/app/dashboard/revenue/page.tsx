@@ -5,8 +5,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, getDoc, limit, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { KpiDaily, FinanceSettings } from '@/lib/types';
+import { collection, query, where, doc, getDoc, limit, orderBy, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { KpiDaily, FinanceSettings, MonthlyFinance } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,10 @@ import {
   Info,
   RefreshCw,
   Percent,
-  Wallet
+  Wallet,
+  Building2,
+  UserCircle2,
+  Wrench
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -55,7 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format } from 'date-fns';
+import { format, startOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
@@ -70,13 +73,36 @@ export default function RevenuePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 재무 설정 폼 상태
-  const [fixedCosts, setFixedCosts] = useState<number>(0);
+  // 재무 설정 - 고정비 항목별 상태
+  const [selectedFinanceMonth, setSelectedFinanceMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [rent, setRent] = useState<number>(0);
+  const [labor, setLabor] = useState<number>(0);
+  const [maintenance, setMaintenance] = useState<number>(0);
+  const [otherCost, setOtherCost] = useState<number>(0);
+
   const [penaltyType, setPenaltyType] = useState<'none' | 'rate' | 'fixed'>('none');
   const [penaltyValue, setPenaltyValue] = useState<number>(0);
   const [discountOrder, setDiscountOrder] = useState<'rateFirst' | 'fixedFirst'>('rateFirst');
 
-  // 센터 데이터 및 재무 설정 조회
+  // 월별 고정비 데이터 조회
+  const financeMonthRef = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedFinanceMonth) return null;
+    return doc(firestore, 'centers', centerId, 'financeMonthly', selectedFinanceMonth);
+  }, [firestore, centerId, selectedFinanceMonth]);
+  const { data: monthlyFinanceData } = useDoc<MonthlyFinance>(financeMonthRef);
+
+  useEffect(() => {
+    if (monthlyFinanceData) {
+      setRent(monthlyFinanceData.rent || 0);
+      setLabor(monthlyFinanceData.labor || 0);
+      setMaintenance(monthlyFinanceData.maintenance || 0);
+      setOtherCost(monthlyFinanceData.other || 0);
+    } else {
+      setRent(0); setLabor(0); setMaintenance(0); setOtherCost(0);
+    }
+  }, [monthlyFinanceData]);
+
+  // 센터 설정 조회
   const centerRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId);
@@ -86,7 +112,6 @@ export default function RevenuePage() {
   useEffect(() => {
     if (centerData?.financeSettings) {
       const settings = centerData.financeSettings as FinanceSettings;
-      setFixedCosts(settings.fixedCosts || 0);
       setPenaltyType(settings.refundPolicy?.penaltyType || 'none');
       setPenaltyValue(settings.refundPolicy?.penaltyType === 'rate' 
         ? (settings.refundPolicy.penaltyRate || 0) * 100 
@@ -116,17 +141,14 @@ export default function RevenuePage() {
 
   const chartData = useMemo(() => {
     if (!kpiHistory || kpiHistory.length === 0) {
-      // 데이터가 없을 때 빈 차트 방지용 더미 데이터
       return Array.from({ length: 7 }).map((_, i) => ({
         name: format(new Date(Date.now() - (6 - i) * 86400000), 'MM/dd'),
         revenue: 0,
-        students: 0
       }));
     }
     return [...kpiHistory].reverse().map(k => ({
       name: k.date.substring(5).replace('-', '/'),
-      revenue: Math.round((k.totalRevenue || 0) / 10000), // 만원 단위
-      students: k.activeStudentCount || 0
+      revenue: Math.round((k.totalRevenue || 0)), // 일일 발생 매출
     }));
   }, [kpiHistory]);
 
@@ -134,8 +156,17 @@ export default function RevenuePage() {
     if (!firestore || !centerId) return;
     setIsSaving(true);
     try {
-      const financeSettings: FinanceSettings = {
-        fixedCosts,
+      // 1. 월별 고정비 저장
+      const totalFixedCosts = rent + labor + maintenance + otherCost;
+      await setDoc(doc(firestore, 'centers', centerId, 'financeMonthly', selectedFinanceMonth), {
+        yearMonth: selectedFinanceMonth,
+        rent, labor, maintenance, other: otherCost,
+        totalFixedCosts,
+        updatedAt: serverTimestamp()
+      });
+
+      // 2. 공통 정책 저장
+      const financeSettings: Partial<FinanceSettings> = {
         refundPolicy: {
           penaltyType,
           penaltyRate: penaltyType === 'rate' ? penaltyValue / 100 : undefined,
@@ -152,7 +183,7 @@ export default function RevenuePage() {
         updatedAt: serverTimestamp()
       });
 
-      toast({ title: "재무 정책이 저장되었습니다." });
+      toast({ title: "재무 정책 및 비용이 저장되었습니다." });
       setIsSettingsOpen(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "저장 실패", description: e.message });
@@ -161,11 +192,17 @@ export default function RevenuePage() {
     }
   };
 
+  const months = useMemo(() => {
+    const end = new Date();
+    const start = subMonths(end, 5);
+    return eachMonthOfInterval({ start, end }).reverse().map(d => format(d, 'yyyy-MM'));
+  }, []);
+
   if (membershipsLoading || isKpiLoading) {
     return (
       <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-        <p className="font-black text-primary tracking-tighter">재무 데이터를 집계 중입니다...</p>
+        <p className="font-black text-primary tracking-tighter">재무 데이터를 분석 중입니다...</p>
       </div>
     );
   }
@@ -176,24 +213,23 @@ export default function RevenuePage() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-primary/60">
             <Calculator className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Advanced Finance Matrix</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Accrual Finance System</span>
           </div>
           <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-3xl" : "text-5xl")}>
             재무 및 손익 분석
           </h1>
-          <p className="text-sm font-bold text-muted-foreground/70 mt-2">센터의 실질 수익성과 재무 건전성을 관리합니다.</p>
+          <p className="text-sm font-bold text-muted-foreground/70 mt-2">일할 계산 방식의 정밀한 센터 수익성을 관리합니다.</p>
         </div>
         <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
-          <Settings className="h-4 w-4" /> 재무 정책 설정
+          <Settings className="h-4 w-4" /> 재무 정책 및 비용 설정
         </Button>
       </header>
 
-      {/* 실시간 KPI 섹션 */}
       <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-4")}>
         <Card className="rounded-[2rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative group">
           <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-700" />
           <div className="relative z-10 space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘 매출 (결제기준)</p>
+            <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘 발생 매출 (Accrued)</p>
             <div className="flex items-baseline gap-1">
               <h3 className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>₩{(todayKpi?.totalRevenue || 0).toLocaleString()}</h3>
             </div>
@@ -211,7 +247,7 @@ export default function RevenuePage() {
           <div className="flex justify-between items-end">
             <div>
               <h3 className="text-4xl font-black tracking-tighter text-primary">{todayKpi?.breakevenStudents || '-'}<span className="text-lg opacity-40 ml-1">명</span></h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1">목표 재원생 수</p>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1">{selectedFinanceMonth} 고정비 기준</p>
             </div>
             <div className="bg-amber-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><Target className="h-6 w-6 text-amber-600" /></div>
           </div>
@@ -219,12 +255,12 @@ export default function RevenuePage() {
 
         <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 group hover:shadow-2xl transition-all">
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
-            <PieChart className="h-3 w-3 text-blue-500" /> 평균 객단가 (ARPU)
+            <PieChart className="h-3 w-3 text-blue-500" /> 일일 인당 매출
           </p>
           <div className="flex justify-between items-end">
             <div>
-              <h3 className="text-4xl font-black tracking-tighter text-primary">₩{Math.round(todayKpi?.avgFinalPrice || 0).toLocaleString()}</h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1">실질 인당 수강료</p>
+              <h3 className="text-4xl font-black tracking-tighter text-primary">₩{Math.round((todayKpi?.totalRevenue || 0) / (todayKpi?.activeStudentCount || 1)).toLocaleString()}</h3>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1">실질 1일 수강료</p>
             </div>
             <div className="bg-blue-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><PieChart className="h-6 w-6 text-blue-600" /></div>
           </div>
@@ -232,117 +268,140 @@ export default function RevenuePage() {
 
         <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 group hover:shadow-2xl transition-all">
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
-            <TrendingUp className="h-3 w-3 text-rose-500" /> 총 할인액
+            <Users className="h-3 w-3 text-emerald-500" /> 유료 재원생
           </p>
           <div className="flex justify-between items-end">
             <div>
-              <h3 className="text-4xl font-black tracking-tighter text-rose-600">₩{(todayKpi?.totalDiscount || 0).toLocaleString()}</h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1">프로모션/형제 할인</p>
+              <h3 className="text-4xl font-black tracking-tighter text-emerald-600">{todayKpi?.activeStudentCount || 0}<span className="text-lg opacity-40 ml-1">명</span></h3>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1">오늘 기준 활성 인원</p>
             </div>
-            <div className="bg-rose-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><TrendingUp className="h-6 w-6 text-rose-600" /></div>
+            <div className="bg-emerald-50 p-3 rounded-2xl group-hover:rotate-12 transition-transform"><Users className="h-6 w-6 text-emerald-600" /></div>
           </div>
         </Card>
       </section>
 
-      {/* 매출 추이 그래프 */}
       <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className="p-8 sm:p-10 border-b bg-muted/5">
           <div className="flex justify-between items-center">
             <div className="space-y-1">
               <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-                <TrendingUp className="h-6 w-6 text-primary" /> 매출 및 성장 트렌드
+                <TrendingUp className="h-6 w-6 text-primary" /> 일별 발생 매출 추이 (발생주의)
               </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Revenue & Growth History (Unit: 10,000 KRW)</CardDescription>
+              <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Daily Accrued Revenue (Sum of Price/28 per active student)</CardDescription>
             </div>
-            <Badge variant="outline" className="font-black text-[10px] border-primary/20 bg-white">최근 30일 데이터</Badge>
+            <Badge variant="outline" className="font-black text-[10px] border-primary/20 bg-white">최근 30일 실질 매출</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-8 sm:p-10">
           <div className="h-[350px] w-full">
-            {isKpiLoading ? (
-              <div className="h-full w-full flex items-center justify-center bg-muted/5 rounded-3xl">
-                <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
-              </div>
-            ) : chartData.every(d => d.revenue === 0) ? (
-              <div className="h-full w-full flex flex-col items-center justify-center gap-4 bg-muted/5 rounded-3xl border-2 border-dashed">
-                <Info className="h-12 w-12 text-muted-foreground opacity-10" />
-                <p className="text-sm font-bold text-muted-foreground/40 italic">집계된 매출 데이터가 아직 없습니다.</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" fontSize={11} fontWeight="bold" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
-                  <YAxis fontSize={11} fontWeight="900" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
-                    cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5 5' }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    name="매출(만원)"
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={4} 
-                    fillOpacity={1} 
-                    fill="url(#colorRev)" 
-                    animationDuration={2000}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" fontSize={11} fontWeight="bold" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
+                <YAxis fontSize={11} fontWeight="900" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+                  formatter={(value: number) => [`₩${value.toLocaleString()}`, "매출"]}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={4} 
+                  fillOpacity={1} 
+                  fill="url(#colorRev)" 
+                  animationDuration={2000}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      {/* 기존 학생별 수익 관리 리스트 */}
       <div className="mt-4">
         <RevenueAnalysis />
       </div>
 
-      {/* 재무 정책 설정 다이얼로그 */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-lg")}>
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-xl")}>
           <div className="bg-primary p-10 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
             <DialogHeader>
               <div className="flex items-center gap-2 mb-2">
                 <div className="bg-white/20 p-1.5 rounded-lg"><Settings className="h-4 w-4" /></div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Finance Policy</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Finance & Cost Policy</span>
               </div>
-              <DialogTitle className="text-3xl font-black tracking-tighter">재무 정책 설정</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold mt-1">센터 운영비 및 환불/할인 로직을 구성합니다.</DialogDescription>
+              <DialogTitle className="text-3xl font-black tracking-tighter">재무 및 비용 설정</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold mt-1">월별 고정비와 센터 공통 환불/할인 로직을 구성합니다.</DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="p-8 space-y-8 bg-white max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {/* 고정비 설정 */}
+            {/* 고정비 월별 설정 */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 ml-1">
-                <Wallet className="h-4 w-4 text-primary" />
-                <h4 className="text-sm font-black text-primary uppercase">운영 고정비 (월 평균)</h4>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 ml-1">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-black text-primary uppercase">월별 운영 비용 (고정비)</h4>
+                </div>
+                <Select value={selectedFinanceMonth} onValueChange={setSelectedFinanceMonth}>
+                  <SelectTrigger className="w-[140px] h-9 rounded-xl border-2 font-black text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="p-5 rounded-2xl bg-muted/30 border border-border/50 space-y-4">
+              
+              <div className="p-6 rounded-2xl bg-muted/30 border border-border/50 grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black text-muted-foreground uppercase ml-1">월 총 고정비 (임대료+인건비+관리비 등)</Label>
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-1.5">
+                    <Building2 className="h-3 w-3" /> 임대료
+                  </Label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-primary">₩</span>
-                    <Input 
-                      type="number" 
-                      value={fixedCosts} 
-                      onChange={(e) => setFixedCosts(Number(e.target.value))}
-                      className="h-12 pl-10 rounded-xl border-2 font-black text-lg"
-                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-primary/40 text-xs">₩</span>
+                    <Input type="number" value={rent} onChange={(e) => setRent(Number(e.target.value))} className="h-10 pl-8 rounded-lg border-2 font-bold" />
                   </div>
-                  <p className="text-[9px] font-bold text-muted-foreground/60 flex items-center gap-1 ml-1">
-                    <Info className="h-3 w-3" /> 이 수치를 기반으로 실시간 손익분기점(BEP)이 계산됩니다.
-                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-1.5">
+                    <UserCircle2 className="h-3 w-3" /> 인건비
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-primary/40 text-xs">₩</span>
+                    <Input type="number" value={labor} onChange={(e) => setLabor(Number(e.target.value))} className="h-10 pl-8 rounded-lg border-2 font-bold" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-1.5">
+                    <Wrench className="h-3 w-3" /> 관리비
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-primary/40 text-xs">₩</span>
+                    <Input type="number" value={maintenance} onChange={(e) => setMaintenance(Number(e.target.value))} className="h-10 pl-8 rounded-lg border-2 font-bold" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-1.5">
+                    기타 비용
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-primary/40 text-xs">₩</span>
+                    <Input type="number" value={otherCost} onChange={(e) => setOtherCost(Number(e.target.value))} className="h-10 pl-8 rounded-lg border-2 font-bold" />
+                  </div>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-dashed mt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-primary">총 고정비 합계</span>
+                    <span className="text-lg font-black text-primary">₩{(rent + labor + maintenance + otherCost).toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -351,9 +410,12 @@ export default function RevenuePage() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 ml-1">
                 <RefreshCw className="h-4 w-4 text-rose-500" />
-                <h4 className="text-sm font-black text-rose-600 uppercase">환불 위약금 정책</h4>
+                <h4 className="text-sm font-black text-rose-600 uppercase">환불 위약금 정책 (28일 일할 기본)</h4>
               </div>
               <div className="p-5 rounded-2xl bg-rose-50/30 border border-rose-100 space-y-4">
+                <p className="text-[9px] font-bold text-rose-900/60 leading-relaxed mb-2">
+                  💡 모든 환불은 28일 기준 잔여 일수에 대해 일할 계산됩니다. 아래 설정은 일할 계산된 금액에서 차감할 추가 위약금입니다.
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   {['none', 'rate', 'fixed'].map((type) => (
                     <Button
@@ -380,12 +442,7 @@ export default function RevenuePage() {
                       ) : (
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-rose-300">₩</span>
                       )}
-                      <Input 
-                        type="number" 
-                        value={penaltyValue} 
-                        onChange={(e) => setPenaltyValue(Number(e.target.value))}
-                        className={cn("h-12 rounded-xl border-2 font-black text-lg", penaltyType === 'fixed' ? "pl-10" : "pr-10")}
-                      />
+                      <Input type="number" value={penaltyValue} onChange={(e) => setPenaltyValue(Number(e.target.value))} className={cn("h-12 rounded-xl border-2 font-black text-lg", penaltyType === 'fixed' ? "pl-10" : "pr-10")} />
                     </div>
                   </div>
                 )}
@@ -408,19 +465,13 @@ export default function RevenuePage() {
                     <SelectItem value="fixedFirst">정액(원) 우선 적용</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="p-3 bg-white/80 rounded-xl border border-emerald-100/50 flex items-start gap-3">
-                  <Info className="h-4 w-4 text-emerald-500 mt-0.5" />
-                  <p className="text-[10px] font-bold text-emerald-900/60 leading-relaxed">
-                    적용 순서에 따라 최종 결제 금액이 미세하게 달라질 수 있습니다. 센터 수익성을 고려하여 선택해 주세요.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
 
           <DialogFooter className="p-8 bg-muted/30 border-t">
             <Button onClick={handleSaveSettings} disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
-              {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : '정책 설정 저장하기'}
+              {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : `${selectedFinanceMonth} 재무 데이터 저장`}
             </Button>
           </DialogFooter>
         </DialogContent>
