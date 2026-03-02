@@ -7,7 +7,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +22,6 @@ import {
   Clock,
   Zap,
   Users,
-  TrendingUp,
   Trophy,
   User,
   Sparkles,
@@ -74,7 +72,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // 1. 학생 데이터 (정렬 고정)
+  // 1. 학생 데이터
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('seatNo', 'asc'));
@@ -224,18 +222,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       {/* 3. 실시간 좌석 상황판 (이미지 완벽 매칭 수직 그리드) */}
       <Card className="rounded-[3.5rem] border-none shadow-[0_20px_60px_rgba(0,0,0,0.06)] bg-white mx-4 overflow-hidden">
-        <CardHeader className="p-8 sm:p-10 pb-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <Armchair className="h-6 w-6 text-[#4A3F35]" />
-              <CardTitle className="text-2xl font-black tracking-tighter text-[#4A3F35]">실시간 좌석 상황판</CardTitle>
-            </div>
-            <Button asChild variant="outline" className="rounded-2xl h-11 px-6 font-black border-2 shadow-sm">
-              <Link href="/dashboard/teacher/layout-view">전체 도면 보기</Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6 sm:p-10 pt-2">
+        <CardContent className="p-6 sm:p-10">
           <div className="rounded-[2.5rem] border-2 border-[#F0EDE8] p-6 sm:p-8 bg-white overflow-x-auto custom-scrollbar">
             <div className="grid grid-cols-8 gap-3 sm:gap-4 min-w-[800px]">
               {Array.from({ length: 8 }).map((_, colIndex) => (
@@ -293,7 +280,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
-      {/* 4. 하단 상담 현황 섹션 (이미지 매칭) */}
+      {/* 4. 하단 상담 현황 섹션 */}
       <section className="px-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

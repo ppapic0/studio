@@ -1,3 +1,4 @@
+
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -39,7 +40,7 @@ function ensureApp(): FirebaseApp {
 function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
-  // 기본 호스트 및 SSL 설정을 SDK에 위임하여 시간 동기화 오류 가능성을 낮춥니다.
+  // 내부 어설션 에러 방지를 위해 타브 관리자 설정을 표준으로 유지합니다.
   firestore = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
@@ -71,22 +72,6 @@ export function initializeFirebase() {
   const fn = ensureFunctions(app);
 
   return { firebaseApp: app, auth: a, firestore: db, functions: fn };
-}
-
-/**
- * (호환용) 앱 인스턴스로부터 SDK를 가져오는 함수
- */
-export function getSdks(app: FirebaseApp) {
-  const db = ensureFirestore(app);
-  const a = ensureAuth(app);
-  const fn = ensureFunctions(app);
-
-  return {
-    firebaseApp: app,
-    auth: a,
-    firestore: db,
-    functions: fn,
-  };
 }
 
 export * from './provider';
