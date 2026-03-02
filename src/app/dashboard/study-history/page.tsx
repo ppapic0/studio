@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -76,6 +75,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -410,7 +410,7 @@ export default function StudyHistoryPage() {
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
-    if (isNaN(hours) || isNaN(mins)) return time12h;
+    if (isNaN(hours) || iNaN(mins)) return time12h;
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
