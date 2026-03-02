@@ -304,7 +304,7 @@ export default function AppointmentsPage() {
     <div className={cn("flex flex-col gap-6 max-w-4xl mx-auto pb-20", isMobile ? "px-1" : "px-4")}>
       <header className={cn("flex justify-between items-center", isMobile ? "flex-col gap-4 items-start" : "flex-row")}>
         <div className="space-y-1">
-          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-3xl" : "text-4xl")}>상담 및 피드백</h1>
+          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
             {isAdmin ? 'All Center Appointments' : 'Appointment & Feedback Center'}
           </p>

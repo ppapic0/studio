@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -36,19 +35,19 @@ export function BottomNav() {
       { href: '/dashboard/growth', label: '성장트랙', icon: Zap },
       { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
       { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
-      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
+      { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     ],
     teacher: [
       { href: '/dashboard/teacher', label: '센터홈', icon: LayoutDashboard },
       { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
       { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
-      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
+      { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     ],
     parent: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard/study-history', label: '기록트랙', icon: History },
-      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
+      { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
       { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
     ],
     centerAdmin: [
