@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -23,10 +22,29 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
 import { LeaderboardEntry, WithId, StudentProfile, CenterMembership } from '@/lib/types';
-import { Loader2, Trophy, Medal, Crown, Star, Flame, History, Zap, User, LayoutGrid } from 'lucide-react';
+import { 
+  Loader2, 
+  Trophy, 
+  Medal, 
+  Crown, 
+  Star, 
+  Flame, 
+  History, 
+  Zap, 
+  User, 
+  LayoutGrid,
+  Filter
+} from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type LeaderboardTabProps = {
   title: string;
@@ -124,7 +142,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
               <div className="p-8 rounded-full bg-muted/20">
                 <Trophy className="h-16 w-16 text-muted-foreground opacity-10" />
               </div>
-              <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-widest">데이터 집계 중입니다.</p>
+              <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-widest">해당 반의 데이터가 없습니다.</p>
             </div>
           ) : (
             <div className="divide-y divide-muted/10">
@@ -233,10 +251,12 @@ export default function LeaderboardsPage() {
   const { activeMembership, viewMode } = useAppContext();
   
   const [seasonOffset, setSeasonOffset] = useState<0 | -1>(0); 
-  const [rankingScope, setRankingScope] = useState<'class' | 'total'>('class'); // 반별 vs 전체 탭 상태
+  const [rankingScope, setRankingScope] = useState<'class' | 'total'>('class');
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
   
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
+  const isStaff = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const myClassName = activeMembership?.className;
   
   const targetDate = useMemo(() => {
@@ -266,6 +286,24 @@ export default function LeaderboardsPage() {
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
+
+  // 데이터에서 추출한 배정된 반 목록
+  const availableClasses = useMemo(() => {
+    if (!allLpEntries) return [];
+    const classes = new Set<string>();
+    allLpEntries.forEach(e => { if (e.classNameSnapshot) classes.add(e.classNameSnapshot); });
+    if (myClassName) classes.add(myClassName);
+    return Array.from(classes).sort();
+  }, [allLpEntries, myClassName]);
+
+  // 초기 반 설정
+  useEffect(() => {
+    if (myClassName && !selectedClass) {
+      setSelectedClass(myClassName);
+    } else if (availableClasses.length > 0 && !selectedClass) {
+      setSelectedClass(availableClasses[0]);
+    }
+  }, [myClassName, availableClasses, selectedClass]);
 
   // 나의 현재 데이터 찾기
   const myRankEntry = useMemo(() => {
@@ -335,17 +373,17 @@ export default function LeaderboardsPage() {
       </header>
 
       <Tabs value={rankingScope} onValueChange={(val: any) => setRankingScope(val)} className="w-full">
-        <div className="flex justify-center mb-8">
+        <div className="flex flex-col items-center gap-6 mb-8">
           <TabsList className={cn(
             "grid grid-cols-2 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
             isMobile ? "h-12 max-w-[240px]" : "h-20 max-w-md rounded-[2.5rem]"
           )}>
-            <TabsTrigger value="class" disabled={!myClassName} className={cn(
+            <TabsTrigger value="class" className={cn(
               "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
               isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
             )}>
               <LayoutGrid className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", rankingScope === 'class' ? "text-primary" : "text-muted-foreground")} /> 
-              <span>{myClassName || '반 미지정'}</span>
+              <span>반별 랭킹</span>
             </TabsTrigger>
             <TabsTrigger value="total" className={cn(
               "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
@@ -354,12 +392,34 @@ export default function LeaderboardsPage() {
               <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span>전체 랭킹</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* 반 선택 필터 (반별 랭킹 탭에서만 노출) */}
+          {rankingScope === 'class' && (
+            <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xl p-2 rounded-2xl border shadow-lg animate-in fade-in zoom-in-95 duration-300">
+              <Filter className="h-4 w-4 text-primary opacity-40 ml-2" />
+              <Select value={selectedClass || ''} onValueChange={setSelectedClass}>
+                <SelectTrigger className="h-10 w-[180px] sm:w-[220px] border-none bg-transparent font-black text-xs sm:text-sm focus:ring-0 shadow-none">
+                  <SelectValue placeholder="조회할 반 선택" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-2xl">
+                  {availableClasses.map(c => (
+                    <SelectItem key={c} value={c} className="font-black">
+                      {c} {c === myClassName ? '(우리 반)' : ''}
+                    </SelectItem>
+                  ))}
+                  {availableClasses.length === 0 && (
+                    <p className="p-4 text-center text-xs font-bold opacity-40">배정된 반 정보가 없습니다.</p>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <TabsContent value="class" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
           <LeaderboardTab
-            title="우리 반 LP 챔피언"
-            description={`${myClassName}에서 가장 높은 포인트를 획득한 상위 3명입니다.`}
+            title={selectedClass ? `${selectedClass} 챔피언` : '반별 랭킹'}
+            description={selectedClass ? `${selectedClass}에서 가장 높은 포인트를 획득한 상위 3명입니다.` : '반을 선택하여 순위를 확인하세요.'}
             entries={allLpEntries}
             myEntry={myRankEntry}
             totalStudents={totalCount}
@@ -367,7 +427,7 @@ export default function LeaderboardsPage() {
             metricType="lp"
             isMobile={isMobile}
             studentsMap={studentsMap}
-            classNameFilter={myClassName}
+            classNameFilter={selectedClass}
           />
         </TabsContent>
 
