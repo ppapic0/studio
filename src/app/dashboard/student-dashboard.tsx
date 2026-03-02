@@ -527,7 +527,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="p-3 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 shadow-sm shrink-0 mb-2">
                     <Timer className="h-6 w-6" />
                   </div>
-                  <span className="font-black tracking-tight text-primary text-lg truncate w-full">{item.title.split(': ')[0]}</span>
+                  <span className="font-black tracking-tight text-primary text-lg w-full break-keep">{item.title.split(': ')[0]}</span>
                   <Badge variant="outline" className="font-mono font-black text-amber-600 text-lg px-5 py-2 rounded-2xl border-amber-200 bg-amber-50/50 shadow-inner">
                     {item.title.split(': ')[1] || '--:--'}
                   </Badge>
