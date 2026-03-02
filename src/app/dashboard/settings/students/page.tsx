@@ -23,7 +23,7 @@ import {
   LayoutGrid,
   ArrowRightLeft
 } from 'lucide-react';
-import { StudentProfile, CenterMembership } from '@/lib/types';
+import { StudentProfile, CenterMembership, InviteCode } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -70,7 +70,14 @@ export default function StudentAccountManagementPage() {
   
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isAdmin });
 
-  // 2. 학생 상세 프로필 조회 (학교/학년 정보용)
+  // 2. 초대 코드 조회 (반 목록 추출용)
+  const invitesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
+  }, [firestore, centerId, isAdmin]);
+  const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery, { enabled: isAdmin });
+
+  // 3. 학생 상세 프로필 조회 (학교/학년 정보용)
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return collection(firestore, 'centers', centerId, 'students');
@@ -79,11 +86,11 @@ export default function StudentAccountManagementPage() {
   const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isAdmin });
 
   const availableClasses = useMemo(() => {
-    if (!studentMembers) return [];
     const classes = new Set<string>();
-    studentMembers.forEach(m => { if (m.className) classes.add(m.className); });
+    studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
+    inviteCodes?.forEach(i => { if (i.targetClassName) classes.add(i.targetClassName); });
     return Array.from(classes).sort();
-  }, [studentMembers]);
+  }, [studentMembers, inviteCodes]);
 
   const filteredStudents = useMemo(() => {
     if (!studentMembers) return [];
@@ -106,12 +113,15 @@ export default function StudentAccountManagementPage() {
       
       if (result.data?.ok) {
         toast({ title: "삭제 완료", description: "학생 계정과 모든 데이터가 영구 삭제되었습니다." });
+      } else {
+        throw new Error(result.data?.message || "삭제 요청이 거절되었습니다.");
       }
     } catch (e: any) {
+      console.error("[Delete Error]", e);
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message || "서버 오류가 발생했습니다." 
+        description: e.message || "서버 오류가 발생했습니다. 권한을 확인해 주세요." 
       });
     } finally {
       setIsDeleting(null);
@@ -123,21 +133,22 @@ export default function StudentAccountManagementPage() {
     setIsUpdating(studentId);
     try {
       const batch = writeBatch(firestore);
+      const finalClass = newClassName === 'none' ? '' : newClassName;
       
       // 1. members 컬렉션 업데이트
       const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
-      batch.update(memberRef, { className: newClassName, updatedAt: serverTimestamp() });
+      batch.update(memberRef, { className: finalClass, updatedAt: serverTimestamp() });
       
       // 2. userCenters 컬렉션 업데이트
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
-      batch.update(userCenterRef, { className: newClassName, updatedAt: serverTimestamp() });
+      batch.update(userCenterRef, { className: finalClass, updatedAt: serverTimestamp() });
       
-      // 3. students 컬렉션 업데이트 (있을 경우)
+      // 3. students 컬렉션 업데이트
       const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
-      batch.update(studentRef, { className: newClassName, updatedAt: serverTimestamp() });
+      batch.update(studentRef, { className: finalClass, updatedAt: serverTimestamp() });
 
       await batch.commit();
-      toast({ title: "반 이동 완료", description: `선택한 학생을 [${newClassName}]으로 배정했습니다.` });
+      toast({ title: "반 이동 완료", description: finalClass ? `선택한 학생을 [${finalClass}]으로 배정했습니다.` : "배정을 해제했습니다." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "이동 실패", description: e.message });
     } finally {
@@ -226,7 +237,7 @@ export default function StudentAccountManagementPage() {
 
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       {/* 반 이동 셀렉터 */}
-                      <div className="flex-1 sm:w-40">
+                      <div className="flex-1 sm:w-48">
                         <Select 
                           value={member.className || 'none'} 
                           onValueChange={(val) => handleMoveClass(member.id, val)}
@@ -243,7 +254,6 @@ export default function StudentAccountManagementPage() {
                             {availableClasses.map(c => (
                               <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>
                             ))}
-                            <SelectItem value="new" disabled className="text-[10px] opacity-40">※ 새 반은 초대 코드 생성 시 등록됩니다.</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -295,7 +305,7 @@ export default function StudentAccountManagementPage() {
           Administrator Control Panel
         </div>
         <p className="text-[9px] font-bold text-center leading-relaxed">
-          학생의 반 정보는 멤버십 데이터와 실시간 연동됩니다.<br/>
+          학생의 반 정보는 초대 코드 설정 및 멤버십 데이터와 실시간 연동됩니다.<br/>
           반 이동 시 기존의 학습 리포트 기록은 유지됩니다.
         </p>
       </footer>

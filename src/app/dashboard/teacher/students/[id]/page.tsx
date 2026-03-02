@@ -69,10 +69,11 @@ import {
   CalendarCheck,
   Coffee,
   School,
-  ArrowRightLeft
+  ArrowRightLeft,
+  LayoutGrid
 } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, InviteCode } from '@/lib/types';
 import { format, subDays, addDays, startOfDay, startOfWeek, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -190,12 +191,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId]);
   const { data: allMembers } = useCollection<CenterMembership>(allMembersQuery);
 
+  // 초대 코드 조회 (추가적인 반 목록 추출용)
+  const invitesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
+  }, [firestore, centerId]);
+  const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery);
+
   const availableClasses = useMemo(() => {
-    if (!allMembers) return [];
     const classes = new Set<string>();
-    allMembers.forEach(m => { if (m.className) classes.add(m.className); });
+    allMembers?.forEach(m => { if (m.className) classes.add(m.className); });
+    inviteCodes?.forEach(i => { if (i.targetClassName) classes.add(i.targetClassName); });
     return Array.from(classes).sort();
-  }, [allMembers]);
+  }, [allMembers, inviteCodes]);
 
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -248,7 +256,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
 
-  const appointments = useMemo(() => rawApts ? [...rawApts].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0)) : [], [rawApts]);
+  const appointments = useMemo(() => rawApts ? [...rawApts].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)) : [], [rawApts]);
   const counselingLogs = useMemo(() => rawCounselLogs ? [...rawCounselLogs].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)) : [], [rawCounselLogs]);
   const logs = useMemo(() => rawLogs ? [...rawLogs].sort((a, b) => b.dateKey.localeCompare(a.dateKey)) : [], [rawLogs]);
 

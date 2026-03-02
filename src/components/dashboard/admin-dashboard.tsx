@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -48,7 +49,7 @@ import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay } from '@/lib/types';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -88,24 +89,33 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: activeMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
 
-  // 사용 가능한 반 목록 추출 (모든 학생 멤버십 데이터 조사)
+  // 2. 초대 코드 조회 (반 목록 추출용)
+  const invitesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
+  }, [firestore, centerId]);
+  const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery, { enabled: isActive });
+
+  // 사용 가능한 반 목록 추출 (학생 멤버십 + 초대 코드 설정 조사)
   const availableClasses = useMemo(() => {
-    if (!activeMembers) return [];
     const classes = new Set<string>();
-    activeMembers.forEach(m => { 
+    activeMembers?.forEach(m => { 
       if (m.className) classes.add(m.className); 
     });
+    inviteCodes?.forEach(i => {
+      if (i.targetClassName) classes.add(i.targetClassName);
+    });
     return Array.from(classes).sort();
-  }, [activeMembers]);
+  }, [activeMembers, inviteCodes]);
 
-  // 2. 실시간 좌석 데이터
+  // 3. 실시간 좌석 데이터
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 실시간 학습 로그 집계
+  // 4. 실시간 학습 로그 집계
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -116,14 +126,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey, yesterdayKey]);
   const { data: centerLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
-  // 4. 데일리 리포트 데이터
+  // 5. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, todayKey]);
   const { data: dailyReports } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
 
-  // 5. 통계 보조 데이터
+  // 6. 통계 보조 데이터
   const todayStatsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
@@ -186,7 +196,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const regularityRate = targetMemberIds.size > 0 ? Math.round((sentReports.length / targetMemberIds.size) * 100) : 0;
     const readRate = sentReports.length > 0 ? Math.round((sentReports.filter(r => r.viewedAt).length / sentReports.length) * 100) : 0;
     
-    // 코멘트 작성률 (코멘트 내용이 AI 템플릿 외에 일정 길이 이상인 경우를 유효한 코멘트로 간주)
     const commentWriteRate = sentReports.length > 0 
       ? Math.round((sentReports.filter(r => r.content.length > 200).length / sentReports.length) * 100)
       : 0;
@@ -270,7 +279,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className="space-y-1 relative z-10">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 트랙 총량 (Accrued)</p>
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-1">
                     <h3 className="text-6xl font-black tracking-tighter">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
                     <div className={cn("flex items-center text-xs font-bold px-3 py-1 rounded-full bg-white/10 shadow-inner", metrics.studyTimeGrowth >= 0 ? "text-emerald-400" : "text-rose-400")}>
                       {metrics.studyTimeGrowth >= 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}

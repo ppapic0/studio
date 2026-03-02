@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -21,7 +22,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
-import { LeaderboardEntry, WithId, StudentProfile, CenterMembership } from '@/lib/types';
+import { LeaderboardEntry, WithId, StudentProfile, CenterMembership, InviteCode } from '@/lib/types';
 import { 
   Loader2, 
   Trophy, 
@@ -270,6 +271,12 @@ export default function LeaderboardsPage() {
   }, [firestore, activeMembership]);
   const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember });
 
+  const invitesQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(collection(firestore, 'inviteCodes'), where('centerId', '==', activeMembership.id));
+  }, [firestore, activeMembership]);
+  const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery, { enabled: isMember });
+
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'students');
@@ -296,8 +303,9 @@ export default function LeaderboardsPage() {
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
     if (myClassName) classes.add(myClassName);
     allLpEntries?.forEach(e => { if (e.classNameSnapshot) classes.add(e.classNameSnapshot); });
+    inviteCodes?.forEach(i => { if (i.targetClassName) classes.add(i.targetClassName); });
     return Array.from(classes).sort();
-  }, [studentMembers, allLpEntries, myClassName]);
+  }, [studentMembers, allLpEntries, myClassName, inviteCodes]);
 
   useEffect(() => {
     if (myClassName && !selectedClass) {
