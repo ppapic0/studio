@@ -460,19 +460,28 @@ export default function StudyPlanPage() {
     await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id));
   };
 
-  const handleApplyToAllWeekdays = async () => {
+  // 학습 To-do 반복 복사
+  const handleApplyTasksToAllWeekdays = async () => {
     if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
+    const tasksToCopy = dailyPlans.filter(p => p.category !== 'schedule');
+    if (tasksToCopy.length === 0) {
+      toast({ variant: "destructive", title: "복사할 학습 계획이 없습니다." });
+      return;
+    }
+
     setIsSubmitting(true);
     const weekday = getDay(selectedDate);
     const monthDates = eachDayOfInterval({ start: startOfMonth(selectedDate), end: endOfMonth(selectedDate) });
     const targetDates = monthDates.filter(d => getDay(d) === weekday && !isSameDay(d, selectedDate) && !isBefore(startOfDay(d), startOfDay(new Date())));
+    
     const batch = writeBatch(firestore);
     try {
       for (const targetDate of targetDates) {
         const targetDateKey = format(targetDate, 'yyyy-MM-dd');
         const targetWeekKey = format(targetDate, "yyyy-'W'II");
         const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', targetWeekKey, 'items');
-        dailyPlans.forEach(plan => {
+        
+        tasksToCopy.forEach(plan => {
           batch.set(doc(itemsCollectionRef), {
             title: plan.title, done: false, weight: plan.weight, dateKey: targetDateKey, category: plan.category || 'study',
             subject: plan.subject || null, targetMinutes: plan.targetMinutes || 0,
@@ -481,7 +490,40 @@ export default function StudyPlanPage() {
         });
       }
       await batch.commit();
-      toast({ title: "일정 복사 완료", description: `이번 달의 남은 ${format(selectedDate, 'EEEE', { locale: ko })}에 계획이 복사되었습니다.` });
+      toast({ title: "계획 복사 완료", description: `이번 달의 남은 ${format(selectedDate, 'EEEE', { locale: ko })}에 학습 계획이 복사되었습니다.` });
+    } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
+  };
+
+  // 생활 루틴 반복 복사
+  const handleApplyRoutineToAllWeekdays = async () => {
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
+    const routinesToCopy = dailyPlans.filter(p => p.category === 'schedule');
+    if (routinesToCopy.length === 0) {
+      toast({ variant: "destructive", title: "복사할 생활 루틴이 없습니다." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    const weekday = getDay(selectedDate);
+    const monthDates = eachDayOfInterval({ start: startOfMonth(selectedDate), end: endOfMonth(selectedDate) });
+    const targetDates = monthDates.filter(d => getDay(d) === weekday && !isSameDay(d, selectedDate) && !isBefore(startOfDay(d), startOfDay(new Date())));
+    
+    const batch = writeBatch(firestore);
+    try {
+      for (const targetDate of targetDates) {
+        const targetDateKey = format(targetDate, 'yyyy-MM-dd');
+        const targetWeekKey = format(targetDate, "yyyy-'W'II");
+        const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', targetWeekKey, 'items');
+        
+        routinesToCopy.forEach(plan => {
+          batch.set(doc(itemsCollectionRef), {
+            title: plan.title, done: false, weight: 0, dateKey: targetDateKey, category: 'schedule',
+            studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          });
+        });
+      }
+      await batch.commit();
+      toast({ title: "루틴 복사 완료", description: `이번 달의 남은 ${format(selectedDate, 'EEEE', { locale: ko })}에 생활 루틴이 복사되었습니다.` });
     } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
   };
 
@@ -645,6 +687,7 @@ export default function StudyPlanPage() {
       </Card>
 
       <div className={cn("grid gap-4 sm:gap-6 items-start", isMobile ? "grid-cols-1 px-0" : "md:grid-cols-12")}>
+        {/* 학습 계획 카드 */}
         <div className={cn("w-full mx-auto order-1 md:order-2", isMobile ? "md:col-span-12" : "md:col-span-7")}>
           <Tabs defaultValue="study" className="w-full">
             <Card className={cn("border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]", isMobile ? "rounded-[1.5rem]" : "")}>
@@ -726,7 +769,7 @@ export default function StudyPlanPage() {
                 </div>
                 {!isPast && (
                   <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Button variant="outline" size="sm" className={cn("rounded-xl gap-2 font-black border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95", isMobile ? "h-10 text-[10px] w-full" : "h-12 px-8 text-xs")} onClick={handleApplyToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
+                    <Button variant="outline" size="sm" className={cn("rounded-xl gap-2 font-black border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95", isMobile ? "h-10 text-[10px] w-full" : "h-12 px-8 text-xs")} onClick={handleApplyTasksToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
                       {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Copy className="h-3.5 w-3.5" />} 이 요일 반복 복사
                     </Button>
                   </div>
@@ -736,6 +779,7 @@ export default function StudyPlanPage() {
           </Tabs>
         </div>
 
+        {/* 생활 루틴 카드 */}
         <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.02] mx-auto w-full order-2 md:order-1", isMobile ? "md:col-span-12 rounded-[1.5rem]" : "md:col-span-5")}>
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
             <div className="flex items-center justify-between">
@@ -764,6 +808,21 @@ export default function StudyPlanPage() {
                 <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isPast} isMobile={isMobile} />
               ))
             }
+            
+            {/* 생활 루틴 하단 반복 복사 버튼 */}
+            {!isPast && scheduleItems.length > 0 && (
+              <div className="flex justify-end mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={cn("rounded-xl gap-2 font-black border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95", isMobile ? "h-9 text-[9px] px-3" : "h-10 px-5 text-xs")} 
+                  onClick={handleApplyRoutineToAllWeekdays} 
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Copy className="h-3 w-3" />} 루틴 반복 복사
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
