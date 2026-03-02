@@ -9,24 +9,26 @@ import { format, subDays } from 'date-fns';
 
 /**
  * 초기 데이터 시딩용 함수 (관리자용)
- * 테스트 학생들을 생성하고 03반, 04반에 골고루 배정합니다.
+ * 테스트 학생들을 생성하고 03반, 04반, 과외반에 골고루 배정합니다.
  */
 export async function seedInitialData(db: Firestore, uid: string, centerId: string) {
   const batch = writeBatch(db);
   
-  // 1. 초대 코드 설정 (03반, 04반 전용 코드)
+  // 1. 초대 코드 설정
   batch.set(doc(db, 'inviteCodes', '0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '03반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
   batch.set(doc(db, 'inviteCodes', '0404'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '04반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
+  batch.set(doc(db, 'inviteCodes', 'TUTOR'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '과외반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
   batch.set(doc(db, 'inviteCodes', 'T0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'teacher', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
   batch.set(doc(db, 'inviteCodes', 'A0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'centerAdmin', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
 
-  // 테스트 학생 그룹 (03반 3명, 04반 2명)
+  // 테스트 학생 그룹 (03반, 04반, 과외반)
   const testStudents = [
     { id: 'test-student-03-1', name: '김민수', class: '03반' },
     { id: 'test-student-03-2', name: '이지원', class: '03반' },
-    { id: 'test-student-03-3', name: '박하늘', class: '03반' },
     { id: 'test-student-04-1', name: '최강산', class: '04반' },
     { id: 'test-student-04-2', name: '정유리', class: '04반' },
+    { id: 'test-student-tutor-1', name: '박과외', class: '과외반' },
+    { id: 'test-student-tutor-2', name: '한지수', class: '과외반' },
   ];
 
   const yesterday = subDays(new Date(), 1);
@@ -37,7 +39,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
   for (const sInfo of testStudents) {
     const sUid = sInfo.id;
     
-    // (1) 멤버십 및 사용자 센터 정보 등록 (반 정보 className 필수 포함)
+    // (1) 멤버십 및 사용자 센터 정보 등록
     const memberRef = doc(db, 'centers', centerId, 'members', sUid);
     const userCenterRef = doc(db, 'userCenters', sUid, 'centers', centerId);
     const timestamp = serverTimestamp();

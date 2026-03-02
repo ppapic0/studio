@@ -60,14 +60,12 @@ type LeaderboardTabProps = {
 };
 
 function LeaderboardTab({ title, description, entries, myEntry, totalStudents, isLoading, metricType, isMobile, studentsMap, classNameFilter }: LeaderboardTabProps) {
-  // 필터링 및 랭킹 재계산 (반별 랭킹일 경우)
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     let list = [...entries];
     if (classNameFilter) {
       list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
     }
-    // 필터링 후 다시 랭킹순 정렬
     return list.sort((a, b) => b.value - a.value);
   }, [entries, classNameFilter]);
 
@@ -97,7 +95,6 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
     return name.charAt(0) + "*O"; 
   };
 
-  // 나의 현재 필터링된 순위 찾기
   const myFilteredRankIdx = useMemo(() => {
     if (!myEntry) return -1;
     return filteredEntries.findIndex(e => e.studentId === myEntry.studentId);
@@ -214,7 +211,6 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
         </CardContent>
       </Card>
 
-      {/* 나의 순위 섹션 (필터링된 기준) */}
       {myFilteredRankIdx !== -1 && (
         <Card className={cn(
           "border-none shadow-xl bg-primary text-primary-foreground overflow-hidden relative group",
@@ -264,7 +260,6 @@ export default function LeaderboardsPage() {
 
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
-  // 센터 모든 학생 멤버 조회 (전체 반 목록 추출용)
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -275,7 +270,6 @@ export default function LeaderboardsPage() {
   }, [firestore, activeMembership]);
   const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember });
 
-  // 학생 상세 프로필 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'students');
@@ -288,7 +282,6 @@ export default function LeaderboardsPage() {
     return map;
   }, [studentProfiles]);
 
-  // 랭킹 데이터를 전체 다 가져와서 클라이언트에서 필터링
   const lpQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -298,23 +291,14 @@ export default function LeaderboardsPage() {
   }, [firestore, activeMembership, periodKey]);
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
 
-  // 반 목록 추출 (멤버십 데이터 기준)
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
-    
-    // 1. 실제 재원생 멤버십에서 반 추출
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
-    
-    // 2. 현재 내 반 추가
     if (myClassName) classes.add(myClassName);
-    
-    // 3. 랭킹 스냅샷에서도 추출 (이미 퇴원한 학생의 기록이 있을 수 있음)
     allLpEntries?.forEach(e => { if (e.classNameSnapshot) classes.add(e.classNameSnapshot); });
-    
     return Array.from(classes).sort();
   }, [studentMembers, allLpEntries, myClassName]);
 
-  // 초기 반 설정
   useEffect(() => {
     if (myClassName && !selectedClass) {
       setSelectedClass(myClassName);
@@ -323,7 +307,6 @@ export default function LeaderboardsPage() {
     }
   }, [myClassName, availableClasses, selectedClass]);
 
-  // 나의 현재 데이터 찾기
   const myRankEntry = useMemo(() => {
     if (!allLpEntries || !user) return null;
     return allLpEntries.find(e => e.studentId === user.uid) || null;
@@ -401,7 +384,6 @@ export default function LeaderboardsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* 반 선택 필터 (반별 랭킹 탭에서만 노출) */}
           {rankingScope === 'class' && (
             <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xl p-2 rounded-2xl border shadow-lg animate-in fade-in zoom-in-95 duration-300">
               <Filter className="h-4 w-4 text-primary opacity-40 ml-2" />
