@@ -555,30 +555,40 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <Card className={cn("border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "rounded-[1.25rem]" : "")}>
         <div className="grid grid-cols-1 lg:grid-cols-3">
           <div className={cn("lg:col-span-2 border-r border-dashed border-muted", isMobile && "border-r-0")}>
-            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-3.5" : "p-10")}>
+            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-4" : "p-10")}>
               <div className="flex items-center justify-between">
-                <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-primary", isMobile ? "text-base" : "text-3xl")}>
-                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-4 w-4" : "h-8 w-8")} /> 계획트랙
+                <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-primary", isMobile ? "text-lg" : "text-3xl")}>
+                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 계획트랙
                 </CardTitle>
-                <Badge variant="secondary" className={cn("bg-emerald-500 text-white border-none font-black h-5 uppercase tracking-widest", isMobile ? "text-[7px] px-1" : "text-[10px] px-3")}>
+                <Badge variant="secondary" className={cn("bg-emerald-500 text-white border-none font-black h-5 uppercase tracking-widest", isMobile ? "text-[8px] px-1.5" : "text-[10px] px-3")}>
                   {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className={cn("bg-emerald-50/5", isMobile ? "p-3.5" : "p-10")}>
-              <div className="grid gap-2 sm:gap-4">
+            <CardContent className={cn("bg-emerald-50/5", isMobile ? "p-4" : "p-10")}>
+              <div className="grid gap-3 sm:gap-4">
                 {studyTasks.length === 0 ? (
-                  <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-emerald-200 rounded-xl">계획이 없습니다.</div>
+                  <div className="py-12 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-xl">오늘의 학습 계획이 없습니다.</div>
                 ) : studyTasks.map((task) => (
                   <div key={task.id} className={cn(
-                    "flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-500 relative group", 
-                    task.done ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white border-transparent shadow-sm",
-                    isMobile ? "p-2.5" : ""
+                    "flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-500 relative group", 
+                    task.done ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white border-transparent shadow-sm hover:shadow-md",
+                    isMobile ? "p-4" : ""
                   )}>
-                    <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} className={cn("rounded-md border-2", isMobile ? "h-5 w-5" : "h-8 w-8")} />
-                    <div className="flex-1 grid gap-0.5">
-                      <Label htmlFor={task.id} className={cn("font-black tracking-tight leading-snug truncate", isMobile ? "text-[11px]" : "text-lg", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>{task.title}</Label>
-                      {task.targetMinutes && <span className="text-[7px] font-black text-muted-foreground/40 uppercase flex items-center gap-1"><Clock className="h-2 w-2" /> {task.targetMinutes}m Goal</span>}
+                    <Checkbox 
+                      id={task.id} 
+                      checked={task.done} 
+                      onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                      className={cn("rounded-md border-2", isMobile ? "h-6 w-6" : "h-8 w-8")} 
+                    />
+                    <div className="flex-1 grid gap-1">
+                      <Label 
+                        htmlFor={task.id} 
+                        className={cn("font-black tracking-tight leading-snug break-keep", isMobile ? "text-sm" : "text-lg", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}
+                      >
+                        {task.title}
+                      </Label>
+                      {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
                     </div>
                   </div>
                 ))}
