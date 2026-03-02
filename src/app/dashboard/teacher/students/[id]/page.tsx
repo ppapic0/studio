@@ -1,3 +1,4 @@
+
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
@@ -67,7 +68,8 @@ import {
   Timer,
   CalendarCheck,
   Coffee,
-  School
+  School,
+  ArrowRightLeft
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId } from '@/lib/types';
@@ -181,6 +183,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: studentMembership } = useDoc<CenterMembership>(membershipRef);
 
+  // 센터 모든 멤버십 (반 목록 추출용)
+  const allMembersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
+  }, [firestore, centerId]);
+  const { data: allMembers } = useCollection<CenterMembership>(allMembersQuery);
+
+  const availableClasses = useMemo(() => {
+    if (!allMembers) return [];
+    const classes = new Set<string>();
+    allMembers.forEach(m => { if (m.className) classes.add(m.className); });
+    return Array.from(classes).sort();
+  }, [allMembers]);
+
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
@@ -196,7 +212,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const rankingQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const periodKey = format(new Date(), 'yyyy-MM');
-    return query(collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_completion`, 'entries'), where('studentId', '==', studentId));
+    return query(collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries'), where('studentId', '==', studentId));
   }, [firestore, centerId, studentId]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
 
@@ -256,15 +272,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', schoolName: '', grade: '', password: '', parentLinkCode: '' });
+  const [editForm, setEditForm] = useState({ name: '', schoolName: '', grade: '', password: '', parentLinkCode: '', className: '' });
   const [statusForm, setStatusForm] = useState<string>('active');
 
   useEffect(() => {
     if (student && !hasInitializedForm.current) {
-      setEditForm({ name: student.name, schoolName: student.schoolName, grade: student.grade, password: '', parentLinkCode: student.parentLinkCode || '' });
+      setEditForm({ 
+        name: student.name, 
+        schoolName: student.schoolName, 
+        grade: student.grade, 
+        password: '', 
+        parentLinkCode: student.parentLinkCode || '',
+        className: student.className || studentMembership?.className || ''
+      });
       hasInitializedForm.current = true;
     } else if (studentMembership && !hasInitializedForm.current) {
-      setEditForm(f => ({ ...f, name: studentMembership.displayName || '' }));
+      setEditForm(f => ({ ...f, name: studentMembership.displayName || '', className: studentMembership.className || '' }));
     }
   }, [student, studentMembership]);
 
@@ -306,13 +329,32 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const handleUpdateInfo = async () => {
-    if (!functions || !centerId || !studentId) return;
+    if (!functions || !centerId || !studentId || !firestore) return;
     setIsUpdating(true);
     try {
+      // 1. 기본 정보 수정 (Cloud Function 호출)
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
-      const result: any = await updateFn({ studentId, centerId, displayName: editForm.name, schoolName: editForm.schoolName, grade: editForm.grade, password: editForm.password.length >= 6 ? editForm.password : undefined, parentLinkCode: editForm.parentLinkCode.trim() || null });
-      if (result.data?.ok) { toast({ title: "수정 완료" }); setIsEditModalOpen(false); }
-    } catch (e) { toast({ variant: "destructive", title: "실패" }); } finally { setIsUpdating(false); }
+      await updateFn({ 
+        studentId, 
+        centerId, 
+        displayName: editForm.name, 
+        schoolName: editForm.schoolName, 
+        grade: editForm.grade, 
+        password: editForm.password.length >= 6 ? editForm.password : undefined, 
+        parentLinkCode: editForm.parentLinkCode.trim() || null 
+      });
+
+      // 2. 반 정보 수정 (직접 Firestore 업데이트)
+      const batch = writeBatch(firestore);
+      batch.update(doc(firestore, 'centers', centerId, 'members', studentId), { className: editForm.className, updatedAt: serverTimestamp() });
+      batch.update(doc(firestore, 'centers', centerId, 'students', studentId), { className: editForm.className, updatedAt: serverTimestamp() });
+      batch.update(doc(firestore, 'userCenters', studentId, 'centers', centerId), { className: editForm.className, updatedAt: serverTimestamp() });
+      
+      await batch.commit();
+      
+      toast({ title: "정보 수정 완료" });
+      setIsEditModalOpen(false);
+    } catch (e) { toast({ variant: "destructive", title: "수정 실패" }); } finally { setIsUpdating(false); }
   };
 
   const handleUpdateStatus = async () => {
@@ -362,6 +404,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold">
               <span className="flex items-center gap-1 text-primary"><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
               <span className="opacity-30">|</span><span>{student?.grade}</span>
+              <span className="opacity-30">|</span><span className="flex items-center gap-1 text-emerald-600"><LayoutGrid className="h-3 w-3" /> {student?.className || studentMembership?.className || '반 미지정'}</span>
             </div>
           </div>
         </div>
@@ -775,11 +818,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <DialogContent className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
           <div className="bg-primary p-10 text-white relative">
             <DialogTitle className="text-3xl font-black tracking-tighter">정보 수정</DialogTitle>
-            <DialogDescription className="text-white/60 font-bold">학생의 프로필 정보를 업데이트합니다.</DialogDescription>
+            <DialogDescription className="text-white/60 font-bold">학생의 프로필 및 소속 반을 업데이트합니다.</DialogDescription>
           </div>
           <div className="p-10 space-y-5 bg-white">
             <div className="grid gap-4 py-4">
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학생 이름</Label><Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} placeholder="이름" className="rounded-xl border-2 h-12 font-bold" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 반</Label>
+                <Select value={editForm.className || 'none'} onValueChange={v => setEditForm({...editForm, className: v === 'none' ? '' : v})}>
+                  <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-2xl">
+                    <SelectItem value="none" className="font-bold">반 미배정</SelectItem>
+                    {availableClasses.map(c => (
+                      <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} placeholder="학교" className="rounded-xl border-2 h-12 font-bold" /></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">현재 학년</Label><Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}><SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl border-none shadow-2xl"><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학부모 연동 코드 (6자리)</Label><Input value={editForm.parentLinkCode} onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value})} placeholder="6자리 코드" maxLength={6} className="rounded-xl border-2 h-12 font-black tracking-[0.5em] text-center" /></div>

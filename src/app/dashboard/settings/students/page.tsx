@@ -10,19 +10,18 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { 
   Search, 
   UserCog, 
   Trash2, 
   Loader2, 
-  UserMinus,
-  AlertTriangle,
-  ChevronRight,
-  ShieldAlert,
+  AlertTriangle, 
   UserX,
-  Users
+  Users,
+  LayoutGrid,
+  ArrowRightLeft
 } from 'lucide-react';
 import { StudentProfile, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -37,6 +36,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 export default function StudentAccountManagementPage() {
@@ -47,6 +53,7 @@ export default function StudentAccountManagementPage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
   
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
@@ -70,6 +77,13 @@ export default function StudentAccountManagementPage() {
   }, [firestore, centerId, isAdmin]);
   
   const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isAdmin });
+
+  const availableClasses = useMemo(() => {
+    if (!studentMembers) return [];
+    const classes = new Set<string>();
+    studentMembers.forEach(m => { if (m.className) classes.add(m.className); });
+    return Array.from(classes).sort();
+  }, [studentMembers]);
 
   const filteredStudents = useMemo(() => {
     if (!studentMembers) return [];
@@ -104,12 +118,39 @@ export default function StudentAccountManagementPage() {
     }
   };
 
+  const handleMoveClass = async (studentId: string, newClassName: string) => {
+    if (!firestore || !centerId) return;
+    setIsUpdating(studentId);
+    try {
+      const batch = writeBatch(firestore);
+      
+      // 1. members 컬렉션 업데이트
+      const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
+      batch.update(memberRef, { className: newClassName, updatedAt: serverTimestamp() });
+      
+      // 2. userCenters 컬렉션 업데이트
+      const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
+      batch.update(userCenterRef, { className: newClassName, updatedAt: serverTimestamp() });
+      
+      // 3. students 컬렉션 업데이트 (있을 경우)
+      const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
+      batch.update(studentRef, { className: newClassName, updatedAt: serverTimestamp() });
+
+      await batch.commit();
+      toast({ title: "반 이동 완료", description: `선택한 학생을 [${newClassName}]으로 배정했습니다.` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "이동 실패", description: e.message });
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Card className="max-w-md border-none shadow-xl rounded-[2rem]">
           <CardHeader className="text-center p-10">
-            <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+            <LayoutGrid className="h-12 w-12 text-rose-500 mx-auto mb-4" />
             <CardTitle className="text-2xl font-black">접근 권한 없음</CardTitle>
             <CardDescription className="font-bold">센터 관리자만 이 페이지를 이용할 수 있습니다.</CardDescription>
           </CardHeader>
@@ -123,15 +164,15 @@ export default function StudentAccountManagementPage() {
       <header className="flex flex-col gap-1">
         <h1 className={cn("font-black tracking-tighter flex items-center gap-2 text-primary", isMobile ? "text-2xl" : "text-4xl")}>
           <UserCog className="h-8 w-8" />
-          학생 계정 관리
+          학생 계정 및 반 관리
         </h1>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] ml-1">Account Lifecycle Management</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] ml-1">Lifecycle & Class Management</p>
       </header>
 
       <div className="relative group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
         <Input 
-          placeholder="삭제할 학생의 이름을 검색하세요..." 
+          placeholder="학생 이름으로 검색..." 
           className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all bg-white", isMobile ? "h-14" : "h-16 text-lg")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -141,9 +182,9 @@ export default function StudentAccountManagementPage() {
       <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
         <CardHeader className="bg-muted/5 border-b p-8">
           <CardTitle className="text-xl font-black flex items-center gap-2">
-            <Users className="h-5 w-5 opacity-40" /> 등록된 학생 리스트
+            <Users className="h-5 w-5 opacity-40" /> 관리 대상 학생 리스트
           </CardTitle>
-          <CardDescription className="font-bold">계정을 삭제하면 복구가 불가능하므로 주의해 주세요.</CardDescription>
+          <CardDescription className="font-bold">소속 반을 변경하거나 계정을 영구적으로 삭제할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {membersLoading ? (
@@ -154,14 +195,14 @@ export default function StudentAccountManagementPage() {
           ) : filteredStudents.length === 0 ? (
             <div className="py-32 text-center opacity-20 italic font-black text-sm">
               <UserX className="h-16 w-16 mx-auto mb-4" />
-              학생 정보가 없습니다.
+              검색 결과가 없습니다.
             </div>
           ) : (
             <div className="divide-y divide-muted/10">
               {filteredStudents.map((member) => {
                 const profile = studentsProfiles?.find(p => p.id === member.id);
                 return (
-                  <div key={member.id} className="p-6 sm:p-8 flex items-center justify-between hover:bg-muted/5 transition-all group">
+                  <div key={member.id} className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-muted/5 transition-all group gap-6">
                     <div className="flex items-center gap-4 min-w-0">
                       <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50">
                         <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
@@ -183,38 +224,64 @@ export default function StudentAccountManagementPage() {
                       </div>
                     </div>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-12 w-12 rounded-2xl text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-95 shadow-sm bg-white border"
-                          disabled={isDeleting === member.id}
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      {/* 반 이동 셀렉터 */}
+                      <div className="flex-1 sm:w-40">
+                        <Select 
+                          value={member.className || 'none'} 
+                          onValueChange={(val) => handleMoveClass(member.id, val)}
+                          disabled={isUpdating === member.id}
                         >
-                          {isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : <Trash2 className="h-5 w-5" />}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
-                        <AlertDialogHeader>
-                          <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4">
-                            <AlertTriangle className="h-10 w-10 text-rose-600" />
-                          </div>
-                          <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">계정을 영구 삭제하시겠습니까?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
-                            <span className="text-rose-600">[{member.displayName}]</span> 학생의 인증 정보, 학습 기록, 성장 데이터가 모두 삭제되며 **절대 복구할 수 없습니다.**
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-8 flex flex-col gap-2">
-                          <AlertDialogAction 
-                            onClick={() => handleDeleteAccount(member.id)}
-                            className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
+                          <SelectTrigger className="rounded-xl border-2 h-11 font-black text-xs bg-white shadow-sm">
+                            <div className="flex items-center gap-2">
+                              {isUpdating === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRightLeft className="h-3 w-3 opacity-40" />}
+                              <SelectValue placeholder="반 미배정" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-none shadow-2xl">
+                            <SelectItem value="none" className="font-bold">반 미배정</SelectItem>
+                            {availableClasses.map(c => (
+                              <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>
+                            ))}
+                            <SelectItem value="new" disabled className="text-[10px] opacity-40">※ 새 반은 초대 코드 생성 시 등록됩니다.</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 계정 삭제 */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-11 w-11 rounded-xl text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-95 shadow-sm bg-white border shrink-0"
+                            disabled={isDeleting === member.id}
                           >
-                            영구 삭제 승인
-                          </AlertDialogAction>
-                          <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            {isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : <Trash2 className="h-5 w-5" />}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
+                          <AlertDialogHeader>
+                            <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4">
+                              <AlertTriangle className="h-10 w-10 text-rose-600" />
+                            </div>
+                            <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">계정을 영구 삭제하시겠습니까?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
+                              <span className="text-rose-600">[{member.displayName}]</span> 학생의 모든 데이터가 삭제되며 **절대 복구할 수 없습니다.**
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="mt-8 flex flex-col gap-2">
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteAccount(member.id)}
+                              className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
+                            >
+                              영구 삭제 승인
+                            </AlertDialogAction>
+                            <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 );
               })}
@@ -225,11 +292,11 @@ export default function StudentAccountManagementPage() {
 
       <footer className="pt-10 flex flex-col items-center gap-4 opacity-30">
         <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.4em] text-primary">
-          Administrator Command Center
+          Administrator Control Panel
         </div>
         <p className="text-[9px] font-bold text-center leading-relaxed">
-          계정 삭제 시 Firebase Auth 및 Firestore의 모든 연관 문서가 삭제됩니다.<br/>
-          퇴원생의 기록을 남기려면 '상태 변경'에서 퇴원 처리를 하세요.
+          학생의 반 정보는 멤버십 데이터와 실시간 연동됩니다.<br/>
+          반 이동 시 기존의 학습 리포트 기록은 유지됩니다.
         </p>
       </footer>
     </div>
