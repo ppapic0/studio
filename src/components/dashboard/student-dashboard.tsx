@@ -30,6 +30,8 @@ import {
   TrendingUp,
   Settings2,
   Wand2,
+  History,
+  Calendar
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -46,46 +48,54 @@ import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const TIERS = [
   { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800', shadow: 'shadow-slate-200/50' },
-  { name: '브론즈', min: 20, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
-  { name: '실버', min: 40, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
-  { name: '골드', min: 60, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
-  { name: '플래티넘', min: 75, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
-  { name: '다이아몬드', min: 85, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
-  { name: '마스터', min: 95, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
+  { name: '브론즈', min: 3000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
+  { name: '실버', min: 7000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
+  { name: '골드', min: 12000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
+  { name: '플래티넘', min: 18000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
+  { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
+  { name: '마스터', min: 35000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
 ];
 
 /**
  * Jacob 전용 티어 컨트롤러 컴포넌트
  */
-function JacobTierController({ progressRef, currentStats }: { progressRef: any, currentStats: any }) {
+function JacobTierController({ progressRef, currentStats, currentLp }: { progressRef: any, currentStats: any, currentLp: number }) {
   const [stats, setStats] = useState(currentStats);
+  const [lp, setLp] = useState(currentLp);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     setStats(currentStats);
-  }, [currentStats]);
+    setLp(currentLp);
+  }, [currentStats, currentLp]);
 
   const handleUpdate = async () => {
     setIsUpdating(true);
     try {
       await updateDoc(progressRef, {
         stats: stats,
+        seasonLp: lp,
         updatedAt: serverTimestamp()
       });
-      toast({ title: "티어 보정 완료", description: "설정한 스탯이 실시간으로 반영되었습니다." });
+      toast({ title: "테스트 데이터 반영 완료", description: "설정한 스탯과 LP가 실시간으로 반영되었습니다." });
     } catch (e) {
       toast({ variant: "destructive", title: "보정 실패" });
     } finally {
       setIsUpdating(false);
     }
-  };
-
-  const setTierValue = (val: number) => {
-    setStats({ focus: val, consistency: val, achievement: val, resilience: val });
   };
 
   return (
@@ -100,6 +110,19 @@ function JacobTierController({ progressRef, currentStats }: { progressRef: any, 
         </div>
       </CardHeader>
       <CardContent className="p-0 space-y-8">
+        <div className="space-y-3">
+          <div className="flex justify-between items-center px-1">
+            <span className="text-[10px] font-black uppercase text-primary">시즌 누적 LP (티어 결정)</span>
+            <span className="text-sm font-black text-primary">{lp.toLocaleString()} LP</span>
+          </div>
+          <Slider 
+            value={[lp]} 
+            max={40000} 
+            step={500} 
+            onValueChange={([val]) => setLp(val)}
+          />
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
           {Object.entries({
             focus: '집중력',
@@ -122,22 +145,83 @@ function JacobTierController({ progressRef, currentStats }: { progressRef: any, 
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-center">
-          {[
-            { l: '아이언(10)', v: 10 }, { l: '실버(45)', v: 45 }, 
-            { l: '골드(65)', v: 65 }, { l: '플래티넘(80)', v: 80 }, 
-            { l: '다이아(90)', v: 90 }, { l: '마스터(98)', v: 98 }
-          ].map(t => (
-            <Button key={t.v} variant="outline" size="sm" onClick={() => setTierValue(t.v)} className="rounded-lg font-black text-[10px] h-8 px-3 border-2">{t.l}</Button>
-          ))}
-        </div>
-
         <Button onClick={handleUpdate} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
           {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5" />}
-          스탯 즉시 반영 및 티어 업데이트
+          시스템 상태 즉시 반영
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * 일자별 LP 히스토리 컴포넌트
+ */
+function LPHistoryDialog({ dailyLpStatus }: { dailyLpStatus?: GrowthProgress['dailyLpStatus'] }) {
+  const sortedDates = useMemo(() => {
+    if (!dailyLpStatus) return [];
+    return Object.entries(dailyLpStatus)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 30);
+  }, [dailyLpStatus]);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
+            <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">시즌 러닝 포인트 (LP)</CardTitle>
+            <div className="bg-accent/5 p-2.5 rounded-xl group-hover:bg-accent/10 transition-colors"><Zap className="h-6 w-6 text-accent" /></div>
+          </CardHeader>
+          <CardContent className="px-10 pb-10">
+            <div className="font-black tracking-tighter text-primary text-6xl">
+              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className="text-2xl ml-1.5 opacity-40 font-bold">LP</span>
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <Badge variant="secondary" className="bg-accent/10 text-accent border-none font-black text-[10px] px-3 py-1">히스토리 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+              <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Season Active</span>
+            </div>
+          </CardContent>
+        </Card>
+      </DialogTrigger>
+      <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
+        <div className="bg-accent p-10 text-white relative">
+          <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
+          <DialogHeader>
+            <DialogTitle className="text-3xl font-black tracking-tighter">LP 획득 히스토리</DialogTitle>
+            <DialogDescription className="text-white/70 font-bold mt-1">최근 30일간의 러닝 포인트 획득 내역입니다.</DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#fafafa]">
+          {sortedDates.length === 0 ? (
+            <div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>
+          ) : (
+            <div className="space-y-3">
+              {sortedDates.map(([date, data]) => (
+                <div key={date} className="bg-white p-5 rounded-2xl border-2 border-primary/5 flex items-center justify-between shadow-sm group hover:border-accent/20 transition-all">
+                  <div className="grid gap-1">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{date}</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[8px] px-1.5">출석</Badge>}
+                      {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[8px] px-1.5">계획</Badge>}
+                      {data.growth && <Badge className="bg-purple-500 text-white border-none font-black text-[8px] px-1.5">품질</Badge>}
+                      {data.bonus6h && <Badge className="bg-amber-500 text-white border-none font-black text-[8px] px-1.5">6H</Badge>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-black text-primary tabular-nums">{(data.dailyLpAmount || 0).toLocaleString()}</span>
+                    <span className="text-[10px] ml-1 font-bold text-muted-foreground/40">LP</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="p-6 bg-white border-t justify-center">
+          <Button variant="ghost" className="font-bold text-muted-foreground">닫기</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -190,13 +274,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return values.reduce((a, b) => a + b, 0) / values.length;
   }, [stats]);
 
+  // 티어 판정 기준 변경: LP 기반
+  const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    return TIERS.slice().reverse().find(t => avgStat >= t.min) || TIERS[0];
-  }, [avgStat]);
+    return TIERS.slice().reverse().find(t => currentLp >= t.min) || TIERS[0];
+  }, [currentLp]);
 
-  const masteryBoost = useMemo(() => 1 + ((progress?.mastery || 0) / 100) * 0.10, [progress?.mastery]);
   const statBoost = useMemo(() => 1 + (avgStat / 100) * 0.10, [avgStat]);
-  const totalBoost = Math.min(1.20, masteryBoost * statBoost);
+  const totalBoost = Math.min(1.20, statBoost);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -236,6 +321,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const lpEarned = calculateFinalLp(sessionMinutes);
         updateData.seasonLp = increment(lpEarned);
         updateData.totalLpEarned = increment(lpEarned);
+        updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(lpEarned);
         updateData['stats.focus'] = increment(sessionMinutes / 100); 
         
         const totalNow = (todayStudyLog?.totalMinutes || 0) + sessionMinutes;
@@ -243,6 +329,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           const bonusLp = calculateFinalLp(200);
           updateData.seasonLp = increment(bonusLp);
           updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
+          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(bonusLp);
           updateData['stats.resilience'] = increment(0.5);
           toast({ title: "🏆 6시간 초몰입 보너스!", description: `+${bonusLp} LP 획득` });
         }
@@ -292,6 +379,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           seasonLp: increment(attendanceLp),
           totalLpEarned: increment(attendanceLp),
           [`dailyLpStatus.${todayKey}.attendance`]: true,
+          [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(attendanceLp),
           'stats.consistency': increment(0.1),
           updatedAt: serverTimestamp()
         });
@@ -321,6 +409,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           seasonLp: increment(planLp),
           totalLpEarned: increment(planLp),
           [`dailyLpStatus.${todayKey}.plan`]: true,
+          [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
           updatedAt: serverTimestamp()
         });
         toast({ title: "🎯 오늘의 계획 완벽 달성!", description: `+${planLp} LP 획득` });
@@ -377,17 +466,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             )}
             
-            <Button 
-              size="lg" 
+            <button 
               className={cn(
-                "w-full rounded-[2.5rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none", 
+                "w-full rounded-[2.5rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-3", 
                 isMobile ? "h-20 text-2xl" : "h-24 px-16 text-3xl", 
-                isTimerActive ? "bg-rose-500 hover:bg-rose-600" : "bg-white text-primary hover:bg-slate-50"
+                isTimerActive ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-white text-primary hover:bg-slate-50"
               )} 
               onClick={handleStudyStartStop}
             >
-              {isTimerActive ? <>트랙 종료 <Square className="ml-3 h-8 w-8 fill-current" /></> : <>트랙 시작 <Play className="ml-3 h-8 w-8 fill-current" /></>}
-            </Button>
+              {isTimerActive ? <>트랙 종료 <Square className="h-8 w-8 fill-current" /></> : <>트랙 시작 <Play className="h-8 w-8 fill-current" /></>}
+            </button>
           </div>
         </div>
       </section>
@@ -410,27 +498,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
-            <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">시즌 러닝 포인트 (LP)</CardTitle>
-            <div className="bg-accent/5 p-2.5 rounded-xl group-hover:bg-accent/10 transition-colors"><Zap className="h-6 w-6 text-accent" /></div>
-          </CardHeader>
-          <CardContent className="px-10 pb-10">
-            <div className="font-black tracking-tighter text-primary text-6xl">
-              {(progress?.seasonLp || 0).toLocaleString()}<span className="text-2xl ml-1.5 opacity-40 font-bold">LP</span>
-            </div>
-            <div className="flex items-center gap-2 mt-4">
-              <Badge variant="secondary" className="bg-accent/10 text-accent border-none font-black text-[10px] px-3 py-1">MAX BOOST x{totalBoost.toFixed(2)}</Badge>
-              <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Season Active</span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* 시즌 LP 카드 (클릭 시 히스토리 팝업) */}
+        <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} />
       </div>
 
       {/* 3. 계획 및 루틴 */}
       <div className={cn("grid gap-6 grid-cols-1 lg:grid-cols-3")}>
         <Card className={cn("border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03] lg:col-span-2")}>
-          <CardHeader className="bg-muted/5 border-b p-10 sm:p-12">
+          <CardHeader className="bg-muted/10 border-b p-10 sm:p-12">
             <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-3xl text-primary">
               <ListTodo className="h-8 w-8" /> 오늘의 계획트랙
             </CardTitle>
@@ -494,7 +569,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       {/* 4. Jacob 전용 티어 컨트롤러 패널 */}
       {isJacob && progressRef && (
-        <JacobTierController progressRef={progressRef} currentStats={stats} />
+        <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} />
       )}
     </div>
   );
