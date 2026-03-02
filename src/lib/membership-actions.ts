@@ -52,9 +52,20 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
+    // 초기 마스터리 정보 (LP 시스템 기반)
+    const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
+    batch.set(progressRef, {
+      level: 1,
+      currentLp: 500,
+      nextLevelLp: 1000,
+      stats: { focus: 0.5, consistency: 0.5, achievement: 0.5, resilience: 0.5 },
+      skills: {},
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
     const routineItems = [
-      { title: '등원: 08:30', category: 'schedule' },
-      { title: '하원: 22:00', category: 'schedule' },
+      { title: '등원 예정: 08:30', category: 'schedule' },
+      { title: '하원 예정: 22:00', category: 'schedule' },
       { title: '수학 문제집 2단원', category: 'study', done: true },
       { title: '영어 단어 100개', category: 'study', done: true },
       { title: '국어 비문학 3지문', category: 'study', done: false },

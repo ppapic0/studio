@@ -198,8 +198,8 @@ export interface DailyReport {
 
 export interface GrowthProgress {
   level: number;
-  currentXp: number;
-  nextLevelXp: number;
+  currentLp: number;
+  nextLevelLp: number;
   stats: {
     focus: number;
     consistency: number;

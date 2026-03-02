@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -154,11 +153,11 @@ export default function KioskPage() {
             createdAt: serverTimestamp()
           });
 
-          // (3) 마스터리 경험치 업데이트
+          // (3) 마스터리 경험치 업데이트 (LP)
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
           batch.set(progressRef, {
             stats: { focus: increment(durationMinutes / 1000), consistency: increment(0.1) },
-            currentXp: increment(durationMinutes),
+            currentLp: increment(durationMinutes),
             updatedAt: serverTimestamp()
           }, { merge: true });
         }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -57,7 +56,7 @@ import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, getDoc, Timestamp } from 'firebase/firestore';
 import { format, startOfDay } from 'date-fns';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -65,9 +64,7 @@ import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 
-const AUTO_TERMINATE_SECONDS = 7200; 
-const GRACE_PERIOD_SECONDS = 60; 
-const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
+const getNextLevelLp = (level: number) => 1000 + (level - 1) * 300;
 
 export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
@@ -95,10 +92,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
 
   const [localSeconds, setLocalSeconds] = useState(0);
-  const [showSessionAlert, setShowSessionAlert] = useState(false);
-  const [gracePeriod, setGracePeriod] = useState(GRACE_PERIOD_SECONDS);
-
-  const isLevelingUp = useRef(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -123,7 +116,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', user.uid);
   }, [firestore, activeMembership, user, todayKey]);
-  const { data: dailyStat, isLoading: dailyStatLoading } = useDoc<DailyStudentStat>(dailyStatRef, { enabled: isActive });
+  const { data: dailyStat } = useDoc<DailyStudentStat>(dailyStatRef, { enabled: isActive });
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -138,7 +131,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       where('dateKey', '==', todayKey)
     );
   }, [firestore, activeMembership, user, weekKey, todayKey]);
-  const { data: todayPlans, isLoading: plansLoading } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
+  const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
   
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
@@ -171,14 +164,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       createdAt: serverTimestamp()
     });
 
-    // 3. 마스터리 점수 업데이트
+    // 3. 마스터리 점수 업데이트 (LP)
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
     await setDoc(progressRef, {
       stats: {
         focus: increment(sessionMinutes / 1000),
         consistency: increment(0.1), 
       },
-      currentXp: increment(sessionMinutes), 
+      currentLp: increment(sessionMinutes), 
       updatedAt: serverTimestamp()
     }, { merge: true });
   };
@@ -222,7 +215,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !weekKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
-    updateDoc(itemRef, { done: !item.done, updatedAt: serverTimestamp() });
+    const nextState = !item.done;
+    
+    updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
+    
+    // 계획 완수 시 LP 보너스 지급 (10 LP)
+    if (nextState) {
+      const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+      setDoc(progressRef, {
+        stats: { achievement: increment(0.05) },
+        currentLp: increment(10),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
   };
 
   if (!isActive) return null;

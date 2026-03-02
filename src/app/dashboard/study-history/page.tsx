@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -349,10 +348,18 @@ export default function StudyHistoryPage() {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: !item.done, updatedAt: serverTimestamp() });
-    if (!item.done) {
+    const nextState = !item.done;
+    
+    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
+    
+    // 완수 시 LP 보너스 (10 LP)
+    if (nextState) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-      setDoc(progressRef, { stats: { achievement: increment(0.05) }, currentXp: increment(10), updatedAt: serverTimestamp() }, { merge: true });
+      setDoc(progressRef, { 
+        stats: { achievement: increment(0.05) }, 
+        currentLp: increment(10), 
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
     }
   };
 
@@ -395,7 +402,7 @@ export default function StudyHistoryPage() {
           <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8 flex flex-col justify-center gap-4">
             <h3 className="font-black text-sm uppercase text-primary/40 flex items-center gap-2"><Sparkles className="h-4 w-4" /> {isParent ? 'Insight' : 'Mastery Tip'}</h3>
             <p className="text-xs font-bold leading-relaxed text-foreground/70">
-              {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 마스터리 경험치가 대폭 상승합니다.'}
+              {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 마스터리 LP가 대폭 상승합니다.'}
             </p>
             {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg"><Link href="/dashboard/growth">보드 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
           </Card>

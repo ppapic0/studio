@@ -44,29 +44,29 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
 const MOCK_SKILLS: (SkillNode & { link: string })[] = [
-  { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { xp: 1.03 }, iconKey: 'Target', link: '/dashboard' },
-  { id: 'f2', branch: 'focus', name: '방해 금지', description: '중단 없는 세션 5회 연속 달성 시 해금됩니다.', maxLevel: 1, prerequisites: ['f1'], unlockCondition: { stat: 'focus', value: 25 }, effects: { xp: 1.05 }, iconKey: 'Target', link: '/dashboard' },
-  { id: 'f3', branch: 'focus', name: '몰입의 강도', description: '평균 집중도 90% 이상을 일주일간 유지하세요.', maxLevel: 3, prerequisites: ['f2'], unlockCondition: { stat: 'focus', value: 45 }, effects: { xp: 1.08 }, iconKey: 'Flame', link: '/dashboard' },
-  { id: 'f4', branch: 'focus', name: '하이퍼 포커스', description: '3시간 이상의 초몰입 세션을 성공적으로 마쳤습니다.', maxLevel: 5, prerequisites: ['f3'], unlockCondition: { stat: 'focus', value: 70 }, effects: { xp: 1.12 }, iconKey: 'Zap', link: '/dashboard' },
-  { id: 'f5', branch: 'focus', name: '몰입의 대가', description: '어떤 환경에서도 즉시 몰입 상태에 진입할 수 있습니다.', maxLevel: 1, prerequisites: ['f4'], unlockCondition: { stat: 'focus', value: 95 }, effects: { xp: 1.20 }, iconKey: 'Crown', link: '/dashboard' },
+  { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { lp: 1.03 }, iconKey: 'Target', link: '/dashboard' },
+  { id: 'f2', branch: 'focus', name: '방해 금지', description: '중단 없는 세션 5회 연속 달성 시 해금됩니다.', maxLevel: 1, prerequisites: ['f1'], unlockCondition: { stat: 'focus', value: 25 }, effects: { lp: 1.05 }, iconKey: 'Target', link: '/dashboard' },
+  { id: 'f3', branch: 'focus', name: '몰입의 강도', description: '평균 집중도 90% 이상을 일주일간 유지하세요.', maxLevel: 3, prerequisites: ['f2'], unlockCondition: { stat: 'focus', value: 45 }, effects: { lp: 1.08 }, iconKey: 'Flame', link: '/dashboard' },
+  { id: 'f4', branch: 'focus', name: '하이퍼 포커스', description: '3시간 이상의 초몰입 세션을 성공적으로 마쳤습니다.', maxLevel: 5, prerequisites: ['f3'], unlockCondition: { stat: 'focus', value: 70 }, effects: { lp: 1.12 }, iconKey: 'Zap', link: '/dashboard' },
+  { id: 'f5', branch: 'focus', name: '몰입의 대가', description: '어떤 환경에서도 즉시 몰입 상태에 진입할 수 있습니다.', maxLevel: 1, prerequisites: ['f4'], unlockCondition: { stat: 'focus', value: 95 }, effects: { lp: 1.20 }, iconKey: 'Crown', link: '/dashboard' },
 
-  { id: 'c1', branch: 'consistency', name: '작심삼일 타파', description: '3일 동안 멈추지 않고 학습을 기록했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'consistency', value: 10 }, effects: { xp: 1.03 }, iconKey: 'RefreshCw', link: '/dashboard' },
-  { id: 'c2', branch: 'consistency', name: '일주일의 기적', description: '7일 연속 출석 시 주간 보너스가 강화됩니다.', maxLevel: 1, prerequisites: ['c1'], unlockCondition: { stat: 'consistency', value: 25 }, effects: { xp: 1.07 }, iconKey: 'Medal', link: '/dashboard' },
-  { id: 'c3', branch: 'consistency', name: '루틴 정착', description: '30일 중 25일 이상 학습을 완료하는 습관을 형성합니다.', maxLevel: 3, prerequisites: ['c2'], unlockCondition: { stat: 'consistency', value: 50 }, effects: { xp: 1.10 }, iconKey: 'RefreshCw', link: '/dashboard' },
-  { id: 'c4', branch: 'consistency', name: '철의 의지', description: '100일 연속 학습이라는 경이로운 기록에 도전하세요.', maxLevel: 1, prerequisites: ['c3'], unlockCondition: { stat: 'consistency', value: 80 }, effects: { xp: 1.15 }, iconKey: 'Flame', link: '/dashboard' },
-  { id: 'c5', branch: 'consistency', name: '습관의 화신', description: '학습이 일상의 숨쉬기처럼 자연스러운 단계입니다.', maxLevel: 1, prerequisites: ['c4'], unlockCondition: { stat: 'consistency', value: 98 }, effects: { xp: 1.25 }, iconKey: 'Crown', link: '/dashboard' },
+  { id: 'c1', branch: 'consistency', name: '작심삼일 타파', description: '3일 동안 멈추지 않고 학습을 기록했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'consistency', value: 10 }, effects: { lp: 1.03 }, iconKey: 'RefreshCw', link: '/dashboard' },
+  { id: 'c2', branch: 'consistency', name: '일주일의 기적', description: '7일 연속 출석 시 주간 보너스가 강화됩니다.', maxLevel: 1, prerequisites: ['c1'], unlockCondition: { stat: 'consistency', value: 25 }, effects: { lp: 1.07 }, iconKey: 'Medal', link: '/dashboard' },
+  { id: 'c3', branch: 'consistency', name: '루틴 정착', description: '30일 중 25일 이상 학습을 완료하는 습관을 형성합니다.', maxLevel: 3, prerequisites: ['c2'], unlockCondition: { stat: 'consistency', value: 50 }, effects: { lp: 1.10 }, iconKey: 'RefreshCw', link: '/dashboard' },
+  { id: 'c4', branch: 'consistency', name: '철의 의지', description: '100일 연속 학습이라는 경이로운 기록에 도전하세요.', maxLevel: 1, prerequisites: ['c3'], unlockCondition: { stat: 'consistency', value: 80 }, effects: { lp: 1.15 }, iconKey: 'Flame', link: '/dashboard' },
+  { id: 'c5', branch: 'consistency', name: '습관의 화신', description: '학습이 일상의 숨쉬기처럼 자연스러운 단계입니다.', maxLevel: 1, prerequisites: ['c4'], unlockCondition: { stat: 'consistency', value: 98 }, effects: { lp: 1.25 }, iconKey: 'Crown', link: '/dashboard' },
 
-  { id: 'a1', branch: 'achievement', name: '오늘 완벽', description: '오늘 설정한 자습 To-do를 100% 달성했습니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'achievement', value: 15 }, effects: { xp: 1.05 }, iconKey: 'CheckCircle2', link: '/dashboard/plan' },
-  { id: 'a2', branch: 'achievement', name: '과목 밸런스', description: '3개 이상의 과목을 편식 없이 고르게 학습했습니다.', maxLevel: 1, prerequisites: ['a1'], unlockCondition: { stat: 'achievement', value: 30 }, effects: { xp: 1.08 }, iconKey: 'Target', link: '/dashboard/plan' },
-  { id: 'a3', branch: 'achievement', name: '주간 정복자', description: '한 주간 모든 목표 달성률 95% 이상을 기록하세요.', maxLevel: 3, prerequisites: ['a2'], unlockCondition: { stat: 'achievement', value: 55 }, effects: { xp: 1.12 }, iconKey: 'Trophy', link: '/dashboard/plan' },
-  { id: 'a4', branch: 'achievement', name: '전략적 플래너', description: '자신에게 딱 맞는 학습량을 스스로 설계하고 달성합니다.', maxLevel: 1, prerequisites: ['a3'], unlockCondition: { stat: 'achievement', value: 75 }, effects: { xp: 1.18 }, iconKey: 'Zap', link: '/dashboard/plan' },
-  { id: 'a5', branch: 'achievement', name: '성취의 정점', description: '설정한 모든 원대한 목표를 현실로 만들어냅니다.', maxLevel: 1, prerequisites: ['a4'], unlockCondition: { stat: 'achievement', value: 95 }, effects: { xp: 1.30 }, iconKey: 'Crown', link: '/dashboard/plan' },
+  { id: 'a1', branch: 'achievement', name: '오늘 완벽', description: '오늘 설정한 자습 To-do를 100% 달성했습니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'achievement', value: 15 }, effects: { lp: 1.05 }, iconKey: 'CheckCircle2', link: '/dashboard/plan' },
+  { id: 'a2', branch: 'achievement', name: '과목 밸런스', description: '3개 이상의 과목을 편식 없이 고르게 학습했습니다.', maxLevel: 1, prerequisites: ['a1'], unlockCondition: { stat: 'achievement', value: 30 }, effects: { lp: 1.08 }, iconKey: 'Target', link: '/dashboard/plan' },
+  { id: 'a3', branch: 'achievement', name: '주간 정복자', description: '한 주간 모든 목표 달성률 95% 이상을 기록하세요.', maxLevel: 3, prerequisites: ['a2'], unlockCondition: { stat: 'achievement', value: 55 }, effects: { lp: 1.12 }, iconKey: 'Trophy', link: '/dashboard/plan' },
+  { id: 'a4', branch: 'achievement', name: '전략적 플래너', description: '자신에게 딱 맞는 학습량을 스스로 설계하고 달성합니다.', maxLevel: 1, prerequisites: ['a3'], unlockCondition: { stat: 'achievement', value: 75 }, effects: { lp: 1.18 }, iconKey: 'Zap', link: '/dashboard/plan' },
+  { id: 'a5', branch: 'achievement', name: '성취의 정점', description: '설정한 모든 원대한 목표를 현실로 만들어냅니다.', maxLevel: 1, prerequisites: ['a4'], unlockCondition: { stat: 'achievement', value: 95 }, effects: { lp: 1.30 }, iconKey: 'Crown', link: '/dashboard/plan' },
 
-  { id: 'r1', branch: 'resilience', name: '빠른 회복', description: '슬럼프 감지 후 2일 이내에 다시 학습을 시작했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'resilience', value: 15 }, effects: { xp: 1.05 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
-  { id: 'r2', branch: 'resilience', name: '역전의 발판', description: '성적이 하락한 과목에 더 많은 시간을 투자하여 극복합니다.', maxLevel: 1, prerequisites: ['r1'], unlockCondition: { stat: 'resilience', value: 35 }, effects: { xp: 1.08 }, iconKey: 'RefreshCw', link: '/dashboard/study-history' },
-  { id: 'r3', branch: 'resilience', name: '강철 멘탈', description: '어떤 외부 유혹에도 흔들리지 않고 자리를 지킵니다.', maxLevel: 3, prerequisites: ['r2'], unlockCondition: { stat: 'resilience', value: 60 }, effects: { xp: 1.12 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
-  { id: 'r4', branch: 'resilience', name: '슬럼프 파괴자', description: '슬럼프를 성장의 기회로 바꾸는 능력을 갖췄습니다.', maxLevel: 1, prerequisites: ['r3'], unlockCondition: { stat: 'resilience', value: 85 }, effects: { xp: 1.20 }, iconKey: 'Zap', link: '/dashboard/study-history' },
-  { id: 'r5', branch: 'resilience', name: '불굴의 마스터', description: '실패를 두려워하지 않으며 끊임없이 재도전합니다.', maxLevel: 1, prerequisites: ['r4'], unlockCondition: { stat: 'resilience', value: 98 }, effects: { xp: 1.30 }, iconKey: 'Crown', link: '/dashboard/study-history' },
+  { id: 'r1', branch: 'resilience', name: '빠른 회복', description: '슬럼프 감지 후 2일 이내에 다시 학습을 시작했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'resilience', value: 15 }, effects: { lp: 1.05 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
+  { id: 'r2', branch: 'resilience', name: '역전의 발판', description: '성적이 하락한 과목에 더 많은 시간을 투자하여 극복합니다.', maxLevel: 1, prerequisites: ['r1'], unlockCondition: { stat: 'resilience', value: 35 }, effects: { lp: 1.08 }, iconKey: 'RefreshCw', link: '/dashboard/study-history' },
+  { id: 'r3', branch: 'resilience', name: '강철 멘탈', description: '어떤 외부 유혹에도 흔들리지 않고 자리를 지킵니다.', maxLevel: 3, prerequisites: ['r2'], unlockCondition: { stat: 'resilience', value: 60 }, effects: { lp: 1.12 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
+  { id: 'r4', branch: 'resilience', name: '슬럼프 파괴자', description: '슬럼프를 성장의 기회로 바꾸는 능력을 갖췄습니다.', maxLevel: 1, prerequisites: ['r3'], unlockCondition: { stat: 'resilience', value: 85 }, effects: { lp: 1.20 }, iconKey: 'Zap', link: '/dashboard/study-history' },
+  { id: 'r5', branch: 'resilience', name: '불굴의 마스터', description: '실패를 두려워하지 않으며 끊임없이 재도전합니다.', maxLevel: 1, prerequisites: ['r4'], unlockCondition: { stat: 'resilience', value: 98 }, effects: { lp: 1.30 }, iconKey: 'Crown', link: '/dashboard/study-history' },
 ];
 
 const STAT_CONFIG = {
@@ -77,8 +77,8 @@ const STAT_CONFIG = {
 };
 
 const MAX_LEVEL = 30;
-const getNextLevelXp = (level: number) => 1000 + (level - 1) * 300;
-const TOTAL_MASTER_XP = 150000; 
+const getNextLevelLp = (level: number) => 1000 + (level - 1) * 300;
+const TOTAL_MASTER_LP = 150000; 
 
 function SystemGuideDialog() {
   return (
@@ -137,14 +137,15 @@ function SystemGuideDialog() {
 
           <div className="space-y-3 pt-2">
             <h4 className="flex items-center gap-2 font-black text-sm text-primary">
-              <Zap className="h-4 w-4 fill-current" /> 경험치(XP)와 곡선형 성장
+              <Zap className="h-4 w-4 fill-current" /> 러닝 포인트(LP)와 곡선형 성장
             </h4>
             <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 text-[11px] font-bold leading-relaxed text-muted-foreground">
-              - **1분 몰입 = 1 XP**<br/>
-              - 초반 레벨업은 빠르며, 후반으로 갈수록 요구 XP가 증가합니다.<br/>
-              - **레벨 1**: 1,000 XP (약 2일)<br/>
-              - **레벨 29**: 9,400 XP (약 19일)<br/>
-              - 총 300일간 하루 평균 500 XP를 모아야 Lv.30에 도달합니다.
+              - **1분 몰입 = 1 LP**<br/>
+              - **계획 완수 1개 = 10 LP**<br/>
+              - 초반 레벨업은 빠르며, 후반으로 갈수록 요구 LP가 증가합니다.<br/>
+              - **레벨 1**: 1,000 LP (약 2일)<br/>
+              - **레벨 29**: 9,400 LP (약 19일)<br/>
+              - 총 300일간 하루 평균 500 LP를 모아야 Lv.30에 도달합니다.
             </div>
           </div>
         </div>
@@ -178,20 +179,20 @@ export default function GrowthPage() {
 
   const currentLevelThreshold = useMemo(() => {
     if (!progress) return 1000;
-    return getNextLevelXp(Number(progress.level) || 1);
+    return getNextLevelLp(Number(progress.level) || 1);
   }, [progress?.level]);
 
   useEffect(() => {
-    if (progress && progressRef && progress.currentXp >= currentLevelThreshold && !isLevelingUp.current) {
+    if (progress && progressRef && progress.currentLp >= currentLevelThreshold && !isLevelingUp.current) {
       isLevelingUp.current = true;
-      const overflowXp = progress.currentXp - currentLevelThreshold;
+      const overflowLp = progress.currentLp - currentLevelThreshold;
       const nextLevel = (Number(progress.level) || 1) + 1;
-      const nextThreshold = getNextLevelXp(nextLevel);
+      const nextThreshold = getNextLevelLp(nextLevel);
 
       updateDoc(progressRef, {
         level: nextLevel,
-        currentXp: overflowXp,
-        nextLevelXp: nextThreshold,
+        currentLp: overflowLp,
+        nextLevelLp: nextThreshold,
         updatedAt: serverTimestamp()
       }).then(() => {
         toast({
@@ -206,15 +207,15 @@ export default function GrowthPage() {
         }, 1000);
       });
     }
-  }, [progress?.currentXp, progress?.level, progressRef, currentLevelThreshold]); 
+  }, [progress?.currentLp, progress?.level, progressRef, currentLevelThreshold]); 
 
   const totalMultiplier = useMemo(() => {
     if (!progress?.skills) return 1.0;
     let multiplier = 1.0;
     Object.keys(progress.skills).forEach(skillId => {
       const skill = MOCK_SKILLS.find(s => s.id === skillId);
-      if (skill && skill.effects && skill.effects.xp) {
-        multiplier *= skill.effects.xp;
+      if (skill && skill.effects && skill.effects.lp) {
+        multiplier *= skill.effects.lp;
       }
     });
     return multiplier;
@@ -261,13 +262,13 @@ export default function GrowthPage() {
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
 
-  const calculateTotalXpSpent = (lvl: number) => {
+  const calculateTotalLpSpent = (lvl: number) => {
     let sum = 0;
-    for(let i=1; i<lvl; i++) sum += getNextLevelXp(i);
+    for(let i=1; i<lvl; i++) sum += getNextLevelLp(i);
     return sum;
   };
-  const currentTotalXp = calculateTotalXpSpent(Number(progress?.level) || 1) + (progress?.currentXp || 0); 
-  const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_XP - currentTotalXp) / 500); 
+  const currentTotalLp = calculateTotalLpSpent(Number(progress?.level) || 1) + (progress?.currentLp || 0); 
+  const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_LP - currentTotalLp) / 500); 
   const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
 
   return (
@@ -331,7 +332,7 @@ export default function GrowthPage() {
           <CardTitle className={cn("font-black", isMobile ? "text-xl" : "text-xl")}>
             성장 페이스 분석
           </CardTitle>
-          <CardDescription className="text-primary-foreground/60 font-bold text-[10px] sm:text-xs">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} XP</CardDescription>
+          <CardDescription className="text-primary-foreground/60 font-bold text-[10px] sm:text-xs">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} LP</CardDescription>
         </CardHeader>
         <CardContent className={cn("relative z-10 p-0")}>
           <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
@@ -373,7 +374,7 @@ export default function GrowthPage() {
                 <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" 
                   style={{ 
                     strokeDasharray: isMobile ? 125.6 : 175.8, 
-                    strokeDashoffset: (isMobile ? 125.6 : 175.8) - ((isMobile ? 125.6 : 175.8) * (progress?.currentXp || 0) / currentLevelThreshold) 
+                    strokeDashoffset: (isMobile ? 125.6 : 175.8) - ((isMobile ? 125.6 : 175.8) * (progress?.currentLp || 0) / currentLevelThreshold) 
                   }} 
                 />
               </svg>
@@ -384,10 +385,10 @@ export default function GrowthPage() {
             </div>
             <div className="flex-1 flex flex-col gap-1.5 min-w-0">
               <div className="flex justify-between items-end">
-                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Progress</span>
-                <span className="text-[9px] font-black tabular-nums">{(progress?.currentXp || 0).toLocaleString()} XP</span>
+                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Learning Points</span>
+                <span className="text-[9px] font-black tabular-nums">{(progress?.currentLp || 0).toLocaleString()} LP</span>
               </div>
-              <Progress value={((progress?.currentXp || 0) / currentLevelThreshold) * 100} className="h-1 rounded-full shadow-inner" />
+              <Progress value={((progress?.currentLp || 0) / currentLevelThreshold) * 100} className="h-1 rounded-full shadow-inner" />
               <div className="flex justify-between items-center">
                 <span className="text-[8px] font-black text-primary/60">Lv.{MAX_LEVEL}</span>
                 <span className="text-[8px] font-black text-muted-foreground flex items-center gap-1">

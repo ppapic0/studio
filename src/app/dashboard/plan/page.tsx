@@ -430,10 +430,18 @@ export default function StudyPlanPage() {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
-    updateDoc(itemRef, { done: !item.done, updatedAt: serverTimestamp() });
-    if (!item.done) {
+    const nextState = !item.done;
+    
+    updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
+    
+    // 완수 시 LP 보너스 (10 LP)
+    if (nextState) {
       const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-      setDoc(progressRef, { stats: { achievement: increment(0.05) }, currentXp: increment(10), updatedAt: serverTimestamp() }, { merge: true });
+      setDoc(progressRef, { 
+        stats: { achievement: increment(0.05) }, 
+        currentLp: increment(10), 
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
     }
   };
 
