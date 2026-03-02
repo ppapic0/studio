@@ -317,7 +317,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-10">
-          <ScrollArea className="w-full">
+          <ScrollArea className="w-full max-w-full">
             <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-fit mx-auto">
               <div className="grid grid-cols-10 gap-2 sm:gap-3">
                 {Array.from({ length: 10 }).map((_, colIndex) => (
@@ -346,8 +346,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 : isAbsent 
                                   ? "bg-rose-50 border-rose-300 text-rose-600" 
                                   : student 
-                                    ? "bg-white border-primary/20 text-primary" 
-                                    : "bg-white border-muted/40 text-muted-foreground/20 hover:border-primary/20"
+                                    ? "bg-white border-primary/30 text-primary" 
+                                    : "bg-white border-primary/40 text-primary/10 hover:border-primary/60"
                           )}
                         >
                           <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
@@ -363,9 +363,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center opacity-40">
-                              <span className="text-[8px] font-black">EMPTY</span>
-                              {isEditMode && <UserPlus className="h-3 w-3 mt-1 text-primary" />}
+                            <div className="flex flex-col items-center">
+                              <span className="text-[8px] font-black tracking-tighter opacity-100">EMPTY</span>
+                              {isEditMode && <UserPlus className="h-3 w-3 mt-1 text-primary/40" />}
                             </div>
                           )}
                         </div>
