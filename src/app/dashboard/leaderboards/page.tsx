@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -38,7 +39,6 @@ type LeaderboardTabProps = {
 };
 
 function LeaderboardTab({ title, description, entries, isLoading, metricType, isMobile, studentsMap }: LeaderboardTabProps) {
-  // 오직 1, 2, 3등만 필터링
   const topThree = useMemo(() => {
     if (!entries) return [];
     return entries.filter(entry => entry.rank <= 3).sort((a, b) => a.rank - b.rank);
@@ -59,7 +59,7 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
 
   const formatName = (name: string) => {
     if (!name) return "";
-    return name.charAt(0) + "*O"; // 성만 노출
+    return name.charAt(0) + "*O"; 
   };
 
   return (
@@ -69,23 +69,23 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
     )}>
       <CardHeader className={cn(
         "bg-gradient-to-b from-muted/30 to-transparent relative border-b",
-        isMobile ? "p-8" : "p-12"
+        isMobile ? "p-6" : "p-12"
       )}>
         <div className="absolute top-8 right-8 opacity-5 rotate-12">
-          {getIcon(isMobile ? "h-24 w-24" : "h-40 w-40")}
+          {getIcon(isMobile ? "h-20 w-24" : "h-40 w-40")}
         </div>
         <div className="flex items-center gap-6 relative z-10">
           <div className={cn(
             "rounded-[1.5rem] shadow-xl shrink-0 flex items-center justify-center p-4 bg-amber-50 text-amber-600",
-            isMobile ? "h-14 w-14" : "h-20 w-20"
+            isMobile ? "h-12 w-12" : "h-20 w-20"
           )}>
-            {getIcon(isMobile ? "h-8 w-8" : "h-10 w-10")}
+            {getIcon(isMobile ? "h-6 w-6" : "h-10 w-10")}
           </div>
           <div className="space-y-1">
-            <CardTitle className={cn("font-black tracking-tighter uppercase leading-none", isMobile ? "text-2xl" : "text-5xl")}>
+            <CardTitle className={cn("font-black tracking-tighter uppercase leading-none", isMobile ? "text-xl" : "text-5xl")}>
               {title}
             </CardTitle>
-            <CardDescription className={cn("font-bold text-muted-foreground/80", isMobile ? "text-xs" : "text-xl")}>{description}</CardDescription>
+            <CardDescription className={cn("font-bold text-muted-foreground/80", isMobile ? "text-[10px]" : "text-xl")}>{description}</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -108,47 +108,48 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
               const profile = studentsMap[entry.studentId];
               return (
                 <div key={entry.id} className={cn(
-                  "p-8 sm:p-12 flex items-center justify-between transition-all duration-500 group relative overflow-hidden",
+                  "flex items-center justify-between transition-all duration-500 group relative overflow-hidden",
+                  isMobile ? "p-6" : "p-12",
                   entry.rank === 1 ? "bg-amber-50/20" : entry.rank === 2 ? "bg-slate-50/20" : "bg-orange-50/20"
                 )}>
                   {entry.rank === 1 && (
                     <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
-                      <Crown className="h-40 w-40 -rotate-12" />
+                      <Crown className={cn(isMobile ? "h-24 w-24" : "h-40 w-40", "-rotate-12")} />
                     </div>
                   )}
                   
-                  <div className="flex items-center gap-8 sm:gap-12 relative z-10 min-w-0">
-                    <div className="w-12 shrink-0 flex flex-col items-center justify-center gap-2">
+                  <div className={cn("flex items-center relative z-10 min-w-0", isMobile ? "gap-4" : "gap-12")}>
+                    <div className="w-10 shrink-0 flex flex-col items-center justify-center gap-2">
                       {getRankBadge(entry.rank)}
-                      <span className="text-xs font-black opacity-20 uppercase tracking-widest">Rank</span>
+                      <span className="text-[8px] font-black opacity-20 uppercase tracking-widest">Rank</span>
                     </div>
                     
                     <div className="relative shrink-0">
                       <Avatar className={cn(
                         "border-4 border-white shadow-2xl transition-transform duration-700 group-hover:scale-110",
-                        isMobile ? "h-16 w-16" : "h-24 w-24"
+                        isMobile ? "h-14 w-14" : "h-24 w-24"
                       )}>
                         <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
                           {entry.displayNameSnapshot?.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
                       {entry.rank === 1 && (
-                        <div className="absolute -top-3 -right-3">
-                          <Flame className="h-8 w-8 text-orange-500 fill-orange-500 animate-pulse" />
+                        <div className="absolute -top-2 -right-2">
+                          <Flame className={cn(isMobile ? "h-5 w-5" : "h-8 w-8", "text-orange-500 fill-orange-500 animate-pulse")} />
                         </div>
                       )}
                     </div>
 
-                    <div className="grid gap-1 min-w-0">
-                      <div className="flex items-center gap-3">
-                        <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-2xl" : "text-4xl")}>
+                    <div className="grid gap-0.5 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-4xl")}>
                           {formatName(entry.displayNameSnapshot)}
                         </span>
-                        <Badge className="bg-white/80 text-primary border-none shadow-sm font-black text-[9px] uppercase h-5 px-2">Verified</Badge>
+                        <Badge className="bg-white/80 text-primary border-none shadow-sm font-black text-[8px] uppercase h-4 px-1.5">OK</Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground font-bold">
-                        <History className="h-3.5 w-3.5 opacity-40" />
-                        <span className={cn("truncate", isMobile ? "text-xs" : "text-lg")}>{profile?.schoolName || "비공개 학교"}</span>
+                      <div className="flex items-center gap-1.5 text-muted-foreground font-bold">
+                        <History className="h-3 w-3 opacity-40" />
+                        <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{profile?.schoolName || "비공개 학교"}</span>
                       </div>
                     </div>
                   </div>
@@ -156,12 +157,12 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
                   <div className="text-right shrink-0 relative z-10">
                     <div className={cn(
                       "font-black tabular-nums tracking-tighter leading-none drop-shadow-sm text-primary",
-                      isMobile ? "text-3xl" : "text-6xl",
+                      isMobile ? "text-xl" : "text-6xl",
                       entry.rank === 1 && "text-amber-600"
                     )}>
-                      {entry.value.toLocaleString()}<span className="text-sm sm:text-2xl ml-1.5 opacity-30 uppercase">lp</span>
+                      {entry.value.toLocaleString()}<span className={cn("opacity-30 uppercase font-bold", isMobile ? "text-[10px] ml-1" : "text-2xl ml-1.5")}>lp</span>
                     </div>
-                    <span className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.2em] mt-2 block">Season Achievement</span>
+                    <span className="text-[8px] font-black text-muted-foreground/30 uppercase tracking-[0.2em] mt-1.5 block">Achievement</span>
                   </div>
                 </div>
               );
@@ -177,7 +178,7 @@ export default function LeaderboardsPage() {
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
   
-  const [seasonOffset, setSeasonOffset] = useState<0 | -1>(0); // 0: 이번 시즌, -1: 지난 시즌
+  const [seasonOffset, setSeasonOffset] = useState<0 | -1>(0); 
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
   
@@ -187,7 +188,6 @@ export default function LeaderboardsPage() {
 
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
-  // 학생 프로필 정보 (학교명 조회를 위함)
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'students');
@@ -232,7 +232,7 @@ export default function LeaderboardsPage() {
           <span className="text-[9px] font-black uppercase tracking-[0.25em] text-primary/60">Season Hall of Fame</span>
           <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
         </div>
-        <h1 className={cn("font-black tracking-tight flex items-center gap-3", isMobile ? "text-3xl" : "text-6xl")}>
+        <h1 className={cn("font-black tracking-tight flex items-center gap-3", isMobile ? "text-2xl" : "text-6xl")}>
           랭킹트랙
         </h1>
         
@@ -240,22 +240,22 @@ export default function LeaderboardsPage() {
           <Button 
             onClick={() => setSeasonOffset(0)}
             className={cn(
-              "rounded-xl h-11 px-6 font-black text-xs transition-all",
+              "rounded-xl h-10 px-4 sm:h-11 sm:px-6 font-black text-[10px] sm:text-xs transition-all",
               seasonOffset === 0 ? "bg-primary text-white shadow-lg" : "bg-transparent text-muted-foreground hover:bg-muted/50"
             )}
-          >이번 시즌 (LIVE)</Button>
+          >이번 시즌</Button>
           <Button 
             onClick={() => setSeasonOffset(-1)}
             className={cn(
-              "rounded-xl h-11 px-6 font-black text-xs transition-all",
+              "rounded-xl h-10 px-4 sm:h-11 sm:px-6 font-black text-[10px] sm:text-xs transition-all",
               seasonOffset === -1 ? "bg-primary text-white shadow-lg" : "bg-transparent text-muted-foreground hover:bg-muted/50"
             )}
-          >지난 시즌 (ARCHIVE)</Button>
+          >지난 시즌</Button>
         </div>
 
-        <p className={cn("font-bold text-muted-foreground leading-relaxed mt-4", isMobile ? "text-sm max-w-xs" : "text-xl max-w-2xl")}>
-          {format(targetDate, 'yyyy년 M월')} 시즌 최정상에 오른 챔피언들입니다. <br/>
-          센터 내 Top 3만이 누릴 수 있는 명예의 전당입니다.
+        <p className={cn("font-bold text-muted-foreground leading-relaxed mt-2", isMobile ? "text-xs max-w-xs" : "text-xl max-w-2xl")}>
+          {format(targetDate, 'yyyy년 M월')} 시즌 최정상 챔피언들입니다. <br/>
+          Top 3만이 누릴 수 있는 명예의 전당입니다.
         </p>
       </header>
 
@@ -263,7 +263,7 @@ export default function LeaderboardsPage() {
         <div className="flex justify-center mb-8">
           <TabsList className={cn(
             "grid grid-cols-1 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
-            isMobile ? "h-14 max-w-[200px]" : "h-20 max-w-sm rounded-[2.5rem]"
+            isMobile ? "h-12 max-w-[180px]" : "h-20 max-w-sm rounded-[2.5rem]"
           )}>
             <TabsTrigger value="lp" className={cn(
               "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
@@ -277,7 +277,7 @@ export default function LeaderboardsPage() {
         <TabsContent value="lp" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
           <LeaderboardTab
             title="시즌 LP 챔피언"
-            description="가장 높은 러닝 포인트를 획득한 상위 3명입니다."
+            description="가장 높은 포인트를 획득한 상위 3명입니다."
             entries={lpEntries}
             isLoading={lpLoading}
             metricType="lp"

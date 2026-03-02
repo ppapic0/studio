@@ -419,7 +419,7 @@ export default function StudyHistoryPage() {
               <Badge className="bg-white/10 text-white border-none font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} TIER</Badge>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-6xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
               <span className="text-xl font-bold opacity-40 uppercase ml-2">Total Time</span>
             </div>
           </div>
@@ -463,28 +463,28 @@ export default function StudyHistoryPage() {
                   key={dateKey} 
                   onClick={() => setSelectedDateForPlan(day)} 
                   className={cn(
-                    "p-4 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white group overflow-hidden", 
+                    "p-2 sm:p-4 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white group overflow-hidden", 
                     isMobile ? "aspect-square" : "min-h-[160px]", 
                     !isCurrentMonth ? "opacity-[0.05] grayscale" : getHeatmapColor(minutes), 
                     isToday && "ring-4 ring-inset ring-primary/30 z-10 shadow-2xl scale-[1.02] rounded-xl"
                   )}
                 >
-                  <div className="flex justify-between items-start mb-3">
+                  <div className="flex justify-between items-start mb-1 sm:mb-3">
                     <span className={cn(
-                      "text-xs font-black tracking-tighter tabular-nums", 
+                      "text-[10px] sm:text-xs font-black tracking-tighter tabular-nums", 
                       idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-rose-600" : "text-primary/40",
-                      isToday && "text-primary scale-125"
+                      isToday && "text-primary scale-110 sm:scale-125"
                     )}>
                       {format(day, 'd')}
                     </span>
-                    <div className="flex flex-col items-end gap-1.5">
-                      {minutes >= 180 && <Zap className="h-4 w-4 text-amber-500 fill-amber-500 drop-shadow-sm animate-pulse" />}
-                      {hasPlans && <div className="w-2 h-2 rounded-full bg-primary/30" />}
+                    <div className="flex flex-col items-end gap-1">
+                      {minutes >= 180 && <Zap className="h-3 w-3 sm:h-4 w-4 text-amber-500 fill-amber-500 drop-shadow-sm animate-pulse" />}
+                      {hasPlans && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary/30" />}
                     </div>
                   </div>
                   {minutes > 0 && (
-                    <div className="mt-auto flex flex-col items-center gap-1 group-hover:scale-110 transition-transform duration-500">
-                      <span className={cn("font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none", isMobile ? "text-xs" : "text-3xl")}>
+                    <div className="mt-auto flex flex-col items-center gap-0.5 group-hover:scale-110 transition-transform duration-500">
+                      <span className={cn("font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none", isMobile ? "text-[10px]" : "text-3xl")}>
                         {formatMinutes(minutes)}
                       </span>
                       {!isMobile && minutes >= 360 && (
@@ -493,8 +493,8 @@ export default function StudyHistoryPage() {
                     </div>
                   )}
                   {isToday && (
-                    <div className="absolute bottom-2 right-2">
-                      <div className="bg-primary text-white p-1 rounded-full shadow-lg"><Activity className="h-2 w-2" /></div>
+                    <div className="absolute bottom-1 right-1">
+                      <div className="bg-primary text-white p-0.5 rounded-full shadow-lg"><Activity className="h-1.5 w-1.5" /></div>
                     </div>
                   )}
                 </div>
@@ -508,16 +508,16 @@ export default function StudyHistoryPage() {
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : "sm:max-w-xl rounded-[3rem]")}>
           <div className="bg-primary p-8 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader><DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-7 w-7 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[500px]")}>
             <Tabs defaultValue="schedule" className="w-full">
               <TabsList className="grid w-full grid-cols-3 rounded-none h-16 bg-muted/20 p-0 border-b">
-                <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-xs uppercase tracking-widest">ROUTINE</TabsTrigger>
-                <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-xs uppercase tracking-widest">STUDY</TabsTrigger>
-                <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-xs uppercase tracking-widest">LIFE</TabsTrigger>
+                <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] sm:text-xs uppercase tracking-widest">ROUTINE</TabsTrigger>
+                <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-[10px] sm:text-xs uppercase tracking-widest">STUDY</TabsTrigger>
+                <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] sm:text-xs uppercase tracking-widest">LIFE</TabsTrigger>
               </TabsList>
-              <div className="p-8 space-y-8">
+              <div className={cn("space-y-8", isMobile ? "p-5" : "p-8")}>
                 <TabsContent value="schedule" className="mt-0 space-y-4">
                   {!isActuallyPast && !isParent && (
                     <div className="flex justify-end">

@@ -254,7 +254,6 @@ export default function StudyPlanPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
-  // 등하원 필수 설정 상태
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
 
@@ -303,7 +302,6 @@ export default function StudyPlanPage() {
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
 
-  // 필수 항목 존재 여부 체크
   const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
   const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
   const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
@@ -390,20 +388,17 @@ export default function StudyPlanPage() {
     const colRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
 
     try {
-      // 기존 등하원/미등원 항목 삭제
       scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원')).forEach(i => {
         batch.delete(doc(colRef, i.id));
       });
 
       if (type === 'attend') {
-        // 등원 항목 추가
         batch.set(doc(colRef), {
           title: `등원 예정: ${inTime}`,
           done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
           studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
-        // 하원 항목 추가
         batch.set(doc(colRef), {
           title: `하원 예정: ${outTime}`,
           done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
@@ -411,7 +406,6 @@ export default function StudyPlanPage() {
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
       } else {
-        // 미등원 항목 추가
         batch.set(doc(colRef), {
           title: `이날 등원하지 않습니다`,
           done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
@@ -447,8 +441,6 @@ export default function StudyPlanPage() {
     
     if (nextState) {
       const batch = writeBatch(firestore);
-      
-      // 마스터리 업데이트: 목표달성 스탯 (항목당 0.1점, 하루 최대 0.5점)
       const achievementCount = progress?.dailyLpStatus?.[selectedDateKey]?.achievementCount || 0;
       if (achievementCount < 5) {
         batch.update(progressRef!, { 
@@ -456,13 +448,10 @@ export default function StudyPlanPage() {
           [`dailyLpStatus.${selectedDateKey}.achievementCount`]: increment(1)
         });
       }
-
-      // 10 LP 즉시 지급
       batch.update(progressRef!, {
         seasonLp: increment(10),
         updatedAt: serverTimestamp()
       });
-
       await batch.commit();
     }
   };
@@ -547,33 +536,32 @@ export default function StudyPlanPage() {
         })}
       </div>
 
-      {/* 필수 등하원 설정 섹션 - 티어 컬러 반영 */}
       {!isPast && (
         <Card className={cn(
           "border-none shadow-2xl rounded-[2.5rem] overflow-hidden transition-all duration-700 bg-white ring-1 ring-black/[0.03]",
           "relative group"
         )}>
           <div className={cn("h-2 w-full bg-gradient-to-r", currentTier.gradient)} />
-          <CardHeader className="bg-muted/5 p-8 border-b">
+          <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-6" : "p-8")}>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-                <CalendarClock className="h-7 w-7 text-primary" /> 오늘의 출석 설정 (필수)
+              <CardTitle className={cn("font-black tracking-tighter flex items-center gap-3", isMobile ? "text-xl" : "text-2xl")}>
+                <CalendarClock className={cn("text-primary", isMobile ? "h-6 w-6" : "h-7 w-7")} /> 오늘의 출석 설정 (필수)
               </CardTitle>
               <Badge className={cn("bg-white text-primary border-none font-black text-[9px] uppercase tracking-widest px-3 py-1 shadow-sm")}>Step 1</Badge>
             </div>
             <CardDescription className="font-bold text-sm mt-1 text-muted-foreground/70">선생님의 관제를 위해 반드시 오늘 등원 정보를 입력해 주세요.</CardDescription>
           </CardHeader>
-          <CardContent className="p-8 sm:p-10">
+          <CardContent className={cn(isMobile ? "p-6" : "p-8 sm:p-10")}>
             {(!hasInPlan || !hasOutPlan) && !isAbsentMode ? (
               <div className="flex flex-col gap-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className={cn("grid gap-8", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 ml-1">
                       <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
                       <Label className="text-xs font-black text-primary uppercase tracking-widest">오늘 등원합니다</Label>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 grid grid-cols-2 gap-3">
+                    <div className={cn("flex items-center gap-4", isMobile ? "flex-col" : "flex-row")}>
+                      <div className="flex-1 grid grid-cols-2 gap-3 w-full">
                         <div className="space-y-2">
                           <span className="text-[10px] font-black opacity-40 ml-1">등원 예정</span>
                           <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-xl shadow-inner focus-visible:ring-primary/20" />
@@ -583,11 +571,11 @@ export default function StudyPlanPage() {
                           <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-xl shadow-inner focus-visible:ring-primary/20" />
                         </div>
                       </div>
-                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("h-14 px-10 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all mt-6 text-white bg-gradient-to-br", currentTier.gradient)}>설정 완료</Button>
+                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full mt-2" : "px-10 mt-6", currentTier.gradient)}>설정 완료</Button>
                     </div>
                   </div>
                   
-                  <div className="flex flex-col justify-center items-center border-l border-dashed pl-8">
+                  <div className={cn("flex flex-col justify-center items-center", isMobile ? "border-t border-dashed pt-8" : "border-l border-dashed pl-8")}>
                     <p className="text-xs font-bold text-muted-foreground mb-4">오늘은 공부를 쉬어갑니다.</p>
                     <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="w-full h-14 rounded-2xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-3 text-lg transition-all active:scale-95">
                       <XCircle className="h-6 w-6" /> 이날 등원하지 않습니다
@@ -596,14 +584,14 @@ export default function StudyPlanPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between p-8 rounded-[2.5rem] bg-[#fafafa] border-2 border-transparent shadow-inner relative group overflow-hidden">
+              <div className={cn("flex items-center justify-between rounded-[2.5rem] bg-[#fafafa] border-2 border-transparent shadow-inner relative group overflow-hidden", isMobile ? "flex-col p-6 gap-4" : "p-8")}>
                 <div className={cn("absolute inset-0 opacity-[0.03] pointer-events-none bg-gradient-to-br", currentTier.gradient)} />
-                <div className="flex items-center gap-6 relative z-10">
+                <div className={cn("flex items-center gap-6 relative z-10", isMobile ? "flex-col text-center" : "flex-row")}>
                   <div className={cn("p-4 rounded-3xl shadow-xl text-white bg-gradient-to-br", isAbsentMode ? "from-rose-500 to-rose-700" : currentTier.gradient)}>
                     {isAbsentMode ? <XCircle className="h-8 w-8" /> : <CheckCircle2 className="h-8 w-8" />}
                   </div>
                   <div className="grid gap-1">
-                    <span className="text-2xl font-black tracking-tighter text-primary">{isAbsentMode ? '오늘 휴무 (미등원)' : '출석 시간 설정 완료'}</span>
+                    <span className={cn("font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-2xl")}>{isAbsentMode ? '오늘 휴무 (미등원)' : '출석 시간 설정 완료'}</span>
                     {!isAbsentMode && <span className="text-sm font-bold text-muted-foreground">{inTime} 등원 ~ {outTime} 하원</span>}
                   </div>
                 </div>
@@ -619,22 +607,21 @@ export default function StudyPlanPage() {
         </Card>
       )}
 
-      {/* 학습 밸런스 요약 카드 - 티어 컬러 반영 */}
       <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03] group hover:shadow-2xl transition-all duration-500">
         <div className={cn("h-1.5 w-full bg-gradient-to-r opacity-30", currentTier.gradient)} />
-        <CardHeader className="p-8 pb-4">
+        <CardHeader className={cn(isMobile ? "p-6" : "p-8 pb-4")}>
           <div className="flex items-center gap-3">
             <div className="bg-primary/5 p-2 rounded-xl"><BarChart3 className="h-5 w-5 text-primary" /></div>
             <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-primary/60">Daily Learning Balance Matrix</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-8 pt-2">
+        <CardContent className={cn(isMobile ? "p-6 pt-2" : "p-8 pt-2")}>
           <div className="flex flex-col gap-8">
             <div className="flex items-baseline gap-3">
-              <span className={cn("text-6xl font-black tracking-tighter drop-shadow-sm text-primary")}>
-                {Math.floor(studyTimeSummary.total / 60)}<span className="text-2xl opacity-40 ml-1">h</span> {studyTimeSummary.total % 60}<span className="text-2xl opacity-40 ml-1">m</span>
+              <span className={cn("font-black tracking-tighter drop-shadow-sm text-primary", isMobile ? "text-4xl" : "text-6xl")}>
+                {Math.floor(studyTimeSummary.total / 60)}<span className="text-xl opacity-40 ml-1">h</span> {studyTimeSummary.total % 60}<span className="text-xl opacity-40 ml-1">m</span>
               </span>
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Today's Target Depth</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Today's Target Depth</span>
             </div>
             
             <div className="flex flex-wrap gap-3">
@@ -642,15 +629,15 @@ export default function StudyPlanPage() {
                 const plannedTime = studyTimeSummary.breakdown[subj.id] || 0;
                 if (plannedTime === 0) return null;
                 return (
-                  <div key={subj.id} className={cn("flex items-center gap-3 px-5 py-2.5 rounded-2xl border-2 transition-all hover:scale-105 shadow-sm", subj.light, subj.text, "border-transparent")}>
-                    <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", subj.color)} />
-                    <span className="text-sm font-black tracking-tight">{subj.label} {Math.floor(plannedTime / 60)}h {plannedTime % 60}m</span>
+                  <div key={subj.id} className={cn("flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all hover:scale-105 shadow-sm", subj.light, subj.text, "border-transparent")}>
+                    <div className={cn("w-2 h-2 rounded-full shadow-sm", subj.color)} />
+                    <span className="text-[11px] font-black tracking-tight">{subj.label} {Math.floor(plannedTime / 60)}h {plannedTime % 60}m</span>
                   </div>
                 );
               })}
               {studyTimeSummary.total === 0 && (
-                <div className="py-4 px-6 rounded-2xl bg-muted/20 border-2 border-dashed border-muted-foreground/10 flex items-center gap-3 text-muted-foreground/40 italic text-sm font-bold w-full">
-                  <Info className="h-4 w-4" /> 학습 계획을 추가하여 시간 배분을 정밀하게 분석하세요.
+                <div className="py-4 px-6 rounded-2xl bg-muted/20 border-2 border-dashed border-muted-foreground/10 flex items-center gap-3 text-muted-foreground/40 italic text-[11px] font-bold w-full">
+                  <Info className="h-4 w-4" /> 학습 계획을 추가하여 시간 배분을 분석하세요.
                 </div>
               )}
             </div>
@@ -659,7 +646,6 @@ export default function StudyPlanPage() {
       </Card>
 
       <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1 px-0" : "md:grid-cols-12")}>
-        {/* 생활 루틴 */}
         <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.02] mx-auto w-full", isMobile ? "md:col-span-12" : "md:col-span-5")}>
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-6" : "p-8")}>
             <div className="flex items-center justify-between">
@@ -691,7 +677,6 @@ export default function StudyPlanPage() {
           </CardContent>
         </Card>
 
-        {/* 학습 & 개인 일정 */}
         <div className={cn("w-full mx-auto", isMobile ? "md:col-span-12" : "md:col-span-7")}>
           <Tabs defaultValue="study" className="w-full">
             <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]">

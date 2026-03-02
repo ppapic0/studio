@@ -188,8 +188,8 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost }: { dailyLpStatus?: Growth
             <div className="bg-amber-50 p-2.5 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md"><Zap className="h-6 w-6 text-amber-600 group-hover:text-white" /></div>
           </CardHeader>
           <CardContent className="px-10 pb-10">
-            <div className="font-black tracking-tighter text-amber-600 text-6xl sm:text-7xl drop-shadow-sm">
-              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className="text-2xl ml-1.5 opacity-40 font-bold uppercase">lp</span>
+            <div className="font-black tracking-tighter text-amber-600 text-5xl sm:text-7xl drop-shadow-sm">
+              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className="text-xl ml-1.5 opacity-40 font-bold uppercase">lp</span>
             </div>
             <div className="flex items-center gap-2 mt-6">
               <Badge variant="secondary" className="bg-amber-50 text-amber-700 border border-amber-100 font-black text-[10px] px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all">히스토리 분석하기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
@@ -268,7 +268,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m }: { st
             <div className="bg-blue-50 p-2.5 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md"><Clock className="h-6 w-6 text-blue-600 group-hover:text-white" /></div>
           </CardHeader>
           <CardContent className="px-10 pb-10">
-            <div className="font-black tracking-tighter text-blue-600 text-6xl sm:text-7xl drop-shadow-sm">{h}<span className="text-2xl ml-1.5 opacity-40 font-bold uppercase">h</span> {m}<span className="text-2xl ml-1.5 opacity-40 font-bold uppercase">m</span></div>
+            <div className="font-black tracking-tighter text-blue-600 text-5xl sm:text-7xl drop-shadow-sm">{h}<span className="text-xl ml-1.5 opacity-40 font-bold uppercase">h</span> {m}<span className="text-xl ml-1.5 opacity-40 font-bold uppercase">m</span></div>
             <div className="mt-6 flex items-center gap-2">
               <Badge variant="secondary" className="bg-blue-50 text-blue-700 border border-blue-100 font-black text-[10px] px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all">몰입 세션 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-2" />
@@ -374,7 +374,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    // 엘리트 티어 기준을 25,000점으로 조정
     if (currentLp >= 25000) {
       if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
       if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
@@ -383,7 +382,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return TIERS.slice(0, 5).reverse().find(t => currentLp >= t.min) || TIERS[0];
   }, [currentLp, currentRank]);
 
-  // 각 스킬 100점당 5% 부스트 (최대 20%)
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
 
   const studyLogRef = useMemoFirebase(() => {
@@ -412,13 +410,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const updateData: any = { updatedAt: serverTimestamp() };
       
       if (sessionMinutes > 0) {
-        // 1. 순수 공부 시간 LP 보상 (분당 1 LP * 부스트)
         let studyLpEarned = Math.round(sessionMinutes * totalBoost);
-        
-        // 2. 집중력 스탯 (1시간당 0.1점)
         updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
-        // 3. 출석 보너스 LP 로직 (3시간 달성 시 +100 LP)
         const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
         const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
         
@@ -429,7 +423,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
         }
 
-        // 4. 회복력 스탯 (하루 6시간 이상 공부 시 +0.5점)
         if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
           updateData['stats.resilience'] = increment(0.5);
           updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
@@ -454,7 +447,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setStartTime(Date.now()); 
       setIsTimerActive(true);
       
-      // 입실 시 꾸준함 스탯 상승 (+0.5점)
       if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
         await updateDoc(progressRef, {
           'stats.consistency': increment(0.5),
@@ -475,8 +467,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     
     if (nextState) {
       const batch = writeBatch(firestore);
-      
-      // 목표달성 스탯 업데이트 (항목당 0.1점, 하루 최대 0.5점)
       const achievementCount = progress?.dailyLpStatus?.[todayKey]?.achievementCount || 0;
       if (achievementCount < 5) {
         batch.update(progressRef, { 
@@ -485,7 +475,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         });
       }
 
-      // 계획 보너스 LP 체크 (3개 이상 작성 & 모두 완료 시 +100 LP)
       const currentStudyTasks = todayPlans.filter(p => p.category === 'study' || !p.category);
       const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
       
@@ -526,7 +515,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             {isTimerActive && (
               <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] shrink-0 w-full sm:w-auto px-10 py-6 sm:px-12 sm:py-8")}>
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50 mb-2">Live Session</span>
-                <span className="font-mono font-black tracking-tighter tabular-nums text-white text-6xl leading-none">{Math.floor(localSeconds / 60).toString().padStart(2, '0')}:{(localSeconds % 60).toString().padStart(2, '0')}</span>
+                <span className="font-mono font-black tracking-tighter tabular-nums text-white text-5xl sm:text-6xl leading-none">{Math.floor(localSeconds / 60).toString().padStart(2, '0')}:{(localSeconds % 60).toString().padStart(2, '0')}</span>
               </div>
             )}
             <button className={cn("w-full rounded-[2.5rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-3 whitespace-nowrap", isMobile ? "h-20 text-2xl" : "h-24 px-16 text-3xl", isTimerActive ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-white text-primary hover:bg-slate-50")} onClick={handleStudyStartStop}>
@@ -543,19 +532,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       <Card className={cn("border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]")}>
         <div className="grid grid-cols-1 lg:grid-cols-3">
-          {/* Left Side: Study Plans (2/3 width) */}
           <div className="lg:col-span-2 border-r border-dashed border-muted">
-            <CardHeader className="bg-emerald-50/30 border-b p-8 sm:p-10">
+            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-6" : "p-8 sm:p-10")}>
               <div className="flex items-center justify-between">
-                <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-3xl text-primary">
-                  <ListTodo className="h-8 w-8 text-emerald-600" /> 오늘의 계획트랙
+                <CardTitle className={cn("font-black flex items-center gap-4 tracking-tighter text-primary", isMobile ? "text-2xl" : "text-3xl")}>
+                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-6 w-6" : "h-8 w-8")} /> 오늘의 계획트랙
                 </CardTitle>
                 <Badge variant="secondary" className="bg-emerald-500 text-white border-none font-black text-[10px] px-3 h-7 uppercase tracking-widest">
                   {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-8 sm:p-10 bg-emerald-50/5">
+            <CardContent className={cn("bg-emerald-50/5", isMobile ? "p-6" : "p-8 sm:p-10")}>
               <div className="grid gap-4">
                 {studyTasks.length === 0 ? (
                   <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed border-emerald-200 rounded-[2.5rem]">등록된 학습 계획이 없습니다.</div>
@@ -582,14 +570,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </CardContent>
           </div>
 
-          {/* Right Side: Routines (1/3 width) */}
           <div className="lg:col-span-1 bg-amber-50/20">
-            <CardHeader className="bg-amber-100/30 border-b p-8 sm:p-10">
-              <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-amber-700 text-2xl sm:text-3xl">
-                <Timer className="h-8 w-8 text-amber-600" /> 오늘의 루틴
+            <CardHeader className={cn("bg-amber-100/30 border-b", isMobile ? "p-6" : "p-8 sm:p-10")}>
+              <CardTitle className={cn("font-black flex items-center gap-4 tracking-tighter text-amber-700", isMobile ? "text-xl" : "text-2xl sm:text-3xl")}>
+                <Timer className={cn("text-amber-600", isMobile ? "h-6 w-6" : "h-8 w-8")} /> 오늘의 루틴
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-8 sm:p-10 flex flex-col gap-4">
+            <CardContent className={cn("flex flex-col gap-4", isMobile ? "p-6" : "p-8 sm:p-10")}>
               {scheduleItems.length === 0 ? (
                 <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed border-amber-200 rounded-[2.5rem]">등록된 루틴이 없습니다.</div>
               ) : scheduleItems.map((item) => (
