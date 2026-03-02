@@ -7,6 +7,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,9 @@ import {
   History,
   Timer,
   LogIn,
-  LogOut
+  LogOut,
+  Filter,
+  LayoutGrid
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -68,6 +71,13 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -89,6 +99,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  
+  // 반별 필터링 상태
+  const [selectedClass, setSelectedClass] = useState<string>('all');
 
   const [gridRows, setGridRows] = useState(7);
   const [gridCols, setGridCols] = useState(10);
@@ -128,10 +141,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery, { enabled: isActive });
 
+  // 사용 가능한 반 목록 추출
+  const availableClasses = useMemo(() => {
+    if (!studentMembers) return [];
+    const classes = new Set<string>();
+    studentMembers.forEach(m => {
+      if (m.className) classes.add(m.className);
+    });
+    return Array.from(classes).sort();
+  }, [studentMembers]);
+
   const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isActive) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId]);
+  }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
   const logsQuery = useMemoFirebase(() => {
@@ -241,56 +264,65 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   };
 
+  // 통계 계산 로직 (반별 필터링 적용)
   const stats = useMemo(() => {
-    if (!mounted) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
+    if (!mounted || !attendanceList || !studentMembers) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
 
     let studying = 0;
     let absent = 0;
     let away = 0;
     let totalSeatsCount = 0;
     let totalMins = 0;
-    let allLiveMinutes: number[] = [];
+    let filteredLiveMinutes: number[] = [];
 
-    const attendanceMap = new globalThis.Map(attendanceList?.map(a => [a.id, a]));
+    // 반별 필터링된 멤버 ID 세트
+    const filteredMemberIds = new Set(
+      studentMembers
+        .filter(m => selectedClass === 'all' || m.className === selectedClass)
+        .map(m => m.id)
+    );
 
-    for (let col = 0; col < gridCols; col++) {
-      for (let row = 0; row < gridRows; row++) {
-        const seatNo = col * gridRows + row + 1;
-        const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
-        const seatData = attendanceMap.get(seatId);
+    attendanceList.forEach(seat => {
+      if (seat.type !== 'aisle') {
+        // 통계 산출 시 필터링된 반 학생이 앉아있는 경우만 계산하거나, 
+        // 'all'인 경우 전체 좌석을 기준으로 함
+        const isTargetStudent = seat.studentId && filteredMemberIds.has(seat.studentId);
         
-        if (!seatData || seatData.type !== 'aisle') {
+        if (selectedClass === 'all' || isTargetStudent) {
           totalSeatsCount++;
-          const studentId = seatData?.studentId;
-          if (studentId) {
-            const studentLog = todayLogs?.find(l => l.studentId === studentId);
+          
+          if (seat.studentId && isTargetStudent) {
+            const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
             const logMins = studentLog?.totalMinutes || 0;
-            const status = seatData?.status || 'absent';
+            const status = seat.status || 'absent';
 
             let sessionMins = 0;
-            if (status === 'studying' && seatData?.lastCheckInAt) {
-              sessionMins = Math.floor((now - seatData.lastCheckInAt.toMillis()) / 60000);
+            if (status === 'studying' && seat.lastCheckInAt) {
+              sessionMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
             }
 
             const currentTotal = logMins + sessionMins;
             totalMins += currentTotal;
-            allLiveMinutes.push(currentTotal);
+            filteredLiveMinutes.push(currentTotal);
 
             if (status === 'studying') studying++;
             else if (status === 'absent') absent++;
             else if (status === 'away' || status === 'break') away++;
+          } else if (!seat.studentId && selectedClass === 'all') {
+            // 학생이 없는 빈 좌석은 'all'일 때만 전체 카운트에 포함
+            absent++;
           }
         }
       }
-    }
+    });
 
-    const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalMins / allLiveMinutes.length) : 0;
-    const sortedMinutes = [...allLiveMinutes].sort((a, b) => b - a);
+    const avgMinutes = filteredLiveMinutes.length > 0 ? Math.round(totalMins / filteredLiveMinutes.length) : 0;
+    const sortedMinutes = [...filteredLiveMinutes].sort((a, b) => b - a);
     const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
     const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
 
     return { studying, absent, away, total: totalSeatsCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
-  }, [attendanceList, todayLogs, now, gridCols, gridRows, mounted]);
+  }, [attendanceList, todayLogs, studentMembers, selectedClass, now, mounted]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -424,38 +456,72 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </div>
           <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">LIVE</Badge>
         </div>
-        
-        <div className={cn("flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-[1.25rem] border shadow-sm", isMobile ? "flex-col items-stretch px-2" : "p-2 rounded-[1.5rem]")}>
-          <div className={cn("flex items-center gap-2 px-4", isMobile ? "border-b pb-2" : "border-r")}>
-            <Activity className="h-4 w-4 text-emerald-500" />
-            <div className="grid leading-none">
-              <span className="text-[8px] font-black text-muted-foreground uppercase">Center Total</span>
-              <span className="text-sm font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}h {stats.totalCenterMinutes % 60}m</span>
-            </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border shadow-sm px-4">
+            <Filter className="h-3.5 w-3.5 text-primary opacity-40" />
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger className="border-none shadow-none focus:ring-0 font-black text-xs h-8 w-[140px] bg-transparent">
+                <SelectValue placeholder="반 선택" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-none shadow-2xl">
+                <SelectItem value="all" className="font-black">센터 전체 보기</SelectItem>
+                {availableClasses.map(c => (
+                  <SelectItem key={c} value={c} className="font-black">{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className={cn("flex items-center gap-2 px-4", isMobile ? "border-b pb-2 py-2" : "border-r")}>
-            <Users className="h-4 w-4 text-blue-500" />
-            <div className="grid leading-none">
-              <span className="text-[8px] font-black text-muted-foreground uppercase">Avg Study</span>
-              <span className="text-sm font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}h {stats.avgMinutes % 60}m</span>
+          
+          <div className={cn("flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-[1.25rem] border shadow-sm", isMobile ? "hidden" : "p-2 rounded-[1.5rem]")}>
+            <div className="flex items-center gap-2 px-4 border-r">
+              <Activity className="h-4 w-4 text-emerald-500" />
+              <div className="grid leading-none">
+                <span className="text-[8px] font-black text-muted-foreground uppercase">{selectedClass === 'all' ? 'Center' : selectedClass} Total</span>
+                <span className="text-sm font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}h {stats.totalCenterMinutes % 60}m</span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-1.5 sm:py-0">
-            <Trophy className="h-4 w-4 text-amber-500" />
-            <div className="grid leading-none">
-              <span className="text-[8px] font-black text-muted-foreground uppercase">Top 20% Avg</span>
-              <span className="text-sm font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}h {stats.top20Avg % 60}m</span>
+            <div className="flex items-center gap-2 px-4 border-r">
+              <Users className="h-4 w-4 text-blue-500" />
+              <div className="grid leading-none">
+                <span className="text-[8px] font-black text-muted-foreground uppercase">Avg Study</span>
+                <span className="text-sm font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}h {stats.avgMinutes % 60}m</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-4">
+              <Trophy className="h-4 w-4 text-amber-500" />
+              <div className="grid leading-none">
+                <span className="text-[8px] font-black text-muted-foreground uppercase">Top 20% Avg</span>
+                <span className="text-sm font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}h {stats.top20Avg % 60}m</span>
+              </div>
             </div>
           </div>
         </div>
       </header>
+
+      {isMobile && (
+        <div className="px-4 grid grid-cols-3 gap-2">
+          <div className="p-3 bg-white rounded-2xl border shadow-sm flex flex-col items-center">
+            <span className="text-[7px] font-black text-muted-foreground uppercase">Total</span>
+            <span className="text-xs font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}h</span>
+          </div>
+          <div className="p-3 bg-white rounded-2xl border shadow-sm flex flex-col items-center">
+            <span className="text-[7px] font-black text-muted-foreground uppercase">Avg</span>
+            <span className="text-xs font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}h</span>
+          </div>
+          <div className="p-3 bg-white rounded-2xl border shadow-sm flex flex-col items-center">
+            <span className="text-[7px] font-black text-muted-foreground uppercase">Top 20</span>
+            <span className="text-xs font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}h</span>
+          </div>
+        </div>
+      )}
 
       <section className={cn("grid gap-4 px-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
         {[
           { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity, bg: 'bg-white' },
           { label: '미입실', val: stats.absent, color: 'text-rose-500', icon: AlertCircle, bg: 'bg-white' },
           { label: '외출/휴식', val: stats.away, color: 'text-amber-500', icon: Clock, bg: 'bg-white' },
-          { label: '배치 좌석', val: stats.total, color: 'text-primary', icon: Armchair, bg: 'bg-white', hasEdit: true }
+          { label: selectedClass === 'all' ? '배치 좌석' : `${selectedClass} 인원`, val: stats.total, color: 'text-primary', icon: Armchair, bg: 'bg-white', hasEdit: true }
         ].map((item, i) => (
           <Card key={i} className={cn("rounded-[2rem] sm:rounded-[2.5rem] border-none shadow-sm bg-white p-5 sm:p-8 transition-all hover:shadow-md relative overflow-hidden group")}>
             <div className="flex justify-between items-start mb-2">
@@ -517,6 +583,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <CardTitle className={cn("font-black tracking-tight flex items-center gap-2", isMobile ? "text-lg" : "text-xl")}>
               <Armchair className={cn("opacity-40", isMobile ? "h-4 w-4" : "h-5 w-5")} /> 
               {isEditMode ? '배치 수정' : '좌석 상황판'}
+              {selectedClass !== 'all' && <Badge variant="secondary" className="bg-primary/5 text-primary border-none ml-2">{selectedClass}</Badge>}
             </CardTitle>
             <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6 uppercase">{gridCols}x{gridRows}</Badge>
           </div>
@@ -538,6 +605,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       const seatDataFromList = attendanceList?.find(a => a.id === seatId);
                       const seat = seatDataFromList || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
+                      const studentMember = studentMembers?.find(m => m.id === seat?.studentId);
+                      
+                      const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
                       
                       const timeInfo = student ? getStudentStudyTimes(student.id, seat.status, seat.lastCheckInAt) : null;
                       const statusLogic = student ? getStudentStatusLogic(student.id, seat.status, timeInfo?.totalMins || 0) : { isAlert: false, isAbsentMode: false };
@@ -554,6 +624,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           onClick={() => handleSeatClick(seat)}
                           className={cn(
                             "aspect-square min-w-[64px] rounded-xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1 cursor-pointer shadow-sm border-2",
+                            isFilteredOut ? "opacity-20 grayscale border-transparent bg-muted/10" : 
                             isAisle 
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
                               : isStudying 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -49,7 +50,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
       list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
     }
     // 필터링 후 다시 랭킹순 정렬
-    return list.sort((a, b) => a.value - b.value === 0 ? 0 : b.value - a.value);
+    return list.sort((a, b) => b.value - a.value);
   }, [entries, classNameFilter]);
 
   const topThree = useMemo(() => {
@@ -68,7 +69,8 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
   const formatRank = (idx: number) => {
     const rank = idx + 1;
     if (rank <= 3) return `${rank}위`;
-    const percent = Math.max(1, Math.ceil((rank / (classNameFilter ? filteredEntries.length : totalStudents)) * 100));
+    const denominator = classNameFilter ? filteredEntries.length : totalStudents;
+    const percent = Math.max(1, Math.ceil((rank / (denominator || 1)) * 100));
     return `상위 ${percent}%`;
   };
 
@@ -255,7 +257,7 @@ export default function LeaderboardsPage() {
     return map;
   }, [studentProfiles]);
 
-  // 랭킹 데이터를 전체 다 가져와서 클라이언트에서 필터링 (복합 색인 요구 방지)
+  // 랭킹 데이터를 전체 다 가져와서 클라이언트에서 필터링
   const lpQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(

@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -93,7 +94,7 @@ const TIER_PRESETS = [
   { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
-function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string }) {
+function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string }) {
   const [stats, setStats] = useState(currentStats);
   const [lp, setLp] = useState(currentLp);
   const [mockRank, setMockRank] = useState(999);
@@ -113,7 +114,14 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
       const batch = writeBatch(firestore);
       batch.update(progressRef, { stats: stats, seasonLp: lp, updatedAt: serverTimestamp() });
       const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', userId);
-      batch.set(rankRef, { studentId: userId, displayNameSnapshot: displayName, value: lp, rank: mockRank, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(rankRef, { 
+        studentId: userId, 
+        displayNameSnapshot: displayName, 
+        classNameSnapshot: className || null, 
+        value: lp, 
+        rank: mockRank, 
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
       await batch.commit();
       toast({ title: "테스트 데이터 반영 완료" });
     } catch (e) {
@@ -1013,7 +1021,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Dialog>
       </section>
 
-      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} />}
+      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
     </div>
   );
 }
