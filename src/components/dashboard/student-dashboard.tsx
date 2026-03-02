@@ -465,13 +465,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
 
-      // 당일 신청 패널티 부여 (+5점)
+      // 당일 신청 패널티 부여 (지각 +3, 결석 +5)
       if (isTodayRequest) {
+        const pointsToAdd = requestType === 'late' ? 3 : 5;
         batch.update(progressRef!, {
-          penaltyPoints: increment(5),
+          penaltyPoints: increment(pointsToAdd),
           updatedAt: serverTimestamp()
         });
-        toast({ title: "당일 신청으로 벌점 5점이 부과되었습니다." });
+        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
       }
 
       await batch.commit();
@@ -783,7 +784,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3">
                       <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
                       <p className="text-[11px] font-bold text-rose-900 leading-relaxed">
-                        **당일 신청 알림**: 당일 지각/결석 신청 시 시스템 규정에 따라 **벌점 5점이 즉시 부과**됩니다.
+                        **당일 신청 알림**: 당일 신청 시 규정에 따라 **벌점(지각 +3, 결석 +5)**이 즉시 부과됩니다.
                       </p>
                     </div>
                   )}
