@@ -401,6 +401,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
   
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
+  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
