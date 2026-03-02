@@ -32,7 +32,7 @@ type LeaderboardTabProps = {
   description: string;
   entries: WithId<LeaderboardEntry>[] | null;
   isLoading: boolean;
-  metricType: 'lp' | 'completion' | 'attendance';
+  metricType: 'lp';
   isMobile: boolean;
   studentsMap: Record<string, StudentProfile>;
 };
@@ -45,11 +45,7 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
   }, [entries]);
 
   const getIcon = (size = "h-10 w-10") => {
-    switch(metricType) {
-      case 'lp': return <Zap className={cn(size, "text-amber-500 drop-shadow-lg")} />;
-      case 'completion': return <Crown className={cn(size, "text-yellow-500 drop-shadow-lg")} />;
-      case 'attendance': return <Star className={cn(size, "text-blue-500 drop-shadow-lg")} />;
-    }
+    return <Zap className={cn(size, "text-amber-500 drop-shadow-lg")} />;
   };
 
   const getRankBadge = (rank: number) => {
@@ -80,10 +76,8 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
         </div>
         <div className="flex items-center gap-6 relative z-10">
           <div className={cn(
-            "rounded-[1.5rem] shadow-xl shrink-0 flex items-center justify-center p-4",
-            isMobile ? "h-14 w-14" : "h-20 w-20",
-            metricType === 'lp' ? "bg-amber-50 text-amber-600" : 
-            metricType === 'completion' ? "bg-yellow-50 text-yellow-600" : "bg-blue-50 text-blue-600"
+            "rounded-[1.5rem] shadow-xl shrink-0 flex items-center justify-center p-4 bg-amber-50 text-amber-600",
+            isMobile ? "h-14 w-14" : "h-20 w-20"
           )}>
             {getIcon(isMobile ? "h-8 w-8" : "h-10 w-10")}
           </div>
@@ -161,11 +155,11 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
 
                   <div className="text-right shrink-0 relative z-10">
                     <div className={cn(
-                      "font-black tabular-nums tracking-tighter leading-none drop-shadow-sm",
+                      "font-black tabular-nums tracking-tighter leading-none drop-shadow-sm text-primary",
                       isMobile ? "text-3xl" : "text-6xl",
-                      entry.rank === 1 ? "text-amber-600" : "text-primary"
+                      entry.rank === 1 && "text-amber-600"
                     )}>
-                      {entry.value.toLocaleString()}<span className="text-sm sm:text-2xl ml-1.5 opacity-30 uppercase">{metricType === 'attendance' ? '일' : metricType === 'lp' ? 'lp' : '%'}</span>
+                      {entry.value.toLocaleString()}<span className="text-sm sm:text-2xl ml-1.5 opacity-30 uppercase">lp</span>
                     </div>
                     <span className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.2em] mt-2 block">Season Achievement</span>
                   </div>
@@ -216,26 +210,6 @@ export default function LeaderboardsPage() {
   }, [firestore, activeMembership, periodKey]);
   const { data: lpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
 
-  const completionQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_completion`, 'entries'),
-      orderBy('rank', 'asc'),
-      limit(3) 
-    );
-  }, [firestore, activeMembership, periodKey]);
-  const { data: completionEntries, isLoading: completionLoading } = useCollection<LeaderboardEntry>(completionQuery, { enabled: isMember });
-
-  const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_attendance`, 'entries'),
-      orderBy('rank', 'asc'),
-      limit(3)
-    );
-  }, [firestore, activeMembership, periodKey]);
-  const { data: attendanceEntries, isLoading: attendanceLoading } = useCollection<LeaderboardEntry>(attendanceQuery, { enabled: isMember });
-
   if (!isMember) {
     return (
         <div className="max-w-4xl mx-auto py-20 px-4">
@@ -281,35 +255,21 @@ export default function LeaderboardsPage() {
 
         <p className={cn("font-bold text-muted-foreground leading-relaxed mt-4", isMobile ? "text-sm max-w-xs" : "text-xl max-w-2xl")}>
           {format(targetDate, 'yyyy년 M월')} 시즌 최정상에 오른 챔피언들입니다. <br/>
-          각 분야 Top 3만이 누릴 수 있는 명예의 전당입니다.
+          센터 내 Top 3만이 누릴 수 있는 명예의 전당입니다.
         </p>
       </header>
 
       <Tabs defaultValue="lp" className="w-full">
         <div className="flex justify-center mb-8">
           <TabsList className={cn(
-            "grid grid-cols-3 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
-            isMobile ? "h-14 max-w-sm" : "h-20 max-w-3xl rounded-[2.5rem]"
+            "grid grid-cols-1 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
+            isMobile ? "h-14 max-w-[200px]" : "h-20 max-w-sm rounded-[2.5rem]"
           )}>
             <TabsTrigger value="lp" className={cn(
               "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
               isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
             )}>
-              <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span className={cn(isMobile ? "truncate" : "")}>종합 LP</span>
-            </TabsTrigger>
-            
-            <TabsTrigger value="completion" className={cn(
-              "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
-              isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
-            )}>
-              <Crown className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-yellow-500")} /> <span className={cn(isMobile ? "truncate" : "")}>계획완수</span>
-            </TabsTrigger>
-
-            <TabsTrigger value="attendance" className={cn(
-              "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
-              isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
-            )}>
-              <Star className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-blue-500")} /> <span className={cn(isMobile ? "truncate" : "")}>출석왕</span>
+              <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span>종합 LP 랭킹</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -325,30 +285,6 @@ export default function LeaderboardsPage() {
             studentsMap={studentsMap}
           />
         </TabsContent>
-
-        <TabsContent value="completion" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
-          <LeaderboardTab
-            title="계획완수 마스터"
-            description="3개 이상 계획을 가장 성실히 완수한 상위 3명입니다."
-            entries={completionEntries}
-            isLoading={completionLoading}
-            metricType="completion"
-            isMobile={isMobile}
-            studentsMap={studentsMap}
-          />
-        </TabsContent>
-
-        <TabsContent value="attendance" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
-          <LeaderboardTab
-            title="몰입 출석왕"
-            description="3시간 이상 몰입 학습을 가장 많이 기록한 상위 3명입니다."
-            entries={attendanceEntries}
-            isLoading={attendanceLoading}
-            metricType="attendance"
-            isMobile={isMobile}
-            studentsMap={studentsMap}
-          />
-        </TabsContent>
       </Tabs>
 
       <footer className="pt-12 flex flex-col items-center gap-4 opacity-30">
@@ -357,7 +293,7 @@ export default function LeaderboardsPage() {
         </div>
         <p className="text-[9px] font-bold max-w-md text-center leading-relaxed">
           개인정보 보호를 위해 성명은 마스킹 처리되며,<br/>
-          학교 대항전 느낌을 살리기 위해 소속 학교가 강조됩니다.
+          소속 학교가 강조되어 표시됩니다.
         </p>
       </footer>
     </div>
