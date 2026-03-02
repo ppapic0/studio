@@ -71,24 +71,26 @@ const TIERS = [
 ];
 
 const TIER_PRESETS = [
-  { label: '아이언', lp: 0, stats: 10, color: 'bg-slate-400' },
-  { label: '실버', lp: 10000, stats: 45, color: 'bg-slate-300' },
-  { label: '골드', lp: 15000, stats: 65, color: 'bg-yellow-500' },
-  { label: '플래티넘', lp: 20000, stats: 80, color: 'bg-emerald-400' },
-  { label: '다이아', lp: 25000, stats: 90, color: 'bg-blue-400' },
-  { label: '마스터', lp: 26000, stats: 95, color: 'bg-purple-500' },
-  { label: '그마', lp: 30000, stats: 98, color: 'bg-rose-500' },
-  { label: '챌린저', lp: 35000, stats: 100, color: 'bg-cyan-400' },
+  { label: '아이언', lp: 0, stats: 10, rank: 999, color: 'bg-slate-400' },
+  { label: '실버', lp: 10000, stats: 45, rank: 50, color: 'bg-slate-300' },
+  { label: '골드', lp: 15000, stats: 65, rank: 20, color: 'bg-yellow-500' },
+  { label: '플래티넘', lp: 20000, stats: 80, rank: 10, color: 'bg-emerald-400' },
+  { label: '다이아', lp: 25000, stats: 90, rank: 5, color: 'bg-blue-400' },
+  { label: '마스터', lp: 26000, stats: 95, rank: 4, color: 'bg-purple-500' },
+  { label: '그마', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
+  { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
 /**
  * Jacob 전용 티어 컨트롤러 컴포넌트
  */
-function JacobTierController({ progressRef, currentStats, currentLp }: { progressRef: any, currentStats: any, currentLp: number }) {
+function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string }) {
   const [stats, setStats] = useState(currentStats);
   const [lp, setLp] = useState(currentLp);
+  const [mockRank, setMockRank] = useState(999);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   useEffect(() => {
     setStats(currentStats);
@@ -96,14 +98,30 @@ function JacobTierController({ progressRef, currentStats, currentLp }: { progres
   }, [currentStats, currentLp]);
 
   const handleUpdate = async () => {
+    if (!firestore) return;
     setIsUpdating(true);
     try {
-      await updateDoc(progressRef, {
+      const batch = writeBatch(firestore);
+      
+      // 1. 성장 정보 업데이트
+      batch.update(progressRef, {
         stats: stats,
         seasonLp: lp,
         updatedAt: serverTimestamp()
       });
-      toast({ title: "테스트 데이터 반영 완료", description: "설정한 스탯과 LP가 실시간으로 반영되었습니다." });
+
+      // 2. 랭킹 정보 시뮬레이션 (즉시 반영을 위해)
+      const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', userId);
+      batch.set(rankRef, {
+        studentId: userId,
+        displayNameSnapshot: displayName,
+        value: lp,
+        rank: mockRank,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
+      toast({ title: "테스트 데이터 반영 완료", description: "설정한 스탯과 LP, 랭킹이 실시간으로 반영되었습니다." });
     } catch (e) {
       toast({ variant: "destructive", title: "보정 실패" });
     } finally {
@@ -113,6 +131,7 @@ function JacobTierController({ progressRef, currentStats, currentLp }: { progres
 
   const applyPreset = (preset: typeof TIER_PRESETS[0]) => {
     setLp(preset.lp);
+    setMockRank(preset.rank);
     setStats({ focus: preset.stats, consistency: preset.stats, achievement: preset.stats, resilience: preset.stats });
   };
 
@@ -124,7 +143,7 @@ function JacobTierController({ progressRef, currentStats, currentLp }: { progres
             <div className="bg-primary p-2 rounded-xl text-white shadow-lg"><Settings2 className="h-5 w-5" /></div>
             <div>
               <CardTitle className="text-xl font-black tracking-tighter">Jacob's Dev Stat Controller</CardTitle>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Real-time Tier & LP Simulation</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">Rank & Tier Simulator</p>
             </div>
           </div>
           <Badge className="bg-rose-500 text-white font-black px-3 py-1 rounded-full shadow-lg">TEST ACCOUNT ONLY</Badge>
@@ -132,7 +151,6 @@ function JacobTierController({ progressRef, currentStats, currentLp }: { progres
       </CardHeader>
       
       <CardContent className="p-0 flex flex-col lg:flex-row gap-10">
-        {/* Left: Manual Controls */}
         <div className="flex-1 space-y-8">
           <div className="space-y-4">
             <div className="flex justify-between items-center px-1">
@@ -165,7 +183,6 @@ function JacobTierController({ progressRef, currentStats, currentLp }: { progres
           </div>
         </div>
 
-        {/* Right: Presets & Apply */}
         <div className="lg:w-[320px] flex flex-col gap-6 shrink-0">
           <div className="grid grid-cols-3 gap-2">
             {TIER_PRESETS.map((preset) => (
@@ -629,7 +646,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       {/* 4. Jacob 전용 티어 컨트롤러 패널 */}
       {isJacob && progressRef && (
-        <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} />
+        <JacobTierController 
+          progressRef={progressRef} 
+          currentStats={stats} 
+          currentLp={currentLp} 
+          userId={user.uid}
+          centerId={activeMembership.id}
+          periodKey={periodKey}
+          displayName={user.displayName || 'Jacob'}
+        />
       )}
     </div>
   );
