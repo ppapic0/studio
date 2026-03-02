@@ -50,7 +50,7 @@ import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
