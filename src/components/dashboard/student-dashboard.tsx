@@ -428,7 +428,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const myRequestsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
-    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트 측에서 정렬합니다.
+    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트 측에서 필터링합니다.
     return query(
       collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
       where('studentId', '==', user.uid)
@@ -994,7 +994,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Dialog>
       </section>
 
-      {isJacob && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} />}
+      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} />}
     </div>
   );
 }
