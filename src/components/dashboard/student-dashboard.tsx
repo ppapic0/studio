@@ -29,11 +29,14 @@ import {
   Crown,
   ChevronRight,
   TrendingUp,
+  Settings2,
+  Wand2,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -55,12 +58,89 @@ const TIERS = [
   { name: '마스터', min: 95, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
 ];
 
-const STAT_CONFIG = {
-  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500', accent: 'bg-blue-50' },
-  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500', bg: 'bg-emerald-500', accent: 'bg-emerald-50' },
-  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500', bg: 'bg-amber-500', accent: 'bg-amber-50' },
-  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', bg: 'bg-rose-500', accent: 'bg-rose-50' },
-};
+/**
+ * Jacob 전용 티어 컨트롤러 컴포넌트
+ */
+function JacobTierController({ progressRef, currentStats }: { progressRef: any, currentStats: any }) {
+  const [stats, setStats] = useState(currentStats);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setStats(currentStats);
+  }, [currentStats]);
+
+  const handleUpdate = async () => {
+    setIsUpdating(true);
+    try {
+      await updateDoc(progressRef, {
+        stats: stats,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: "티어 보정 완료", description: "설정한 스탯이 실시간으로 반영되었습니다." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "보정 실패" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const setTierValue = (val: number) => {
+    setStats({ focus: val, consistency: val, achievement: val, resilience: val });
+  };
+
+  return (
+    <Card className="border-4 border-dashed border-primary/20 bg-primary/5 rounded-[2.5rem] p-8 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+      <CardHeader className="p-0 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary p-2 rounded-xl text-white"><Settings2 className="h-5 w-5" /></div>
+            <CardTitle className="text-xl font-black tracking-tighter">Jacob's Dev Stat Controller</CardTitle>
+          </div>
+          <Badge className="bg-rose-500 text-white font-black">TEST ACCOUNT ONLY</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0 space-y-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          {Object.entries({
+            focus: '집중력',
+            consistency: '꾸준함',
+            achievement: '목표달성',
+            resilience: '회복력'
+          }).map(([key, label]) => (
+            <div key={key} className="space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-black uppercase text-muted-foreground">{label}</span>
+                <span className="text-xs font-black text-primary">{(stats[key] || 0).toFixed(0)}</span>
+              </div>
+              <Slider 
+                value={[stats[key] || 0]} 
+                max={100} 
+                step={1} 
+                onValueChange={([val]) => setStats({ ...stats, [key]: val })}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 justify-center">
+          {[
+            { l: '아이언(10)', v: 10 }, { l: '실버(45)', v: 45 }, 
+            { l: '골드(65)', v: 65 }, { l: '플래티넘(80)', v: 80 }, 
+            { l: '다이아(90)', v: 90 }, { l: '마스터(98)', v: 98 }
+          ].map(t => (
+            <Button key={t.v} variant="outline" size="sm" onClick={() => setTierValue(t.v)} className="rounded-lg font-black text-[10px] h-8 px-3 border-2">{t.l}</Button>
+          ))}
+        </div>
+
+        <Button onClick={handleUpdate} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
+          {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5" />}
+          스탯 즉시 반영 및 티어 업데이트
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
@@ -255,8 +335,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
 
+  const isJacob = user?.email === 'jacob444@naver.com';
+
   return (
-    <div className={cn("flex flex-col gap-6 sm:gap-8 pb-24")}>
+    <div className={cn("flex flex-col gap-6 sm:gap-10 pb-24")}>
       {/* 1. 티어 기반 프리미엄 트래커 카드 */}
       <section className={cn(
         "group relative overflow-hidden text-white shadow-2xl transition-all duration-700 rounded-[2.5rem] p-8 sm:rounded-[3rem] sm:p-12",
@@ -311,100 +393,57 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 2. 요약 지표 (공부시간, LP) - 마스터리 삭제 */}
-      <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
-        <Card className="border-none shadow-xl bg-white rounded-[2rem] overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 px-8 pt-8">
+      {/* 2. 요약 지표 (공부시간, LP) */}
+      <div className={cn("grid gap-4 sm:gap-6", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
+        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">오늘의 누적 몰입</CardTitle>
-            <div className="bg-primary/5 p-2 rounded-xl"><Clock className="h-5 w-5 text-primary/60" /></div>
+            <div className="bg-primary/5 p-2.5 rounded-xl group-hover:bg-primary/10 transition-colors"><Clock className="h-6 w-6 text-primary/60" /></div>
           </CardHeader>
-          <CardContent className="px-8 pb-8">
-            <div className="font-black tracking-tighter text-primary text-5xl">
-              {h}<span className="text-xl ml-1.5 opacity-40 font-bold">h</span> {m}<span className="text-xl ml-1.5 opacity-40 font-bold">m</span>
+          <CardContent className="px-10 pb-10">
+            <div className="font-black tracking-tighter text-primary text-6xl">
+              {h}<span className="text-2xl ml-1.5 opacity-40 font-bold">h</span> {m}<span className="text-2xl ml-1.5 opacity-40 font-bold">m</span>
             </div>
-            <p className="font-bold text-muted-foreground/60 text-[11px] mt-3">Daily Goal: 6h (360m)</p>
+            <p className="font-bold text-muted-foreground/60 text-xs mt-4 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Daily Goal: 6h (360m) Focus Target
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-xl bg-white rounded-[2rem] overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 px-8 pt-8">
+        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">시즌 러닝 포인트 (LP)</CardTitle>
-            <div className="bg-accent/5 p-2 rounded-xl"><Zap className="h-5 w-5 text-accent" /></div>
+            <div className="bg-accent/5 p-2.5 rounded-xl group-hover:bg-accent/10 transition-colors"><Zap className="h-6 w-6 text-accent" /></div>
           </CardHeader>
-          <CardContent className="px-8 pb-8">
-            <div className="font-black tracking-tighter text-primary text-5xl">
-              {(progress?.seasonLp || 0).toLocaleString()}<span className="text-xl ml-1.5 opacity-40 font-bold">LP</span>
+          <CardContent className="px-10 pb-10">
+            <div className="font-black tracking-tighter text-primary text-6xl">
+              {(progress?.seasonLp || 0).toLocaleString()}<span className="text-2xl ml-1.5 opacity-40 font-bold">LP</span>
             </div>
             <div className="flex items-center gap-2 mt-4">
-              <Badge variant="secondary" className="bg-accent/10 text-accent border-none font-black text-[10px]">MAX BOOST x{totalBoost.toFixed(2)}</Badge>
+              <Badge variant="secondary" className="bg-accent/10 text-accent border-none font-black text-[10px] px-3 py-1">MAX BOOST x{totalBoost.toFixed(2)}</Badge>
+              <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Season Active</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 3. 4대 핵심 품질 스탯 */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="h-6 w-6 text-primary opacity-40" />
-            <h2 className="text-2xl font-black tracking-tighter uppercase tracking-widest">Quality Stats</h2>
-          </div>
-          <Badge variant="outline" className="rounded-full font-black text-[10px] border-primary/20 px-4 py-1">TIER AVG: {avgStat.toFixed(1)}</Badge>
-        </div>
-
-        <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2 lg:grid-cols-4")}>
-          {Object.entries(STAT_CONFIG).map(([key, config]) => {
-            const val = stats[key as keyof typeof stats] || 0;
-            const Icon = config.icon;
-            return (
-              <Card key={key} className="border-none bg-white shadow-xl rounded-[2.5rem] overflow-hidden group hover:-translate-y-1 transition-all duration-500 ring-1 ring-black/[0.03]">
-                <CardHeader className="p-8 pb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={cn("p-3 rounded-2xl", config.accent)}>
-                      <Icon className={cn("h-6 w-6", config.color)} />
-                    </div>
-                    <span className={cn("font-black text-[9px] uppercase tracking-widest opacity-40")}>{config.sub}</span>
-                  </div>
-                  <CardTitle className={cn("text-xl font-black tracking-tight mb-1")}>{config.label}</CardTitle>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black tabular-nums">{val.toFixed(1)}</span>
-                    <span className="text-xs font-bold text-muted-foreground opacity-40">/ 100</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-8 pb-8">
-                  <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner mb-4">
-                    <div 
-                      className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", config.bg)}
-                      style={{ width: `${val}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground">
-                    <span>품질 가중치</span>
-                    <span className={cn("font-black", config.color)}>x{(1 + (val/100)*0.10).toFixed(2)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 4. 계획 및 루틴 */}
+      {/* 3. 계획 및 루틴 */}
       <div className={cn("grid gap-6 grid-cols-1 lg:grid-cols-3")}>
-        <Card className={cn("border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03] lg:col-span-2")}>
-          <CardHeader className="bg-muted/5 border-b p-10">
+        <Card className={cn("border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03] lg:col-span-2")}>
+          <CardHeader className="bg-muted/5 border-b p-10 sm:p-12">
             <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-3xl text-primary">
               <ListTodo className="h-8 w-8" /> 오늘의 계획트랙
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-10">
+          <CardContent className="p-10 sm:p-12">
             <div className="grid gap-4">
               {studyTasks.length === 0 ? (
-                <div className="py-16 text-center opacity-20 italic font-black text-sm">등록된 학습 계획이 없습니다.</div>
+                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-[2.5rem]">등록된 학습 계획이 없습니다.</div>
               ) : studyTasks.map((task) => (
                 <div key={task.id} className={cn(
                   "flex items-center gap-6 p-8 rounded-[2.5rem] border-2 transition-all duration-500", 
-                  task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md"
+                  task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md hover:border-primary/10"
                 )}>
                   <Checkbox 
                     id={task.id} 
@@ -428,7 +467,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
+        <Card className="border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
           <CardHeader className="bg-amber-50/30 border-b p-10">
             <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-amber-700">
               <Timer className="h-8 w-8" /> 오늘의 루틴
@@ -437,14 +476,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <CardContent className="p-10 bg-[#fafafa]">
             <div className="space-y-4">
               {scheduleItems.length === 0 ? (
-                <div className="py-16 text-center opacity-20 italic font-black text-sm">등록된 루틴이 없습니다.</div>
+                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed border-amber-200 rounded-[2.5rem]">등록된 루틴이 없습니다.</div>
               ) : scheduleItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-8 rounded-[2.5rem] bg-white border shadow-sm group hover:border-amber-300 transition-all">
+                <div key={item.id} className="flex items-center justify-between p-8 rounded-[2.5rem] bg-white border shadow-sm group hover:border-amber-300 transition-all active:scale-[0.98]">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600"><Timer className="h-4 w-4" /></div>
+                    <div className="p-2.5 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 shadow-sm"><Timer className="h-4 w-4" /></div>
                     <span className="font-black tracking-tight text-primary">{item.title.split(': ')[0]}</span>
                   </div>
-                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-lg px-4 py-1.5 rounded-2xl border-amber-200 bg-amber-50">
+                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-lg px-4 py-1.5 rounded-2xl border-amber-200 bg-amber-50/50">
                     {item.title.split(': ')[1] || '--:--'}
                   </Badge>
                 </div>
@@ -453,6 +492,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* 4. Jacob 전용 티어 컨트롤러 패널 */}
+      {isJacob && progressRef && (
+        <JacobTierController progressRef={progressRef} currentStats={stats} />
+      )}
     </div>
   );
 }
