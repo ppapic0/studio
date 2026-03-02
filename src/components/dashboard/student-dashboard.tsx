@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -66,9 +67,9 @@ const TIERS = [
   { name: '골드', min: 15000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
   { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
   { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
-  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
-  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
-  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
+  { name: '마스터', min: 30000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
+  { name: '그랜드마스터', min: 30000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
+  { name: '챌린저', min: 30000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
 ];
 
 const TIER_PRESETS = [
@@ -77,9 +78,9 @@ const TIER_PRESETS = [
   { label: '골드', lp: 15000, stats: 65, rank: 20, color: 'bg-yellow-500' },
   { label: '플래티넘', lp: 20000, stats: 80, rank: 10, color: 'bg-emerald-400' },
   { label: '다이아', lp: 25000, stats: 90, rank: 5, color: 'bg-blue-400' },
-  { label: '마스터', lp: 26000, stats: 95, rank: 4, color: 'bg-purple-500' },
-  { label: '그마', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
-  { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
+  { label: '마스터', lp: 31000, stats: 95, rank: 4, color: 'bg-purple-500' },
+  { label: '그마', lp: 35000, stats: 98, rank: 2, color: 'bg-rose-500' },
+  { label: '챌린저', lp: 40000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
 function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string }) {
@@ -140,7 +141,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
               <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 LP</span>
               <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
             </div>
-            <Slider value={[lp]} max={40000} step={500} onValueChange={([val]) => setLp(val)} />
+            <Slider value={[lp]} max={45000} step={500} onValueChange={([val]) => setLp(val)} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
@@ -374,7 +375,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    if (currentLp >= 25000) {
+    // 엘리트 티어 기준을 30,000점으로 상향 (25,000~30,000은 다이아몬드 구간)
+    if (currentLp >= 30000) {
       if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
       if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
       return TIERS.find(t => t.name === '마스터')!;
