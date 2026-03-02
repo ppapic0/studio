@@ -33,13 +33,11 @@ export function ReportNotifier() {
     if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
 
     const centerId = activeMembership.id;
-    // 최신 리포트 발송 상태 감지
+    // 복합 색인 요구를 피하기 위해 orderBy와 limit을 제거하고 클라이언트 측에서 필터링합니다.
     const q = query(
       collection(firestore, 'centers', centerId, 'dailyReports'),
       where('studentId', '==', user.uid),
-      where('status', '==', 'sent'),
-      orderBy('updatedAt', 'desc'),
-      limit(1)
+      where('status', '==', 'sent')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -48,6 +46,7 @@ export function ReportNotifier() {
         return;
       }
 
+      // 변경된 문서 중 가장 최신의 발송된 리포트 하나를 찾습니다.
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified') {
           const data = change.doc.data();

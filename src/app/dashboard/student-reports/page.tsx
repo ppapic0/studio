@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { DailyReport } from '@/lib/types';
 import { format } from 'date-fns';
 import { 
@@ -46,20 +46,25 @@ export default function StudentReportsPage() {
 
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
+    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트에서 정렬합니다.
     return query(
       collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
       where('studentId', '==', user.uid),
-      where('status', '==', 'sent'),
-      orderBy('dateKey', 'desc')
+      where('status', '==', 'sent')
     );
   }, [firestore, activeMembership, user]);
 
-  const { data: reports, isLoading } = useCollection<DailyReport>(reportsQuery);
+  const { data: rawReports, isLoading } = useCollection<DailyReport>(reportsQuery);
 
   const filteredReports = useMemo(() => {
-    if (!reports) return [];
-    return reports.filter(r => r.dateKey.includes(searchTerm));
-  }, [reports, searchTerm]);
+    if (!rawReports) return [];
+    
+    // 클라이언트 측 정렬 (최신순)
+    const sorted = [...rawReports].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+    
+    // 검색어 필터링
+    return sorted.filter(r => r.dateKey.includes(searchTerm));
+  }, [rawReports, searchTerm]);
 
   return (
     <div className={cn("flex flex-col gap-6 w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-1" : "gap-10")}>

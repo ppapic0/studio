@@ -30,19 +30,21 @@ export function NotificationBell() {
     if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
 
     const centerId = activeMembership.id;
+    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트에서 정렬합니다.
     const q = query(
       collection(firestore, 'centers', centerId, 'dailyReports'),
       where('studentId', '==', user.uid),
-      where('status', '==', 'sent'),
-      orderBy('updatedAt', 'desc'),
-      limit(5)
+      where('status', '==', 'sent')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedReports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const fetchedReports = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0))
+        .slice(0, 5);
+        
       setReports(fetchedReports);
       
-      // 최근 24시간 이내 업데이트된 게 있으면 뱃지 표시
       const now = Date.now();
       const isNew = fetchedReports.some(r => now - (r.updatedAt?.toMillis() || 0) < 24 * 60 * 60 * 1000);
       setHasNew(isNew);
@@ -92,7 +94,7 @@ export function NotificationBell() {
                     <p className="text-sm font-black tracking-tight">{report.dateKey} 분석 리포트</p>
                     <div className="flex items-center gap-1.5 opacity-40">
                       <Clock className="h-2.5 w-2.5" />
-                      <span className="text-[9px] font-bold">{format(report.updatedAt?.toDate(), 'HH:mm')} 도착</span>
+                      <span className="text-[9px] font-bold">{report.updatedAt ? format(report.updatedAt.toDate(), 'HH:mm') : ''} 도착</span>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />

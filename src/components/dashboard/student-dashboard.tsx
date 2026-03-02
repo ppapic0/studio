@@ -395,11 +395,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const penaltyPoints = progress?.penaltyPoints || 0;
   const penaltyRate = useMemo(() => {
-    if (penaltyPoints >= 30) return 0.15; // 30점 이상: 15% (강등 상태)
-    if (penaltyPoints >= 20) return 0.10; // 20-29점: 10%
-    if (penaltyPoints >= 10) return 0.06; // 10-19점: 6%
-    if (penaltyPoints >= 5) return 0.03;  // 5-9점: 3%
-    return 0; // 0-4점: 0%
+    if (penaltyPoints >= 30) return 0.15; 
+    if (penaltyPoints >= 20) return 0.10; 
+    if (penaltyPoints >= 10) return 0.06; 
+    if (penaltyPoints >= 5) return 0.03;  
+    return 0; 
   }, [penaltyPoints]);
 
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
@@ -428,14 +428,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const myRequestsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
+    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트 측에서 정렬합니다.
     return query(
       collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
-      where('studentId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
-      limit(5)
+      where('studentId', '==', user.uid)
     );
   }, [firestore, activeMembership, user]);
-  const { data: myRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+
+  const myRequests = useMemo(() => {
+    if (!rawRequests) return [];
+    return [...rawRequests]
+      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [rawRequests]);
 
   const handleRequestSubmit = async () => {
     if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
@@ -465,7 +471,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
 
-      // 당일 신청 패널티 부여 (지각 +3, 결석 +5)
       if (isTodayRequest) {
         const pointsToAdd = requestType === 'late' ? 3 : 5;
         batch.update(progressRef!, {
@@ -864,7 +869,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
               <div className={cn("space-y-10", isMobile ? "p-5" : "p-10")}>
-                {/* 현재 나의 상태 섹션 */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <Activity className="h-4 w-4 text-rose-600" />
@@ -890,7 +894,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </Card>
                 </section>
 
-                {/* 벌점 기준 섹션 */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <AlertOctagon className="h-4 w-4 text-primary" />
@@ -916,7 +919,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </section>
 
-                {/* 패널티 단계 섹션 */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <TrendingUp className="h-4 w-4 text-primary" />
@@ -932,7 +934,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     ].map(step => (
                       <div key={step.range} className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-border/50 shadow-sm">
                         <div className={cn("w-1.5 h-10 rounded-full", step.color)} />
-                        <div className="flex-1 grid">
+                        <div className="grid flex-1">
                           <span className="text-[10px] font-black text-muted-foreground uppercase">{step.range} 점 ({step.label})</span>
                           <span className="text-sm font-black text-primary">{step.effect}</span>
                         </div>
@@ -941,7 +943,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </section>
 
-                {/* 회복 시스템 섹션 */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <RefreshCw className="h-4 w-4 text-emerald-600" />
