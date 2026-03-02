@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -25,7 +24,8 @@ import {
   UserCheck,
   UserMinus,
   PauseCircle,
-  Users
+  Users,
+  Activity
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
