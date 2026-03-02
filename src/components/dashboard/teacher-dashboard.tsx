@@ -100,7 +100,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   
-  // 반별 필터링 상태
   const [selectedClass, setSelectedClass] = useState<string>('all');
 
   const [gridRows, setGridRows] = useState(7);
@@ -141,7 +140,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery, { enabled: isActive });
 
-  // 사용 가능한 반 목록 추출
   const availableClasses = useMemo(() => {
     if (!studentMembers) return [];
     const classes = new Set<string>();
@@ -157,26 +155,35 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
+  // 색인 오류 방지를 위해 복합 쿼리를 단순화하고 클라이언트에서 필터링합니다.
   const logsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !todayKey) return null;
+    if (!firestore || !centerId) return null;
     return query(
       collectionGroup(firestore, 'days'),
-      where('centerId', '==', centerId),
-      where('dateKey', '==', todayKey)
+      where('centerId', '==', centerId)
     );
-  }, [firestore, centerId, todayKey]);
-  const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
+  }, [firestore, centerId]);
+  const { data: allCenterLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
+
+  const todayLogs = useMemo(() => {
+    if (!allCenterLogs) return [];
+    return allCenterLogs.filter(l => l.dateKey === todayKey);
+  }, [allCenterLogs, todayKey]);
 
   const plansQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !todayKey) return null;
+    if (!firestore || !centerId) return null;
     return query(
       collectionGroup(firestore, 'items'),
       where('centerId', '==', centerId),
-      where('dateKey', '==', todayKey),
       where('category', '==', 'schedule')
     );
-  }, [firestore, centerId, todayKey]);
-  const { data: centerTodayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive });
+  }, [firestore, centerId]);
+  const { data: allCenterPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive });
+
+  const centerTodayPlans = useMemo(() => {
+    if (!allCenterPlans) return [];
+    return allCenterPlans.filter(p => p.dateKey === todayKey);
+  }, [allCenterPlans, todayKey]);
 
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -264,7 +271,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   };
 
-  // 통계 계산 로직 (반별 필터링 적용)
   const stats = useMemo(() => {
     if (!mounted || !attendanceList || !studentMembers) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
 
@@ -275,7 +281,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let totalMins = 0;
     let filteredLiveMinutes: number[] = [];
 
-    // 반별 필터링된 멤버 ID 세트
     const filteredMemberIds = new Set(
       studentMembers
         .filter(m => selectedClass === 'all' || m.className === selectedClass)
@@ -284,8 +289,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     attendanceList.forEach(seat => {
       if (seat.type !== 'aisle') {
-        // 통계 산출 시 필터링된 반 학생이 앉아있는 경우만 계산하거나, 
-        // 'all'인 경우 전체 좌석을 기준으로 함
         const isTargetStudent = seat.studentId && filteredMemberIds.has(seat.studentId);
         
         if (selectedClass === 'all' || isTargetStudent) {
@@ -309,7 +312,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             else if (status === 'absent') absent++;
             else if (status === 'away' || status === 'break') away++;
           } else if (!seat.studentId && selectedClass === 'all') {
-            // 학생이 없는 빈 좌석은 'all'일 때만 전체 카운트에 포함
             absent++;
           }
         }

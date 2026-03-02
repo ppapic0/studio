@@ -73,23 +73,32 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
 
 exports.deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
-    const { studentId, centerId } = data;
+    
+    const studentId = data.studentId ? data.studentId.toString().trim() : null;
+    const centerId = data.centerId ? data.centerId.toString().trim() : null;
+    
     if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "매개변수가 누락되었습니다.");
+    
     const callerId = context.auth.uid;
     try {
         const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-        if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') throw new functions.https.HttpsError("permission-denied", "관리자만 가능합니다.");
+        if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') {
+            throw new functions.https.HttpsError("permission-denied", "관리자만 가능합니다.");
+        }
+        
         try {
             await admin.auth().deleteUser(studentId);
         } catch (e) {
             if (e.code !== 'auth/user-not-found') throw e;
         }
+        
         const batch = db.batch();
         batch.delete(db.doc(`users/${studentId}`));
         batch.delete(db.doc(`centers/${centerId}/members/${studentId}`));
         batch.delete(db.doc(`userCenters/${studentId}/centers/${centerId}`));
         batch.delete(db.doc(`centers/${centerId}/students/${studentId}`));
         batch.delete(db.doc(`centers/${centerId}/growthProgress/${studentId}`));
+        
         await batch.commit();
         return { ok: true, message: "계정이 영구적으로 삭제되었습니다." };
     } catch (error) {

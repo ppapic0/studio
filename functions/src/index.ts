@@ -174,9 +174,13 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
  * 학생 계정을 영구 삭제하는 함수 (관리자 전용)
  */
 export const deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
+  }
   
-  const { studentId, centerId } = data;
+  const studentId = data.studentId?.toString().trim();
+  const centerId = data.centerId?.toString().trim();
+
   if (!studentId || !centerId) {
     throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 유효하지 않습니다.");
   }
@@ -188,9 +192,8 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
 
     // 1. 권한 확인 (관리자만 가능)
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    const callerData = callerMemberSnap.data();
     
-    if (!callerMemberSnap.exists || callerData?.role !== 'centerAdmin') {
+    if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') {
       console.warn(`[DeleteStudent] Unauthorized attempt by ${callerId}`);
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다. 관리자만 가능합니다.");
     }
@@ -211,11 +214,18 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
     // 3. Firestore 데이터 정리 (Batch)
     const batch = db.batch();
     
-    batch.delete(db.doc(`users/${studentId}`));
-    batch.delete(db.doc(`centers/${centerId}/members/${studentId}`));
-    batch.delete(db.doc(`userCenters/${studentId}/centers/${centerId}`));
-    batch.delete(db.doc(`centers/${centerId}/students/${studentId}`));
-    batch.delete(db.doc(`centers/${centerId}/growthProgress/${studentId}`));
+    // 삭제 대상 문서 경로 정의
+    const paths = [
+      `users/${studentId}`,
+      `centers/${centerId}/members/${studentId}`,
+      `userCenters/${studentId}/centers/${centerId}`,
+      `centers/${centerId}/students/${studentId}`,
+      `centers/${centerId}/growthProgress/${studentId}`
+    ];
+
+    paths.forEach(path => {
+      batch.delete(db.doc(path));
+    });
 
     await batch.commit();
     console.log(`[DeleteStudent] Firestore data for ${studentId} cleaned up`);
