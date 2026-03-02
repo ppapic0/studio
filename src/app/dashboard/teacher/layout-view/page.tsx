@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -42,9 +43,6 @@ import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
-
-const GRID_WIDTH = 20;
-const GRID_HEIGHT = 10;
 
 export default function LayoutViewPage() {
   const firestore = useFirestore();
@@ -99,28 +97,6 @@ export default function LayoutViewPage() {
   }, [firestore, centerId, todayKey]);
   const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery);
 
-  const seatBounds = useMemo(() => {
-    if (!attendanceList || attendanceList.length === 0) return null;
-    let minX = GRID_WIDTH, maxX = 0, minY = GRID_HEIGHT, maxY = 0;
-    attendanceList.forEach(s => {
-      if (s.gridX !== undefined && s.gridY !== undefined) {
-        minX = Math.min(minX, s.gridX); maxX = Math.max(maxX, s.gridX);
-        minY = Math.min(minY, s.gridY); maxY = Math.max(maxY, s.gridY);
-      }
-    });
-    return { minX, maxX, minY, maxY };
-  }, [attendanceList]);
-
-  const gridDimensions = useMemo(() => {
-    if (!seatBounds) return { cols: GRID_WIDTH, rows: GRID_HEIGHT, startX: 0, startY: 0 };
-    return {
-      cols: seatBounds.maxX - seatBounds.minX + 1,
-      rows: seatBounds.maxY - seatBounds.minY + 1,
-      startX: seatBounds.minX,
-      startY: seatBounds.minY
-    };
-  }, [seatBounds]);
-
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
     return students.filter(s => {
@@ -132,7 +108,11 @@ export default function LayoutViewPage() {
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { status, updatedAt: serverTimestamp() });
+      await updateDoc(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { 
+        status, 
+        updatedAt: serverTimestamp(),
+        ...(status === 'studying' ? { lastCheckInAt: serverTimestamp() } : {})
+      });
       toast({ title: "변경 완료" });
       setIsManaging(false);
     } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); }
@@ -179,12 +159,12 @@ export default function LayoutViewPage() {
   };
 
   const stats = useMemo(() => {
-    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
+    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 70 };
     return {
       studying: attendanceList.filter(a => a.status === 'studying').length,
       absent: attendanceList.filter(a => a.studentId && a.status === 'absent').length,
       away: attendanceList.filter(a => ['away', 'break'].includes(a.status)).length,
-      total: attendanceList.length
+      total: Math.max(70, attendanceList.length)
     };
   }, [attendanceList]);
 
@@ -194,13 +174,10 @@ export default function LayoutViewPage() {
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Monitor className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
-            <h1 className={cn("font-black tracking-tighter text-primary whitespace-nowrap break-keep", isMobile ? "text-xl" : "text-4xl")}>실시간 관제</h1>
-            <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter">LIVE</span>
-            </div>
+            <h1 className={cn("font-black tracking-tighter text-primary whitespace-nowrap break-keep", isMobile ? "text-xl" : "text-4xl")}>전체 도면 및 배치</h1>
+            <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">CONFIG</Badge>
           </div>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-1 ml-1">Command & Control Matrix</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-1 ml-1">Spatial Assignment Matrix</p>
         </div>
         <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 hover:bg-primary/5 transition-all" onClick={() => window.location.reload()}>
           <RefreshCw className="h-5 w-5 opacity-40 group-hover:opacity-100" />
@@ -224,37 +201,61 @@ export default function LayoutViewPage() {
         ))}
       </div>
 
-      <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50 relative flex-1 flex flex-col group">
+      <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50 relative flex-1 flex flex-col group">
         <CardContent className={cn("relative z-10 flex items-center justify-center flex-1", isMobile ? "p-4" : "p-10")}>
-          {studentsLoading || attendanceLoading ? (
-            <div className="flex flex-col items-center gap-4 py-40"><Loader2 className="animate-spin h-12 w-12 text-primary opacity-20" /></div>
-          ) : !attendanceList?.length ? (
-            <div className="py-40 text-center opacity-20 italic">No Seats Configured</div>
-          ) : (
-            <div className={cn("w-full bg-white relative", isMobile ? "p-2 rounded-2xl border" : "p-10 rounded-[2rem] border shadow-2xl")}>
-              <div className="grid w-full mx-auto gap-1.5 sm:gap-2" style={{ gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(0, 1fr))` }}>
-                {Array.from({ length: gridDimensions.rows * gridDimensions.cols }).map((_, idx) => {
-                  const x = gridDimensions.startX + (idx % gridDimensions.cols);
-                  const y = gridDimensions.startY + Math.floor(idx / gridDimensions.cols);
-                  const seat = attendanceList.find(a => a.gridX === x && a.gridY === y);
-                  const occupant = students?.find(s => s.id === seat?.studentId);
-                  if (!seat) return <div key={idx} className="aspect-square opacity-0" />;
-                  const isStudying = seat.status === 'studying';
-                  const isAlert = seat.studentId && seat.status === 'absent';
-                  return (
-                    <div key={seat.id} onClick={() => occupant ? (setSelectedSeat(seat), setIsManaging(true)) : (setSelectedSeat(seat), setIsAssigning(true))}
-                      className={cn("aspect-square rounded-lg sm:rounded-xl border-2 flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-85 p-1",
-                        isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-105 z-10" : isAlert ? "bg-rose-50 border-rose-400 text-rose-700" : seat.status === 'away' || seat.status === 'break' ? "bg-amber-500 border-amber-600 text-white" : occupant ? "bg-white border-primary/20 text-primary hover:border-primary/50" : "bg-muted/5 border-transparent opacity-30")}>
-                      <span className={cn("font-black absolute top-1 left-1.5 text-[8px]", isStudying ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
-                      <span className="font-black truncate w-full text-center text-[11px] leading-tight px-1">{occupant?.name || ''}</span>
-                      {occupant && <span className={cn("text-[9px] font-bold mt-1 tracking-tighter", isStudying ? "text-white" : "text-primary/60")}>{getLiveTimeLabel(seat)}</span>}
-                      {isStudying && <Activity className="h-2 w-2 animate-pulse absolute bottom-1.5" />}
-                    </div>
-                  );
-                })}
-              </div>
+          <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] overflow-x-auto custom-scrollbar w-full">
+            <div className="grid grid-cols-10 gap-2 sm:gap-3 min-w-[1000px]">
+              {Array.from({ length: 10 }).map((_, colIndex) => (
+                <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
+                  {Array.from({ length: 7 }).map((_, rowIndex) => {
+                    const seatNo = colIndex * 7 + rowIndex + 1;
+                    const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
+                    const seat = attendanceList?.find(a => a.id === seatId);
+                    const occupant = students?.find(s => s.id === seat?.studentId);
+                    
+                    const isStudying = seat?.status === 'studying';
+                    const isAlert = occupant && seat?.status === 'absent';
+                    const isAway = seat?.status === 'away' || seat?.status === 'break';
+
+                    return (
+                      <div 
+                        key={seatNo} 
+                        onClick={() => occupant && seat ? (setSelectedSeat(seat), setIsManaging(true)) : (setSelectedSeat({ id: seatId, seatNo, status: 'absent', updatedAt: serverTimestamp() } as any), setIsAssigning(true))}
+                        className={cn(
+                          "aspect-[1.1/1] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm",
+                          isStudying 
+                            ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
+                            : isAway
+                              ? "bg-amber-500 border-amber-600 text-white"
+                              : isAlert 
+                                ? "bg-rose-50 border-rose-300 text-rose-600" 
+                                : occupant 
+                                  ? "bg-white border-primary/20 text-primary" 
+                                  : "bg-transparent border-muted/20 text-muted-foreground/30 hover:border-primary/10"
+                        )}
+                      >
+                        <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAlert ? "text-rose-300" : "opacity-40")}>
+                          {seatNo}
+                        </span>
+                        
+                        {occupant ? (
+                          <div className="flex flex-col items-center gap-0 w-full px-1">
+                            <span className="text-[10px] sm:text-[12px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{occupant.name}</span>
+                            <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
+                              {getLiveTimeLabel(seat!)}
+                            </span>
+                            {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-black opacity-10">EMPTY</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 

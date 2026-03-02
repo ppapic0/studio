@@ -121,7 +121,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const getLiveTimeLabel = (seat: AttendanceCurrent) => {
     const totalMins = getLiveTimeInMinutes(seat);
-    return `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+    const hh = Math.floor(totalMins / 60);
+    const mm = totalMins % 60;
+    return `${hh}h ${mm}m`;
   };
 
   // 정밀 지표 산출
@@ -220,7 +222,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {/* 3. 10x7 실시간 상황판 (Layout View 로직 이식) */}
+      {/* 3. 10x7 실시간 상황판 (Layout View와 완벽 동기화) */}
       <Card className="rounded-[3.5rem] border-none shadow-xl bg-white mx-4 overflow-hidden">
         <CardContent className="p-6 sm:p-10">
           <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] overflow-x-auto custom-scrollbar">
