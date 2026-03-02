@@ -84,7 +84,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: activeMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
 
-  // 사용 가능한 반 목록 추출
+  // 사용 가능한 반 목록 추출 (모든 학생 멤버십 데이터 조사)
   const availableClasses = useMemo(() => {
     if (!activeMembers) return [];
     const classes = new Set<string>();
@@ -101,7 +101,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 실시간 학습 로그 집계 (collectionGroup)
+  // 3. 실시간 학습 로그 집계
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -128,10 +128,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   // --- 실시간 KPI 엔진 ---
   const metrics = useMemo(() => {
-    // 필수 데이터가 로딩 전이면 null 반환
     if (!activeMembers || !attendanceList || !isMounted) return null;
 
-    // (A) 필터링 대상 학생 선별
     const filteredMembers = activeMembers.filter(m => selectedClass === 'all' || m.className === selectedClass);
     const targetMemberIds = new Set(filteredMembers.map(m => m.id));
 
@@ -139,13 +137,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     let totalYestMins = 0;
     const studentLiveMinutes: number[] = [];
 
-    // (B) 각 학생별 실시간 합산 로직
     filteredMembers.forEach(member => {
-      // 오늘 로그
       const todayLog = centerLogs?.find(l => l.studentId === member.id && l.dateKey === todayKey);
       let cumulative = todayLog?.totalMinutes || 0;
 
-      // 실시간 세션 계산 (공부 중인 경우)
       const seat = attendanceList.find(a => a.studentId === member.id);
       if (seat?.status === 'studying' && seat.lastCheckInAt) {
         const liveSession = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
@@ -155,12 +150,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       totalTodayMins += cumulative;
       studentLiveMinutes.push(cumulative);
 
-      // 어제 로그
       const yestLog = centerLogs?.find(l => l.studentId === member.id && l.dateKey === yesterdayKey);
       totalYestMins += yestLog?.totalMinutes || 0;
     });
 
-    // (C) 지표 계산
     const studyTimeGrowth = totalYestMins > 0 ? ((totalTodayMins - totalYestMins) / totalYestMins) * 100 : 0;
     const checkedInCount = attendanceList.filter(a => a.studentId && targetMemberIds.has(a.studentId) && a.status === 'studying').length;
     
@@ -195,15 +188,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       bottom20Avg,
       avgCompletion,
       highAchieverRate,
-      lowAchieverRate: 100 - highAchieverRate - Math.round((filteredTodayStats.filter(s => s.todayPlanCompletionRate > 50 && s.todayPlanCompletionRate < 80).length / (filteredTodayStats.length || 1)) * 100),
+      lowAchieverRate: 100 - highAchieverRate,
       riskCount,
       counselingNeedCount: filteredTodayStats.filter(s => (s.studyTimeGrowthRate || 0) <= -0.3).length,
       feedbackRate
     };
   }, [activeMembers, attendanceList, centerLogs, todayStats, dailyReports, selectedClass, now, isMounted, todayKey, yesterdayKey]);
 
-  // 무한 로딩 방지를 위한 로딩 상태 체크
-  // 멤버 로딩만 끝나면 틀을 보여줍니다.
   if (!isActive) return null;
   const isEssentialLoading = membersLoading || !isMounted;
 
@@ -375,7 +366,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </CardTitle>
                     <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-rose-600/60">Risk & Intervention Management</CardDescription>
                   </div>
-                  <div className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                  <div className="h-2 w-2 rounded-full bg-rose-500" />
                 </div>
               </CardHeader>
               <CardContent className={cn("space-y-10", isMobile ? "p-6" : "p-10")}>
