@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -37,20 +38,20 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const STAT_CONFIG = {
-  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500' },
-  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500', bg: 'bg-emerald-500' },
-  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500', bg: 'bg-amber-500' },
-  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', bg: 'bg-rose-500' },
+  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500', accent: 'bg-blue-50' },
+  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500', bg: 'bg-emerald-500', accent: 'bg-emerald-50' },
+  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500', bg: 'bg-amber-500', accent: 'bg-amber-50' },
+  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', bg: 'bg-rose-500', accent: 'bg-rose-50' },
 };
 
 const TIERS = [
-  { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400' },
-  { name: '브론즈', min: 20, color: 'text-orange-700', bg: 'bg-orange-700' },
-  { name: '실버', min: 40, color: 'text-slate-300', bg: 'bg-slate-300' },
-  { name: '골드', min: 60, color: 'text-yellow-500', bg: 'bg-yellow-500' },
-  { name: '플래티넘', min: 75, color: 'text-emerald-400', bg: 'bg-emerald-400' },
-  { name: '다이아몬드', min: 85, color: 'text-blue-400', bg: 'bg-blue-400' },
-  { name: '마스터', min: 95, color: 'text-purple-500', bg: 'bg-purple-500' },
+  { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800' },
+  { name: '브론즈', min: 20, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
+  { name: '실버', min: 40, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
+  { name: '골드', min: 60, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
+  { name: '플래티넘', min: 75, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
+  { name: '다이아몬드', min: 85, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
+  { name: '마스터', min: 95, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800' },
 ];
 
 function SystemGuideDialog() {
@@ -166,16 +167,19 @@ export default function GrowthPage() {
       </header>
 
       {/* 시즌 메인 대시보드 */}
-      <Card className="border-none bg-primary text-primary-foreground shadow-2xl rounded-[3rem] overflow-hidden relative group">
+      <Card className={cn(
+        "border-none text-white shadow-2xl rounded-[3rem] overflow-hidden relative group transition-all duration-700",
+        "bg-gradient-to-br", currentTier.gradient
+      )}>
         <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-700">
           <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />
         </div>
         <div className={cn("relative z-10 p-8 sm:p-12 space-y-10")}>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
-              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-3 py-1 mb-2">SEASON 2025-03</Badge>
+              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-3 py-1 mb-2 uppercase tracking-widest">SEASON 2025-03 ACTIVE</Badge>
               <h2 className={cn("font-black tracking-tighter leading-none", isMobile ? "text-5xl" : "text-7xl")}>
-                {(progress?.seasonLp || 0).toLocaleString()}<span className="text-2xl opacity-40 ml-2">LP</span>
+                {(progress?.seasonLp || 0).toLocaleString()}<span className="text-2xl opacity-40 ml-2 uppercase font-bold">lp</span>
               </h2>
               <p className="text-sm font-bold opacity-60">현재 시즌 행동 보상 총계</p>
             </div>
@@ -183,7 +187,7 @@ export default function GrowthPage() {
             <div className="flex flex-col items-center md:items-end gap-2">
               <div className={cn("p-6 rounded-[2.5rem] bg-white/10 backdrop-blur-xl border border-white/10 flex flex-col items-center min-w-[180px] shadow-2xl")}>
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">Current Tier</span>
-                <span className={cn("text-3xl font-black tracking-tighter", currentTier.color)}>{currentTier.name}</span>
+                <span className={cn("text-3xl font-black tracking-tighter")}>{currentTier.name}</span>
                 <span className="text-[10px] font-bold mt-1 opacity-40">실력 지수: {avgStat.toFixed(1)}</span>
               </div>
             </div>
@@ -192,7 +196,7 @@ export default function GrowthPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: '누적 마스터리', val: `Lv.${progress?.mastery || 0}`, sub: '노력의 보상', icon: Crown, color: 'text-amber-400' },
-              { label: '통합 부스트', val: `x${totalBoost.toFixed(2)}`, sub: 'LP 가중치', icon: Zap, color: 'text-accent' },
+              { label: '통합 부스트', val: `x${totalBoost.toFixed(2)}`, sub: 'LP 가중치', icon: Zap, color: 'text-yellow-400' },
               { label: '시즌 랭킹', val: '상위 12%', sub: '전체 기준', icon: Trophy, color: 'text-emerald-400' },
               { label: '시즌 남은 일수', val: '18일', sub: '3월 시즌 종료', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
@@ -224,10 +228,10 @@ export default function GrowthPage() {
             const val = stats[key as keyof typeof stats] || 0;
             const Icon = config.icon;
             return (
-              <Card key={key} className="border-none bg-white shadow-xl rounded-[2.5rem] overflow-hidden group hover:-translate-y-1 transition-all duration-500">
+              <Card key={key} className="border-none bg-white shadow-xl rounded-[2.5rem] overflow-hidden group hover:-translate-y-1 transition-all duration-500 ring-1 ring-black/[0.03]">
                 <CardHeader className="p-8 pb-4">
                   <div className="flex items-center justify-between mb-4">
-                    <div className={cn("p-3 rounded-2xl bg-opacity-10", config.bg)}>
+                    <div className={cn("p-3 rounded-2xl", config.accent)}>
                       <Icon className={cn("h-6 w-6", config.color)} />
                     </div>
                     <span className={cn("font-black text-[9px] uppercase tracking-widest opacity-40")}>{config.sub}</span>
@@ -246,8 +250,8 @@ export default function GrowthPage() {
                     />
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground">
-                    <span>품질 배율</span>
-                    <span className={config.color}>x{(1 + (val/100)*0.10).toFixed(2)}</span>
+                    <span>품질 가중치</span>
+                    <span className={cn("font-black", config.color)}>x{(1 + (val/100)*0.10).toFixed(2)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -258,9 +262,9 @@ export default function GrowthPage() {
 
       {/* 마스터리 상세 분석 */}
       <div className="grid gap-6 md:grid-cols-12 px-1">
-        <Card className="md:col-span-7 rounded-[3rem] border-none shadow-2xl bg-white p-10 space-y-8">
+        <Card className="md:col-span-7 rounded-[3rem] border-none shadow-2xl bg-white p-10 space-y-8 ring-1 ring-black/[0.02]">
           <div className="space-y-1">
-            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-2">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-2 text-primary">
               <Crown className="h-6 w-6 text-amber-500" /> 영구 성장 마스터리
             </h3>
             <p className="text-sm font-bold text-muted-foreground">시즌이 바뀌어도 유지되는 당신의 정수입니다.</p>
@@ -284,7 +288,7 @@ export default function GrowthPage() {
           </div>
         </Card>
 
-        <Card className="md:col-span-5 rounded-[3rem] border-none shadow-2xl bg-[#fafafa] p-10 flex flex-col justify-center gap-6">
+        <Card className="md:col-span-5 rounded-[3rem] border-none shadow-2xl bg-[#fafafa] p-10 flex flex-col justify-center gap-6 ring-1 ring-black/[0.02]">
           <div className="p-6 rounded-[2rem] bg-white shadow-sm border space-y-4">
             <h4 className="font-black text-xs uppercase text-primary/40 flex items-center gap-2 tracking-widest">Next Tier Goal</h4>
             <div className="flex items-center justify-between">
