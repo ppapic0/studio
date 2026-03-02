@@ -21,7 +21,8 @@ import {
   AlertTriangle,
   ChevronRight,
   ShieldAlert,
-  UserX
+  UserX,
+  Users
 } from 'lucide-react';
 import { StudentProfile, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
