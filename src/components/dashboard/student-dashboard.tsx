@@ -520,7 +520,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 {currentTier.name} Tier Active
               </Badge>
               <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-4xl" : "text-6xl")}>
-                {isTimerActive ? "몰입의 정점에\n도착하셨네요!" : "오늘의 성장을 위해\n트랙을 시작하세요"}
+                {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
             
@@ -559,9 +559,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       {/* 2. 요약 지표 (공부시간, LP) */}
       <div className={cn("grid gap-4 sm:gap-6", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
-        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500">
+        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
-            <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">오늘의 누적 몰입</CardTitle>
+            <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">오늘의 누적 트랙</CardTitle>
             <div className="bg-primary/5 p-2.5 rounded-xl group-hover:bg-primary/10 transition-colors"><Clock className="h-6 w-6 text-primary/60" /></div>
           </CardHeader>
           <CardContent className="px-10 pb-10">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -35,7 +34,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/growth', label: '성장트랙', icon: Zap },
     { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
     { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
-    { href: '/dashboard/appointments', label: '상담 예약', icon: MessageCircle },
+    { href: '/dashboard/appointments', label: '상담 트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   teacher: [
@@ -43,20 +42,20 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
-    { href: '/dashboard/appointments', label: '상담 관리', icon: MessageCircle },
+    { href: '/dashboard/appointments', label: '상담 트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   parent: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/study-history', label: '기록트랙', icon: History },
-    { href: '/dashboard/appointments', label: '상담 내역', icon: MessageCircle },
+    { href: '/dashboard/appointments', label: '상담 트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   centerAdmin: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
-    { href: '/dashboard/appointments', label: '상담 현황', icon: MessageCircle },
+    { href: '/dashboard/appointments', label: '상담 트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
     { href: '/dashboard/revenue', label: '수익 분석', icon: DollarSign },
     { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
