@@ -59,7 +59,8 @@ import {
   CalendarClock,
   Zap,
   Trophy,
-  Crown
+  Crown,
+  Info
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
