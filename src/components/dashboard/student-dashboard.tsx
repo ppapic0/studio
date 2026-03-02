@@ -70,6 +70,17 @@ const TIERS = [
   { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-200/50' },
 ];
 
+const TIER_PRESETS = [
+  { label: '아이언', lp: 0, stats: 10, color: 'bg-slate-400' },
+  { label: '실버', lp: 10000, stats: 45, color: 'bg-slate-300' },
+  { label: '골드', lp: 15000, stats: 65, color: 'bg-yellow-500' },
+  { label: '플래티넘', lp: 20000, stats: 80, color: 'bg-emerald-400' },
+  { label: '다이아', lp: 25000, stats: 90, color: 'bg-blue-400' },
+  { label: '마스터', lp: 26000, stats: 95, color: 'bg-purple-500' },
+  { label: '그마', lp: 30000, stats: 98, color: 'bg-rose-500' },
+  { label: '챌린저', lp: 35000, stats: 100, color: 'bg-cyan-400' },
+];
+
 /**
  * Jacob 전용 티어 컨트롤러 컴포넌트
  */
@@ -100,57 +111,89 @@ function JacobTierController({ progressRef, currentStats, currentLp }: { progres
     }
   };
 
+  const applyPreset = (preset: typeof TIER_PRESETS[0]) => {
+    setLp(preset.lp);
+    setStats({ focus: preset.stats, consistency: preset.stats, achievement: preset.stats, resilience: preset.stats });
+  };
+
   return (
     <Card className="border-4 border-dashed border-primary/20 bg-primary/5 rounded-[2.5rem] p-8 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-      <CardHeader className="p-0 mb-6">
+      <CardHeader className="p-0 mb-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-primary p-2 rounded-xl text-white"><Settings2 className="h-5 w-5" /></div>
-            <CardTitle className="text-xl font-black tracking-tighter">Jacob's Dev Stat Controller</CardTitle>
+            <div className="bg-primary p-2 rounded-xl text-white shadow-lg"><Settings2 className="h-5 w-5" /></div>
+            <div>
+              <CardTitle className="text-xl font-black tracking-tighter">Jacob's Dev Stat Controller</CardTitle>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Real-time Tier & LP Simulation</p>
+            </div>
           </div>
-          <Badge className="bg-rose-500 text-white font-black">TEST ACCOUNT ONLY</Badge>
+          <Badge className="bg-rose-500 text-white font-black px-3 py-1 rounded-full shadow-lg">TEST ACCOUNT ONLY</Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-0 space-y-8">
-        <div className="space-y-3">
-          <div className="flex justify-between items-center px-1">
-            <span className="text-[10px] font-black uppercase text-primary">시즌 누적 LP (티어 결정)</span>
-            <span className="text-sm font-black text-primary">{lp.toLocaleString()} LP</span>
-          </div>
-          <Slider 
-            value={[lp]} 
-            max={40000} 
-            step={500} 
-            onValueChange={([val]) => setLp(val)}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-          {Object.entries({
-            focus: '집중력',
-            consistency: '꾸준함',
-            achievement: '목표달성',
-            resilience: '회복력'
-          }).map(([key, label]) => (
-            <div key={key} className="space-y-3">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[10px] font-black uppercase text-muted-foreground">{label}</span>
-                <span className="text-xs font-black text-primary">{(stats[key] || 0).toFixed(0)}</span>
-              </div>
-              <Slider 
-                value={[stats[key] || 0]} 
-                max={100} 
-                step={1} 
-                onValueChange={([val]) => setStats({ ...stats, [key]: val })}
-              />
+      
+      <CardContent className="p-0 flex flex-col lg:flex-row gap-10">
+        {/* Left: Manual Controls */}
+        <div className="flex-1 space-y-8">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-1">
+              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 LP (티어 결정 기준)</span>
+              <span className="text-sm font-black text-primary bg-white px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
             </div>
-          ))}
+            <Slider value={[lp]} max={40000} step={500} onValueChange={([val]) => setLp(val)} />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+            {Object.entries({
+              focus: '집중력',
+              consistency: '꾸준함',
+              achievement: '목표달성',
+              resilience: '회복력'
+            }).map(([key, label]) => (
+              <div key={key} className="space-y-3">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[9px] font-black uppercase text-muted-foreground">{label}</span>
+                  <span className="text-[10px] font-black text-primary">{(stats[key as keyof typeof stats] || 0).toFixed(0)}</span>
+                </div>
+                <Slider 
+                  value={[stats[key as keyof typeof stats] || 0]} 
+                  max={100} 
+                  step={1} 
+                  onValueChange={([val]) => setStats({ ...stats, [key]: val })} 
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
-        <Button onClick={handleUpdate} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
-          {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5" />}
-          시스템 상태 즉시 반영
-        </Button>
+        {/* Right: Presets & Apply */}
+        <div className="lg:w-[320px] flex flex-col gap-6 shrink-0">
+          <div className="grid grid-cols-3 gap-2">
+            {TIER_PRESETS.map((preset) => (
+              <Button 
+                key={preset.label} 
+                variant="outline" 
+                size="sm" 
+                onClick={() => applyPreset(preset)}
+                className={cn(
+                  "rounded-xl h-12 px-0 font-black text-[10px] border-2 transition-all hover:scale-105 shadow-sm bg-white",
+                  "flex flex-col items-center justify-center leading-none gap-1"
+                )}
+              >
+                <div className={cn("w-2 h-2 rounded-full", preset.color)} />
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+
+          <Button 
+            onClick={handleUpdate} 
+            disabled={isUpdating} 
+            className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-3 active:scale-95 transition-all"
+          >
+            {isUpdating ? <Loader2 className="animate-spin h-6 w-6" /> : <Wand2 className="h-6 w-6" />}
+            시스템 상태 즉시 반영
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
