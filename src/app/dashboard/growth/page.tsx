@@ -40,10 +40,42 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const STAT_CONFIG = {
-  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500', accent: 'bg-blue-50' },
-  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500', bg: 'bg-emerald-500', accent: 'bg-emerald-50' },
-  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500', bg: 'bg-amber-500', accent: 'bg-amber-50' },
-  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', bg: 'bg-rose-500', accent: 'bg-rose-50' },
+  focus: { 
+    label: '집중력', 
+    sub: 'FOCUS', 
+    icon: Target, 
+    color: 'text-blue-500', 
+    bg: 'bg-blue-500', 
+    accent: 'bg-blue-50',
+    guide: '실시간 몰입 시간에 비례하여 상승합니다. (100분당 +1.0)'
+  },
+  consistency: { 
+    label: '꾸준함', 
+    sub: 'CONSISTENCY', 
+    icon: RefreshCw, 
+    color: 'text-emerald-500', 
+    bg: 'bg-emerald-500', 
+    accent: 'bg-emerald-50',
+    guide: '매일 잊지 않고 출석 트랙을 시작하면 상승합니다. (일일 +0.1)'
+  },
+  achievement: { 
+    label: '목표달성', 
+    sub: 'ACHIEVEMENT', 
+    icon: CheckCircle2, 
+    color: 'text-amber-500', 
+    bg: 'bg-amber-500', 
+    accent: 'bg-amber-50',
+    guide: '계획트랙의 To-do를 완료할 때마다 실시간으로 상승합니다. (항목당 +0.05)'
+  },
+  resilience: { 
+    label: '회복력', 
+    sub: 'RESILIENCE', 
+    icon: ShieldCheck, 
+    color: 'text-rose-500', 
+    bg: 'bg-rose-500', 
+    accent: 'bg-rose-50',
+    guide: '6시간 이상의 초몰입 달성 시 가장 강력하게 상승합니다. (보너스 발생 시 +0.5)'
+  },
 };
 
 const TIERS = [
@@ -234,12 +266,12 @@ export default function GrowthPage() {
         </div>
       </Card>
 
-      {/* 4대 핵심 품질 스탯 */}
+      {/* 4대 핵심 스킬트랙 */}
       <section className="space-y-6">
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <Target className="h-6 w-6 text-primary opacity-40" />
-            <h2 className="text-2xl font-black tracking-tighter">품질 평가 스탯</h2>
+            <h2 className="text-2xl font-black tracking-tighter">스킬트랙</h2>
           </div>
           <Badge variant="outline" className="rounded-full font-black text-[10px] border-primary/20 px-3">AVG: {avgStat.toFixed(1)}</Badge>
         </div>
@@ -263,16 +295,27 @@ export default function GrowthPage() {
                     <span className="text-xs font-bold text-muted-foreground opacity-40">/ 100</span>
                   </div>
                 </CardHeader>
-                <CardContent className="px-8 pb-8">
-                  <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner mb-4">
-                    <div 
-                      className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", config.bg)}
-                      style={{ width: `${val}%` }}
-                    />
+                <CardContent className="px-8 pb-8 space-y-4">
+                  <div>
+                    <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner mb-2">
+                      <div 
+                        className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", config.bg)}
+                        style={{ width: `${val}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground">
+                      <span>품질 가중치</span>
+                      <span className={cn("font-black", config.color)}>x{(1 + (val/100)*0.10).toFixed(2)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground">
-                    <span>품질 가중치</span>
-                    <span className={cn("font-black", config.color)}>x{(1 + (val/100)*0.10).toFixed(2)}</span>
+                  
+                  <div className="pt-4 border-t border-dashed">
+                    <p className="text-[10px] font-black text-primary/40 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                      <Sparkles className="h-3 w-3" /> 획득 가이드
+                    </p>
+                    <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
+                      {config.guide}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -308,7 +351,7 @@ export default function GrowthPage() {
         </Card>
       </div>
 
-      {/* LP 성취 가이드 섹션 - 페이지 최하단으로 이동 */}
+      {/* LP 성취 가이드 섹션 - 페이지 최하단 */}
       <section className="animate-in slide-in-from-top-4 duration-1000">
         <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]">
           <CardHeader className="bg-muted/5 border-b p-8">
@@ -338,7 +381,7 @@ export default function GrowthPage() {
                 <div className="flex items-center gap-2 font-black text-xs text-emerald-600 uppercase"><TrendingUp className="h-4 w-4" /> 실력 지수 (티어)</div>
                 <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-[88px] flex items-center">
                   <p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">
-                    4대 품질 스탯(집중, 꾸준함, 성취, 회복)의 평균이 당신의 **티어**를 결정합니다.
+                    4대 핵심 스탯(집중, 꾸준함, 성취, 회복)의 평균이 당신의 **티어**를 결정합니다.
                   </p>
                 </div>
               </div>
