@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
+import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -81,7 +82,13 @@ export default function DashboardPage() {
   if (activeMembership) {
     const userRole = activeMembership.role;
     
-    if (userRole === 'teacher' || userRole === 'centerAdmin') {
+    // 센터 관리자는 KPI 대시보드를 홈으로 사용
+    if (userRole === 'centerAdmin') {
+      return <AdminDashboard isActive={true} />;
+    }
+
+    // 선생님은 실시간 관제 화면을 홈으로 사용
+    if (userRole === 'teacher') {
       return <TeacherDashboard isActive={true} />;
     }
 

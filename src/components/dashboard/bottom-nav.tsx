@@ -17,7 +17,8 @@ import {
   GraduationCap,
   History,
   MonitorSmartphone,
-  UserCog
+  UserCog,
+  Monitor
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -41,11 +42,11 @@ export function BottomNav() {
       { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     ],
     teacher: [
-      { href: '/dashboard/teacher', label: '센터홈', icon: LayoutDashboard },
+      { href: '/dashboard/teacher', label: '현황', icon: Monitor },
       { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
       { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
-      { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
+      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
     parent: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
@@ -55,10 +56,10 @@ export function BottomNav() {
     ],
     centerAdmin: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-      { href: '/dashboard/settings/students', label: '계정관리', icon: UserCog },
+      { href: '/dashboard/teacher', label: '현황', icon: Monitor },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
       { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
-      { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
+      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
   };
 

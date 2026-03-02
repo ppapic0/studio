@@ -20,7 +20,8 @@ import {
   History,
   DollarSign,
   MonitorSmartphone,
-  UserCog
+  UserCog,
+  Monitor
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -40,7 +41,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   teacher: [
-    { href: '/dashboard/teacher', label: '센터 홈', icon: LayoutDashboard },
+    { href: '/dashboard/teacher', label: '실시간 관제', icon: Monitor },
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
@@ -54,7 +55,8 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   centerAdmin: [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard', label: '운영 홈', icon: LayoutDashboard },
+    { href: '/dashboard/teacher', label: '실시간 현황', icon: Monitor },
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
