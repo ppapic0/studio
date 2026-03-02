@@ -26,7 +26,8 @@ import {
   History,
   UserPlus,
   UserMinus,
-  Search
+  Search,
+  Monitor
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -75,9 +76,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [now, setNow] = useState(Date.now());
 
-  // 실시간 시간 업데이트 (1분마다)
+  // 실시간 시간 업데이트 (10초마다 더 정밀하게)
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60000);
+    const timer = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -200,6 +201,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
     let totalMins = studentLog?.totalMinutes || 0;
 
+    // 현재 공부 중인 경우 실시간 세션 시간 합산
     if (seat.status === 'studying' && seat.lastCheckInAt) {
       const startTime = seat.lastCheckInAt.toMillis();
       const sessionMins = Math.floor((now - startTime) / 60000);
@@ -214,52 +216,59 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
-      {/* 1. 실시간 관제 섹션 (퀵 지표 + 도면) */}
+    <div className="flex flex-col gap-8 w-full max-w-6xl mx-auto pb-20">
+      {/* 1. 실시간 관제 섹션 (지표 + 도면) */}
       <section className="space-y-6">
         <div className="flex items-center gap-2 px-1">
-          <Activity className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-black tracking-tighter">실시간 관제 홈</h2>
-          <Badge className="bg-emerald-500 text-white border-none font-black text-[10px]">LIVE</Badge>
+          <Monitor className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-black tracking-tighter">실시간 관제 홈</h2>
+          <Badge className="bg-blue-600 text-white border-none font-black text-[10px] animate-pulse">LIVE FEED</Badge>
         </div>
 
-        <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+        <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "grid-cols-4")}>
           {[
-            { label: '학습 중', val: attendanceList?.filter(a => a.status === 'studying').length || 0, color: 'text-emerald-600', icon: Activity, bg: 'bg-emerald-50/50' },
+            { label: '학습 중', val: attendanceList?.filter(a => a.status === 'studying').length || 0, color: 'text-blue-600', icon: Activity, bg: 'bg-blue-50/50' },
             { label: '미입실', val: attendanceList?.filter(a => a.studentId && a.status === 'absent').length || 0, color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-50/50' },
             { label: '외출/휴식', val: attendanceList?.filter(a => ['away', 'break'].includes(a.status)).length || 0, color: 'text-amber-600', icon: Clock, bg: 'bg-amber-50/50' },
             { label: '배치 좌석', val: attendanceList?.length || 0, color: 'text-primary', icon: Armchair, bg: 'bg-muted/30' }
           ].map((item, i) => (
-            <Card key={i} className={cn("rounded-[1.5rem] border-none shadow-sm p-4 flex flex-col gap-1", item.bg)}>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[9px] font-black uppercase text-muted-foreground/60">{item.label}</span>
-                <item.icon className={cn("h-3.5 w-3.5", item.color)} />
+            <Card key={i} className={cn("rounded-[2rem] border-none shadow-md p-6 flex flex-col gap-1 transition-all hover:shadow-lg", item.bg)}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-widest">{item.label}</span>
+                <item.icon className={cn("h-5 w-5", item.color)} />
               </div>
-              <div className={cn("text-3xl font-black tracking-tighter", item.color)}>{item.val}</div>
+              <div className={cn("text-4xl font-black tracking-tighter", item.color)}>{item.val}</div>
             </Card>
           ))}
         </div>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white ring-1 ring-border/50">
-          <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-8")}>
+        <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white ring-1 ring-border/50">
+          <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-6" : "p-10")}>
             <div className="flex justify-between gap-4 items-center">
-              <CardTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 tracking-tighter">
-                <Armchair className="h-5 w-5 text-primary shrink-0" /> 실시간 좌석 상황판
-              </CardTitle>
-              <Button variant="outline" size="sm" className="rounded-2xl font-black h-10 px-4" asChild>
-                <Link href="/dashboard/teacher/layout-view">전체 도면 보기</Link>
+              <div className="space-y-1">
+                <CardTitle className="text-2xl font-black flex items-center gap-3 tracking-tighter">
+                  <Armchair className="h-6 w-6 text-primary shrink-0" /> 실시간 좌석 상황판
+                </CardTitle>
+                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Real-time Seat Matrix & Live Study Timer</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" className="rounded-2xl font-black h-11 px-6 border-2 shadow-sm bg-white" asChild>
+                <Link href="/dashboard/teacher/layout-view">도면 크게 보기</Link>
               </Button>
             </div>
           </CardHeader>
-          <CardContent className={cn("bg-[#fafafa]", isMobile ? "p-4" : "p-8")}>
+          <CardContent className={cn("bg-[#fafafa]", isMobile ? "p-4" : "p-10")}>
             {attendanceLoading ? (
-              <div className="flex justify-center py-20"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+              <div className="flex flex-col items-center justify-center py-40 gap-4">
+                <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground/40 italic">Syncing matrix data...</p>
+              </div>
             ) : !attendanceList?.length ? (
               <div className="py-20 text-center text-muted-foreground/40 font-black italic">배치된 좌석이 없습니다.</div>
             ) : (
-              <div className={cn("w-full bg-white p-6 rounded-3xl border shadow-inner overflow-hidden")}>
+              <div className={cn("w-full bg-white p-8 rounded-[2.5rem] border shadow-inner overflow-hidden relative")}>
+                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
                 <div 
-                  className="grid w-full gap-2 mx-auto"
+                  className="grid w-full gap-3 mx-auto relative z-10"
                   style={{ gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(0, 1fr))` }}
                 >
                   {Array.from({ length: gridDimensions.rows * gridDimensions.cols }).map((_, idx) => {
@@ -277,17 +286,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         key={seat.id} 
                         onClick={() => occupant ? (setSelectedSeatForManage(seat), setIsManagingSeatModalOpen(true)) : (setSelectedSeatForAssign({id: seat.id, seatNo: seat.seatNo}), setIsAssignModalOpen(true))}
                         className={cn(
-                          "aspect-square rounded-lg border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-90 p-1",
-                          isStudying ? "bg-emerald-500 border-emerald-600 text-white shadow-lg" : 
+                          "aspect-square rounded-xl border-2 flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-90 p-1 group",
+                          isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl shadow-blue-600/20 z-10 scale-105" : 
                           isAlert ? "bg-rose-50 border-rose-400 text-rose-700" :
                           seat.status === 'away' || seat.status === 'break' ? "bg-amber-500 border-amber-600 text-white" : 
-                          occupant ? "bg-white border-primary/20 text-primary" : "bg-white border-primary/5 opacity-30"
+                          occupant ? "bg-white border-primary/20 text-primary hover:border-primary/50" : "bg-white border-primary/5 opacity-30"
                         )}
                       >
-                        <span className="font-black absolute top-0.5 left-0.5 text-[7px] opacity-40">{seat.seatNo}</span>
-                        <span className="font-black truncate w-full text-center text-[10px] leading-tight">{occupant?.name || ''}</span>
-                        {occupant && <span className="text-[8px] font-bold opacity-80 mt-0.5">{getLiveTimeLabel(seat)}</span>}
-                        {isStudying && <Activity className="h-1.5 w-1.5 animate-pulse absolute bottom-1" />}
+                        <span className={cn("font-black absolute top-1 left-1.5 text-[8px] tracking-tighter", isStudying ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
+                        <span className="font-black truncate w-full text-center text-[11px] leading-tight px-1">{occupant?.name || ''}</span>
+                        {occupant && <span className={cn("text-[9px] font-bold mt-1 tracking-tighter", isStudying ? "text-white" : "text-primary/60")}>{getLiveTimeLabel(seat)}</span>}
+                        {isStudying && <Activity className="h-2 w-2 animate-pulse absolute bottom-1.5" />}
                       </div>
                     );
                   })}
@@ -295,14 +304,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
             )}
           </CardContent>
+          
+          <div className="bg-muted/10 p-6 flex justify-center gap-6 border-t border-dashed">
+            {[
+              { label: '학습 중', color: 'bg-blue-600' },
+              { label: '미입실', color: 'bg-rose-500' },
+              { label: '외출/휴식', color: 'bg-amber-500' },
+              { label: '공석', color: 'bg-muted/30 border border-muted' }
+            ].map(l => (
+              <div key={l.label} className="flex items-center gap-2">
+                <div className={cn("w-2 h-2 rounded-full", l.color)} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{l.label}</span>
+              </div>
+            ))}
+          </div>
         </Card>
       </section>
 
       {/* 2. 오늘 상담 현황 섹션 */}
       <section className="space-y-4">
         <div className="flex items-center gap-2 px-1">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-black tracking-tighter">오늘 상담 현황</h2>
+          <MessageSquare className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-black tracking-tighter">오늘 상담 현황</h2>
         </div>
         
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
@@ -310,67 +333,102 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             {aptLoading ? (
               <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
             ) : appointments.length === 0 ? (
-              <div className="py-20 text-center flex flex-col items-center gap-4 text-muted-foreground/30 font-black italic">
-                <History className="h-12 w-12 opacity-10" />
-                오늘 예정된 상담이 없습니다.
+              <div className="py-24 text-center flex flex-col items-center gap-4 text-muted-foreground/30 font-black italic">
+                <History className="h-16 w-16 opacity-10" />
+                <div className="space-y-1">
+                  <p className="text-lg">오늘 예정된 상담이 없습니다.</p>
+                  <p className="text-xs uppercase tracking-widest">No appointments for today</p>
+                </div>
               </div>
             ) : (
               <div className="divide-y divide-muted/10">
                 {appointments.map((apt: any) => (
-                  <div key={apt.id} className="p-6 flex items-center justify-between hover:bg-muted/5 transition-colors group">
-                    <div className="flex items-center gap-6">
-                      <div className="h-14 w-14 rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:bg-primary transition-all duration-500">
-                        <span className="text-[10px] font-black text-primary/60 group-hover:text-white/60 uppercase">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'aaa') : ''}</span>
-                        <span className="text-lg font-black text-primary group-hover:text-white">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'h:mm') : ''}</span>
+                  <div key={apt.id} className="p-8 flex items-center justify-between hover:bg-muted/5 transition-colors group">
+                    <div className="flex items-center gap-8">
+                      <div className="h-16 w-16 rounded-[1.5rem] bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:bg-primary transition-all duration-500 shadow-inner">
+                        <span className="text-[10px] font-black text-primary/60 group-hover:text-white/60 uppercase leading-none mb-0.5">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'aaa') : ''}</span>
+                        <span className="text-xl font-black text-primary group-hover:text-white">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'h:mm') : ''}</span>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-black group-hover:text-primary transition-colors">{apt.studentName} 학생</h3>
-                        <p className="text-xs font-bold text-muted-foreground">{apt.studentNote || '상담 주제 미입력'}</p>
+                      <div className="space-y-1">
+                        <h3 className="text-xl font-black group-hover:text-primary transition-colors">{apt.studentName} 학생</h3>
+                        <p className="text-sm font-bold text-muted-foreground">{apt.studentNote || '상담 주제 미입력'}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10 transition-all" asChild>
-                      <Link href={`/dashboard/teacher/students/${apt.studentId}`}><ChevronRight className="h-5 w-5" /></Link>
+                    <Button variant="secondary" className="rounded-2xl font-black h-12 px-6 gap-2 bg-muted/50 hover:bg-primary hover:text-white transition-all shadow-sm" asChild>
+                      <Link href={`/dashboard/teacher/students/${apt.studentId}`}>상세 분석 리포트 <ChevronRight className="h-4 w-4" /></Link>
                     </Button>
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
+          <div className="p-4 bg-muted/5 border-t">
+            <Button asChild variant="ghost" className="w-full h-12 rounded-2xl text-xs font-black text-muted-foreground hover:text-primary hover:bg-white transition-all gap-2">
+              <Link href="/dashboard/appointments">상담 관리 센터 바로가기 <ArrowRight className="h-4 w-4" /></Link>
+            </Button>
+          </div>
         </Card>
       </section>
 
-      {/* 좌석 관리 및 배정 모달 (기존 로직 유지) */}
+      {/* 좌석 관리 모달들 */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
-        <DialogContent className="rounded-[2.5rem] p-0 overflow-hidden sm:max-w-md">
-          <div className="bg-primary p-8 text-white"><DialogTitle className="text-2xl font-black">학생 배정 (SEAT {selectedSeatForAssign?.seatNo})</DialogTitle></div>
-          <div className="p-6 space-y-4">
-            <Input placeholder="이름 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2" />
-            <ScrollArea className="h-64">
-              {unassignedStudents.map(s => (
-                <div key={s.id} onClick={() => assignStudentToSeat(s)} className="p-4 rounded-xl hover:bg-primary/5 cursor-pointer flex justify-between items-center group">
-                  <span className="font-bold">{s.name} ({s.schoolName})</span>
-                  <UserPlus className="h-4 w-4 opacity-0 group-hover:opacity-100" />
-                </div>
-              ))}
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
+          <div className="bg-primary p-10 text-white relative">
+            <UserPlus className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
+            <DialogTitle className="text-3xl font-black tracking-tighter">학생 좌석 배정</DialogTitle>
+            <p className="text-white/60 font-bold mt-1 text-sm">SEAT NO. {selectedSeatForAssign?.seatNo}</p>
+          </div>
+          <div className="p-8 space-y-6 bg-white">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+              <Input placeholder="이름 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-12 font-bold" />
+            </div>
+            <ScrollArea className="h-72 pr-2">
+              <div className="space-y-2">
+                {unassignedStudents.map(s => (
+                  <div key={s.id} onClick={() => assignStudentToSeat(s)} className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex justify-between items-center group transition-all">
+                    <div className="grid">
+                      <span className="font-black text-base">{s.name}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground">{s.schoolName} · {s.grade}</span>
+                    </div>
+                    <UserPlus className="h-5 w-5 text-primary opacity-0 group-hover:opacity-100 transition-all" />
+                  </div>
+                ))}
+                {unassignedStudents.length === 0 && <p className="text-center py-10 text-xs font-bold text-muted-foreground/40 italic">배정 가능한 재원생이 없습니다.</p>}
+              </div>
             </ScrollArea>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isManagingSeatModalOpen} onOpenChange={setIsManagingSeatModalOpen}>
-        <DialogContent className="rounded-[2.5rem] p-0 overflow-hidden sm:max-w-md">
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
           {selectedSeatForManage && (
             <>
-              <div className="bg-primary p-8 text-white">
-                <DialogTitle className="text-3xl font-black">{students?.find(s => s.id === selectedSeatForManage.studentId)?.name} 학생</DialogTitle>
-                <p className="opacity-60 text-xs font-bold mt-1">SEAT NO. {selectedSeatForManage.seatNo}</p>
-              </div>
-              <div className="p-8 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Button onClick={() => handleStatusUpdate('studying')} className="h-16 rounded-2xl bg-emerald-500 font-black"><Clock className="mr-2 h-4 w-4" /> 입실</Button>
-                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-16 rounded-2xl text-rose-600 border-rose-200 font-black"><AlertCircle className="mr-2 h-4 w-4" /> 퇴실</Button>
+              <div className={cn("p-10 text-white relative transition-colors duration-500", selectedSeatForManage.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
+                <DialogTitle className="text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeatForManage.studentId)?.name} 학생</DialogTitle>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT NO. {selectedSeatForManage.seatNo}</Badge>
+                  <span className="text-white/60 font-bold text-xs uppercase tracking-widest">{selectedSeatForManage.status}</span>
                 </div>
-                <Button variant="ghost" onClick={unassignStudentFromSeat} className="w-full text-rose-600 font-bold"><UserMinus className="mr-2 h-4 w-4" /> 좌석 배정 해제</Button>
+              </div>
+              <div className="p-8 space-y-5 bg-white">
+                <div className="grid grid-cols-2 gap-4">
+                  <Button onClick={() => handleStatusUpdate('studying')} className="h-20 rounded-[1.5rem] bg-blue-600 hover:bg-blue-700 font-black text-lg shadow-xl gap-3">
+                    <Activity className="h-5 w-5" /> 입실/학습
+                  </Button>
+                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-20 rounded-[1.5rem] text-rose-600 border-rose-200 hover:bg-rose-50 font-black text-lg gap-3">
+                    <AlertCircle className="h-5 w-5" /> 하원/퇴실
+                  </Button>
+                </div>
+                <div className="pt-4 border-t border-dashed space-y-3">
+                  <Button variant="secondary" className="w-full h-14 rounded-2xl font-black gap-2 bg-muted/50" asChild>
+                    <Link href={`/dashboard/teacher/students/${selectedSeatForManage.studentId}`}><Activity className="h-4 w-4" /> 학생 정밀 분석 리포트</Link>
+                  </Button>
+                  <Button variant="ghost" onClick={unassignStudentFromSeat} className="w-full text-rose-600 font-black h-12 rounded-2xl hover:bg-rose-50 gap-2">
+                    <UserMinus className="h-4 w-4" /> 좌석 배정 해제
+                  </Button>
+                </div>
               </div>
             </>
           )}

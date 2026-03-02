@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -57,13 +58,14 @@ export default function LayoutViewPage() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [today, setToday] = useState<Date | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    setToday(new Date());
+    const timer = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(timer);
   }, []);
 
-  const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
 
   // 1. 모든 학생 상세 프로필
   const studentsQuery = useMemoFirebase(() => {
@@ -190,9 +192,18 @@ export default function LayoutViewPage() {
     };
   }, [attendanceList]);
 
-  const formatMinutes = (minutes: number) => {
-    const hh = Math.floor(minutes / 60);
-    const mm = minutes % 60;
+  const getLiveTimeLabel = (seat: AttendanceCurrent) => {
+    const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
+    let totalMins = studentLog?.totalMinutes || 0;
+
+    if (seat.status === 'studying' && seat.lastCheckInAt) {
+      const startTime = seat.lastCheckInAt.toMillis();
+      const sessionMins = Math.floor((now - startTime) / 60000);
+      totalMins += Math.max(0, sessionMins);
+    }
+
+    const hh = Math.floor(totalMins / 60);
+    const mm = totalMins % 60;
     return `${hh}h ${mm}m`;
   };
 
@@ -203,12 +214,12 @@ export default function LayoutViewPage() {
           <div className="flex items-center gap-2">
             <Monitor className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
             <h1 className={cn("font-black tracking-tighter text-primary whitespace-nowrap break-keep", isMobile ? "text-xl" : "text-4xl")}>실시간 관제</h1>
-            <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">LIVE</span>
+            <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter">LIVE</span>
             </div>
           </div>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-1 ml-1">Command & Control</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-1 ml-1">Command & Control Matrix</p>
         </div>
         <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 hover:bg-primary/5 transition-all" onClick={() => window.location.reload()}>
           <RefreshCw className="h-5 w-5 opacity-40 group-hover:opacity-100" />
@@ -217,7 +228,7 @@ export default function LayoutViewPage() {
 
       <div className={cn("grid gap-3", isMobile ? "grid-cols-2 px-1" : "grid-cols-4")}>
         {[
-          { label: '학습 중', val: stats.studying, color: 'text-emerald-600', icon: Activity, bg: 'bg-emerald-50/50' },
+          { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity, bg: 'bg-blue-50/50' },
           { label: '미입실', val: stats.absent, color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-50/50' },
           { label: '외출/휴식', val: stats.away, color: 'text-amber-600', icon: Clock, bg: 'bg-amber-50/50' },
           { label: '배치 좌석', val: stats.total, color: 'text-primary', icon: Armchair, bg: 'bg-muted/30' }
@@ -259,9 +270,6 @@ export default function LayoutViewPage() {
                   const occupant = students?.find(s => s.id === seat?.studentId);
                   if (!seat) return <div key={idx} className="aspect-square opacity-0" />;
 
-                  const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
-                  const totalStudyTime = studentLog?.totalMinutes || 0;
-
                   const isStudying = seat.status === 'studying';
                   const isAlert = seat.studentId && seat.status === 'absent';
 
@@ -274,31 +282,17 @@ export default function LayoutViewPage() {
                         else setIsAssigning(true);
                       }}
                       className={cn(
-                        "aspect-square rounded-lg sm:rounded-xl border flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-[0.85] hover:z-20 p-1",
-                        isStudying ? "bg-emerald-500 border-emerald-600 text-white shadow-xl shadow-emerald-500/20" : 
+                        "aspect-square rounded-lg sm:rounded-xl border-2 flex flex-col items-center justify-center transition-all relative cursor-pointer shadow-sm active:scale-[0.85] hover:z-20 p-1",
+                        isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl shadow-blue-600/20 z-10 scale-105" : 
                         isAlert ? "bg-rose-50 border-rose-400 text-rose-700" :
-                        seat.status === 'away' ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20" :
-                        seat.status === 'break' ? "bg-blue-500 border-blue-600 text-white shadow-xl shadow-blue-500/20" : 
+                        seat.status === 'away' || seat.status === 'break' ? "bg-amber-500 border-amber-600 text-white" : 
                         occupant ? "bg-white border-primary/20 text-primary hover:border-primary/50" : "bg-muted/5 border-transparent"
                       )}
                     >
-                      {isMobile ? (
-                        <>
-                          <span className={cn("font-black text-[7px] absolute top-1 left-1", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white/60" : "text-primary/30")}>{seat.seatNo}</span>
-                          <span className={cn("font-black text-[9px] mt-1 tracking-tighter", isStudying || seat.status === 'away' || seat.status === 'break' ? "text-white" : "text-primary/80")}>
-                            {totalStudyTime > 0 ? formatMinutes(totalStudyTime) : '-'}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className={cn("font-black absolute top-1 left-1.5 leading-none text-[8px]", isStudying || seat.status === 'away' ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
-                          <span className={cn("font-black truncate w-full text-center leading-none tracking-tighter px-1 text-[11px] mb-1")}>{occupant?.name}</span>
-                          <span className={cn("font-bold text-[10px] opacity-80 flex items-center gap-1", isStudying ? "text-white" : "text-primary/60")}>
-                            {totalStudyTime > 0 ? formatMinutes(totalStudyTime) : '0h 0m'}
-                            {isStudying && <Activity className="h-2 w-2 animate-pulse" />}
-                          </span>
-                        </>
-                      )}
+                      <span className={cn("font-black absolute top-1 left-1.5 text-[8px] tracking-tighter", isStudying ? "opacity-60" : "opacity-30")}>{seat.seatNo}</span>
+                      <span className="font-black truncate w-full text-center text-[11px] leading-tight px-1">{occupant?.name || ''}</span>
+                      {occupant && <span className={cn("text-[9px] font-bold mt-1 tracking-tighter", isStudying ? "text-white" : "text-primary/60")}>{getLiveTimeLabel(seat)}</span>}
+                      {isStudying && <Activity className="h-2 w-2 animate-pulse absolute bottom-1.5" />}
                     </div>
                   );
                 })}
@@ -311,11 +305,10 @@ export default function LayoutViewPage() {
       {/* 좌석 상태 정보 범례 */}
       <section className="bg-white/60 backdrop-blur-xl rounded-[2rem] p-3 border shadow-lg flex flex-wrap gap-2 justify-center items-center ring-1 ring-border/50">
         {[
-          { label: '학습', color: 'bg-emerald-500' },
-          { label: '부재', color: 'bg-rose-500' },
-          { label: '외출', color: 'bg-amber-500' },
-          { label: '휴식', color: 'bg-blue-500' },
-          { label: '미배정', color: 'bg-muted/30 border border-muted' }
+          { label: '학습 중 (입실)', color: 'bg-blue-600' },
+          { label: '미입실 (퇴실)', color: 'bg-rose-500' },
+          { label: '외출/휴식', color: 'bg-amber-500' },
+          { label: '미배정/공석', color: 'bg-muted/30 border border-muted' }
         ].map((item) => (
           <div key={item.label} className="flex items-center gap-2 bg-white/80 px-4 py-2 rounded-2xl border border-white shadow-sm transition-all hover:scale-105">
             <div className={cn("w-2 h-2 rounded-full", item.color)} />
@@ -329,7 +322,7 @@ export default function LayoutViewPage() {
         <DialogContent className={cn("border-none shadow-[0_-20px_80px_rgba(0,0,0,0.2)] p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 translate-x-0 left-0 right-0 max-w-none rounded-t-[3rem] rounded-b-none" : "rounded-[2.5rem] sm:max-w-md")}>
           {selectedSeat && (
             <>
-              <div className={cn("p-10 text-white relative overflow-hidden transition-colors duration-500", selectedSeat.status === 'studying' ? "bg-emerald-600" : "bg-primary")}>
+              <div className={cn("p-10 text-white relative overflow-hidden transition-colors duration-500", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
                 <Sparkles className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
                 <div className="flex items-center gap-2 mb-3">
                   <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT {selectedSeat.seatNo}</Badge>
@@ -341,10 +334,10 @@ export default function LayoutViewPage() {
               </div>
               <div className="p-10 space-y-5 bg-white">
                 <div className="grid grid-cols-2 gap-4">
-                  <Button onClick={() => handleStatusUpdate('studying')} className="h-20 rounded-[1.75rem] font-black bg-emerald-500 gap-3 text-lg shadow-xl hover:bg-emerald-600 transition-all active:scale-90"><Zap className="h-5 w-5 fill-current" /> 학습 시작</Button>
+                  <Button onClick={() => handleStatusUpdate('studying')} className="h-20 rounded-[1.75rem] font-black bg-blue-600 gap-3 text-lg shadow-xl hover:bg-blue-700 transition-all active:scale-90"><Zap className="h-5 w-5 fill-current" /> 입실 처리</Button>
                   <Button onClick={() => handleStatusUpdate('away')} className="h-20 rounded-[1.75rem] font-black bg-amber-500 gap-3 text-lg shadow-xl hover:bg-amber-600 transition-all active:scale-90"><MapPin className="h-5 w-5" /> 외출 중</Button>
-                  <Button onClick={() => handleStatusUpdate('break')} className="h-20 rounded-[1.75rem] font-black bg-blue-500 gap-3 text-lg shadow-xl hover:bg-blue-600 transition-all active:scale-90"><Maximize2 className="h-5 w-5" /> 휴식 중</Button>
-                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-20 rounded-[1.75rem] font-black border-rose-200 text-rose-600 gap-3 text-lg hover:bg-rose-50 transition-all active:scale-90"><AlertCircle className="h-5 w-5" /> 하원 처리</Button>
+                  <Button onClick={() => handleStatusUpdate('break')} className="h-20 rounded-[1.75rem] font-black bg-blue-400 gap-3 text-lg shadow-xl hover:bg-blue-500 transition-all active:scale-90"><Maximize2 className="h-5 w-5" /> 휴식 중</Button>
+                  <Button onClick={() => handleStatusUpdate('absent')} variant="outline" className="h-20 rounded-[1.75rem] font-black border-rose-200 text-rose-600 gap-3 text-lg hover:bg-rose-50 transition-all active:scale-90"><AlertCircle className="h-5 w-5" /> 퇴실 처리</Button>
                 </div>
                 {selectedSeat.studentId && (
                   <div className="pt-4 border-t border-dashed space-y-3">
