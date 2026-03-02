@@ -593,17 +593,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <Timer className={cn("text-amber-600", isMobile ? "h-4 w-4" : "h-8 w-8")} /> 루틴
               </CardTitle>
             </CardHeader>
-            <CardContent className={cn("flex flex-col gap-2", isMobile ? "p-3.5" : "p-10")}>
+            <CardContent className={cn(isMobile ? "p-3.5" : "p-10")}>
               {scheduleItems.length === 0 ? (
                 <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-amber-200 rounded-xl">루틴이 없습니다.</div>
-              ) : scheduleItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white border-2 border-transparent shadow-sm">
-                  <span className="font-black text-[10px] truncate w-2/3">{item.title.split(': ')[0]}</span>
-                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-[9px] px-1.5 h-5 border-amber-200 bg-amber-50/50">
-                    {item.title.split(': ')[1] || '--:--'}
-                  </Badge>
+              ) : (
+                <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "flex flex-col")}>
+                  {scheduleItems.map((item) => (
+                    <div key={item.id} className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border-2 border-amber-100/50 shadow-sm text-center">
+                      <span className={cn("font-black tracking-tighter text-primary truncate w-full px-1", isMobile ? "text-[10px]" : "text-xs")}>
+                        {item.title.split(': ')[0]}
+                      </span>
+                      <Badge variant="outline" className={cn("font-mono font-black text-amber-600 border-amber-200 bg-amber-50/50 mt-1 h-5", isMobile ? "text-[8px] px-1" : "text-[10px] px-2")}>
+                        {item.title.split(': ')[1] || '--:--'}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </CardContent>
           </div>
         </div>
