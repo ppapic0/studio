@@ -64,7 +64,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -129,7 +129,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 오늘 학습 로그 (실시간 합산용)
+  // 4. 오늘 학습 로그 (실시간 합산용) - collectionGroup 사용
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(
@@ -182,9 +182,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const metrics = useMemo(() => {
     if (!attendanceList || !students) return { totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
     
-    const allLiveMinutes = attendanceList
-      .filter(a => !!a.studentId && a.type !== 'aisle')
-      .map(a => getLiveTimeInMinutes(a.studentId!, a.status, a.lastCheckInAt));
+    const activeSeats = attendanceList.filter(a => !!a.studentId && a.type !== 'aisle');
+    const allLiveMinutes = activeSeats.map(a => getLiveTimeInMinutes(a.studentId!, a.status, a.lastCheckInAt));
     
     const totalCenterMinutes = allLiveMinutes.reduce((acc, m) => acc + m, 0);
     const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalCenterMinutes / allLiveMinutes.length) : 0;
@@ -198,12 +197,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const stats = useMemo(() => {
     if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
-    const seatsOnly = attendanceList.filter(a => a.type !== 'aisle');
+    // 'aisle'(통로) 타입을 제외한 실제 'seat'만 집계
+    const actualSeats = attendanceList.filter(a => a.type !== 'aisle');
     return {
-      studying: seatsOnly.filter(a => a.status === 'studying').length,
-      absent: seatsOnly.filter(a => a.studentId && a.status === 'absent').length,
-      away: seatsOnly.filter(a => a.status === 'away' || a.status === 'break').length,
-      total: seatsOnly.length
+      studying: actualSeats.filter(a => a.status === 'studying').length,
+      absent: actualSeats.filter(a => a.studentId && a.status === 'absent').length,
+      away: actualSeats.filter(a => a.status === 'away' || a.status === 'break').length,
+      total: actualSeats.length
     };
   }, [attendanceList]);
 
@@ -418,10 +418,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </CardHeader>
         <CardContent className="p-6 sm:p-10">
           <ScrollArea className="w-full max-w-full">
-            <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-fit mx-auto">
-              <div className="grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
+            <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-max mx-auto">
+              <div 
+                className="grid gap-3 sm:gap-4" 
+                style={{ 
+                  gridTemplateColumns: `repeat(${gridCols}, minmax(100px, 1fr))`,
+                }}
+              >
                 {Array.from({ length: gridCols }).map((_, colIndex) => (
-                  <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
+                  <div key={colIndex} className="flex flex-col gap-3 sm:gap-4">
                     {Array.from({ length: gridRows }).map((_, rowIndex) => {
                       const seatNo = colIndex * gridRows + rowIndex + 1;
                       const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
@@ -438,7 +443,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           key={seatNo} 
                           onClick={() => handleSeatClick(seat)}
                           className={cn(
-                            "aspect-[1.1/1] w-[92px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm border-2",
+                            "aspect-[1.1/1] min-w-[100px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-2 cursor-pointer shadow-sm border-2",
                             isAisle 
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
                               : isStudying 
@@ -471,7 +476,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           ) : (
                             <div className="flex flex-col items-center">
-                              <span className="text-[8px] font-black tracking-tighter opacity-100">EMPTY</span>
+                              <span className="text-[8px] font-black tracking-tighter opacity-100 uppercase">Empty</span>
                               {isEditMode && <UserPlus className="h-3 w-3 mt-1 text-primary/40" />}
                             </div>
                           )}
@@ -482,6 +487,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 ))}
               </div>
             </div>
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </CardContent>
       </Card>
@@ -526,7 +532,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
-        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md")}>
           {selectedSeat && (
             <>
               <div className={cn("p-10 text-white relative", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
@@ -574,7 +580,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
-        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md")}>
           <div className="bg-primary p-8 text-white relative">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
             <DialogHeader className="relative z-10">
