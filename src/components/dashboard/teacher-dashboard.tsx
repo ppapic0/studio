@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -31,9 +32,11 @@ import {
   Check,
   X,
   Map,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Grid3X3,
+  Save
 } from 'lucide-react';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
@@ -63,6 +66,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
@@ -78,6 +82,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 그리드 설정 상태
+  const [gridRows, setGridRows] = useState(7);
+  const [gridCols, setGridCols] = useState(10);
+
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(timer);
@@ -85,6 +93,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  // 0. 센터 설정 (그리드 크기 등)
+  const centerRef = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return doc(firestore, 'centers', centerId);
+  }, [firestore, centerId]);
+  const { data: centerData } = useDoc<any>(centerRef);
+
+  useEffect(() => {
+    if (centerData?.layoutSettings) {
+      setGridRows(centerData.layoutSettings.rows || 7);
+      setGridCols(centerData.layoutSettings.cols || 10);
+    }
+  }, [centerData]);
 
   // 1. 모든 학생 데이터
   const studentsQuery = useMemoFirebase(() => {
@@ -107,10 +129,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 오늘 학습 로그
+  // 4. 오늘 학습 로그 (실시간 합산용)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
-    return query(collectionGroup(firestore, 'days'), where('centerId', '==', centerId), where('dateKey', '==', todayKey));
+    return query(
+      collectionGroup(firestore, 'days'),
+      where('centerId', '==', centerId),
+      where('dateKey', '==', todayKey)
+    );
   }, [firestore, centerId, todayKey]);
   const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
@@ -136,19 +162,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, studentMembers, searchTerm]);
 
-  const getLiveTimeInMinutes = (seat: AttendanceCurrent) => {
-    if (!seat.studentId) return 0;
-    const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
+  const getLiveTimeInMinutes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
+    const studentLog = todayLogs?.find(l => l.studentId === studentId);
     let totalMins = studentLog?.totalMinutes || 0;
-    if (seat.status === 'studying' && seat.lastCheckInAt) {
-      const startTime = seat.lastCheckInAt.toMillis();
+    if (status === 'studying' && lastCheckInAt) {
+      const startTime = lastCheckInAt.toMillis();
       totalMins += Math.floor((now - startTime) / 60000);
     }
     return totalMins;
   };
 
-  const getLiveTimeLabel = (seat: AttendanceCurrent) => {
-    const totalMins = getLiveTimeInMinutes(seat);
+  const getLiveTimeLabel = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
+    const totalMins = getLiveTimeInMinutes(studentId, status, lastCheckInAt);
     const hh = Math.floor(totalMins / 60);
     const mm = totalMins % 60;
     return `${hh}h ${mm}m`;
@@ -159,7 +184,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     
     const allLiveMinutes = attendanceList
       .filter(a => !!a.studentId && a.type !== 'aisle')
-      .map(a => getLiveTimeInMinutes(a));
+      .map(a => getLiveTimeInMinutes(a.studentId!, a.status, a.lastCheckInAt));
     
     const totalCenterMinutes = allLiveMinutes.reduce((acc, m) => acc + m, 0);
     const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalCenterMinutes / allLiveMinutes.length) : 0;
@@ -195,6 +220,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); }
   };
 
+  const handleSaveGridSettings = async () => {
+    if (!firestore || !centerId) return;
+    setIsSaving(true);
+    try {
+      await setDoc(doc(firestore, 'centers', centerId), {
+        layoutSettings: {
+          rows: gridRows,
+          cols: gridCols,
+          updatedAt: serverTimestamp()
+        }
+      }, { merge: true });
+      toast({ title: "그리드 크기가 저장되었습니다." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "저장 실패" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleToggleCellType = async () => {
     if (!firestore || !centerId || !selectedSeat) return;
     const nextType = selectedSeat.type === 'aisle' ? 'seat' : 'aisle';
@@ -204,7 +248,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
       
-      // 통로로 변경할 때 학생이 배정되어 있다면 해제
       if (nextType === 'aisle' && selectedSeat.studentId) {
         batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { seatNo: 0, updatedAt: serverTimestamp() });
         batch.set(seatRef, { type: 'aisle', studentId: null, status: 'absent', updatedAt: serverTimestamp() }, { merge: true });
@@ -216,11 +259,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
       setIsManaging(false);
       setIsAssigning(false);
-    } catch (e) {
-      toast({ variant: "destructive", title: "변경 실패" });
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); } finally { setIsSaving(false); }
   };
 
   const assignStudentToSeat = async (student: StudentProfile) => {
@@ -254,11 +293,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const handleSeatClick = (seat: AttendanceCurrent) => {
     setSelectedSeat(seat);
     if (isEditMode) {
-      // 편집 모드에서는 학생이 있든 없든 관리 다이얼로그 노출 (통로 전환 때문)
       if (seat.studentId) setIsManaging(true);
       else setIsAssigning(true);
     } else {
-      // 일반 모드에서는 통로가 아니고 학생이 배정된 경우만 관리 가능
       if (seat.studentId && seat.type !== 'aisle') setIsManaging(true);
     }
   };
@@ -337,6 +374,33 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
+      {/* 그리드 설정 섹션 (편집 모드일 때만 노출) */}
+      {isEditMode && (
+        <Card className="mx-4 rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-3 rounded-2xl"><Grid3X3 className="h-6 w-6 text-white" /></div>
+            <div className="grid">
+              <h3 className="text-xl font-black tracking-tight">그리드 크기 설정</h3>
+              <p className="text-xs font-bold opacity-60">센터 규모에 맞춰 가로/세로 좌석 수를 조절하세요.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="grid gap-1.5">
+              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">가로 (열)</Label>
+              <Input type="number" value={gridCols} onChange={e => setGridCols(Number(e.target.value))} className="w-24 h-12 bg-white text-primary rounded-xl font-black text-center" />
+            </div>
+            <X className="h-4 w-4 opacity-40 mt-6" />
+            <div className="grid gap-1.5">
+              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">세로 (행)</Label>
+              <Input type="number" value={gridRows} onChange={e => setGridRows(Number(e.target.value))} className="w-24 h-12 bg-white text-primary rounded-xl font-black text-center" />
+            </div>
+            <Button onClick={handleSaveGridSettings} disabled={isSaving} className="h-12 rounded-xl px-6 bg-white text-primary font-black hover:bg-white/90 gap-2 mt-6 shadow-xl active:scale-95 transition-all">
+              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />} 설정 저장
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <Card className={cn(
         "rounded-[3.5rem] border-none shadow-xl bg-white mx-4 overflow-hidden transition-all duration-500",
         isEditMode ? "ring-4 ring-primary/20" : ""
@@ -348,19 +412,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               {isEditMode ? '공간 배치 및 통로 수정' : '실시간 좌석 상황판'}
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6">SEAT</Badge>
-              <Badge variant="outline" className="border-transparent font-black text-[9px] px-3 h-6 bg-muted/20">AISLE</Badge>
+              <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6 uppercase">Seat Plan: {gridCols}x{gridRows}</Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-10">
           <ScrollArea className="w-full max-w-full">
             <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-fit mx-auto">
-              <div className="grid grid-cols-10 gap-2 sm:gap-3">
-                {Array.from({ length: 10 }).map((_, colIndex) => (
+              <div className="grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
+                {Array.from({ length: gridCols }).map((_, colIndex) => (
                   <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
-                    {Array.from({ length: 7 }).map((_, rowIndex) => {
-                      const seatNo = colIndex * 7 + rowIndex + 1;
+                    {Array.from({ length: gridRows }).map((_, rowIndex) => {
+                      const seatNo = colIndex * gridRows + rowIndex + 1;
                       const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
                       const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
@@ -402,7 +465,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="flex flex-col items-center gap-0 w-full px-1">
                               <span className="text-[10px] sm:text-[11px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
-                                {getLiveTimeLabel(seat!)}
+                                {getLiveTimeLabel(student.id, seat.status, seat.lastCheckInAt)}
                               </span>
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
