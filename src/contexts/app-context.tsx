@@ -3,7 +3,8 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { format } from 'date-fns';
 
 export type CenterMembership = {
   id: string; // centerId
@@ -15,6 +16,18 @@ export type CenterMembership = {
 };
 
 export type ViewMode = 'responsive' | 'mobile';
+
+export const TIERS = [
+  { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800' },
+  { name: '브론즈', min: 5000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
+  { name: '실버', min: 10000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
+  { name: '골드', min: 15000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
+  { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
+  { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
+  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800' },
+  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800' },
+  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
+];
 
 interface AppContextType {
   memberships: CenterMembership[];
@@ -32,6 +45,9 @@ interface AppContextType {
   setStartTime: (time: number | null) => void;
   lastActiveCheckTime: number | null;
   setLastActiveCheckTime: (time: number | null) => void;
+
+  // Global Tier State
+  currentTier: typeof TIERS[0];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -50,10 +66,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
+  // Tier State
+  const [currentTier, setCurrentTier] = useState(TIERS[0]);
+
   const activeMembershipRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Load view mode from local storage (UI preference is fine to keep global)
     const savedMode = localStorage.getItem('app_view_mode') as ViewMode;
     if (savedMode) setViewModeState(savedMode);
   }, []);
@@ -69,6 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActiveMembership(null);
       setMembershipsLoading(false);
       activeMembershipRef.current = null;
+      setCurrentTier(TIERS[0]);
       return;
     }
 
@@ -99,9 +118,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore]);
 
+  // 실시간 티어 동기화 (학생인 경우에만)
+  useEffect(() => {
+    if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
+      setCurrentTier(TIERS[0]);
+      return;
+    }
+
+    const centerId = activeMembership.id;
+    const periodKey = format(new Date(), 'yyyy-MM');
+    const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', user.uid);
+    const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+
+    let progressData: any = null;
+    let rankData: any = null;
+
+    const updateTier = () => {
+      const lp = progressData?.seasonLp || 0;
+      const rank = rankData?.rank || 999;
+
+      if (lp >= 25000) {
+        if (rank === 1) setCurrentTier(TIERS.find(t => t.name === '챌린저')!);
+        else if (rank === 2 || rank === 3) setCurrentTier(TIERS.find(t => t.name === '그랜드마스터')!);
+        else setCurrentTier(TIERS.find(t => t.name === '마스터')!);
+      } else {
+        const found = TIERS.slice(0, 6).reverse().find(t => lp >= t.min) || TIERS[0];
+        setCurrentTier(found);
+      }
+    };
+
+    const unsubProgress = onSnapshot(progressRef, (snap) => {
+      if (snap.exists()) {
+        progressData = snap.data();
+        updateTier();
+      }
+    });
+
+    const unsubRank = onSnapshot(rankRef, (snap) => {
+      if (snap.exists()) {
+        rankData = snap.data();
+        updateTier();
+      }
+    });
+
+    return () => {
+      unsubProgress();
+      unsubRank();
+    };
+  }, [user, firestore, activeMembership]);
+
   // Timer Persistence Sync - User-Specific Keys
   useEffect(() => {
-    // 사용자가 로그아웃하거나 바뀌면 이전 사용자의 타이머 상태를 클라이언트 메모리에서 즉시 초기화
     setIsTimerActive(false);
     setStartTime(null);
     setLastActiveCheckTime(null);
@@ -149,7 +216,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     startTime,
     setStartTime,
     lastActiveCheckTime,
-    setLastActiveCheckTime
+    setLastActiveCheckTime,
+    currentTier
   }), [
     memberships, 
     activeMembership, 
@@ -157,7 +225,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     viewMode,
     isTimerActive, 
     startTime, 
-    lastActiveCheckTime
+    lastActiveCheckTime,
+    currentTier
   ]);
 
   return (

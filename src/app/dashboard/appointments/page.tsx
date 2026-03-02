@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -67,7 +68,7 @@ import { cn } from '@/lib/utils';
 export default function AppointmentsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
 
   const isMobile = viewMode === 'mobile';
@@ -312,12 +313,12 @@ export default function AppointmentsPage() {
         {isStudent && (
           <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
             <DialogTrigger asChild>
-              <Button size="lg" className={cn("rounded-2xl font-black gap-2 shadow-xl bg-primary text-white interactive-button", isMobile ? "w-full h-14" : "h-14 px-8")}>
+              <Button size="lg" className={cn("rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full h-14" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
                 <CalendarPlus className="h-5 w-5" /> 새 상담 신청
               </Button>
             </DialogTrigger>
             <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[380px]" : "sm:max-w-md")}>
-              <div className="bg-primary p-10 text-white relative">
+              <div className={cn("p-10 text-white relative", `bg-gradient-to-br ${currentTier.gradient}`)}>
                 <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
                 <DialogHeader>
                   <DialogTitle className="text-3xl font-black tracking-tighter text-left">상담 신청</DialogTitle>
@@ -366,7 +367,7 @@ export default function AppointmentsPage() {
                 </div>
               </div>
               <DialogFooter className="p-8 bg-muted/30">
-                <Button onClick={handleRequestAppointment} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
+                <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white", `bg-gradient-to-br ${currentTier.gradient}`)}>
                   {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 신청 완료'}
                 </Button>
               </DialogFooter>
@@ -405,7 +406,7 @@ export default function AppointmentsPage() {
                   {reservations.map((res) => (
                     <div key={res.id} className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4">
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
-                        <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:bg-primary transition-all duration-500 shadow-inner">
+                        <div className={cn("h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
                           <span className="text-[8px] sm:text-[10px] font-black text-primary/60 uppercase group-hover:text-white/60 tracking-tighter">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'MMM') : ''}</span>
                           <span className="text-xl sm:text-2xl font-black text-primary group-hover:text-white leading-none mt-0.5">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
                         </div>

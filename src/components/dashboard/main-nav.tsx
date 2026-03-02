@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -63,7 +64,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
 };
 
 export function MainNav({ isMobile = false }: MainNavProps) {
-  const { activeMembership } = useAppContext();
+  const { activeMembership, currentTier } = useAppContext();
   const pathname = usePathname();
   
   if (!activeMembership) {
@@ -76,6 +77,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
 
   const userRole = activeMembership.role;
   const userNavItems = navItems[userRole] || [];
+  const isStudent = userRole === 'student';
   
   const navClass = cn(
     'flex-1 items-start px-4 text-sm font-medium pt-8',
@@ -87,7 +89,13 @@ export function MainNav({ isMobile = false }: MainNavProps) {
     isMobile ? 'text-lg' : ''
   );
   
-  const activeLinkClass = 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground shadow-lg shadow-primary/20';
+  // 티어 기반 활성 탭 스타일
+  const activeLinkClass = cn(
+    'text-white shadow-xl shadow-black/10',
+    isStudent 
+      ? `bg-gradient-to-br ${currentTier.gradient}` 
+      : 'bg-primary text-primary-foreground shadow-primary/20'
+  );
 
   return (
     <nav className={navClass}>

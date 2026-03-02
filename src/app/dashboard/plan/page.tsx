@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -107,18 +108,6 @@ const SUBJECTS = [
   { id: 'science', label: '과탐', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-600' },
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
-];
-
-const TIERS = [
-  { name: '아이언', min: 0, gradient: 'from-slate-500 via-slate-600 to-slate-800' },
-  { name: '브론즈', min: 5000, gradient: 'from-orange-600 via-orange-700 to-orange-900' },
-  { name: '실버', min: 10000, gradient: 'from-blue-300 via-slate-400 to-slate-600' },
-  { name: '골드', min: 15000, gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
-  { name: '플래티넘', min: 20000, gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
-  { name: '다이아몬드', min: 25000, gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
-  { name: '마스터', min: 25000, gradient: 'from-purple-500 via-violet-600 to-violet-800' },
-  { name: '그랜드마스터', min: 25000, gradient: 'from-rose-500 via-pink-600 to-rose-800' },
-  { name: '챌린저', min: 25000, gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
 ];
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: any) {
@@ -252,7 +241,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: an
 export default function StudyPlanPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
 
   const isMobile = viewMode === 'mobile';
@@ -276,7 +265,6 @@ export default function StudyPlanPage() {
   const isStudent = activeMembership?.role === 'student';
   const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
-  const periodKey = selectedDate ? format(selectedDate, 'yyyy-MM') : '';
 
   const isPast = selectedDate ? isBefore(startOfDay(selectedDate), startOfDay(new Date())) : false;
 
@@ -310,27 +298,6 @@ export default function StudyPlanPage() {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
   }, [firestore, activeMembership, user]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
-
-  // 티어 판별을 위한 랭킹 정보 조회
-  const rankQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !periodKey) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
-      where('studentId', '==', user.uid)
-    );
-  }, [firestore, activeMembership, user, periodKey]);
-  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 999;
-
-  const currentLp = progress?.seasonLp || 0;
-  const currentTier = useMemo(() => {
-    if (currentLp >= 25000) {
-      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
-      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
-      return TIERS.find(t => t.name === '마스터')!;
-    }
-    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
-  }, [currentLp, currentRank]);
 
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);

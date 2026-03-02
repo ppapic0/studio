@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -79,18 +80,6 @@ const STAT_CONFIG = {
     guide: '당일 6시간 이상의 초몰입 달성 시 상승합니다. (일일 +0.5)'
   },
 };
-
-const TIERS = [
-  { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800' },
-  { name: '브론즈', min: 5000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
-  { name: '실버', min: 10000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
-  { name: '골드', min: 15000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
-  { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
-  { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
-  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800' },
-  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800' },
-  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
-];
 
 function SystemGuideDialog() {
   return (
@@ -178,7 +167,7 @@ function SystemGuideDialog() {
 
 export default function GrowthPage() {
   const { user } = useUser();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, currentTier } = useAppContext();
   const firestore = useFirestore();
   const isMobile = viewMode === 'mobile';
   const periodKey = format(new Date(), 'yyyy-MM');
@@ -217,14 +206,6 @@ export default function GrowthPage() {
   }, [stats]);
 
   const currentLp = progress?.seasonLp || 0;
-  const currentTier = useMemo(() => {
-    if (currentLp >= 25000) {
-      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
-      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
-      return TIERS.find(t => t.name === '마스터')!;
-    }
-    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
-  }, [currentLp, currentRank]);
 
   // 각 스킬 100점당 5% 부스트 (최대 20%)
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
@@ -273,7 +254,7 @@ export default function GrowthPage() {
                 <span className="text-[10px] font-bold mt-1 opacity-40">
                   {currentTier.name === '챌린저' ? '압도적 1위 유지 중' : 
                    currentTier.name === '그랜드마스터' ? '정상 탈환 도전 중' :
-                   `다음 승급까지: ${Math.max(0, (TIERS.find(t => t.min > currentLp)?.min || 25000) - currentLp).toLocaleString()} LP`}
+                   `다음 승급까지: ${Math.max(0, (25000) - currentLp).toLocaleString()} LP`}
                 </span>
               </div>
             </div>

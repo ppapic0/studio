@@ -100,18 +100,6 @@ const SUBJECTS = [
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
 
-const TIERS = [
-  { name: '아이언', min: 0, gradient: 'from-slate-500 via-slate-600 to-slate-800' },
-  { name: '브론즈', min: 5000, gradient: 'from-orange-600 via-orange-700 to-orange-900' },
-  { name: '실버', min: 10000, gradient: 'from-blue-300 via-slate-400 to-slate-600' },
-  { name: '골드', min: 15000, gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
-  { name: '플래티넘', min: 20000, gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
-  { name: '다이아몬드', min: 25000, gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
-  { name: '마스터', min: 25000, gradient: 'from-purple-500 via-violet-600 to-violet-800' },
-  { name: '그랜드마스터', min: 25000, gradient: 'from-rose-500 via-pink-600 to-rose-800' },
-  { name: '챌린저', min: 25000, gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
-];
-
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
@@ -244,7 +232,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
 export default function StudyHistoryPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
   
   const isMobile = viewMode === 'mobile';
@@ -264,7 +252,6 @@ export default function StudyHistoryPage() {
   useEffect(() => { setCurrentDate(new Date()); }, []);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const monthKey = currentDate ? format(currentDate, 'yyyy-MM') : '';
 
   const studyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !targetUid || !activeMembership) return null;
@@ -284,26 +271,6 @@ export default function StudyHistoryPage() {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
   }, [firestore, activeMembership, targetUid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: !!targetUid });
-
-  const rankQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !targetUid || !monthKey) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${monthKey}_lp`, 'entries'),
-      where('studentId', '==', targetUid)
-    );
-  }, [firestore, activeMembership, targetUid, monthKey]);
-  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 999;
-
-  const currentLp = progress?.seasonLp || 0;
-  const currentTier = useMemo(() => {
-    if (currentLp >= 25000) {
-      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
-      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
-      return TIERS.find(t => t.name === '마스터')!;
-    }
-    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
-  }, [currentLp, currentRank]);
 
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
   const dailyPlans = useMemo(() => allPlans?.filter(p => p.dateKey === selectedDateKey) || [], [allPlans, selectedDateKey]);
@@ -374,7 +341,7 @@ export default function StudyHistoryPage() {
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
-    if (isNaN(hours) || iisNaN(mins)) return time12h;
+    if (isNaN(hours) || isNaN(mins)) return time12h;
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
