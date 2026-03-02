@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -19,7 +20,7 @@ import {
   increment,
   setDoc
 } from 'firebase/firestore';
-import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry } from '@/lib/types';
+import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport } from '@/lib/types';
 import { 
   format, 
   startOfMonth, 
@@ -58,7 +59,13 @@ import {
   CalendarCheck,
   CircleDot,
   Trophy,
-  Crown
+  Crown,
+  FileText,
+  CheckCircle2,
+  MessageCircle,
+  BrainCircuit,
+  TrendingUp,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +77,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -98,6 +105,61 @@ const SUBJECTS = [
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
+
+/**
+ * 리포트 텍스트 파싱 컴포넌트
+ */
+function VisualReportViewer({ content }: { content: string }) {
+  const sections = useMemo(() => {
+    // 이모지 기준으로 섹션 분리
+    const parts = content.split(/(?=🕒|✅|📊|💬|🧠)/g);
+    return parts.map(p => p.trim()).filter(Boolean);
+  }, [content]);
+
+  const getSectionIcon = (text: string) => {
+    if (text.includes('출결')) return <Clock className="h-5 w-5 text-blue-600" />;
+    if (text.includes('계획 완수율')) return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
+    if (text.includes('AI 분석')) return <TrendingUp className="h-5 w-5 text-purple-600" />;
+    if (text.includes('코멘트')) return <MessageCircle className="h-5 w-5 text-amber-600" />;
+    if (text.includes('AI 종합 피드백')) return <BrainCircuit className="h-5 w-5 text-rose-600" />;
+    return <Sparkles className="h-5 w-5 text-primary" />;
+  };
+
+  const getSectionColor = (text: string) => {
+    if (text.includes('출결')) return "bg-blue-50/50 border-blue-100";
+    if (text.includes('계획 완수율')) return "bg-emerald-50/50 border-emerald-100";
+    if (text.includes('AI 분석')) return "bg-purple-50/50 border-purple-100";
+    if (text.includes('코멘트')) return "bg-amber-50/50 border-amber-100";
+    if (text.includes('AI 종합 피드백')) return "bg-rose-50/50 border-rose-100";
+    return "bg-muted/30 border-border";
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-700">
+      {sections.map((section, idx) => {
+        const lines = section.split('\n');
+        const title = lines[0];
+        const body = lines.slice(1).join('\n');
+        
+        return (
+          <Card key={idx} className={cn("rounded-[1.5rem] border shadow-sm overflow-hidden", getSectionColor(title))}>
+            <CardHeader className="p-5 pb-2 border-b border-white/20">
+              <div className="flex items-center gap-2">
+                {getSectionIcon(title)}
+                <span className="font-black text-sm tracking-tight">{title.replace(/^[^\s]+\s/, '')}</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <p className="text-sm font-bold text-foreground/80 leading-relaxed whitespace-pre-wrap break-keep">
+                {body}
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
@@ -265,13 +327,21 @@ export default function StudyHistoryPage() {
   }, [firestore, targetUid, activeMembership, weekKey]);
   const { data: allPlans } = useCollection<StudyPlanItem>(plansQuery);
 
+  const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
+
+  // 데일리 리포트 데이터 조회
+  const reportRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !targetUid || !selectedDateKey) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${selectedDateKey}_${targetUid}`);
+  }, [firestore, activeMembership, targetUid, selectedDateKey]);
+  const { data: dailyReport, isLoading: reportLoading } = useDoc<DailyReport>(reportRef);
+
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
   }, [firestore, activeMembership, targetUid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: !!targetUid });
 
-  const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
   const dailyPlans = useMemo(() => allPlans?.filter(p => p.dateKey === selectedDateKey) || [], [allPlans, selectedDateKey]);
   const scheduleItems = useMemo(() => dailyPlans.filter(p => p.category === 'schedule'), [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans.filter(p => p.category === 'personal'), [dailyPlans]);
@@ -509,14 +579,35 @@ export default function StudyHistoryPage() {
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
             <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
           </div>
-          <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[50vh]" : "max-h-[500px]")}>
-            <Tabs defaultValue="schedule" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 rounded-none h-16 bg-muted/20 p-0 border-b">
-                <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] sm:text-xs uppercase tracking-widest">ROUTINE</TabsTrigger>
-                <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-[10px] sm:text-xs uppercase tracking-widest">STUDY</TabsTrigger>
-                <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] sm:text-xs uppercase tracking-widest">LIFE</TabsTrigger>
+          <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[600px]")}>
+            <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
+              <TabsList className="grid w-full grid-cols-4 rounded-none h-16 bg-muted/20 p-0 border-b">
+                <TabsTrigger value="ai-report" disabled={!dailyReport || dailyReport.status !== 'sent'} className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
+                  <Sparkles className="h-3.5 w-3.5" /> AI 리포트
+                </TabsTrigger>
+                <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
+                  <Clock className="h-3.5 w-3.5" /> 루틴
+                </TabsTrigger>
+                <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
+                  <Target className="h-3.5 w-3.5" /> 학습
+                </TabsTrigger>
+                <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-rose-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
+                  <Activity className="h-3.5 w-3.5" /> 개인
+                </TabsTrigger>
               </TabsList>
               <div className={cn("space-y-8", isMobile ? "p-5" : "p-8")}>
+                <TabsContent value="ai-report" className="mt-0">
+                  {reportLoading ? (
+                    <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                  ) : dailyReport && dailyReport.status === 'sent' ? (
+                    <VisualReportViewer content={dailyReport.content} />
+                  ) : (
+                    <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">
+                      <FileText className="h-12 w-12" />
+                      <p className="font-black text-sm">이날의 분석 리포트가 없습니다.</p>
+                    </div>
+                  )}
+                </TabsContent>
                 <TabsContent value="schedule" className="mt-0 space-y-4">
                   {!isActuallyPast && !isParent && (
                     <div className="flex justify-end">
@@ -568,12 +659,12 @@ export default function StudyHistoryPage() {
                 </TabsContent>
                 <TabsContent value="personal" className="mt-0 space-y-4">
                   <div className="grid gap-3">
-                    {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-amber-50/20 border-amber-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="h-6 w-6 rounded-lg" /><Label className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
+                    {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-rose-50/20 border-rose-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="h-6 w-6 rounded-lg" /><Label className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
                   </div>
                   {!isActuallyPast && !isParent && (
-                    <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1.5 shadow-sm mt-4 gap-1.5">
+                    <div className="relative flex items-center bg-white border-2 border-rose-100 rounded-2xl p-1.5 shadow-sm mt-4 gap-1.5">
                       <Input placeholder="기타 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} className="flex-1 border-none shadow-none focus-visible:ring-0 font-bold h-11 text-sm" />
-                      <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 shadow-lg shadow-amber-500/10 shrink-0 relative z-10"><Plus className="h-5 w-5" /></Button>
+                      <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} className="h-10 w-10 rounded-xl border-2 border-rose-500 text-rose-600 shadow-lg shadow-rose-500/10 shrink-0 relative z-10"><Plus className="h-5 w-5" /></Button>
                     </div>
                   )}
                 </TabsContent>
