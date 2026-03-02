@@ -120,13 +120,11 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const callerId = context.auth.uid;
 
   try {
-    // 1. 권한 확인
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
       throw new functions.https.HttpsError("permission-denied", "정보를 수정할 권한이 없습니다.");
     }
 
-    // 2. Auth 업데이트 (비밀번호/이름)
     try {
       const authUpdates: any = {};
       if (password && password.length >= 6) authUpdates.password = password;
@@ -139,7 +137,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       throw new functions.https.HttpsError("internal", `인증 정보 수정 실패: ${authError.message}`);
     }
 
-    // 3. Firestore 업데이트 (Batch)
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
 
@@ -147,13 +144,11 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
     const memberRef = db.doc(`centers/${centerId}/members/${studentId}`);
 
-    // (1) 전역 유저 프로필
     const userUpdate: any = { updatedAt: timestamp };
     if (displayName) userUpdate.displayName = displayName;
     if (schoolName) userUpdate.schoolName = schoolName;
     batch.set(userRef, userUpdate, { merge: true });
     
-    // (2) 학생 상세 프로필
     const studentUpdate: any = { updatedAt: timestamp };
     if (displayName) studentUpdate.name = displayName;
     if (schoolName) studentUpdate.schoolName = schoolName;
@@ -161,7 +156,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (parentLinkCode !== undefined) studentUpdate.parentLinkCode = parentLinkCode;
     batch.set(studentRef, studentUpdate, { merge: true });
 
-    // (3) 센터 멤버 정보
     if (displayName) {
       batch.set(memberRef, { displayName, updatedAt: timestamp }, { merge: true });
     }
@@ -183,7 +177,9 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   
   const { studentId, centerId } = data;
-  if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
+  if (!studentId || !centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 유효하지 않습니다.");
+  }
 
   const callerId = context.auth.uid;
 
@@ -192,7 +188,9 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
 
     // 1. 권한 확인 (관리자만 가능)
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') {
+    const callerData = callerMemberSnap.data();
+    
+    if (!callerMemberSnap.exists || callerData?.role !== 'centerAdmin') {
       console.warn(`[DeleteStudent] Unauthorized attempt by ${callerId}`);
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다. 관리자만 가능합니다.");
     }
@@ -213,15 +211,10 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
     // 3. Firestore 데이터 정리 (Batch)
     const batch = db.batch();
     
-    // (1) 전역 유저 정보
     batch.delete(db.doc(`users/${studentId}`));
-    // (2) 센터 멤버십
     batch.delete(db.doc(`centers/${centerId}/members/${studentId}`));
-    // (3) 사용자 센터 역인덱스
     batch.delete(db.doc(`userCenters/${studentId}/centers/${centerId}`));
-    // (4) 학생 상세 프로필
     batch.delete(db.doc(`centers/${centerId}/students/${studentId}`));
-    // (5) 성장 포인트 정보
     batch.delete(db.doc(`centers/${centerId}/growthProgress/${studentId}`));
 
     await batch.commit();
@@ -232,7 +225,7 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   } catch (error: any) {
     console.error("[DeleteStudent Final Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류");
+    throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류가 발생했습니다.");
   }
 });
 

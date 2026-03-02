@@ -74,6 +74,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
 exports.deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
     const { studentId, centerId } = data;
+    if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "매개변수가 누락되었습니다.");
     const callerId = context.auth.uid;
     try {
         const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
@@ -93,7 +94,7 @@ exports.deleteStudentAccount = functions.region(region).https.onCall(async (data
         return { ok: true, message: "계정이 영구적으로 삭제되었습니다." };
     } catch (error) {
         if (error instanceof functions.https.HttpsError) throw error;
-        throw new functions.https.HttpsError("internal", error.message);
+        throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류");
     }
 });
 
