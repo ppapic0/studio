@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -177,7 +176,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: an
   const TimePicker = ({ type, h, m, p }: any) => (
     <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
       <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)}>
-        <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[42px] text-[9px]" : "w-[55px] text-xs")}>
+        <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[48px] text-[10px]" : "w-[55px] text-xs")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -187,14 +186,14 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: an
       </Select>
       <div className="w-px h-2 bg-border/50 mx-0.5" />
       <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)}>
-        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[30px] text-[10px]" : "w-[45px] text-sm")}>
+        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{HOURS.map(hour => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}</SelectContent>
       </Select>
       <span className="text-[9px] font-black opacity-30 px-0.5">:</span>
       <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)}>
-        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[30px] text-[10px]" : "w-[45px] text-sm")}>
+        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{MINUTES.map(min => <SelectItem key={min} value={min}>{min}</SelectItem>)}</SelectContent>
@@ -646,38 +645,7 @@ export default function StudyPlanPage() {
       </Card>
 
       <div className={cn("grid gap-4 sm:gap-6 items-start", isMobile ? "grid-cols-1 px-0" : "md:grid-cols-12")}>
-        <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.02] mx-auto w-full", isMobile ? "md:col-span-12 rounded-[1.5rem]" : "md:col-span-5")}>
-          <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
-            <div className="flex items-center justify-between">
-              <CardTitle className={cn("flex items-center gap-2 font-black tracking-tighter text-primary", isMobile ? "text-base" : "text-2xl")}>
-                <div className="bg-primary/5 p-1.5 rounded-lg"><Clock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-6 w-6")} /></div>
-                생활 루틴
-              </CardTitle>
-              {!isPast && (
-                <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
-                  <DialogTrigger asChild><Button variant="ghost" size="icon" className={cn("rounded-full hover:bg-primary/10 transition-all", isMobile ? "h-8 w-8" : "h-10 w-10")}><PlusCircle className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /></Button></DialogTrigger>
-                  <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-8", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2rem]" : "sm:max-w-md")}>
-                    <DialogHeader><DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl")}>새 루틴 추가</DialogTitle></DialogHeader>
-                    <div className="space-y-6 pt-4">
-                      <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-2xl border-2 font-bold text-base" />
-                      <div className="flex flex-wrap gap-2">{['점심', '저녁', '학원', '독서실'].map(tag => <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white py-1.5 px-4 rounded-xl font-black text-xs" onClick={() => setNewRoutineTitle(tag)}>+{tag}</Badge>)}</div>
-                    </div>
-                    <DialogFooter className="pt-6"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white bg-gradient-to-br", currentTier.gradient)}>{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className={cn("bg-[#fafafa] flex flex-col gap-3", isMobile ? "p-4" : "p-8")}>
-            {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className={cn("py-12 text-center opacity-20 italic font-black border-2 border-dashed rounded-2xl", isMobile ? "text-xs" : "text-sm")}>등록된 루틴이 없습니다.</div> :
-              scheduleItems.sort((a,b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00')).map((item) => (
-                <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isPast} isMobile={isMobile} />
-              ))
-            }
-          </CardContent>
-        </Card>
-
-        <div className={cn("w-full mx-auto", isMobile ? "md:col-span-12" : "md:col-span-7")}>
+        <div className={cn("w-full mx-auto order-1 md:order-2", isMobile ? "md:col-span-12" : "md:col-span-7")}>
           <Tabs defaultValue="study" className="w-full">
             <Card className={cn("border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]", isMobile ? "rounded-[1.5rem]" : "")}>
               <CardHeader className="p-0 border-b bg-muted/5">
@@ -767,6 +735,37 @@ export default function StudyPlanPage() {
             </Card>
           </Tabs>
         </div>
+
+        <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.02] mx-auto w-full order-2 md:order-1", isMobile ? "md:col-span-12 rounded-[1.5rem]" : "md:col-span-5")}>
+          <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
+            <div className="flex items-center justify-between">
+              <CardTitle className={cn("flex items-center gap-2 font-black tracking-tighter text-primary", isMobile ? "text-base" : "text-2xl")}>
+                <div className="bg-primary/5 p-1.5 rounded-lg"><Clock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-6 w-6")} /></div>
+                생활 루틴
+              </CardTitle>
+              {!isPast && (
+                <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
+                  <DialogTrigger asChild><Button variant="ghost" size="icon" className={cn("rounded-full hover:bg-primary/10 transition-all", isMobile ? "h-8 w-8" : "h-10 w-10")}><PlusCircle className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /></Button></DialogTrigger>
+                  <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-8", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2rem]" : "sm:max-w-md")}>
+                    <DialogHeader><DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl")}>새 루틴 추가</DialogTitle></DialogHeader>
+                    <div className="space-y-6 pt-4">
+                      <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-2xl border-2 font-bold text-base" />
+                      <div className="flex flex-wrap gap-2">{['점심', '저녁', '학원', '독서실'].map(tag => <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white py-1.5 px-4 rounded-xl font-black text-xs" onClick={() => setNewRoutineTitle(tag)}>+{tag}</Badge>)}</div>
+                    </div>
+                    <DialogFooter className="pt-6"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white bg-gradient-to-br", currentTier.gradient)}>{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className={cn("bg-[#fafafa] flex flex-col gap-3", isMobile ? "p-4" : "p-8")}>
+            {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className={cn("py-12 text-center opacity-20 italic font-black border-2 border-dashed rounded-2xl", isMobile ? "text-xs" : "text-sm")}>등록된 루틴이 없습니다.</div> :
+              scheduleItems.sort((a,b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00')).map((item) => (
+                <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isPast} isMobile={isMobile} />
+              ))
+            }
+          </CardContent>
+        </Card>
       </div>
       
       <footer className={cn("py-8 text-center opacity-30", isMobile ? "hidden" : "px-4 py-12")}>

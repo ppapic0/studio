@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -168,7 +167,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
   const TimePicker = ({ type, h, m, p }: any) => (
     <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
       <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)}>
-        <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[42px] text-[9px]" : "w-[55px] text-xs")}>
+        <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[48px] text-[10px]" : "w-[55px] text-xs")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -178,14 +177,14 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
       </Select>
       <div className="w-px h-2 bg-border/50 mx-0.5" />
       <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)}>
-        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[30px] text-[10px]" : "w-[45px] text-sm")}>
+        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{HOURS.map(hour => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}</SelectContent>
       </Select>
       <span className="text-[9px] font-black opacity-30 px-0.5">:</span>
       <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)}>
-        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[30px] text-[10px]" : "w-[45px] text-sm")}>
+        <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{MINUTES.map(min => <SelectItem key={min} value={min}>{min}</SelectItem>)}</SelectContent>
