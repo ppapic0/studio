@@ -4,11 +4,8 @@ import {
   writeBatch, 
   serverTimestamp, 
   Firestore,
-  setDoc
 } from 'firebase/firestore';
 import { format, subDays } from 'date-fns';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
  * 초기 데이터 시딩용 함수 (관리자용)
@@ -52,14 +49,14 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
-    // 초기 마스터리 정보 (LP 시스템 기반)
+    // 초기 성장 정보 (새로운 LP 시스템 기반)
     const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
     batch.set(progressRef, {
-      level: 1,
-      currentLp: 500,
-      nextLevelLp: 1000,
-      stats: { focus: 0.5, consistency: 0.5, achievement: 0.5, resilience: 0.5 },
-      skills: {},
+      seasonLp: 5000,
+      mastery: 15,
+      stats: { focus: 45, consistency: 60, achievement: 55, resilience: 30 },
+      totalLpEarned: 15000,
+      lastResetAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }, { merge: true });
 
@@ -88,7 +85,6 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
   }
 
   await batch.commit().catch(async (err) => {
-    // 에러 발생 시 공통 리스너에서 처리
     console.error("Seeding commit failed:", err);
   });
   

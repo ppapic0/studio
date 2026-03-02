@@ -48,7 +48,7 @@ export interface MonthlyFinance {
 }
 
 export interface FinanceSettings {
-  fixedCosts: number; // Legacy, replaced by monthly collection
+  fixedCosts: number; 
   refundPolicy: {
     penaltyType: 'none' | 'rate' | 'fixed';
     penaltyRate?: number;
@@ -112,7 +112,7 @@ export interface RefundRecord {
 
 export interface KpiDaily {
   date: string; // YYYY-MM-DD
-  totalRevenue: number; // Accrued daily revenue (Total / 28 per active invoice)
+  totalRevenue: number; 
   totalDiscount: number;
   totalRefund: number;
   paidInvoiceCount: number;
@@ -197,20 +197,37 @@ export interface DailyReport {
 }
 
 export interface GrowthProgress {
-  level: number;
-  currentLp: number;
-  nextLevelLp: number;
+  seasonLp: number; // 시즌 리셋 대상
+  mastery: number; // 0-100 영구 성장
   stats: {
     focus: number;
     consistency: number;
     achievement: number;
     resilience: number;
   };
-  skills: Record<string, {
-    level: number;
-    unlockedAt: Timestamp;
-  }>;
+  dailyLpStatus?: {
+    [dateKey: string]: {
+      attendance: boolean;
+      plan: boolean;
+      growth: boolean;
+      bonus6h: boolean;
+    };
+  };
+  totalLpEarned: number; // 마스터리 계산용 누적 LP
+  lastResetAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface SkillNode {
+  id: string;
+  branch: 'focus' | 'consistency' | 'achievement' | 'resilience';
+  name: string;
+  description: string;
+  maxLevel: number;
+  prerequisites: string[];
+  unlockCondition: { stat: string; value: number };
+  effects: { lp: number };
+  iconKey: string;
 }
 
 export interface StudyPlanItem {
@@ -264,4 +281,13 @@ export interface ParentAiCache {
   content: any;
   dateKey: string;
   createdAt: Timestamp;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  studentId: string;
+  displayNameSnapshot: string;
+  value: number;
+  rank: number;
+  updatedAt: Timestamp;
 }

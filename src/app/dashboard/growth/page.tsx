@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
-import { useDoc, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-import { GrowthProgress, SkillNode } from '@/lib/types';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { GrowthProgress } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Dialog,
   DialogContent,
@@ -21,53 +20,21 @@ import {
 import { 
   Loader2, 
   Zap, 
-  Lock, 
-  Unlock, 
-  Star, 
   Target, 
   RefreshCw, 
   CheckCircle2, 
   ShieldCheck, 
   Trophy,
   Crown,
-  Medal,
-  ArrowRight,
   TrendingUp,
-  CalendarDays,
   Sparkles,
   ArrowUpCircle,
   Flame,
+  Info,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { useToast } from '@/hooks/use-toast';
-
-const MOCK_SKILLS: (SkillNode & { link: string })[] = [
-  { id: 'f1', branch: 'focus', name: '딥워크 25', description: '25분 집중 세션 3회 달성하여 몰입의 기초를 다집니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'focus', value: 10 }, effects: { lp: 1.03 }, iconKey: 'Target', link: '/dashboard' },
-  { id: 'f2', branch: 'focus', name: '방해 금지', description: '중단 없는 세션 5회 연속 달성 시 해금됩니다.', maxLevel: 1, prerequisites: ['f1'], unlockCondition: { stat: 'focus', value: 25 }, effects: { lp: 1.05 }, iconKey: 'Target', link: '/dashboard' },
-  { id: 'f3', branch: 'focus', name: '몰입의 강도', description: '평균 집중도 90% 이상을 일주일간 유지하세요.', maxLevel: 3, prerequisites: ['f2'], unlockCondition: { stat: 'focus', value: 45 }, effects: { lp: 1.08 }, iconKey: 'Flame', link: '/dashboard' },
-  { id: 'f4', branch: 'focus', name: '하이퍼 포커스', description: '3시간 이상의 초몰입 세션을 성공적으로 마쳤습니다.', maxLevel: 5, prerequisites: ['f3'], unlockCondition: { stat: 'focus', value: 70 }, effects: { lp: 1.12 }, iconKey: 'Zap', link: '/dashboard' },
-  { id: 'f5', branch: 'focus', name: '몰입의 대가', description: '어떤 환경에서도 즉시 몰입 상태에 진입할 수 있습니다.', maxLevel: 1, prerequisites: ['f4'], unlockCondition: { stat: 'focus', value: 95 }, effects: { lp: 1.20 }, iconKey: 'Crown', link: '/dashboard' },
-
-  { id: 'c1', branch: 'consistency', name: '작심삼일 타파', description: '3일 동안 멈추지 않고 학습을 기록했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'consistency', value: 10 }, effects: { lp: 1.03 }, iconKey: 'RefreshCw', link: '/dashboard' },
-  { id: 'c2', branch: 'consistency', name: '일주일의 기적', description: '7일 연속 출석 시 주간 보너스가 강화됩니다.', maxLevel: 1, prerequisites: ['c1'], unlockCondition: { stat: 'consistency', value: 25 }, effects: { lp: 1.07 }, iconKey: 'Medal', link: '/dashboard' },
-  { id: 'c3', branch: 'consistency', name: '루틴 정착', description: '30일 중 25일 이상 학습을 완료하는 습관을 형성합니다.', maxLevel: 3, prerequisites: ['c2'], unlockCondition: { stat: 'consistency', value: 50 }, effects: { lp: 1.10 }, iconKey: 'RefreshCw', link: '/dashboard' },
-  { id: 'c4', branch: 'consistency', name: '철의 의지', description: '100일 연속 학습이라는 경이로운 기록에 도전하세요.', maxLevel: 1, prerequisites: ['c3'], unlockCondition: { stat: 'consistency', value: 80 }, effects: { lp: 1.15 }, iconKey: 'Flame', link: '/dashboard' },
-  { id: 'c5', branch: 'consistency', name: '습관의 화신', description: '학습이 일상의 숨쉬기처럼 자연스러운 단계입니다.', maxLevel: 1, prerequisites: ['c4'], unlockCondition: { stat: 'consistency', value: 98 }, effects: { lp: 1.25 }, iconKey: 'Crown', link: '/dashboard' },
-
-  { id: 'a1', branch: 'achievement', name: '오늘 완벽', description: '오늘 설정한 자습 To-do를 100% 달성했습니다.', maxLevel: 3, prerequisites: [], unlockCondition: { stat: 'achievement', value: 15 }, effects: { lp: 1.05 }, iconKey: 'CheckCircle2', link: '/dashboard/plan' },
-  { id: 'a2', branch: 'achievement', name: '과목 밸런스', description: '3개 이상의 과목을 편식 없이 고르게 학습했습니다.', maxLevel: 1, prerequisites: ['a1'], unlockCondition: { stat: 'achievement', value: 30 }, effects: { lp: 1.08 }, iconKey: 'Target', link: '/dashboard/plan' },
-  { id: 'a3', branch: 'achievement', name: '주간 정복자', description: '한 주간 모든 목표 달성률 95% 이상을 기록하세요.', maxLevel: 3, prerequisites: ['a2'], unlockCondition: { stat: 'achievement', value: 55 }, effects: { lp: 1.12 }, iconKey: 'Trophy', link: '/dashboard/plan' },
-  { id: 'a4', branch: 'achievement', name: '전략적 플래너', description: '자신에게 딱 맞는 학습량을 스스로 설계하고 달성합니다.', maxLevel: 1, prerequisites: ['a3'], unlockCondition: { stat: 'achievement', value: 75 }, effects: { lp: 1.18 }, iconKey: 'Zap', link: '/dashboard/plan' },
-  { id: 'a5', branch: 'achievement', name: '성취의 정점', description: '설정한 모든 원대한 목표를 현실로 만들어냅니다.', maxLevel: 1, prerequisites: ['a4'], unlockCondition: { stat: 'achievement', value: 95 }, effects: { lp: 1.30 }, iconKey: 'Crown', link: '/dashboard/plan' },
-
-  { id: 'r1', branch: 'resilience', name: '빠른 회복', description: '슬럼프 감지 후 2일 이내에 다시 학습을 시작했습니다.', maxLevel: 1, prerequisites: [], unlockCondition: { stat: 'resilience', value: 15 }, effects: { lp: 1.05 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
-  { id: 'r2', branch: 'resilience', name: '역전의 발판', description: '성적이 하락한 과목에 더 많은 시간을 투자하여 극복합니다.', maxLevel: 1, prerequisites: ['r1'], unlockCondition: { stat: 'resilience', value: 35 }, effects: { lp: 1.08 }, iconKey: 'RefreshCw', link: '/dashboard/study-history' },
-  { id: 'r3', branch: 'resilience', name: '강철 멘탈', description: '어떤 외부 유혹에도 흔들리지 않고 자리를 지킵니다.', maxLevel: 3, prerequisites: ['r2'], unlockCondition: { stat: 'resilience', value: 60 }, effects: { lp: 1.12 }, iconKey: 'ShieldCheck', link: '/dashboard/study-history' },
-  { id: 'r4', branch: 'resilience', name: '슬럼프 파괴자', description: '슬럼프를 성장의 기회로 바꾸는 능력을 갖췄습니다.', maxLevel: 1, prerequisites: ['r3'], unlockCondition: { stat: 'resilience', value: 85 }, effects: { lp: 1.20 }, iconKey: 'Zap', link: '/dashboard/study-history' },
-  { id: 'r5', branch: 'resilience', name: '불굴의 마스터', description: '실패를 두려워하지 않으며 끊임없이 재도전합니다.', maxLevel: 1, prerequisites: ['r4'], unlockCondition: { stat: 'resilience', value: 98 }, effects: { lp: 1.30 }, iconKey: 'Crown', link: '/dashboard/study-history' },
-];
 
 const STAT_CONFIG = {
   focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500' },
@@ -76,81 +43,81 @@ const STAT_CONFIG = {
   resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', bg: 'bg-rose-500' },
 };
 
-const MAX_LEVEL = 30;
-const getNextLevelLp = (level: number) => 1000 + (level - 1) * 300;
-const TOTAL_MASTER_LP = 150000; 
+const TIERS = [
+  { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400' },
+  { name: '브론즈', min: 20, color: 'text-orange-700', bg: 'bg-orange-700' },
+  { name: '실버', min: 40, color: 'text-slate-300', bg: 'bg-slate-300' },
+  { name: '골드', min: 60, color: 'text-yellow-500', bg: 'bg-yellow-500' },
+  { name: '플래티넘', min: 75, color: 'text-emerald-400', bg: 'bg-emerald-400' },
+  { name: '다이아몬드', min: 85, color: 'text-blue-400', bg: 'bg-blue-400' },
+  { name: '마스터', min: 95, color: 'text-purple-500', bg: 'bg-purple-500' },
+];
 
 function SystemGuideDialog() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full mt-2 rounded-xl text-[10px] sm:text-xs font-black border-dashed border-2 h-10 hover:bg-primary/5 transition-colors">
-          성장 시스템 가이드 보기
+        <Button variant="outline" className="w-full mt-4 rounded-2xl text-xs font-black border-dashed border-2 h-12 hover:bg-primary/5 transition-all">
+          <Info className="mr-2 h-4 w-4" /> LP 및 마스터리 가이드 보기
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
-        <div className="bg-primary p-8 text-primary-foreground relative">
-          <Sparkles className="absolute top-4 right-4 h-12 w-12 opacity-20 animate-pulse" />
+      <DialogContent className="sm:max-w-[500px] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
+        <div className="bg-primary p-10 text-primary-foreground relative">
+          <Sparkles className="absolute top-4 right-4 h-12 w-12 opacity-20" />
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black tracking-tighter">성장 시스템 마스터 가이드</DialogTitle>
-            <DialogDescription className="text-primary-foreground/70 font-bold">
-              Lv.30 마스터리는 하루 6시간 몰입을 300일간 지속해야 도달할 수 있는 정점입니다.
+            <DialogTitle className="text-3xl font-black tracking-tighter">LP 성장 시스템 가이드</DialogTitle>
+            <DialogDescription className="text-primary-foreground/70 font-bold mt-2">
+              행동 보상(LP)과 질적 평가(스탯)가 결합된 정밀 성장 시스템입니다.
             </DialogDescription>
           </DialogHeader>
         </div>
-        <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+        <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-4">
-            <h4 className="flex items-center gap-2 font-black text-sm text-primary">
-              <ArrowUpCircle className="h-4 w-4" /> 4대 핵심 스탯 획득법
+            <h4 className="font-black text-primary flex items-center gap-2">
+              <Zap className="h-4 w-4 fill-current" /> 하루 기본 LP (최대 1,000)
             </h4>
-            <div className="grid gap-3">
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-blue-50 border border-blue-100">
-                <Target className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div>
-                  <p className="text-xs font-black text-blue-900">집중력 (Focus)</p>
-                  <p className="text-[10px] font-bold text-blue-700/70">몰입 1,000분당 1점. 6시간 공부 시 약 0.36점을 얻습니다.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { l: '계획 수립', v: 200 }, { l: '출석 확인', v: 200 },
+                { l: '목표 달성', v: 200 }, { l: '6시간 보너스', v: 200 }
+              ].map(item => (
+                <div key={item.l} className="p-4 rounded-2xl bg-muted/50 border flex justify-between items-center">
+                  <span className="text-xs font-bold">{item.l}</span>
+                  <span className="text-sm font-black text-primary">+{item.v}</span>
                 </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
-                <RefreshCw className="h-5 w-5 text-emerald-600 mt-0.5" />
-                <div>
-                  <p className="text-xs font-black text-emerald-900">꾸준함 (Consistency)</p>
-                  <p className="text-[10px] font-bold text-emerald-700/70">학습 세션을 완료할 때마다 0.1점이 누적됩니다.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-100">
-                <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="text-xs font-black text-amber-900">목표달성 (Achievement)</p>
-                  <p className="text-[10px] font-bold text-amber-700/70">플래너 To-do 항목 하나당 0.05점이 상승합니다.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-rose-50 border border-rose-100">
-                <ShieldCheck className="h-5 w-5 text-rose-600 mt-0.5" />
-                <div>
-                  <p className="text-xs font-black text-rose-900">회복력 (Resilience)</p>
-                  <p className="text-[10px] font-bold text-rose-700/70">6시간 이상 초몰입 세션 성공 시 0.5점이 부여됩니다.</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
-            <h4 className="flex items-center gap-2 font-black text-sm text-primary">
-              <Zap className="h-4 w-4 fill-current" /> 러닝 포인트(LP)와 곡선형 성장
+          <div className="space-y-4">
+            <h4 className="font-black text-primary flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> 강력한 부스트 시스템
             </h4>
-            <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 text-[11px] font-bold leading-relaxed text-muted-foreground">
-              - **1분 몰입 = 1 LP**<br/>
-              - **계획 완수 1개 = 10 LP**<br/>
-              - 초반 레벨업은 빠르며, 후반으로 갈수록 요구 LP가 증가합니다.<br/>
-              - **레벨 1**: 1,000 LP (약 2일)<br/>
-              - **레벨 29**: 9,400 LP (약 19일)<br/>
-              - 총 300일간 하루 평균 500 LP를 모아야 Lv.30에 도달합니다.
+            <div className="p-6 rounded-3xl bg-blue-50 border border-blue-100 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-blue-900">마스터리 부스트 (영구)</span>
+                <span className="text-xs font-black text-blue-600">MAX +10%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-blue-900">4스탯 품질 배율 (현재)</span>
+                <span className="text-xs font-black text-blue-600">MAX +10%</span>
+              </div>
+              <p className="text-[10px] font-bold text-blue-700/60 leading-relaxed pt-2 border-t border-blue-200">
+                ※ 최종 부스트는 최대 1.20배까지 적용되며, 행동당 보너스는 25 LP를 초과할 수 없습니다.
+              </p>
             </div>
           </div>
-        </div>
-        <div className="p-6 bg-muted/30 border-t flex justify-end">
-          <Button onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()} className="rounded-xl font-black">확인했습니다</Button>
+
+          <div className="space-y-2">
+            <h4 className="font-black text-primary flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" /> 시즌 리셋 규칙
+            </h4>
+            <p className="text-xs font-bold text-muted-foreground leading-relaxed">
+              - 30일마다 시즌이 종료됩니다.<br/>
+              - **LP는 0으로 리셋**되며, **4스탯은 5% 감쇠**됩니다.<br/>
+              - **마스터리(누적 노력)**는 리셋 없이 영구적으로 유지됩니다.
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -161,368 +128,182 @@ export default function GrowthPage() {
   const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
-  const { toast } = useToast();
-  const [activeBranch, setActiveBranch] = useState<'focus' | 'consistency' | 'achievement' | 'resilience'>('focus');
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-  
-  const isLevelingUp = useRef(false);
   const isMobile = viewMode === 'mobile';
 
-  const targetUid = user?.uid;
-
   const progressRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !targetUid) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-  }, [firestore, activeMembership?.id, targetUid]);
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+  }, [firestore, activeMembership?.id, user?.uid]);
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
 
-  const currentLevelThreshold = useMemo(() => {
-    if (!progress) return 1000;
-    return getNextLevelLp(Number(progress.level) || 1);
-  }, [progress?.level]);
+  const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+  const avgStat = useMemo(() => {
+    const values = Object.values(stats);
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }, [stats]);
 
-  useEffect(() => {
-    if (progress && progressRef && progress.currentLp >= currentLevelThreshold && !isLevelingUp.current) {
-      isLevelingUp.current = true;
-      const overflowLp = progress.currentLp - currentLevelThreshold;
-      const nextLevel = (Number(progress.level) || 1) + 1;
-      const nextThreshold = getNextLevelLp(nextLevel);
+  const currentTier = useMemo(() => {
+    return TIERS.slice().reverse().find(t => avgStat >= t.min) || TIERS[0];
+  }, [avgStat]);
 
-      updateDoc(progressRef, {
-        level: nextLevel,
-        currentLp: overflowLp,
-        nextLevelLp: nextThreshold,
-        updatedAt: serverTimestamp()
-      }).then(() => {
-        toast({
-          title: "🎉 레벨 업!",
-          description: `축하합니다! 마스터리 Lv.${nextLevel}에 도달하셨습니다.`,
-        });
-      }).catch(err => {
-        console.error("Level up error:", err);
-      }).finally(() => {
-        setTimeout(() => {
-          isLevelingUp.current = false;
-        }, 1000);
-      });
-    }
-  }, [progress?.currentLp, progress?.level, progressRef, currentLevelThreshold]); 
-
-  const totalMultiplier = useMemo(() => {
-    if (!progress?.skills) return 1.0;
-    let multiplier = 1.0;
-    Object.keys(progress.skills).forEach(skillId => {
-      const skill = MOCK_SKILLS.find(s => s.id === skillId);
-      if (skill && skill.effects && skill.effects.lp) {
-        multiplier *= skill.effects.lp;
-      }
-    });
-    return multiplier;
-  }, [progress?.skills]);
-
-  const selectedSkill = useMemo(() => 
-    MOCK_SKILLS.find(s => s.id === selectedSkillId) || MOCK_SKILLS.find(s => s.branch === activeBranch),
-  [selectedSkillId, activeBranch]);
-
-  useEffect(() => {
-    const firstSkill = MOCK_SKILLS.find(s => s.branch === activeBranch);
-    if (firstSkill) setSelectedSkillId(firstSkill.id);
-  }, [activeBranch]);
-
-  const handleUnlockSkill = (skillId: string) => {
-    if (!progressRef || !user) return;
-    
-    const updateData = {
-      [`skills.${skillId}`]: {
-        level: 1,
-        unlockedAt: serverTimestamp()
-      },
-      updatedAt: serverTimestamp()
-    };
-
-    setDoc(progressRef, updateData, { merge: true })
-      .then(() => {
-        toast({
-          title: "스킬 해금 완료!",
-          description: `마스터리 보너스가 x${totalMultiplier.toFixed(2)}로 강화되었습니다.`,
-        });
-      })
-      .catch(async (serverError) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: progressRef.path,
-          operation: 'write',
-          requestResourceData: updateData,
-        }));
-      });
-  };
+  const masteryBoost = useMemo(() => 1 + ((progress?.mastery || 0) / 100) * 0.10, [progress?.mastery]);
+  const statBoost = useMemo(() => 1 + (avgStat / 100) * 0.10, [avgStat]);
+  const totalBoost = Math.min(1.20, masteryBoost * statBoost);
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
-  const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-  const SelectedBranchIcon = STAT_CONFIG[activeBranch].icon;
-
-  const calculateTotalLpSpent = (lvl: number) => {
-    let sum = 0;
-    for(let i=1; i<lvl; i++) sum += getNextLevelLp(i);
-    return sum;
-  };
-  const currentTotalLp = calculateTotalLpSpent(Number(progress?.level) || 1) + (progress?.currentLp || 0); 
-  const estimatedDaysToMax = Math.ceil((TOTAL_MASTER_LP - currentTotalLp) / 500); 
-  const daysSpent = Math.max(1, 300 - estimatedDaysToMax);
-
   return (
-    <div className={cn("flex flex-col pb-24", isMobile ? "gap-4 px-0" : "gap-8")}>
-      <header className={cn("flex flex-col", isMobile ? "gap-1 px-1" : "gap-2")}>
+    <div className={cn("flex flex-col pb-24", isMobile ? "gap-5 px-1" : "gap-10")}>
+      <header className={cn("flex flex-col", isMobile ? "gap-1" : "gap-2")}>
         <div className="flex items-center gap-3">
-          <div className={cn("bg-primary rounded-2xl shadow-lg shadow-primary/20 flex items-center justify-center", isMobile ? "p-2" : "p-2.5")}>
-            <Zap className={cn("text-white fill-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
+          <div className="bg-primary rounded-2xl p-2.5 shadow-lg shadow-primary/20">
+            <TrendingUp className="text-white h-6 w-6" />
           </div>
-          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-3xl")}>성장 로드맵</h1>
+          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>성장 로드맵</h1>
         </div>
-        <div className="flex items-center gap-2 ml-1">
-          <Badge variant="outline" className={cn("border-primary/20 text-primary font-bold px-2 py-0.5", isMobile ? "text-[9px]" : "text-xs")}>CORE ROADMAP</Badge>
-          <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>곡선형 마스터리 시스템</p>
-        </div>
+        <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px] uppercase tracking-widest" : "text-sm")}>Season Mastery & Performance Engine</p>
       </header>
 
-      {/* 핵심 스탯 그리드 */}
-      <section className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-2 lg:grid-cols-4")}>
-        {Object.entries(STAT_CONFIG).map(([key, config]) => {
-          const val = stats[key as keyof typeof stats] || 0;
-          const Icon = config.icon;
-          return (
-            <Card key={key} className="border-none bg-white shadow-md overflow-hidden group rounded-[1.5rem] sm:rounded-[2rem]">
-              <CardHeader className={cn("space-y-1", isMobile ? "p-4 pb-2" : "p-6 pb-3")}>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className={cn("font-black text-muted-foreground/60 leading-none mb-1", isMobile ? "text-[8px]" : "text-xs")}>{config.sub}</span>
-                    <span className={cn("font-black tracking-tight", isMobile ? "text-xs" : "text-base", config.color)}>{config.label}</span>
-                  </div>
-                  <Icon className={cn("opacity-20 group-hover:opacity-100 transition-all group-hover:scale-110", isMobile ? "h-4 w-4" : "h-5 w-5", config.color)} />
-                </div>
-                <div className="flex items-baseline gap-1 pt-1.5">
-                  <span className={cn("font-black tabular-nums", isMobile ? "text-xl" : "text-2xl")}>{val.toFixed(1)}</span>
-                  <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[8px]" : "text-xs")}>/ 100</span>
-                </div>
-              </CardHeader>
-              <CardContent className={cn("space-y-2", isMobile ? "px-4 pb-4" : "px-6 pb-6")}>
-                <div className="relative h-1.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                  <div 
-                    className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", config.bg)}
-                    style={{ width: `${Math.min(100, val)}%` }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </section>
-
-      {/* 분석 섹션 */}
-      <Card className={cn("border-none bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-2xl rounded-[2rem] overflow-hidden relative group", isMobile ? "p-5" : "p-8")}>
-        <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-700">
-          <TrendingUp className={cn(isMobile ? "h-24 w-24" : "h-40 w-40")} />
+      {/* 시즌 메인 대시보드 */}
+      <Card className="border-none bg-primary text-primary-foreground shadow-2xl rounded-[3rem] overflow-hidden relative group">
+        <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-700">
+          <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />
         </div>
-        <CardHeader className={cn("relative z-10 p-0 mb-5")}>
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-3 w-3 text-amber-400 fill-current" />
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60">Insight Analysis</span>
+        <div className={cn("relative z-10 p-8 sm:p-12 space-y-10")}>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-2">
+              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-3 py-1 mb-2">SEASON 2025-03</Badge>
+              <h2 className={cn("font-black tracking-tighter leading-none", isMobile ? "text-5xl" : "text-7xl")}>
+                {(progress?.seasonLp || 0).toLocaleString()}<span className="text-2xl opacity-40 ml-2">LP</span>
+              </h2>
+              <p className="text-sm font-bold opacity-60">현재 시즌 행동 보상 총계</p>
+            </div>
+            
+            <div className="flex flex-col items-center md:items-end gap-2">
+              <div className={cn("p-6 rounded-[2.5rem] bg-white/10 backdrop-blur-xl border border-white/10 flex flex-col items-center min-w-[180px] shadow-2xl")}>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">Current Tier</span>
+                <span className={cn("text-3xl font-black tracking-tighter", currentTier.color)}>{currentTier.name}</span>
+                <span className="text-[10px] font-bold mt-1 opacity-40">실력 지수: {avgStat.toFixed(1)}</span>
+              </div>
+            </div>
           </div>
-          <CardTitle className={cn("font-black", isMobile ? "text-xl" : "text-xl")}>
-            성장 페이스 분석
-          </CardTitle>
-          <CardDescription className="text-primary-foreground/60 font-bold text-[10px] sm:text-xs">현재 레벨 목표: {currentLevelThreshold.toLocaleString()} LP</CardDescription>
-        </CardHeader>
-        <CardContent className={cn("relative z-10 p-0")}>
-          <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: '여정 진행', val: daysSpent, unit: '일차' },
-              { label: '일일 목표', val: 360, unit: '분/일' },
-              { label: '남은 일수', val: estimatedDaysToMax > 0 ? estimatedDaysToMax : '-', unit: '일 예상', highlight: true },
-              { label: '보너스', val: `x${totalMultiplier.toFixed(2)}`, unit: '합산', success: true }
+              { label: '누적 마스터리', val: `Lv.${progress?.mastery || 0}`, sub: '노력의 보상', icon: Crown, color: 'text-amber-400' },
+              { label: '통합 부스트', val: `x${totalBoost.toFixed(2)}`, sub: 'LP 가중치', icon: Zap, color: 'text-accent' },
+              { label: '시즌 랭킹', val: '상위 12%', sub: '전체 기준', icon: Trophy, color: 'text-emerald-400' },
+              { label: '시즌 남은 일수', val: '18일', sub: '3월 시즌 종료', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
-              <div key={i} className="bg-white/10 backdrop-blur-md p-3.5 rounded-[1.25rem] border border-white/10 flex flex-col justify-center">
-                <p className="text-[8px] font-black uppercase opacity-60 mb-1">{item.label}</p>
-                <div className="flex items-baseline gap-0.5">
-                  <span className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl", item.highlight ? "text-amber-400" : item.success ? "text-emerald-400" : "")}>{item.val}</span>
-                  <span className="text-[8px] font-bold opacity-60 ml-0.5">{item.unit}</span>
+              <div key={i} className="bg-white/5 p-5 rounded-3xl border border-white/5 flex flex-col gap-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <item.icon className={cn("h-3.5 w-3.5", item.color)} />
+                  <span className="text-[9px] font-black uppercase tracking-widest opacity-40">{item.label}</span>
                 </div>
+                <div className="text-xl font-black tracking-tight">{item.val}</div>
+                <span className="text-[9px] font-bold opacity-30">{item.sub}</span>
               </div>
             ))}
           </div>
-        </CardContent>
+        </div>
       </Card>
 
-      {/* 마스터리 로드맵 메인 섹션 */}
-      <section className={cn("bg-white/50 backdrop-blur-xl border border-border/50 shadow-2xl relative overflow-hidden", isMobile ? "p-4 rounded-[2rem]" : "p-10 rounded-[3rem]")}>
-        <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className={cn("flex flex-col justify-between gap-5 mb-6 relative z-10", isMobile ? "" : "md:flex-row md:items-center")}>
-          <div className="space-y-1">
-            <h2 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
-              마스터리 로드맵
-              <Badge variant="secondary" className="bg-primary text-white border-none font-black px-2 py-0.5 text-[8px] sm:text-[10px]">PREMIUM</Badge>
-            </h2>
-            <p className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>Lv.30은 상위 0.1%의 증거입니다.</p>
+      {/* 4대 핵심 품질 스탯 */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-3">
+            <Target className="h-6 w-6 text-primary opacity-40" />
+            <h2 className="text-2xl font-black tracking-tighter">품질 평가 스탯</h2>
           </div>
-          
-          <div className={cn("bg-white p-3 rounded-[1.5rem] flex items-center gap-3 border border-border/50 shadow-xl", isMobile ? "w-full" : "min-w-[280px]")}>
-            <div className="relative flex items-center justify-center shrink-0">
-              <svg className={cn("transform -rotate-90", isMobile ? "h-12 w-12" : "h-16 w-16")}>
-                <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted/30" />
-                <circle cx={isMobile ? "24" : "32"} cy={isMobile ? "24" : "32"} r={isMobile ? "20" : "28"} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" 
-                  style={{ 
-                    strokeDasharray: isMobile ? 125.6 : 175.8, 
-                    strokeDashoffset: (isMobile ? 125.6 : 175.8) - ((isMobile ? 125.6 : 175.8) * (progress?.currentLp || 0) / currentLevelThreshold) 
-                  }} 
-                />
-              </svg>
-              <div className="absolute flex flex-col items-center leading-none">
-                <span className="text-[7px] font-black text-muted-foreground uppercase mb-0.5">LV</span>
-                <span className={cn("font-black text-primary", isMobile ? "text-lg" : "text-xl")}>{progress?.level || 1}</span>
-              </div>
-            </div>
-            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-              <div className="flex justify-between items-end">
-                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Learning Points</span>
-                <span className="text-[9px] font-black tabular-nums">{(progress?.currentLp || 0).toLocaleString()} LP</span>
-              </div>
-              <Progress value={((progress?.currentLp || 0) / currentLevelThreshold) * 100} className="h-1 rounded-full shadow-inner" />
-              <div className="flex justify-between items-center">
-                <span className="text-[8px] font-black text-primary/60">Lv.{MAX_LEVEL}</span>
-                <span className="text-[8px] font-black text-muted-foreground flex items-center gap-1">
-                  <Star className="h-2 w-2 fill-current" /> MASTER
-                </span>
-              </div>
-            </div>
-          </div>
+          <Badge variant="outline" className="rounded-full font-black text-[10px] border-primary/20 px-3">AVG: {avgStat.toFixed(1)}</Badge>
         </div>
 
-        <Tabs defaultValue="focus" className="w-full relative z-10" onValueChange={(val) => setActiveBranch(val as any)}>
-          <TabsList className={cn("grid grid-cols-4 bg-muted/30 p-1 rounded-xl border border-border/50 shadow-inner mb-6", isMobile ? "h-12" : "h-16")}>
-            <TabsTrigger value="focus" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-blue-600 text-[10px] sm:text-xs">
-              <Target className="h-3.5 w-3.5" /> <span className="hidden sm:inline">집중</span>
-            </TabsTrigger>
-            <TabsTrigger value="consistency" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-emerald-600 text-[10px] sm:text-xs">
-              <RefreshCw className="h-3.5 w-3.5" /> <span className="hidden sm:inline">꾸준</span>
-            </TabsTrigger>
-            <TabsTrigger value="achievement" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-amber-600 text-[10px] sm:text-xs">
-              <CheckCircle2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">성취</span>
-            </TabsTrigger>
-            <TabsTrigger value="resilience" className="rounded-lg font-black data-[state=active]:bg-white data-[state=active]:shadow-md transition-all gap-1 data-[state=active]:text-rose-600 text-[10px] sm:text-xs">
-              <ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">회복</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
-            <div className={cn("flex flex-col gap-4", isMobile ? "lg:col-span-12 items-center" : "lg:col-span-7")}>
-              {MOCK_SKILLS.filter(s => s.branch === activeBranch).map((skill, idx) => {
-                const isUnlocked = !!progress?.skills?.[skill.id];
-                const canUnlock = !isUnlocked && stats[activeBranch] >= (skill.unlockCondition.value || 0);
-                const isSelected = selectedSkillId === skill.id;
-                
-                return (
-                  <div key={skill.id} className="relative flex flex-col items-center w-full">
-                    {idx < 4 && (
-                      <div className={cn(
-                        "absolute top-full w-0.5 h-4 border-l-2 border-dashed transition-colors duration-500",
-                        isUnlocked ? "border-primary/50" : "border-muted"
-                      )} />
-                    )}
-                    
-                    <Card 
-                      onClick={() => setSelectedSkillId(skill.id)}
-                      className={cn(
-                        "relative overflow-hidden cursor-pointer transition-all duration-500 border-2 w-full rounded-[1.5rem]",
-                        isSelected ? "border-primary ring-4 ring-primary/10 scale-[1.02] z-10 shadow-xl" : "border-border/50",
-                        isUnlocked ? "bg-white shadow-md" : canUnlock ? "bg-primary/5 border-primary/30 animate-pulse-soft" : "bg-muted/50 grayscale opacity-60",
-                        isMobile ? "max-w-full" : "max-w-[360px]"
-                      )}
-                    >
-                      <CardHeader className={cn("flex flex-row items-center gap-3", isMobile ? "p-4" : "p-5")}>
-                        <div className={cn(
-                          "rounded-xl transition-all duration-700 flex items-center justify-center shrink-0",
-                          isMobile ? "p-2.5 h-10 w-10" : "p-3 h-12 w-12",
-                          isUnlocked ? "bg-primary text-white shadow-lg" : canUnlock ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                        )}>
-                          {isUnlocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                        </div>
-                        <div className="grid gap-0.5 min-w-0 flex-1">
-                          <CardTitle className={cn("font-black leading-tight truncate", isMobile ? "text-sm" : "text-base")}>{skill.name}</CardTitle>
-                          <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
-                            {isUnlocked ? `Mastery Unlocked` : canUnlock ? "해금 가능" : "잠겨있음"}
-                          </span>
-                        </div>
-                        {isUnlocked && <Star className="ml-auto h-3.5 w-3.5 text-amber-400 fill-current" />}
-                      </CardHeader>
-                    </Card>
+        <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2 lg:grid-cols-4")}>
+          {Object.entries(STAT_CONFIG).map(([key, config]) => {
+            const val = stats[key as keyof typeof stats] || 0;
+            const Icon = config.icon;
+            return (
+              <Card key={key} className="border-none bg-white shadow-xl rounded-[2.5rem] overflow-hidden group hover:-translate-y-1 transition-all duration-500">
+                <CardHeader className="p-8 pb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={cn("p-3 rounded-2xl bg-opacity-10", config.bg)}>
+                      <Icon className={cn("h-6 w-6", config.color)} />
+                    </div>
+                    <span className={cn("font-black text-[9px] uppercase tracking-widest opacity-40")}>{config.sub}</span>
                   </div>
-                );
-              })}
+                  <CardTitle className={cn("text-xl font-black tracking-tight mb-1")}>{config.label}</CardTitle>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black tabular-nums">{val.toFixed(1)}</span>
+                    <span className="text-xs font-bold text-muted-foreground opacity-40">/ 100</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-8 pb-8">
+                  <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner mb-4">
+                    <div 
+                      className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out rounded-full", config.bg)}
+                      style={{ width: `${val}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground">
+                    <span>품질 배율</span>
+                    <span className={config.color}>x{(1 + (val/100)*0.10).toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 마스터리 상세 분석 */}
+      <div className="grid gap-6 md:grid-cols-12 px-1">
+        <Card className="md:col-span-7 rounded-[3rem] border-none shadow-2xl bg-white p-10 space-y-8">
+          <div className="space-y-1">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-2">
+              <Crown className="h-6 w-6 text-amber-500" /> 영구 성장 마스터리
+            </h3>
+            <p className="text-sm font-bold text-muted-foreground">시즌이 바뀌어도 유지되는 당신의 정수입니다.</p>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="flex justify-between items-end">
+              <div className="grid gap-1">
+                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Mastery Level</span>
+                <span className="text-5xl font-black text-primary">Lv.{progress?.mastery || 0}</span>
+              </div>
+              <div className="text-right">
+                <Badge className="bg-amber-100 text-amber-700 border-none font-black text-[10px] mb-2 px-3">PERMANENT BOOST</Badge>
+                <p className="text-2xl font-black text-amber-600">+{( (progress?.mastery || 0) / 10 * 1 ).toFixed(1)}%</p>
+              </div>
             </div>
+            <Progress value={progress?.mastery || 0} className="h-3 bg-muted" />
+            <p className="text-xs font-bold text-muted-foreground leading-relaxed bg-[#fafafa] p-5 rounded-2xl border border-dashed italic text-center">
+              "Lv.100 마스터리는 하루 6시간 몰입을 300일간 지속해야 도달할 수 있는 전설적인 경지입니다."
+            </p>
+          </div>
+        </Card>
 
-            <div className={cn("h-full", isMobile ? "lg:col-span-12" : "lg:col-span-5")}>
-              {selectedSkill ? (
-                <Card className={cn(
-                  "border-none bg-primary text-primary-foreground shadow-2xl rounded-[2rem] overflow-hidden transform-gpu",
-                  !isMobile && "sticky top-24"
-                )}>
-                  <CardHeader className={cn(isMobile ? "p-6 pb-3" : "p-8 pb-4")}>
-                    <Badge className="w-fit mb-2 bg-white/20 hover:bg-white/30 text-white border-none font-black text-[8px] uppercase tracking-[0.2em] px-2 py-0.5">
-                      {STAT_CONFIG[activeBranch].label} PATH
-                    </Badge>
-                    <CardTitle className={cn("font-black tracking-tighter mb-1", isMobile ? "text-2xl" : "text-3xl")}>{selectedSkill.name}</CardTitle>
-                    <p className={cn("font-bold leading-relaxed opacity-80", isMobile ? "text-xs" : "text-sm")}>{selectedSkill.description}</p>
-                  </CardHeader>
-                  <CardContent className={cn("space-y-5", isMobile ? "p-6" : "p-8")}>
-                    <div className="space-y-2">
-                      <h4 className="text-[9px] font-black uppercase tracking-widest opacity-60">Unlock Requirement</h4>
-                      <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
-                        <div className="flex items-center gap-2">
-                          <SelectedBranchIcon className="h-3.5 w-3.5 opacity-60" />
-                          <span className="text-[11px] font-black">{STAT_CONFIG[activeBranch].label} {selectedSkill.unlockCondition.value}점</span>
-                        </div>
-                        {(stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-current" />
-                        ) : (
-                          <span className="text-[10px] font-black opacity-60">{(stats[activeBranch] || 0).toFixed(1)} / {selectedSkill.unlockCondition.value}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-1 flex flex-col gap-2.5">
-                      <Button asChild className="w-full h-12 rounded-xl bg-white text-primary hover:bg-white/90 font-black text-sm shadow-xl gap-2 active:scale-95 transition-all">
-                        <Link href={selectedSkill.link}>지금 수행하기 <ArrowRight className="ml-auto h-3.5 w-3.5" /></Link>
-                      </Button>
-
-                      {!!progress?.skills?.[selectedSkill.id] ? (
-                        <div className="flex items-center justify-center gap-2 text-white/40 font-black text-[9px] uppercase tracking-widest py-1.5">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Mastery Active
-                        </div>
-                      ) : (stats[activeBranch] || 0) >= (selectedSkill.unlockCondition.value || 0) ? (
-                        <Button 
-                          onClick={() => handleUnlockSkill(selectedSkill.id)}
-                          className="w-full h-12 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-black text-sm shadow-xl gap-2"
-                        >
-                          <Unlock className="h-3.5 w-3.5" /> 지금 해금하기
-                        </Button>
-                      ) : (
-                        <Button disabled className="w-full h-12 rounded-xl bg-white/10 text-white/40 font-black text-sm border border-white/5 gap-2">
-                          <Lock className="h-3.5 w-3.5" /> 조건 미충족
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
+        <Card className="md:col-span-5 rounded-[3rem] border-none shadow-2xl bg-[#fafafa] p-10 flex flex-col justify-center gap-6">
+          <div className="p-6 rounded-[2rem] bg-white shadow-sm border space-y-4">
+            <h4 className="font-black text-xs uppercase text-primary/40 flex items-center gap-2 tracking-widest">Next Tier Goal</h4>
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-black text-muted-foreground">{currentTier.name}</span>
+              <ChevronRight className="h-5 w-5 opacity-20" />
+              <span className="text-lg font-black text-primary">
+                {TIERS[TIERS.indexOf(currentTier) + 1]?.name || 'MAX'}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[10px] font-black opacity-40 uppercase">
+                <span>평균 스탯 달성률</span>
+                <span>{Math.round((avgStat / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || 100)) * 100)}%</span>
+              </div>
+              <Progress value={(avgStat / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || 100)) * 100} className="h-1.5" />
             </div>
           </div>
-        </Tabs>
-      </section>
-      
-      <div className="px-4">
-        <SystemGuideDialog />
+          <SystemGuideDialog />
+        </Card>
       </div>
     </div>
   );
