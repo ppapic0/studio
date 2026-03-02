@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -19,7 +20,7 @@ import {
   increment,
   setDoc
 } from 'firebase/firestore';
-import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress } from '@/lib/types';
+import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry } from '@/lib/types';
 import { 
   format, 
   startOfMonth, 
@@ -56,7 +57,9 @@ import {
   Activity,
   PlusCircle,
   CalendarCheck,
-  CircleDot
+  CircleDot,
+  Trophy,
+  Crown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +98,18 @@ const SUBJECTS = [
   { id: 'science', label: '과탐', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-600' },
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
+];
+
+const TIERS = [
+  { name: '아이언', min: 0, gradient: 'from-slate-500 via-slate-600 to-slate-800' },
+  { name: '브론즈', min: 5000, gradient: 'from-orange-600 via-orange-700 to-orange-900' },
+  { name: '실버', min: 10000, gradient: 'from-blue-300 via-slate-400 to-slate-600' },
+  { name: '골드', min: 15000, gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
+  { name: '플래티넘', min: 20000, gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
+  { name: '다이아몬드', min: 25000, gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
+  { name: '마스터', min: 25000, gradient: 'from-purple-500 via-violet-600 to-violet-800' },
+  { name: '그랜드마스터', min: 25000, gradient: 'from-rose-500 via-pink-600 to-rose-800' },
+  { name: '챌린저', min: 25000, gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
 ];
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disabled }: any) {
@@ -248,6 +263,9 @@ export default function StudyHistoryPage() {
 
   useEffect(() => { setCurrentDate(new Date()); }, []);
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const monthKey = currentDate ? format(currentDate, 'yyyy-MM') : '';
+
   const studyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !targetUid || !activeMembership) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'studyLogs', targetUid, 'days'), orderBy('dateKey', 'desc'));
@@ -266,6 +284,26 @@ export default function StudyHistoryPage() {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
   }, [firestore, activeMembership, targetUid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: !!targetUid });
+
+  const rankQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !targetUid || !monthKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${monthKey}_lp`, 'entries'),
+      where('studentId', '==', targetUid)
+    );
+  }, [firestore, activeMembership, targetUid, monthKey]);
+  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
+  const currentRank = rankEntries?.[0]?.rank || 999;
+
+  const currentLp = progress?.seasonLp || 0;
+  const currentTier = useMemo(() => {
+    if (currentLp >= 25000) {
+      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
+      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
+      return TIERS.find(t => t.name === '마스터')!;
+    }
+    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
+  }, [currentLp, currentRank]);
 
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
   const dailyPlans = useMemo(() => allPlans?.filter(p => p.dateKey === selectedDateKey) || [], [allPlans, selectedDateKey]);
@@ -289,7 +327,7 @@ export default function StudyHistoryPage() {
   };
 
   const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-white/50';
+    if (minutes === 0) return 'bg-white/40';
     if (minutes < 60) return 'bg-emerald-50 text-emerald-700 ring-inset ring-1 ring-emerald-100';
     if (minutes < 180) return 'bg-emerald-100 text-emerald-800 ring-inset ring-1 ring-emerald-200';
     if (minutes < 300) return 'bg-emerald-200 text-emerald-900 ring-inset ring-1 ring-emerald-300';
@@ -336,7 +374,7 @@ export default function StudyHistoryPage() {
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
-    if (isNaN(hours) || isNaN(mins)) return time12h;
+    if (isNaN(hours) || iisNaN(mins)) return time12h;
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
@@ -361,8 +399,6 @@ export default function StudyHistoryPage() {
     
     if (nextState) {
       const batch = writeBatch(firestore);
-      
-      // 마스터리 업데이트: 목표달성 스탯 (항목당 0.1점, 하루 최대 0.5점)
       const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
       if (achievementCount < 5) {
         batch.update(progressRef, { 
@@ -370,13 +406,7 @@ export default function StudyHistoryPage() {
           [`dailyLpStatus.${dateKey}.achievementCount`]: increment(1)
         });
       }
-
-      // 10 LP 즉시 지급
-      batch.update(progressRef, {
-        seasonLp: increment(10),
-        updatedAt: serverTimestamp()
-      });
-
+      batch.update(progressRef, { seasonLp: increment(10), updatedAt: serverTimestamp() });
       await batch.commit();
     }
   };
@@ -396,7 +426,7 @@ export default function StudyHistoryPage() {
       <header className={cn("flex justify-between items-center px-2", isMobile ? "flex-col gap-4" : "flex-row")}>
         <div className="flex flex-col gap-1">
           <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Study Logs & History</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 ml-1">Study Logs & History</p>
         </div>
         <div className="flex items-center gap-2 bg-white/80 p-1.5 rounded-2xl border shadow-xl">
            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
@@ -406,73 +436,98 @@ export default function StudyHistoryPage() {
       </header>
 
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
-        <Card className="md:col-span-2 border-none shadow-2xl bg-primary text-primary-foreground rounded-[2.5rem] p-8">
-          <div className="flex justify-between items-center mb-6">
-            <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Monthly Summary</span>
-            <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5">이번 달 총 몰입</Badge>
+        <Card className={cn(
+          "md:col-span-2 border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 text-white",
+          "bg-gradient-to-br", currentTier.gradient
+        )}>
+          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+            {currentTier.name === '챌린저' ? <Crown className="h-48 w-48" /> : <Trophy className="h-48 w-48" />}
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-6xl")}>{formatMinutes(monthTotalMinutes)}</span>
-            <span className="text-lg font-bold opacity-60">총 학습 완료</span>
+          <div className="relative z-10">
+            <div className="flex justify-between items-center mb-10">
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60">Monthly Analytics</span>
+                <Badge className="w-fit bg-white/20 text-white border-none font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
+              </div>
+              <Badge className="bg-white/10 text-white border-none font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} TIER</Badge>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-6xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
+              <span className="text-xl font-bold opacity-40 uppercase ml-2">Total Time</span>
+            </div>
           </div>
         </Card>
+        
         {!isMobile && (
-          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8 flex flex-col justify-center gap-4">
-            <h3 className="font-black text-sm uppercase text-primary/40 flex items-center gap-2"><Sparkles className="h-4 w-4" /> Insight</h3>
-            <p className="text-xs font-bold leading-relaxed text-foreground/70">
-              {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 시즌 LP가 대폭 상승합니다.'}
-            </p>
-            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
+          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-10 flex flex-col justify-center gap-6 relative overflow-hidden ring-1 ring-black/[0.03]">
+            <div className="bg-primary/5 p-3 rounded-2xl w-fit"><Sparkles className="h-6 w-6 text-primary" /></div>
+            <div className="space-y-2">
+              <h3 className="font-black text-sm uppercase tracking-widest text-primary/40">Insight</h3>
+              <p className="text-base font-bold leading-relaxed text-foreground/70">
+                {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 시즌 LP가 대폭 상승합니다.'}
+              </p>
+            </div>
+            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-95"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
           </Card>
         )}
       </div>
 
-      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full border-2 border-primary/5">
+      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full border-2 border-primary/5 ring-1 ring-black/[0.03]">
         <CardContent className="p-0">
           <div className="grid grid-cols-7 border-b-2 border-primary/10 bg-muted/20">
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
-              <div key={day} className={cn("py-5 text-center text-[11px] font-black uppercase tracking-widest", i === 5 ? "text-blue-600" : i === 6 ? "text-red-600" : "text-primary/60")}>{day}</div>
+              <div key={day} className={cn("py-6 text-center text-[11px] font-black uppercase tracking-widest", i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60")}>{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 auto-rows-fr">
-            {logsLoading ? <div className="col-span-7 h-[400px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : calendarData.days.map((day, idx) => {
+            {logsLoading ? (
+              <div className="col-span-7 h-[400px] flex items-center justify-center">
+                <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
+              </div>
+            ) : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const minutes = logs?.find(l => l.dateKey === dateKey)?.totalMinutes || 0;
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isToday = isSameDay(day, new Date());
+              
               return (
                 <div 
                   key={dateKey} 
                   onClick={() => setSelectedDateForPlan(day)} 
                   className={cn(
-                    "p-3 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white overflow-hidden group hover:z-20 hover:scale-[1.02] hover:shadow-2xl", 
-                    isMobile ? "aspect-square" : "min-h-[140px]", 
-                    !isCurrentMonth ? "opacity-[0.08]" : getHeatmapColor(minutes), 
-                    isToday && "ring-4 ring-inset ring-primary/30 z-10 shadow-xl"
+                    "p-4 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white group overflow-hidden", 
+                    isMobile ? "aspect-square" : "min-h-[160px]", 
+                    !isCurrentMonth ? "opacity-[0.05] grayscale" : getHeatmapColor(minutes), 
+                    isToday && "ring-4 ring-inset ring-primary/30 z-10 shadow-2xl scale-[1.02] rounded-xl"
                   )}
                 >
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-3">
                     <span className={cn(
-                      "text-[11px] font-black tracking-tighter", 
-                      idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "text-primary/40",
+                      "text-xs font-black tracking-tighter tabular-nums", 
+                      idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-rose-600" : "text-primary/40",
                       isToday && "text-primary scale-125"
                     )}>
                       {format(day, 'd')}
                     </span>
                     <div className="flex flex-col items-end gap-1.5">
-                      {minutes >= 180 && <Zap className="h-3 w-3 text-yellow-500 fill-yellow-500 drop-shadow-sm animate-pulse" />}
-                      {hasPlans && <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />}
+                      {minutes >= 180 && <Zap className="h-4 w-4 text-amber-500 fill-amber-500 drop-shadow-sm animate-pulse" />}
+                      {hasPlans && <div className="w-2 h-2 rounded-full bg-primary/30" />}
                     </div>
                   </div>
                   {minutes > 0 && (
-                    <div className="mt-auto flex flex-col items-center gap-1">
-                      <span className={cn("font-mono font-black tracking-tighter tabular-nums drop-shadow-sm", isMobile ? "text-[11px]" : "text-2xl")}>
+                    <div className="mt-auto flex flex-col items-center gap-1 group-hover:scale-110 transition-transform duration-500">
+                      <span className={cn("font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none", isMobile ? "text-xs" : "text-3xl")}>
                         {formatMinutes(minutes)}
                       </span>
                       {!isMobile && minutes >= 360 && (
-                        <Badge className="bg-white/30 text-primary border-none font-black text-[8px] h-4 px-1.5">FOCUS MAX</Badge>
+                        <Badge className="bg-white/30 text-primary border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">FOCUS MAX</Badge>
                       )}
+                    </div>
+                  )}
+                  {isToday && (
+                    <div className="absolute bottom-2 right-2">
+                      <div className="bg-primary text-white p-1 rounded-full shadow-lg"><Activity className="h-2 w-2" /></div>
                     </div>
                   )}
                 </div>
@@ -486,60 +541,77 @@ export default function StudyHistoryPage() {
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : "sm:max-w-xl rounded-[3rem]")}>
           <div className="bg-primary p-8 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-7 w-7 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[500px]")}>
             <Tabs defaultValue="schedule" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 rounded-none h-14 bg-muted/20 p-0 border-b">
-                <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-xs uppercase">ROUTINE</TabsTrigger>
-                <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-xs uppercase">STUDY</TabsTrigger>
-                <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-xs uppercase">LIFE</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 rounded-none h-16 bg-muted/20 p-0 border-b">
+                <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-xs uppercase tracking-widest">ROUTINE</TabsTrigger>
+                <TabsTrigger value="study" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 font-black text-xs uppercase tracking-widest">STUDY</TabsTrigger>
+                <TabsTrigger value="personal" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-xs uppercase tracking-widest">LIFE</TabsTrigger>
               </TabsList>
-              <div className="p-6 space-y-6">
-                <TabsContent value="schedule" className="mt-0 space-y-3">
-                  {!isActuallyPast && !isParent && <div className="flex justify-end"><Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}><DialogTrigger asChild><Button variant="ghost" size="sm" className="h-7 text-[10px] font-black gap-1"><Plus className="h-3 w-3" /> 추가</Button></DialogTrigger><DialogContent className="rounded-3xl p-8"><DialogHeader><DialogTitle className="text-xl font-black">루틴 추가</DialogTitle></DialogHeader><Input placeholder="루틴 이름" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-12 border-2" /><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} className="w-full h-12 rounded-2xl font-black">추가하기</Button></DialogContent></Dialog></div>}
-                  {scheduleItems.length === 0 ? <p className="text-center py-6 text-[10px] font-bold text-muted-foreground/40 italic">등록된 루틴이 없습니다.</p> : scheduleItems.map(item => <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isActuallyPast} isMobile={isMobile} disabled={isParent} />)}
-                </TabsContent>
-                <TabsContent value="study" className="mt-0 space-y-3">
-                  {studyTasks.map(task => {
-                    const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
-                    return (
-                      <div key={task.id} className={cn("flex items-start gap-3 p-3.5 rounded-2xl border-2 transition-all", task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white shadow-sm")}>
-                        <Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="mt-1" />
-                        <div className="flex-1 grid gap-1">
-                          <div className="flex items-center gap-2">
-                            <Badge className={cn("rounded-md font-black text-[8px] px-1.5 py-0 border-none", subj?.color, "text-white")}>{subj?.label}</Badge>
-                            {task.targetMinutes && <span className="text-[9px] font-black text-muted-foreground/40">{task.targetMinutes}분</span>}
-                          </div>
-                          <Label className={cn("text-sm font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label>
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className="p-8 space-y-8">
+                <TabsContent value="schedule" className="mt-0 space-y-4">
                   {!isActuallyPast && !isParent && (
-                    <div className="flex flex-col gap-3 p-4 rounded-2xl bg-white border-2 border-emerald-100 shadow-sm">
-                      <div className="grid grid-cols-2 gap-2">
+                    <div className="flex justify-end">
+                      <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
+                        <DialogTrigger asChild><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black gap-1 bg-white shadow-sm border rounded-xl"><Plus className="h-3.5 w-3.5" /> 루틴 추가</Button></DialogTrigger>
+                        <DialogContent className="rounded-3xl p-10 border-none shadow-2xl">
+                          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">생활 루틴 추가</DialogTitle></DialogHeader>
+                          <Input placeholder="루틴 이름 (예: 영어 학원, 점심 식사)" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 border-2 rounded-2xl font-bold" />
+                          <Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">루틴 생성</Button>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
+                  {scheduleItems.length === 0 ? <div className="py-16 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">등록된 루틴이 없습니다.</div> : scheduleItems.map(item => <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isActuallyPast} isMobile={isMobile} disabled={isParent} />)}
+                </TabsContent>
+                <TabsContent value="study" className="mt-0 space-y-4">
+                  <div className="grid gap-3">
+                    {studyTasks.map(task => {
+                      const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
+                      return (
+                        <div key={task.id} className={cn("flex items-start gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white shadow-sm hover:shadow-md")}>
+                          <Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="mt-1 h-6 w-6 rounded-lg" />
+                          <div className="flex-1 grid gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn("rounded-md font-black text-[9px] px-2 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
+                              {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-tight flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}분 목표</span>}
+                            </div>
+                            <Label className={cn("text-base font-bold tracking-tight transition-all leading-snug", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {!isActuallyPast && !isParent && (
+                    <div className="flex flex-col gap-4 p-6 rounded-[2rem] bg-white border-2 border-emerald-100 shadow-sm mt-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <Select value={newStudySubject} onValueChange={setNewStudySubject}>
-                          <SelectTrigger className="h-8 rounded-lg border-2 text-[10px] font-bold"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-10 rounded-xl border-2 text-xs font-black"><SelectValue /></SelectTrigger>
                           <SelectContent className="rounded-xl">{SUBJECTS.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
                         </Select>
-                        <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-8 rounded-lg border-2 text-[10px] font-bold" />
+                        <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-10 rounded-xl border-2 text-xs font-black text-center" />
                       </div>
-                      <div className="relative flex items-center bg-muted/10 rounded-xl p-1">
-                        <Input placeholder="공부 계획 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} className="border-none shadow-none focus-visible:ring-0 font-bold h-8 text-[10px]" />
-                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} className="h-7 w-7 rounded-lg bg-emerald-500"><Plus className="h-3.5 w-3.5" /></Button>
+                      <div className="relative flex items-center bg-muted/10 rounded-2xl p-1.5">
+                        <Input placeholder="공부 할 일 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} className="border-none shadow-none focus-visible:ring-0 font-bold h-10 text-sm" />
+                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"><Plus className="h-5 w-5" /></Button>
                       </div>
                     </div>
                   )}
                 </TabsContent>
-                <TabsContent value="personal" className="mt-0 space-y-3">
-                  {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all", task.done ? "bg-amber-50/20 border-emerald-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} /><Label className={cn("flex-1 text-sm font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
-                  {!isActuallyPast && !isParent && <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1 shadow-sm"><Input placeholder="일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} className="border-none shadow-none focus-visible:ring-0 font-bold h-9 text-xs" /><Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} className="h-8 w-8 rounded-xl border-2 border-amber-500 text-amber-600"><Plus className="h-4 w-4" /></Button></div>}
+                <TabsContent value="personal" className="mt-0 space-y-4">
+                  <div className="grid gap-3">
+                    {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-amber-50/20 border-amber-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="h-6 w-6 rounded-lg" /><Label className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
+                  </div>
+                  {!isActuallyPast && !isParent && <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1.5 shadow-sm mt-4"><Input placeholder="기타 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} className="border-none shadow-none focus-visible:ring-0 font-bold h-11 text-sm" /><Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 shadow-lg shadow-amber-500/10"><Plus className="h-5 w-5" /></Button></div>}
                 </TabsContent>
               </div>
             </Tabs>
           </div>
-          <DialogFooter className="p-6 bg-white border-t"><Button variant="ghost" className="w-full h-10 rounded-2xl font-black text-xs text-muted-foreground" onClick={() => setSelectedDateForPlan(null)}>닫기</Button></DialogFooter>
+          <div className="p-8 bg-white border-t shrink-0 flex justify-center">
+            <Button variant="ghost" className="w-full h-12 rounded-2xl font-black text-muted-foreground/60 hover:bg-muted/50 transition-all" onClick={() => setSelectedDateForPlan(null)}>분석 창 닫기</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
