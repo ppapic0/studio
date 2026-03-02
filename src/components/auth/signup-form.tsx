@@ -31,16 +31,20 @@ import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
-  displayName: z.string().optional(), // 학부모는 자녀 이름 기반 자동 생성
+  displayName: z.string().optional(),
   email: z.string().email('유효한 이메일을 입력해주세요.'),
   password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
+  confirmPassword: z.string().min(1, '비밀번호 확인을 입력해주세요.'),
   role: z.enum(['student', 'teacher', 'parent', 'centerAdmin'], {
     required_error: '역할을 선택해주세요.',
   }),
   schoolName: z.string().optional(),
   inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
-  parentLinkCode: z.string().optional(), // 학생용: 부모님께 알려줄 코드
-  studentLinkCode: z.string().optional(), // 학부모용: 자녀의 코드
+  parentLinkCode: z.string().optional(), 
+  studentLinkCode: z.string().optional(), 
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "비밀번호가 일치하지 않습니다.",
+  path: ["confirmPassword"],
 });
 
 export function SignupForm() {
@@ -57,6 +61,7 @@ export function SignupForm() {
       displayName: '', 
       email: '', 
       password: '', 
+      confirmPassword: '',
       role: 'student',
       schoolName: '',
       inviteCode: '',
@@ -70,7 +75,6 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     
-    // 추가 유효성 검사
     if (values.role === 'student') {
       if (!values.displayName || values.displayName.length < 2) {
         form.setError('displayName', { message: '이름을 입력해주세요.' });
@@ -99,7 +103,6 @@ export function SignupForm() {
     setIsLoading(true);
     
     try {
-      // 1. 초대 코드 검증 (역할별 권한 확인 및 반 정보 획득)
       setLoadingStatus('초대 코드를 검증하고 있습니다...');
       const inviteRef = doc(firestore, 'inviteCodes', values.inviteCode);
       const inviteSnap = await getDoc(inviteRef);
@@ -113,7 +116,6 @@ export function SignupForm() {
 
       const inviteData = inviteSnap.data();
       
-      // 중요: 사용자가 선택한 역할과 초대 코드의 지정된 역할이 일치하는지 검증
       if (inviteData.intendedRole !== values.role) {
         setIsLoading(false);
         setLoadingStatus('');
@@ -140,13 +142,12 @@ export function SignupForm() {
       }
 
       const centerId = inviteData.centerId; 
-      const targetClassName = inviteData.targetClassName || null; // 초대 코드에 설정된 반 이름
+      const targetClassName = inviteData.targetClassName || null;
       const timestamp = serverTimestamp();
       const batch = writeBatch(firestore);
       let finalDisplayName = values.displayName || '';
       let linkedStudentId = '';
 
-      // 2. 학부모 가입 시 자녀 정보 조회 및 닉네임 자동 생성
       if (values.role === 'parent') {
         setLoadingStatus('자녀 정보를 확인하고 있습니다...');
         const studentsRef = collection(firestore, 'centers', centerId, 'students');
@@ -171,7 +172,6 @@ export function SignupForm() {
       const user = userCredential.user;
       await updateProfile(user, { displayName: finalDisplayName });
 
-      // 3. 프로필 정보 저장
       batch.set(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
@@ -181,25 +181,23 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 4. 센터 내 멤버십 등록 정보
       const membershipData: any = {
         id: user.uid,
         centerId: centerId,
         role: values.role,
         status: "active",
-        className: targetClassName, // 자동 반 배정
+        className: targetClassName,
         joinedAt: timestamp,
         displayName: finalDisplayName,
       };
 
-      // 5. 역할별 추가 처리
       if (values.role === 'student') {
         batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
           id: user.uid,
           name: finalDisplayName,
           schoolName: values.schoolName || '',
           grade: '고등학생',
-          className: targetClassName, // 학생 프로필에도 저장
+          className: targetClassName,
           seatNo: 0,
           targetDailyMinutes: 360,
           parentUids: [],
@@ -224,7 +222,6 @@ export function SignupForm() {
         });
       }
 
-      // 6. 멤버십 및 사용자 센터 정보 저장
       batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), membershipData);
       batch.set(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
         id: centerId,
@@ -236,7 +233,6 @@ export function SignupForm() {
         ...(membershipData.linkedStudentIds ? { linkedStudentIds: membershipData.linkedStudentIds } : {})
       });
 
-      // 7. 초대 코드 사용 횟수 업데이트
       batch.update(inviteRef, {
         usedCount: increment(1),
         updatedAt: timestamp
@@ -320,7 +316,18 @@ export function SignupForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="font-bold">비밀번호</FormLabel>
+              <FormLabel className="font-bold">비밀번호 (8자 이상)</FormLabel>
+              <FormControl><Input type="password" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-bold">비밀번호 확인</FormLabel>
               <FormControl><Input type="password" {...field} disabled={isLoading} className="rounded-xl h-12" /></FormControl>
               <FormMessage />
             </FormItem>
