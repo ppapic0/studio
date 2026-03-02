@@ -149,6 +149,7 @@ export interface AttendanceCurrent {
   id: string;
   seatNo: number;
   status: "studying" | "away" | "break" | "absent";
+  type?: "seat" | "aisle";
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
   gridX?: number; 

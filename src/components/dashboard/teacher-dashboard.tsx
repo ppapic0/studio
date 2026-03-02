@@ -29,7 +29,9 @@ import {
   UserPlus,
   Search,
   Check,
-  X
+  X,
+  Map,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -44,7 +46,8 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  setDoc
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -155,7 +158,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!attendanceList || !students) return { totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
     
     const allLiveMinutes = attendanceList
-      .filter(a => !!a.studentId)
+      .filter(a => !!a.studentId && a.type !== 'aisle')
       .map(a => getLiveTimeInMinutes(a));
     
     const totalCenterMinutes = allLiveMinutes.reduce((acc, m) => acc + m, 0);
@@ -169,12 +172,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [attendanceList, todayLogs, now, students]);
 
   const stats = useMemo(() => {
-    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 70 };
+    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
+    const seatsOnly = attendanceList.filter(a => a.type !== 'aisle');
     return {
-      studying: attendanceList.filter(a => a.status === 'studying').length,
-      absent: attendanceList.filter(a => a.studentId && a.status === 'absent').length,
-      away: attendanceList.filter(a => a.status === 'away' || a.status === 'break').length,
-      total: Math.max(70, attendanceList.length)
+      studying: seatsOnly.filter(a => a.status === 'studying').length,
+      absent: seatsOnly.filter(a => a.studentId && a.status === 'absent').length,
+      away: seatsOnly.filter(a => a.status === 'away' || a.status === 'break').length,
+      total: seatsOnly.length
     };
   }, [attendanceList]);
 
@@ -191,6 +195,34 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); }
   };
 
+  const handleToggleCellType = async () => {
+    if (!firestore || !centerId || !selectedSeat) return;
+    const nextType = selectedSeat.type === 'aisle' ? 'seat' : 'aisle';
+    
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
+      
+      // 통로로 변경할 때 학생이 배정되어 있다면 해제
+      if (nextType === 'aisle' && selectedSeat.studentId) {
+        batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { seatNo: 0, updatedAt: serverTimestamp() });
+        batch.set(seatRef, { type: 'aisle', studentId: null, status: 'absent', updatedAt: serverTimestamp() }, { merge: true });
+      } else {
+        batch.set(seatRef, { type: nextType, updatedAt: serverTimestamp() }, { merge: true });
+      }
+
+      await batch.commit();
+      toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
+      setIsManaging(false);
+      setIsAssigning(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "변경 실패" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const assignStudentToSeat = async (student: StudentProfile) => {
     if (!firestore || !centerId || !selectedSeat) return;
     setIsSaving(true);
@@ -198,7 +230,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const seatId = selectedSeat.id;
       batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { seatNo: selectedSeat.seatNo, updatedAt: serverTimestamp() });
-      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId), { studentId: student.id, status: 'absent', updatedAt: serverTimestamp() });
+      batch.set(doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId), { studentId: student.id, status: 'absent', type: 'seat', updatedAt: serverTimestamp() }, { merge: true });
       await batch.commit();
       toast({ title: `${student.name} 학생 배정 완료` });
       setIsAssigning(false);
@@ -212,7 +244,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     try {
       const batch = writeBatch(firestore);
       batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { seatNo: 0, updatedAt: serverTimestamp() });
-      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { studentId: null, status: 'absent', updatedAt: serverTimestamp() });
+      batch.set(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { studentId: null, status: 'absent', updatedAt: serverTimestamp() }, { merge: true });
       await batch.commit();
       toast({ title: "배정 해제 완료" });
       setIsManaging(false);
@@ -222,10 +254,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const handleSeatClick = (seat: AttendanceCurrent) => {
     setSelectedSeat(seat);
     if (isEditMode) {
+      // 편집 모드에서는 학생이 있든 없든 관리 다이얼로그 노출 (통로 전환 때문)
       if (seat.studentId) setIsManaging(true);
       else setIsAssigning(true);
     } else {
-      if (seat.studentId) setIsManaging(true);
+      // 일반 모드에서는 통로가 아니고 학생이 배정된 경우만 관리 가능
+      if (seat.studentId && seat.type !== 'aisle') setIsManaging(true);
     }
   };
 
@@ -311,9 +345,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
               <Armchair className="h-5 w-5 opacity-40" /> 
-              {isEditMode ? '좌석 배치 수정 모드' : '실시간 좌석 상황판 (70석)'}
+              {isEditMode ? '공간 배치 및 통로 수정' : '실시간 좌석 상황판'}
             </CardTitle>
-            {isEditMode && <Badge className="bg-primary text-white font-black text-[10px] px-3 py-1">좌석 클릭 시 학생 배정/해제 가능</Badge>}
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6">SEAT</Badge>
+              <Badge variant="outline" className="border-transparent font-black text-[9px] px-3 h-6 bg-muted/20">AISLE</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-10">
@@ -325,9 +362,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     {Array.from({ length: 7 }).map((_, rowIndex) => {
                       const seatNo = colIndex * 7 + rowIndex + 1;
                       const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
-                      const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent' } as AttendanceCurrent;
+                      const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
                       
+                      const isAisle = seat?.type === 'aisle';
                       const isStudying = seat?.status === 'studying';
                       const isAbsent = student && seat?.status === 'absent';
                       const isAway = seat?.status === 'away' || seat?.status === 'break';
@@ -337,24 +375,30 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           key={seatNo} 
                           onClick={() => handleSeatClick(seat)}
                           className={cn(
-                            "aspect-[1.1/1] w-[92px] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm",
-                            isEditMode ? "hover:border-primary border-dashed" : "border-solid",
-                            isStudying 
-                              ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
-                              : isAway
-                                ? "bg-amber-500 border-amber-600 text-white"
-                                : isAbsent 
-                                  ? "bg-rose-50 border-rose-300 text-rose-600" 
-                                  : student 
-                                    ? "bg-white border-primary/30 text-primary" 
-                                    : "bg-white border-primary/40 text-primary/10 hover:border-primary/60"
+                            "aspect-[1.1/1] w-[92px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm border-2",
+                            isAisle 
+                              ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
+                              : isStudying 
+                                ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
+                                : isAway
+                                  ? "bg-amber-500 border-amber-600 text-white"
+                                  : isAbsent 
+                                    ? "bg-rose-50 border-rose-300 text-rose-600" 
+                                    : student 
+                                      ? "bg-white border-primary/30 text-primary" 
+                                      : "bg-white border-primary/40 text-primary/10 hover:border-primary/60",
+                            isEditMode && isAisle && "border-dashed border-muted-foreground/20 text-muted-foreground/20 bg-muted/5"
                           )}
                         >
-                          <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
-                            {seatNo}
-                          </span>
+                          {!isAisle && (
+                            <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
+                              {seatNo}
+                            </span>
+                          )}
                           
-                          {student ? (
+                          {isAisle ? (
+                            isEditMode && <Map className="h-4 w-4 opacity-40" />
+                          ) : student ? (
                             <div className="flex flex-col items-center gap-0 w-full px-1">
                               <span className="text-[10px] sm:text-[11px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
@@ -434,9 +478,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="p-8 space-y-6 bg-white">
                 {isEditMode ? (
-                  <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">
-                    {isSaving ? <Loader2 className="animate-spin" /> : '좌석 배정 해제'}
-                  </Button>
+                  <div className="grid gap-3">
+                    <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">
+                      {isSaving ? <Loader2 className="animate-spin" /> : '좌석 배정 해제'}
+                    </Button>
+                    <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="w-full h-12 rounded-xl font-black gap-2 border-2">
+                      <ArrowRightLeft className="h-4 w-4" /> 통로로 전환하기
+                    </Button>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <Button onClick={() => handleStatusUpdate('studying')} className="h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-3 flex flex-col shadow-xl active:scale-95 transition-all">
@@ -466,28 +515,53 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <div className="bg-primary p-8 text-white relative">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
             <DialogHeader className="relative z-10">
-              <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3"><UserPlus className="h-7 w-7" /> 학생 좌석 배정</DialogTitle>
-              <p className="text-white/60 font-bold mt-1 text-sm">SEAT NO. {selectedSeat?.seatNo}</p>
+              <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
+                {selectedSeat?.type === 'aisle' ? <Map className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}
+                {selectedSeat?.type === 'aisle' ? '공간 설정' : '학생 좌석 배정'}
+              </DialogTitle>
+              <p className="text-white/60 font-bold mt-1 text-sm">GRID ID: {selectedSeat?.seatNo}</p>
             </DialogHeader>
           </div>
-          <div className="p-6 space-y-4 bg-white">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
-              <Input placeholder="이름으로 찾기..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-11 text-sm font-bold" />
-            </div>
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-2">
-                {unassignedStudents.length === 0 ? <p className="text-center py-10 text-xs font-bold text-muted-foreground/40 italic">배정 가능한 미배정 학생이 없습니다.</p> : unassignedStudents.map((student) => (
-                  <div key={student.id} onClick={() => assignStudentToSeat(student)} className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center justify-between group transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">{student.name.charAt(0)}</div>
-                      <div className="grid gap-0.5"><span className="font-black text-sm group-hover:text-primary transition-colors">{student.name}</span><span className="text-[10px] font-bold text-muted-foreground">{student.schoolName}</span></div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                  </div>
-                ))}
+          <div className="p-6 space-y-6 bg-white">
+            {isEditMode && (
+              <div className="p-4 rounded-2xl bg-muted/30 border-2 border-dashed border-primary/20">
+                <Button 
+                  onClick={handleToggleCellType} 
+                  className={cn(
+                    "w-full h-14 rounded-xl font-black gap-2 transition-all",
+                    selectedSeat?.type === 'aisle' ? "bg-primary text-white" : "bg-white text-primary border-2"
+                  )}
+                >
+                  <ArrowRightLeft className="h-4 w-4" /> 
+                  {selectedSeat?.type === 'aisle' ? '좌석으로 사용하기' : '통로로 전환하기'}
+                </Button>
+                <p className="text-[10px] font-bold text-center mt-3 text-muted-foreground">
+                  통로로 전환 시 해당 칸은 번호가 부여되지 않으며 좌석 수에서 제외됩니다.
+                </p>
               </div>
-            </ScrollArea>
+            )}
+
+            {selectedSeat?.type !== 'aisle' && (
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                  <Input placeholder="이름으로 찾기..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-11 text-sm font-bold" />
+                </div>
+                <ScrollArea className="h-[300px] pr-4">
+                  <div className="space-y-2">
+                    {unassignedStudents.length === 0 ? <p className="text-center py-10 text-xs font-bold text-muted-foreground/40 italic">배정 가능한 미배정 학생이 없습니다.</p> : unassignedStudents.map((student) => (
+                      <div key={student.id} onClick={() => assignStudentToSeat(student)} className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center justify-between group transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">{student.name.charAt(0)}</div>
+                          <div className="grid gap-0.5"><span className="font-black text-sm group-hover:text-primary transition-colors">{student.name}</span><span className="text-[10px] font-bold text-muted-foreground">{student.schoolName}</span></div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </div>
           <DialogFooter className="p-6 bg-muted/20 border-t flex justify-center"><Button variant="ghost" onClick={() => setIsAssigning(false)} className="font-bold text-muted-foreground">취소</Button></DialogFooter>
         </DialogContent>
