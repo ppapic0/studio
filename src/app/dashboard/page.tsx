@@ -114,7 +114,7 @@ export default function DashboardPage() {
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tighter">아직 소속된 센터가 없습니다</h1>
           <p className="text-muted-foreground font-bold max-w-sm mx-auto leading-relaxed">
-            가입 과정에서 정보 전송이 늦어질 수 있습니다.<br/>
+            가입 과정에서 정보 전송이 느려질 수 있습니다.<br/>
             '다시 확인'을 누르거나 코드를 다시 입력해 보세요.
           </p>
         </div>

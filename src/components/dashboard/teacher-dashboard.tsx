@@ -25,9 +25,9 @@ import {
   Users,
   TrendingUp,
   Trophy,
-  UserPlus,
   User,
-  Sparkles
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -74,25 +74,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // 데이터 로딩
+  // 1. 학생 데이터 (정렬 고정)
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('seatNo', 'asc'));
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
+  // 2. 실시간 좌석 현황
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
+  // 3. 오늘 학습 로그 (실시간 합산용)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(collectionGroup(firestore, 'days'), where('centerId', '==', centerId), where('dateKey', '==', todayKey));
   }, [firestore, centerId, todayKey]);
   const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
+  // 4. 오늘 상담 예약
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const todayDate = new Date();
@@ -106,7 +109,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.scheduledAt?.toMillis()||0)) : [], [rawAppointments]);
 
-  // 실시간 공부 시간 합산 로직
+  // 실시간 시간 합산 엔진
   const getLiveTimeInMinutes = (seat: AttendanceCurrent) => {
     if (!seat.studentId) return 0;
     const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
@@ -123,7 +126,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
   };
 
-  // 정밀 지표 계산
+  // 정밀 지표 산출
   const metrics = useMemo(() => {
     if (!attendanceList || !students) return { totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
     
@@ -167,23 +170,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1400px] mx-auto pb-24 bg-[#F8F7F4]/30 min-h-screen">
-      {/* 1. 상단 타이틀 섹션 */}
-      <header className="flex items-center justify-between px-4 pt-6">
+    <div className="flex flex-col gap-6 w-full max-w-[1400px] mx-auto pb-24 min-h-screen">
+      {/* 1. 고도화된 상단 지표 섹션 */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between px-4 pt-6 gap-4">
         <div className="flex items-center gap-3">
           <Monitor className="h-8 w-8 text-[#4A3F35]" />
           <h1 className="text-3xl font-black tracking-tight text-[#4A3F35]">실시간 관제 홈</h1>
-          <Badge className="bg-blue-500 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 flex items-center justify-center tracking-tighter">LIVE</Badge>
+          <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">LIVE</Badge>
         </div>
-        <div className="hidden md:flex items-center gap-4 bg-white/80 p-2 rounded-2xl border shadow-sm">
-          <div className="flex items-center gap-2 px-3 border-r">
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
+        
+        <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md p-2 rounded-[1.5rem] border shadow-sm">
+          <div className="flex items-center gap-2 px-4 border-r">
+            <Activity className="h-4 w-4 text-emerald-500" />
             <div className="grid leading-none">
               <span className="text-[8px] font-black text-muted-foreground uppercase">Center Total</span>
               <span className="text-sm font-black text-emerald-600">{Math.floor(metrics.totalCenterMinutes / 60)}h {metrics.totalCenterMinutes % 60}m</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3">
+          <div className="flex items-center gap-2 px-4 border-r">
+            <Users className="h-4 w-4 text-blue-500" />
+            <div className="grid leading-none">
+              <span className="text-[8px] font-black text-muted-foreground uppercase">Avg Study</span>
+              <span className="text-sm font-black text-blue-600">{Math.floor(metrics.avgMinutes / 60)}h {metrics.avgMinutes % 60}m</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-4">
             <Trophy className="h-4 w-4 text-amber-500" />
             <div className="grid leading-none">
               <span className="text-[8px] font-black text-muted-foreground uppercase">Top 20% Avg</span>
@@ -193,7 +204,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      {/* 2. 핵심 지표 카드 */}
+      {/* 2. 핵심 4대 지표 카드 */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
         {[
           { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity, bg: 'bg-white' },
@@ -201,7 +212,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           { label: '외출/휴식', val: stats.away, color: 'text-amber-500', icon: Clock, bg: 'bg-white' },
           { label: '배치 좌석', val: stats.total, color: 'text-[#4A3F35]', icon: Armchair, bg: 'bg-white' }
         ].map((item, i) => (
-          <Card key={i} className="rounded-[2.5rem] border-none shadow-[0_15px_40px_rgba(0,0,0,0.04)] bg-white p-6 sm:p-8 group transition-all hover:shadow-xl">
+          <Card key={i} className="rounded-[2.5rem] border-none shadow-[0_15px_40px_rgba(0,0,0,0.04)] bg-white p-6 sm:p-8 group transition-all hover:shadow-xl active:scale-[0.98]">
             <div className="flex justify-between items-start mb-2">
               <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">{item.label}</span>
               <item.icon className={cn("h-5 w-5", item.color)} />
@@ -211,7 +222,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {/* 3. 실시간 좌석 상황판 (컴팩트 그리드) */}
+      {/* 3. 실시간 좌석 상황판 (이미지 완벽 매칭 수직 그리드) */}
       <Card className="rounded-[3.5rem] border-none shadow-[0_20px_60px_rgba(0,0,0,0.06)] bg-white mx-4 overflow-hidden">
         <CardHeader className="p-8 sm:p-10 pb-4">
           <div className="flex justify-between items-center">
@@ -219,15 +230,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <Armchair className="h-6 w-6 text-[#4A3F35]" />
               <CardTitle className="text-2xl font-black tracking-tighter text-[#4A3F35]">실시간 좌석 상황판</CardTitle>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-600" /> 학습중</div>
-              <div className="flex items-center gap-1.5 ml-3"><div className="w-2 h-2 rounded-full bg-rose-500" /> 미입실</div>
-            </div>
+            <Button asChild variant="outline" className="rounded-2xl h-11 px-6 font-black border-2 shadow-sm">
+              <Link href="/dashboard/teacher/layout-view">전체 도면 보기</Link>
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-10 pt-2">
-          <div className="rounded-[2.5rem] border-2 border-[#F0EDE8] p-6 sm:p-8 bg-white">
-            <div className="grid grid-cols-8 gap-3 sm:gap-4">
+          <div className="rounded-[2.5rem] border-2 border-[#F0EDE8] p-6 sm:p-8 bg-white overflow-x-auto custom-scrollbar">
+            <div className="grid grid-cols-8 gap-3 sm:gap-4 min-w-[800px]">
               {Array.from({ length: 8 }).map((_, colIndex) => (
                 <div key={colIndex} className="flex flex-col gap-3 sm:gap-4">
                   {Array.from({ length: 6 }).map((_, rowIndex) => {
@@ -250,7 +260,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           }
                         }}
                         className={cn(
-                          "aspect-[1.1/1] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer",
+                          "aspect-[1.1/1] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm",
                           isStudying 
                             ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
                             : isAway
@@ -265,7 +275,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         </span>
                         
                         {student ? (
-                          <div className="flex flex-col items-center gap-0 w-full">
+                          <div className="flex flex-col items-center gap-0 w-full px-1">
                             <span className="text-[11px] sm:text-[13px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                             <span className={cn("text-[8px] sm:text-[9px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
                               {getLiveTimeLabel(seat!)}
@@ -283,15 +293,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
-      {/* 4. 하단 상담 현황 섹션 */}
+      {/* 4. 하단 상담 현황 섹션 (이미지 매칭) */}
       <section className="px-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 opacity-80">
+          <div className="flex items-center gap-3">
             <MessageSquare className="h-6 w-6 text-[#4A3F35]" />
             <h2 className="text-2xl font-black tracking-tighter text-[#4A3F35]">오늘 상담 현황</h2>
+            <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black h-6">{appointments.length}건</Badge>
           </div>
           <Button asChild variant="ghost" className="font-black text-xs text-muted-foreground hover:text-primary gap-2">
-            <Link href="/dashboard/appointments">전체 관리 <ChevronRight className="h-4 w-4" /></Link>
+            <Link href="/dashboard/appointments">상담 관리 센터 전체보기 <ArrowRight className="h-4 w-4" /></Link>
           </Button>
         </div>
 
@@ -300,11 +311,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <div className="col-span-full py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
           ) : appointments.length === 0 ? (
             <div className="col-span-full py-16 text-center bg-white/50 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10">
-              <p className="font-black text-muted-foreground/30 text-sm">오늘 예정된 상담이 없습니다.</p>
+              <p className="font-black text-muted-foreground/30 text-sm italic">오늘 예정된 상담이 없습니다.</p>
             </div>
           ) : (
             appointments.map((apt) => (
-              <Card key={apt.id} className="rounded-3xl border-none shadow-sm bg-white p-6 flex items-center justify-between group hover:shadow-md transition-all">
+              <Card key={apt.id} className="rounded-[2rem] border-none shadow-sm bg-white p-6 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]">
                 <div className="flex items-center gap-4">
                   <div className="h-12 w-12 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col items-center justify-center shrink-0">
                     <span className="text-[10px] font-black text-primary/60 leading-none">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
@@ -318,7 +329,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   {apt.status === 'requested' ? (
                     <Badge className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[9px]">승인대기</Badge>
                   ) : (
-                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px]">확정</Badge>
+                    <Badge className="bg-emerald-500 text-white border-none font-black text-[9px] shadow-sm">예약확정</Badge>
                   )}
                   <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
                 </div>
