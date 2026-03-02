@@ -87,7 +87,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [gridCols, setGridCols] = useState(10);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 10000);
+    // 1초마다 현재 시간을 업데이트하여 실시간 타이머 구현
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -129,7 +130,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 오늘 학습 로그 (실시간 합산용) - collectionGroup 사용
+  // 4. 오늘 학습 로그 (실시간 합산용)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(
@@ -165,9 +166,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const getLiveTimeInMinutes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     let totalMins = studentLog?.totalMinutes || 0;
-    if (status === 'studying' && lastCheckInAt) {
+    
+    // 만약 학생의 로그가 1분 이내에 업데이트되었다면 강제로 studying 상태인 것으로 간주하여 라이브 합산 (김재윤 학생 케이스 해결)
+    const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
+    const isRecentlyActive = (now - logUpdatedAt) < 60000;
+
+    if ((status === 'studying' || isRecentlyActive) && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
-      totalMins += Math.floor((now - startTime) / 60000);
+      // 세션 시작 이후 흐른 시간 합산
+      const elapsed = Math.floor((now - startTime) / 60000);
+      if (elapsed > 0) totalMins += elapsed;
     }
     return totalMins;
   };
@@ -197,7 +205,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const stats = useMemo(() => {
     if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
-    // 'aisle'(통로) 타입을 제외한 실제 'seat'만 집계
     const actualSeats = attendanceList.filter(a => a.type !== 'aisle');
     return {
       studying: actualSeats.filter(a => a.status === 'studying').length,
@@ -374,7 +381,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {/* 그리드 설정 섹션 (편집 모드일 때만 노출) */}
       {isEditMode && (
         <Card className="mx-4 rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-4">
@@ -420,22 +426,27 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <ScrollArea className="w-full max-w-full">
             <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-max mx-auto">
               <div 
-                className="grid gap-3 sm:gap-4" 
+                className="grid gap-2 sm:gap-3" 
                 style={{ 
-                  gridTemplateColumns: `repeat(${gridCols}, minmax(100px, 1fr))`,
+                  gridTemplateColumns: `repeat(${gridCols}, minmax(85px, 1fr))`,
                 }}
               >
                 {Array.from({ length: gridCols }).map((_, colIndex) => (
-                  <div key={colIndex} className="flex flex-col gap-3 sm:gap-4">
+                  <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
                     {Array.from({ length: gridRows }).map((_, rowIndex) => {
                       const seatNo = colIndex * gridRows + rowIndex + 1;
                       const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
                       const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
                       
+                      // 김재윤 학생 케이스 보정: 로그가 최근 갱신되었다면 강제로 studying 상태로 간주
+                      const studentLog = todayLogs?.find(l => l.studentId === student?.id);
+                      const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
+                      const isRecentlyActive = (now - logUpdatedAt) < 60000;
+
                       const isAisle = seat?.type === 'aisle';
-                      const isStudying = seat?.status === 'studying';
-                      const isAbsent = student && seat?.status === 'absent';
+                      const isStudying = seat?.status === 'studying' || (student && isRecentlyActive);
+                      const isAbsent = student && !isStudying && seat?.status === 'absent';
                       const isAway = seat?.status === 'away' || seat?.status === 'break';
 
                       return (
@@ -443,7 +454,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           key={seatNo} 
                           onClick={() => handleSeatClick(seat)}
                           className={cn(
-                            "aspect-[1.1/1] min-w-[100px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-2 cursor-pointer shadow-sm border-2",
+                            "aspect-square min-w-[85px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-2 cursor-pointer shadow-sm border-2",
                             isAisle 
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
                               : isStudying 
@@ -470,7 +481,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="flex flex-col items-center gap-0 w-full px-1">
                               <span className="text-[10px] sm:text-[11px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
-                                {getLiveTimeLabel(student.id, seat.status, seat.lastCheckInAt)}
+                                {getLiveTimeLabel(student.id, isStudying ? 'studying' : seat.status, seat.lastCheckInAt)}
                               </span>
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>

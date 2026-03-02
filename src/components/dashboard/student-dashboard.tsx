@@ -183,11 +183,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
     if (isTimerActive) {
-      // 종료 시 좌석 상태 업데이트
+      // 종료 시 좌석 상태 업데이트 - setDoc merge 사용하여 문서가 없어도 생성되게 함
       if (studentProfile?.seatNo) {
         const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
         const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
-        updateDoc(seatRef, { status: 'absent', updatedAt: serverTimestamp() });
+        setDoc(seatRef, { status: 'absent', updatedAt: serverTimestamp() }, { merge: true });
       }
 
       await saveStudyTime();
@@ -198,15 +198,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     } else {
       const now = Date.now();
       
-      // 시작 시 좌석 상태 업데이트 (lastCheckInAt 포함하여 실시간 계산 가능하게 함)
+      // 시작 시 좌석 상태 업데이트 - setDoc merge 사용하여 더 안정적으로 업데이트
       if (studentProfile?.seatNo) {
         const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
         const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
-        updateDoc(seatRef, { 
+        setDoc(seatRef, { 
           status: 'studying', 
           lastCheckInAt: serverTimestamp(),
           updatedAt: serverTimestamp() 
-        });
+        }, { merge: true });
       }
 
       setStartTime(now);
@@ -235,7 +235,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               {isTimerActive ? "몰입의 정점에\n도착하셨네요!" : "오늘의 트랙을\n시작해볼까요?"}
             </h2>
             <div className={cn("flex items-center gap-2 bg-white/10 backdrop-blur-md w-fit px-4 py-2 rounded-full border border-white/10", isMobile ? "mx-auto" : "md:mx-0")}>
-              <Sparkles className="h-3.5 w-3.5 text-accent animate-pulse" />
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+              </span>
               <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 whitespace-nowrap">Live Study Tracker</span>
             </div>
           </div>
