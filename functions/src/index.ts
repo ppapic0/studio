@@ -172,7 +172,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
 /**
  * 학생 계정을 영구 삭제하는 함수 (관리자 전용)
- * Auth 계정이 이미 삭제된 경우에도 Firestore 데이터를 강제로 정리합니다.
  */
 export const deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -183,40 +182,37 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   const centerId = data.centerId ? data.centerId.toString().trim() : null;
 
   if (!studentId || !centerId) {
-    throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 유효하지 않습니다.");
+    throw new functions.https.HttpsError("invalid-argument", "유효한 학생 ID와 센터 ID가 필요합니다.");
   }
 
   const callerId = context.auth.uid;
 
   try {
-    console.log(`[DeleteStudent] Request by ${callerId} to delete ${studentId} in center ${centerId}`);
-
-    // 1. 권한 확인 (관리자만 가능)
+    // 1. 관리자 권한 확인
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     const callerData = callerMemberSnap.data();
     
-    if (!callerMemberSnap.exists || callerData?.role !== 'centerAdmin') {
-      console.warn(`[DeleteStudent] Unauthorized attempt by ${callerId}`);
-      throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다. 관리자만 가능합니다.");
+    if (!callerMemberSnap.exists || !['centerAdmin', 'teacher'].includes(callerData?.role)) {
+      throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    // 2. Auth 유저 삭제 (이미 삭제된 경우 에러를 무시하고 진행)
+    // 2. Auth 유저 삭제 (실패해도 Firestore 정리는 진행)
     try {
       await admin.auth().deleteUser(studentId);
-      console.log(`[DeleteStudent] Auth user ${studentId} deleted successfully.`);
     } catch (authError: any) {
-      if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-uid') {
-        console.warn(`[DeleteStudent] Auth user ${studentId} missing or invalid. Proceeding with DB cleanup.`);
+      if (authError.code === 'auth/user-not-found') {
+        console.warn(`[DeleteStudent] User ${studentId} not found in Auth. Proceeding with Firestore cleanup.`);
       } else {
-        console.error(`[DeleteStudent] Auth deletion error:`, authError);
-        throw new functions.https.HttpsError("internal", `인증 정보 삭제 실패: ${authError.message}`);
+        console.error(`[DeleteStudent] Auth Deletion Error:`, authError);
+        // 치명적 에러인 경우에만 중단
+        if (authError.code !== 'auth/invalid-uid') {
+           throw new functions.https.HttpsError("internal", `인증 계정 삭제 중 서버 에러: ${authError.message}`);
+        }
       }
     }
 
-    // 3. Firestore 데이터 정리 (Batch 사용)
+    // 3. Firestore 데이터 일괄 정리
     const batch = db.batch();
-    
-    // 삭제 대상 문서 경로 정의
     const paths = [
       `users/${studentId}`,
       `centers/${centerId}/members/${studentId}`,
@@ -230,14 +226,12 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
     });
 
     await batch.commit();
-    console.log(`[DeleteStudent] Firestore cleanup for ${studentId} completed.`);
-
-    return { ok: true, message: "계정 및 모든 데이터가 영구적으로 삭제되었습니다." };
+    return { ok: true, message: "계정 및 모든 데이터가 영구 삭제되었습니다." };
 
   } catch (error: any) {
-    console.error("[DeleteStudent Final Error]", error);
+    console.error("[DeleteStudent Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류가 발생했습니다.");
+    throw new functions.https.HttpsError("internal", error.message || "알 수 없는 서버 내부 오류가 발생했습니다.");
   }
 });
 
