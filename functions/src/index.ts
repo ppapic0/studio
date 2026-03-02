@@ -176,6 +176,50 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 });
 
 /**
+ * 학생 계정을 영구 삭제하는 함수 (관리자 전용)
+ */
+export const deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
+  
+  const { studentId, centerId } = data;
+  if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
+
+  const callerId = context.auth.uid;
+
+  try {
+    // 1. 권한 확인 (관리자만 가능)
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
+    if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') {
+      throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다. 관리자만 가능합니다.");
+    }
+
+    // 2. Auth 유저 삭제
+    try {
+      await admin.auth().deleteUser(studentId);
+    } catch (authError: any) {
+      if (authError.code !== 'auth/user-not-found') {
+        throw new functions.https.HttpsError("internal", `인증 정보 삭제 실패: ${authError.message}`);
+      }
+    }
+
+    // 3. Firestore 데이터 정리 (Batch)
+    const batch = db.batch();
+    batch.delete(db.doc(`users/${studentId}`));
+    batch.delete(db.doc(`centers/${centerId}/members/${studentId}`));
+    batch.delete(db.doc(`userCenters/${studentId}/centers/${centerId}`));
+    batch.delete(db.doc(`centers/${centerId}/students/${studentId}`));
+    batch.delete(db.doc(`centers/${centerId}/growthProgress/${studentId}`));
+
+    await batch.commit();
+    return { ok: true, message: "계정이 영구적으로 삭제되었습니다." };
+
+  } catch (error: any) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류");
+  }
+});
+
+/**
  * 초대 코드 사용 및 센터 가입 함수
  */
 export const redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {

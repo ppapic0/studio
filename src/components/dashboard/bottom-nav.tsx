@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -15,7 +16,8 @@ import {
   Trophy,
   GraduationCap,
   History,
-  MonitorSmartphone
+  MonitorSmartphone,
+  UserCog
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -53,9 +55,10 @@ export function BottomNav() {
     ],
     centerAdmin: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-      { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
+      { href: '/dashboard/settings/students', label: '계정관리', icon: UserCog },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
-      { href: '/dashboard/teacher/students', label: '관리', icon: GraduationCap },
+      { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
+      { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     ],
   };
 

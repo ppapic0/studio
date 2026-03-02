@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -18,7 +19,8 @@ import {
   FileText,
   History,
   DollarSign,
-  MonitorSmartphone
+  MonitorSmartphone,
+  UserCog
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -55,6 +57,8 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
+    { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
+    { href: '/dashboard/settings/students', label: '학생 계정 관리', icon: UserCog },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
     { href: '/dashboard/revenue', label: '수익 분석', icon: DollarSign },
