@@ -37,7 +37,8 @@ import {
   Filter,
   Trophy,
   Target,
-  Sparkles
+  Sparkles,
+  FileText
 } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -72,7 +73,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
 
-  // 1. 센터 모든 재원생 (필터링 기준 데이터)
+  // 1. 센터 모든 재원생
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -83,7 +84,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: activeMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
 
-  // 사용 가능한 반 목록 추출 (모든 재원생 대상)
+  // 사용 가능한 반 목록 추출
   const availableClasses = useMemo(() => {
     if (!activeMembers) return [];
     const classes = new Set<string>();
@@ -93,14 +94,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return Array.from(classes).sort();
   }, [activeMembers]);
 
-  // 2. 실시간 좌석 데이터 (현재 등원 및 공부 여부 확인용)
+  // 2. 실시간 좌석 데이터
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 실시간 학습 로그 집계 (collectionGroup 사용)
+  // 3. 실시간 학습 로그 집계 (collectionGroup)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -109,7 +110,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       where('dateKey', 'in', [todayKey, yesterdayKey])
     );
   }, [firestore, centerId, todayKey, yesterdayKey]);
-  const { data: centerLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
+  const { data: centerLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
   // 4. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
@@ -118,7 +119,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: dailyReports } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
 
-  // 5. 통계 보조 데이터 (계획 완수율 등)
+  // 5. 통계 보조 데이터
   const todayStatsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
@@ -127,7 +128,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   // --- 실시간 KPI 엔진 ---
   const metrics = useMemo(() => {
-    if (!activeMembers || !attendanceList || !centerLogs) return null;
+    // 필수 데이터가 로딩 전이면 null 반환
+    if (!activeMembers || !attendanceList || !isMounted) return null;
 
     // (A) 필터링 대상 학생 선별
     const filteredMembers = activeMembers.filter(m => selectedClass === 'all' || m.className === selectedClass);
@@ -140,7 +142,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     // (B) 각 학생별 실시간 합산 로직
     filteredMembers.forEach(member => {
       // 오늘 로그
-      const todayLog = centerLogs.find(l => l.studentId === member.id && l.dateKey === todayKey);
+      const todayLog = centerLogs?.find(l => l.studentId === member.id && l.dateKey === todayKey);
       let cumulative = todayLog?.totalMinutes || 0;
 
       // 실시간 세션 계산 (공부 중인 경우)
@@ -153,8 +155,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       totalTodayMins += cumulative;
       studentLiveMinutes.push(cumulative);
 
-      // 어제 로그 (비교용)
-      const yestLog = centerLogs.find(l => l.studentId === member.id && l.dateKey === yesterdayKey);
+      // 어제 로그
+      const yestLog = centerLogs?.find(l => l.studentId === member.id && l.dateKey === yesterdayKey);
       totalYestMins += yestLog?.totalMinutes || 0;
     });
 
@@ -162,15 +164,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const studyTimeGrowth = totalYestMins > 0 ? ((totalTodayMins - totalYestMins) / totalYestMins) * 100 : 0;
     const checkedInCount = attendanceList.filter(a => a.studentId && targetMemberIds.has(a.studentId) && a.status === 'studying').length;
     
-    // 점유율: 물리적 좌석 대비가 아닌, 해당 반 정원 대비 실제 학습 인원
     const seatOccupancy = targetMemberIds.size > 0 ? Math.round((checkedInCount / targetMemberIds.size) * 100) : 0;
 
     const sortedMinutes = [...studentLiveMinutes].sort((a, b) => b - a);
     const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
-    const top20Avg = sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count;
-    const bottom20Avg = sortedMinutes.slice(-top20Count).reduce((acc, m) => acc + m, 0) / top20Count;
+    const top20Avg = sortedMinutes.length > 0 ? sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count : 0;
+    const bottom20Avg = sortedMinutes.length > 0 ? sortedMinutes.slice(-top20Count).reduce((acc, m) => acc + m, 0) / top20Count : 0;
 
-    // 성과 지표 (stats 데이터 활용)
     const filteredTodayStats = todayStats?.filter(s => targetMemberIds.has(s.studentId)) || [];
     const avgCompletion = filteredTodayStats.length > 0 
       ? Math.round(filteredTodayStats.reduce((acc, s) => acc + (s.todayPlanCompletionRate || 0), 0) / filteredTodayStats.length) 
@@ -182,7 +182,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     const riskCount = filteredTodayStats.filter(s => s.riskDetected || (s.totalStudyMinutes < 180 && s.todayPlanCompletionRate < 50)).length;
     
-    // 리포트 발송 신뢰도
     const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
     const feedbackRate = targetMemberIds.size > 0 ? Math.round(((filteredReports.filter(r => r.status === 'sent').length || 0) / targetMemberIds.size) * 100) : 0;
 
@@ -201,12 +200,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingNeedCount: filteredTodayStats.filter(s => (s.studyTimeGrowthRate || 0) <= -0.3).length,
       feedbackRate
     };
-  }, [activeMembers, attendanceList, centerLogs, todayStats, dailyReports, selectedClass, now, todayKey, yesterdayKey]);
+  }, [activeMembers, attendanceList, centerLogs, todayStats, dailyReports, selectedClass, now, isMounted, todayKey, yesterdayKey]);
 
+  // 무한 로딩 방지를 위한 로딩 상태 체크
+  // 멤버 로딩만 끝나면 틀을 보여줍니다.
   if (!isActive) return null;
-  const isLoading = membersLoading || attendanceLoading || !isMounted || !metrics;
+  const isEssentialLoading = membersLoading || !isMounted;
 
-  if (isLoading) {
+  if (isEssentialLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
@@ -248,233 +249,242 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      <section className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <Activity className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-black tracking-tighter">실시간 현황 분석</h2>
-          <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">LIVE TRACKING</Badge>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-primary text-primary-foreground p-10 overflow-hidden relative group">
-            <div className="absolute -right-4 -top-4 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000">
-              <Flame className="h-48 w-48" />
+      {metrics ? (
+        <>
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <Activity className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">실시간 현황 분석</h2>
+              <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">LIVE TRACKING</Badge>
             </div>
-            <div className="space-y-1 relative z-10">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 트랙 총량 (Accrued)</p>
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-6xl font-black tracking-tighter">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
-                <div className={cn("flex items-center text-xs font-bold px-3 py-1 rounded-full bg-white/10 shadow-inner", metrics.studyTimeGrowth >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                  {metrics.studyTimeGrowth >= 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-                  {Math.abs(metrics.studyTimeGrowth).toFixed(1)}%
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="rounded-[2.5rem] border-none shadow-2xl bg-primary text-primary-foreground p-10 overflow-hidden relative group">
+                <div className="absolute -right-4 -top-4 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000">
+                  <Flame className="h-48 w-48" />
                 </div>
-              </div>
-              <div className="pt-8 space-y-3">
-                <div className="flex justify-between text-[10px] font-black opacity-60 uppercase tracking-widest">
-                  <span>일일 활성 목표 (Avg 6h)</span>
-                  <span>{Math.min(100, Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100))}%</span>
+                <div className="space-y-1 relative z-10">
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 트랙 총량 (Accrued)</p>
+                  <div className="flex items-baseline gap-2">
+                    <h3 className="text-6xl font-black tracking-tighter">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
+                    <div className={cn("flex items-center text-xs font-bold px-3 py-1 rounded-full bg-white/10 shadow-inner", metrics.studyTimeGrowth >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                      {metrics.studyTimeGrowth >= 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
+                      {Math.abs(metrics.studyTimeGrowth).toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="pt-8 space-y-3">
+                    <div className="flex justify-between text-[10px] font-black opacity-60 uppercase tracking-widest">
+                      <span>일일 활성 목표 (Avg 6h)</span>
+                      <span>{Math.min(100, Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100))}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden shadow-inner">
+                      <div className="h-full bg-white transition-all duration-1000" style={{ width: `${Math.min(100, (metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)}%` }} />
+                    </div>
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden shadow-inner">
-                  <div className="h-full bg-white transition-all duration-1000" style={{ width: `${Math.min(100, (metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)}%` }} />
+              </Card>
+
+              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
+                    <h3 className="text-5xl font-black tracking-tighter text-primary">{metrics.checkedInCount}<span className="text-2xl opacity-40 ml-1">명</span></h3>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-[1.5rem] group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm"><Users className="h-8 w-8 text-blue-600 group-hover:text-white" /></div>
                 </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
-            <div className="flex justify-between items-start mb-6">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
-                <h3 className="text-5xl font-black tracking-tighter text-primary">{metrics.checkedInCount}<span className="text-2xl opacity-40 ml-1">명</span></h3>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-[1.5rem] group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm"><Users className="h-8 w-8 text-blue-600 group-hover:text-white" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-dashed">
-              <div className="space-y-1">
-                <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">전체 재원생</p>
-                <p className="text-xl font-black">{metrics.totalStudents}명</p>
-              </div>
-              <div className="space-y-1 text-right">
-                <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
-                <p className="text-xl font-black text-blue-600">{metrics.seatOccupancy}%</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
-            <div className="flex justify-between items-start mb-6">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">인당 평균 시간</p>
-                <h3 className="text-5xl font-black tracking-tighter text-primary">{(metrics.totalTodayMins / (metrics.totalStudents || 1) / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
-              </div>
-              <div className="bg-amber-50 p-4 rounded-[1.5rem] group-hover:bg-amber-500 group-hover:text-white transition-all duration-500 shadow-sm"><Clock className="h-8 w-8 text-amber-600 group-hover:text-white" /></div>
-            </div>
-            <div className="space-y-4 mt-8 pt-8 border-t border-dashed">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /><span className="text-emerald-600">상위 20% 리듬</span></div>
-                <span className="font-black text-base">{(metrics.top20Avg / 60).toFixed(1)}h</span>
-              </div>
-              <div className="flex items-center justify-between text-xs font-bold">
-                <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-rose-500" /><span className="text-rose-600">하위 20% 리듬</span></div>
-                <span className="font-black text-base">{(metrics.bottom20Avg / 60).toFixed(1)}h</span>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="bg-muted/5 border-b p-10">
-            <div className="flex justify-between items-center">
-              <div className="space-y-1">
-                <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-                  <TrendingUp className="h-6 w-6 text-emerald-600" /> 학습 퀄리티 지표
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Plan Performance & Growth Trend</CardDescription>
-              </div>
-              <Badge variant="outline" className="font-black text-[10px] border-emerald-200 text-emerald-700 bg-emerald-50/50">WEEKLY VIEW</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className={cn("space-y-10", isMobile ? "p-6" : "p-10")}>
-            <div className="grid grid-cols-3 gap-6">
-              <div className="bg-[#fafafa] p-6 rounded-3xl border shadow-inner text-center space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase">평균 완수율</p>
-                <div className="text-3xl font-black text-primary">{metrics.avgCompletion}%</div>
-              </div>
-              <div className="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 text-center space-y-1">
-                <p className="text-[10px] font-black text-emerald-600 uppercase">최상위 그룹</p>
-                <div className="text-3xl font-black text-emerald-600">{metrics.highAchieverRate}%</div>
-              </div>
-              <div className="bg-rose-50/50 p-6 rounded-3xl border border-rose-100 text-center space-y-1">
-                <p className="text-[10px] font-black text-rose-600 uppercase">집중 필요군</p>
-                <div className="text-3xl font-black text-rose-600">{metrics.lowAchieverRate}%</div>
-              </div>
-            </div>
-            
-            <div className="p-8 rounded-[2rem] bg-emerald-50/30 border border-emerald-100 space-y-4">
-              <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-emerald-600" />
-                <h4 className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">학습 성취 요약</h4>
-              </div>
-              <p className="text-sm font-bold text-emerald-900/70 leading-relaxed">
-                현재 선택된 대상 중 **{metrics.avgCompletion}%**가 계획된 목표를 달성 중이며, 상위권 그룹은 평균보다 **1.5배** 높은 집중 밀도를 보이고 있습니다.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="bg-rose-50/30 border-b p-10">
-            <div className="flex justify-between items-center">
-              <div className="space-y-1">
-                <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-                  <ShieldAlert className="h-6 w-6 text-rose-600" /> 이상 징후 조기 탐지
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-rose-600/60">Risk & Intervention Management</CardDescription>
-              </div>
-              <div className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-            </div>
-          </CardHeader>
-          <CardContent className={cn("space-y-10", isMobile ? "p-6" : "p-10")}>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-8 rounded-[2.5rem] bg-rose-50/50 border-2 border-rose-100 flex flex-col items-center text-center gap-3 shadow-xl shadow-rose-500/5 group hover:bg-rose-500 hover:border-rose-500 transition-all duration-500">
-                <AlertTriangle className="h-12 w-12 text-rose-600 group-hover:text-white transition-colors" />
-                <div>
-                  <p className="text-5xl font-black text-rose-700 group-hover:text-white transition-colors">{metrics.riskCount}</p>
-                  <p className="text-[10px] font-black text-rose-600/60 uppercase group-hover:text-white/60 transition-colors tracking-widest mt-1">학습 위험군</p>
+                <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-dashed">
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">재원생(대상)</p>
+                    <p className="text-xl font-black">{metrics.totalStudents}명</p>
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
+                    <p className="text-xl font-black text-blue-600">{metrics.seatOccupancy}%</p>
+                  </div>
                 </div>
-              </div>
-              <div className="p-8 rounded-[2.5rem] bg-blue-50/50 border-2 border-blue-100 flex flex-col items-center text-center gap-3 shadow-xl shadow-blue-500/5 group hover:bg-blue-600 hover:border-blue-600 transition-all duration-500">
-                <MessageSquare className="h-12 w-12 text-blue-600 group-hover:text-white transition-colors" />
-                <div>
-                  <p className="text-5xl font-black text-blue-700 group-hover:text-white transition-colors">{metrics.counselingNeedCount}</p>
-                  <p className="text-[10px] font-black text-blue-600/60 uppercase group-hover:text-white/60 transition-colors tracking-widest mt-1">상담 필요군</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-8 rounded-[2rem] bg-[#fafafa] border-2 border-dashed border-muted-foreground/10 space-y-5">
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-amber-500 fill-current" />
-                <h5 className="text-[11px] font-black text-primary uppercase tracking-widest">자동 개입 알고리즘 작동 중</h5>
-              </div>
-              <ul className="space-y-3">
-                {[
-                  { text: '최근 3일 연속 목표 시간 미달', color: 'bg-rose-400' },
-                  { text: '주간 계획 완수율 40% 이하 지속', color: 'bg-amber-400' },
-                  { text: '직전 주 대비 학습량 30% 이상 급감', color: 'bg-blue-400' }
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 text-xs font-bold text-muted-foreground/80">
-                    <div className={cn("h-1.5 w-1.5 rounded-full shrink-0", item.color)} />
-                    {item.text}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </Card>
 
-      <section className="pb-10 px-1">
-        <Card className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03]">
-          <div className="absolute -right-10 -bottom-10 opacity-5 rotate-12 transition-transform duration-1000 group-hover:scale-110">
-            <HeartHandshake className="h-64 w-64" />
+              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">인당 평균 시간</p>
+                    <h3 className="text-5xl font-black tracking-tighter text-primary">{(metrics.totalTodayMins / (metrics.totalStudents || 1) / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
+                  </div>
+                  <div className="bg-amber-50 p-4 rounded-[1.5rem] group-hover:bg-amber-500 group-hover:text-white transition-all duration-500 shadow-sm"><Clock className="h-8 w-8 text-amber-600 group-hover:text-white" /></div>
+                </div>
+                <div className="space-y-4 mt-8 pt-8 border-t border-dashed">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /><span className="text-emerald-600">상위 20% 리듬</span></div>
+                    <span className="font-black text-base">{(metrics.top20Avg / 60).toFixed(1)}h</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-rose-500" /><span className="text-rose-600">하위 20% 리듬</span></div>
+                    <span className="font-black text-base">{(metrics.bottom20Avg / 60).toFixed(1)}h</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </section>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
+              <CardHeader className="bg-muted/5 border-b p-10">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
+                      <TrendingUp className="h-6 w-6 text-emerald-600" /> 학습 퀄리티 지표
+                    </CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Plan Performance & Growth Trend</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="font-black text-[10px] border-emerald-200 text-emerald-700 bg-emerald-50/50">DAILY VIEW</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className={cn("space-y-10", isMobile ? "p-6" : "p-10")}>
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="bg-[#fafafa] p-6 rounded-3xl border shadow-inner text-center space-y-1">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase">평균 완수율</p>
+                    <div className="text-3xl font-black text-primary">{metrics.avgCompletion}%</div>
+                  </div>
+                  <div className="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 text-center space-y-1">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase">최상위 그룹</p>
+                    <div className="text-3xl font-black text-emerald-600">{metrics.highAchieverRate}%</div>
+                  </div>
+                  <div className="bg-rose-50/50 p-6 rounded-3xl border border-rose-100 text-center space-y-1">
+                    <p className="text-[10px] font-black text-rose-600 uppercase">집중 필요군</p>
+                    <div className="text-3xl font-black text-rose-600">{metrics.lowAchieverRate}%</div>
+                  </div>
+                </div>
+                
+                <div className="p-8 rounded-[2rem] bg-emerald-50/30 border border-emerald-100 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-emerald-600" />
+                    <h4 className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">학습 성취 요약</h4>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-900/70 leading-relaxed">
+                    {selectedClass === 'all' ? '센터' : selectedClass}의 현재 완수율은 **{metrics.avgCompletion}%** 입니다. 상위권 그룹은 평균보다 높은 몰입 밀도를 유지하고 있습니다.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
+              <CardHeader className="bg-rose-50/30 border-b p-10">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
+                      <ShieldAlert className="h-6 w-6 text-rose-600" /> 이상 징후 조기 탐지
+                    </CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-rose-600/60">Risk & Intervention Management</CardDescription>
+                  </div>
+                  <div className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                </div>
+              </CardHeader>
+              <CardContent className={cn("space-y-10", isMobile ? "p-6" : "p-10")}>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="p-8 rounded-[2.5rem] bg-rose-50/50 border-2 border-rose-100 flex flex-col items-center text-center gap-3 shadow-xl shadow-rose-500/5 group hover:bg-rose-500 hover:border-rose-500 transition-all duration-500">
+                    <AlertTriangle className="h-12 w-12 text-rose-600 group-hover:text-white transition-colors" />
+                    <div>
+                      <p className="text-5xl font-black text-rose-700 group-hover:text-white transition-colors">{metrics.riskCount}</p>
+                      <p className="text-[10px] font-black text-rose-600/60 uppercase group-hover:text-white/60 transition-colors tracking-widest mt-1">학습 위험군</p>
+                    </div>
+                  </div>
+                  <div className="p-8 rounded-[2.5rem] bg-blue-50/50 border-2 border-blue-100 flex flex-col items-center text-center gap-3 shadow-xl shadow-blue-500/5 group hover:bg-blue-600 hover:border-blue-600 transition-all duration-500">
+                    <MessageSquare className="h-12 w-12 text-blue-600 group-hover:text-white transition-colors" />
+                    <div>
+                      <p className="text-5xl font-black text-blue-700 group-hover:text-white transition-colors">{metrics.counselingNeedCount}</p>
+                      <p className="text-[10px] font-black text-blue-600/60 uppercase group-hover:text-white/60 transition-colors tracking-widest mt-1">상담 필요군</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-8 rounded-[2rem] bg-[#fafafa] border-2 border-dashed border-muted-foreground/10 space-y-5">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-500 fill-current" />
+                    <h5 className="text-[11px] font-black text-primary uppercase tracking-widest">자동 개입 알고리즘 작동 중</h5>
+                  </div>
+                  <ul className="space-y-3">
+                    {[
+                      { text: '최근 3일 연속 목표 시간 미달', color: 'bg-rose-400' },
+                      { text: '주간 계획 완수율 40% 이하 지속', color: 'bg-amber-400' },
+                      { text: '직전 주 대비 학습량 30% 이상 급감', color: 'bg-blue-400' }
+                    ].map((item, i) => (
+                      <li key={i} className="flex items-center gap-3 text-xs font-bold text-muted-foreground/80">
+                        <div className={cn("h-1.5 w-1.5 rounded-full shrink-0", item.color)} />
+                        {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="space-y-10 relative z-10">
-            <div className="flex justify-between items-center">
-              <div className="space-y-1">
-                <CardTitle className="text-2xl font-black tracking-tighter">부모님 신뢰 및 관리 지표</CardTitle>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Parental Trust & Feedback Quality</p>
-              </div>
-              <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">CENTER KPI</Badge>
-            </div>
-            
-            <div className="grid gap-10 md:grid-cols-2">
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
-                  <div className="grid gap-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">데일리 리포트 발송률</span>
-                    <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.feedbackRate}%</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">Benchmark</span>
-                    <p className="text-xs font-black text-emerald-600">Optimal (90%↑)</p>
-                  </div>
-                </div>
-                <div className="h-2.5 w-full bg-blue-50 rounded-full overflow-hidden shadow-inner border border-blue-100/50">
-                  <div className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${metrics.feedbackRate}%` }} />
-                </div>
-              </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
-                  <div className="grid gap-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">상담일지 정밀 기록률</span>
-                    <div className="text-5xl font-black text-primary tabular-nums">82%</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">Status</span>
-                    <p className="text-xs font-black text-amber-600">Stable</p>
-                  </div>
-                </div>
-                <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                  <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: '82%' }} />
-                </div>
+          <section className="pb-10 px-1">
+            <Card className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03]">
+              <div className="absolute -right-10 -bottom-10 opacity-5 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+                <HeartHandshake className="h-64 w-64" />
               </div>
-            </div>
+              <div className="space-y-10 relative z-10">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-black tracking-tighter">부모님 신뢰 및 관리 지표</CardTitle>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Parental Trust & Feedback Quality</p>
+                  </div>
+                  <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">CENTER KPI</Badge>
+                </div>
+                
+                <div className="grid gap-10 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                      <div className="grid gap-1">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">데일리 리포트 발송률</span>
+                        <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.feedbackRate}%</div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">Benchmark</span>
+                        <p className="text-xs font-black text-emerald-600">Optimal (90%↑)</p>
+                      </div>
+                    </div>
+                    <div className="h-2.5 w-full bg-blue-50 rounded-full overflow-hidden shadow-inner border border-blue-100/50">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${metrics.feedbackRate}%` }} />
+                    </div>
+                  </div>
 
-            <div className="p-6 rounded-[1.5rem] bg-muted/20 border-2 border-dashed flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white rounded-2xl shadow-sm"><Target className="h-6 w-6 text-primary" /></div>
-                <p className="text-sm font-bold text-foreground/70 leading-relaxed max-w-md">"학부모 신뢰도는 리포트의 **발송 정기성**과 **상담 내용의 구체성**에서 결정됩니다."</p>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                      <div className="grid gap-1">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">상담일지 정밀 기록률</span>
+                        <div className="text-5xl font-black text-primary tabular-nums">82%</div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">Status</span>
+                        <p className="text-xs font-black text-amber-600">Stable</p>
+                      </div>
+                    </div>
+                    <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
+                      <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: '82%' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-[1.5rem] bg-muted/20 border-2 border-dashed flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white rounded-2xl shadow-sm"><Target className="h-6 w-6 text-primary" /></div>
+                    <p className="text-sm font-bold text-foreground/70 leading-relaxed max-w-md">"학부모 신뢰도는 리포트의 **발송 정기성**과 **상담 내용의 구체성**에서 결정됩니다."</p>
+                  </div>
+                  <Button asChild variant="outline" className="rounded-xl font-black text-xs gap-2 bg-white border-2 shadow-sm hover:bg-primary hover:text-white transition-all">
+                    <Link href="/dashboard/reports">리포트 센터 관리 <ChevronRight className="h-4 w-4" /></Link>
+                  </Button>
+                </div>
               </div>
-              <Button asChild variant="outline" className="rounded-xl font-black text-xs gap-2 bg-white border-2 shadow-sm hover:bg-primary hover:text-white transition-all">
-                <Link href="/dashboard/reports">리포트 센터 관리 <ChevronRight className="h-4 w-4" /></Link>
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </section>
+            </Card>
+          </section>
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-40 gap-4 opacity-20">
+          <Activity className="h-16 w-16 animate-pulse" />
+          <p className="font-black text-xl tracking-tighter">분석 데이터를 집계하고 있습니다...</p>
+        </div>
+      )}
     </div>
   );
 }
