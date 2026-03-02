@@ -117,7 +117,7 @@ export default function StudentAccountManagementPage() {
         throw new Error(result.data?.message || "삭제 요청이 거절되었습니다.");
       }
     } catch (e: any) {
-      console.error("[Delete Error]", e);
+      console.error("[Delete Error Details]", e);
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
@@ -225,7 +225,7 @@ export default function StudentAccountManagementPage() {
                           <span className="font-black text-lg truncate tracking-tight">{member.displayName}</span>
                           <Badge variant="secondary" className={cn(
                             "font-black text-[8px] border-none h-4 px-1.5",
-                            member.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
+                            member.status === 'active' ? "bg-emerald-50 text-emerald-600" : member.status === 'onHold' ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-600"
                           )}>
                             {member.status === 'active' ? '재원' : member.status === 'onHold' ? '휴학' : '퇴원'}
                           </Badge>

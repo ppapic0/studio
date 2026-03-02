@@ -205,11 +205,10 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
       await admin.auth().deleteUser(studentId);
       console.log(`[DeleteStudent] Auth user ${studentId} deleted successfully.`);
     } catch (authError: any) {
-      if (authError.code === 'auth/user-not-found') {
-        console.warn(`[DeleteStudent] Auth user ${studentId} already missing. Proceeding with DB cleanup.`);
+      if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-uid') {
+        console.warn(`[DeleteStudent] Auth user ${studentId} missing or invalid. Proceeding with DB cleanup.`);
       } else {
         console.error(`[DeleteStudent] Auth deletion error:`, authError);
-        // 심각한 인증 오류인 경우에만 중단
         throw new functions.https.HttpsError("internal", `인증 정보 삭제 실패: ${authError.message}`);
       }
     }
