@@ -46,7 +46,6 @@ export default function StudentReportsPage() {
 
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
-    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트에서 정렬합니다.
     return query(
       collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
       where('studentId', '==', user.uid),
@@ -119,23 +118,23 @@ export default function StudentReportsPage() {
               className="rounded-[2.5rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 cursor-pointer group bg-white ring-1 ring-border/50 overflow-hidden"
             >
               <CardContent className="p-0">
-                <div className="flex items-center justify-between p-6 sm:p-10">
-                  <div className="flex items-center gap-6 min-w-0">
-                    <div className={cn("h-16 w-16 rounded-[1.5rem] bg-primary/5 flex flex-col items-center justify-center shrink-0 border-2 border-primary/10 group-hover:bg-primary group-hover:border-primary transition-all duration-500 shadow-inner")}>
-                      <Calendar className="h-6 w-6 text-primary group-hover:text-white" />
+                <div className={cn("flex items-center justify-between p-6 sm:p-10", isMobile ? "p-5" : "")}>
+                  <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+                    <div className={cn("h-12 w-12 sm:h-16 sm:w-16 rounded-2xl sm:rounded-[1.5rem] bg-primary/5 flex flex-col items-center justify-center shrink-0 border-2 border-primary/10 group-hover:bg-primary group-hover:border-primary transition-all duration-500 shadow-inner")}>
+                      <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:text-white" />
                     </div>
-                    <div className="grid gap-1 min-w-0">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-xl font-black tracking-tighter text-primary">{report.dateKey} 리포트</h3>
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] px-2 h-5">VERIFIED</Badge>
+                    <div className="grid gap-0.5 min-w-0 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-xl font-black tracking-tighter text-primary truncate whitespace-nowrap">{report.dateKey} 리포트</h3>
+                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 border-none font-black text-[8px] px-1.5 h-4 flex-shrink-0">OK</Badge>
                       </div>
-                      <p className="text-[11px] font-bold text-muted-foreground/60 line-clamp-1 max-w-[400px]">
-                        {report.content.substring(0, 100).replace(/[🕒✅📊💬🧠]/g, '')}...
+                      <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/60 truncate whitespace-nowrap max-w-full">
+                        {report.content.replace(/[🕒✅📊💬🧠]/g, '').trim().substring(0, 50)}...
                       </p>
                     </div>
                   </div>
-                  <div className="h-12 w-12 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                    <ChevronRight className="h-6 w-6" />
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm shrink-0 ml-2">
+                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
                 </div>
               </CardContent>
@@ -144,22 +143,27 @@ export default function StudentReportsPage() {
         </div>
       )}
 
-      {/* 리포트 상세 다이얼로그 */}
+      {/* 리포트 상세 다이얼로그 - 앱모드 중앙 정렬 팝업 개선 */}
       <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "max-w-3xl max-h-[90vh]")}>
+        <DialogContent className={cn(
+          "rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", 
+          isMobile 
+            ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2.5rem]" 
+            : "max-w-3xl max-h-[90vh]"
+        )}>
           {selectedReport && (
             <>
-              <div className="bg-primary text-white relative overflow-hidden shrink-0 p-8 sm:p-12">
-                <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
-                  <Sparkles className="h-48 w-48" />
+              <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-8" : "p-12")}>
+                <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12">
+                  <Sparkles className={cn(isMobile ? "h-32 w-32" : "h-48 w-48")} />
                 </div>
-                <DialogHeader className="relative z-10">
+                <DialogHeader className="relative z-10 text-left">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] tracking-[0.2em] uppercase px-3 py-1">Premium AI Analysis</Badge>
+                    <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">Premium AI Analysis</Badge>
                     <span className="text-white/60 font-black text-[10px] tracking-widest">{selectedReport.dateKey}</span>
                   </div>
-                  <DialogTitle className="text-3xl sm:text-5xl font-black tracking-tighter">정밀 분석 리포트</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1 text-sm">성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
+                  <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-5xl")}>정밀 분석 리포트</DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold mt-1 text-xs sm:text-sm">성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
                 </DialogHeader>
               </div>
 
@@ -167,7 +171,7 @@ export default function StudentReportsPage() {
                 <VisualReportViewer content={selectedReport.content} />
               </div>
 
-              <DialogFooter className="p-8 bg-white border-t shrink-0 flex justify-center">
+              <DialogFooter className="p-6 sm:p-8 bg-white border-t shrink-0 flex justify-center">
                 <DialogClose asChild>
                   <Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 active:scale-95 transition-all">분석 완료</Button>
                 </DialogClose>
