@@ -18,6 +18,7 @@ export interface CenterMembership {
   status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;
+  className?: string; // 소속 반 이름
   linkedStudentIds?: string[];
   monthlyFee?: number;
   tutoringDiscount?: boolean;
@@ -28,6 +29,7 @@ export interface InviteCode {
   id: string;
   centerId: string;
   intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  targetClassName?: string; // 이 코드로 가입 시 자동 배정될 반 이름
   maxUses: number;
   usedCount: number;
   expiresAt: Timestamp | null;
@@ -35,7 +37,6 @@ export interface InviteCode {
   createdByUserId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-  centerId: string;
 }
 
 export interface MonthlyFinance {
@@ -128,6 +129,7 @@ export interface StudentProfile {
   name: string;
   grade: string;
   schoolName: string;
+  className?: string; // 소속 반 이름
   seatNo: number;
   targetDailyMinutes: number;
   parentUids: string[];
@@ -318,6 +320,7 @@ export interface LeaderboardEntry {
   id: string;
   studentId: string;
   displayNameSnapshot: string;
+  classNameSnapshot?: string; // 순위 집계 시점의 반 이름
   value: number;
   rank: number;
   updatedAt: Timestamp;

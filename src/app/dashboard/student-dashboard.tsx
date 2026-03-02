@@ -35,7 +35,11 @@ import {
   FileText,
   ClipboardPen,
   AlertOctagon,
-  BellRing
+  BellRing,
+  Info,
+  ShieldAlert,
+  ArrowRight,
+  ClipboardCheck
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -45,9 +49,9 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership } from '@/lib/types';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit } from 'firebase/firestore';
+import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
@@ -63,6 +67,9 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import Link from 'next/link';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const TIERS = [
   { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
@@ -86,7 +93,7 @@ const TIER_PRESETS = [
   { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
-function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string }) {
+function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string }) {
   const [stats, setStats] = useState(currentStats);
   const [lp, setLp] = useState(currentLp);
   const [mockRank, setMockRank] = useState(999);
@@ -106,7 +113,14 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
       const batch = writeBatch(firestore);
       batch.update(progressRef, { stats: stats, seasonLp: lp, updatedAt: serverTimestamp() });
       const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', userId);
-      batch.set(rankRef, { studentId: userId, displayNameSnapshot: displayName, value: lp, rank: mockRank, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(rankRef, { 
+        studentId: userId, 
+        displayNameSnapshot: displayName, 
+        classNameSnapshot: className, // 반 정보 스냅샷 추가
+        value: lp, 
+        rank: mockRank, 
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
       await batch.commit();
       toast({ title: "테스트 데이터 반영 완료" });
     } catch (e) {
@@ -307,7 +321,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               {sessions.map((session) => (
                 <div key={session.id} className="bg-white p-4 rounded-xl border-2 border-primary/5 flex items-center justify-between shadow-sm group">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
                       <Timer className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="grid leading-tight">
@@ -382,11 +396,40 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'), where('studentId', '==', user.uid));
   }, [firestore, activeMembership?.id, user?.uid, periodKey]);
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 999;
+  const currentRank = rankEntries?.[0]?.rank || 0;
+
+  // 전체 학생 수 조회
+  const totalStudentsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership]);
+  const { data: activeStudentsCount } = useCollection<CenterMembership>(totalStudentsQuery);
+  const totalCount = activeStudentsCount?.length || 1;
+
+  const rankDisplay = useMemo(() => {
+    if (currentRank === 0) return '산정 중';
+    if (currentRank <= 3) return `${currentRank}위`;
+    const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
+    return `상위 ${percent}%`;
+  }, [currentRank, totalCount]);
 
   const currentLp = progress?.seasonLp || 0;
   
+  const penaltyPoints = progress?.penaltyPoints || 0;
+  const penaltyRate = useMemo(() => {
+    if (penaltyPoints >= 30) return 0.15; 
+    if (penaltyPoints >= 20) return 0.10; 
+    if (penaltyPoints >= 10) return 0.06; 
+    if (penaltyPoints >= 5) return 0.03;  
+    return 0; 
+  }, [penaltyPoints]);
+
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+  const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -401,6 +444,77 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
   
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
+  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
+
+  // 지각/결석 신청서 상태 및 로직
+  const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
+  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [requestReason, setRequestReason] = useState('');
+  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+
+  const myRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트 측에서 필터링합니다.
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+
+  const myRequests = useMemo(() => {
+    if (!rawRequests) return [];
+    return [...rawRequests]
+      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [rawRequests]);
+
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
+    if (requestReason.trim().length < 10) {
+      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
+      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
+      
+      const requestData: any = {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: requestReason.trim(),
+        status: 'requested',
+        penaltyApplied: isTodayRequest,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
+
+      if (isTodayRequest) {
+        const pointsToAdd = requestType === 'late' ? 3 : 5;
+        batch.update(progressRef!, {
+          penaltyPoints: increment(pointsToAdd),
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
+      }
+
+      await batch.commit();
+      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      setRequestReason('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
 
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
@@ -413,14 +527,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const updateData: any = { updatedAt: serverTimestamp() };
       
       if (sessionMinutes > 0) {
-        let studyLpEarned = Math.round(sessionMinutes * totalBoost);
+        let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
         updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
         const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
         const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
         
         if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
-          const attendanceLp = Math.round(100 * totalBoost);
+          const attendanceLp = Math.round(100 * finalMultiplier);
           studyLpEarned += attendanceLp;
           updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
           toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
@@ -482,7 +596,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
       
       if (currentStudyTasks.length >= 3 && willBeDoneCount === currentStudyTasks.length && !progress?.dailyLpStatus?.[todayKey]?.plan) {
-        const planLp = Math.round(100 * totalBoost);
+        const planLp = Math.round(100 * finalMultiplier);
         batch.update(progressRef, {
           seasonLp: increment(planLp),
           [`dailyLpStatus.${todayKey}.plan`]: true,
@@ -535,7 +649,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <button className={cn(
               "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap",
               isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
-              isTimerActive ? "bg-rose-50 text-white" : "bg-white text-primary"
+              isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
             )} onClick={handleStudyStartStop}>
               {isTimerActive ? <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></> : <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>}
             </button>
@@ -625,9 +739,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </Card>
 
-      {/* 신규 관리 섹션 (데일리 리포트 / 신청서 / 벌점) */}
       <section className={cn("grid gap-2.5", isMobile ? "grid-cols-3" : "grid-cols-3")}>
-        <Link href="/dashboard/study-history">
+        <Link href="/dashboard/student-reports">
           <Card className={cn(
             "border-none shadow-lg bg-white/80 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 flex flex-col items-center text-center",
             isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
@@ -657,18 +770,99 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </Card>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
-            <div className="bg-amber-500 p-8 text-white relative">
+          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+            <div className="bg-amber-500 p-8 text-white relative shrink-0">
               <BellRing className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
                 <DialogDescription className="text-white/70 font-bold">지각 또는 결석 사유를 입력하여 제출하세요.</DialogDescription>
               </DialogHeader>
             </div>
-            <div className="p-8 space-y-4">
-              <p className="text-center py-10 font-bold text-muted-foreground italic">준비 중인 기능입니다.</p>
+            <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
+              <div className="p-8 space-y-8">
+                <div className="grid gap-6 bg-white p-6 rounded-[2rem] border shadow-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">신청 종류</Label>
+                      <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
+                        <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="late">지각 (Late)</SelectItem>
+                          <SelectItem value="absence">결석 (Absence)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
+                      <Input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className="rounded-xl border-2 h-12 font-bold" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center ml-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">사유 (최소 10자)</Label>
+                      <span className={cn("text-[9px] font-bold", requestReason.length < 10 ? "text-rose-500" : "text-emerald-500")}>{requestReason.length}/10자</span>
+                    </div>
+                    <Textarea 
+                      placeholder="사유를 상세히 입력해 주세요. (예: 병원 진료, 학교 행사 참여 등)" 
+                      value={requestReason}
+                      onChange={e => setRequestReason(e.target.value)}
+                      className="rounded-2xl border-2 min-h-[100px] font-bold text-sm resize-none"
+                    />
+                  </div>
+
+                  {requestDate === format(new Date(), 'yyyy-MM-dd') && (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3">
+                      <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] font-bold text-rose-900 leading-relaxed">
+                        **당일 신청 알림**: 당일 신청 시 규정에 따라 **벌점(지각 +3, 결석 +5)**이 즉시 부과됩니다.
+                      </p>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={handleRequestSubmit} 
+                    disabled={isRequestSubmitting || requestReason.length < 10} 
+                    className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 active:scale-95 transition-all"
+                  >
+                    {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
+                    <History className="h-3.5 w-3.5" /> 최근 신청 내역 (최근 5건)
+                  </h4>
+                  <div className="grid gap-2">
+                    {myRequests?.length === 0 ? (
+                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">신청 내역이 없습니다.</div>
+                    ) : (
+                      myRequests?.map(req => (
+                        <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>
+                              <Clock className="h-4 w-4 text-amber-600" />
+                            </div>
+                            <div className="grid leading-tight">
+                              <span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span>
+                            </div>
+                          </div>
+                          <Badge className={cn(
+                            "font-black text-[9px] border-none px-2",
+                            req.status === 'requested' ? "bg-muted text-muted-foreground" : 
+                            req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+                          )}>
+                            {req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <DialogFooter className="p-6 border-t"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+            <DialogFooter className="p-6 border-t shrink-0 bg-white"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -687,27 +881,146 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </Card>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
-            <div className="bg-rose-600 p-8 text-white relative">
-              <ShieldCheck className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+          <DialogContent className={cn("rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "max-w-[95vw] rounded-[2rem] h-[85vh]" : "max-h-[90vh]")}>
+            <div className={cn("bg-rose-600 text-white relative shrink-0", isMobile ? "p-6" : "p-10")}>
+              <ShieldAlert className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black">벌점 및 상점 관리</DialogTitle>
-                <DialogDescription className="text-white/70 font-bold">센터 규정 준수 현황입니다.</DialogDescription>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-widest">Growth Guard</Badge>
+                </div>
+                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
               </DialogHeader>
             </div>
-            <div className="p-8 flex flex-col items-center justify-center gap-4">
-              <div className="text-5xl font-black text-primary">0</div>
-              <p className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">Total Penalty Points</p>
-              <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-center">
-                <p className="text-xs font-bold text-emerald-700">현재 매우 깨끗한 기록을 유지하고 있습니다. 👏</p>
+
+            <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
+              <div className={cn("space-y-10", isMobile ? "p-5" : "p-10")}>
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <Activity className="h-4 w-4 text-rose-600" />
+                    <h4 className="text-xs font-black uppercase text-rose-600 tracking-widest">현재 나의 규정 점수</h4>
+                  </div>
+                  <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 flex flex-col items-center text-center gap-4 ring-1 ring-black/5">
+                    <div className={cn(
+                      "text-7xl font-black tracking-tighter leading-none",
+                      penaltyPoints < 10 ? "text-emerald-500" : penaltyPoints < 20 ? "text-amber-500" : "text-rose-600"
+                    )}>
+                      {penaltyPoints}<span className="text-lg opacity-40 ml-1">점</span>
+                    </div>
+                    <div className="grid gap-1">
+                      <p className="font-black text-lg text-primary tracking-tight">
+                        {penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : penaltyPoints < 30 ? "주의 및 강등 위험 상태입니다. ⚠️" : "강등 및 즉시 면담 대상입니다. 🔥"}
+                      </p>
+                      {penaltyRate > 0 && (
+                        <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
+                          LP 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
+                        </Badge>
+                      )}
+                    </div>
+                  </Card>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <AlertOctagon className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">벌점 부여 기준 (강도형)</h4>
+                  </div>
+                  <div className="grid gap-2">
+                    {[
+                      { l: '지각 (10분 이상)', v: '+3', d: '정해진 등원 시간 미준수 시' },
+                      { l: '무단 결석', v: '+7', d: '사전 연락 없이 결석 시' },
+                      { l: '휴대폰 적발', v: '+5', d: '학습 중 휴대폰 무단 사용 시' },
+                      { l: '수면 반복 경고', v: '+3', d: '졸음으로 인한 지도를 따르지 않을 때' },
+                      { l: '태도 문제', v: '+5', d: '학습 분위기 저해 및 불손 태도' }
+                    ].map(item => (
+                      <div key={item.l} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-border/50 shadow-sm group hover:border-rose-200 transition-all">
+                        <div className="grid gap-0.5">
+                          <span className="text-sm font-black text-primary">{item.l}</span>
+                          <span className="text-[10px] font-bold text-muted-foreground">{item.d}</span>
+                        </div>
+                        <Badge variant="outline" className="h-8 w-12 flex justify-center font-black text-rose-600 border-rose-100 bg-rose-50 rounded-xl">{item.v}</Badge>
+                      </div>
+                    ))}
+                    <p className="text-[9px] font-black text-rose-600 text-center mt-2 italic">※ 하루 최대 벌점은 10점으로 제한됩니다.</p>
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">구간별 영향</h4>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      { range: '0 ~ 4', label: '정상', effect: '패널티 없음', color: 'bg-emerald-500' },
+                      { range: '5 ~ 9', label: '안전', effect: 'LP -3% 적용', color: 'bg-emerald-400' },
+                      { range: '10 ~ 19', label: '주의', effect: 'LP -6% & 학부모 자동 알림', color: 'bg-amber-500' },
+                      { range: '20 ~ 29', label: '경고', effect: 'LP -10% & 승급 불가 & 강등 경고', color: 'bg-rose-500' },
+                      { range: '30 이상', label: '강등', effect: '즉시 1단계 강등 & 3자 대면 상담', color: 'bg-black' }
+                    ].map(step => (
+                      <div key={step.range} className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-border/50 shadow-sm">
+                        <div className={cn("w-1.5 h-10 rounded-full", step.color)} />
+                        <div className="grid flex-1">
+                          <span className="text-[10px] font-black text-muted-foreground uppercase">{step.range} 점 ({step.label})</span>
+                          <span className="text-sm font-black text-primary">{step.effect}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <RefreshCw className="h-4 w-4 text-emerald-600" />
+                    <h4 className="text-xs font-black uppercase text-emerald-600 tracking-widest">벌점 회복 시스템</h4>
+                  </div>
+                  <div className="grid gap-3">
+                    <Card className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Timer className="h-5 w-5 text-emerald-600" /></div>
+                      <div className="grid gap-1">
+                        <span className="text-xs font-black text-emerald-700 uppercase">자동 회복 (Normal Life)</span>
+                        <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
+                          - 매일 완전 정상 생활 시: **-1점**<br/>
+                          - 7일 연속 정상 등원: **추가 -5점**<br/>
+                          - 한 달 무지각 달성: **추가 -10점**
+                        </p>
+                      </div>
+                    </Card>
+                    <Card className="p-5 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Zap className="h-5 w-5 text-blue-600" /></div>
+                      <div className="grid gap-1">
+                        <span className="text-xs font-black text-blue-700 uppercase">보너스 회복 (Elite Effort)</span>
+                        <p className="text-xs font-bold text-blue-900/70 leading-relaxed">
+                          - 집중도 90% 이상 5일 유지: **-5점**<br/>
+                          - 6시간 초몰입 5일 연속 달성: **-5점**
+                        </p>
+                      </div>
+                    </Card>
+                    <Card className="p-5 rounded-2xl bg-purple-50/50 border border-purple-100 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><RefreshCw className="h-5 w-5 text-purple-600" /></div>
+                      <div className="grid gap-1">
+                        <span className="text-xs font-black text-purple-700 uppercase">시즌 종료 리셋</span>
+                        <p className="text-xs font-bold text-purple-900/70 leading-relaxed">
+                          - 매 시즌 종료 시 **벌점 50%가 자동 감쇠**됩니다.<br/>
+                          <span className="text-[10px] opacity-60">(예: 20점 → 10점 잔류)</span>
+                        </p>
+                      </div>
+                    </Card>
+                  </div>
+                </section>
               </div>
             </div>
-            <DialogFooter className="p-6 border-t"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+
+            <DialogFooter className={cn("p-6 bg-white border-t shrink-0 flex justify-center", isMobile ? "p-4" : "p-6")}>
+              <DialogClose asChild>
+                <Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">규정을 준수하겠습니다</Button>
+              </DialogClose>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </section>
 
-      {isJacob && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} />}
+      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
     </div>
   );
 }

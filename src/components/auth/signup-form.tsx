@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -100,7 +99,7 @@ export function SignupForm() {
     setIsLoading(true);
     
     try {
-      // 1. 초대 코드 검증 (역할별 권한 확인)
+      // 1. 초대 코드 검증 (역할별 권한 확인 및 반 정보 획득)
       setLoadingStatus('초대 코드를 검증하고 있습니다...');
       const inviteRef = doc(firestore, 'inviteCodes', values.inviteCode);
       const inviteSnap = await getDoc(inviteRef);
@@ -140,7 +139,8 @@ export function SignupForm() {
         return;
       }
 
-      const centerId = inviteData.centerId || 'learning-lab-dongbaek'; 
+      const centerId = inviteData.centerId; 
+      const targetClassName = inviteData.targetClassName || null; // 초대 코드에 설정된 반 이름
       const timestamp = serverTimestamp();
       const batch = writeBatch(firestore);
       let finalDisplayName = values.displayName || '';
@@ -187,6 +187,7 @@ export function SignupForm() {
         centerId: centerId,
         role: values.role,
         status: "active",
+        className: targetClassName, // 자동 반 배정
         joinedAt: timestamp,
         displayName: finalDisplayName,
       };
@@ -198,6 +199,7 @@ export function SignupForm() {
           name: finalDisplayName,
           schoolName: values.schoolName || '',
           grade: '고등학생',
+          className: targetClassName, // 학생 프로필에도 저장
           seatNo: 0,
           targetDailyMinutes: 360,
           parentUids: [],
@@ -229,6 +231,7 @@ export function SignupForm() {
         centerId: centerId,
         role: values.role,
         status: "active",
+        className: targetClassName,
         joinedAt: timestamp,
         ...(membershipData.linkedStudentIds ? { linkedStudentIds: membershipData.linkedStudentIds } : {})
       });

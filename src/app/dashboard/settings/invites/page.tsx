@@ -1,4 +1,3 @@
-
 'use client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Loader2, RefreshCw } from 'lucide-react';
+import { PlusCircle, Loader2, RefreshCw, LayoutGrid } from 'lucide-react';
 import { useCollection, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -56,6 +55,7 @@ export default function InviteCodesPage() {
   const [newCode, setNewCode] = useState({
     code: '',
     role: 'student' as InviteCode['intendedRole'],
+    className: '', // 반 이름 추가
     maxUses: 100,
     expiresInDays: 30,
   });
@@ -92,6 +92,7 @@ export default function InviteCodesPage() {
 
     const data = {
       intendedRole: newCode.role,
+      targetClassName: newCode.className.trim() || undefined,
       maxUses: Number(newCode.maxUses),
       usedCount: 0,
       expiresAt: expiresAt,
@@ -109,6 +110,7 @@ export default function InviteCodesPage() {
         setNewCode({
           code: '',
           role: 'student',
+          className: '',
           maxUses: 100,
           expiresInDays: 30,
         });
@@ -170,7 +172,7 @@ export default function InviteCodesPage() {
               <TableHeader className="bg-muted/10">
                 <TableRow className="hover:bg-transparent border-none h-14">
                   <TableHead className="font-black text-[10px] uppercase pl-8">CODE</TableHead>
-                  <TableHead className="font-black text-[10px] uppercase">ROLE</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase">ROLE / CLASS</TableHead>
                   <TableHead className="font-black text-[10px] uppercase">USAGE</TableHead>
                   <TableHead className="font-black text-[10px] uppercase">EXPIRES</TableHead>
                   <TableHead className="font-black text-[10px] uppercase">STATUS</TableHead>
@@ -191,16 +193,24 @@ export default function InviteCodesPage() {
                   inviteCodes?.map((invite) => {
                     const status = getStatus(invite);
                     return (
-                      <TableRow key={invite.id} className="hover:bg-muted/5 transition-colors h-20 group">
+                      <TableRow key={invite.id} className="hover:bg-muted/5 transition-colors h-24 group">
                         <TableCell className="pl-8">
                           <code className="bg-primary/5 px-3 py-1.5 rounded-lg text-primary font-black tracking-widest text-sm border border-primary/10">
                             {invite.id}
                           </code>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-black text-[10px] rounded-md border-primary/20 text-primary/60 uppercase">
-                            {invite.intendedRole}
-                          </Badge>
+                          <div className="flex flex-col gap-1.5">
+                            <Badge variant="outline" className="w-fit font-black text-[10px] rounded-md border-primary/20 text-primary/60 uppercase">
+                              {invite.intendedRole}
+                            </Badge>
+                            {invite.targetClassName && (
+                              <div className="flex items-center gap-1.5 text-emerald-600">
+                                <LayoutGrid className="h-3 w-3" />
+                                <span className="text-[11px] font-black">{invite.targetClassName} 배정</span>
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
@@ -222,7 +232,7 @@ export default function InviteCodesPage() {
                           <Switch 
                             checked={invite.isActive !== false} 
                             onCheckedChange={() => handleToggleActive(invite)}
-                            className="data-[state=checked]:bg-primary"
+                            className="data-[state=checked]:bg-primary ml-auto"
                           />
                         </TableCell>
                       </TableRow>
@@ -239,7 +249,7 @@ export default function InviteCodesPage() {
         <DialogHeader>
           <DialogTitle className="text-3xl font-black tracking-tighter">새 초대 코드 생성</DialogTitle>
           <DialogDescription className="font-bold text-sm text-muted-foreground pt-2">
-            코드 이름이 문서 ID로 사용됩니다. 중복되지 않게 입력하세요.
+            코드와 함께 배정될 반을 설정할 수 있습니다.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-6">
@@ -247,20 +257,28 @@ export default function InviteCodesPage() {
             <Label htmlFor="code" className="text-[10px] font-black uppercase tracking-widest ml-1">초대 코드 이름</Label>
             <Input id="code" value={newCode.code} onChange={(e) => setNewCode(c => ({...c, code: e.target.value}))} className="h-12 rounded-xl border-2 font-black tracking-widest" placeholder="예: DONGBAEK2025" />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="role" className="text-[10px] font-black uppercase tracking-widest ml-1">배정 역할</Label>
-            <Select value={newCode.role} onValueChange={(value) => setNewCode(c => ({...c, role: value as any}))}>
-              <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
-                <SelectValue placeholder="역할 선택" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-none shadow-2xl">
-                <SelectItem value="student">학생 (Student)</SelectItem>
-                <SelectItem value="teacher">교사 (Teacher)</SelectItem>
-                <SelectItem value="centerAdmin">센터 관리자 (Admin)</SelectItem>
-                <SelectItem value="parent">학부모 (Parent)</SelectItem>
-              </SelectContent>
-            </Select>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="role" className="text-[10px] font-black uppercase tracking-widest ml-1">배정 역할</Label>
+              <Select value={newCode.role} onValueChange={(value) => setNewCode(c => ({...c, role: value as any}))}>
+                <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                  <SelectValue placeholder="역할 선택" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-2xl">
+                  <SelectItem value="student">학생</SelectItem>
+                  <SelectItem value="teacher">교사</SelectItem>
+                  <SelectItem value="centerAdmin">관리자</SelectItem>
+                  <SelectItem value="parent">학부모</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="className" className="text-[10px] font-black uppercase tracking-widest ml-1">배정될 반 (선택)</Label>
+              <Input id="className" value={newCode.className} onChange={(e) => setNewCode(c => ({...c, className: e.target.value}))} className="h-12 rounded-xl border-2 font-black" placeholder="예: 의대반" />
+            </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="maxUses" className="text-[10px] font-black uppercase tracking-widest ml-1">최대 사용 횟수</Label>

@@ -19,10 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, orderBy, limit, where, doc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
 import { LeaderboardEntry, WithId, StudentProfile, CenterMembership } from '@/lib/types';
-import { Loader2, Trophy, AlertCircle, Medal, Crown, Star, Flame, TrendingUp, Zap, CalendarDays, History, User } from 'lucide-react';
+import { Loader2, Trophy, Medal, Crown, Star, Flame, History, Zap, User, LayoutGrid } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,30 +37,38 @@ type LeaderboardTabProps = {
   metricType: 'lp';
   isMobile: boolean;
   studentsMap: Record<string, StudentProfile>;
+  classNameFilter?: string | null;
 };
 
-function LeaderboardTab({ title, description, entries, myEntry, totalStudents, isLoading, metricType, isMobile, studentsMap }: LeaderboardTabProps) {
-  const topThree = useMemo(() => {
+function LeaderboardTab({ title, description, entries, myEntry, totalStudents, isLoading, metricType, isMobile, studentsMap, classNameFilter }: LeaderboardTabProps) {
+  // 필터링 및 랭킹 재계산 (반별 랭킹일 경우)
+  const filteredEntries = useMemo(() => {
     if (!entries) return [];
-    return entries.filter(entry => entry.rank <= 3).sort((a, b) => a.rank - b.rank);
-  }, [entries]);
+    let list = [...entries];
+    if (classNameFilter) {
+      list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
+    }
+    // 필터링 후 다시 랭킹순 정렬
+    return list.sort((a, b) => a.value - b.value === 0 ? 0 : b.value - a.value);
+  }, [entries, classNameFilter]);
 
-  const getIcon = (size = "h-10 w-10") => {
-    return <Zap className={cn(size, "text-amber-500 drop-shadow-lg")} />;
-  };
+  const topThree = useMemo(() => {
+    return filteredEntries.slice(0, 3);
+  }, [filteredEntries]);
 
-  const getRankBadge = (rank: number) => {
-    switch(rank) {
-      case 1: return <div className="bg-gradient-to-br from-yellow-300 to-amber-500 p-2 rounded-full shadow-lg"><Crown className="h-5 w-5 text-white" /></div>;
-      case 2: return <div className="bg-gradient-to-br from-slate-200 to-slate-400 p-2 rounded-full shadow-lg"><Medal className="h-5 w-5 text-white" /></div>;
-      case 3: return <div className="bg-gradient-to-br from-orange-300 to-orange-600 p-2 rounded-full shadow-lg"><Star className="h-5 w-5 text-white" /></div>;
+  const getRankBadge = (idx: number) => {
+    switch(idx) {
+      case 0: return <div className="bg-gradient-to-br from-yellow-300 to-amber-500 p-2 rounded-full shadow-lg"><Crown className="h-5 w-5 text-white" /></div>;
+      case 1: return <div className="bg-gradient-to-br from-slate-200 to-slate-400 p-2 rounded-full shadow-lg"><Medal className="h-5 w-5 text-white" /></div>;
+      case 2: return <div className="bg-gradient-to-br from-orange-300 to-orange-600 p-2 rounded-full shadow-lg"><Star className="h-5 w-5 text-white" /></div>;
       default: return null;
     }
   };
 
-  const formatRank = (rank: number) => {
+  const formatRank = (idx: number) => {
+    const rank = idx + 1;
     if (rank <= 3) return `${rank}위`;
-    const percent = Math.max(1, Math.ceil((rank / totalStudents) * 100));
+    const percent = Math.max(1, Math.ceil((rank / (classNameFilter ? filteredEntries.length : totalStudents)) * 100));
     return `상위 ${percent}%`;
   };
 
@@ -68,6 +76,12 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
     if (!name) return "";
     return name.charAt(0) + "*O"; 
   };
+
+  // 나의 현재 필터링된 순위 찾기
+  const myFilteredRankIdx = useMemo(() => {
+    if (!myEntry) return -1;
+    return filteredEntries.findIndex(e => e.studentId === myEntry.studentId);
+  }, [filteredEntries, myEntry]);
 
   return (
     <div className="space-y-6">
@@ -80,18 +94,18 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
           isMobile ? "p-6" : "p-12"
         )}>
           <div className="absolute top-8 right-8 opacity-5 rotate-12">
-            {getIcon(isMobile ? "h-20 w-24" : "h-40 w-40")}
+            <Zap className={cn(isMobile ? "h-20 w-24" : "h-40 w-40", "text-amber-500")} />
           </div>
           <div className="flex items-center gap-6 relative z-10">
             <div className={cn(
               "rounded-[1.5rem] shadow-xl shrink-0 flex items-center justify-center p-4 bg-amber-50 text-amber-600",
               isMobile ? "h-12 w-12" : "h-20 w-20"
             )}>
-              {getIcon(isMobile ? "h-6 w-6" : "h-10 w-10")}
+              <Trophy className={cn(isMobile ? "h-6 w-6" : "h-10 w-10")} />
             </div>
             <div className="space-y-1">
               <CardTitle className={cn("font-black tracking-tighter uppercase leading-none", isMobile ? "text-xl" : "text-5xl")}>
-                {title}
+                {classNameFilter ? `${classNameFilter} 챔피언` : title}
               </CardTitle>
               <CardDescription className={cn("font-bold text-muted-foreground/80", isMobile ? "text-[10px]" : "text-xl")}>{description}</CardDescription>
             </div>
@@ -103,7 +117,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
               <p className="font-black text-[10px] text-muted-foreground/40 uppercase tracking-widest italic">Authenticating Champions...</p>
             </div>
-          ) : !topThree || topThree.length === 0 ? (
+          ) : topThree.length === 0 ? (
             <div className="text-center py-32 flex flex-col items-center gap-6">
               <div className="p-8 rounded-full bg-muted/20">
                 <Trophy className="h-16 w-16 text-muted-foreground opacity-10" />
@@ -112,15 +126,15 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
             </div>
           ) : (
             <div className="divide-y divide-muted/10">
-              {topThree.map((entry) => {
+              {topThree.map((entry, idx) => {
                 const profile = studentsMap[entry.studentId];
                 return (
                   <div key={entry.id} className={cn(
                     "flex items-center justify-between transition-all duration-500 group relative overflow-hidden",
                     isMobile ? "p-6" : "p-12",
-                    entry.rank === 1 ? "bg-amber-50/20" : entry.rank === 2 ? "bg-slate-50/20" : "bg-orange-50/20"
+                    idx === 0 ? "bg-amber-50/20" : idx === 1 ? "bg-slate-50/20" : "bg-orange-50/20"
                   )}>
-                    {entry.rank === 1 && (
+                    {idx === 0 && (
                       <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
                         <Crown className={cn(isMobile ? "h-24 w-24" : "h-40 w-40", "-rotate-12")} />
                       </div>
@@ -128,7 +142,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                     
                     <div className={cn("flex items-center relative z-10 min-w-0", isMobile ? "gap-4" : "gap-12")}>
                       <div className="w-10 shrink-0 flex flex-col items-center justify-center gap-2">
-                        {getRankBadge(entry.rank)}
+                        {getRankBadge(idx)}
                         <span className="text-[8px] font-black opacity-20 uppercase tracking-widest">Rank</span>
                       </div>
                       
@@ -141,7 +155,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                             {entry.displayNameSnapshot?.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
-                        {entry.rank === 1 && (
+                        {idx === 0 && (
                           <div className="absolute -top-2 -right-2">
                             <Flame className={cn(isMobile ? "h-5 w-5" : "h-8 w-8", "text-orange-500 fill-orange-500 animate-pulse")} />
                           </div>
@@ -166,7 +180,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                       <div className={cn(
                         "font-black tabular-nums tracking-tighter leading-none drop-shadow-sm text-primary",
                         isMobile ? "text-xl" : "text-6xl",
-                        entry.rank === 1 && "text-amber-600"
+                        idx === 0 && "text-amber-600"
                       )}>
                         {entry.value.toLocaleString()}<span className={cn("opacity-30 uppercase font-bold", isMobile ? "text-[10px] ml-1" : "text-2xl ml-1.5")}>lp</span>
                       </div>
@@ -180,8 +194,8 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
         </CardContent>
       </Card>
 
-      {/* 나의 순위 섹션 (4위 이하일 때 노출) */}
-      {myEntry && myEntry.rank > 3 && (
+      {/* 나의 순위 섹션 (필터링된 기준) */}
+      {myFilteredRankIdx !== -1 && (
         <Card className={cn(
           "border-none shadow-xl bg-primary text-primary-foreground overflow-hidden relative group",
           isMobile ? "rounded-[1.5rem] p-6" : "rounded-[2.5rem] p-10"
@@ -193,15 +207,15 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
             <div className="flex items-center gap-6">
               <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex flex-col items-center justify-center">
                 <span className="text-[10px] font-black uppercase tracking-widest opacity-60">My Pos</span>
-                <span className="text-2xl font-black">{formatRank(myEntry.rank)}</span>
+                <span className="text-2xl font-black">{formatRank(myFilteredRankIdx)}</span>
               </div>
               <div className="grid">
-                <span className="text-xs font-black uppercase tracking-widest opacity-60">나의 시즌 성적</span>
+                <span className="text-xs font-black uppercase tracking-widest opacity-60">{classNameFilter ? `${classNameFilter} 내 순위` : '나의 시즌 성적'}</span>
                 <h3 className="text-2xl sm:text-3xl font-black tracking-tighter">챔피언을 향해 나아가는 중! 🚀</h3>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl sm:text-4xl font-black tabular-nums tracking-tighter">{myEntry.value.toLocaleString()}<span className="text-sm sm:text-lg opacity-40 ml-1 uppercase">lp</span></div>
+              <div className="text-2xl sm:text-4xl font-black tabular-nums tracking-tighter">{myEntry?.value.toLocaleString()}<span className="text-sm sm:text-lg opacity-40 ml-1 uppercase">lp</span></div>
               <p className="text-[10px] font-bold opacity-60 mt-1 uppercase">Season Points Earned</p>
             </div>
           </div>
@@ -217,8 +231,11 @@ export default function LeaderboardsPage() {
   const { activeMembership, viewMode } = useAppContext();
   
   const [seasonOffset, setSeasonOffset] = useState<0 | -1>(0); 
+  const [rankingScope, setRankingScope] = useState<'class' | 'total'>('class'); // 반별 vs 전체 탭 상태
+  
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
+  const myClassName = activeMembership?.className;
   
   const targetDate = useMemo(() => {
     return seasonOffset === 0 ? new Date() : subMonths(new Date(), 1);
@@ -238,27 +255,23 @@ export default function LeaderboardsPage() {
     return map;
   }, [studentProfiles]);
 
+  // 랭킹 데이터를 전체 다 가져와서 클라이언트에서 필터링 (복합 색인 요구 방지)
   const lpQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
-      orderBy('rank', 'asc'),
-      limit(3) 
+      orderBy('value', 'desc')
     );
   }, [firestore, activeMembership, periodKey]);
-  const { data: lpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
+  const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
 
-  // 나의 현재 순위 정보 조회
-  const myRankQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
-      where('studentId', '==', user.uid)
-    );
-  }, [firestore, activeMembership, user, periodKey]);
-  const { data: myRankEntries } = useCollection<LeaderboardEntry>(myRankQuery, { enabled: isMember });
+  // 나의 현재 데이터 찾기
+  const myRankEntry = useMemo(() => {
+    if (!allLpEntries || !user) return null;
+    return allLpEntries.find(e => e.studentId === user.uid) || null;
+  }, [allLpEntries, user]);
 
-  // 전체 학생 수 조회 (백분위 계산용)
+  // 전체 학생 수 조회
   const totalStudentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -319,27 +332,49 @@ export default function LeaderboardsPage() {
         </p>
       </header>
 
-      <Tabs defaultValue="lp" className="w-full">
+      <Tabs value={rankingScope} onValueChange={(val: any) => setRankingScope(val)} className="w-full">
         <div className="flex justify-center mb-8">
           <TabsList className={cn(
-            "grid grid-cols-1 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
-            isMobile ? "h-12 max-w-[180px]" : "h-20 max-w-sm rounded-[2.5rem]"
+            "grid grid-cols-2 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
+            isMobile ? "h-12 max-w-[240px]" : "h-20 max-w-md rounded-[2.5rem]"
           )}>
-            <TabsTrigger value="lp" className={cn(
+            <TabsTrigger value="class" disabled={!myClassName} className={cn(
               "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
               isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
             )}>
-              <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span>종합 LP 랭킹</span>
+              <LayoutGrid className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", rankingScope === 'class' ? "text-primary" : "text-muted-foreground")} /> 
+              <span>{myClassName || '반 미지정'}</span>
+            </TabsTrigger>
+            <TabsTrigger value="total" className={cn(
+              "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
+              isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
+            )}>
+              <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span>전체 랭킹</span>
             </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="lp" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
+        <TabsContent value="class" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
+          <LeaderboardTab
+            title="우리 반 LP 챔피언"
+            description={`${myClassName}에서 가장 높은 포인트를 획득한 상위 3명입니다.`}
+            entries={allLpEntries}
+            myEntry={myRankEntry}
+            totalStudents={totalCount}
+            isLoading={lpLoading}
+            metricType="lp"
+            isMobile={isMobile}
+            studentsMap={studentsMap}
+            classNameFilter={myClassName}
+          />
+        </TabsContent>
+
+        <TabsContent value="total" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
           <LeaderboardTab
             title="시즌 LP 챔피언"
-            description="가장 높은 포인트를 획득한 상위 3명입니다."
-            entries={lpEntries}
-            myEntry={myRankEntries?.[0] || null}
+            description="센터 전체에서 가장 높은 포인트를 획득한 상위 3명입니다."
+            entries={allLpEntries}
+            myEntry={myRankEntry}
             totalStudents={totalCount}
             isLoading={lpLoading}
             metricType="lp"
