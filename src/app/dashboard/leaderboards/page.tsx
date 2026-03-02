@@ -13,7 +13,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@/components/ui/tabs';
+} from '@/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useCollection, useFirestore, useUser } from '@/firebase';
@@ -256,7 +256,6 @@ export default function LeaderboardsPage() {
   
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
-  const isStaff = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const myClassName = activeMembership?.className;
   
   const targetDate = useMemo(() => {
@@ -265,6 +264,18 @@ export default function LeaderboardsPage() {
 
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
+  // 센터 모든 학생 멤버 조회 (전체 반 목록 추출용)
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership]);
+  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember });
+
+  // 학생 상세 프로필 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'students');
@@ -287,14 +298,21 @@ export default function LeaderboardsPage() {
   }, [firestore, activeMembership, periodKey]);
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
 
-  // 데이터에서 추출한 배정된 반 목록
+  // 반 목록 추출 (멤버십 데이터 기준)
   const availableClasses = useMemo(() => {
-    if (!allLpEntries) return [];
     const classes = new Set<string>();
-    allLpEntries.forEach(e => { if (e.classNameSnapshot) classes.add(e.classNameSnapshot); });
+    
+    // 1. 실제 재원생 멤버십에서 반 추출
+    studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
+    
+    // 2. 현재 내 반 추가
     if (myClassName) classes.add(myClassName);
+    
+    // 3. 랭킹 스냅샷에서도 추출 (이미 퇴원한 학생의 기록이 있을 수 있음)
+    allLpEntries?.forEach(e => { if (e.classNameSnapshot) classes.add(e.classNameSnapshot); });
+    
     return Array.from(classes).sort();
-  }, [allLpEntries, myClassName]);
+  }, [studentMembers, allLpEntries, myClassName]);
 
   // 초기 반 설정
   useEffect(() => {
@@ -311,17 +329,7 @@ export default function LeaderboardsPage() {
     return allLpEntries.find(e => e.studentId === user.uid) || null;
   }, [allLpEntries, user]);
 
-  // 전체 학생 수 조회
-  const totalStudentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
-    );
-  }, [firestore, activeMembership]);
-  const { data: activeStudents } = useCollection<CenterMembership>(totalStudentsQuery, { enabled: isMember });
-  const totalCount = activeStudents?.length || 1;
+  const totalCount = studentMembers?.length || 1;
 
   if (!isMember) {
     return (

@@ -9,11 +9,12 @@ import { format, subDays } from 'date-fns';
 
 /**
  * 초기 데이터 시딩용 함수 (관리자용)
+ * 테스트 학생들을 생성하고 03반, 04반에 골고루 배정합니다.
  */
 export async function seedInitialData(db: Firestore, uid: string, centerId: string) {
   const batch = writeBatch(db);
   
-  // 1. 초대 코드 설정
+  // 1. 초대 코드 설정 (03반, 04반 전용 코드)
   batch.set(doc(db, 'inviteCodes', '0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '03반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
   batch.set(doc(db, 'inviteCodes', '0404'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '04반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
   batch.set(doc(db, 'inviteCodes', 'T0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'teacher', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
@@ -35,17 +36,57 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
 
   for (const sInfo of testStudents) {
     const sUid = sInfo.id;
+    
+    // (1) 멤버십 및 사용자 센터 정보 등록 (반 정보 className 필수 포함)
+    const memberRef = doc(db, 'centers', centerId, 'members', sUid);
+    const userCenterRef = doc(db, 'userCenters', sUid, 'centers', centerId);
+    const timestamp = serverTimestamp();
+
+    batch.set(memberRef, {
+      id: sUid,
+      centerId: centerId,
+      role: 'student',
+      status: 'active',
+      className: sInfo.class,
+      displayName: sInfo.name,
+      joinedAt: timestamp,
+      updatedAt: timestamp
+    }, { merge: true });
+
+    batch.set(userCenterRef, {
+      id: centerId,
+      centerId: centerId,
+      role: 'student',
+      status: 'active',
+      className: sInfo.class,
+      joinedAt: timestamp,
+      updatedAt: timestamp
+    }, { merge: true });
+
+    // (2) 학생 상세 프로필
+    const studentProfileRef = doc(db, 'centers', centerId, 'students', sUid);
+    batch.set(studentProfileRef, {
+      id: sUid,
+      name: sInfo.name,
+      className: sInfo.class,
+      schoolName: '테스트고등학교',
+      grade: '3학년',
+      seatNo: 0,
+      targetDailyMinutes: 360,
+      createdAt: timestamp,
+    }, { merge: true });
+
+    // (3) 학습 로그 및 통계
     const logRef = doc(db, 'centers', centerId, 'studyLogs', sUid, 'days', yesterdayKey);
     const statRef = doc(db, 'centers', centerId, 'dailyStudentStats', yesterdayKey, 'students', sUid);
     
-    // 기본 로그 및 통계
     batch.set(logRef, {
       totalMinutes: 300 + Math.floor(Math.random() * 200),
       studentId: sUid,
       dateKey: yesterdayKey,
       centerId: centerId,
-      updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
+      updatedAt: timestamp,
+      createdAt: timestamp,
     }, { merge: true });
 
     batch.set(statRef, {
@@ -58,22 +99,22 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       weeklyPlanCompletionRate: 0.85,
       studyTimeGrowthRate: 0.02,
       riskDetected: false,
-      updatedAt: serverTimestamp(),
+      updatedAt: timestamp,
     }, { merge: true });
 
-    // 초기 성장 정보
+    // (4) 성장 정보 (LP)
     const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
     const randomLp = 3000 + Math.floor(Math.random() * 10000);
     batch.set(progressRef, {
       seasonLp: randomLp,
-      mastery: 10,
+      level: 10,
       stats: { focus: 40, consistency: 50, achievement: 45, resilience: 30 },
       totalLpEarned: randomLp + 5000,
-      lastResetAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      lastResetAt: timestamp,
+      updatedAt: timestamp
     }, { merge: true });
 
-    // 랭킹 엔트리 생성 (04반 데이터 포함)
+    // (5) 랭킹 엔트리 생성
     const rankRef = doc(db, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', sUid);
     batch.set(rankRef, {
       studentId: sUid,
@@ -81,9 +122,10 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       classNameSnapshot: sInfo.class,
       value: randomLp,
       rank: 999,
-      updatedAt: serverTimestamp()
+      updatedAt: timestamp
     }, { merge: true });
 
+    // (6) 기본 계획 생성
     const routineItems = [
       { title: '등원 예정: 09:00', category: 'schedule' },
       { title: '하원 예정: 22:00', category: 'schedule' },
@@ -101,8 +143,8 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
         studentId: sUid,
         centerId: centerId,
         studyPlanWeekId: weekKey,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: timestamp,
+        updatedAt: timestamp,
       });
     });
   }
