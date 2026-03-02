@@ -200,6 +200,7 @@ export interface DailyReport {
 export interface GrowthProgress {
   seasonLp: number; // 시즌 리셋 대상
   mastery: number; // 0-100 영구 성장 (부스트 영향)
+  penaltyPoints: number; // 0-100 벌점
   stats: {
     focus: number;
     consistency: number;

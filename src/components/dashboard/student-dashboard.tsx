@@ -35,7 +35,10 @@ import {
   FileText,
   ClipboardPen,
   AlertOctagon,
-  BellRing
+  BellRing,
+  Info,
+  ShieldAlert,
+  ArrowRight
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -386,7 +389,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const currentLp = progress?.seasonLp || 0;
   
+  // 벌점 패널티 계산
+  const penaltyPoints = progress?.penaltyPoints || 0;
+  const penaltyRate = useMemo(() => {
+    if (penaltyPoints >= 80) return 0.10; // 강등 즉시 검토 (패널티 강화)
+    if (penaltyPoints >= 60) return 0.08;
+    if (penaltyPoints >= 40) return 0.05;
+    if (penaltyPoints >= 20) return 0.03;
+    return 0;
+  }, [penaltyPoints]);
+
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+  const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -414,14 +428,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const updateData: any = { updatedAt: serverTimestamp() };
       
       if (sessionMinutes > 0) {
-        let studyLpEarned = Math.round(sessionMinutes * totalBoost);
+        // 벌점 패널티가 적용된 최종 LP 계산
+        let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
         updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
         const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
         const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
         
         if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
-          const attendanceLp = Math.round(100 * totalBoost);
+          const attendanceLp = Math.round(100 * finalMultiplier);
           studyLpEarned += attendanceLp;
           updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
           toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
@@ -483,7 +498,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
       
       if (currentStudyTasks.length >= 3 && willBeDoneCount === currentStudyTasks.length && !progress?.dailyLpStatus?.[todayKey]?.plan) {
-        const planLp = Math.round(100 * totalBoost);
+        const planLp = Math.round(100 * finalMultiplier);
         batch.update(progressRef, {
           seasonLp: increment(planLp),
           [`dailyLpStatus.${todayKey}.plan`]: true,
@@ -688,22 +703,145 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </Card>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
-            <div className="bg-rose-600 p-8 text-white relative">
-              <ShieldCheck className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+          <DialogContent className={cn("rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "max-w-[95vw] rounded-[2rem] h-[85vh]" : "max-h-[90vh]")}>
+            <div className={cn("bg-rose-600 text-white relative shrink-0", isMobile ? "p-6" : "p-10")}>
+              <ShieldAlert className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black">벌점 및 상점 관리</DialogTitle>
-                <DialogDescription className="text-white/70 font-bold">센터 규정 준수 현황입니다.</DialogDescription>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-widest">Growth Guard</Badge>
+                </div>
+                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
               </DialogHeader>
             </div>
-            <div className="p-8 flex flex-col items-center justify-center gap-4">
-              <div className="text-5xl font-black text-primary">0</div>
-              <p className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">Total Penalty Points</p>
-              <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-center">
-                <p className="text-xs font-bold text-emerald-700">현재 매우 깨끗한 기록을 유지하고 있습니다. 👏</p>
+
+            <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
+              <div className={cn("space-y-10", isMobile ? "p-5" : "p-10")}>
+                {/* 현재 나의 상태 섹션 */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <Activity className="h-4 w-4 text-rose-600" />
+                    <h4 className="text-xs font-black uppercase text-rose-600 tracking-widest">현재 나의 규정 점수</h4>
+                  </div>
+                  <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 flex flex-col items-center text-center gap-4 ring-1 ring-black/5">
+                    <div className={cn(
+                      "text-7xl font-black tracking-tighter leading-none",
+                      penaltyPoints < 20 ? "text-emerald-500" : penaltyPoints < 40 ? "text-amber-500" : "text-rose-600"
+                    )}>
+                      {penaltyPoints}<span className="text-lg opacity-40 ml-1">점</span>
+                    </div>
+                    <div className="grid gap-1">
+                      <p className="font-black text-lg text-primary tracking-tight">
+                        {penaltyPoints < 20 ? "매우 양호한 상태입니다! ✨" : penaltyPoints < 40 ? "주의가 필요한 단계입니다. ⚠️" : "강력한 집중 관리가 필요합니다. 🔥"}
+                      </p>
+                      {penaltyRate > 0 && (
+                        <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
+                          LP 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
+                        </Badge>
+                      )}
+                    </div>
+                  </Card>
+                </section>
+
+                {/* 벌점 기준 섹션 */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <AlertOctagon className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">벌점 부여 기준</h4>
+                  </div>
+                  <div className="grid gap-2">
+                    {[
+                      { l: '지각 (10분 이상)', v: '+5', d: '정해진 등원 시간 미준수 시' },
+                      { l: '무단 결석', v: '+10', d: '사전 연락 없이 결석 시' },
+                      { l: '자리 이탈 (20분 이상)', v: '+5', d: '학습 중 장시간 부재 적발 시' },
+                      { l: '졸음/수면 반복 경고', v: '+5', d: '선생님의 지도를 따르지 않을 때' },
+                      { l: '휴대폰 사용/태도 불량', v: '+10', d: '학습 분위기 저해 행동' }
+                    ].map(item => (
+                      <div key={item.l} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-border/50 shadow-sm group hover:border-rose-200 transition-all">
+                        <div className="grid gap-0.5">
+                          <span className="text-sm font-black text-primary">{item.l}</span>
+                          <span className="text-[10px] font-bold text-muted-foreground">{item.d}</span>
+                        </div>
+                        <Badge variant="outline" className="h-8 w-12 flex justify-center font-black text-rose-600 border-rose-100 bg-rose-50 rounded-xl">{item.v}</Badge>
+                      </div>
+                    ))}
+                    <p className="text-[9px] font-bold text-muted-foreground/60 text-center mt-2 italic">※ 감정적 폭주 방지를 위해 하루 최대 벌점은 15점으로 제한됩니다.</p>
+                  </div>
+                </section>
+
+                {/* 패널티 단계 섹션 */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">단계별 학습 영향</h4>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      { range: '0 ~ 19', label: '정상', effect: '영향 없음 (Perfect)', color: 'bg-emerald-500' },
+                      { range: '20 ~ 39', label: '주의', effect: '시즌 LP 획득량 -3%', color: 'bg-amber-500' },
+                      { range: '40 ~ 59', label: '경고', effect: 'LP -5% & 티어 승급 제한', color: 'bg-orange-500' },
+                      { range: '60 ~ 79', label: '위험', effect: 'LP -8% & 강등 카운트 +1', color: 'bg-rose-500' },
+                      { range: '80 이상', label: '제재', effect: '강등 즉시 검토 & 학부모 상담', color: 'bg-black' }
+                    ].map(step => (
+                      <div key={step.range} className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-border/50 shadow-sm">
+                        <div className={cn("w-1.5 h-10 rounded-full", step.color)} />
+                        <div className="flex-1 grid">
+                          <span className="text-[10px] font-black text-muted-foreground uppercase">{step.range} 점 ({step.label})</span>
+                          <span className="text-sm font-black text-primary">{step.effect}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 회복 시스템 섹션 */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <RefreshCw className="h-4 w-4 text-emerald-600" />
+                    <h4 className="text-xs font-black uppercase text-emerald-600 tracking-widest">벌점 회복 시스템</h4>
+                  </div>
+                  <div className="grid gap-3">
+                    <Card className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Timer className="h-5 w-5 text-emerald-600" /></div>
+                      <div className="grid gap-1">
+                        <span className="text-xs font-black text-emerald-700 uppercase">자동 회복 (Normal Life)</span>
+                        <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
+                          - 매일 완전 정상 생활 시: **-3점**<br/>
+                          - 7일 연속 정상 등원: **추가 -10점**<br/>
+                          - 한 달 무지각 달성: **추가 -10점**
+                        </p>
+                      </div>
+                    </Card>
+                    <Card className="p-5 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Zap className="h-5 w-5 text-blue-600" /></div>
+                      <div className="grid gap-1">
+                        <span className="text-xs font-black text-blue-700 uppercase">보너스 회복 (Elite Effort)</span>
+                        <p className="text-xs font-bold text-blue-900/70 leading-relaxed">
+                          - 집중도 90% 이상 5일 유지: **-5점**<br/>
+                          - 6시간 초몰입 5일 연속 달성: **-5점**
+                        </p>
+                      </div>
+                    </Card>
+                    <Card className="p-5 rounded-2xl bg-purple-50/50 border border-purple-100 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><RefreshCw className="h-5 w-5 text-purple-600" /></div>
+                      <div className="grid gap-1">
+                        <span className="text-xs font-black text-purple-700 uppercase">시즌 종료 리셋</span>
+                        <p className="text-xs font-bold text-purple-900/70 leading-relaxed">
+                          - 매 시즌 종료 시 **벌점 50%가 자동 감쇠**됩니다.<br/>
+                          <span className="text-[10px] opacity-60">(예: 40점 → 20점 잔류)</span>
+                        </p>
+                      </div>
+                    </Card>
+                  </div>
+                </section>
               </div>
             </div>
-            <DialogFooter className="p-6 border-t"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+
+            <DialogFooter className={cn("p-6 bg-white border-t shrink-0 flex justify-center", isMobile ? "p-4" : "p-6")}>
+              <DialogClose asChild>
+                <Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">규정을 준수하겠습니다</Button>
+              </DialogClose>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </section>
