@@ -87,7 +87,7 @@ export function AppointmentNotifier() {
               {isCanceled ? '상담이 취소되었습니다' : '상담 예약 확정!'}
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1">
-              {isCanceled ? '선생님께서 상담 일정을 취소하셨습니다.' : '선생님과 상담 약속이 잡혔습니다.'}
+              {isCanceled ? '상담 일정이 취소되었습니다.' : '선생님과 상담 약속이 잡혔습니다.'}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -118,14 +118,14 @@ export function AppointmentNotifier() {
               <div className="flex items-center gap-2 text-primary/60 ml-1">
                 {isCanceled ? <AlertCircle className="h-3.5 w-3.5 text-rose-500" /> : <MessageSquare className="h-3.5 w-3.5" />}
                 <span className="text-[10px] font-black uppercase tracking-widest">
-                  {isCanceled ? "Cancellation Reason" : "Teacher's Note"}
+                  {isCanceled ? "취소 사유 / 메모" : "Teacher's Note"}
                 </span>
               </div>
               <div className={cn(
                 "p-4 rounded-2xl border text-sm font-bold leading-relaxed italic",
                 isCanceled ? "bg-rose-50/50 border-rose-100 text-rose-900" : "bg-[#fafafa] border-border text-foreground/80"
               )}>
-                "{notification.teacherNote || (isCanceled ? "선생님 개인 사정으로 상담이 어렵습니다." : "")}"
+                "{notification.teacherNote || (isCanceled ? "상담 일정이 취소되었습니다." : "")}"
               </div>
             </div>
           )}
