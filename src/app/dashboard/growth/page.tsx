@@ -59,7 +59,7 @@ function SystemGuideDialog() {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full mt-4 rounded-2xl text-xs font-black border-dashed border-2 h-12 hover:bg-primary/5 transition-all">
-          <Info className="mr-2 h-4 w-4" /> LP 및 마스터리 가이드 보기
+          <Info className="mr-2 h-4 w-4" /> LP 및 티어 가이드 보기
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
@@ -80,7 +80,7 @@ function SystemGuideDialog() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 { l: '계획 수립', v: 200 }, { l: '출석 확인', v: 200 },
-                { l: '목표 달성', v: 200 }, { l: '6시간 보너스', v: 200 }
+                { l: '품질 달성', v: 200 }, { l: '6시간 보너스', v: 200 }
               ].map(item => (
                 <div key={item.l} className="p-4 rounded-2xl bg-muted/50 border flex justify-between items-center">
                   <span className="text-xs font-bold">{item.l}</span>
@@ -92,15 +92,15 @@ function SystemGuideDialog() {
 
           <div className="space-y-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> 강력한 부스트 시스템
+              <TrendingUp className="h-4 w-4" /> 부스트 시스템
             </h4>
             <div className="p-6 rounded-3xl bg-blue-50 border border-blue-100 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-blue-900">마스터리 부스트 (영구)</span>
+                <span className="text-xs font-bold text-blue-900">마스터리 보너스</span>
                 <span className="text-xs font-black text-blue-600">MAX +10%</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-blue-900">4스탯 품질 배율 (현재)</span>
+                <span className="text-xs font-bold text-blue-900">4스탯 품질 배율</span>
                 <span className="text-xs font-black text-blue-600">MAX +10%</span>
               </div>
               <p className="text-[10px] font-bold text-blue-700/60 leading-relaxed pt-2 border-t border-blue-200">
@@ -115,8 +115,8 @@ function SystemGuideDialog() {
             </h4>
             <p className="text-xs font-bold text-muted-foreground leading-relaxed">
               - 30일마다 시즌이 종료됩니다.<br/>
-              - **LP는 0으로 리셋**되며, **4스탯은 5% 감쇠**됩니다.<br/>
-              - **마스터리(누적 노력)**는 리셋 없이 영구적으로 유지됩니다.
+              - **시즌 LP는 0으로 리셋**되며, **4스탯은 5% 감쇠**됩니다.<br/>
+              - **누적 마스터리(노력의 정수)**는 유지됩니다.
             </p>
           </div>
         </div>
@@ -161,9 +161,9 @@ export default function GrowthPage() {
           <div className="bg-primary rounded-2xl p-2.5 shadow-lg shadow-primary/20">
             <TrendingUp className="text-white h-6 w-6" />
           </div>
-          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>성장 로드맵</h1>
+          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>성장트랙</h1>
         </div>
-        <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px] uppercase tracking-widest" : "text-sm")}>Season Mastery & Performance Engine</p>
+        <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px] uppercase tracking-widest" : "text-sm")}>Season LP & Quality Management</p>
       </header>
 
       {/* 시즌 메인 대시보드 */}
@@ -177,11 +177,11 @@ export default function GrowthPage() {
         <div className={cn("relative z-10 p-8 sm:p-12 space-y-10")}>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
-              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-3 py-1 mb-2 uppercase tracking-widest">SEASON 2025-03 ACTIVE</Badge>
+              <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-3 py-1 mb-2 uppercase tracking-widest">SEASON ACTIVE</Badge>
               <h2 className={cn("font-black tracking-tighter leading-none", isMobile ? "text-5xl" : "text-7xl")}>
                 {(progress?.seasonLp || 0).toLocaleString()}<span className="text-2xl opacity-40 ml-2 uppercase font-bold">lp</span>
               </h2>
-              <p className="text-sm font-bold opacity-60">현재 시즌 행동 보상 총계</p>
+              <p className="text-sm font-bold opacity-60">이번 시즌 행동 보상 포인트</p>
             </div>
             
             <div className="flex flex-col items-center md:items-end gap-2">
@@ -195,10 +195,10 @@ export default function GrowthPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: '누적 마스터리', val: `Lv.${progress?.mastery || 0}`, sub: '노력의 보상', icon: Crown, color: 'text-amber-400' },
-              { label: '통합 부스트', val: `x${totalBoost.toFixed(2)}`, sub: 'LP 가중치', icon: Zap, color: 'text-yellow-400' },
-              { label: '시즌 랭킹', val: '상위 12%', sub: '전체 기준', icon: Trophy, color: 'text-emerald-400' },
-              { label: '시즌 남은 일수', val: '18일', sub: '3월 시즌 종료', icon: RefreshCw, color: 'text-blue-400' }
+              { label: '품질 부스트', val: `x${statBoost.toFixed(2)}`, sub: '4스탯 가중치', icon: Zap, color: 'text-yellow-400' },
+              { label: '통합 부스트', val: `x${totalBoost.toFixed(2)}`, sub: '최종 LP 배율', icon: Flame, color: 'text-orange-400' },
+              { label: '시즌 랭킹', val: '상위 12%', sub: '센터 전체 기준', icon: Trophy, color: 'text-emerald-400' },
+              { label: '시즌 남은 일수', val: '18일', sub: '월간 리셋 예정', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
               <div key={i} className="bg-white/5 p-5 rounded-3xl border border-white/5 flex flex-col gap-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -260,53 +260,31 @@ export default function GrowthPage() {
         </div>
       </section>
 
-      {/* 마스터리 상세 분석 */}
-      <div className="grid gap-6 md:grid-cols-12 px-1">
-        <Card className="md:col-span-7 rounded-[3rem] border-none shadow-2xl bg-white p-10 space-y-8 ring-1 ring-black/[0.02]">
-          <div className="space-y-1">
-            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-2 text-primary">
-              <Crown className="h-6 w-6 text-amber-500" /> 영구 성장 마스터리
-            </h3>
-            <p className="text-sm font-bold text-muted-foreground">시즌이 바뀌어도 유지되는 당신의 정수입니다.</p>
+      {/* 티어 목표 요약 */}
+      <div className="px-1">
+        <Card className="rounded-[3rem] border-none shadow-2xl bg-[#fafafa] p-10 flex flex-col md:flex-row items-center justify-between gap-8 ring-1 ring-black/[0.02]">
+          <div className="space-y-2 text-center md:text-left">
+            <h3 className="text-2xl font-black tracking-tighter">다음 티어를 향하여</h3>
+            <p className="text-sm font-bold text-muted-foreground">실력 지수를 높여 더 높은 등급의 트랙 테마를 획득하세요.</p>
           </div>
           
-          <div className="space-y-6">
-            <div className="flex justify-between items-end">
-              <div className="grid gap-1">
-                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Mastery Level</span>
-                <span className="text-5xl font-black text-primary">Lv.{progress?.mastery || 0}</span>
-              </div>
-              <div className="text-right">
-                <Badge className="bg-amber-100 text-amber-700 border-none font-black text-[10px] mb-2 px-3">PERMANENT BOOST</Badge>
-                <p className="text-2xl font-black text-amber-600">+{( (progress?.mastery || 0) / 10 * 1 ).toFixed(1)}%</p>
-              </div>
-            </div>
-            <Progress value={progress?.mastery || 0} className="h-3 bg-muted" />
-            <p className="text-xs font-bold text-muted-foreground leading-relaxed bg-[#fafafa] p-5 rounded-2xl border border-dashed italic text-center">
-              "Lv.100 마스터리는 하루 6시간 몰입을 300일간 지속해야 도달할 수 있는 전설적인 경지입니다."
-            </p>
-          </div>
-        </Card>
-
-        <Card className="md:col-span-5 rounded-[3rem] border-none shadow-2xl bg-[#fafafa] p-10 flex flex-col justify-center gap-6 ring-1 ring-black/[0.02]">
-          <div className="p-6 rounded-[2rem] bg-white shadow-sm border space-y-4">
-            <h4 className="font-black text-xs uppercase text-primary/40 flex items-center gap-2 tracking-widest">Next Tier Goal</h4>
-            <div className="flex items-center justify-between">
+          <div className="flex items-center gap-10">
+            <div className="flex items-center gap-4">
               <span className="text-lg font-black text-muted-foreground">{currentTier.name}</span>
               <ChevronRight className="h-5 w-5 opacity-20" />
               <span className="text-lg font-black text-primary">
                 {TIERS[TIERS.indexOf(currentTier) + 1]?.name || 'MAX'}
               </span>
             </div>
-            <div className="space-y-1.5">
+            <div className="w-48 space-y-1.5">
               <div className="flex justify-between text-[10px] font-black opacity-40 uppercase">
-                <span>평균 스탯 달성률</span>
+                <span>진척도</span>
                 <span>{Math.round((avgStat / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || 100)) * 100)}%</span>
               </div>
               <Progress value={(avgStat / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || 100)) * 100} className="h-1.5" />
             </div>
+            <SystemGuideDialog />
           </div>
-          <SystemGuideDialog />
         </Card>
       </div>
     </div>

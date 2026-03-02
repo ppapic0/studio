@@ -38,7 +38,7 @@ import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -311,8 +311,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 2. 요약 지표 (공부시간, LP, 마스터리) */}
-      <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-3")}>
+      {/* 2. 요약 지표 (공부시간, LP) - 마스터리 삭제 */}
+      <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
         <Card className="border-none shadow-xl bg-white rounded-[2rem] overflow-hidden ring-1 ring-black/[0.03]">
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-8 pt-8">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">오늘의 누적 몰입</CardTitle>
@@ -338,19 +338,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center gap-2 mt-4">
               <Badge variant="secondary" className="bg-accent/10 text-accent border-none font-black text-[10px]">MAX BOOST x{totalBoost.toFixed(2)}</Badge>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-xl bg-white rounded-[2rem] overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 px-8 pt-8">
-            <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">누적 마스터리</CardTitle>
-            <div className="bg-purple-50 p-2 rounded-xl"><Crown className="h-5 w-5 text-purple-500" /></div>
-          </CardHeader>
-          <CardContent className="px-8 pb-8">
-            <div className="font-black tracking-tighter text-purple-600 text-5xl">
-              Lv.{progress?.mastery || 0}
-            </div>
-            <Progress value={progress?.mastery || 0} className="h-1.5 mt-4" />
           </CardContent>
         </Card>
       </div>
@@ -407,7 +394,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <Card className={cn("border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03] lg:col-span-2")}>
           <CardHeader className="bg-muted/5 border-b p-10">
             <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-3xl text-primary">
-              <ListTodo className="h-8 w-8" /> 오늘의 학습 계획
+              <ListTodo className="h-8 w-8" /> 오늘의 계획트랙
             </CardTitle>
           </CardHeader>
           <CardContent className="p-10">
@@ -423,7 +410,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     id={task.id} 
                     checked={task.done} 
                     onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                    className="h-10 w-10 rounded-2xl border-2 transition-all data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" 
+                    className="h-10 w-10 rounded-2xl border-2 transition-all data-[state=checked]:scale-110" 
                   />
                   <div className="flex-1 grid gap-1">
                     <Label htmlFor={task.id} className={cn("font-black text-xl tracking-tight transition-all", task.done && "line-through text-muted-foreground/40 italic")}>

@@ -33,9 +33,9 @@ export function BottomNav() {
   const navItems: Record<string, { href: string; label: string; icon: any }[]> = {
     student: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-      { href: '/dashboard/growth', label: '로드맵', icon: Zap },
-      { href: '/dashboard/study-history', label: '기록', icon: CalendarDays },
-      { href: '/dashboard/plan', label: '계획', icon: ClipboardCheck },
+      { href: '/dashboard/growth', label: '성장트랙', icon: Zap },
+      { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
+      { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
     teacher: [
@@ -47,9 +47,9 @@ export function BottomNav() {
     ],
     parent: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-      { href: '/dashboard/study-history', label: '학습시간', icon: History },
+      { href: '/dashboard/study-history', label: '기록트랙', icon: History },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
-      { href: '/dashboard/leaderboards', label: '리더보드', icon: Trophy },
+      { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
     ],
     centerAdmin: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },

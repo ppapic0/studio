@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -377,7 +378,7 @@ export default function StudyHistoryPage() {
     <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-20", isMobile ? "gap-4 px-1" : "gap-10")}>
       <header className={cn("flex justify-between items-center px-2", isMobile ? "flex-col gap-4" : "flex-row")}>
         <div className="flex flex-col gap-1">
-          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>{isParent ? '자녀 학습 리포트' : '학습 기록'}</h1>
+          <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Study Logs & History</p>
         </div>
         <div className="flex items-center gap-2 bg-white/80 p-1.5 rounded-2xl border shadow-xl">
@@ -400,11 +401,11 @@ export default function StudyHistoryPage() {
         </Card>
         {!isMobile && (
           <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8 flex flex-col justify-center gap-4">
-            <h3 className="font-black text-sm uppercase text-primary/40 flex items-center gap-2"><Sparkles className="h-4 w-4" /> {isParent ? 'Insight' : 'Mastery Tip'}</h3>
+            <h3 className="font-black text-sm uppercase text-primary/40 flex items-center gap-2"><Sparkles className="h-4 w-4" /> Insight</h3>
             <p className="text-xs font-bold leading-relaxed text-foreground/70">
-              {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 마스터리 LP가 대폭 상승합니다.'}
+              {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 시즌 LP가 대폭 상승합니다.'}
             </p>
-            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg"><Link href="/dashboard/growth">보드 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
+            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
           </Card>
         )}
       </div>

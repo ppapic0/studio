@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -160,7 +161,7 @@ function LeaderboardTab({ title, description, entries, isLoading, metricType, is
             <TableRow className="hover:bg-transparent border-b bg-muted/5 h-16">
               <TableHead className="w-[120px] font-black text-center text-xs uppercase tracking-widest">RANK</TableHead>
               <TableHead className="font-black text-xs uppercase tracking-widest">STUDENT CHAMPION</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest pr-12">MASTERY SCORE</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest pr-12">QUALITY SCORE</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -270,7 +271,7 @@ export default function LeaderboardsPage() {
             <Trophy className="h-20 w-20 text-muted-foreground opacity-20 mb-6" />
             <AlertTitle className="text-3xl font-black mb-4 tracking-tighter uppercase">Access Restricted</AlertTitle>
             <AlertDescription className="text-lg font-bold text-muted-foreground/70">
-              리더보드를 확인하려면 먼저 센터에 가입해야 합니다.
+              랭킹트랙을 확인하려면 먼저 센터에 가입해야 합니다.
             </AlertDescription>
           </Alert>
         </div>
@@ -286,7 +287,7 @@ export default function LeaderboardsPage() {
           <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
         </div>
         <h1 className={cn("font-black tracking-tight flex items-center gap-3", isMobile ? "text-3xl" : "text-6xl")}>
-          명예의 전당
+          랭킹트랙
         </h1>
         <p className={cn("font-bold text-muted-foreground leading-relaxed", isMobile ? "text-sm max-w-xs" : "text-xl max-w-2xl")}>
           {format(new Date(), 'yyyy년 M월')} 시즌 최고의 챔피언들입니다. <br/>

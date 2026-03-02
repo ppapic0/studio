@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -486,7 +487,7 @@ export default function StudyPlanPage() {
       <header className={cn("flex flex-col", isMobile ? "gap-1 px-1" : "gap-2")}>
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-2xl" : "text-4xl")}>나의 학습 계획</h1>
+            <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-2xl" : "text-4xl")}>계획트랙</h1>
             <p className={cn("font-bold text-muted-foreground mt-1.5", isMobile ? "text-[10px] uppercase tracking-[0.2em]" : "text-sm")}>
               {isPast ? 'Archive View' : 'Daily Study Matrix & Routine'}
             </p>
