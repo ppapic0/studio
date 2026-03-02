@@ -460,7 +460,6 @@ export default function StudyPlanPage() {
     await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id));
   };
 
-  // 학습 To-do 반복 복사
   const handleApplyTasksToAllWeekdays = async () => {
     if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
     const tasksToCopy = dailyPlans.filter(p => p.category !== 'schedule');
@@ -494,7 +493,6 @@ export default function StudyPlanPage() {
     } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
   };
 
-  // 생활 루틴 반복 복사
   const handleApplyRoutineToAllWeekdays = async () => {
     if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
     const routinesToCopy = dailyPlans.filter(p => p.category === 'schedule');
@@ -601,18 +599,18 @@ export default function StudyPlanPage() {
                       <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-3 w-3" : "h-4 w-4")} />
                       <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>오늘 등원합니다</Label>
                     </div>
-                    <div className={cn("flex items-center gap-3", isMobile ? "flex-col" : "flex-row")}>
-                      <div className="flex-1 grid grid-cols-2 gap-2 w-full">
+                    <div className={cn("flex items-center gap-2 sm:gap-3", isMobile ? "flex-col" : "flex-row")}>
+                      <div className="flex-1 grid grid-cols-2 gap-1 sm:gap-2 w-full">
                         <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[8px]" : "text-[10px]")}>등원 예정</span>
-                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-10 text-base" : "h-14 text-xl")} />
+                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
+                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
                         </div>
                         <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[8px]" : "text-[10px]")}>하원 예정</span>
-                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-10 text-base" : "h-14 text-xl")} />
+                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>하원 예정</span>
+                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
                         </div>
                       </div>
-                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-11 text-sm" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
+                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-10 text-xs" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
                     </div>
                   </div>
                   

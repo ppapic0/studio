@@ -51,7 +51,9 @@ export function LoginForm() {
     if (!auth) return;
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      // 이메일 주소 전후 공백 제거 (트림 처리)
+      const trimmedEmail = values.email.trim();
+      await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
       // router.replace를 사용하여 인증 상태 변경 후 AuthGuard가 자연스럽게 대시보드로 이동시키도록 합니다.
       router.replace('/dashboard');
     } catch (error: any) {

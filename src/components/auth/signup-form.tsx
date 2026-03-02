@@ -168,13 +168,15 @@ export function SignupForm() {
       }
 
       setLoadingStatus('계정 생성 중...');
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      // 이메일 주소 전후 공백 제거 (트림 처리)
+      const trimmedEmail = values.email.trim();
+      const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, values.password);
       const user = userCredential.user;
       await updateProfile(user, { displayName: finalDisplayName });
 
       batch.set(doc(firestore, 'users', user.uid), {
         id: user.uid,
-        email: values.email,
+        email: trimmedEmail,
         displayName: finalDisplayName,
         schoolName: values.schoolName || '',
         createdAt: timestamp,
