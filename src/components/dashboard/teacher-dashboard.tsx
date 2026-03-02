@@ -143,12 +143,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [attendanceList, todayLogs, now, students]);
 
   const stats = useMemo(() => {
-    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 48 };
+    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 70 };
     return {
       studying: attendanceList.filter(a => a.status === 'studying').length,
       absent: attendanceList.filter(a => a.studentId && a.status === 'absent').length,
       away: attendanceList.filter(a => a.status === 'away' || a.status === 'break').length,
-      total: Math.max(48, attendanceList.length)
+      total: Math.max(70, attendanceList.length)
     };
   }, [attendanceList]);
 
@@ -220,15 +220,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {/* 3. 실시간 좌석 상황판 (이미지 완벽 매칭 수직 그리드) */}
+      {/* 3. 실시간 좌석 상황판 (이미지 완벽 매칭 수직 그리드 - 가로 10, 세로 7) */}
       <Card className="rounded-[3.5rem] border-none shadow-[0_20px_60px_rgba(0,0,0,0.06)] bg-white mx-4 overflow-hidden">
         <CardContent className="p-6 sm:p-10">
           <div className="rounded-[2.5rem] border-2 border-[#F0EDE8] p-6 sm:p-8 bg-white overflow-x-auto custom-scrollbar">
-            <div className="grid grid-cols-8 gap-3 sm:gap-4 min-w-[800px]">
-              {Array.from({ length: 8 }).map((_, colIndex) => (
-                <div key={colIndex} className="flex flex-col gap-3 sm:gap-4">
-                  {Array.from({ length: 6 }).map((_, rowIndex) => {
-                    const seatNo = colIndex * 6 + rowIndex + 1;
+            <div className="grid grid-cols-10 gap-2 sm:gap-3 min-w-[1000px]">
+              {Array.from({ length: 10 }).map((_, colIndex) => (
+                <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
+                  {Array.from({ length: 7 }).map((_, rowIndex) => {
+                    const seatNo = colIndex * 7 + rowIndex + 1;
                     const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
                     const seat = attendanceList?.find(a => a.id === seatId);
                     const student = students?.find(s => s.id === seat?.studentId);
@@ -263,8 +263,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         
                         {student ? (
                           <div className="flex flex-col items-center gap-0 w-full px-1">
-                            <span className="text-[11px] sm:text-[13px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
-                            <span className={cn("text-[8px] sm:text-[9px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
+                            <span className="text-[10px] sm:text-[12px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
+                            <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
                               {getLiveTimeLabel(seat!)}
                             </span>
                             {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
