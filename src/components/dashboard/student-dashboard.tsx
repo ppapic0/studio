@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -404,10 +403,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="font-black tracking-tighter text-primary text-6xl">
               {h}<span className="text-2xl ml-1.5 opacity-40 font-bold">h</span> {m}<span className="text-2xl ml-1.5 opacity-40 font-bold">m</span>
             </div>
-            <p className="font-bold text-muted-foreground/60 text-xs mt-4 flex items-center gap-2">
+            <div className="font-bold text-muted-foreground/60 text-xs mt-4 flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Daily Goal: 6h (360m) Focus Target
-            </p>
+            </div>
           </CardContent>
         </Card>
 
