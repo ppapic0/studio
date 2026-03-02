@@ -108,9 +108,12 @@ export default function InviteCodesPage() {
     const codeId = newCode.code.trim();
     const codeRef = doc(firestore, 'inviteCodes', codeId);
 
+    // 학생이 아닐 경우 반 정보를 무시합니다.
+    const finalClassName = newCode.role === 'student' ? newCode.className.trim() : '';
+
     const data = {
       intendedRole: newCode.role,
-      targetClassName: newCode.className.trim() || undefined,
+      targetClassName: finalClassName || undefined,
       maxUses: Number(newCode.maxUses),
       usedCount: 0,
       expiresAt: expiresAt,
@@ -315,7 +318,7 @@ export default function InviteCodesPage() {
           <DialogHeader className="relative z-10">
             <DialogTitle className="text-3xl font-black tracking-tighter">새 초대 코드 생성</DialogTitle>
             <DialogDescription className="font-bold text-sm text-white/70 pt-2 leading-relaxed">
-              코드와 함께 배정될 반을 설정하여 <br/>효율적으로 인원을 관리하세요.
+              코드와 함께 배정될 역할을 설정하여 <br/>효율적으로 인원을 관리하세요.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -326,7 +329,7 @@ export default function InviteCodesPage() {
             <Input id="code" value={newCode.code} onChange={(e) => setNewCode(c => ({...c, code: e.target.value}))} className="h-14 rounded-2xl border-2 font-black tracking-widest text-lg shadow-inner" placeholder="예: DONGBAEK2025" />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cn("grid gap-4", newCode.role === 'student' ? "grid-cols-2" : "grid-cols-1")}>
             <div className="grid gap-2">
               <Label htmlFor="role" className="text-[10px] font-black uppercase tracking-widest ml-1 text-primary/60">배정 역할</Label>
               <Select value={newCode.role} onValueChange={(value) => setNewCode(c => ({...c, role: value as any}))}>
@@ -341,10 +344,13 @@ export default function InviteCodesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="className" className="text-[10px] font-black uppercase tracking-widest ml-1 text-primary/60">배정 반 (선택)</Label>
-              <Input id="className" value={newCode.className} onChange={(e) => setNewCode(c => ({...c, className: e.target.value}))} className="h-12 rounded-xl border-2 font-black shadow-sm" placeholder="예: 의대반" />
-            </div>
+            
+            {newCode.role === 'student' && (
+              <div className="grid gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                <Label htmlFor="className" className="text-[10px] font-black uppercase tracking-widest ml-1 text-primary/60">배정 반 (선택)</Label>
+                <Input id="className" value={newCode.className} onChange={(e) => setNewCode(c => ({...c, className: e.target.value}))} className="h-12 rounded-xl border-2 font-black shadow-sm" placeholder="예: 의대반" />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
