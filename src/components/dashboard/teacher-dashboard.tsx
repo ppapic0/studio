@@ -77,7 +77,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
   
-  const [now, setNow] = useState(Date.now());
+  // Hydration safety
+  const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState<number>(0);
   const [selectedSeat, setSelectedSeat] = useState<AttendanceCurrent | null>(null);
   const [isManaging, setIsManaging] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -91,6 +93,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [gridCols, setGridCols] = useState(10);
 
   useEffect(() => {
+    setMounted(true);
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -161,6 +165,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [students, studentMembers, searchTerm]);
 
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
+    if (!mounted || now === 0) return { session: '0h 0m', total: '0h 0m', isStudying: false };
+    
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     const cumulativeMinutes = studentLog?.totalMinutes || 0;
     
@@ -192,7 +198,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let studying = 0;
     let absent = 0;
     let away = 0;
-    let totalSeats = 0;
+    let totalSeatsCount = 0;
     let totalMins = 0;
     let allLiveMinutes: number[] = [];
 
@@ -206,7 +212,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         
         const type = seatData?.type || 'seat';
         if (type === 'seat') {
-          totalSeats++;
+          totalSeatsCount++;
           const studentId = seatData?.studentId;
           if (studentId) {
             const studentLog = todayLogs?.find(l => l.studentId === studentId);
@@ -237,7 +243,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
     const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
 
-    return { studying, absent, away, total: totalSeats, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
+    return { studying, absent, away, total: totalSeatsCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
   }, [attendanceList, todayLogs, now, gridCols, gridRows]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
@@ -353,6 +359,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       setIsManaging(false);
     } catch (e) { toast({ variant: "destructive", title: "해제 실패" }); } finally { setIsSaving(false); }
   };
+
+  if (!mounted) return (
+    <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-4">
+      <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+      <p className="font-black text-primary tracking-tighter uppercase opacity-40">Initializing Command Matrix...</p>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-24 min-h-screen">
