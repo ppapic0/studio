@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -14,7 +15,10 @@ import {
   doc, 
   updateDoc, 
   serverTimestamp,
-  getDocs
+  getDocs,
+  writeBatch,
+  increment,
+  Timestamp
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -29,10 +33,13 @@ import {
   Clock,
   Zap,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Coffee,
+  Undo2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 
 export default function KioskPage() {
   const firestore = useFirestore();
@@ -45,6 +52,7 @@ export default function KioskPage() {
   const [matchedStudents, setMatchedStudents] = useState<StudentProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // 실시간 좌석 현황 조회
   const attendanceQuery = useMemoFirebase(() => {
@@ -96,7 +104,7 @@ export default function KioskPage() {
     }
   };
 
-  const handleToggleStatus = async (student: StudentProfile) => {
+  const handleStatusUpdate = async (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !attendanceList) return;
     
     const seat = attendanceList.find(a => a.studentId === student.id);
@@ -109,22 +117,79 @@ export default function KioskPage() {
       return;
     }
 
-    const nextStatus = seat.status === 'studying' ? 'absent' : 'studying';
-    
+    const prevStatus = seat.status;
+    if (prevStatus === nextStatus) {
+      toast({ title: "이미 해당 상태입니다." });
+      return;
+    }
+
+    setIsProcessing(true);
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id), {
+      const batch = writeBatch(firestore);
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id);
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+      // 1. 퇴실(absent) 처리 시 공부 시간 저장 로직 (공부 중이었던 경우만)
+      if (nextStatus === 'absent' && prevStatus === 'studying' && seat.lastCheckInAt) {
+        const startTime = seat.lastCheckInAt.toMillis();
+        const durationMinutes = Math.floor((Date.now() - startTime) / 60000);
+
+        if (durationMinutes > 0) {
+          // (1) 일일 총 시간 업데이트
+          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
+          batch.set(logRef, {
+            totalMinutes: increment(durationMinutes),
+            studentId: student.id,
+            centerId: centerId,
+            dateKey: todayKey,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+
+          // (2) 세션 기록 추가
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions'));
+          batch.set(sessionRef, {
+            startTime: seat.lastCheckInAt,
+            endTime: serverTimestamp(),
+            durationMinutes,
+            createdAt: serverTimestamp()
+          });
+
+          // (3) 마스터리 경험치 업데이트
+          const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
+          batch.set(progressRef, {
+            stats: { focus: increment(durationMinutes / 1000), consistency: increment(0.1) },
+            currentXp: increment(durationMinutes),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+      }
+
+      // 2. 좌석 상태 업데이트
+      const updateData: any = {
         status: nextStatus,
         updatedAt: serverTimestamp()
-      });
+      };
 
+      // 공부 시작일 때만 체크인 시간 기록
+      if (nextStatus === 'studying') {
+        updateData.lastCheckInAt = serverTimestamp();
+      }
+
+      batch.update(seatRef, updateData);
+      await batch.commit();
+
+      const statusLabels = { studying: '입실', away: '외출/휴식', absent: '퇴실' };
       toast({ 
-        title: nextStatus === 'studying' ? "입실 확인" : "퇴실 확인",
-        description: `${student.name} 학생의 상태가 변경되었습니다.`
+        title: `${statusLabels[nextStatus]} 확인`,
+        description: `${student.name} 학생의 상태가 성공적으로 변경되었습니다.`
       });
       
       resetKiosk();
     } catch (e) {
+      console.error(e);
       toast({ variant: "destructive", title: "처리 실패" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -135,6 +200,15 @@ export default function KioskPage() {
   };
 
   const canGoBack = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+
+  const getStatusInfo = (status?: string) => {
+    switch (status) {
+      case 'studying': return { label: '학습 중', color: 'bg-blue-500', icon: Zap };
+      case 'away': return { label: '외출/휴식 중', color: 'bg-amber-500', icon: Coffee };
+      case 'break': return { label: '휴식 중', color: 'bg-amber-500', icon: Coffee };
+      default: return { label: '미입실 (퇴실 상태)', color: 'bg-slate-400', icon: Clock };
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -163,7 +237,7 @@ export default function KioskPage() {
         <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.4em] opacity-40">Analytical Track Engine Kiosk</p>
       </header>
 
-      <div className="w-full max-w-2xl relative z-10">
+      <div className="w-full max-w-3xl relative z-10">
         {!showResults ? (
           <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
             <CardHeader className="bg-muted/5 border-b p-12 text-center">
@@ -224,57 +298,83 @@ export default function KioskPage() {
           <div className="grid gap-6 w-full animate-in zoom-in-95 duration-500">
             {matchedStudents.map(student => {
               const seat = attendanceList?.find(a => a.studentId === student.id);
-              const isStudying = seat?.status === 'studying';
+              const statusInfo = getStatusInfo(seat?.status);
+              const StatusIcon = statusInfo.icon;
 
               return (
-                <Card key={student.id} className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 relative group transition-all duration-500 hover:shadow-2xl">
+                <Card key={student.id} className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 relative group transition-all duration-500">
                   <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
                     <Sparkles className="h-64 w-64 rotate-12" />
                   </div>
                   
-                  <CardContent className="p-12 sm:p-16 flex flex-col items-center text-center gap-10">
-                    {/* 상단 아이콘 */}
-                    <div className={cn(
-                      "h-32 w-32 rounded-[2.5rem] flex items-center justify-center border-4 shadow-inner transition-all duration-700",
-                      isStudying ? "bg-emerald-500 border-emerald-100 text-white scale-110 shadow-emerald-200" : "bg-white border-muted text-primary/20"
-                    )}>
-                      {isStudying ? <Zap className="h-16 w-16 fill-current animate-pulse" /> : <Clock className="h-16 w-16" />}
-                    </div>
-
-                    {/* 중앙 텍스트 정보 (강조) */}
-                    <div className="space-y-4">
+                  <CardContent className="p-12 sm:p-16 flex flex-col items-center text-center gap-8">
+                    {/* 상단 현재 상태 표시 */}
+                    <div className="space-y-4 w-full">
                       <div className="flex flex-col items-center gap-2">
-                        <Badge variant="outline" className="rounded-xl font-black text-xs px-4 py-1 border-primary/20 text-primary bg-white shadow-sm mb-2">
-                          {seat ? `${seat.seatNo}번 좌석 배정됨` : '좌석 미배정'}
+                        <Badge className={cn("rounded-full font-black text-xs px-4 py-1 border-none shadow-lg mb-2 text-white animate-pulse", statusInfo.color)}>
+                          현재 {statusInfo.label}
                         </Badge>
                         <h3 className="text-6xl font-black tracking-tighter text-primary">{student.name}</h3>
+                        <p className="font-bold text-xl text-muted-foreground opacity-60">{student.schoolName} · {student.grade}</p>
                       </div>
-                      <p className="font-bold text-2xl text-muted-foreground opacity-80">{student.schoolName} · {student.grade}</p>
-                      
-                      {isStudying && (
-                        <div className="flex items-center justify-center gap-2 mt-4">
-                          <Badge className="bg-emerald-500 text-white font-black text-sm px-4 py-1.5 rounded-full border-none shadow-lg animate-bounce">
-                            현재 학습 중입니다
-                          </Badge>
-                        </div>
-                      )}
                     </div>
 
-                    {/* 하단 대형 버튼 */}
-                    <Button 
-                      size="lg"
-                      onClick={() => handleToggleStatus(student)}
-                      className={cn(
-                        "w-full h-28 rounded-[2.5rem] font-black text-3xl gap-4 shadow-2xl transition-all active:scale-95",
-                        isStudying ? "bg-rose-500 hover:bg-rose-600 shadow-rose-200" : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200"
-                      )}
-                    >
-                      {isStudying ? (
-                        <>하원 (공부 종료) <LogOut className="h-10 w-10" /></>
-                      ) : (
-                        <>입실 (공부 시작) <LogIn className="h-10 w-10" /></>
-                      )}
-                    </Button>
+                    {/* 중앙 대형 선택 버튼들 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mt-4">
+                      {/* 1. 입실 / 복귀 */}
+                      <Button 
+                        disabled={isProcessing || seat?.status === 'studying'}
+                        onClick={() => handleStatusUpdate(student, 'studying')}
+                        className={cn(
+                          "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
+                          seat?.status === 'studying' ? "bg-muted text-muted-foreground opacity-40" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
+                        )}
+                      >
+                        <LogIn className="h-12 w-12" />
+                        <div className="grid">
+                          <span className="text-2xl">입실</span>
+                          <span className="text-[10px] opacity-60 uppercase tracking-widest">Start Study</span>
+                        </div>
+                      </Button>
+
+                      {/* 2. 외출 / 휴식 */}
+                      <Button 
+                        disabled={isProcessing || seat?.status === 'away' || seat?.status === 'absent'}
+                        onClick={() => handleStatusUpdate(student, 'away')}
+                        className={cn(
+                          "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
+                          (seat?.status === 'away' || seat?.status === 'absent') ? "bg-muted text-muted-foreground opacity-40" : "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200"
+                        )}
+                      >
+                        <Coffee className="h-12 w-12" />
+                        <div className="grid">
+                          <span className="text-2xl">외출/휴식</span>
+                          <span className="text-[10px] opacity-60 uppercase tracking-widest">Take a Break</span>
+                        </div>
+                      </Button>
+
+                      {/* 3. 퇴실 / 종료 */}
+                      <Button 
+                        disabled={isProcessing || seat?.status === 'absent'}
+                        onClick={() => handleStatusUpdate(student, 'absent')}
+                        className={cn(
+                          "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
+                          seat?.status === 'absent' ? "bg-muted text-muted-foreground opacity-40" : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-200"
+                        )}
+                      >
+                        <LogOut className="h-12 w-12" />
+                        <div className="grid">
+                          <span className="text-2xl">퇴실</span>
+                          <span className="text-[10px] opacity-60 uppercase tracking-widest">Check Out</span>
+                        </div>
+                      </Button>
+                    </div>
+
+                    {isProcessing && (
+                      <div className="flex items-center gap-2 text-primary font-black animate-pulse mt-4">
+                        <Loader2 className="h-5 w-5 animate-spin" /> 정보를 업데이트하고 있습니다...
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -285,7 +385,7 @@ export default function KioskPage() {
               onClick={resetKiosk}
               className="mt-4 text-xl font-black text-muted-foreground/60 hover:text-primary transition-all gap-2"
             >
-              <X className="h-6 w-6" /> 처음으로 돌아가기
+              <Undo2 className="h-6 w-6" /> 처음으로 돌아가기
             </Button>
           </div>
         )}
