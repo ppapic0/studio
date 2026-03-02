@@ -38,7 +38,11 @@ import {
   Trophy,
   Target,
   Sparkles,
-  FileText
+  FileText,
+  History,
+  CheckCircle2,
+  Eye,
+  PenTool
 } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -175,8 +179,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     const riskCount = filteredTodayStats.filter(s => s.riskDetected || (s.totalStudyMinutes < 180 && s.todayPlanCompletionRate < 50)).length;
     
+    // 신뢰 지표 분석
     const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
-    const feedbackRate = targetMemberIds.size > 0 ? Math.round(((filteredReports.filter(r => r.status === 'sent').length || 0) / targetMemberIds.size) * 100) : 0;
+    const sentReports = filteredReports.filter(r => r.status === 'sent');
+    
+    const regularityRate = targetMemberIds.size > 0 ? Math.round((sentReports.length / targetMemberIds.size) * 100) : 0;
+    const readRate = sentReports.length > 0 ? Math.round((sentReports.filter(r => r.viewedAt).length / sentReports.length) * 100) : 0;
+    
+    // 코멘트 작성률 (코멘트 내용이 AI 템플릿 외에 일정 길이 이상인 경우를 유효한 코멘트로 간주)
+    const commentWriteRate = sentReports.length > 0 
+      ? Math.round((sentReports.filter(r => r.content.length > 200).length / sentReports.length) * 100)
+      : 0;
 
     return {
       totalTodayMins,
@@ -191,7 +204,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       lowAchieverRate: 100 - highAchieverRate,
       riskCount,
       counselingNeedCount: filteredTodayStats.filter(s => (s.studyTimeGrowthRate || 0) <= -0.3).length,
-      feedbackRate
+      regularityRate,
+      readRate,
+      commentWriteRate
     };
   }, [activeMembers, attendanceList, centerLogs, todayStats, dailyReports, selectedClass, now, isMounted, todayKey, yesterdayKey]);
 
@@ -418,49 +433,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex justify-between items-center">
                   <div className="space-y-1">
                     <CardTitle className="text-2xl font-black tracking-tighter">부모님 신뢰 및 관리 지표</CardTitle>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Parental Trust & Feedback Quality</p>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Parental Trust & Service Quality Index</p>
                   </div>
-                  <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">CENTER KPI</Badge>
+                  <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">TRUST KPI</Badge>
                 </div>
                 
-                <div className="grid gap-10 md:grid-cols-2">
+                <div className="grid gap-10 md:grid-cols-3">
+                  {/* 발송 정기성 */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">데일리 리포트 발송률</span>
-                        <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.feedbackRate}%</div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">Benchmark</span>
-                        <p className="text-xs font-black text-emerald-600">Optimal (90%↑)</p>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-blue-500" /> 리포트 발송 정기성</span>
+                        <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.regularityRate}%</div>
                       </div>
                     </div>
                     <div className="h-2.5 w-full bg-blue-50 rounded-full overflow-hidden shadow-inner border border-blue-100/50">
-                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${metrics.feedbackRate}%` }} />
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.regularityRate}%` }} />
                     </div>
+                    <p className="text-[9px] font-bold text-muted-foreground/60">대상 인원 대비 발송된 리포트 비율</p>
                   </div>
 
+                  {/* 코멘트 작성률 */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">상담일지 정밀 기록률</span>
-                        <div className="text-5xl font-black text-primary tabular-nums">82%</div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">Status</span>
-                        <p className="text-xs font-black text-amber-600">Stable</p>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><PenTool className="h-3 w-3 text-emerald-500" /> 선생님 코멘트 작성률</span>
+                        <div className="text-5xl font-black text-emerald-600 tabular-nums">{metrics.commentWriteRate}%</div>
                       </div>
                     </div>
-                    <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: '82%' }} />
+                    <div className="h-2.5 w-full bg-emerald-50 rounded-full overflow-hidden shadow-inner border border-emerald-100/50">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.commentWriteRate}%` }} />
                     </div>
+                    <p className="text-[9px] font-bold text-muted-foreground/60">선생님의 고유 의견이 포함된 정밀 분석 비중</p>
+                  </div>
+
+                  {/* 학부모 열람률 */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                      <div className="grid gap-1">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><Eye className="h-3 w-3 text-amber-500" /> 학부모 리포트 열람률</span>
+                        <div className="text-5xl font-black text-amber-600 tabular-nums">{metrics.readRate}%</div>
+                      </div>
+                    </div>
+                    <div className="h-2.5 w-full bg-amber-50 rounded-full overflow-hidden shadow-inner border border-amber-100/50">
+                      <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.readRate}%` }} />
+                    </div>
+                    <p className="text-[9px] font-bold text-muted-foreground/60">발송된 리포트 중 실제 확인된 비율</p>
                   </div>
                 </div>
 
                 <div className="p-6 rounded-[1.5rem] bg-muted/20 border-2 border-dashed flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-white rounded-2xl shadow-sm"><Target className="h-6 w-6 text-primary" /></div>
-                    <p className="text-sm font-bold text-foreground/70 leading-relaxed max-w-md">"학부모 신뢰도는 리포트의 **발송 정기성**과 **상담 내용의 구체성**에서 결정됩니다."</p>
+                    <p className="text-sm font-bold text-foreground/70 leading-relaxed max-w-md">"학부모 신뢰도는 리포트의 **발송 정기성**과 **선생님의 진심 어린 코멘트**에서 결정됩니다."</p>
                   </div>
                   <Button asChild variant="outline" className="rounded-xl font-black text-xs gap-2 bg-white border-2 shadow-sm hover:bg-primary hover:text-white transition-all">
                     <Link href="/dashboard/reports">리포트 센터 관리 <ChevronRight className="h-4 w-4" /></Link>

@@ -220,6 +220,7 @@ export interface DailyReport {
   content: string;
   status: "draft" | "sent";
   studentName?: string;
+  viewedAt?: Timestamp; // 학부모 열람 시점
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

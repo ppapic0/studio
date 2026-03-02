@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { DailyReport } from '@/lib/types';
 import { format } from 'date-fns';
 import { 
@@ -65,6 +65,21 @@ export default function StudentReportsPage() {
     return sorted.filter(r => r.dateKey.includes(searchTerm));
   }, [rawReports, searchTerm]);
 
+  const handleOpenReport = async (report: DailyReport) => {
+    setSelectedReport(report);
+    
+    // 처음 열람하는 경우 viewedAt 업데이트
+    if (!report.viewedAt && firestore && activeMembership) {
+      const reportId = `${report.dateKey}_${report.studentId}`;
+      const reportRef = doc(firestore, 'centers', activeMembership.id, 'dailyReports', reportId);
+      
+      updateDoc(reportRef, {
+        viewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }).catch(err => console.error("Error updating report viewed state:", err));
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-6 w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-1" : "gap-10")}>
       <header className={cn("flex flex-col gap-2", isMobile ? "px-2" : "")}>
@@ -114,7 +129,7 @@ export default function StudentReportsPage() {
           {filteredReports.map((report) => (
             <Card 
               key={report.id} 
-              onClick={() => setSelectedReport(report)}
+              onClick={() => handleOpenReport(report)}
               className="rounded-[2.5rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 cursor-pointer group bg-white ring-1 ring-border/50 overflow-hidden"
             >
               <CardContent className="p-0">
@@ -126,7 +141,12 @@ export default function StudentReportsPage() {
                     <div className="grid gap-0.5 min-w-0 overflow-hidden">
                       <div className="flex items-center gap-2">
                         <h3 className="text-base sm:text-xl font-black tracking-tighter text-primary truncate whitespace-nowrap">{report.dateKey} 리포트</h3>
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 border-none font-black text-[8px] px-1.5 h-4 flex-shrink-0">OK</Badge>
+                        <Badge variant="secondary" className={cn(
+                          "border-none font-black text-[8px] px-1.5 h-4 flex-shrink-0",
+                          report.viewedAt ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
+                        )}>
+                          {report.viewedAt ? '읽음' : 'NEW'}
+                        </Badge>
                       </div>
                       <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/60 truncate whitespace-nowrap max-w-full">
                         {report.content.replace(/[🕒✅📊💬🧠]/g, '').trim().substring(0, 50)}...
@@ -143,7 +163,7 @@ export default function StudentReportsPage() {
         </div>
       )}
 
-      {/* 리포트 상세 다이얼로그 - 앱모드 중앙 정렬 팝업 개선 */}
+      {/* 리포트 상세 다이얼로그 */}
       <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
         <DialogContent className={cn(
           "rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", 
