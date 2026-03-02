@@ -4,6 +4,7 @@ import {
   writeBatch, 
   serverTimestamp, 
   Firestore,
+  Timestamp
 } from 'firebase/firestore';
 import { format, subDays } from 'date-fns';
 
@@ -15,11 +16,11 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
   const batch = writeBatch(db);
   
   // 1. 초대 코드 설정
-  batch.set(doc(db, 'inviteCodes', '0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '03반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
-  batch.set(doc(db, 'inviteCodes', '0404'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '04반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
-  batch.set(doc(db, 'inviteCodes', 'TUTOR'), { centerId: 'learning-lab-dongbaek', intendedRole: 'student', targetClassName: '과외반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
-  batch.set(doc(db, 'inviteCodes', 'T0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'teacher', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
-  batch.set(doc(db, 'inviteCodes', 'A0313'), { centerId: 'learning-lab-dongbaek', intendedRole: 'centerAdmin', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
+  batch.set(doc(db, 'inviteCodes', '0313'), { centerId: centerId, intendedRole: 'student', targetClassName: '03반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
+  batch.set(doc(db, 'inviteCodes', '0404'), { centerId: centerId, intendedRole: 'student', targetClassName: '04반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
+  batch.set(doc(db, 'inviteCodes', 'TUTOR'), { centerId: centerId, intendedRole: 'student', targetClassName: '과외반', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
+  batch.set(doc(db, 'inviteCodes', 'T0313'), { centerId: centerId, intendedRole: 'teacher', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
+  batch.set(doc(db, 'inviteCodes', 'A0313'), { centerId: centerId, intendedRole: 'centerAdmin', maxUses: 999, usedCount: 0, createdAt: serverTimestamp(), isActive: true }, { merge: true });
 
   // 테스트 학생 그룹 (03반, 04반, 과외반)
   const testStudents = [
@@ -31,10 +32,12 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     { id: 'test-student-tutor-2', name: '한지수', class: '과외반' },
   ];
 
-  const yesterday = subDays(new Date(), 1);
+  const today = new Date();
+  const todayKey = format(today, 'yyyy-MM-dd');
+  const yesterday = subDays(today, 1);
   const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-  const weekKey = format(yesterday, "yyyy-'W'II");
-  const periodKey = format(new Date(), 'yyyy-MM');
+  const weekKey = format(today, "yyyy-'W'II");
+  const periodKey = format(today, 'yyyy-MM');
 
   for (const sInfo of testStudents) {
     const sUid = sInfo.id;
@@ -78,11 +81,13 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       createdAt: timestamp,
     }, { merge: true });
 
-    // (3) 학습 로그 및 통계
-    const logRef = doc(db, 'centers', centerId, 'studyLogs', sUid, 'days', yesterdayKey);
-    const statRef = doc(db, 'centers', centerId, 'dailyStudentStats', yesterdayKey, 'students', sUid);
+    // (3) 학습 로그 및 통계 (오늘 및 어제 데이터 모두 생성)
+    const logRefToday = doc(db, 'centers', centerId, 'studyLogs', sUid, 'days', todayKey);
+    const logRefYesterday = doc(db, 'centers', centerId, 'studyLogs', sUid, 'days', yesterdayKey);
+    const statRefToday = doc(db, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', sUid);
     
-    batch.set(logRef, {
+    // 어제 기록
+    batch.set(logRefYesterday, {
       totalMinutes: 300 + Math.floor(Math.random() * 200),
       studentId: sUid,
       dateKey: yesterdayKey,
@@ -91,15 +96,25 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       createdAt: timestamp,
     }, { merge: true });
 
-    batch.set(statRef, {
+    // 오늘 기록
+    batch.set(logRefToday, {
+      totalMinutes: 180 + Math.floor(Math.random() * 120),
+      studentId: sUid,
+      dateKey: todayKey,
+      centerId: centerId,
+      updatedAt: timestamp,
+      createdAt: timestamp,
+    }, { merge: true });
+
+    batch.set(statRefToday, {
       centerId,
       studentId: sUid,
-      dateKey: yesterdayKey,
-      todayPlanCompletionRate: 80 + Math.floor(Math.random() * 20),
-      totalStudyMinutes: 300 + Math.floor(Math.random() * 200),
+      dateKey: todayKey,
+      todayPlanCompletionRate: 60 + Math.floor(Math.random() * 30),
+      totalStudyMinutes: 180 + Math.floor(Math.random() * 120),
       attendanceStreakDays: 5,
       weeklyPlanCompletionRate: 0.85,
-      studyTimeGrowthRate: 0.02,
+      studyTimeGrowthRate: 0.05,
       riskDetected: false,
       updatedAt: timestamp,
     }, { merge: true });
@@ -127,21 +142,33 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       updatedAt: timestamp
     }, { merge: true });
 
-    // (6) 기본 계획 생성
+    // (6) 실시간 좌석 상태 (일부 학생은 공부 중으로 설정)
+    const seatId = `seat_00${testStudents.indexOf(sInfo) + 1}`;
+    const isStudying = testStudents.indexOf(sInfo) % 2 === 0;
+    batch.set(doc(db, 'centers', centerId, 'attendanceCurrent', seatId), {
+      id: seatId,
+      seatNo: testStudents.indexOf(sInfo) + 1,
+      studentId: sUid,
+      status: isStudying ? 'studying' : 'absent',
+      type: 'seat',
+      lastCheckInAt: isStudying ? Timestamp.fromDate(subDays(new Date(), 0)) : null,
+      updatedAt: timestamp
+    }, { merge: true });
+
+    // (7) 기본 계획 생성 (오늘)
     const routineItems = [
       { title: '등원 예정: 09:00', category: 'schedule' },
       { title: '하원 예정: 22:00', category: 'schedule' },
       { title: '국어 모의고사 1회', category: 'study', done: true },
-      { title: '수학 기출 30문항', category: 'study', done: true },
+      { title: '수학 기출 30문항', category: 'study', done: false },
     ];
 
     routineItems.forEach((item) => {
       const itemRef = doc(collection(db, 'centers', centerId, 'plans', sUid, 'weeks', weekKey, 'items'));
       batch.set(itemRef, {
         ...item,
-        done: true,
         weight: 1,
-        dateKey: yesterdayKey,
+        dateKey: todayKey,
         studentId: sUid,
         centerId: centerId,
         studyPlanWeekId: weekKey,
