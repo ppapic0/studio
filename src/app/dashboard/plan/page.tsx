@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -56,7 +55,8 @@ import {
   BarChart3,
   BookOpen,
   AlertCircle,
-  XCircle
+  XCircle,
+  CalendarClock
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -293,8 +293,8 @@ export default function StudyPlanPage() {
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
 
   // 필수 항목 존재 여부 체크
-  const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원')), [scheduleItems]);
-  const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원')), [scheduleItems]);
+  const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
+  const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
   const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
 
   const studyTimeSummary = useMemo(() => {
@@ -706,7 +706,7 @@ export default function StudyPlanPage() {
                       </div>
                     ))}
                     {!isPast && (
-                      <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1.5 shadow-sm mt-2">
+                      <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1 shadow-sm mt-2">
                         <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm sm:text-base" />
                         <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl h-10 w-10 border-2 border-amber-500 text-amber-600 shrink-0 shadow-lg"><Plus className="h-5 w-5" /></Button>
                       </div>
