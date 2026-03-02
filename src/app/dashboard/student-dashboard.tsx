@@ -471,76 +471,81 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} />
       </div>
 
-      <div className={cn("grid gap-6 grid-cols-1 lg:grid-cols-3")}>
-        <Card className={cn("border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03] lg:col-span-2")}>
-          <CardHeader className="bg-muted/10 border-b p-8 sm:p-10">
-            <div className="flex items-center justify-between">
-              <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-3xl text-primary">
-                <ListTodo className="h-8 w-8" /> 오늘의 계획트랙
-              </CardTitle>
-              <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[10px] px-3 h-7 uppercase tracking-widest">
-                {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-8 sm:p-10">
-            <div className="grid gap-4">
-              {studyTasks.length === 0 ? (
-                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-[2.5rem]">등록된 학습 계획이 없습니다.</div>
-              ) : studyTasks.map((task) => (
-                <div key={task.id} className={cn(
-                  "flex items-center gap-6 p-6 rounded-[2rem] sm:rounded-[2.5rem] border-2 transition-all duration-500 relative group", 
-                  task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md hover:border-primary/10"
-                )}>
-                  <div className="relative">
-                    <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} className="h-10 w-10 rounded-2xl border-2 transition-all data-[state=checked]:scale-110 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
-                    {task.done && <Check className="absolute inset-0 m-auto h-6 w-6 text-white stroke-[4px]" />}
-                  </div>
-                  <div className="flex-1 grid gap-1.5">
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0">STUDY</Badge>
-                      {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/40 uppercase flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}m Goal</span>}
+      <Card className={cn("border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]")}>
+        <div className="grid grid-cols-1 lg:grid-cols-3">
+          {/* Left Side: Study Plans (2/3 width) */}
+          <div className="lg:col-span-2 border-r border-dashed border-muted">
+            <CardHeader className="bg-emerald-50/30 border-b p-8 sm:p-10">
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-3xl text-primary">
+                  <ListTodo className="h-8 w-8 text-emerald-600" /> 오늘의 계획트랙
+                </CardTitle>
+                <Badge variant="secondary" className="bg-emerald-500 text-white border-none font-black text-[10px] px-3 h-7 uppercase tracking-widest">
+                  {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8 sm:p-10 bg-emerald-50/5">
+              <div className="grid gap-4">
+                {studyTasks.length === 0 ? (
+                  <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed border-emerald-200 rounded-[2.5rem]">등록된 학습 계획이 없습니다.</div>
+                ) : studyTasks.map((task) => (
+                  <div key={task.id} className={cn(
+                    "flex items-center gap-6 p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border-2 transition-all duration-500 relative group", 
+                    task.done ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white border-transparent shadow-sm hover:shadow-md hover:border-primary/10"
+                  )}>
+                    <div className="relative">
+                      <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} className="h-10 w-10 rounded-2xl border-2 transition-all data-[state=checked]:scale-110 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
+                      {task.done && <Check className="absolute inset-0 m-auto h-6 w-6 text-white stroke-[4px]" />}
                     </div>
-                    <Label htmlFor={task.id} className={cn("font-black text-lg sm:text-xl tracking-tight transition-all leading-snug", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>{task.title}</Label>
+                    <div className="flex-1 grid gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0">STUDY</Badge>
+                        {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/40 uppercase flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}m Goal</span>}
+                      </div>
+                      <Label htmlFor={task.id} className={cn("font-black text-lg sm:text-xl tracking-tight transition-all leading-snug", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>{task.title}</Label>
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-all"><ChevronRight className="h-5 w-5 text-muted-foreground/20" /></div>
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-all"><ChevronRight className="h-5 w-5 text-muted-foreground/20" /></div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </div>
 
-        <Card className="border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="bg-amber-50/30 border-b p-8 sm:p-10">
-            <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-amber-700 text-2xl sm:text-3xl">
-              <Timer className="h-8 w-8" /> 오늘의 루틴
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-8 sm:p-10 bg-[#fafafa]">
-            <div className="space-y-4">
+          {/* Right Side: Routines (1/3 width) */}
+          <div className="lg:col-span-1 bg-amber-50/20">
+            <CardHeader className="bg-amber-100/30 border-b p-8 sm:p-10">
+              <CardTitle className="font-black flex items-center gap-4 tracking-tighter text-amber-700 text-2xl sm:text-3xl">
+                <Timer className="h-8 w-8 text-amber-600" /> 오늘의 루틴
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8 sm:p-10 flex flex-col gap-4">
               {scheduleItems.length === 0 ? (
                 <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed border-amber-200 rounded-[2.5rem]">등록된 루틴이 없습니다.</div>
               ) : scheduleItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-6 sm:p-8 rounded-[2rem] bg-white border shadow-sm group hover:border-amber-300 transition-all active:scale-[0.98]">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="p-3 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 shadow-sm shrink-0"><Timer className="h-5 w-5" /></div>
-                    <span className="font-black tracking-tight text-primary text-base sm:text-lg truncate">{item.title.split(': ')[0]}</span>
+                <div key={item.id} className="flex flex-col gap-2 p-6 sm:p-8 rounded-[2rem] bg-white border-2 border-transparent shadow-md group hover:border-amber-300 transition-all active:scale-[0.98] items-center text-center">
+                  <div className="p-3 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 shadow-sm shrink-0 mb-2">
+                    <Timer className="h-6 w-6" />
                   </div>
-                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-base sm:text-lg px-4 py-1.5 rounded-2xl border-amber-200 bg-amber-50/50 shrink-0">{item.title.split(': ')[1] || '--:--'}</Badge>
+                  <span className="font-black tracking-tight text-primary text-lg truncate w-full">{item.title.split(': ')[0]}</span>
+                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-lg px-5 py-2 rounded-2xl border-amber-200 bg-amber-50/50 shadow-inner">
+                    {item.title.split(': ')[1] || '--:--'}
+                  </Badge>
                 </div>
               ))}
-            </div>
-            
-            <div className="mt-8 p-6 rounded-[2rem] bg-white border-2 border-dashed border-amber-200 flex flex-col items-center gap-2 text-center">
-              <Sparkles className="h-5 w-5 text-amber-400" />
-              <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">
-                모든 루틴을 지키면<br/>
-                <span className="text-amber-600 font-black">추가 보너스 LP</span>를 기대할 수 있습니다.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              
+              <div className="mt-auto p-6 rounded-[2rem] bg-white/50 border-2 border-dashed border-amber-200 flex flex-col items-center gap-2 text-center shadow-inner">
+                <Sparkles className="h-6 w-6 text-amber-400 animate-pulse" />
+                <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
+                  모든 루틴을 지키면<br/>
+                  <span className="text-amber-600 font-black text-sm">추가 보너스 LP</span>를 기대할 수 있습니다.
+                </p>
+              </div>
+            </CardContent>
+          </div>
+        </div>
+      </Card>
+
       {isJacob && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} />}
     </div>
   );
