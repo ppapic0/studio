@@ -31,7 +31,11 @@ import {
   Settings2,
   Wand2,
   History,
-  Calendar
+  Calendar,
+  FileText,
+  ClipboardPen,
+  AlertOctagon,
+  BellRing
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -58,6 +62,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import Link from 'next/link';
 
 const TIERS = [
   { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
@@ -330,7 +335,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { activeMembership, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode } = useAppContext();
+  const { activeMembership, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode, currentTier } = useAppContext();
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
@@ -380,15 +385,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const currentRank = rankEntries?.[0]?.rank || 999;
 
   const currentLp = progress?.seasonLp || 0;
-  const currentTier = useMemo(() => {
-    if (currentLp >= 25000) {
-      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
-      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
-      return TIERS.find(t => t.name === '마스터')!;
-    }
-    return TIERS.slice(0, 5).reverse().find(t => currentLp >= t.min) || TIERS[0];
-  }, [currentLp, currentRank]);
-
+  
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
 
   const studyLogRef = useMemoFirebase(() => {
@@ -403,7 +400,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership, user, weekKey, todayKey]);
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
   
-  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
 
   const handleStudyStartStop = async () => {
@@ -628,6 +624,88 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           )}
         </div>
       </Card>
+
+      {/* 신규 관리 섹션 (데일리 리포트 / 신청서 / 벌점) */}
+      <section className={cn("grid gap-2.5", isMobile ? "grid-cols-3" : "grid-cols-3")}>
+        <Link href="/dashboard/study-history">
+          <Card className={cn(
+            "border-none shadow-lg bg-white/80 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 flex flex-col items-center text-center",
+            isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
+          )}>
+            <div className={cn("rounded-2xl bg-primary/5 flex items-center justify-center", isMobile ? "h-10 w-10" : "h-16 w-16")}>
+              <FileText className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
+            </div>
+            <div className="grid">
+              <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>데일리 리포트</span>
+              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Analysis</span>
+            </div>
+          </Card>
+        </Link>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className={cn(
+              "border-none shadow-lg bg-white/80 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 flex flex-col items-center text-center cursor-pointer",
+              isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
+            )}>
+              <div className={cn("rounded-2xl bg-amber-50 flex items-center justify-center", isMobile ? "h-10 w-10" : "h-16 w-16")}>
+                <ClipboardPen className={cn("text-amber-600", isMobile ? "h-5 w-5" : "h-8 w-8")} />
+              </div>
+              <div className="grid">
+                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>지각/결석 신청</span>
+                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Requests</span>
+              </div>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
+            <div className="bg-amber-500 p-8 text-white relative">
+              <BellRing className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold">지각 또는 결석 사유를 입력하여 제출하세요.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="p-8 space-y-4">
+              <p className="text-center py-10 font-bold text-muted-foreground italic">준비 중인 기능입니다.</p>
+            </div>
+            <DialogFooter className="p-6 border-t"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className={cn(
+              "border-none shadow-lg bg-white/80 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 flex flex-col items-center text-center cursor-pointer",
+              isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
+            )}>
+              <div className={cn("rounded-2xl bg-rose-50 flex items-center justify-center", isMobile ? "h-10 w-10" : "h-16 w-16")}>
+                <AlertOctagon className={cn("text-rose-600", isMobile ? "h-5 w-5" : "h-8 w-8")} />
+              </div>
+              <div className="grid">
+                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>벌점 현황</span>
+                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Penalties</span>
+              </div>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
+            <div className="bg-rose-600 p-8 text-white relative">
+              <ShieldCheck className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black">벌점 및 상점 관리</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold">센터 규정 준수 현황입니다.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="p-8 flex flex-col items-center justify-center gap-4">
+              <div className="text-5xl font-black text-primary">0</div>
+              <p className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">Total Penalty Points</p>
+              <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-center">
+                <p className="text-xs font-bold text-emerald-700">현재 매우 깨끗한 기록을 유지하고 있습니다. 👏</p>
+              </div>
+            </div>
+            <DialogFooter className="p-6 border-t"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
 
       {isJacob && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} />}
     </div>
