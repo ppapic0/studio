@@ -41,7 +41,7 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
@@ -60,12 +60,14 @@ import {
 
 const TIERS = [
   { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800', shadow: 'shadow-slate-200/50' },
-  { name: '브론즈', min: 3000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
-  { name: '실버', min: 7000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
-  { name: '골드', min: 12000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
-  { name: '플래티넘', min: 18000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
+  { name: '브론즈', min: 5000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
+  { name: '실버', min: 10000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
+  { name: '골드', min: 15000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
+  { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
   { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
-  { name: '마스터', min: 35000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
+  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
+  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-200/50' },
+  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-200/50' },
 ];
 
 /**
@@ -248,6 +250,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+  const periodKey = today ? format(today, 'yyyy-MM') : '';
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -274,11 +277,29 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return values.reduce((a, b) => a + b, 0) / values.length;
   }, [stats]);
 
-  // 티어 판정 기준 변경: LP 기반
+  // 실시간 랭킹 정보 조회 (고위 티어 결정용)
+  const rankQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership?.id, user?.uid, periodKey]);
+  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
+  const currentRank = rankEntries?.[0]?.rank || 999;
+
+  // 티어 판정 로직 최적화: LP 기준 + 랭킹 기반 고위 티어
   const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    return TIERS.slice().reverse().find(t => currentLp >= t.min) || TIERS[0];
-  }, [currentLp]);
+    // 25,000 LP 이상일 때 랭킹에 따른 고위 티어 적용
+    if (currentLp >= 25000) {
+      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
+      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
+      return TIERS.find(t => t.name === '마스터')!;
+    }
+    // 25,000 LP 미만일 때 LP 임계값에 따른 일반 티어 적용
+    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
+  }, [currentLp, currentRank]);
 
   const statBoost = useMemo(() => 1 + (avgStat / 100) * 0.10, [avgStat]);
   const totalBoost = Math.min(1.20, statBoost);
@@ -433,7 +454,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         "bg-gradient-to-br", currentTier.gradient, currentTier.shadow
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110 group-hover:rotate-45">
-          <Trophy className="h-48 w-48 sm:h-64 sm:w-64" />
+          {currentTier.name === '챌린저' ? <Crown className="h-48 w-48 sm:h-64 sm:w-64" /> : <Trophy className="h-48 w-48 sm:h-64 sm:w-64" />}
         </div>
         
         <div className={cn("relative z-10 flex flex-col gap-8", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>

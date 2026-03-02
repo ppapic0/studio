@@ -2,10 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
-import { useDoc, useFirestore, useUser } from '@/firebase';
+import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { GrowthProgress } from '@/lib/types';
+import { doc, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
+import { GrowthProgress, LeaderboardEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -82,12 +82,14 @@ const STAT_CONFIG = {
 
 const TIERS = [
   { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800' },
-  { name: '브론즈', min: 3000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
-  { name: '실버', min: 7000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
-  { name: '골드', min: 12000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
-  { name: '플래티넘', min: 18000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
+  { name: '브론즈', min: 5000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
+  { name: '실버', min: 10000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
+  { name: '골드', min: 15000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
+  { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
   { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
-  { name: '마스터', min: 35000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800' },
+  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800' },
+  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800' },
+  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
 ];
 
 function SystemGuideDialog() {
@@ -111,14 +113,14 @@ function SystemGuideDialog() {
         <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white">
           <div className="space-y-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <Zap className="h-4 w-4 fill-current text-accent" /> 1. 하루 기본 LP (최대 1,000)
+              <Zap className="h-4 w-4 fill-current text-accent" /> 1. 행동 보상 LP (일일 최대 1,000)
             </h4>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { l: '출석 확인', v: 200, d: '오늘 첫 입실 시' },
-                { l: '계획 수립', v: 200, d: '모든 To-do 완료 시' },
-                { l: '성장 달성', v: 200, d: '일일 목표 도달 시' },
-                { l: '6시간 보너스', v: 200, d: '초몰입 달성 시' }
+                { l: '계획 완료', v: 200, d: '모든 To-do 완료 시' },
+                { l: '성장 보너스', v: 200, d: '품질 목표 도달 시' },
+                { l: '6시간 보충', v: 200, d: '초몰입 달성 시' }
               ].map(item => (
                 <div key={item.l} className="p-4 rounded-2xl bg-muted/30 border flex flex-col gap-1">
                   <div className="flex justify-between items-center">
@@ -133,11 +135,16 @@ function SystemGuideDialog() {
 
           <div className="space-y-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-emerald-500" /> 2. 티어 판정 (LP 기준)
+              <Trophy className="h-4 w-4 text-emerald-500" /> 2. 티어 판정 (LP + 랭킹)
             </h4>
-            <p className="text-xs font-bold text-muted-foreground leading-relaxed">
-              티어는 **이번 시즌 획득한 누적 LP**로 결정됩니다. 시즌이 바뀔 때마다 모든 학생은 아이언에서 다시 시작합니다.
-            </p>
+            <div className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100">
+              <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
+                - **아이언 ~ 다이아몬드**: 0 ~ 25,000 LP 구간 (포인트로 결정)<br/>
+                - **챌린저**: 25,000 LP 이상 중 **센터 1위**<br/>
+                - **그랜드마스터**: 25,000 LP 이상 중 **센터 2, 3위**<br/>
+                - **마스터**: 25,000 LP 이상 상위권
+              </p>
+            </div>
           </div>
 
           <div className="space-y-4 pt-4">
@@ -147,9 +154,8 @@ function SystemGuideDialog() {
             <div className="p-5 rounded-2xl bg-rose-50/50 border border-rose-100">
               <p className="text-xs font-bold text-rose-900/70 leading-relaxed">
                 - **30일**마다 시즌이 종료됩니다.<br/>
-                - **시즌 LP는 0으로 리셋**되어 티어가 재산정됩니다.<br/>
-                - **4대 스킬 스탯은 5% 감쇠**되어 실력 유지가 필요합니다.<br/>
-                - **누적 마스터리 부스트**는 유지됩니다.
+                - **시즌 LP는 0으로 리셋**되어 모든 학생이 다시 시작합니다.<br/>
+                - **스킬 스탯(집중/꾸준함 등)은 5% 감쇠**됩니다.
               </p>
             </div>
           </div>
@@ -164,6 +170,7 @@ export default function GrowthPage() {
   const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
   const isMobile = viewMode === 'mobile';
+  const periodKey = format(new Date(), 'yyyy-MM');
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -171,6 +178,17 @@ export default function GrowthPage() {
   }, [firestore, activeMembership?.id, user?.uid]);
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
+
+  // 실시간 랭킹 조회
+  const rankQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership?.id, user?.uid, periodKey]);
+  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
+  const currentRank = rankEntries?.[0]?.rank || 999;
 
   const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
   const avgStat = useMemo(() => {
@@ -180,11 +198,16 @@ export default function GrowthPage() {
 
   const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    return TIERS.slice().reverse().find(t => currentLp >= t.min) || TIERS[0];
-  }, [currentLp]);
+    if (currentLp >= 25000) {
+      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
+      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
+      return TIERS.find(t => t.name === '마스터')!;
+    }
+    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
+  }, [currentLp, currentRank]);
 
   const statBoost = useMemo(() => 1 + (avgStat / 100) * 0.10, [avgStat]);
-  const totalBoost = Math.min(1.20, statBoost); // 레벨 제거에 따라 4스탯 부스트만 적용하거나 추후 마스터리 부스트 합산 가능
+  const totalBoost = Math.min(1.20, statBoost);
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
@@ -211,7 +234,7 @@ export default function GrowthPage() {
         "bg-gradient-to-br", currentTier.gradient
       )}>
         <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-700">
-          <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />
+          {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 p-8 sm:p-12 space-y-10")}>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -227,16 +250,20 @@ export default function GrowthPage() {
               <div className={cn("p-6 rounded-[2.5rem] bg-white/10 backdrop-blur-xl border border-white/10 flex flex-col items-center min-w-[180px] shadow-2xl")}>
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">Current Tier</span>
                 <span className={cn("text-3xl font-black tracking-tighter")}>{currentTier.name}</span>
-                <span className="text-[10px] font-bold mt-1 opacity-40">다음 등급까지: {(TIERS[TIERS.indexOf(currentTier) + 1]?.min - currentLp || 0).toLocaleString()} LP</span>
+                <span className="text-[10px] font-bold mt-1 opacity-40">
+                  {currentTier.name === '챌린저' ? '압도적 1위 유지 중' : 
+                   currentTier.name === '그랜드마스터' ? '정상 탈환 도전 중' :
+                   `다음 승급까지: ${Math.max(0, (TIERS.find(t => t.min > currentLp)?.min || 25000) - currentLp).toLocaleString()} LP`}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: '스킬 부스트', val: `x${statBoost.toFixed(2)}`, sub: '4스탯 가중치', icon: Zap, color: 'text-yellow-400' },
+              { label: '센터 랭킹', val: `${currentRank}위`, sub: '전체 재원생 기준', icon: Trophy, color: 'text-yellow-400' },
               { label: '실력 지수', val: avgStat.toFixed(1), sub: '품질 스탯 평균', icon: Activity, color: 'text-orange-400' },
-              { label: '시즌 랭킹', val: '상위 12%', sub: '센터 전체 기준', icon: Trophy, color: 'text-emerald-400' },
+              { label: '스킬 부스트', val: `x${statBoost.toFixed(2)}`, sub: '획득량 가중치', icon: Zap, color: 'text-emerald-400' },
               { label: '시즌 남은 일수', val: '18일', sub: '월간 리셋 예정', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
               <div key={i} className="bg-white/5 p-5 rounded-3xl border border-white/5 flex flex-col gap-1">
@@ -314,8 +341,8 @@ export default function GrowthPage() {
       <div className="px-1">
         <Card className="rounded-[3rem] border-none shadow-2xl bg-[#fafafa] p-10 flex flex-col md:flex-row items-center justify-between gap-8 ring-1 ring-black/[0.02]">
           <div className="space-y-2 text-center md:text-left">
-            <h3 className="text-2xl font-black tracking-tighter">다음 티어 도전</h3>
-            <p className="text-sm font-bold text-muted-foreground">LP를 더 모아 {TIERS[TIERS.indexOf(currentTier) + 1]?.name || '마스터'} 등급으로 승급하세요.</p>
+            <h3 className="text-2xl font-black tracking-tighter">상위 티어 도전</h3>
+            <p className="text-sm font-bold text-muted-foreground">챌린저는 센터 1위, 그랜드마스터는 2~3위에게만 허락됩니다.</p>
           </div>
           
           <div className="flex items-center gap-10">
@@ -323,15 +350,15 @@ export default function GrowthPage() {
               <span className="text-lg font-black text-muted-foreground">{currentTier.name}</span>
               <ChevronRight className="h-5 w-5 opacity-20" />
               <span className="text-lg font-black text-primary">
-                {TIERS[TIERS.indexOf(currentTier) + 1]?.name || 'MAX'}
+                {currentRank === 1 ? 'LEGEND' : currentRank <= 3 ? 'CHALLENGER' : 'TOP 3'}
               </span>
             </div>
             <div className="w-48 space-y-1.5">
               <div className="flex justify-between text-[10px] font-black opacity-40 uppercase">
-                <span>승급까지</span>
-                <span>{Math.round((currentLp / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || currentLp)) * 100)}%</span>
+                <span>랭킹 승급까지</span>
+                <span>{currentRank > 3 ? `${currentRank - 3}명 추월 필요` : currentRank === 1 ? 'Champion' : '1위 도전 중'}</span>
               </div>
-              <Progress value={(currentLp / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || currentLp)) * 100} className="h-1.5" />
+              <Progress value={currentRank <= 3 ? 100 : (10 / currentRank) * 100} className="h-1.5" />
             </div>
           </div>
         </Card>
@@ -354,7 +381,7 @@ export default function GrowthPage() {
                 <div className="flex items-center gap-2 font-black text-xs text-primary uppercase"><Zap className="h-4 w-4 text-accent fill-current" /> 행동 보상</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
-                    <span className="text-[11px] font-bold">출석/계획/성장/6H</span>
+                    <span className="text-[11px] font-bold">출석/계획/품질/6H</span>
                     <span className="text-xs font-black text-primary">각 +200 LP</span>
                   </div>
                   <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
@@ -367,7 +394,7 @@ export default function GrowthPage() {
                 <div className="flex items-center gap-2 font-black text-xs text-emerald-600 uppercase"><TrendingUp className="h-4 w-4" /> 시즌제 등급 (티어)</div>
                 <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-[88px] flex items-center">
                   <p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">
-                    매달 모은 **시즌 LP**가 당신의 티어를 결정합니다. 시즌 종료 시 LP는 초기화됩니다.
+                    2.5만 LP까지는 포인트로, 그 이상은 **센터 내 상대 순위**로 결정됩니다. (1위: 챌린저, 2~3위: 그랜드마스터)
                   </p>
                 </div>
               </div>
