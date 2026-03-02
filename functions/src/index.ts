@@ -102,6 +102,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
     return { ok: true, uid, message: "학생 등록이 완료되었습니다." };
 
   } catch (error: any) {
+    console.error("[RegisterStudent Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류가 발생했습니다.");
   }
@@ -187,33 +188,49 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   const callerId = context.auth.uid;
 
   try {
+    console.log(`[DeleteStudent] Request by ${callerId} to delete ${studentId} in center ${centerId}`);
+
     // 1. 권한 확인 (관리자만 가능)
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') {
+      console.warn(`[DeleteStudent] Unauthorized attempt by ${callerId}`);
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다. 관리자만 가능합니다.");
     }
 
     // 2. Auth 유저 삭제
     try {
       await admin.auth().deleteUser(studentId);
+      console.log(`[DeleteStudent] Auth user ${studentId} deleted`);
     } catch (authError: any) {
-      if (authError.code !== 'auth/user-not-found') {
+      if (authError.code === 'auth/user-not-found') {
+        console.warn(`[DeleteStudent] Auth user ${studentId} already not found`);
+      } else {
+        console.error(`[DeleteStudent] Auth deletion error:`, authError);
         throw new functions.https.HttpsError("internal", `인증 정보 삭제 실패: ${authError.message}`);
       }
     }
 
     // 3. Firestore 데이터 정리 (Batch)
     const batch = db.batch();
+    
+    // (1) 전역 유저 정보
     batch.delete(db.doc(`users/${studentId}`));
+    // (2) 센터 멤버십
     batch.delete(db.doc(`centers/${centerId}/members/${studentId}`));
+    // (3) 사용자 센터 역인덱스
     batch.delete(db.doc(`userCenters/${studentId}/centers/${centerId}`));
+    // (4) 학생 상세 프로필
     batch.delete(db.doc(`centers/${centerId}/students/${studentId}`));
+    // (5) 성장 포인트 정보
     batch.delete(db.doc(`centers/${centerId}/growthProgress/${studentId}`));
 
     await batch.commit();
+    console.log(`[DeleteStudent] Firestore data for ${studentId} cleaned up`);
+
     return { ok: true, message: "계정이 영구적으로 삭제되었습니다." };
 
   } catch (error: any) {
+    console.error("[DeleteStudent Final Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류");
   }
@@ -239,17 +256,14 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       
       const inviteData = inviteSnap.data()!;
       
-      // 비활성화 여부 확인
       if (inviteData.isActive === false) {
         throw new functions.https.HttpsError("failed-precondition", "비활성화된 초대 코드입니다.");
       }
 
-      // 만료일 확인
       if (inviteData.expiresAt && inviteData.expiresAt.toDate() < new Date()) {
         throw new functions.https.HttpsError("failed-precondition", "만료된 초대 코드입니다.");
       }
 
-      // 사용 횟수 확인
       if (inviteData.usedCount >= inviteData.maxUses) {
         throw new functions.https.HttpsError("failed-precondition", "사용 횟수가 초과된 초대 코드입니다.");
       }
@@ -284,6 +298,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       return { ok: true, message: "센터 가입이 완료되었습니다." };
     });
   } catch (error: any) {
+    console.error("[RedeemInviteCode Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError("internal", error.message);
   }
