@@ -45,6 +45,7 @@ import { collection, query, where } from 'firebase/firestore';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
@@ -52,10 +53,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState<Date | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
     setIsMounted(true);
     setToday(new Date());
+    
+    // 실시간 지표 업데이트를 위한 하트비트
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    
+    return () => clearInterval(timer);
   }, []);
 
   const isMobile = viewMode === 'mobile';
@@ -133,7 +142,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     
     const checkedInCount = filteredAttendance.filter(a => a.status === 'studying').length;
     
-    // 점유율 계산: 반별일 때는 해당 반 학생 수 대비, 전체일 때는 물리적 좌석 대비
+    // 점유율 계산
     let occupancy = 0;
     if (selectedClass === 'all') {
       const physicalSeats = attendanceList.filter(a => a.type !== 'aisle').length;
