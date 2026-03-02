@@ -398,7 +398,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (penaltyPoints >= 30) return 0.15; // 30점 이상: 15% (강등 상태)
     if (penaltyPoints >= 20) return 0.10; // 20-29점: 10%
     if (penaltyPoints >= 10) return 0.06; // 10-19점: 6%
-    return 0.03; // 0-9점: 3%
+    if (penaltyPoints >= 5) return 0.03;  // 5-9점: 3%
+    return 0; // 0-4점: 0%
   }, [penaltyPoints]);
 
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
@@ -923,7 +924,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <div className="space-y-3">
                     {[
-                      { range: '0 ~ 9', label: '정상', effect: 'LP -3% 적용', color: 'bg-emerald-500' },
+                      { range: '0 ~ 4', label: '정상', effect: '패널티 없음', color: 'bg-emerald-500' },
+                      { range: '5 ~ 9', label: '안전', effect: 'LP -3% 적용', color: 'bg-emerald-400' },
                       { range: '10 ~ 19', label: '주의', effect: 'LP -6% & 학부모 자동 알림', color: 'bg-amber-500' },
                       { range: '20 ~ 29', label: '경고', effect: 'LP -10% & 승급 불가 & 강등 경고', color: 'bg-rose-500' },
                       { range: '30 이상', label: '강등', effect: '즉시 1단계 강등 & 3자 대면 상담', color: 'bg-black' }
@@ -951,8 +953,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       <div className="grid gap-1">
                         <span className="text-xs font-black text-emerald-700 uppercase">자동 회복 (Normal Life)</span>
                         <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
-                          - 매일 완전 정상 생활 시: **-3점**<br/>
-                          - 7일 연속 정상 등원: **추가 -10점**<br/>
+                          - 매일 완전 정상 생활 시: **-1점**<br/>
+                          - 7일 연속 정상 등원: **추가 -5점**<br/>
                           - 한 달 무지각 달성: **추가 -10점**
                         </p>
                       </div>
