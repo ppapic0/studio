@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -369,7 +368,7 @@ export default function DailyReportsPage() {
                 <span className="text-white/60 font-black text-[10px] tracking-widest">{dateKey}</span>
               </div>
               <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-5xl")}>{selectedStudent?.name} 학생</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold text-sm mt-1">성장 데이터를 바탕으로 AI가 최적의 분석 리포트를 생성합니다.</DialogDescription>
+              <DialogDescription className="text-white/70 font-bold text-sm mt-1">성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
             </DialogHeader>
           </div>
 

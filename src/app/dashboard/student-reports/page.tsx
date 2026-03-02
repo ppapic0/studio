@@ -159,7 +159,7 @@ export default function StudentReportsPage() {
                     <span className="text-white/60 font-black text-[10px] tracking-widest">{selectedReport.dateKey}</span>
                   </div>
                   <DialogTitle className="text-3xl sm:text-5xl font-black tracking-tighter">정밀 분석 리포트</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1 text-sm">성장 데이터를 바탕으로 AI가 도출한 최적의 솔루션입니다.</DialogDescription>
+                  <DialogDescription className="text-white/70 font-bold mt-1 text-sm">성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
                 </DialogHeader>
               </div>
 

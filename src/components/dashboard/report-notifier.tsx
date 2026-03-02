@@ -88,7 +88,7 @@ export function ReportNotifier() {
               데일리 리포트가 도착했습니다
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1">
-              선생님이 어제 데이터를 정밀 분석하여 보냈습니다.
+              성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.
             </DialogDescription>
           </DialogHeader>
         </div>
