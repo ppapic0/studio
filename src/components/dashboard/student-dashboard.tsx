@@ -56,6 +56,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 
 const TIERS = [
@@ -236,7 +237,11 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost }: { dailyLpStatus?: Growth
             </div>
           )}
         </div>
-        <DialogFooter className="p-6 bg-white border-t justify-center"><Button variant="ghost" className="font-bold text-muted-foreground">닫기</Button></DialogFooter>
+        <DialogFooter className="p-6 bg-white border-t justify-center">
+          <DialogClose asChild>
+            <Button variant="ghost" className="font-bold text-muted-foreground">닫기</Button>
+          </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -306,7 +311,9 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m }: { st
           )}
         </div>
         <DialogFooter className="p-6 bg-white border-t justify-center">
-          <Button variant="ghost" className="font-bold text-muted-foreground">닫기</Button>
+          <DialogClose asChild>
+            <Button variant="ghost" className="font-bold text-muted-foreground">닫기</Button>
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -395,32 +402,56 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
+    
     if (isTimerActive) {
       const nowTs = Date.now();
       const sessionMinutes = Math.floor((nowTs - (startTime || nowTs)) / 60000);
+      
+      const batch = writeBatch(firestore);
       const updateData: any = { updatedAt: serverTimestamp() };
+      
       if (sessionMinutes > 0) {
-        const lpEarned = Math.round(sessionMinutes * totalBoost);
-        updateData.seasonLp = increment(lpEarned);
-        updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(lpEarned);
+        // 1. 순수 공부 시간 LP 보상 (분당 1 LP * 부스트)
+        const studyLpEarned = Math.round(sessionMinutes * totalBoost);
+        
+        // 2. 3시간(180분) 달성 시 출석 보너스 LP 로직 (200 LP * 부스트)
+        const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
+        const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
+        
+        // 3시간 이상 공부했고, 아직 출석 보너스를 받지 않았다면 지급
+        if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
+          const attendanceLp = Math.round(200 * totalBoost);
+          updateData.seasonLp = increment(studyLpEarned + attendanceLp);
+          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned + attendanceLp);
+          updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
+          updateData['stats.consistency'] = increment(0.1);
+          toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+        } else {
+          updateData.seasonLp = increment(studyLpEarned);
+          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
+        }
+
+        // 스탯 업데이트
         updateData['stats.focus'] = increment(sessionMinutes / 100); 
-        const batch = writeBatch(firestore);
-        batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), updatedAt: serverTimestamp() }, { merge: true });
+        
+        // 공부 로그 및 세션 기록 저장
+        batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
         
         const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
         batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+        
         batch.update(progressRef, updateData);
         await batch.commit();
       }
-      setIsTimerActive(false); setStartTime(null); toast({ title: "트랙 종료됨" });
+      
+      setIsTimerActive(false); 
+      setStartTime(null); 
+      toast({ title: "트랙 종료됨" });
     } else {
-      setStartTime(Date.now()); setIsTimerActive(true);
-      const batch = writeBatch(firestore);
-      if (!progress?.dailyLpStatus?.[todayKey]?.attendance) {
-        const attendanceLp = Math.round(200 * totalBoost);
-        batch.update(progressRef, { seasonLp: increment(attendanceLp), [`dailyLpStatus.${todayKey}.attendance`]: true, [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(attendanceLp), 'stats.consistency': increment(0.1), updatedAt: serverTimestamp() });
-      }
-      await batch.commit();
+      // 공부 시작 (타이머 작동)
+      setStartTime(Date.now()); 
+      setIsTimerActive(true);
+      toast({ title: "트랙 시작! 3시간 공부 시 보너스 LP가 지급됩니다." });
     }
   };
 
