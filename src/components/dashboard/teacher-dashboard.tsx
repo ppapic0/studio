@@ -63,6 +63,7 @@ import {
 import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { 
   Dialog,
   DialogContent,
@@ -278,14 +279,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let totalMins = 0;
     let filteredLiveMinutes: number[] = [];
 
-    // 1. 반별 학생 ID 필터링
     const filteredMemberIds = new Set(
       studentMembers
         .filter(m => (selectedClass === 'all' || m.className === selectedClass) && m.status === 'active')
         .map(m => m.id)
     );
 
-    // 2. 물리적 좌석 수 계산 (그리드 전체에서 통로 제외)
     const aisleIds = new Set(attendanceList.filter(s => s.type === 'aisle').map(s => s.id));
     let totalPhysicalSeats = 0;
     for(let i = 1; i <= gridRows * gridCols; i++) {
@@ -294,7 +293,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         }
     }
 
-    // 3. 현재 상태 집계 (배정된 학생들 대상)
     attendanceList.forEach(seat => {
       if (seat.type !== 'aisle' && seat.studentId) {
         const isTargetStudent = filteredMemberIds.has(seat.studentId);
@@ -319,9 +317,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     });
 
-    // 4. '미입실' 인원 계산
-    // 반 선택 시: (해당 반 전체 재원생 수 - 공부중 - 외출/휴식중)
-    // 전체 보기 시: (전체 물리 좌석 - 공부중 - 외출/휴식중)
     let absent = 0;
     let totalDisplayCount = 0;
 
@@ -675,13 +670,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           {isAisle ? (
                             isEditMode && <MapIcon className="h-3 w-3 opacity-40" />
                           ) : student ? (
-                            <div className="flex flex-col items-center gap-0 w-full px-0.5">
+                            <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
-                              <div className="flex flex-col items-center leading-tight">
-                                <span className={cn("text-[7px] font-bold tracking-tight", isStudying || isAlert || isAway ? "text-white/90" : "text-muted-foreground")}>
-                                  {isAbsentMode ? '미등원' : `LIVE: ${timeInfo?.session}`}
+                              <div className="flex flex-col items-center leading-[1.1]">
+                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAlert || isAway ? "text-white" : "text-primary")}>
+                                  {isAbsentMode ? '미등원' : `L: ${timeInfo?.session}`}
                                 </span>
-                                <span className={cn("text-[7px] font-bold tracking-tight opacity-60", isStudying || isAlert || isAway ? "text-white/70" : "text-muted-foreground/60")}>
+                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAlert || isAway ? "text-white/90" : "text-primary/80")}>
                                   {isAbsentMode ? '-' : `T: ${timeInfo?.total}`}
                                 </span>
                               </div>
