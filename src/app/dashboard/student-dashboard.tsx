@@ -31,9 +31,7 @@ import {
   Settings2,
   Wand2,
   History,
-  Calendar,
-  LogIn,
-  LogOut
+  Calendar
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -120,7 +118,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
   };
 
   return (
-    <Card className="border-4 border-dashed border-primary/20 bg-white/50 backdrop-blur-xl rounded-[2.5rem] p-8 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-1000 ring-1 ring-black/5 shadow-2xl">
+    <Card className="border-4 border-dashed border-primary/20 bg-white/20 backdrop-blur-xl rounded-[2.5rem] p-8 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-1000 ring-1 ring-black/5 shadow-2xl">
       <CardHeader className="p-0 mb-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -139,7 +137,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
           <div className="space-y-4">
             <div className="flex justify-between items-center px-1">
               <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 LP</span>
-              <span className="text-sm font-black text-primary bg-white px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
+              <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
             </div>
             <Slider value={[lp]} max={40000} step={500} onValueChange={([val]) => setLp(val)} />
           </div>
@@ -160,7 +158,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         <div className="lg:w-[320px] flex flex-col gap-6 shrink-0">
           <div className="grid grid-cols-3 gap-2">
             {TIER_PRESETS.map((preset) => (
-              <Button key={preset.label} variant="outline" size="sm" onClick={() => applyPreset(preset)} className="rounded-xl h-12 px-0 font-black text-[10px] border-2 transition-all hover:scale-105 shadow-sm bg-white flex flex-col items-center justify-center leading-none gap-1">
+              <Button key={preset.label} variant="outline" size="sm" onClick={() => applyPreset(preset)} className="rounded-xl h-12 px-0 font-black text-[10px] border-2 transition-all hover:scale-105 shadow-sm bg-white/80 flex flex-col items-center justify-center leading-none gap-1">
                 <div className={cn("w-2 h-2 rounded-full", preset.color)} />{preset.label}
               </Button>
             ))}
@@ -183,7 +181,7 @@ function LPHistoryDialog({ dailyLpStatus }: { dailyLpStatus?: GrowthProgress['da
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer">
+        <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.08)] bg-white/90 backdrop-blur-xl rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">시즌 러닝 포인트 (LP)</CardTitle>
             <div className="bg-amber-50 p-2.5 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md"><Zap className="h-6 w-6 text-amber-600 group-hover:text-white" /></div>
@@ -208,7 +206,7 @@ function LPHistoryDialog({ dailyLpStatus }: { dailyLpStatus?: GrowthProgress['da
             <DialogDescription className="text-white/70 font-bold mt-1">최근 30일간의 러닝 포인트 획득 내역입니다.</DialogDescription>
           </DialogHeader>
         </div>
-        <div className="p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#fafafa]">
+        <div className="p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]">
           {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
             <div className="space-y-3">
               {sortedDates.map(([date, data]) => (
@@ -252,7 +250,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m }: { st
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 relative cursor-pointer">
+        <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.08)] bg-white/90 backdrop-blur-xl rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 relative cursor-pointer">
           <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">오늘의 누적 트랙</CardTitle>
@@ -276,7 +274,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m }: { st
             <DialogDescription className="text-white/70 font-bold mt-1">오늘 완료된 몰입 세션 기록입니다.</DialogDescription>
           </DialogHeader>
         </div>
-        <div className="p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#fafafa]">
+        <div className="p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]">
           {isLoading ? (
             <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
           ) : !sessions || sessions.length === 0 ? (
@@ -402,15 +400,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const batch = writeBatch(firestore);
         batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), updatedAt: serverTimestamp() }, { merge: true });
         
-        // 세션 서브컬렉션에 기록 추가
         const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-        batch.set(sessionRef, {
-          startTime: Timestamp.fromMillis(startTime!),
-          endTime: Timestamp.fromMillis(nowTs),
-          durationMinutes: sessionMinutes,
-          createdAt: serverTimestamp()
-        });
-
+        batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
         batch.update(progressRef, updateData);
         await batch.commit();
       }
@@ -476,13 +467,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       <div className={cn("grid gap-4 sm:gap-6", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
-        <StudySessionHistoryDialog 
-          studentId={user!.uid} 
-          centerId={activeMembership!.id} 
-          todayKey={todayKey} 
-          h={h} 
-          m={m} 
-        />
+        <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={h} m={m} />
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} />
       </div>
 
@@ -504,34 +489,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-[2.5rem]">등록된 학습 계획이 없습니다.</div>
               ) : studyTasks.map((task) => (
                 <div key={task.id} className={cn(
-                  "flex items-center gap-6 p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border-2 transition-all duration-500 relative group", 
+                  "flex items-center gap-6 p-6 rounded-[2rem] sm:rounded-[2.5rem] border-2 transition-all duration-500 relative group", 
                   task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md hover:border-primary/10"
                 )}>
                   <div className="relative">
-                    <Checkbox 
-                      id={task.id} 
-                      checked={task.done} 
-                      onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                      className="h-10 w-10 rounded-2xl border-2 transition-all data-[state=checked]:scale-110 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" 
-                    />
+                    <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} className="h-10 w-10 rounded-2xl border-2 transition-all data-[state=checked]:scale-110 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
                     {task.done && <Check className="absolute inset-0 m-auto h-6 w-6 text-white stroke-[4px]" />}
                   </div>
                   <div className="flex-1 grid gap-1.5">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0">STUDY</Badge>
-                      {task.targetMinutes && (
-                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> {task.targetMinutes}m Goal
-                        </span>
-                      )}
+                      {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/40 uppercase flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}m Goal</span>}
                     </div>
-                    <Label htmlFor={task.id} className={cn("font-black text-lg sm:text-xl tracking-tight transition-all leading-snug", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>
-                      {task.title}
-                    </Label>
+                    <Label htmlFor={task.id} className={cn("font-black text-lg sm:text-xl tracking-tight transition-all leading-snug", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>{task.title}</Label>
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-all">
-                    <ChevronRight className="h-5 w-5 text-muted-foreground/20" />
-                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-all"><ChevronRight className="h-5 w-5 text-muted-foreground/20" /></div>
                 </div>
               ))}
             </div>
@@ -551,14 +523,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               ) : scheduleItems.map((item) => (
                 <div key={item.id} className="flex items-center justify-between p-6 sm:p-8 rounded-[2rem] bg-white border shadow-sm group hover:border-amber-300 transition-all active:scale-[0.98]">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="p-3 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 shadow-sm shrink-0">
-                      <Timer className="h-5 w-5" />
-                    </div>
+                    <div className="p-3 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 shadow-sm shrink-0"><Timer className="h-5 w-5" /></div>
                     <span className="font-black tracking-tight text-primary text-base sm:text-lg truncate">{item.title.split(': ')[0]}</span>
                   </div>
-                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-base sm:text-lg px-4 py-1.5 rounded-2xl border-amber-200 bg-amber-50/50 shrink-0">
-                    {item.title.split(': ')[1] || '--:--'}
-                  </Badge>
+                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-base sm:text-lg px-4 py-1.5 rounded-2xl border-amber-200 bg-amber-50/50 shrink-0">{item.title.split(': ')[1] || '--:--'}</Badge>
                 </div>
               ))}
             </div>
