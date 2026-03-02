@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -193,6 +192,8 @@ export default function LayoutViewPage() {
   }, [attendanceList]);
 
   const getLiveTimeLabel = (seat: AttendanceCurrent) => {
+    if (!seat.studentId) return '0h 0m';
+    
     const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
     let totalMins = studentLog?.totalMinutes || 0;
 
@@ -342,11 +343,11 @@ export default function LayoutViewPage() {
                 {selectedSeat.studentId && (
                   <div className="pt-4 border-t border-dashed space-y-3">
                     <Button variant="secondary" className="w-full h-16 rounded-[1.5rem] font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all" asChild>
-                      <a href={`/dashboard/teacher/students/${selectedSeat.studentId}`}>
+                      <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}>
                         <User className="h-5 w-5 opacity-40" />
                         학생 상세 분석 리포트
                         <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
-                      </a>
+                      </a >
                     </Button>
                     <Button variant="ghost" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-rose-600 hover:bg-rose-50 gap-3">
                       <UserMinus className="h-4 w-4" /> 좌석 배정 해제

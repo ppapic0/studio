@@ -4,7 +4,7 @@ import { use, useState, useMemo, useEffect, useRef } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,11 +61,15 @@ import {
   Star,
   RefreshCw,
   Check,
-  X
+  X,
+  ListTodo,
+  Timer,
+  CalendarCheck
 } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation } from '@/lib/types';
-import { format, subDays, startOfDay } from 'date-fns';
+import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId } from '@/lib/types';
+import { format, subDays, startOfDay, startOfWeek, addDays, isSameDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ResponsiveContainer, 
@@ -141,6 +145,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const hasInitializedForm = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
 
+  // 계획 탭을 위한 일자 선택 상태
+  const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date>(new Date());
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -199,6 +206,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return query(collection(firestore, 'centers', centerId, 'counselingLogs'), where('studentId', '==', studentId));
   }, [firestore, centerId, studentId]);
   const { data: rawCounselLogs } = useCollection<CounselingLog>(counselLogsQuery);
+
+  // 계획 데이터 조회 로직 (상세 분석용)
+  const selectedDateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
+  const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+  const plansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !weekKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'),
+      where('dateKey', '==', selectedDateKey)
+    );
+  }, [firestore, centerId, studentId, weekKey, selectedDateKey]);
+  const { data: dailyPlans, isLoading: plansLoading } = useCollection<StudyPlanItem>(plansQuery);
+
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(selectedDateForPlan, { weekStartsOn: 1 });
+    return [...Array(7)].map((_, i) => addDays(start, i));
+  }, [selectedDateForPlan]);
+
+  const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
+  const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
+  const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
 
   const appointments = useMemo(() => rawApts ? [...rawApts].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0)) : [], [rawApts]);
   const counselingLogs = useMemo(() => rawCounselLogs ? [...rawCounselLogs].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)) : [], [rawCounselLogs]);
@@ -566,14 +594,113 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
 
-        <TabsContent value="plans" className="mt-6">
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 text-center flex flex-col items-center gap-4">
-            <ClipboardCheck className="h-16 w-16 text-muted-foreground opacity-10" />
-            <div className="space-y-1">
-              <p className="text-xl font-black text-muted-foreground/40">공부 계획 상세 데이터</p>
-              <p className="text-sm font-bold text-muted-foreground/20 uppercase tracking-widest">Planned vs Actual Matrix</p>
+        <TabsContent value="plans" className="mt-6 space-y-6">
+          <div className="flex flex-col gap-6">
+            {/* 일자 선택 가로 정렬 */}
+            <div className={cn("grid grid-cols-7 gap-1.5 sm:gap-4", isMobile ? "px-0" : "px-0")}>
+              {weekDays.map((day) => {
+                const isSelected = isSameDay(day, selectedDateForPlan);
+                const isToday = isSameDay(day, new Date());
+                return (
+                  <Button
+                    key={day.toISOString()}
+                    variant={isSelected ? "default" : "outline"}
+                    className={cn(
+                      "flex flex-col transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-3.5 sm:py-4",
+                      isMobile ? "px-0" : "px-4",
+                      isSelected ? "bg-primary border-primary shadow-lg scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
+                      isToday && !isSelected && "border-primary/30"
+                    )}
+                    onClick={() => setSelectedDateForPlan(day)}
+                  >
+                    <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[8px] mb-1.5" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
+                    <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-lg" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
+                  </Button>
+                );
+              })}
             </div>
-          </Card>
+
+            <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
+              {/* 생활 루틴 */}
+              <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.02] w-full", isMobile ? "md:col-span-12" : "md:col-span-5")}>
+                <CardHeader className={cn("bg-muted/5 border-b p-6 sm:p-8")}>
+                  <CardTitle className="flex items-center gap-2 font-black tracking-tighter text-primary text-xl">
+                    <div className="bg-primary/5 p-1.5 rounded-lg"><Clock className="h-5 w-5 text-primary" /></div>
+                    생활 루틴
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 sm:p-8 bg-[#fafafa]">
+                  {plansLoading ? (
+                    <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 opacity-20" /></div>
+                  ) : scheduleItems.length === 0 ? (
+                    <div className="py-10 text-center opacity-20 italic font-black text-xs">등록된 루틴이 없습니다.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {scheduleItems.map((item) => (
+                        <div key={item.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex justify-between items-center">
+                          <span className="font-bold text-sm">{item.title.split(': ')[0]}</span>
+                          <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 px-2 py-0.5 text-[10px]">
+                            {item.title.split(': ')[1] || '--:--'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 자습 및 개인 일정 */}
+              <Card className={cn("border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02] w-full", isMobile ? "md:col-span-12" : "md:col-span-7")}>
+                <CardHeader className="p-0 border-b bg-muted/5">
+                  <div className="flex h-16 items-center px-8">
+                    <CardTitle className="text-xl font-black tracking-tighter flex items-center gap-2 text-primary">
+                      <ListTodo className="h-5 w-5 text-emerald-500" /> 학습 To-do 및 일정
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 sm:p-8 bg-[#fafafa]">
+                  {plansLoading ? (
+                    <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 opacity-20" /></div>
+                  ) : (studyTasks.length === 0 && personalTasks.length === 0) ? (
+                    <div className="py-10 text-center opacity-20 italic font-black text-xs">등록된 일정이 없습니다.</div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* 자습 To-do */}
+                      <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-1">Study To-do</h4>
+                        {studyTasks.map((task) => (
+                          <div key={task.id} className={cn("flex items-center gap-4 p-4 rounded-2xl border-2 transition-all", task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm")}>
+                            <div className={cn("h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0", task.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-muted")}>
+                              {task.done && <Check className="h-3.5 w-3.5" />}
+                            </div>
+                            <span className={cn("flex-1 text-sm font-bold", task.done && "line-through text-muted-foreground/40")}>{task.title}</span>
+                            {task.targetMinutes && <Badge variant="secondary" className="text-[9px] font-black opacity-60">{task.targetMinutes}분</Badge>}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 개인 일정 */}
+                      <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest ml-1">Personal Schedule</h4>
+                        {personalTasks.map((task) => (
+                          <div key={task.id} className={cn("flex items-center gap-4 p-4 rounded-2xl border-2 transition-all", task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent shadow-sm")}>
+                            <div className={cn("h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0", task.done ? "bg-amber-500 border-amber-500 text-white" : "border-muted")}>
+                              {task.done && <Check className="h-3.5 w-3.5" />}
+                            </div>
+                            <span className={cn("flex-1 text-sm font-bold", task.done && "line-through text-muted-foreground/40")}>{task.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+                <div className="bg-muted/10 border-t p-6 flex items-center gap-2.5 justify-center">
+                  <CalendarCheck className="h-4 w-4 text-primary opacity-40" />
+                  <p className="text-[11px] font-black text-primary/70 uppercase tracking-widest">{format(selectedDateForPlan, 'yyyy. MM. dd', { locale: ko })}</p>
+                </div>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="counseling" className="mt-6 space-y-10">

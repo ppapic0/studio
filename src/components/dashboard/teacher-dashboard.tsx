@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -76,7 +75,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [now, setNow] = useState(Date.now());
 
-  // 실시간 시간 업데이트 (10초마다 더 정밀하게)
+  // 실시간 시간 업데이트 (10초마다)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(timer);
@@ -198,10 +197,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const getLiveTimeLabel = (seat: AttendanceCurrent) => {
+    if (!seat.studentId) return '0h 0m';
+    
     const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
     let totalMins = studentLog?.totalMinutes || 0;
 
-    // 현재 공부 중인 경우 실시간 세션 시간 합산
+    // 현재 공부 중인 경우 실시간 세션 시간 합산 (초 단위 보정)
     if (seat.status === 'studying' && seat.lastCheckInAt) {
       const startTime = seat.lastCheckInAt.toMillis();
       const sessionMins = Math.floor((now - startTime) / 60000);
