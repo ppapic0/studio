@@ -545,7 +545,7 @@ export default function StudyHistoryPage() {
                               <Badge className={cn("rounded-md font-black text-[9px] px-2 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
                               {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-tight flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}분 목표</span>}
                             </div>
-                            <Label className={cn("text-base font-bold tracking-tight transition-all leading-snug", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
+                            <Label className={cn("text-base font-bold tracking-tight transition-all leading-snug break-keep", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
                           </div>
                         </div>
                       );
@@ -560,9 +560,9 @@ export default function StudyHistoryPage() {
                         </Select>
                         <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-10 rounded-xl border-2 text-xs font-black text-center" />
                       </div>
-                      <div className="relative flex items-center bg-muted/10 rounded-2xl p-1.5">
-                        <Input placeholder="공부 할 일 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} className="border-none shadow-none focus-visible:ring-0 font-bold h-10 text-sm" />
-                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"><Plus className="h-5 w-5" /></Button>
+                      <div className="relative flex items-center bg-muted/10 rounded-2xl p-1.5 gap-1.5">
+                        <Input placeholder="공부 할 일 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} className="flex-1 border-none shadow-none focus-visible:ring-0 font-bold h-10 text-sm" />
+                        <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} className="h-10 w-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 shrink-0 relative z-10"><Plus className="h-5 w-5" /></Button>
                       </div>
                     </div>
                   )}
@@ -571,7 +571,12 @@ export default function StudyHistoryPage() {
                   <div className="grid gap-3">
                     {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-amber-50/20 border-amber-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="h-6 w-6 rounded-lg" /><Label className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
                   </div>
-                  {!isActuallyPast && !isParent && <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1.5 shadow-sm mt-4"><Input placeholder="기타 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} className="border-none shadow-none focus-visible:ring-0 font-bold h-11 text-sm" /><Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 shadow-lg shadow-amber-500/10"><Plus className="h-5 w-5" /></Button></div>}
+                  {!isActuallyPast && !isParent && (
+                    <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1.5 shadow-sm mt-4 gap-1.5">
+                      <Input placeholder="기타 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} className="flex-1 border-none shadow-none focus-visible:ring-0 font-bold h-11 text-sm" />
+                      <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} className="h-10 w-10 rounded-xl border-2 border-amber-500 text-amber-600 shadow-lg shadow-amber-500/10 shrink-0 relative z-10"><Plus className="h-5 w-5" /></Button>
+                    </div>
+                  )}
                 </TabsContent>
               </div>
             </Tabs>

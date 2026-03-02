@@ -92,7 +92,7 @@ import {
   startOfDay
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { type StudyPlanItem, type WithId, type GrowthProgress, type LeaderboardEntry } from '@/lib/types';
+import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -538,9 +538,9 @@ export default function StudyPlanPage() {
 
       {!isPast && (
         <Card className={cn(
-          "border-none shadow-2xl rounded-[2.5rem] overflow-hidden transition-all duration-700 bg-white ring-1 ring-black/[0.03]",
+          "border-none shadow-2xl overflow-hidden transition-all duration-700 bg-white ring-1 ring-black/[0.03]",
           "relative group",
-          isMobile ? "rounded-[1.5rem]" : ""
+          isMobile ? "rounded-[1.25rem]" : "rounded-[2.5rem]"
         )}>
           <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
@@ -656,7 +656,7 @@ export default function StudyPlanPage() {
               {!isPast && (
                 <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                   <DialogTrigger asChild><Button variant="ghost" size="icon" className={cn("rounded-full hover:bg-primary/10 transition-all", isMobile ? "h-8 w-8" : "h-10 w-10")}><PlusCircle className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /></Button></DialogTrigger>
-                  <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-8", isMobile ? "max-w-[90vw] rounded-[2rem]" : "sm:max-w-md")}>
+                  <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-8", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2rem]" : "sm:max-w-md")}>
                     <DialogHeader><DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl")}>새 루틴 추가</DialogTitle></DialogHeader>
                     <div className="space-y-6 pt-4">
                       <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-2xl border-2 font-bold text-base" />
@@ -725,9 +725,9 @@ export default function StudyPlanPage() {
                             <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-9 rounded-lg border-2 font-black text-center text-xs" />
                           </div>
                         </div>
-                        <div className="relative flex items-center bg-muted/20 rounded-xl p-1">
-                          <Input placeholder="할 일 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-9 text-xs" />
-                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-lg h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"><Plus className="h-4 w-4" /></Button>
+                        <div className="relative flex items-center bg-muted/20 rounded-xl p-1 gap-1">
+                          <Input placeholder="할 일 추가..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10 text-xs" />
+                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className={cn("rounded-lg shrink-0 shadow-lg bg-emerald-500 hover:bg-emerald-600 text-white relative z-10", isMobile ? "h-10 w-10" : "h-8 w-8")}><Plus className="h-4 w-4" /></Button>
                         </div>
                       </div>
                     )}
@@ -743,9 +743,9 @@ export default function StudyPlanPage() {
                       </div>
                     ))}
                     {!isPast && (
-                      <div className={cn("relative flex items-center bg-white border-2 border-amber-100 rounded-xl p-1 shadow-sm mt-2", isMobile ? "p-1" : "p-1.5 rounded-[1.5rem]")}>
-                        <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-9 text-xs" />
-                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-lg h-8 w-8 border-2 border-amber-500 text-amber-600 shrink-0 shadow-lg"><Plus className="h-4 w-4" /></Button>
+                      <div className={cn("relative flex items-center bg-white border-2 border-amber-100 rounded-xl p-1 shadow-sm mt-2 gap-1", isMobile ? "p-1.5" : "p-1.5 rounded-[1.5rem]")}>
+                        <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-10 text-xs" />
+                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className={cn("rounded-lg shrink-0 shadow-lg border-2 border-amber-500 text-amber-600 relative z-10", isMobile ? "h-10 w-10" : "h-8 w-8")}><Plus className="h-4 w-4" /></Button>
                       </div>
                     )}
                   </div>
