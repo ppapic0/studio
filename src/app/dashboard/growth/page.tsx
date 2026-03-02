@@ -190,7 +190,16 @@ export default function GrowthPage() {
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
   const currentRank = rankEntries?.[0]?.rank || 999;
 
-  const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+  const stats = useMemo(() => {
+    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+    return {
+      focus: Math.min(100, raw.focus),
+      consistency: Math.min(100, raw.consistency),
+      achievement: Math.min(100, raw.achievement),
+      resilience: Math.min(100, raw.resilience),
+    };
+  }, [progress?.stats]);
+
   const avgStat = useMemo(() => {
     const values = Object.values(stats);
     return values.reduce((a, b) => a + b, 0) / values.length;
@@ -284,7 +293,7 @@ export default function GrowthPage() {
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <Target className="h-6 w-6 text-primary opacity-40" />
-            <h2 className="text-2xl font-black tracking-tighter">스킬트랙 (질적 평가)</h2>
+            <h2 className="text-2xl font-black tracking-tighter">스킬트랙</h2>
           </div>
           <Badge variant="outline" className="rounded-full font-black text-[10px] border-primary/20 px-3">AVG: {avgStat.toFixed(1)}</Badge>
         </div>

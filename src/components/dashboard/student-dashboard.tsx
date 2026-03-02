@@ -332,7 +332,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
 
-  const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+  const stats = useMemo(() => {
+    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+    return {
+      focus: Math.min(100, raw.focus),
+      consistency: Math.min(100, raw.consistency),
+      achievement: Math.min(100, raw.achievement),
+      resilience: Math.min(100, raw.resilience),
+    };
+  }, [progress?.stats]);
+
   const avgStat = useMemo(() => {
     const values = Object.values(stats);
     return values.reduce((a, b) => a + b, 0) / values.length;
@@ -504,8 +513,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const isJacob = user?.email === 'jacob444@naver.com';
 
   return (
-    <div className={cn("flex flex-col gap-6 sm:gap-10 pb-24")}>
-      {/* 1. 티어 기반 프리미엄 트래커 카드 */}
+    <div className={cn("flex flex-col gap-6 sm:gap-10 pb-24 relative z-10")}>
       <section className={cn(
         "group relative overflow-hidden text-white shadow-2xl transition-all duration-700 rounded-[2.5rem] p-8 sm:rounded-[3rem] sm:p-12",
         "bg-gradient-to-br", currentTier.gradient, currentTier.shadow
@@ -558,9 +566,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 2. 요약 지표 (공부시간, LP) - 프리미엄 컬러 테마 개편 */}
       <div className={cn("grid gap-4 sm:gap-6", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
-        {/* 오늘의 누적 트랙 - 몰입의 블루 테마 */}
         <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 relative">
           <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
@@ -578,11 +584,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 시즌 러닝 포인트 카드 (클릭 시 히스토리 팝업) - 성취의 앰버 테마 */}
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} />
       </div>
 
-      {/* 3. 계획 및 루틴 */}
       <div className={cn("grid gap-6 grid-cols-1 lg:grid-cols-3")}>
         <Card className={cn("border-none shadow-2xl rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03] lg:col-span-2")}>
           <CardHeader className="bg-muted/10 border-b p-10 sm:p-12">
@@ -647,7 +651,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 4. Jacob 전용 티어 컨트롤러 패널 */}
       {isJacob && progressRef && (
         <JacobTierController 
           progressRef={progressRef} 
