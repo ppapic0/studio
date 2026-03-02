@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, writeBatch, collection, query, where, getDocs, getDoc, increment } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -240,12 +240,18 @@ export function SignupForm() {
 
       await batch.commit();
 
-      setLoadingStatus('완료! 대시보드로 이동합니다.');
-      toast({ title: '가입 성공', description: `환영합니다, ${finalDisplayName}님!` });
+      setLoadingStatus('회원가입이 완료되었습니다!');
+      toast({ 
+        title: '회원가입 완료 ✨', 
+        description: `${finalDisplayName}님의 계정이 성공적으로 생성되었습니다. 로그인 창으로 이동합니다.` 
+      });
       
+      // 명확한 확인을 위해 로그아웃 후 로그인 페이지로 이동
+      await signOut(auth);
+
       setTimeout(() => {
-        router.replace('/dashboard');
-      }, 500);
+        router.replace('/login');
+      }, 1500);
 
     } catch (error: any) {
       console.error('Signup Error:', error);
