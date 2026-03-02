@@ -82,12 +82,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 그리드 설정 상태 (기본 가로 10, 세로 7)
   const [gridRows, setGridRows] = useState(7);
   const [gridCols, setGridCols] = useState(10);
 
   useEffect(() => {
-    // 1초마다 현재 시간을 업데이트하여 실시간 타이머 구현
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -95,7 +93,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // 0. 센터 설정 (그리드 크기 등)
   const centerRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId);
@@ -109,28 +106,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   }, [centerData]);
 
-  // 1. 모든 학생 데이터
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
-  // 2. 학생들의 멤버십 정보
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
   }, [firestore, centerId]);
   const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
 
-  // 3. 실시간 좌석 현황
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 오늘 학습 로그 (실시간 합산용)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(
@@ -141,7 +134,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
-  // 5. 오늘 상담 예약
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const todayDate = new Date();
@@ -167,9 +159,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     let totalMins = studentLog?.totalMinutes || 0;
     
-    // 세션 감지 보정 로직 (김재윤 학생 케이스 대응)
     const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
-    const isRecentlyActive = (now - logUpdatedAt) < 60000; // 1분 이내 활동 시 강제 실시간 합산
+    const isRecentlyActive = (now - logUpdatedAt) < 60000;
 
     if ((status === 'studying' || isRecentlyActive) && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
@@ -186,37 +177,54 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return `${hh}h ${mm}m`;
   };
 
-  const metrics = useMemo(() => {
-    if (!attendanceList || !students) return { totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
-    
-    const activeSeats = attendanceList.filter(a => !!a.studentId && a.type !== 'aisle');
-    const allLiveMinutes = activeSeats.map(a => getLiveTimeInMinutes(a.studentId!, a.status, a.lastCheckInAt));
-    
-    const totalCenterMinutes = allLiveMinutes.reduce((acc, m) => acc + m, 0);
-    const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalCenterMinutes / allLiveMinutes.length) : 0;
-    
+  const stats = useMemo(() => {
+    let studying = 0;
+    let absent = 0;
+    let away = 0;
+    let totalSeats = 0;
+    let totalMins = 0;
+    let allLiveMinutes: number[] = [];
+
+    for (let c = 0; c < gridCols; c++) {
+      for (let r = 0; r < gridRows; r++) {
+        const seatNo = c * gridRows + r + 1;
+        const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
+        const seatData = attendanceList?.find(a => a.id === seatId);
+        
+        const type = seatData?.type || 'seat';
+        
+        if (type === 'seat') {
+          totalSeats++;
+          const studentId = seatData?.studentId;
+          const status = seatData?.status || 'absent';
+          
+          if (studentId) {
+            const mins = getLiveTimeInMinutes(studentId, status, seatData?.lastCheckInAt);
+            totalMins += mins;
+            allLiveMinutes.push(mins);
+
+            const studentLog = todayLogs?.find(l => l.studentId === studentId);
+            const isRecentlyActive = studentLog && (now - (studentLog.updatedAt?.toMillis() || 0)) < 60000;
+
+            if (status === 'studying' || isRecentlyActive) {
+              studying++;
+            } else if (status === 'absent') {
+              absent++;
+            } else if (status === 'away' || status === 'break') {
+              away++;
+            }
+          }
+        }
+      }
+    }
+
+    const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalMins / allLiveMinutes.length) : 0;
     const sortedMinutes = [...allLiveMinutes].sort((a, b) => b - a);
     const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
-    const top20Avg = Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count);
+    const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
 
-    return { totalCenterMinutes, avgMinutes, top20Avg };
-  }, [attendanceList, todayLogs, now, students]);
-
-  const stats = useMemo(() => {
-    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
-    const actualSeats = attendanceList.filter(a => a.type !== 'aisle');
-    return {
-      studying: actualSeats.filter(a => {
-        if (a.status === 'studying') return true;
-        // 보정 로직 적용된 상태 집계
-        const log = todayLogs?.find(l => l.studentId === a.studentId);
-        return log && (now - (log.updatedAt?.toMillis() || 0)) < 60000;
-      }).length,
-      absent: actualSeats.filter(a => a.studentId && a.status === 'absent').length,
-      away: actualSeats.filter(a => a.status === 'away' || a.status === 'break').length,
-      total: actualSeats.length
-    };
-  }, [attendanceList, todayLogs, now]);
+    return { studying, absent, away, total: totalSeats, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
+  }, [attendanceList, todayLogs, now, gridCols, gridRows]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -330,21 +338,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <Activity className="h-4 w-4 text-emerald-500" />
             <div className="grid leading-none">
               <span className="text-[8px] font-black text-muted-foreground uppercase">Center Total</span>
-              <span className="text-sm font-black text-emerald-600">{Math.floor(metrics.totalCenterMinutes / 60)}h {metrics.totalCenterMinutes % 60}m</span>
+              <span className="text-sm font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}h {stats.totalCenterMinutes % 60}m</span>
             </div>
           </div>
           <div className="flex items-center gap-2 px-4 border-r">
             <Users className="h-4 w-4 text-blue-500" />
             <div className="grid leading-none">
               <span className="text-[8px] font-black text-muted-foreground uppercase">Avg Study</span>
-              <span className="text-sm font-black text-blue-600">{Math.floor(metrics.avgMinutes / 60)}h {metrics.avgMinutes % 60}m</span>
+              <span className="text-sm font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}h {stats.avgMinutes % 60}m</span>
             </div>
           </div>
           <div className="flex items-center gap-2 px-4">
             <Trophy className="h-4 w-4 text-amber-500" />
             <div className="grid leading-none">
               <span className="text-[8px] font-black text-muted-foreground uppercase">Top 20% Avg</span>
-              <span className="text-sm font-black text-amber-600">{Math.floor(metrics.top20Avg / 60)}h {metrics.top20Avg % 60}m</span>
+              <span className="text-sm font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}h {stats.top20Avg % 60}m</span>
             </div>
           </div>
         </div>
@@ -430,20 +438,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <ScrollArea className="w-full max-w-full">
             <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-fit mx-auto">
               <div 
-                className="grid gap-2" 
+                className="grid gap-1.5" 
                 style={{ 
-                  gridTemplateColumns: `repeat(${gridCols}, minmax(72px, 1fr))`,
+                  gridTemplateColumns: `repeat(${gridCols}, minmax(64px, 1fr))`,
                 }}
               >
                 {Array.from({ length: gridCols }).map((_, colIndex) => (
-                  <div key={colIndex} className="flex flex-col gap-2">
+                  <div key={colIndex} className="flex flex-col gap-1.5">
                     {Array.from({ length: gridRows }).map((_, rowIndex) => {
                       const seatNo = colIndex * gridRows + rowIndex + 1;
                       const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
-                      const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
+                      const seatDataFromList = attendanceList?.find(a => a.id === seatId);
+                      const seat = seatDataFromList || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
                       
-                      // 김재윤 학생 등 실시간 감지 보정 로직 적용된 상태 판별
                       const studentLog = todayLogs?.find(l => l.studentId === student?.id);
                       const isRecentlyActive = studentLog && (now - (studentLog.updatedAt?.toMillis() || 0)) < 60000;
 
@@ -457,7 +465,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           key={seatNo} 
                           onClick={() => handleSeatClick(seat)}
                           className={cn(
-                            "aspect-square min-w-[72px] rounded-xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm border-2",
+                            "aspect-square min-w-[64px] rounded-xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1 cursor-pointer shadow-sm border-2",
                             isAisle 
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
                               : isStudying 
