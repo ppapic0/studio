@@ -313,6 +313,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     } catch (e) { toast({ variant: "destructive", title: "실패" }); } finally { setIsUpdating(false); }
   };
 
+  const handleUpdateStatus = async () => {
+    if (!firestore || !centerId || !studentId) return;
+    setIsUpdating(true);
+    try {
+      const batch = writeBatch(firestore);
+      const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
+      const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
+      
+      batch.update(memberRef, { status: statusForm, updatedAt: serverTimestamp() });
+      batch.update(userCenterRef, { status: statusForm, updatedAt: serverTimestamp() });
+      
+      await batch.commit();
+      toast({ title: "상태가 업데이트되었습니다." });
+      setIsStatusModalOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "업데이트 실패", description: e.message });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
   return (
@@ -443,8 +464,41 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}><DialogContent className="rounded-[2.5rem] sm:max-w-md p-8"><DialogHeader><DialogTitle className="text-3xl font-black">정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-4"><Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} placeholder="이름" className="rounded-xl border-2" /><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} placeholder="학교" className="rounded-xl border-2" /><Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}><SelectTrigger className="rounded-xl border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select><Input value={editForm.parentLinkCode} onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value})} placeholder="학부모 연동 코드" maxLength={4} className="rounded-xl border-2" /><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="새 비밀번호 (선택)" className="rounded-xl border-2" /></div><DialogFooter><Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-12 rounded-2xl font-black shadow-xl">저장</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}><DialogContent className="rounded-[2.5rem] sm:max-w-md p-8"><DialogHeader><DialogTitle className="text-2xl font-black">상태 관리</DialogTitle></DialogHeader><div className="py-4 space-y-2">{[{id:'active',l:'재원'},{id:'onHold',l:'휴학'},{id:'withdrawn',l:'퇴원'}].map(i=>(<div key={i.id} onClick={()=>setStatusForm(i.id)} className={cn("p-4 rounded-xl border-2 cursor-pointer", statusForm===i.id?"border-primary bg-primary/5":"border-transparent bg-muted/10")}><span className="font-black">{i.l}</span></div>))}</div><DialogFooter><Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full h-12 rounded-2xl font-black">업데이트</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="rounded-[2.5rem] sm:max-w-md p-8">
+          <DialogHeader><DialogTitle className="text-3xl font-black">정보 수정</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} placeholder="이름" className="rounded-xl border-2" />
+            <Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} placeholder="학교" className="rounded-xl border-2" />
+            <Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}>
+              <SelectTrigger className="rounded-xl border-2"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1학년">1학년</SelectItem>
+                <SelectItem value="2학년">2학년</SelectItem>
+                <SelectItem value="3학년">3학년</SelectItem>
+                <SelectItem value="N수생">N수생</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input value={editForm.parentLinkCode} onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value})} placeholder="학부모 연동 코드" maxLength={4} className="rounded-xl border-2" />
+            <Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="새 비밀번호 (선택)" className="rounded-xl border-2" />
+          </div>
+          <DialogFooter><Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-12 rounded-2xl font-black shadow-xl">저장</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
+        <DialogContent className="rounded-[2.5rem] sm:max-w-md p-8">
+          <DialogHeader><DialogTitle className="text-2xl font-black">상태 관리</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-2">
+            {[{id:'active',l:'재원'},{id:'onHold',l:'휴학'},{id:'withdrawn',l:'퇴원'}].map(i=>(
+              <div key={i.id} onClick={()=>setStatusForm(i.id)} className={cn("p-4 rounded-xl border-2 cursor-pointer", statusForm===i.id?"border-primary bg-primary/5":"border-transparent bg-muted/10")}>
+                <span className="font-black">{i.l}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter><Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full h-12 rounded-2xl font-black">업데이트</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
