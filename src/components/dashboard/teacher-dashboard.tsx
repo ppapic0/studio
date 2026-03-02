@@ -155,7 +155,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 색인 오류 방지를 위해 복합 쿼리를 단순화하고 클라이언트에서 필터링합니다.
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -275,56 +274,80 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!mounted || !attendanceList || !studentMembers) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
 
     let studying = 0;
-    let absent = 0;
     let away = 0;
-    let totalSeatsCount = 0;
     let totalMins = 0;
     let filteredLiveMinutes: number[] = [];
 
+    // 1. 반별 학생 ID 필터링
     const filteredMemberIds = new Set(
       studentMembers
-        .filter(m => selectedClass === 'all' || m.className === selectedClass)
+        .filter(m => (selectedClass === 'all' || m.className === selectedClass) && m.status === 'active')
         .map(m => m.id)
     );
 
+    // 2. 물리적 좌석 수 계산 (그리드 전체에서 통로 제외)
+    const aisleIds = new Set(attendanceList.filter(s => s.type === 'aisle').map(s => s.id));
+    let totalPhysicalSeats = 0;
+    for(let i = 1; i <= gridRows * gridCols; i++) {
+        if(!aisleIds.has(`seat_${i.toString().padStart(3, '0')}`)) {
+            totalPhysicalSeats++;
+        }
+    }
+
+    // 3. 현재 상태 집계 (배정된 학생들 대상)
     attendanceList.forEach(seat => {
-      if (seat.type !== 'aisle') {
-        const isTargetStudent = seat.studentId && filteredMemberIds.has(seat.studentId);
+      if (seat.type !== 'aisle' && seat.studentId) {
+        const isTargetStudent = filteredMemberIds.has(seat.studentId);
         
-        if (selectedClass === 'all' || isTargetStudent) {
-          totalSeatsCount++;
-          
-          if (seat.studentId && isTargetStudent) {
-            const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
-            const logMins = studentLog?.totalMinutes || 0;
-            const status = seat.status || 'absent';
+        if (isTargetStudent) {
+          const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
+          const logMins = studentLog?.totalMinutes || 0;
+          const status = seat.status || 'absent';
 
-            let sessionMins = 0;
-            if (status === 'studying' && seat.lastCheckInAt) {
-              sessionMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
-            }
-
-            const currentTotal = logMins + sessionMins;
-            totalMins += currentTotal;
-            filteredLiveMinutes.push(currentTotal);
-
-            if (status === 'studying') studying++;
-            else if (status === 'absent') absent++;
-            else if (status === 'away' || status === 'break') away++;
-          } else if (!seat.studentId && selectedClass === 'all') {
-            absent++;
+          let sessionMins = 0;
+          if (status === 'studying' && seat.lastCheckInAt) {
+            sessionMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
           }
+
+          const currentTotal = logMins + sessionMins;
+          totalMins += currentTotal;
+          filteredLiveMinutes.push(currentTotal);
+
+          if (status === 'studying') studying++;
+          else if (status === 'away' || status === 'break') away++;
         }
       }
     });
+
+    // 4. '미입실' 인원 계산
+    // 반 선택 시: (해당 반 전체 재원생 수 - 공부중 - 외출/휴식중)
+    // 전체 보기 시: (전체 물리 좌석 - 공부중 - 외출/휴식중)
+    let absent = 0;
+    let totalDisplayCount = 0;
+
+    if (selectedClass !== 'all') {
+        totalDisplayCount = filteredMemberIds.size;
+        absent = Math.max(0, totalDisplayCount - studying - away);
+    } else {
+        totalDisplayCount = totalPhysicalSeats;
+        absent = Math.max(0, totalDisplayCount - studying - away);
+    }
 
     const avgMinutes = filteredLiveMinutes.length > 0 ? Math.round(totalMins / filteredLiveMinutes.length) : 0;
     const sortedMinutes = [...filteredLiveMinutes].sort((a, b) => b - a);
     const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
     const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
 
-    return { studying, absent, away, total: totalSeatsCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
-  }, [attendanceList, todayLogs, studentMembers, selectedClass, now, mounted]);
+    return { 
+      studying, 
+      absent, 
+      away, 
+      total: totalDisplayCount, 
+      totalCenterMinutes: totalMins, 
+      avgMinutes, 
+      top20Avg 
+    };
+  }, [attendanceList, todayLogs, studentMembers, selectedClass, now, mounted, gridRows, gridCols]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -632,7 +655,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               : isStudying 
                                 ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
                                 : isAlert
-                                  ? "bg-rose-500 border-rose-600 text-white animate-pulse shadow-lg shadow-rose-200"
+                                  ? "bg-rose-500 border-rose-600 text-white shadow-lg shadow-rose-200"
                                   : isAway
                                     ? "bg-amber-500 border-amber-600 text-white"
                                     : isAbsentMode
