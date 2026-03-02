@@ -211,7 +211,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost }: { dailyLpStatus?: Growth
           {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
             <div className="space-y-3">
               {sortedDates.map(([date, data]) => {
-                const discreteLp = (data.attendance ? 200 : 0) + (data.plan ? 200 : 0) + (data.growth ? 200 : 0) + (data.bonus6h ? 200 : 0);
+                const discreteLp = (data.attendance ? 200 : 0) + (data.plan ? 200 : 0) + (data.growth ? 200 : 0);
                 const boostedDiscrete = Math.round(discreteLp * totalBoost);
                 const studyLp = Math.max(0, (data.dailyLpAmount || 0) - boostedDiscrete);
 
@@ -223,7 +223,6 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost }: { dailyLpStatus?: Growth
                         {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[8px] px-1.5">출석</Badge>}
                         {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[8px] px-1.5">계획</Badge>}
                         {data.growth && <Badge className="bg-purple-500 text-white border-none font-black text-[8px] px-1.5">품질</Badge>}
-                        {data.bonus6h && <Badge className="bg-amber-500 text-white border-none font-black text-[8px] px-1.5">6H</Badge>}
                         {studyLp > 0 && <Badge className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5">몰입 학습</Badge>}
                       </div>
                     </div>

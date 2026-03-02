@@ -113,14 +113,13 @@ function SystemGuideDialog() {
         <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white">
           <div className="space-y-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <Zap className="h-4 w-4 fill-current text-accent" /> 1. 행동 보상 LP (일일 최대 1,000)
+              <Zap className="h-4 w-4 fill-current text-accent" /> 1. 행동 보상 LP (일일 최대 보너스)
             </h4>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { l: '출석 확인', v: 200, d: '오늘 첫 입실 시' },
+                { l: '출석 보너스', v: 200, d: '당일 3시간 이상 학습 시' },
                 { l: '계획 완료', v: 200, d: '모든 To-do 완료 시' },
-                { l: '성장 보너스', v: 200, d: '품질 목표 도달 시' },
-                { l: '6시간 보충', v: 200, d: '초몰입 달성 시' }
+                { l: '성장 보너스', v: 200, d: '품질 목표 도달 시' }
               ].map(item => (
                 <div key={item.l} className="p-4 rounded-2xl bg-muted/30 border flex flex-col gap-1">
                   <div className="flex justify-between items-center">
@@ -390,7 +389,7 @@ export default function GrowthPage() {
                 <div className="flex items-center gap-2 font-black text-xs text-primary uppercase"><Zap className="h-4 w-4 text-accent fill-current" /> 행동 보상</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
-                    <span className="text-[11px] font-bold">출석/계획/품질/6H</span>
+                    <span className="text-[11px] font-bold">출석/계획/품질 보너스</span>
                     <span className="text-xs font-black text-primary">각 +200 LP</span>
                   </div>
                   <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
@@ -400,7 +399,10 @@ export default function GrowthPage() {
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-2 font-black text-xs text-emerald-600 uppercase"><TrendingUp className="h-4 w-4" /> 시즌제 등급 (티어)</div>
+                <div className="flex items-center gap-2 ml-1">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em]">Season Tier</h4>
+                </div>
                 <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-[88px] flex items-center">
                   <p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">
                     2.5만 LP까지는 포인트로, 그 이상은 **센터 내 상대 순위**로 결정됩니다. (1위: 챌린저, 2~3위: 그랜드마스터)
@@ -408,7 +410,10 @@ export default function GrowthPage() {
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-2 font-black text-xs text-purple-600 uppercase"><Star className="h-4 w-4 fill-current" /> 스킬 감쇠 규칙</div>
+                <div className="flex items-center gap-2 ml-1">
+                  <Star className="h-4 w-4 text-purple-600 fill-current" />
+                  <h4 className="text-[10px] font-black uppercase text-purple-600 tracking-[0.2em]">Decay Rule</h4>
+                </div>
                 <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 h-[88px] flex items-center">
                   <p className="text-[11px] font-bold leading-relaxed text-purple-900/70">
                     시즌 종료 시 4대 스킬은 **5%씩 감쇠**합니다. 꾸준한 학습 품질 유지가 필수입니다.
