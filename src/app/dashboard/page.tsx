@@ -81,23 +81,22 @@ export default function DashboardPage() {
   if (activeMembership) {
     const userRole = activeMembership.role;
     
-    // 선생님 또는 관리자인 경우 이미지와 동일한 프리미엄 관제 대시보드만 표시
     if (userRole === 'teacher' || userRole === 'centerAdmin') {
       return <TeacherDashboard isActive={true} />;
     }
 
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 mb-4 flex-wrap px-2">
-          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>
-            {userRole === 'parent' ? `${user?.displayName} 학부모님, 반갑습니다!` : `${user?.displayName}님, 반가워요!`}
+      <div className={cn("flex flex-col", isMobile ? "gap-1" : "gap-2")}>
+        <div className={cn("flex items-center gap-2 mb-2 flex-wrap px-1", isMobile ? "mt-0" : "mb-4")}>
+          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-4xl")}>
+            {userRole === 'parent' ? `${user?.displayName} 학부모님` : `${user?.displayName}님, 반가워요!`}
           </h1>
-          <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none text-[11px] uppercase whitespace-nowrap shrink-0">
+          <Badge variant="secondary" className={cn("rounded-full font-black bg-primary text-white border-none uppercase whitespace-nowrap shrink-0", isMobile ? "h-5 px-2 text-[9px]" : "h-7 px-3 text-[11px]")}>
             {userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
         </div>
         
-        <div className="flex flex-col gap-8">
+        <div className={cn("flex flex-col", isMobile ? "gap-4" : "gap-8")}>
           <StudentDashboard isActive={userRole === 'student'} />
           <ParentDashboard isActive={userRole === 'parent'} />
         </div>
