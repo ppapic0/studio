@@ -117,11 +117,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
-  const membersQuery = useMemoFirebase(() => {
+  const studentMembersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
   }, [firestore, centerId]);
-  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+  const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery, { enabled: isActive });
 
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -175,18 +175,70 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     const totalMinutes = cumulativeMinutes + (sessionMinutes > 0 ? sessionMinutes : 0);
 
-    const format = (mins: number) => {
+    const formatTime = (mins: number) => {
       const hh = Math.floor(mins / 60);
       const mm = mins % 60;
       return `${hh}h ${mm}m`;
     };
 
     return {
-      session: format(sessionMinutes),
-      total: format(totalMinutes),
+      session: formatTime(sessionMinutes),
+      total: formatTime(totalMinutes),
       isStudying: status === 'studying' || isRecentlyActive
     };
   };
+
+  const stats = useMemo(() => {
+    let studying = 0;
+    let absent = 0;
+    let away = 0;
+    let totalSeats = 0;
+    let totalMins = 0;
+    let allLiveMinutes: number[] = [];
+
+    const attendanceMap = new Map(attendanceList?.map(a => [a.id, a]));
+
+    for (let col = 0; col < gridCols; col++) {
+      for (let row = 0; row < gridRows; row++) {
+        const seatNo = col * gridRows + row + 1;
+        const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
+        const seatData = attendanceMap.get(seatId);
+        
+        const type = seatData?.type || 'seat';
+        if (type === 'seat') {
+          totalSeats++;
+          const studentId = seatData?.studentId;
+          if (studentId) {
+            const studentLog = todayLogs?.find(l => l.studentId === studentId);
+            const logMins = studentLog?.totalMinutes || 0;
+            const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
+            const isRecentlyActive = (now - logUpdatedAt) < 60000;
+            const status = seatData?.status || 'absent';
+
+            let sessionMins = 0;
+            if ((status === 'studying' || isRecentlyActive) && seatData?.lastCheckInAt) {
+              sessionMins = Math.floor((now - seatData.lastCheckInAt.toMillis()) / 60000);
+            }
+
+            const currentTotal = logMins + (sessionMins > 0 ? sessionMins : 0);
+            totalMins += currentTotal;
+            allLiveMinutes.push(currentTotal);
+
+            if (status === 'studying' || isRecentlyActive) studying++;
+            else if (status === 'absent') absent++;
+            else if (status === 'away' || status === 'break') away++;
+          }
+        }
+      }
+    }
+
+    const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalMins / allLiveMinutes.length) : 0;
+    const sortedMinutes = [...allLiveMinutes].sort((a, b) => b - a);
+    const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
+    const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
+
+    return { studying, absent, away, total: totalSeats, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
+  }, [attendanceList, todayLogs, now, gridCols, gridRows]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -301,50 +353,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       setIsManaging(false);
     } catch (e) { toast({ variant: "destructive", title: "해제 실패" }); } finally { setIsSaving(false); }
   };
-
-  const stats = useMemo(() => {
-    let studying = 0;
-    let absent = 0;
-    let away = 0;
-    let totalSeats = 0;
-    let totalMins = 0;
-    let allLiveMinutes: number[] = [];
-
-    attendanceList?.forEach(seatData => {
-      const type = seatData?.type || 'seat';
-      if (type === 'seat') {
-        totalSeats++;
-        const studentId = seatData?.studentId;
-        if (studentId) {
-          const studentLog = todayLogs?.find(l => l.studentId === studentId);
-          const logMins = studentLog?.totalMinutes || 0;
-          const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
-          const isRecentlyActive = (now - logUpdatedAt) < 60000;
-          const status = seatData.status;
-
-          let sessionMins = 0;
-          if ((status === 'studying' || isRecentlyActive) && seatData.lastCheckInAt) {
-            sessionMins = Math.floor((now - seatData.lastCheckInAt.toMillis()) / 60000);
-          }
-
-          const currentTotal = logMins + (sessionMins > 0 ? sessionMins : 0);
-          totalMins += currentTotal;
-          allLiveMinutes.push(currentTotal);
-
-          if (status === 'studying' || isRecentlyActive) studying++;
-          else if (status === 'absent') absent++;
-          else if (status === 'away' || status === 'break') away++;
-        }
-      }
-    });
-
-    const avgMinutes = allLiveMinutes.length > 0 ? Math.round(totalMins / allLiveMinutes.length) : 0;
-    const sortedMinutes = [...allLiveMinutes].sort((a, b) => b - a);
-    const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
-    const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
-
-    return { studying, absent, away, total: totalSeats, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
-  }, [attendanceList, todayLogs, now]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-24 min-h-screen">
@@ -598,6 +606,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#fafafa]">
                 <div className="p-8 space-y-8">
+                  {selectedSeat.studentId && (
+                    <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
+                      <div className="flex-1 text-center">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Live Session</p>
+                        <p className="text-2xl font-black text-blue-600 tabular-nums">{getStudentStudyTimes(selectedSeat.studentId, selectedSeat.status, selectedSeat.lastCheckInAt).session}</p>
+                      </div>
+                      <div className="w-px h-10 bg-border/50 self-center" />
+                      <div className="flex-1 text-center">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Today Total</p>
+                        <p className="text-2xl font-black text-primary tabular-nums">{getStudentStudyTimes(selectedSeat.studentId, selectedSeat.status, selectedSeat.lastCheckInAt).total}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {isEditMode ? (
                     <div className="grid gap-3">
                       <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">
@@ -620,7 +642,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   )}
 
-                  {/* 오늘의 세션 히스토리 */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">
                       <h4 className="text-xs font-black uppercase text-primary/60 tracking-widest flex items-center gap-2">
