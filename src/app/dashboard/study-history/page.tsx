@@ -261,6 +261,12 @@ export default function StudyHistoryPage() {
   }, [firestore, targetUid, activeMembership, weekKey]);
   const { data: allPlans } = useCollection<StudyPlanItem>(plansQuery);
 
+  const progressRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !targetUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
+  }, [firestore, activeMembership, targetUid]);
+  const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: !!targetUid });
+
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
   const dailyPlans = useMemo(() => allPlans?.filter(p => p.dateKey === selectedDateKey) || [], [allPlans, selectedDateKey]);
   const scheduleItems = useMemo(() => dailyPlans.filter(p => p.category === 'schedule'), [dailyPlans]);
@@ -346,20 +352,32 @@ export default function StudyHistoryPage() {
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
+    if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid || !progressRef) return;
+    const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const nextState = !item.done;
     
     await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
     
-    // 완수 시 LP 보너스 (10 LP)
     if (nextState) {
-      const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-      setDoc(progressRef, { 
-        stats: { achievement: increment(0.05) }, 
-        currentLp: increment(10), 
-        updatedAt: serverTimestamp() 
-      }, { merge: true });
+      const batch = writeBatch(firestore);
+      
+      // 마스터리 업데이트: 목표달성 스탯 (항목당 0.1점, 하루 최대 0.5점)
+      const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
+      if (achievementCount < 5) {
+        batch.update(progressRef, { 
+          'stats.achievement': increment(0.1),
+          [`dailyLpStatus.${dateKey}.achievementCount`]: increment(1)
+        });
+      }
+
+      // 10 LP 즉시 지급
+      batch.update(progressRef, {
+        seasonLp: increment(10),
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
     }
   };
 

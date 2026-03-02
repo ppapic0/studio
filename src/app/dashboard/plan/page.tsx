@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -59,7 +58,7 @@ import {
   XCircle,
   CalendarClock
 } from 'lucide-react';
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
@@ -88,7 +87,7 @@ import {
   startOfDay
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { type StudyPlanItem, type WithId } from '@/lib/types';
+import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -289,6 +288,12 @@ export default function StudyPlanPage() {
 
   const { data: dailyPlans, isLoading } = useCollection<StudyPlanItem>(planItemsQuery, { enabled: isStudent });
 
+  const progressRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+  }, [firestore, activeMembership, user]);
+  const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
+
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
@@ -429,20 +434,31 @@ export default function StudyPlanPage() {
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
+    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
     
-    updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
+    await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
     
-    // 완수 시 LP 보너스 (10 LP)
     if (nextState) {
-      const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-      setDoc(progressRef, { 
-        stats: { achievement: increment(0.05) }, 
-        currentLp: increment(10), 
-        updatedAt: serverTimestamp() 
-      }, { merge: true });
+      const batch = writeBatch(firestore);
+      
+      // 마스터리 업데이트: 목표달성 스탯 (항목당 0.1점, 하루 최대 0.5점)
+      const achievementCount = progress?.dailyLpStatus?.[selectedDateKey]?.achievementCount || 0;
+      if (achievementCount < 5) {
+        batch.update(progressRef!, { 
+          'stats.achievement': increment(0.1),
+          [`dailyLpStatus.${selectedDateKey}.achievementCount`]: increment(1)
+        });
+      }
+
+      // 10 LP 즉시 지급
+      batch.update(progressRef!, {
+        seasonLp: increment(10),
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
     }
   };
 

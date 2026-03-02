@@ -24,7 +24,7 @@ import {
   RefreshCw, 
   CheckCircle2, 
   ShieldCheck, 
-  Trophy,
+  Trophy, 
   Crown,
   TrendingUp,
   Sparkles,
@@ -49,7 +49,7 @@ const STAT_CONFIG = {
     color: 'text-blue-500', 
     bg: 'bg-blue-500', 
     accent: 'bg-blue-50',
-    guide: '실시간 몰입 시간에 비례하여 상승합니다. (100분당 +1.0)'
+    guide: '실시간 몰입 시간에 비례하여 상승합니다. (1시간당 +0.1)'
   },
   consistency: { 
     label: '꾸준함', 
@@ -58,7 +58,7 @@ const STAT_CONFIG = {
     color: 'text-emerald-500', 
     bg: 'bg-emerald-500', 
     accent: 'bg-emerald-50',
-    guide: '매일 잊지 않고 출석 트랙을 시작하면 상승합니다. (일일 +0.1)'
+    guide: '매일 잊지 않고 출석 트랙을 시작하면 상승합니다. (일일 +0.5)'
   },
   achievement: { 
     label: '목표달성', 
@@ -67,7 +67,7 @@ const STAT_CONFIG = {
     color: 'text-amber-500', 
     bg: 'bg-amber-500', 
     accent: 'bg-amber-50',
-    guide: '계획트랙의 To-do를 완료할 때마다 실시간으로 상승합니다. (항목당 +0.05)'
+    guide: '계획트랙의 To-do를 완료할 때마다 상승합니다. (항목당 +0.1, 일일 최대 0.5)'
   },
   resilience: { 
     label: '회복력', 
@@ -76,7 +76,7 @@ const STAT_CONFIG = {
     color: 'text-rose-500', 
     bg: 'bg-rose-500', 
     accent: 'bg-rose-50',
-    guide: '6시간 이상의 초몰입 달성 시 가장 강력하게 상승합니다. (보너스 발생 시 +0.5)'
+    guide: '당일 6시간 이상의 초몰입 달성 시 상승합니다. (일일 +0.5)'
   },
 };
 
@@ -118,7 +118,7 @@ function SystemGuideDialog() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { l: '출석 보너스', v: 100, d: '당일 3시간 이상 학습 시' },
-                { l: '계획 보너스', v: 100, d: '3개 이상 계획 작성 후 완료' },
+                { l: '계획 보너스', v: 100, d: '3개 이상 계획 작성 후 모두 완료' },
                 { l: '루틴 보너스', v: 100, d: '등록된 루틴 모두 준수 시' }
               ].map(item => (
                 <div key={item.l} className="p-4 rounded-2xl bg-muted/30 border flex flex-col gap-1">
@@ -197,7 +197,7 @@ export default function GrowthPage() {
       collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
       where('studentId', '==', user.uid)
     );
-  }, [firestore, activeMembership?.id, user?.uid, periodKey]);
+  }, [firestore, activeMembership || {}, user || {}, periodKey]);
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
   const currentRank = rankEntries?.[0]?.rank || 999;
 
@@ -374,8 +374,12 @@ export default function GrowthPage() {
                 <div className="flex items-center gap-2 font-black text-xs text-primary uppercase"><Zap className="h-4 w-4 text-accent fill-current" /> 보너스 보상</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
-                    <span className="text-[11px] font-bold">출석/계획/루틴 보너스</span>
-                    <span className="text-xs font-black text-primary">각 +100 LP</span>
+                    <span className="text-[11px] font-bold">출석 보너스 (3시간↑)</span>
+                    <span className="text-xs font-black text-primary">+100 LP</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
+                    <span className="text-[11px] font-bold">계획 보너스 (모두 완료)</span>
+                    <span className="text-xs font-black text-primary">+100 LP</span>
                   </div>
                   <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
                     <span className="text-[11px] font-bold">실시간 몰입 학습</span>

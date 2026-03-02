@@ -212,7 +212,10 @@ export interface GrowthProgress {
       plan: boolean;
       routine: boolean;
       growth: boolean;
-      dailyLpAmount?: number; // 해당 일자에 획득한 총 LP (기록용)
+      dailyLpAmount?: number;
+      bonus6h?: boolean;
+      achievementCount?: number;
+      checkedIn?: boolean;
     };
   };
   totalLpEarned: number; // 누적 LP

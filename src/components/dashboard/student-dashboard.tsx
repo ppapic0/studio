@@ -414,7 +414,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         // 1. 순수 공부 시간 LP 보상 (분당 1 LP * 부스트)
         let studyLpEarned = Math.round(sessionMinutes * totalBoost);
         
-        // 2. 3시간(180분) 달성 시 출석 보너스 LP 로직 (100 LP * 부스트)
+        // 2. 집중력 스탯 (1시간당 0.1점)
+        updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
+
+        // 3. 출석 보너스 LP 로직 (3시간 달성 시 +100 LP)
         const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
         const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
         
@@ -422,13 +425,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           const attendanceLp = Math.round(100 * totalBoost);
           studyLpEarned += attendanceLp;
           updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
-          updateData['stats.consistency'] = increment(0.1);
           toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+        }
+
+        // 4. 회복력 스탯 (하루 6시간 이상 공부 시 +0.5점)
+        if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
+          updateData['stats.resilience'] = increment(0.5);
+          updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
+          toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
         }
 
         updateData.seasonLp = increment(studyLpEarned);
         updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
-        updateData['stats.focus'] = increment(sessionMinutes / 100); 
         
         batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
         const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
@@ -444,7 +452,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     } else {
       setStartTime(Date.now()); 
       setIsTimerActive(true);
-      toast({ title: "트랙 시작! 3시간 공부 시 보너스 LP가 지급됩니다." });
+      
+      // 입실 시 꾸준함 스탯 상승 (+0.5점)
+      if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
+        await updateDoc(progressRef, {
+          'stats.consistency': increment(0.5),
+          [`dailyLpStatus.${todayKey}.checkedIn`]: true,
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
+      }
     }
   };
 
@@ -456,14 +473,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
     
     if (nextState) {
-      // 스탯 업데이트
       const batch = writeBatch(firestore);
-      batch.update(progressRef, { 
-        'stats.achievement': increment(0.05),
-        updatedAt: serverTimestamp() 
-      });
+      
+      // 목표달성 스탯 업데이트 (항목당 0.1점, 하루 최대 0.5점)
+      const achievementCount = progress?.dailyLpStatus?.[todayKey]?.achievementCount || 0;
+      if (achievementCount < 5) {
+        batch.update(progressRef, { 
+          'stats.achievement': increment(0.1),
+          [`dailyLpStatus.${todayKey}.achievementCount`]: increment(1)
+        });
+      }
 
-      // 계획 보너스 체크 (3개 이상 작성 & 모두 완료 시 +100 LP)
+      // 계획 보너스 LP 체크 (3개 이상 작성 & 모두 완료 시 +100 LP)
       const currentStudyTasks = todayPlans.filter(p => p.category === 'study' || !p.category);
       const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
       
