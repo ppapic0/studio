@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -80,6 +81,12 @@ export default function DashboardPage() {
 
   if (activeMembership) {
     const userRole = activeMembership.role;
+    
+    // 선생님 또는 관리자인 경우 이미지와 동일한 프리미엄 관제 대시보드만 표시
+    if (userRole === 'teacher' || userRole === 'centerAdmin') {
+      return <TeacherDashboard isActive={true} />;
+    }
+
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -87,14 +94,12 @@ export default function DashboardPage() {
             {userRole === 'parent' ? `${user?.displayName} 학부모님, 반갑습니다!` : `${user?.displayName}님, 반가워요!`}
           </h1>
           <Badge variant="secondary" className="h-7 px-3 rounded-full font-black bg-primary text-white border-none text-[11px] uppercase whitespace-nowrap shrink-0">
-            {userRole === 'centerAdmin' ? '관리자' : userRole === 'teacher' ? '선생님' : userRole === 'parent' ? '학부모' : '학생'}
+            {userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
         </div>
         
         <div className="flex flex-col gap-8">
           <StudentDashboard isActive={userRole === 'student'} />
-          <TeacherDashboard isActive={userRole === 'teacher'} />
-          <AdminDashboard isActive={userRole === 'centerAdmin'} />
           <ParentDashboard isActive={userRole === 'parent'} />
         </div>
       </div>
