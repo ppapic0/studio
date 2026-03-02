@@ -111,9 +111,8 @@ export default function InviteCodesPage() {
     // 학생이 아닐 경우 반 정보를 무시합니다.
     const finalClassName = newCode.role === 'student' ? newCode.className.trim() : '';
 
-    const data = {
+    const data: any = {
       intendedRole: newCode.role,
-      targetClassName: finalClassName || undefined,
       maxUses: Number(newCode.maxUses),
       usedCount: 0,
       expiresAt: expiresAt,
@@ -123,6 +122,11 @@ export default function InviteCodesPage() {
       updatedAt: serverTimestamp(),
       centerId: activeMembership.id,
     };
+
+    // undefined 에러 방지를 위해 값이 있을 때만 필드 추가
+    if (finalClassName) {
+      data.targetClassName = finalClassName;
+    }
 
     setDoc(codeRef, data, { merge: true })
       .then(() => {
