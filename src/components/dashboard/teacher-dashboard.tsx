@@ -36,7 +36,9 @@ import {
   Grid3X3,
   Save,
   History,
-  Timer
+  Timer,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -55,7 +57,7 @@ import {
   setDoc,
   getDocs
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { 
@@ -142,6 +144,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
+  // 센터 전체 학생의 오늘 계획 데이터 가져오기 (지각/미작성 체크용)
+  const plansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return query(
+      collectionGroup(firestore, 'items'),
+      where('centerId', '==', centerId),
+      where('dateKey', '==', todayKey),
+      where('category', '==', 'schedule')
+    );
+  }, [firestore, centerId, todayKey]);
+  const { data: centerTodayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive });
+
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     const todayDate = new Date();
@@ -163,8 +177,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, studentMembers, searchTerm]);
 
+  // 학생별 지각 및 계획 작성 여부 판단 로직
+  const getStudentStatusLogic = (studentId: string, status: string, totalMinutes: number) => {
+    if (!centerTodayPlans) return { isAlert: false, schedule: { in: null, out: null } };
+
+    const myPlans = centerTodayPlans.filter(p => p.studentId === studentId);
+    const inItem = myPlans.find(p => p.title.includes('등원'));
+    const outItem = myPlans.find(p => p.title.includes('하원'));
+
+    const schedule = {
+      in: inItem ? inItem.title.split(': ')[1] || null : null,
+      out: outItem ? outItem.title.split(': ')[1] || null : null
+    };
+
+    // 1. 미작성자 체크 (등원 혹은 하원 중 하나라도 없으면)
+    if (!schedule.in || !schedule.out) {
+      return { isAlert: status === 'absent' && totalMinutes === 0, schedule };
+    }
+
+    // 2. 지각 체크
+    if (status === 'absent' && totalMinutes === 0) {
+      const [h, m] = schedule.in.split(':').map(Number);
+      const plannedTime = new Date();
+      plannedTime.setHours(h, m, 0, 0);
+      
+      if (now > plannedTime.getTime()) {
+        return { isAlert: true, schedule };
+      }
+    }
+
+    return { isAlert: false, schedule };
+  };
+
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
-    if (!mounted || now === 0) return { session: '0h 0m', total: '0h 0m', isStudying: false };
+    if (!mounted || now === 0) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
     
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     const cumulativeMinutes = studentLog?.totalMinutes || 0;
@@ -189,6 +235,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return {
       session: formatTime(sessionMinutes),
       total: formatTime(totalMinutes),
+      totalMins: totalMinutes,
       isStudying: status === 'studying' || isRecentlyActive
     };
   };
@@ -203,7 +250,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let totalMins = 0;
     let allLiveMinutes: number[] = [];
 
-    // Use built-in Map constructor by prefixing with globalThis to avoid collision with lucide icon
     const attendanceMap = new globalThis.Map(attendanceList?.map(a => [a.id, a]));
 
     for (let col = 0; col < gridCols; col++) {
@@ -212,27 +258,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
         const seatData = attendanceMap.get(seatId);
         
-        const type = seatData?.type || 'seat';
-        if (type === 'seat') {
+        if (!seatData || seatData.type !== 'aisle') {
           totalSeatsCount++;
           const studentId = seatData?.studentId;
           if (studentId) {
             const studentLog = todayLogs?.find(l => l.studentId === studentId);
             const logMins = studentLog?.totalMinutes || 0;
-            const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
-            const isRecentlyActive = (now - logUpdatedAt) < 60000;
             const status = seatData?.status || 'absent';
 
             let sessionMins = 0;
-            if ((status === 'studying' || isRecentlyActive) && seatData?.lastCheckInAt) {
+            if (status === 'studying' && seatData?.lastCheckInAt) {
               sessionMins = Math.floor((now - seatData.lastCheckInAt.toMillis()) / 60000);
             }
 
-            const currentTotal = logMins + (sessionMins > 0 ? sessionMins : 0);
+            const currentTotal = logMins + sessionMins;
             totalMins += currentTotal;
             allLiveMinutes.push(currentTotal);
 
-            if (status === 'studying' || isRecentlyActive) studying++;
+            if (status === 'studying') studying++;
             else if (status === 'absent') absent++;
             else if (status === 'away' || status === 'break') away++;
           }
@@ -501,11 +544,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       const student = students?.find(s => s.id === seat?.studentId);
                       
                       const timeInfo = student ? getStudentStudyTimes(student.id, seat.status, seat.lastCheckInAt) : null;
+                      const statusLogic = student ? getStudentStatusLogic(student.id, seat.status, timeInfo?.totalMins || 0) : { isAlert: false };
 
                       const isAisle = seat?.type === 'aisle';
                       const isStudying = timeInfo?.isStudying;
-                      const isAbsent = student && !isStudying && seat?.status === 'absent';
-                      const isAway = seat?.status === 'away' || seat?.status === 'break';
+                      const isAlert = !isEditMode && statusLogic.isAlert;
+                      const isAway = !isEditMode && (seat?.status === 'away' || seat?.status === 'break');
 
                       return (
                         <div 
@@ -517,10 +561,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
                               : isStudying 
                                 ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
-                                : isAway
-                                  ? "bg-amber-500 border-amber-600 text-white"
-                                  : isAbsent 
-                                    ? "bg-rose-50 border-rose-300 text-rose-600" 
+                                : isAlert
+                                  ? "bg-rose-500 border-rose-600 text-white animate-pulse shadow-lg shadow-rose-200"
+                                  : isAway
+                                    ? "bg-amber-500 border-amber-600 text-white"
                                     : student 
                                       ? "bg-white border-primary/30 text-primary" 
                                       : "bg-white border-primary/40 text-primary/10 hover:border-primary/60",
@@ -528,7 +572,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           )}
                         >
                           {!isAisle && (
-                            <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
+                            <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAlert || isAway ? "opacity-60" : "opacity-40")}>
                               {seatNo}
                             </span>
                           )}
@@ -539,14 +583,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="flex flex-col items-center gap-0 w-full px-0.5">
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <div className="flex flex-col items-center leading-tight">
-                                <span className={cn("text-[7px] font-bold tracking-tight", isStudying ? "text-white/90" : "text-muted-foreground")}>
+                                <span className={cn("text-[7px] font-bold tracking-tight", isStudying || isAlert || isAway ? "text-white/90" : "text-muted-foreground")}>
                                   LIVE: {timeInfo?.session}
                                 </span>
-                                <span className={cn("text-[7px] font-bold tracking-tight opacity-60", isStudying ? "text-white/70" : "text-muted-foreground/60")}>
+                                <span className={cn("text-[7px] font-bold tracking-tight opacity-60", isStudying || isAlert || isAway ? "text-white/70" : "text-muted-foreground/60")}>
                                   T: {timeInfo?.total}
                                 </span>
                               </div>
-                              {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
+                              {isAlert && <AlertCircle className="h-2 w-2 text-white/80 mt-0.5" />}
+                              {isStudying && !isAlert && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
                           ) : (
                             <div className="flex flex-col items-center">
@@ -609,95 +654,125 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-lg flex flex-col")}>
           {selectedSeat && (
             <>
-              <div className={cn("p-10 text-white relative shrink-0", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
-                <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><Sparkles className="h-32 w-32" /></div>
-                <DialogHeader className="relative z-10">
-                  <DialogTitle className="text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT {selectedSeat.seatNo}</Badge>
-                    <Badge className="bg-white/20 text-white border-none font-black px-3 py-1 uppercase">{selectedSeat.status}</Badge>
-                  </div>
-                </DialogHeader>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#fafafa]">
-                <div className="p-8 space-y-8">
-                  {selectedSeat.studentId && (
-                    <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
-                      <div className="flex-1 text-center">
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Live Session</p>
-                        <p className="text-2xl font-black text-blue-600 tabular-nums">{getStudentStudyTimes(selectedSeat.studentId, selectedSeat.status, selectedSeat.lastCheckInAt).session}</p>
-                      </div>
-                      <div className="w-px h-10 bg-border/50 self-center" />
-                      <div className="flex-1 text-center">
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Today Total</p>
-                        <p className="text-2xl font-black text-primary tabular-nums">{getStudentStudyTimes(selectedSeat.studentId, selectedSeat.status, selectedSeat.lastCheckInAt).total}</p>
-                      </div>
-                    </div>
-                  )}
+              {(() => {
+                const studentId = selectedSeat.studentId;
+                const timeInfo = studentId ? getStudentStudyTimes(studentId, selectedSeat.status, selectedSeat.lastCheckInAt) : null;
+                const statusLogic = studentId ? getStudentStatusLogic(studentId, selectedSeat.status, timeInfo?.totalMins || 0) : null;
+                const isAlert = !isEditMode && statusLogic?.isAlert;
 
-                  {isEditMode ? (
-                    <div className="grid gap-3">
-                      <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">
-                        {isSaving ? <Loader2 className="animate-spin" /> : '좌석 배정 해제'}
-                      </Button>
-                      <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="w-full h-12 rounded-xl font-black gap-2 border-2">
-                        <ArrowRightLeft className="h-4 w-4" /> 통로로 전환하기
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button onClick={() => handleStatusUpdate('studying')} className="h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-3 flex flex-col shadow-xl active:scale-95 transition-all">
-                        <Zap className="h-6 w-6 fill-current" />
-                        <span className="text-lg">입실(공부 시작)</span>
-                      </Button>
-                      <Button variant="outline" onClick={() => handleStatusUpdate('absent')} className="h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-3 flex flex-col active:scale-95 transition-all">
-                        <AlertCircle className="h-6 w-6" />
-                        <span className="text-lg">퇴실(공부 종료)</span>
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                      <h4 className="text-xs font-black uppercase text-primary/60 tracking-widest flex items-center gap-2">
-                        <History className="h-4 w-4" /> 오늘의 몰입 히스토리
-                      </h4>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">{todayKey}</span>
+                return (
+                  <>
+                    <div className={cn("p-10 text-white relative shrink-0", 
+                      isAlert ? "bg-rose-600" : selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
+                      <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><Sparkles className="h-32 w-32" /></div>
+                      <DialogHeader className="relative z-10">
+                        <DialogTitle className="text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT {selectedSeat.seatNo}</Badge>
+                          <Badge className="bg-white/20 text-white border-none font-black px-3 py-1 uppercase">{selectedSeat.status}</Badge>
+                          {isAlert && <Badge className="bg-white text-rose-600 border-none font-black px-3 py-1 uppercase">LATE / NO PLAN</Badge>}
+                        </div>
+                      </DialogHeader>
                     </div>
                     
-                    <div className="grid gap-2">
-                      {sessionsLoading ? (
-                        <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
-                      ) : selectedStudentSessions.length === 0 ? (
-                        <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-xs text-muted-foreground">
-                          아직 완료된 세션이 없습니다.
-                        </div>
-                      ) : (
-                        selectedStudentSessions.map((session) => (
-                          <div key={session.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between group">
-                            <div className="flex items-center gap-4">
-                              <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center">
-                                <Timer className="h-5 w-5 text-primary/40" />
-                              </div>
-                              <div className="grid leading-tight">
-                                <span className="font-black text-sm">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase">Study Session Captured</span>
-                              </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#fafafa]">
+                      <div className="p-8 space-y-8">
+                        {/* 등하원 계획 노출 영역 */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                              <LogIn className="h-3 w-3 text-blue-500" /> 등원 예정
                             </div>
-                            <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-xs px-3">{session.durationMinutes}분</Badge>
+                            <p className="text-2xl font-black text-primary tabular-nums">{statusLogic?.schedule.in || '--:--'}</p>
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                          <div className="p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                              <LogOut className="h-3 w-3 text-rose-500" /> 하원 예정
+                            </div>
+                            <p className="text-2xl font-black text-primary tabular-nums">{statusLogic?.schedule.out || '--:--'}</p>
+                          </div>
+                        </div>
 
-                  <div className="pt-4 border-t border-dashed">
-                    <Button variant="secondary" className="w-full h-16 rounded-2xl font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/5" asChild>
-                      <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}><User className="h-5 w-5 opacity-40" />상세 분석 리포트 보기<ChevronRight className="ml-auto h-5 w-5 opacity-20" /></Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
+                        {selectedSeat.studentId && (
+                          <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
+                            <div className="flex-1 text-center">
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Live Session</p>
+                              <p className="text-2xl font-black text-blue-600 tabular-nums">{timeInfo?.session}</p>
+                            </div>
+                            <div className="w-px h-10 bg-border/50 self-center" />
+                            <div className="flex-1 text-center">
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Today Total</p>
+                              <p className="text-2xl font-black text-primary tabular-nums">{timeInfo?.total}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {isEditMode ? (
+                          <div className="grid gap-3">
+                            <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">
+                              {isSaving ? <Loader2 className="animate-spin" /> : '좌석 배정 해제'}
+                            </Button>
+                            <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="w-full h-12 rounded-xl font-black gap-2 border-2">
+                              <ArrowRightLeft className="h-4 w-4" /> 통로로 전환하기
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-4">
+                            <Button onClick={() => handleStatusUpdate('studying')} className="h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-3 flex flex-col shadow-xl active:scale-95 transition-all">
+                              <Zap className="h-6 w-6 fill-current" />
+                              <span className="text-lg">입실(공부 시작)</span>
+                            </Button>
+                            <Button variant="outline" onClick={() => handleStatusUpdate('absent')} className="h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-3 flex flex-col active:scale-95 transition-all">
+                              <AlertCircle className="h-6 w-6" />
+                              <span className="text-lg">퇴실(공부 종료)</span>
+                            </Button>
+                          </div>
+                        )}
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between px-1">
+                            <h4 className="text-xs font-black uppercase text-primary/60 tracking-widest flex items-center gap-2">
+                              <History className="h-4 w-4" /> 오늘의 몰입 히스토리
+                            </h4>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{todayKey}</span>
+                          </div>
+                          
+                          <div className="grid gap-2">
+                            {sessionsLoading ? (
+                              <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
+                            ) : selectedStudentSessions.length === 0 ? (
+                              <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-xs text-muted-foreground">
+                                아직 완료된 세션이 없습니다.
+                              </div>
+                            ) : (
+                              selectedStudentSessions.map((session) => (
+                                <div key={session.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between group">
+                                  <div className="flex items-center gap-4">
+                                    <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center">
+                                      <Timer className="h-5 w-5 text-primary/40" />
+                                    </div>
+                                    <div className="grid leading-tight">
+                                      <span className="font-black text-sm">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
+                                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Study Session Captured</span>
+                                    </div>
+                                  </div>
+                                  <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-xs px-3">{session.durationMinutes}분</Badge>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-dashed">
+                          <Button variant="secondary" className="w-full h-16 rounded-2xl font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/5" asChild>
+                            <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}><User className="h-5 w-5 opacity-40" />상세 분석 리포트 보기<ChevronRight className="ml-auto h-5 w-5 opacity-20" /></Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
               <DialogFooter className="p-6 bg-white border-t shrink-0 flex justify-center"><Button variant="ghost" onClick={() => setIsManaging(false)} className="font-bold text-muted-foreground">닫기</Button></DialogFooter>
             </>
           )}
