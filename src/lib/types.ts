@@ -158,6 +158,31 @@ export interface AttendanceCurrent {
   studentId?: string; 
 }
 
+export interface AttendanceRecord {
+  id: string;
+  studentId: string;
+  studentName?: string;
+  centerId: string;
+  dateKey: string;
+  status: 'confirmed_present' | 'confirmed_absent' | 'confirmed_late' | 'excused_absent' | 'requested';
+  updatedAt: Timestamp;
+  confirmedByUserId?: string;
+}
+
+export interface AttendanceRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  centerId: string;
+  type: 'late' | 'absence';
+  date: string; // YYYY-MM-DD
+  reason: string;
+  status: 'requested' | 'approved' | 'rejected';
+  penaltyApplied: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface CounselingLog {
   id: string;
   studentId: string;

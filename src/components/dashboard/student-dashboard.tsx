@@ -38,7 +38,8 @@ import {
   BellRing,
   Info,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  ClipboardCheck
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -48,9 +49,9 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest } from '@/lib/types';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc } from 'firebase/firestore';
+import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
@@ -66,6 +67,9 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import Link from 'next/link';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const TIERS = [
   { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
@@ -310,7 +314,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               {sessions.map((session) => (
                 <div key={session.id} className="bg-white p-4 rounded-xl border-2 border-primary/5 flex items-center justify-between shadow-sm group">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
                       <Timer className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="grid leading-tight">
@@ -389,10 +393,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const currentLp = progress?.seasonLp || 0;
   
-  // 벌점 패널티 계산
   const penaltyPoints = progress?.penaltyPoints || 0;
   const penaltyRate = useMemo(() => {
-    if (penaltyPoints >= 80) return 0.10; // 강등 즉시 검토 (패널티 강화)
+    if (penaltyPoints >= 80) return 0.10;
     if (penaltyPoints >= 60) return 0.08;
     if (penaltyPoints >= 40) return 0.05;
     if (penaltyPoints >= 20) return 0.03;
@@ -417,6 +420,70 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
+  // 지각/결석 신청서 상태 및 로직
+  const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
+  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [requestReason, setRequestReason] = useState('');
+  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+
+  const myRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
+      where('studentId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: myRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
+    if (requestReason.trim().length < 10) {
+      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
+      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
+      
+      const requestData: any = {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: requestReason.trim(),
+        status: 'requested',
+        penaltyApplied: isTodayRequest,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
+
+      // 당일 신청 패널티 부여 (+5점)
+      if (isTodayRequest) {
+        batch.update(progressRef!, {
+          penaltyPoints: increment(5),
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: "당일 신청으로 벌점 5점이 부과되었습니다." });
+      }
+
+      await batch.commit();
+      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      setRequestReason('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
+
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
@@ -428,7 +495,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const updateData: any = { updatedAt: serverTimestamp() };
       
       if (sessionMinutes > 0) {
-        // 벌점 패널티가 적용된 최종 LP 계산
         let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
         updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
@@ -641,7 +707,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </Card>
 
-      {/* 신규 관리 섹션 (데일리 리포트 / 신청서 / 벌점) */}
       <section className={cn("grid gap-2.5", isMobile ? "grid-cols-3" : "grid-cols-3")}>
         <Link href="/dashboard/study-history">
           <Card className={cn(
@@ -673,18 +738,99 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </Card>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
-            <div className="bg-amber-500 p-8 text-white relative">
+          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+            <div className="bg-amber-500 p-8 text-white relative shrink-0">
               <BellRing className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
                 <DialogDescription className="text-white/70 font-bold">지각 또는 결석 사유를 입력하여 제출하세요.</DialogDescription>
               </DialogHeader>
             </div>
-            <div className="p-8 space-y-4">
-              <p className="text-center py-10 font-bold text-muted-foreground italic">준비 중인 기능입니다.</p>
+            <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
+              <div className="p-8 space-y-8">
+                <div className="grid gap-6 bg-white p-6 rounded-[2rem] border shadow-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">신청 종류</Label>
+                      <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
+                        <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="late">지각 (Late)</SelectItem>
+                          <SelectItem value="absence">결석 (Absence)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
+                      <Input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className="rounded-xl border-2 h-12 font-bold" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center ml-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">사유 (최소 10자)</Label>
+                      <span className={cn("text-[9px] font-bold", requestReason.length < 10 ? "text-rose-500" : "text-emerald-500")}>{requestReason.length}/10자</span>
+                    </div>
+                    <Textarea 
+                      placeholder="사유를 상세히 입력해 주세요. (예: 병원 진료, 학교 행사 참여 등)" 
+                      value={requestReason}
+                      onChange={e => setRequestReason(e.target.value)}
+                      className="rounded-2xl border-2 min-h-[100px] font-bold text-sm resize-none"
+                    />
+                  </div>
+
+                  {requestDate === format(new Date(), 'yyyy-MM-dd') && (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3">
+                      <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] font-bold text-rose-900 leading-relaxed">
+                        **당일 신청 알림**: 당일 지각/결석 신청 시 시스템 규정에 따라 **벌점 5점이 즉시 부과**됩니다.
+                      </p>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={handleRequestSubmit} 
+                    disabled={isRequestSubmitting || requestReason.length < 10} 
+                    className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 active:scale-95 transition-all"
+                  >
+                    {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
+                    <History className="h-3.5 w-3.5" /> 최근 신청 내역 (최근 5건)
+                  </h4>
+                  <div className="grid gap-2">
+                    {myRequests?.length === 0 ? (
+                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">신청 내역이 없습니다.</div>
+                    ) : (
+                      myRequests?.map(req => (
+                        <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>
+                              {req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}
+                            </div>
+                            <div className="grid leading-tight">
+                              <span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span>
+                            </div>
+                          </div>
+                          <Badge className={cn(
+                            "font-black text-[9px] border-none px-2",
+                            req.status === 'requested' ? "bg-muted text-muted-foreground" : 
+                            req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+                          )}>
+                            {req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <DialogFooter className="p-6 border-t"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+            <DialogFooter className="p-6 border-t shrink-0 bg-white"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
           </DialogContent>
         </Dialog>
 
