@@ -506,80 +506,80 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const isJacob = user?.email === 'jacob444@naver.com';
 
   return (
-    <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-10")}>
+    <div className={cn("flex flex-col relative z-10", isMobile ? "gap-2.5" : "gap-10")}>
       <section className={cn(
         "group relative overflow-hidden text-white shadow-2xl transition-all duration-700 bg-gradient-to-br",
         currentTier.gradient, currentTier.shadow,
-        isMobile ? "rounded-[1.5rem] p-5" : "rounded-[3rem] p-12"
+        isMobile ? "rounded-[1.25rem] p-4" : "rounded-[3rem] p-12"
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
-          {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-24 w-24" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-24 w-24" : "h-64 w-64")} />}
+          {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
-        <div className={cn("relative z-10 flex flex-col gap-4", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
-          <div className={isMobile ? "space-y-2" : "space-y-4"}>
-            <div className="flex flex-col gap-1">
-              <Badge className={cn("w-fit bg-white/20 text-white border-none font-black tracking-[0.2em] uppercase px-2 py-0.5", isMobile ? "mx-auto text-[7px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
-              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-xl" : "text-6xl")}>
+        <div className={cn("relative z-10 flex flex-col gap-3", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
+          <div className={isMobile ? "space-y-1.5" : "space-y-4"}>
+            <div className="flex flex-col gap-0.5">
+              <Badge className={cn("w-fit bg-white/20 text-white border-none font-black tracking-[0.2em] uppercase px-2 py-0.5", isMobile ? "mx-auto text-[6px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
+              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-lg" : "text-6xl")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
-            <div className={cn("flex items-center gap-2 bg-white/10 backdrop-blur-xl w-fit px-3 py-1.5 rounded-full border border-white/20 shadow-2xl", isMobile ? "mx-auto" : "md:mx-0")}>
-              <span className="relative flex h-2 w-2"><span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isTimerActive ? "bg-accent" : "bg-white")}></span><span className={cn("relative inline-flex rounded-full h-2 w-2", isTimerActive ? "bg-accent" : "bg-white")}></span></span>
-              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>Performance Engine</span>
+            <div className={cn("flex items-center gap-1.5 bg-white/10 backdrop-blur-xl w-fit px-2.5 py-1 rounded-full border border-white/20 shadow-2xl", isMobile ? "mx-auto" : "md:mx-0")}>
+              <span className="relative flex h-1.5 w-1.5"><span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isTimerActive ? "bg-accent" : "bg-white")}></span><span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", isTimerActive ? "bg-accent" : "bg-white")}></span></span>
+              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[7px]" : "text-[11px]")}>Performance Engine</span>
             </div>
           </div>
-          <div className={cn("flex items-center gap-3", isMobile ? "flex-col w-full" : "flex-row")}>
+          <div className={cn("flex items-center gap-2.5", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
-              <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-[1.25rem] border border-white/10 shadow-2xl px-6 py-3", isMobile ? "w-full" : "")}>
-                <span className="text-[8px] font-black uppercase tracking-widest opacity-50 mb-1">Live Session</span>
-                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-3xl" : "text-6xl")}>
+              <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-xl border border-white/10 shadow-2xl px-4 py-2", isMobile ? "w-full" : "")}>
+                <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
+                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
                   {Math.floor(localSeconds / 60).toString().padStart(2, '0')}:{(localSeconds % 60).toString().padStart(2, '0')}
                 </span>
               </div>
             )}
             <button className={cn(
-              "w-full rounded-[1.25rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap",
-              isMobile ? "h-14 text-lg px-8" : "h-24 px-16 text-3xl",
+              "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap",
+              isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
               isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
             )} onClick={handleStudyStartStop}>
-              {isTimerActive ? <>트랙 종료 <Square className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} fill="currentColor" /></> : <>트랙 시작 <Play className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} fill="currentColor" /></>}
+              {isTimerActive ? <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></> : <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>}
             </button>
           </div>
         </div>
       </section>
 
-      <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "sm:grid-cols-2")}>
+      <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "sm:grid-cols-2")}>
         <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={h} m={m} isMobile={isMobile} />
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
       </div>
 
-      <Card className={cn("border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "rounded-[1.5rem]" : "")}>
+      <Card className={cn("border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "rounded-[1.25rem]" : "")}>
         <div className="grid grid-cols-1 lg:grid-cols-3">
           <div className="lg:col-span-2 border-r border-dashed border-muted">
-            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-4" : "p-10")}>
+            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-3.5" : "p-10")}>
               <div className="flex items-center justify-between">
-                <CardTitle className={cn("font-black flex items-center gap-3 tracking-tighter text-primary", isMobile ? "text-lg" : "text-3xl")}>
-                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 계획트랙
+                <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-primary", isMobile ? "text-base" : "text-3xl")}>
+                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-4 w-4" : "h-8 w-8")} /> 계획트랙
                 </CardTitle>
-                <Badge variant="secondary" className={cn("bg-emerald-500 text-white border-none font-black h-6 uppercase tracking-widest", isMobile ? "text-[8px] px-1.5" : "text-[10px] px-3")}>
+                <Badge variant="secondary" className={cn("bg-emerald-500 text-white border-none font-black h-5 uppercase tracking-widest", isMobile ? "text-[7px] px-1" : "text-[10px] px-3")}>
                   {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className={cn("bg-emerald-50/5", isMobile ? "p-4" : "p-10")}>
+            <CardContent className={cn("bg-emerald-50/5", isMobile ? "p-3.5" : "p-10")}>
               <div className="grid gap-2 sm:gap-4">
                 {studyTasks.length === 0 ? (
-                  <div className="py-10 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-2xl">계획이 없습니다.</div>
+                  <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-emerald-200 rounded-xl">계획이 없습니다.</div>
                 ) : studyTasks.map((task) => (
                   <div key={task.id} className={cn(
-                    "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-500 relative group", 
+                    "flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-500 relative group", 
                     task.done ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white border-transparent shadow-sm",
-                    isMobile ? "p-3" : ""
+                    isMobile ? "p-2.5" : ""
                   )}>
-                    <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} className={cn("rounded-lg border-2", isMobile ? "h-6 w-6" : "h-8 w-8")} />
+                    <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} className={cn("rounded-md border-2", isMobile ? "h-5 w-5" : "h-8 w-8")} />
                     <div className="flex-1 grid gap-0.5">
-                      <Label htmlFor={task.id} className={cn("font-black tracking-tight leading-snug truncate", isMobile ? "text-xs" : "text-lg", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>{task.title}</Label>
-                      {task.targetMinutes && <span className="text-[8px] font-black text-muted-foreground/40 uppercase flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
+                      <Label htmlFor={task.id} className={cn("font-black tracking-tight leading-snug truncate", isMobile ? "text-[11px]" : "text-lg", task.done ? "line-through text-muted-foreground/40 italic" : "text-primary/80")}>{task.title}</Label>
+                      {task.targetMinutes && <span className="text-[7px] font-black text-muted-foreground/40 uppercase flex items-center gap-1"><Clock className="h-2 w-2" /> {task.targetMinutes}m Goal</span>}
                     </div>
                   </div>
                 ))}
@@ -588,18 +588,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </div>
 
           <div className="lg:col-span-1 bg-amber-50/20">
-            <CardHeader className={cn("bg-amber-100/30 border-b", isMobile ? "p-4" : "p-10")}>
-              <CardTitle className={cn("font-black flex items-center gap-3 tracking-tighter text-amber-700", isMobile ? "text-lg" : "text-2xl")}>
-                <Timer className={cn("text-amber-600", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 루틴
+            <CardHeader className={cn("bg-amber-100/30 border-b", isMobile ? "p-3.5" : "p-10")}>
+              <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-amber-700", isMobile ? "text-base" : "text-2xl")}>
+                <Timer className={cn("text-amber-600", isMobile ? "h-4 w-4" : "h-8 w-8")} /> 루틴
               </CardTitle>
             </CardHeader>
-            <CardContent className={cn("flex flex-col gap-3", isMobile ? "p-4" : "p-10")}>
+            <CardContent className={cn("flex flex-col gap-2", isMobile ? "p-3.5" : "p-10")}>
               {scheduleItems.length === 0 ? (
-                <div className="py-10 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-amber-200 rounded-2xl">루틴이 없습니다.</div>
+                <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-amber-200 rounded-xl">루틴이 없습니다.</div>
               ) : scheduleItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white border-2 border-transparent shadow-sm">
-                  <span className="font-black text-[11px] truncate w-2/3">{item.title.split(': ')[0]}</span>
-                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-[10px] px-2 h-6 border-amber-200 bg-amber-50/50">
+                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white border-2 border-transparent shadow-sm">
+                  <span className="font-black text-[10px] truncate w-2/3">{item.title.split(': ')[0]}</span>
+                  <Badge variant="outline" className="font-mono font-black text-amber-600 text-[9px] px-1.5 h-5 border-amber-200 bg-amber-50/50">
                     {item.title.split(': ')[1] || '--:--'}
                   </Badge>
                 </div>
