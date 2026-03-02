@@ -6,78 +6,78 @@
 
 @layer base {
   :root {
-    /* 기존 40 25% 96%에서 더욱 차분하고 고급스러운 샌드 오프화이트로 변경 */
-    --background: 36 20% 95%;
-    --foreground: 0 0% 18%;
+    /* 하이엔드 에디토리얼 감성의 프리미엄 토프/그레이 배경으로 변경 */
+    --background: 27 15% 94%;
+    --foreground: 0 0% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 18%;
+    --card-foreground: 0 0% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 18%;
+    --popover-foreground: 0 0% 15%;
 
-    --primary: 27 25% 28%;
-    --primary-foreground: 40 25% 96%;
+    --primary: 27 25% 25%;
+    --primary-foreground: 40 25% 98%;
 
-    --secondary: 36 17% 92%;
-    --secondary-foreground: 27 25% 28%;
+    --secondary: 30 10% 90%;
+    --secondary-foreground: 27 25% 25%;
 
-    --muted: 36 17% 92%;
-    --muted-foreground: 27 25% 40%;
+    --muted: 30 10% 90%;
+    --muted-foreground: 27 25% 45%;
 
-    --accent: 30 31% 48%;
-    --accent-foreground: 40 25% 98%;
+    --accent: 30 31% 45%;
+    --accent-foreground: 40 25% 100%;
 
-    --destructive: 33 29% 65%;
-    --destructive-foreground: 0 0% 18%;
+    --destructive: 33 29% 60%;
+    --destructive-foreground: 0 0% 15%;
 
-    --border: 36 17% 87%;
-    --input: 36 17% 87%;
-    --ring: 30 31% 48%;
+    --border: 30 10% 85%;
+    --input: 30 10% 85%;
+    --ring: 30 31% 45%;
 
     --radius: 1.5rem;
 
-    --chart-1: 27 25% 28%;
-    --chart-2: 30 31% 48%;
-    --chart-3: 105 7% 58%;
-    --chart-4: 33 29% 65%;
-    --chart-5: 36 17% 80%;
+    --chart-1: 27 25% 25%;
+    --chart-2: 30 31% 45%;
+    --chart-3: 105 7% 55%;
+    --chart-4: 33 29% 60%;
+    --chart-5: 36 17% 75%;
   }
 
   .dark {
-    --background: 27 15% 15%;
-    --foreground: 40 10% 85%;
+    --background: 27 15% 12%;
+    --foreground: 40 10% 90%;
 
-    --card: 27 15% 18%;
-    --card-foreground: 40 10% 85%;
+    --card: 27 15% 15%;
+    --card-foreground: 40 10% 90%;
 
-    --popover: 27 15% 18%;
-    --popover-foreground: 40 10% 85%;
+    --popover: 27 15% 15%;
+    --popover-foreground: 40 10% 90%;
 
-    --primary: 30 31% 68%;
-    --primary-foreground: 27 25% 10%;
+    --primary: 30 31% 70%;
+    --primary-foreground: 27 25% 8%;
 
-    --secondary: 27 15% 25%;
-    --secondary-foreground: 40 10% 85%;
+    --secondary: 27 15% 22%;
+    --secondary-foreground: 40 10% 90%;
 
-    --muted: 27 15% 25%;
-    --muted-foreground: 40 10% 65%;
+    --muted: 27 15% 22%;
+    --muted-foreground: 40 10% 70%;
 
-    --accent: 30 31% 58%;
-    --accent-foreground: 27 25% 10%;
+    --accent: 30 31% 60%;
+    --accent-foreground: 27 25% 8%;
 
-    --destructive: 33 29% 55%;
-    --destructive-foreground: 40 10% 85%;
+    --destructive: 33 29% 50%;
+    --destructive-foreground: 40 10% 90%;
 
-    --border: 27 15% 30%;
-    --input: 27 15% 30%;
-    --ring: 30 31% 58%;
+    --border: 27 15% 25%;
+    --input: 27 15% 25%;
+    --ring: 30 31% 60%;
     
-    --chart-1: 27 25% 50%;
-    --chart-2: 30 31% 68%;
-    --chart-3: 105 7% 48%;
-    --chart-4: 33 29% 55%;
-    --chart-5: 36 17% 60%;
+    --chart-1: 27 25% 55%;
+    --chart-2: 30 31% 70%;
+    --chart-3: 105 7% 55%;
+    --chart-4: 33 29% 50%;
+    --chart-5: 36 17% 65%;
   }
 }
 
