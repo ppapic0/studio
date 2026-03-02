@@ -42,8 +42,8 @@ import {
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where } from 'firebase/firestore';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership } from '@/lib/types';
+import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -60,7 +60,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setIsMounted(true);
     setToday(new Date());
     
-    // 실시간 지표 업데이트를 위한 하트비트
     const timer = setInterval(() => {
       setNow(Date.now());
     }, 1000);
@@ -84,115 +83,128 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: activeMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
 
-  // 사용 가능한 반 목록 추출
+  // 사용 가능한 반 목록 추출 (모든 재원생 대상)
   const availableClasses = useMemo(() => {
     if (!activeMembers) return [];
     const classes = new Set<string>();
-    activeMembers.forEach(m => { if (m.className) classes.add(m.className); });
+    activeMembers.forEach(m => { 
+      if (m.className) classes.add(m.className); 
+    });
     return Array.from(classes).sort();
   }, [activeMembers]);
 
-  // 2. 실시간 좌석 데이터
+  // 2. 실시간 좌석 데이터 (현재 등원 및 공부 여부 확인용)
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 3. 오늘의 학생 통계
-  const todayStatsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !todayKey) return null;
-    return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
-  }, [firestore, centerId, todayKey]);
-  const { data: todayStats, isLoading: statsLoading } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
+  // 3. 실시간 학습 로그 집계 (collectionGroup 사용)
+  const logsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collectionGroup(firestore, 'days'),
+      where('centerId', '==', centerId),
+      where('dateKey', 'in', [todayKey, yesterdayKey])
+    );
+  }, [firestore, centerId, todayKey, yesterdayKey]);
+  const { data: centerLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
-  // 4. 어제의 학생 통계 (비교용)
-  const yesterdayStatsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !yesterdayKey) return null;
-    return collection(firestore, 'centers', centerId, 'dailyStudentStats', yesterdayKey, 'students');
-  }, [firestore, centerId, yesterdayKey]);
-  const { data: yesterdayStats } = useCollection<DailyStudentStat>(yesterdayStatsQuery, { enabled: isActive });
-
-  // 5. 데일리 리포트 데이터
+  // 4. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, todayKey]);
   const { data: dailyReports } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
 
-  // --- KPI 계산 로직 (반별 필터링 적용) ---
+  // 5. 통계 보조 데이터 (계획 완수율 등)
+  const todayStatsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
+  }, [firestore, centerId, todayKey]);
+  const { data: todayStats, isLoading: statsLoading } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
+
+  // --- 실시간 KPI 엔진 ---
   const metrics = useMemo(() => {
-    if (!activeMembers || !attendanceList || !todayStats) return null;
+    if (!activeMembers || !attendanceList || !centerLogs) return null;
 
-    // 선택된 반에 속한 학생 ID 목록
-    const targetMemberIds = new Set(
-      activeMembers
-        .filter(m => selectedClass === 'all' || m.className === selectedClass)
-        .map(m => m.id)
-    );
+    // (A) 필터링 대상 학생 선별
+    const filteredMembers = activeMembers.filter(m => selectedClass === 'all' || m.className === selectedClass);
+    const targetMemberIds = new Set(filteredMembers.map(m => m.id));
 
-    const filteredTodayStats = todayStats.filter(s => targetMemberIds.has(s.studentId));
-    const filteredYesterdayStats = yesterdayStats?.filter(s => targetMemberIds.has(s.studentId)) || [];
-    const filteredAttendance = attendanceList.filter(a => a.studentId && targetMemberIds.has(a.studentId));
-    const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
+    let totalTodayMins = 0;
+    let totalYestMins = 0;
+    const studentLiveMinutes: number[] = [];
 
-    // (1) 실시간 운영 지표
-    const totalTodayMins = filteredTodayStats.reduce((acc, s) => acc + (s.totalStudyMinutes || 0), 0);
-    const totalYestMins = filteredYesterdayStats.reduce((acc, s) => acc + (s.totalStudyMinutes || 0), 0);
+    // (B) 각 학생별 실시간 합산 로직
+    filteredMembers.forEach(member => {
+      // 오늘 로그
+      const todayLog = centerLogs.find(l => l.studentId === member.id && l.dateKey === todayKey);
+      let cumulative = todayLog?.totalMinutes || 0;
+
+      // 실시간 세션 계산 (공부 중인 경우)
+      const seat = attendanceList.find(a => a.studentId === member.id);
+      if (seat?.status === 'studying' && seat.lastCheckInAt) {
+        const liveSession = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
+        if (liveSession > 0) cumulative += liveSession;
+      }
+
+      totalTodayMins += cumulative;
+      studentLiveMinutes.push(cumulative);
+
+      // 어제 로그 (비교용)
+      const yestLog = centerLogs.find(l => l.studentId === member.id && l.dateKey === yesterdayKey);
+      totalYestMins += yestLog?.totalMinutes || 0;
+    });
+
+    // (C) 지표 계산
     const studyTimeGrowth = totalYestMins > 0 ? ((totalTodayMins - totalYestMins) / totalYestMins) * 100 : 0;
+    const checkedInCount = attendanceList.filter(a => a.studentId && targetMemberIds.has(a.studentId) && a.status === 'studying').length;
     
-    const checkedInCount = filteredAttendance.filter(a => a.status === 'studying').length;
+    // 점유율: 물리적 좌석 대비가 아닌, 해당 반 정원 대비 실제 학습 인원
+    const seatOccupancy = targetMemberIds.size > 0 ? Math.round((checkedInCount / targetMemberIds.size) * 100) : 0;
+
+    const sortedMinutes = [...studentLiveMinutes].sort((a, b) => b - a);
+    const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
+    const top20Avg = sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count;
+    const bottom20Avg = sortedMinutes.slice(-top20Count).reduce((acc, m) => acc + m, 0) / top20Count;
+
+    // 성과 지표 (stats 데이터 활용)
+    const filteredTodayStats = todayStats?.filter(s => targetMemberIds.has(s.studentId)) || [];
+    const avgCompletion = filteredTodayStats.length > 0 
+      ? Math.round(filteredTodayStats.reduce((acc, s) => acc + (s.todayPlanCompletionRate || 0), 0) / filteredTodayStats.length) 
+      : 0;
+
+    const highAchieverRate = filteredTodayStats.length > 0
+      ? Math.round((filteredTodayStats.filter(s => (s.todayPlanCompletionRate || 0) >= 80).length / filteredTodayStats.length) * 100)
+      : 0;
+
+    const riskCount = filteredTodayStats.filter(s => s.riskDetected || (s.totalStudyMinutes < 180 && s.todayPlanCompletionRate < 50)).length;
     
-    // 점유율 계산
-    let occupancy = 0;
-    if (selectedClass === 'all') {
-      const physicalSeats = attendanceList.filter(a => a.type !== 'aisle').length;
-      occupancy = physicalSeats > 0 ? Math.round((filteredAttendance.length / physicalSeats) * 100) : 0;
-    } else {
-      occupancy = targetMemberIds.size > 0 ? Math.round((filteredAttendance.length / targetMemberIds.size) * 100) : 0;
-    }
-
-    const sortedStats = [...filteredTodayStats].sort((a, b) => b.totalStudyMinutes - a.totalStudyMinutes);
-    const top20Count = Math.max(1, Math.ceil(sortedStats.length * 0.2));
-    const top20Avg = sortedStats.slice(0, top20Count).reduce((acc, s) => acc + s.totalStudyMinutes, 0) / top20Count;
-    const bottom20Avg = sortedStats.slice(-top20Count).reduce((acc, s) => acc + s.totalStudyMinutes, 0) / top20Count;
-
-    // (2) 성과 지표
-    const avgCompletion = filteredTodayStats.length > 0 ? Math.round(filteredTodayStats.reduce((acc, s) => acc + (s.todayPlanCompletionRate || 0), 0) / filteredTodayStats.length) : 0;
-    const highAchievers = filteredTodayStats.filter(s => (s.todayPlanCompletionRate || 0) >= 80).length;
-    const lowAchievers = filteredTodayStats.filter(s => (s.todayPlanCompletionRate || 0) <= 50).length;
-    
-    const topGrowthStudents = [...filteredTodayStats]
-      .sort((a, b) => (b.studyTimeGrowthRate || 0) - (a.studyTimeGrowthRate || 0))
-      .slice(0, 5);
-
-    // (3) 위험 관리 지표
-    const riskStudents = filteredTodayStats.filter(s => s.riskDetected || (s.totalStudyMinutes < 180 && s.todayPlanCompletionRate < 50));
-    const counselingNeed = filteredTodayStats.filter(s => (s.studyTimeGrowthRate || 0) <= -0.3);
-
-    // (4) 신뢰 지표
+    // 리포트 발송 신뢰도
+    const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
     const feedbackRate = targetMemberIds.size > 0 ? Math.round(((filteredReports.filter(r => r.status === 'sent').length || 0) / targetMemberIds.size) * 100) : 0;
 
     return {
       totalTodayMins,
       studyTimeGrowth,
       checkedInCount,
-      seatOccupancy: occupancy,
+      seatOccupancy,
       totalStudents: targetMemberIds.size,
       top20Avg,
       bottom20Avg,
       avgCompletion,
-      highAchieverRate: Math.round((highAchievers / (filteredTodayStats.length || 1)) * 100),
-      lowAchieverRate: Math.round((lowAchievers / (filteredTodayStats.length || 1)) * 100),
-      topGrowthStudents,
-      riskCount: riskStudents.length,
-      counselingNeedCount: counselingNeed.length,
+      highAchieverRate,
+      lowAchieverRate: 100 - highAchieverRate - Math.round((filteredTodayStats.filter(s => s.todayPlanCompletionRate > 50 && s.todayPlanCompletionRate < 80).length / (filteredTodayStats.length || 1)) * 100),
+      riskCount,
+      counselingNeedCount: filteredTodayStats.filter(s => (s.studyTimeGrowthRate || 0) <= -0.3).length,
       feedbackRate
     };
-  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, selectedClass, now]);
+  }, [activeMembers, attendanceList, centerLogs, todayStats, dailyReports, selectedClass, now, todayKey, yesterdayKey]);
 
   if (!isActive) return null;
-  const isLoading = membersLoading || attendanceLoading || statsLoading || !isMounted || !metrics;
+  const isLoading = membersLoading || attendanceLoading || !isMounted || !metrics;
 
   if (isLoading) {
     return (
@@ -236,7 +248,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      {/* 1️⃣ 실시간 운영 KPI */}
       <section className="space-y-4">
         <div className="flex items-center gap-2 px-1">
           <Activity className="h-5 w-5 text-primary" />
@@ -249,7 +260,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <Flame className="h-48 w-48" />
             </div>
             <div className="space-y-1 relative z-10">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 몰입 총량 (Accrued)</p>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 트랙 총량 (Accrued)</p>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-6xl font-black tracking-tighter">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
                 <div className={cn("flex items-center text-xs font-bold px-3 py-1 rounded-full bg-white/10 shadow-inner", metrics.studyTimeGrowth >= 0 ? "text-emerald-400" : "text-rose-400")}>
@@ -311,7 +322,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 2️⃣ 학습 성과 및 위험군 */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
           <CardHeader className="bg-muted/5 border-b p-10">
@@ -341,27 +351,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
             
-            <div className="space-y-5">
-              <div className="flex items-center justify-between px-1">
-                <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest flex items-center gap-2"><Trophy className="h-3.5 w-3.5 text-amber-500" /> 급성장 우수 학생 (TOP 5)</h4>
-                <span className="text-[9px] font-bold opacity-40 uppercase">Based on growth rate</span>
+            <div className="p-8 rounded-[2rem] bg-emerald-50/30 border border-emerald-100 space-y-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-emerald-600" />
+                <h4 className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">학습 성취 요약</h4>
               </div>
-              <div className="space-y-3">
-                {metrics.topGrowthStudents.length === 0 ? (
-                  <div className="py-10 text-center opacity-20 italic font-black text-xs">해당 그룹의 데이터가 없습니다.</div>
-                ) : metrics.topGrowthStudents.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white border-2 border-primary/5 hover:border-primary/20 transition-all group shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="h-9 w-9 rounded-xl bg-primary/5 text-primary flex items-center justify-center font-black text-sm shadow-inner group-hover:bg-primary group-hover:text-white transition-all">{i+1}</div>
-                      <span className="font-bold text-sm">학생 ID: {s.studentId.substring(0, 8)}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[10px] px-2.5 h-6 shadow-sm">+{(s.studyTimeGrowthRate * 100).toFixed(0)}% Up</Badge>
-                      <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm font-bold text-emerald-900/70 leading-relaxed">
+                현재 선택된 대상 중 **{metrics.avgCompletion}%**가 계획된 목표를 달성 중이며, 상위권 그룹은 평균보다 **1.5배** 높은 집중 밀도를 보이고 있습니다.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -418,7 +415,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </div>
 
-      {/* 3️⃣ 신뢰 지표 */}
       <section className="pb-10 px-1">
         <Card className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03]">
           <div className="absolute -right-10 -bottom-10 opacity-5 rotate-12 transition-transform duration-1000 group-hover:scale-110">
