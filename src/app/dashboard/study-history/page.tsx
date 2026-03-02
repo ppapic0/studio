@@ -92,6 +92,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
@@ -105,61 +106,6 @@ const SUBJECTS = [
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
-
-/**
- * 리포트 텍스트 파싱 컴포넌트
- */
-function VisualReportViewer({ content }: { content: string }) {
-  const sections = useMemo(() => {
-    // 이모지 기준으로 섹션 분리
-    const parts = content.split(/(?=🕒|✅|📊|💬|🧠)/g);
-    return parts.map(p => p.trim()).filter(Boolean);
-  }, [content]);
-
-  const getSectionIcon = (text: string) => {
-    if (text.includes('출결')) return <Clock className="h-5 w-5 text-blue-600" />;
-    if (text.includes('계획 완수율')) return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
-    if (text.includes('AI 분석')) return <TrendingUp className="h-5 w-5 text-purple-600" />;
-    if (text.includes('코멘트')) return <MessageCircle className="h-5 w-5 text-amber-600" />;
-    if (text.includes('AI 종합 피드백')) return <BrainCircuit className="h-5 w-5 text-rose-600" />;
-    return <Sparkles className="h-5 w-5 text-primary" />;
-  };
-
-  const getSectionColor = (text: string) => {
-    if (text.includes('출결')) return "bg-blue-50/50 border-blue-100";
-    if (text.includes('계획 완수율')) return "bg-emerald-50/50 border-emerald-100";
-    if (text.includes('AI 분석')) return "bg-purple-50/50 border-purple-100";
-    if (text.includes('코멘트')) return "bg-amber-50/50 border-amber-100";
-    if (text.includes('AI 종합 피드백')) return "bg-rose-50/50 border-rose-100";
-    return "bg-muted/30 border-border";
-  };
-
-  return (
-    <div className="space-y-4 animate-in fade-in duration-700">
-      {sections.map((section, idx) => {
-        const lines = section.split('\n');
-        const title = lines[0];
-        const body = lines.slice(1).join('\n');
-        
-        return (
-          <Card key={idx} className={cn("rounded-[1.5rem] border shadow-sm overflow-hidden", getSectionColor(title))}>
-            <CardHeader className="p-5 pb-2 border-b border-white/20">
-              <div className="flex items-center gap-2">
-                {getSectionIcon(title)}
-                <span className="font-black text-sm tracking-tight">{title.replace(/^[^\s]+\s/, '')}</span>
-              </div>
-            </CardHeader>
-            <CardContent className="p-5">
-              <p className="text-sm font-bold text-foreground/80 leading-relaxed whitespace-pre-wrap break-keep">
-                {body}
-              </p>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
@@ -410,7 +356,7 @@ export default function StudyHistoryPage() {
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
-    if (isNaN(hours) || iNaN(mins)) return time12h;
+    if (isNaN(hours) || isNaN(mins)) return time12h;
     if (period === '오후' && hours < 12) hours += 12;
     if (period === '오전' && hours === 12) hours = 0;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;

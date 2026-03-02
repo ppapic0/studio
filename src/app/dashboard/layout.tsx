@@ -4,6 +4,7 @@ import { MainNav } from '@/components/dashboard/main-nav';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { BottomNav } from '@/components/dashboard/bottom-nav';
 import { AppointmentNotifier } from '@/components/dashboard/appointment-notifier';
+import { ReportNotifier } from '@/components/dashboard/report-notifier';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +69,7 @@ export default function DashboardLayout({
 
         {/* Global Notifiers */}
         <AppointmentNotifier />
+        <ReportNotifier />
 
         {/* Bottom Nav */}
         <BottomNav />

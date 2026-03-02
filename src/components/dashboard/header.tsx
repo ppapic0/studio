@@ -71,6 +71,7 @@ import { cn } from '@/lib/utils';
 import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
+import { NotificationBell } from './notification-bell';
 
 export function DashboardHeader() {
   const { user } = useUser();
@@ -208,10 +209,7 @@ export function DashboardHeader() {
           </Button>
         )}
 
-        <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground">
-          <Bell className="h-5 w-5" />
-          <span className="sr-only">알림 열기</span>
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>

@@ -709,7 +709,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </Card>
 
       <section className={cn("grid gap-2.5", isMobile ? "grid-cols-3" : "grid-cols-3")}>
-        <Link href="/dashboard/study-history">
+        <Link href="/dashboard/student-reports">
           <Card className={cn(
             "border-none shadow-lg bg-white/80 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 flex flex-col items-center text-center",
             isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
