@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -55,7 +56,7 @@ import {
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
 import { format, startOfDay } from 'date-fns';
 import { useEffect, useState, useMemo, useRef } from 'react';
@@ -279,6 +280,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
+  // 학생 프로필 정보 (좌석 번호 확인용)
+  const studentProfileRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
+  }, [firestore, activeMembership, user]);
+  const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isActive });
+
   const dailyStatRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', user.uid);
@@ -407,6 +415,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleStudyEndAutomatically = () => {
     if (!isTimerActive) return;
+    
+    // 1. 실시간 좌석 상태 업데이트 (부재로 변경)
+    if (firestore && activeMembership && studentProfile?.seatNo) {
+      const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
+      const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
+      updateDoc(seatRef, { status: 'absent', updatedAt: serverTimestamp() });
+    }
+
     saveStudyTime();
     setIsTimerActive(false);
     setStartTime(null);
@@ -418,6 +434,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
     if (isTimerActive) {
+      // 1. 실시간 좌석 상태 업데이트 (부재로 변경)
+      if (studentProfile?.seatNo) {
+        const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
+        const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
+        updateDoc(seatRef, { status: 'absent', updatedAt: serverTimestamp() });
+      }
+
       saveStudyTime();
       setIsTimerActive(false);
       setStartTime(null);
@@ -426,6 +449,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       toast({ title: "트랙 종료 및 기록 완료" });
     } else {
       const now = Date.now();
+      
+      // 1. 실시간 좌석 상태 업데이트 (공부 중으로 변경)
+      if (studentProfile?.seatNo) {
+        const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
+        const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
+        updateDoc(seatRef, { status: 'studying', updatedAt: serverTimestamp() });
+      }
+
       setStartTime(now);
       setLastActiveCheckTime(now);
       setIsTimerActive(true);
@@ -439,9 +470,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
-
-  if (!isActive) return null;
-  if (!today) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
   const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.floor(localSeconds / 60);
   const h = Math.floor(totalMinutes / 60);
@@ -600,7 +628,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </div>
 
       <div className={cn("grid gap-6", isMobile ? "px-0 grid-cols-1" : "lg:grid-cols-3")}>
-        {/* 오늘의 학습 계획 */}
         <Card className={cn("border-none shadow-2xl rounded-[2.5rem] sm:rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "col-span-1" : "lg:col-span-2")}>
           <CardHeader className={cn("bg-muted/10 border-b", isMobile ? "p-8" : "p-10")}>
             <div className={cn("flex flex-col gap-5", isMobile ? "items-start" : "sm:flex-row sm:items-center justify-between")}>
@@ -671,7 +698,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 오늘의 루틴 */}
         <Card className={cn("border-none shadow-2xl rounded-[2.5rem] sm:rounded-[3rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "col-span-1" : "")}>
           <CardHeader className={cn("bg-accent/5 border-b", isMobile ? "p-8" : "p-10")}>
             <CardTitle className="font-black flex items-center gap-3 tracking-tighter text-accent">
