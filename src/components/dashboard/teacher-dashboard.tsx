@@ -28,7 +28,8 @@ import {
   Settings2,
   UserPlus,
   Search,
-  Check
+  Check,
+  X
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -89,7 +90,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: students, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
-  // 2. 학생들의 멤버십 정보 (재원 상태 확인용)
+  // 2. 학생들의 멤버십 정보
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
@@ -103,7 +104,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 오늘 학습 로그 (실시간 합산용)
+  // 4. 오늘 학습 로그
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(collectionGroup(firestore, 'days'), where('centerId', '==', centerId), where('dateKey', '==', todayKey));
@@ -124,17 +125,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.scheduledAt?.toMillis()||0)) : [], [rawAppointments]);
 
-  // 미배정 학생 필터링
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
     return students.filter(s => {
       const membership = studentMembers.find(m => m.id === s.id);
-      // 재원 중이면서 좌석 번호가 없는 학생
       return membership?.status === 'active' && (!s.seatNo || s.seatNo === 0);
     }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, studentMembers, searchTerm]);
 
-  // 실시간 시간 합산 엔진
   const getLiveTimeInMinutes = (seat: AttendanceCurrent) => {
     if (!seat.studentId) return 0;
     const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
@@ -153,7 +151,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return `${hh}h ${mm}m`;
   };
 
-  // 정밀 지표 산출
   const metrics = useMemo(() => {
     if (!attendanceList || !students) return { totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
     
@@ -200,29 +197,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     try {
       const batch = writeBatch(firestore);
       const seatId = selectedSeat.id;
-      
-      // 1. 학생 프로필에 좌석 번호 업데이트
-      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { 
-        seatNo: selectedSeat.seatNo, 
-        updatedAt: serverTimestamp() 
-      });
-      
-      // 2. 실시간 좌석 정보에 학생 배정
-      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId), { 
-        studentId: student.id, 
-        status: 'absent', 
-        updatedAt: serverTimestamp() 
-      });
-      
+      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { seatNo: selectedSeat.seatNo, updatedAt: serverTimestamp() });
+      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId), { studentId: student.id, status: 'absent', updatedAt: serverTimestamp() });
       await batch.commit();
       toast({ title: `${student.name} 학생 배정 완료` });
       setIsAssigning(false);
       setSearchTerm('');
-    } catch (e) { 
-      toast({ variant: "destructive", title: "배정 실패" }); 
-    } finally { 
-      setIsSaving(false); 
-    }
+    } catch (e) { toast({ variant: "destructive", title: "배정 실패" }); } finally { setIsSaving(false); }
   };
 
   const unassignStudentFromSeat = async () => {
@@ -230,42 +211,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
-      
-      // 1. 학생 프로필에서 좌석 번호 제거
-      batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { 
-        seatNo: 0, 
-        updatedAt: serverTimestamp() 
-      });
-      
-      // 2. 실시간 좌석 정보에서 학생 제거 및 초기화
-      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { 
-        studentId: null, 
-        status: 'absent', 
-        updatedAt: serverTimestamp() 
-      });
-      
+      batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { seatNo: 0, updatedAt: serverTimestamp() });
+      batch.update(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { studentId: null, status: 'absent', updatedAt: serverTimestamp() });
       await batch.commit();
       toast({ title: "배정 해제 완료" });
       setIsManaging(false);
-    } catch (e) { 
-      toast({ variant: "destructive", title: "해제 실패" }); 
-    } finally { 
-      setIsSaving(false); 
-    }
+    } catch (e) { toast({ variant: "destructive", title: "해제 실패" }); } finally { setIsSaving(false); }
   };
 
-  const handleSeatClick = (seat: AttendanceCurrent, seatNo: number) => {
+  const handleSeatClick = (seat: AttendanceCurrent) => {
     setSelectedSeat(seat);
     if (isEditMode) {
-      if (seat.studentId) {
-        setIsManaging(true); // 이미 배정된 경우 관리 다이얼로그 (배정 해제 포함)
-      } else {
-        setIsAssigning(true); // 비어있는 경우 배정 다이얼로그
-      }
+      if (seat.studentId) setIsManaging(true);
+      else setIsAssigning(true);
     } else {
-      if (seat.studentId) {
-        setIsManaging(true); // 입퇴실 처리 다이얼로그
-      }
+      if (seat.studentId) setIsManaging(true);
     }
   };
 
@@ -273,7 +233,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-24 min-h-screen">
-      {/* 1. 정밀 센터 지표 헤더 */}
       <header className="flex flex-col md:flex-row md:items-center justify-between px-4 pt-6 gap-4">
         <div className="flex items-center gap-3">
           <Monitor className="h-8 w-8 text-primary" />
@@ -309,7 +268,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      {/* 2. 핵심 요약 카드 */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
         {[
           { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity, bg: 'bg-white' },
@@ -345,7 +303,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {/* 3. 10x7 실시간 상황판 (가로 10열, 세로 7행) */}
       <Card className={cn(
         "rounded-[3.5rem] border-none shadow-xl bg-white mx-4 overflow-hidden transition-all duration-500",
         isEditMode ? "ring-4 ring-primary/20" : ""
@@ -354,11 +311,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
               <Armchair className="h-5 w-5 opacity-40" /> 
-              {isEditMode ? '좌석 배치 수정 모드' : '실시간 좌석 상황판'}
+              {isEditMode ? '좌석 배치 수정 모드' : '실시간 좌석 상황판 (70석)'}
             </CardTitle>
-            {isEditMode && (
-              <Badge className="bg-primary text-white font-black text-[10px] px-3 py-1">좌석을 클릭하여 학생을 배정하거나 해제하세요.</Badge>
-            )}
+            {isEditMode && <Badge className="bg-primary text-white font-black text-[10px] px-3 py-1">좌석 클릭 시 학생 배정/해제 가능</Badge>}
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-10">
@@ -380,10 +335,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       return (
                         <div 
                           key={seatNo} 
-                          onClick={() => handleSeatClick(seat, seatNo)}
+                          onClick={() => handleSeatClick(seat)}
                           className={cn(
-                            "aspect-[1.1/1] w-[100px] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm",
-                            isEditMode ? "hover:border-primary border-dashed" : "",
+                            "aspect-[1.1/1] w-[92px] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm",
+                            isEditMode ? "hover:border-primary border-dashed" : "border-solid",
                             isStudying 
                               ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" 
                               : isAway
@@ -392,7 +347,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   ? "bg-rose-50 border-rose-300 text-rose-600" 
                                   : student 
                                     ? "bg-white border-primary/20 text-primary" 
-                                    : "bg-transparent border-muted/20 text-muted-foreground/30 hover:border-primary/10"
+                                    : "bg-white border-muted/40 text-muted-foreground/20 hover:border-primary/20"
                           )}
                         >
                           <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
@@ -401,16 +356,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           
                           {student ? (
                             <div className="flex flex-col items-center gap-0 w-full px-1">
-                              <span className="text-[10px] sm:text-[12px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
+                              <span className="text-[10px] sm:text-[11px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
                                 {getLiveTimeLabel(seat!)}
                               </span>
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center opacity-20">
-                              <span className="text-[10px] font-black">EMPTY</span>
-                              {isEditMode && <UserPlus className="h-3 w-3 mt-1" />}
+                            <div className="flex flex-col items-center opacity-40">
+                              <span className="text-[8px] font-black">EMPTY</span>
+                              {isEditMode && <UserPlus className="h-3 w-3 mt-1 text-primary" />}
                             </div>
                           )}
                         </div>
@@ -424,7 +379,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
-      {/* 4. 오늘 상담 현황 */}
       <section className="px-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -438,37 +392,32 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {aptLoading ? (
-            <div className="col-span-full py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
-          ) : appointments.length === 0 ? (
+          {aptLoading ? <div className="col-span-full py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : appointments.length === 0 ? (
             <div className="col-span-full py-16 text-center bg-white/50 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10">
               <p className="font-black text-muted-foreground/30 text-sm italic">오늘 예정된 상담이 없습니다.</p>
             </div>
-          ) : (
-            appointments.map((apt) => (
-              <Card key={apt.id} className="rounded-[2rem] border-none shadow-sm bg-white p-6 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col items-center justify-center shrink-0">
-                    <span className="text-[10px] font-black text-primary/60 leading-none">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
-                  </div>
-                  <div className="grid leading-tight">
-                    <span className="font-black text-base">{apt.studentName} 학생</span>
-                    <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[150px]">{apt.studentNote || '상담 주제 미입력'}</span>
-                  </div>
+          ) : appointments.map((apt) => (
+            <Card key={apt.id} className="rounded-[2rem] border-none shadow-sm bg-white p-6 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col items-center justify-center shrink-0">
+                  <span className="text-[10px] font-black text-primary/60 leading-none">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={cn("font-black text-[9px] border-none", apt.status === 'requested' ? "bg-amber-50 text-amber-600" : "bg-emerald-500 text-white")}>
-                    {apt.status === 'requested' ? '승인대기' : '예약확정'}
-                  </Badge>
-                  <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+                <div className="grid leading-tight">
+                  <span className="font-black text-base">{apt.studentName} 학생</span>
+                  <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[150px]">{apt.studentNote || '상담 주제 미입력'}</span>
                 </div>
-              </Card>
-            ))
-          )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className={cn("font-black text-[9px] border-none", apt.status === 'requested' ? "bg-amber-50 text-amber-600" : "bg-emerald-500 text-white")}>
+                  {apt.status === 'requested' ? '승인대기' : '예약확정'}
+                </Badge>
+                <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+              </div>
+            </Card>
+          ))}
         </div>
       </section>
 
-      {/* 좌석 관리 다이얼로그 (일반 모드: 입퇴실 / 수정 모드: 배정 해제) */}
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
           {selectedSeat && (
@@ -476,9 +425,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn("p-10 text-white relative", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
                 <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><Sparkles className="h-32 w-32" /></div>
                 <DialogHeader className="relative z-10">
-                  <DialogTitle className="text-4xl font-black tracking-tighter">
-                    {students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}
-                  </DialogTitle>
+                  <DialogTitle className="text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT {selectedSeat.seatNo}</Badge>
                     <Badge className="bg-white/20 text-white border-none font-black px-3 py-1 uppercase">{selectedSeat.status}</Badge>
@@ -487,110 +434,62 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="p-8 space-y-6 bg-white">
                 {isEditMode ? (
-                  <div className="space-y-4">
-                    <p className="text-center font-bold text-muted-foreground text-sm">현재 좌석의 배정을 해제하시겠습니까?</p>
-                    <Button 
-                      variant="destructive" 
-                      onClick={unassignStudentFromSeat} 
-                      disabled={isSaving} 
-                      className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200"
-                    >
-                      {isSaving ? <Loader2 className="animate-spin" /> : '좌석 배정 해제'}
-                    </Button>
-                  </div>
+                  <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">
+                    {isSaving ? <Loader2 className="animate-spin" /> : '좌석 배정 해제'}
+                  </Button>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
-                    <Button 
-                      onClick={() => handleStatusUpdate('studying')} 
-                      className="h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-3 flex flex-col shadow-xl active:scale-95 transition-all"
-                    >
+                    <Button onClick={() => handleStatusUpdate('studying')} className="h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-3 flex flex-col shadow-xl active:scale-95 transition-all">
                       <Zap className="h-6 w-6 fill-current" />
                       <span className="text-lg">입실 처리</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => handleStatusUpdate('absent')} 
-                      className="h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-3 flex flex-col active:scale-95 transition-all"
-                    >
+                    <Button variant="outline" onClick={() => handleStatusUpdate('absent')} className="h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-3 flex flex-col active:scale-95 transition-all">
                       <AlertCircle className="h-6 w-6" />
                       <span className="text-lg">퇴실 처리</span>
                     </Button>
                   </div>
                 )}
-                
-                <div className="pt-4 border-t border-dashed space-y-3">
+                <div className="pt-4 border-t border-dashed">
                   <Button variant="secondary" className="w-full h-16 rounded-2xl font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/5" asChild>
-                    <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}>
-                      <User className="h-5 w-5 opacity-40" />
-                      상세 분석 리포트 보기
-                      <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
-                    </Link>
+                    <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}><User className="h-5 w-5 opacity-40" />상세 분석 리포트 보기<ChevronRight className="ml-auto h-5 w-5 opacity-20" /></Link>
                   </Button>
                 </div>
               </div>
-              <DialogFooter className="p-6 bg-muted/20 border-t flex justify-center">
-                <Button variant="ghost" onClick={() => setIsManaging(false)} className="font-bold text-muted-foreground">닫기</Button>
-              </DialogFooter>
+              <DialogFooter className="p-6 bg-muted/20 border-t flex justify-center"><Button variant="ghost" onClick={() => setIsManaging(false)} className="font-bold text-muted-foreground">닫기</Button></DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* 학생 좌석 배정 다이얼로그 (수정 모드에서 빈 좌석 클릭 시) */}
       <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
           <div className="bg-primary p-8 text-white relative">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
             <DialogHeader className="relative z-10">
-              <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
-                <UserPlus className="h-7 w-7" /> 학생 좌석 배정
-              </DialogTitle>
+              <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3"><UserPlus className="h-7 w-7" /> 학생 좌석 배정</DialogTitle>
               <p className="text-white/60 font-bold mt-1 text-sm">SEAT NO. {selectedSeat?.seatNo}</p>
             </DialogHeader>
           </div>
           <div className="p-6 space-y-4 bg-white">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
-              <Input 
-                placeholder="이름으로 찾기..." 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
-                className="rounded-xl border-2 pl-10 h-11 text-sm font-bold" 
-              />
+              <Input placeholder="이름으로 찾기..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-11 text-sm font-bold" />
             </div>
             <ScrollArea className="h-[300px] pr-4">
               <div className="space-y-2">
-                {unassignedStudents.length === 0 ? (
-                  <p className="text-center py-10 text-xs font-bold text-muted-foreground/40 italic">배정 가능한 미배정 학생이 없습니다.</p>
-                ) : (
-                  unassignedStudents.map((student) => (
-                    <div 
-                      key={student.id} 
-                      onClick={() => assignStudentToSeat(student)} 
-                      className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center justify-between group transition-all"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
-                          {student.name.charAt(0)}
-                        </div>
-                        <div className="grid gap-0.5">
-                          <span className="font-black text-sm group-hover:text-primary transition-colors">{student.name}</span>
-                          <span className="text-[10px] font-bold text-muted-foreground">{student.schoolName}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[9px] font-black opacity-0 group-hover:opacity-100 transition-all border-primary/20 text-primary">SELECT</Badge>
-                        <ChevronRight className="h-4 w-4 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                      </div>
+                {unassignedStudents.length === 0 ? <p className="text-center py-10 text-xs font-bold text-muted-foreground/40 italic">배정 가능한 미배정 학생이 없습니다.</p> : unassignedStudents.map((student) => (
+                  <div key={student.id} onClick={() => assignStudentToSeat(student)} className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center justify-between group transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">{student.name.charAt(0)}</div>
+                      <div className="grid gap-0.5"><span className="font-black text-sm group-hover:text-primary transition-colors">{student.name}</span><span className="text-[10px] font-bold text-muted-foreground">{student.schoolName}</span></div>
                     </div>
-                  ))
-                )}
+                    <ChevronRight className="h-4 w-4 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </div>
+                ))}
               </div>
             </ScrollArea>
           </div>
-          <DialogFooter className="p-6 bg-muted/20 border-t flex justify-center">
-            <Button variant="ghost" onClick={() => setIsAssigning(false)} className="font-bold text-muted-foreground">취소</Button>
-          </DialogFooter>
+          <DialogFooter className="p-6 bg-muted/20 border-t flex justify-center"><Button variant="ghost" onClick={() => setIsAssigning(false)} className="font-bold text-muted-foreground">취소</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

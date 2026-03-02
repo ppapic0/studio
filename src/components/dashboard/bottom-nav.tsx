@@ -54,7 +54,6 @@ export function BottomNav() {
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
       { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
-      { href: '/dashboard/teacher/layout-view', label: '도면', icon: Armchair },
       { href: '/dashboard/teacher/students', label: '관리', icon: GraduationCap },
     ],
   };
