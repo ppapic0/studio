@@ -25,7 +25,7 @@ import {
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, writeBatch, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, writeBatch, collection, query, where, getDocs, getDoc, increment } from 'firebase/firestore';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
@@ -71,12 +71,6 @@ export function SignupForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !firestore) return;
     
-    // 가입 코드 검증 (관리자 코드는 노출하지 않고 내부적으로만 체크)
-    if (values.role === 'centerAdmin' && values.inviteCode !== 'A0313') {
-      form.setError('inviteCode', { message: '관리자 가입 코드가 올바르지 않습니다.' });
-      return;
-    }
-
     // 추가 유효성 검사
     if (values.role === 'student') {
       if (!values.displayName || values.displayName.length < 2) {
@@ -106,13 +100,53 @@ export function SignupForm() {
     setIsLoading(true);
     
     try {
-      const centerId = 'learning-lab-dongbaek'; 
+      // 1. 초대 코드 검증 (역할별 권한 확인)
+      setLoadingStatus('초대 코드를 검증하고 있습니다...');
+      const inviteRef = doc(firestore, 'inviteCodes', values.inviteCode);
+      const inviteSnap = await getDoc(inviteRef);
+
+      if (!inviteSnap.exists()) {
+        setIsLoading(false);
+        setLoadingStatus('');
+        form.setError('inviteCode', { message: '존재하지 않거나 유효하지 않은 초대 코드입니다.' });
+        return;
+      }
+
+      const inviteData = inviteSnap.data();
+      
+      // 중요: 사용자가 선택한 역할과 초대 코드의 지정된 역할이 일치하는지 검증
+      if (inviteData.intendedRole !== values.role) {
+        setIsLoading(false);
+        setLoadingStatus('');
+        const roleNames = { student: '학생', teacher: '선생님', parent: '학부모', centerAdmin: '센터 관리자' };
+        const intendedRoleName = roleNames[inviteData.intendedRole as keyof typeof roleNames] || inviteData.intendedRole;
+        form.setError('inviteCode', { 
+          message: `입력하신 코드는 [${intendedRoleName}] 전용 코드입니다. 선택하신 역할과 일치하지 않습니다.` 
+        });
+        return;
+      }
+
+      if (inviteData.isActive === false) {
+        setIsLoading(false);
+        setLoadingStatus('');
+        form.setError('inviteCode', { message: '현재 비활성화된 초대 코드입니다.' });
+        return;
+      }
+
+      if (inviteData.usedCount >= inviteData.maxUses) {
+        setIsLoading(false);
+        setLoadingStatus('');
+        form.setError('inviteCode', { message: '이미 최대 사용 횟수에 도달한 코드입니다.' });
+        return;
+      }
+
+      const centerId = inviteData.centerId || 'learning-lab-dongbaek'; 
       const timestamp = serverTimestamp();
       const batch = writeBatch(firestore);
       let finalDisplayName = values.displayName || '';
       let linkedStudentId = '';
 
-      // 1. 학부모 가입 시 자녀 정보 조회 및 닉네임 자동 생성
+      // 2. 학부모 가입 시 자녀 정보 조회 및 닉네임 자동 생성
       if (values.role === 'parent') {
         setLoadingStatus('자녀 정보를 확인하고 있습니다...');
         const studentsRef = collection(firestore, 'centers', centerId, 'students');
@@ -137,7 +171,7 @@ export function SignupForm() {
       const user = userCredential.user;
       await updateProfile(user, { displayName: finalDisplayName });
 
-      // 2. 프로필 정보 저장
+      // 3. 프로필 정보 저장
       batch.set(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: values.email,
@@ -147,7 +181,7 @@ export function SignupForm() {
         updatedAt: timestamp,
       });
 
-      // 3. 센터 내 멤버십 등록 정보
+      // 4. 센터 내 멤버십 등록 정보
       const membershipData: any = {
         id: user.uid,
         centerId: centerId,
@@ -157,7 +191,7 @@ export function SignupForm() {
         displayName: finalDisplayName,
       };
 
-      // 4. 역할별 추가 처리
+      // 5. 역할별 추가 처리
       if (values.role === 'student') {
         batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
           id: user.uid,
@@ -188,6 +222,7 @@ export function SignupForm() {
         });
       }
 
+      // 6. 멤버십 및 사용자 센터 정보 저장
       batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), membershipData);
       batch.set(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
         id: centerId,
@@ -196,6 +231,12 @@ export function SignupForm() {
         status: "active",
         joinedAt: timestamp,
         ...(membershipData.linkedStudentIds ? { linkedStudentIds: membershipData.linkedStudentIds } : {})
+      });
+
+      // 7. 초대 코드 사용 횟수 업데이트
+      batch.update(inviteRef, {
+        usedCount: increment(1),
+        updatedAt: timestamp
       });
 
       await batch.commit();
@@ -333,16 +374,9 @@ export function SignupForm() {
             <FormItem>
               <FormLabel className="font-bold">센터 가입 코드</FormLabel>
               <FormControl><Input placeholder="센터에서 제공받은 코드" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
-              {(form.watch('role') === 'student' || form.watch('role') === 'parent') && (
-                <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
-                  💡 가입 코드: 0313
-                </FormDescription>
-              )}
-              {form.watch('role') === 'centerAdmin' && (
-                <FormDescription className="text-[10px] font-black text-rose-600 bg-rose-50 p-2 rounded-lg">
-                  💡 관리자 전용 코드를 입력하세요.
-                </FormDescription>
-              )}
+              <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
+                💡 반드시 선택하신 가입 역할에 맞는 코드를 입력해야 합니다.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
