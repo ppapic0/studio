@@ -210,8 +210,8 @@ export interface GrowthProgress {
     [dateKey: string]: {
       attendance: boolean;
       plan: boolean;
+      routine: boolean;
       growth: boolean;
-      bonus6h: boolean;
       dailyLpAmount?: number; // 해당 일자에 획득한 총 LP (기록용)
     };
   };

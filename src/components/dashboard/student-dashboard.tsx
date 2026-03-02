@@ -211,7 +211,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost }: { dailyLpStatus?: Growth
           {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
             <div className="space-y-3">
               {sortedDates.map(([date, data]) => {
-                const discreteLp = (data.attendance ? 200 : 0) + (data.plan ? 200 : 0) + (data.growth ? 200 : 0);
+                const discreteLp = (data.attendance ? 100 : 0) + (data.plan ? 100 : 0) + (data.routine ? 100 : 0);
                 const boostedDiscrete = Math.round(discreteLp * totalBoost);
                 const studyLp = Math.max(0, (data.dailyLpAmount || 0) - boostedDiscrete);
 
@@ -222,7 +222,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost }: { dailyLpStatus?: Growth
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[8px] px-1.5">출석</Badge>}
                         {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[8px] px-1.5">계획</Badge>}
-                        {data.growth && <Badge className="bg-purple-500 text-white border-none font-black text-[8px] px-1.5">품질</Badge>}
+                        {data.routine && <Badge className="bg-amber-500 text-white border-none font-black text-[8px] px-1.5">루틴</Badge>}
                         {studyLp > 0 && <Badge className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5">몰입 학습</Badge>}
                       </div>
                     </div>
@@ -382,7 +382,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
   }, [currentLp, currentRank]);
 
-  const totalBoost = Math.min(1.20, 1 + (avgStat / 100) * 0.10);
+  // 각 스킬 100점당 5% 부스트 (최대 20%)
+  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -411,31 +412,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       
       if (sessionMinutes > 0) {
         // 1. 순수 공부 시간 LP 보상 (분당 1 LP * 부스트)
-        const studyLpEarned = Math.round(sessionMinutes * totalBoost);
+        let studyLpEarned = Math.round(sessionMinutes * totalBoost);
         
-        // 2. 3시간(180분) 달성 시 출석 보너스 LP 로직 (200 LP * 부스트)
+        // 2. 3시간(180분) 달성 시 출석 보너스 LP 로직 (100 LP * 부스트)
         const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
         const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
         
-        // 3시간 이상 공부했고, 아직 출석 보너스를 받지 않았다면 지급
         if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
-          const attendanceLp = Math.round(200 * totalBoost);
-          updateData.seasonLp = increment(studyLpEarned + attendanceLp);
-          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned + attendanceLp);
+          const attendanceLp = Math.round(100 * totalBoost);
+          studyLpEarned += attendanceLp;
           updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
           updateData['stats.consistency'] = increment(0.1);
           toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
-        } else {
-          updateData.seasonLp = increment(studyLpEarned);
-          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
         }
 
-        // 스탯 업데이트
+        updateData.seasonLp = increment(studyLpEarned);
+        updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
         updateData['stats.focus'] = increment(sessionMinutes / 100); 
         
-        // 공부 로그 및 세션 기록 저장
         batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
-        
         const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
         batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
         
@@ -447,7 +442,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setStartTime(null); 
       toast({ title: "트랙 종료됨" });
     } else {
-      // 공부 시작 (타이머 작동)
       setStartTime(Date.now()); 
       setIsTimerActive(true);
       toast({ title: "트랙 시작! 3시간 공부 시 보너스 LP가 지급됩니다." });
@@ -455,17 +449,34 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (!firestore || !user || !activeMembership || !progressRef || !weekKey) return;
+    if (!firestore || !user || !activeMembership || !progressRef || !weekKey || !todayPlans) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
     
-    updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
+    await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
     
     if (nextState) {
-      updateDoc(progressRef, { 
+      // 스탯 업데이트
+      const batch = writeBatch(firestore);
+      batch.update(progressRef, { 
         'stats.achievement': increment(0.05),
         updatedAt: serverTimestamp() 
       });
+
+      // 계획 보너스 체크 (3개 이상 작성 & 모두 완료 시 +100 LP)
+      const currentStudyTasks = todayPlans.filter(p => p.category === 'study' || !p.category);
+      const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
+      
+      if (currentStudyTasks.length >= 3 && willBeDoneCount === currentStudyTasks.length && !progress?.dailyLpStatus?.[todayKey]?.plan) {
+        const planLp = Math.round(100 * totalBoost);
+        batch.update(progressRef, {
+          seasonLp: increment(planLp),
+          [`dailyLpStatus.${todayKey}.plan`]: true,
+          [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
+        });
+        toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+      }
+      await batch.commit();
     }
   };
 
