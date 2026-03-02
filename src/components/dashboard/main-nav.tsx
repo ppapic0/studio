@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -106,7 +105,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         <div className="bg-primary p-2 rounded-xl">
           <BookOpen className="h-6 w-6 text-white" />
         </div>
-        <span>집중트랙</span>
+        <span>트랙학습센터</span>
       </Link>
       {userNavItems.map((item) => (
         <Link 
