@@ -56,7 +56,10 @@ import {
   BookOpen,
   AlertCircle,
   XCircle,
-  CalendarClock
+  CalendarClock,
+  Zap,
+  Trophy,
+  Crown
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -87,7 +90,7 @@ import {
   startOfDay
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/types';
+import { type StudyPlanItem, type WithId, type GrowthProgress, type LeaderboardEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -103,6 +106,18 @@ const SUBJECTS = [
   { id: 'science', label: '과탐', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-600' },
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
+];
+
+const TIERS = [
+  { name: '아이언', min: 0, gradient: 'from-slate-500 via-slate-600 to-slate-800' },
+  { name: '브론즈', min: 5000, gradient: 'from-orange-600 via-orange-700 to-orange-900' },
+  { name: '실버', min: 10000, gradient: 'from-blue-300 via-slate-400 to-slate-600' },
+  { name: '골드', min: 15000, gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
+  { name: '플래티넘', min: 20000, gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
+  { name: '다이아몬드', min: 25000, gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
+  { name: '마스터', min: 25000, gradient: 'from-purple-500 via-violet-600 to-violet-800' },
+  { name: '그랜드마스터', min: 25000, gradient: 'from-rose-500 via-pink-600 to-rose-800' },
+  { name: '챌린저', min: 25000, gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
 ];
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile }: any) {
@@ -260,6 +275,7 @@ export default function StudyPlanPage() {
   const isStudent = activeMembership?.role === 'student';
   const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
+  const periodKey = selectedDate ? format(selectedDate, 'yyyy-MM') : '';
 
   const isPast = selectedDate ? isBefore(startOfDay(selectedDate), startOfDay(new Date())) : false;
 
@@ -293,6 +309,27 @@ export default function StudyPlanPage() {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
   }, [firestore, activeMembership, user]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
+
+  // 티어 판별을 위한 랭킹 정보 조회
+  const rankQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !periodKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership, user, periodKey]);
+  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
+  const currentRank = rankEntries?.[0]?.rank || 999;
+
+  const currentLp = progress?.seasonLp || 0;
+  const currentTier = useMemo(() => {
+    if (currentLp >= 25000) {
+      if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
+      if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
+      return TIERS.find(t => t.name === '마스터')!;
+    }
+    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
+  }, [currentLp, currentRank]);
 
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
@@ -508,7 +545,13 @@ export default function StudyPlanPage() {
               {isPast ? 'Archive View' : 'Daily Study Matrix & Routine'}
             </p>
           </div>
-          {isPast && <Badge variant="destructive" className="rounded-full font-black text-[10px] px-3 py-1 shadow-lg">History Mode</Badge>}
+          {isPast ? (
+            <Badge variant="destructive" className="rounded-full font-black text-[10px] px-3 py-1 shadow-lg">History Mode</Badge>
+          ) : (
+            <Badge variant="secondary" className={cn("rounded-full font-black text-[10px] px-4 py-1 gap-2 border-none h-9 text-white shadow-lg bg-gradient-to-r", currentTier.gradient)}>
+              {currentTier.name === '챌린저' ? <Crown className="h-4 w-4" /> : <Zap className="h-4 w-4" />} {currentTier.name} Tier Active
+            </Badge>
+          )}
         </div>
       </header>
 
@@ -517,113 +560,131 @@ export default function StudyPlanPage() {
           const isSelected = isSameDay(day, selectedDate);
           const isToday = isSameDay(day, new Date());
           return (
-            <Button
+            <button
               key={day.toISOString()}
-              variant={isSelected ? "default" : "outline"}
               className={cn(
-                "flex flex-col transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-3.5 sm:py-4",
+                "flex flex-col items-center justify-center transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-3.5 sm:py-5 shrink-0",
                 isMobile ? "px-0" : "px-4",
-                isSelected ? "bg-primary border-primary shadow-lg scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
+                isSelected 
+                  ? cn("border-transparent shadow-xl scale-105 z-10 text-white bg-gradient-to-br", currentTier.gradient) 
+                  : "bg-white border-transparent hover:border-primary/20",
                 isToday && !isSelected && "border-primary/30"
               )}
               onClick={() => setSelectedDate(day)}
             >
               <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[8px] mb-1.5" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
               <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-lg" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
-            </Button>
+            </button>
           );
         })}
       </div>
 
-      {/* 필수 등하원 설정 섹션 */}
+      {/* 필수 등하원 설정 섹션 - 티어 컬러 반영 */}
       {!isPast && (
-        <Card className="border-2 border-primary/20 shadow-xl rounded-[2.5rem] overflow-hidden bg-white animate-in slide-in-from-top-4 duration-500">
-          <CardHeader className="bg-primary/5 p-6 border-b border-primary/10">
-            <CardTitle className="text-xl font-black tracking-tighter flex items-center gap-2">
-              <CalendarClock className="h-6 w-6 text-primary" /> 오늘의 출석 설정 (필수)
-            </CardTitle>
-            <CardDescription className="font-bold text-xs">선생님의 관제를 위해 반드시 오늘 등원 정보를 입력해 주세요.</CardDescription>
+        <Card className={cn(
+          "border-none shadow-2xl rounded-[2.5rem] overflow-hidden transition-all duration-700 bg-white ring-1 ring-black/[0.03]",
+          "relative group"
+        )}>
+          <div className={cn("h-2 w-full bg-gradient-to-r", currentTier.gradient)} />
+          <CardHeader className="bg-muted/5 p-8 border-b">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
+                <CalendarClock className="h-7 w-7 text-primary" /> 오늘의 출석 설정 (필수)
+              </CardTitle>
+              <Badge className={cn("bg-white text-primary border-none font-black text-[9px] uppercase tracking-widest px-3 py-1 shadow-sm")}>Step 1</Badge>
+            </div>
+            <CardDescription className="font-bold text-sm mt-1 text-muted-foreground/70">선생님의 관제를 위해 반드시 오늘 등원 정보를 입력해 주세요.</CardDescription>
           </CardHeader>
-          <CardContent className="p-8">
+          <CardContent className="p-8 sm:p-10">
             {(!hasInPlan || !hasOutPlan) && !isAbsentMode ? (
-              <div className="flex flex-col gap-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label className="text-sm font-black text-primary uppercase ml-1">오늘 등원합니다</Label>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] font-black opacity-40 ml-1">등원 예정 시간</span>
-                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-lg" />
+              <div className="flex flex-col gap-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 ml-1">
+                      <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
+                      <Label className="text-xs font-black text-primary uppercase tracking-widest">오늘 등원합니다</Label>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-black opacity-40 ml-1">등원 예정</span>
+                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-xl shadow-inner focus-visible:ring-primary/20" />
                         </div>
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] font-black opacity-40 ml-1">하원 예정 시간</span>
-                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-lg" />
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-black opacity-40 ml-1">하원 예정</span>
+                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-xl shadow-inner focus-visible:ring-primary/20" />
                         </div>
                       </div>
-                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-14 px-8 rounded-2xl font-black shadow-lg shadow-primary/20 mt-5">설정 완료</Button>
+                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("h-14 px-10 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all mt-6 text-white bg-gradient-to-br", currentTier.gradient)}>설정 완료</Button>
                     </div>
                   </div>
                   
-                  <div className="flex flex-col justify-center items-center border-l border-dashed pl-6">
+                  <div className="flex flex-col justify-center items-center border-l border-dashed pl-8">
                     <p className="text-xs font-bold text-muted-foreground mb-4">오늘은 공부를 쉬어갑니다.</p>
-                    <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="w-full h-14 rounded-2xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-2">
-                      <XCircle className="h-5 w-5" /> 이날 등원하지 않습니다
+                    <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="w-full h-14 rounded-2xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-3 text-lg transition-all active:scale-95">
+                      <XCircle className="h-6 w-6" /> 이날 등원하지 않습니다
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between p-6 rounded-[2rem] bg-muted/20 border-2 border-transparent">
-                <div className="flex items-center gap-4">
-                  <div className={cn("p-3 rounded-2xl", isAbsentMode ? "bg-rose-100" : "bg-emerald-100")}>
-                    {isAbsentMode ? <XCircle className="h-6 w-6 text-rose-600" /> : <CheckCircle2 className="h-6 w-6 text-emerald-600" />}
+              <div className="flex items-center justify-between p-8 rounded-[2.5rem] bg-[#fafafa] border-2 border-transparent shadow-inner relative group overflow-hidden">
+                <div className={cn("absolute inset-0 opacity-[0.03] pointer-events-none bg-gradient-to-br", currentTier.gradient)} />
+                <div className="flex items-center gap-6 relative z-10">
+                  <div className={cn("p-4 rounded-3xl shadow-xl text-white bg-gradient-to-br", isAbsentMode ? "from-rose-500 to-rose-700" : currentTier.gradient)}>
+                    {isAbsentMode ? <XCircle className="h-8 w-8" /> : <CheckCircle2 className="h-8 w-8" />}
                   </div>
-                  <div className="grid">
-                    <span className="text-xl font-black tracking-tight">{isAbsentMode ? '오늘 휴무 (미등원)' : '출석 시간 설정 완료'}</span>
-                    {!isAbsentMode && <span className="text-xs font-bold text-muted-foreground">{inTime} 등원 ~ {outTime} 하원</span>}
+                  <div className="grid gap-1">
+                    <span className="text-2xl font-black tracking-tighter text-primary">{isAbsentMode ? '오늘 휴무 (미등원)' : '출석 시간 설정 완료'}</span>
+                    {!isAbsentMode && <span className="text-sm font-bold text-muted-foreground">{inTime} 등원 ~ {outTime} 하원</span>}
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => {
-                  // 해당 날짜의 필수 항목들을 찾아 상태를 초기화하도록 유도
                   const batch = writeBatch(firestore!);
                   const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
-                  scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원')).forEach(i => batch.delete(doc(colRef, i.id)));
+                  scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다')).forEach(i => batch.delete(doc(colRef, i.id)));
                   batch.commit().then(() => toast({ title: "설정을 재설정합니다." }));
-                }} className="text-[10px] font-black uppercase text-muted-foreground underline underline-offset-4">다시 설정하기</Button>
+                }} className="text-[10px] font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10">다시 설정하기</Button>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* 학습 밸런스 요약 카드 */}
-      <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
-        <CardHeader className="p-6 pb-2">
-          <div className="flex items-center gap-2">
-            <div className="bg-primary/5 p-1.5 rounded-lg"><BarChart3 className="h-4 w-4 text-primary" /></div>
-            <CardTitle className="text-sm font-black uppercase tracking-widest text-primary/60">학습 밸런스 요약</CardTitle>
+      {/* 학습 밸런스 요약 카드 - 티어 컬러 반영 */}
+      <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03] group hover:shadow-2xl transition-all duration-500">
+        <div className={cn("h-1.5 w-full bg-gradient-to-r opacity-30", currentTier.gradient)} />
+        <CardHeader className="p-8 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/5 p-2 rounded-xl"><BarChart3 className="h-5 w-5 text-primary" /></div>
+            <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-primary/60">Daily Learning Balance Matrix</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-6 pt-2">
-          <div className="flex flex-col gap-6">
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black tracking-tighter text-primary">{Math.floor(studyTimeSummary.total / 60)}h {studyTimeSummary.total % 60}m</span>
-              <span className="text-xs font-bold text-muted-foreground">총 계획 시간</span>
+        <CardContent className="p-8 pt-2">
+          <div className="flex flex-col gap-8">
+            <div className="flex items-baseline gap-3">
+              <span className={cn("text-6xl font-black tracking-tighter drop-shadow-sm text-primary")}>
+                {Math.floor(studyTimeSummary.total / 60)}<span className="text-2xl opacity-40 ml-1">h</span> {studyTimeSummary.total % 60}<span className="text-2xl opacity-40 ml-1">m</span>
+              </span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Today's Target Depth</span>
             </div>
             
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {SUBJECTS.map(subj => {
                 const plannedTime = studyTimeSummary.breakdown[subj.id] || 0;
                 if (plannedTime === 0) return null;
                 return (
-                  <div key={subj.id} className={cn("flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all", subj.light, subj.text, "border-transparent shadow-sm")}>
-                    <div className={cn("w-2 h-2 rounded-full", subj.color)} />
-                    <span className="text-[11px] font-black">{subj.label} {Math.floor(plannedTime / 60)}h {plannedTime % 60}m</span>
+                  <div key={subj.id} className={cn("flex items-center gap-3 px-5 py-2.5 rounded-2xl border-2 transition-all hover:scale-105 shadow-sm", subj.light, subj.text, "border-transparent")}>
+                    <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", subj.color)} />
+                    <span className="text-sm font-black tracking-tight">{subj.label} {Math.floor(plannedTime / 60)}h {plannedTime % 60}m</span>
                   </div>
                 );
               })}
-              {studyTimeSummary.total === 0 && <p className="text-xs font-bold text-muted-foreground/40 italic py-2">학습 계획을 추가하여 시간 배분을 확인하세요.</p>}
+              {studyTimeSummary.total === 0 && (
+                <div className="py-4 px-6 rounded-2xl bg-muted/20 border-2 border-dashed border-muted-foreground/10 flex items-center gap-3 text-muted-foreground/40 italic text-sm font-bold w-full">
+                  <Info className="h-4 w-4" /> 학습 계획을 추가하여 시간 배분을 정밀하게 분석하세요.
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -634,12 +695,10 @@ export default function StudyPlanPage() {
         <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.02] mx-auto w-full", isMobile ? "md:col-span-12" : "md:col-span-5")}>
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-6" : "p-8")}>
             <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <CardTitle className={cn("flex items-center gap-2 font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-2xl")}>
-                  <div className="bg-primary/5 p-1.5 rounded-lg"><Clock className="h-5 w-5 text-primary" /></div>
-                  생활 루틴
-                </CardTitle>
-              </div>
+              <CardTitle className={cn("flex items-center gap-3 font-black tracking-tighter text-primary", isMobile ? "text-xl" : "text-2xl")}>
+                <div className="bg-primary/5 p-2 rounded-xl"><Clock className="h-6 w-6 text-primary" /></div>
+                생활 루틴
+              </CardTitle>
               {!isPast && (
                 <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                   <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 transition-all"><PlusCircle className="h-6 w-6" /></Button></DialogTrigger>
@@ -649,14 +708,14 @@ export default function StudyPlanPage() {
                       <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-2xl border-2 font-bold text-base" />
                       <div className="flex flex-wrap gap-2">{['점심', '저녁', '학원', '독서실'].map(tag => <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white py-1.5 px-4 rounded-xl font-black text-xs" onClick={() => setNewRoutineTitle(tag)}>+{tag}</Badge>)}</div>
                     </div>
-                    <DialogFooter className="pt-6"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
+                    <DialogFooter className="pt-6"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white bg-gradient-to-br", currentTier.gradient)}>{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
                   </DialogContent>
                 </Dialog>
               )}
             </div>
           </CardHeader>
           <CardContent className={cn("bg-[#fafafa] flex flex-col gap-4", isMobile ? "p-5" : "p-8")}>
-            {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className="py-16 text-center opacity-20 italic font-black text-sm">등록된 루틴이 없습니다.</div> :
+            {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className="py-16 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">등록된 루틴이 없습니다.</div> :
               scheduleItems.sort((a,b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00')).map((item) => (
                 <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isPast} isMobile={isMobile} />
               ))
@@ -670,8 +729,8 @@ export default function StudyPlanPage() {
             <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]">
               <CardHeader className="p-0 border-b bg-muted/5">
                 <TabsList className="w-full justify-start rounded-none bg-transparent h-16 p-0 gap-0">
-                  <TabsTrigger value="study" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 font-black text-xs sm:text-sm uppercase">학습 To-do</TabsTrigger>
-                  <TabsTrigger value="personal" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 data-[state=active]:text-amber-600 font-black text-xs sm:text-sm uppercase">개인 일정</TabsTrigger>
+                  <TabsTrigger value="study" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 font-black text-xs sm:text-sm uppercase tracking-widest">학습 To-do</TabsTrigger>
+                  <TabsTrigger value="personal" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 data-[state=active]:text-amber-600 font-black text-xs sm:text-sm uppercase tracking-widest">개인 일정</TabsTrigger>
                 </TabsList>
               </CardHeader>
               <CardContent className={cn("bg-[#fafafa]", isMobile ? "p-5" : "p-8")}>
@@ -680,27 +739,27 @@ export default function StudyPlanPage() {
                     {studyTasks.map((task) => {
                       const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
                       return (
-                        <div key={task.id} className={cn("flex items-start gap-4 p-5 rounded-[1.5rem] border-2 transition-all group", task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm")}>
-                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 mt-1" />
+                        <div key={task.id} className={cn("flex items-start gap-5 p-6 rounded-[2rem] border-2 transition-all group", task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md")}>
+                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className="h-7 w-7 rounded-xl border-2 mt-1" />
                           <div className="flex-1 grid gap-1.5">
                             <div className="flex items-center gap-2">
-                              <Badge className={cn("rounded-md font-black text-[9px] px-1.5 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
-                              {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/60 flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}분</span>}
+                              <Badge className={cn("rounded-md font-black text-[9px] px-2 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
+                              {task.targetMinutes && <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1"><Clock className="h-3 w-3" /> {task.targetMinutes}m Goal</span>}
                             </div>
-                            <Label htmlFor={task.id} className={cn("font-bold text-sm sm:text-base leading-tight transition-all", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
+                            <Label htmlFor={task.id} className={cn("font-black text-base sm:text-lg tracking-tight transition-all leading-snug", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
                           </div>
-                          {!isPast && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}><Trash2 className="h-4 w-4" /></Button>}
+                          {!isPast && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all shrink-0" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}><Trash2 className="h-4 w-4" /></Button>}
                         </div>
                       );
                     })}
                     
                     {!isPast && (
-                      <div className="flex flex-col gap-3 p-5 rounded-[1.5rem] bg-white border-2 border-emerald-100 shadow-sm mt-2">
-                        <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-4 p-6 rounded-[2rem] bg-white border-2 border-emerald-100 shadow-sm mt-2">
+                        <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">과목 선택</Label>
                             <Select value={newStudySubject} onValueChange={setNewStudySubject}>
-                              <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-xs">
+                              <SelectTrigger className="h-11 rounded-xl border-2 font-bold text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -710,12 +769,12 @@ export default function StudyPlanPage() {
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">목표 시간(분)</Label>
-                            <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-10 rounded-xl border-2 font-bold text-xs" />
+                            <Input type="number" value={newStudyMinutes} onChange={(e) => setNewStudyMinutes(e.target.value)} className="h-11 rounded-xl border-2 font-black text-center" />
                           </div>
                         </div>
-                        <div className="relative flex items-center bg-muted/20 rounded-2xl p-1.5">
-                          <Input placeholder="공부 할 일을 입력하세요..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm sm:text-base" />
-                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl h-10 w-10 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"><Plus className="h-5 w-5" /></Button>
+                        <div className="relative flex items-center bg-muted/20 rounded-[1.5rem] p-1.5">
+                          <Input placeholder="공부 할 일을 입력하세요..." value={newStudyTask} onChange={(e) => setNewStudyTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newStudyTask, 'study')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-12 text-sm sm:text-base" />
+                          <Button size="icon" onClick={() => handleAddTask(newStudyTask, 'study')} disabled={isSubmitting || !newStudyTask.trim()} className="rounded-xl h-11 w-11 bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-lg"><Plus className="h-6 w-6" /></Button>
                         </div>
                       </div>
                     )}
@@ -724,16 +783,16 @@ export default function StudyPlanPage() {
                 <TabsContent value="personal" className="mt-0 space-y-4">
                   <div className="grid gap-3">
                     {personalTasks.map((task) => (
-                      <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.5rem] border-2 transition-all group", task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent shadow-sm")}>
-                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className="h-6 w-6 rounded-lg border-2 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500" />
-                        <Label htmlFor={task.id} className={cn("flex-1 font-bold text-sm sm:text-base leading-tight transition-all", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
-                        {!isPast && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}><Trash2 className="h-4 w-4" /></Button>}
+                      <div key={task.id} className={cn("flex items-center gap-5 p-6 rounded-[2rem] border-2 transition-all group", task.done ? "bg-amber-50/30 border-amber-100/50" : "bg-white border-transparent shadow-sm")}>
+                        <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className="h-7 w-7 rounded-xl border-2" />
+                        <Label htmlFor={task.id} className={cn("flex-1 font-black text-base sm:text-lg tracking-tight transition-all", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
+                        {!isPast && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all shrink-0" onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}><Trash2 className="h-4 w-4" /></Button>}
                       </div>
                     ))}
                     {!isPast && (
-                      <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-2xl p-1 shadow-sm mt-2">
-                        <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-11 text-sm sm:text-base" />
-                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl h-10 w-10 border-2 border-amber-500 text-amber-600 shrink-0 shadow-lg"><Plus className="h-5 w-5" /></Button>
+                      <div className="relative flex items-center bg-white border-2 border-amber-100 rounded-[1.5rem] p-1.5 shadow-sm mt-2">
+                        <Input placeholder="개인 일정 추가..." value={newPersonalTask} onChange={(e) => setNewPersonalTask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold h-12 text-sm sm:text-base" />
+                        <Button variant="outline" size="icon" onClick={() => handleAddTask(newPersonalTask, 'personal')} disabled={isSubmitting || !newPersonalTask.trim()} className="rounded-xl h-11 w-11 border-2 border-amber-500 text-amber-600 shrink-0 shadow-lg"><Plus className="h-6 w-6" /></Button>
                       </div>
                     )}
                   </div>
@@ -745,8 +804,8 @@ export default function StudyPlanPage() {
                   <p className="text-[11px] font-black text-primary/70 uppercase tracking-widest">{format(selectedDate, 'yyyy. MM. dd', { locale: ko })}</p>
                 </div>
                 {!isPast && (
-                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Button variant="outline" size="sm" className="rounded-[1.25rem] gap-2 text-[11px] font-black h-11 px-6 border-2 shadow-sm bg-white" onClick={handleApplyToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" className="rounded-2xl gap-2 text-xs font-black h-12 px-8 border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95" onClick={handleApplyToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
                       {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Copy className="h-4 w-4" />} 이 요일 반복 복사
                     </Button>
                   </div>
@@ -757,11 +816,11 @@ export default function StudyPlanPage() {
         </div>
       </div>
       
-      <footer className="px-4 py-8 text-center">
-        <div className="flex items-center justify-center gap-5 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">
-           <div className="flex items-center gap-2"><Activity className="h-3.5 w-3.5" /><span>Ready for Deep Work</span></div>
-           <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" />
-           <div className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /><span>AI Sync Active</span></div>
+      <footer className="px-4 py-12 text-center opacity-30">
+        <div className="flex items-center justify-center gap-6 text-[10px] font-black uppercase tracking-[0.4em] text-primary">
+           <div className="flex items-center gap-2"><Activity className="h-4 w-4" /><span>Ready for Deep Work</span></div>
+           <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
+           <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" /><span>AI Sync Active</span></div>
         </div>
       </footer>
     </div>
