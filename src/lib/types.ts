@@ -229,6 +229,23 @@ export interface StudyPlanItem {
   updatedAt: Timestamp;
 }
 
+export interface StudyLogDay {
+  studentId: string;
+  centerId: string;
+  dateKey: string;
+  totalMinutes: number;
+  updatedAt: Timestamp;
+  createdAt: Timestamp;
+}
+
+export interface StudySession {
+  id: string;
+  startTime: Timestamp;
+  endTime: Timestamp;
+  durationMinutes: number;
+  createdAt: Timestamp;
+}
+
 export interface DailyStudentStat {
     centerId: string;
     studentId: string;

@@ -113,7 +113,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
-  // 학생 프로필 정보 (좌석 번호 확인용)
   const studentProfileRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
@@ -144,18 +143,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
 
-  const todayCompletionRate = useMemo(() => {
-    if (!studyTasks || studyTasks.length === 0) return 0;
-    const doneCount = studyTasks.filter(t => t.done).length;
-    return (doneCount / studyTasks.length) * 100;
-  }, [studyTasks]);
-
   const saveStudyTime = async () => {
     if (!firestore || !user || !activeMembership || !studyLogRef || !startTime || !todayKey) return;
     
-    const sessionMinutes = Math.floor((Date.now() - startTime) / 60000);
+    const now = Date.now();
+    const sessionMinutes = Math.floor((now - startTime) / 60000);
     if (sessionMinutes <= 0) return;
 
+    // 1. 일일 총 시간 업데이트
     const data = {
       totalMinutes: increment(sessionMinutes),
       uid: user.uid,
@@ -165,9 +160,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       studentId: user.uid,
       createdAt: serverTimestamp(),
     };
-
     setDoc(studyLogRef, data, { merge: true });
 
+    // 2. 개별 세션 상세 기록 저장
+    const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
+    setDoc(sessionRef, {
+      startTime: Timestamp.fromMillis(startTime),
+      endTime: Timestamp.fromMillis(now),
+      durationMinutes: sessionMinutes,
+      createdAt: serverTimestamp()
+    });
+
+    // 3. 마스터리 점수 업데이트
     const progressRef = doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
     await setDoc(progressRef, {
       stats: {
@@ -183,7 +187,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
     if (isTimerActive) {
-      // 공부 종료 -> 퇴실 처리
       if (studentProfile?.seatNo) {
         const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
         const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
@@ -198,7 +201,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     } else {
       const now = Date.now();
       
-      // 공부 시작 -> 즉시 입실 처리
       if (studentProfile?.seatNo) {
         const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
         const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
@@ -215,6 +217,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setIsTimerActive(true);
       toast({ title: "입실 확인! 학습 트랙을 시작합니다." });
     }
+  };
+
+  const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
+    if (!firestore || !user || !activeMembership || !weekKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    updateDoc(itemRef, { done: !item.done, updatedAt: serverTimestamp() });
   };
 
   if (!isActive) return null;
