@@ -66,8 +66,8 @@ const TIERS = [
   { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
   { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
   { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
-  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-200/50' },
-  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-200/50' },
+  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
+  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
 ];
 
 const TIER_PRESETS = [
@@ -320,7 +320,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return values.reduce((a, b) => a + b, 0) / values.length;
   }, [stats]);
 
-  // 실시간 랭킹 정보 조회 (고위 티어 결정용)
   const rankQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return query(
@@ -331,16 +330,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
   const currentRank = rankEntries?.[0]?.rank || 999;
 
-  // 티어 판정 로직 최적화: LP 기준 + 랭킹 기반 고위 티어
   const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    // 25,000 LP 이상일 때 랭킹에 따른 고위 티어 적용
     if (currentLp >= 25000) {
       if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
       if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
       return TIERS.find(t => t.name === '마스터')!;
     }
-    // 25,000 LP 미만일 때 LP 임계값에 따른 일반 티어 적용
     return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
   }, [currentLp, currentRank]);
 
@@ -506,7 +502,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <Badge className="w-fit bg-white/20 text-white border-none font-black text-[10px] tracking-[0.3em] uppercase px-3 py-1 mb-2">
                 {currentTier.name} Tier Active
               </Badge>
-              <h2 className={cn("font-black tracking-tighter leading-[1.1]", isMobile ? "text-4xl" : "text-6xl")}>
+              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-4xl" : "text-6xl")}>
                 {isTimerActive ? "몰입의 정점에\n도착하셨네요!" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
@@ -532,7 +528,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             
             <button 
               className={cn(
-                "w-full rounded-[2.5rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-3", 
+                "w-full rounded-[2.5rem] font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-3 whitespace-nowrap", 
                 isMobile ? "h-20 text-2xl" : "h-24 px-16 text-3xl", 
                 isTimerActive ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-white text-primary hover:bg-slate-50"
               )} 
