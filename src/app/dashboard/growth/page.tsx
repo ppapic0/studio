@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -32,7 +31,10 @@ import {
   ArrowUpCircle,
   Flame,
   Info,
-  ChevronRight
+  ChevronRight,
+  BookOpen,
+  Check,
+  Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -66,58 +68,72 @@ function SystemGuideDialog() {
         <div className="bg-primary p-10 text-primary-foreground relative">
           <Sparkles className="absolute top-4 right-4 h-12 w-12 opacity-20" />
           <DialogHeader>
-            <DialogTitle className="text-3xl font-black tracking-tighter">LP 성장 시스템 가이드</DialogTitle>
+            <DialogTitle className="text-3xl font-black tracking-tighter">성장트랙 가이드</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 font-bold mt-2">
-              행동 보상(LP)과 질적 평가(스탯)가 결합된 정밀 성장 시스템입니다.
+              행동 보상(LP)과 질적 평가(티어)가 결합된 정밀 성장 시스템입니다.
             </DialogDescription>
           </DialogHeader>
         </div>
-        <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+        <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white">
           <div className="space-y-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <Zap className="h-4 w-4 fill-current" /> 하루 기본 LP (최대 1,000)
+              <Zap className="h-4 w-4 fill-current text-accent" /> 1. 하루 기본 LP (최대 1,000)
             </h4>
+            <p className="text-xs font-bold text-muted-foreground leading-relaxed">
+              매일 정해진 행동을 수행하면 큰 보상을 받습니다.
+            </p>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { l: '계획 수립', v: 200 }, { l: '출석 확인', v: 200 },
-                { l: '품질 달성', v: 200 }, { l: '6시간 보너스', v: 200 }
+                { l: '출석 확인', v: 200, d: '오늘 첫 입실 시' },
+                { l: '계획 수립', v: 200, d: '모든 To-do 완료 시' },
+                { l: '성장 달성', v: 200, d: '일일 목표 도달 시' },
+                { l: '6시간 보너스', v: 200, d: '초몰입 달성 시' }
               ].map(item => (
-                <div key={item.l} className="p-4 rounded-2xl bg-muted/50 border flex justify-between items-center">
-                  <span className="text-xs font-bold">{item.l}</span>
-                  <span className="text-sm font-black text-primary">+{item.v}</span>
+                <div key={item.l} className="p-4 rounded-2xl bg-muted/30 border flex flex-col gap-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black">{item.l}</span>
+                    <span className="text-sm font-black text-primary">+{item.v}</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-muted-foreground">{item.d}</span>
                 </div>
               ))}
+            </div>
+            <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+              <span className="text-xs font-black">실시간 학습 시간</span>
+              <span className="text-xs font-bold">1분 몰입 = <span className="text-primary font-black">1 LP</span></span>
             </div>
           </div>
 
           <div className="space-y-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> 부스트 시스템
+              <TrendingUp className="h-4 w-4 text-emerald-500" /> 2. 부스트 및 티어 시스템
             </h4>
-            <div className="p-6 rounded-3xl bg-blue-50 border border-blue-100 space-y-3">
+            <div className="p-6 rounded-3xl bg-blue-50 border border-blue-100 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-blue-900">마스터리 보너스</span>
-                <span className="text-xs font-black text-blue-600">MAX +10%</span>
+                <span className="text-xs font-black text-blue-600">최대 +10%</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-blue-900">4스탯 품질 배율</span>
-                <span className="text-xs font-black text-blue-600">MAX +10%</span>
+                <span className="text-xs font-bold text-blue-900">4대 품질 스탯 배율</span>
+                <span className="text-xs font-black text-blue-600">최대 +10%</span>
               </div>
               <p className="text-[10px] font-bold text-blue-700/60 leading-relaxed pt-2 border-t border-blue-200">
-                ※ 최종 부스트는 최대 1.20배까지 적용되며, 행동당 보너스는 25 LP를 초과할 수 없습니다.
+                ※ 최종 부스트는 최대 <span className="font-black text-blue-700">1.20배</span>까지 적용됩니다. 마스터리는 영구히 유지되지만, 품질 스탯은 시즌 종료 시 감쇠됩니다.
               </p>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-4 pt-4">
             <h4 className="font-black text-primary flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" /> 시즌 리셋 규칙
+              <RefreshCw className="h-4 w-4 text-rose-500" /> 3. 시즌 리셋 규칙
             </h4>
-            <p className="text-xs font-bold text-muted-foreground leading-relaxed">
-              - 30일마다 시즌이 종료됩니다.<br/>
-              - **시즌 LP는 0으로 리셋**되며, **4스탯은 5% 감쇠**됩니다.<br/>
-              - **누적 마스터리(노력의 정수)**는 유지됩니다.
-            </p>
+            <div className="p-5 rounded-2xl bg-rose-50/50 border border-rose-100">
+              <p className="text-xs font-bold text-rose-900/70 leading-relaxed">
+                - **30일**마다 시즌이 종료됩니다.<br/>
+                - **시즌 LP는 0으로 리셋**되어 새 시즌 랭킹이 시작됩니다.<br/>
+                - **4스탯은 5% 감쇠**되어 꾸준한 실력 유지가 필요합니다.
+              </p>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -157,14 +173,67 @@ export default function GrowthPage() {
   return (
     <div className={cn("flex flex-col pb-24", isMobile ? "gap-5 px-1" : "gap-10")}>
       <header className={cn("flex flex-col", isMobile ? "gap-1" : "gap-2")}>
-        <div className="flex items-center gap-3">
-          <div className="bg-primary rounded-2xl p-2.5 shadow-lg shadow-primary/20">
-            <TrendingUp className="text-white h-6 w-6" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary rounded-2xl p-2.5 shadow-lg shadow-primary/20">
+              <TrendingUp className="text-white h-6 w-6" />
+            </div>
+            <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>성장트랙</h1>
           </div>
-          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>성장트랙</h1>
+          <Badge variant="secondary" className="rounded-full font-black px-4 py-1 gap-2 bg-accent/10 text-accent border-none h-9">
+            <Sparkles className="h-4 w-4" /> 획득 LP 부스트 x{totalBoost.toFixed(2)}
+          </Badge>
         </div>
         <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px] uppercase tracking-widest" : "text-sm")}>Season LP & Quality Management</p>
       </header>
+
+      {/* LP 성취 가이드 섹션 */}
+      <section className="animate-in slide-in-from-top-4 duration-1000">
+        <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]">
+          <CardHeader className="bg-muted/5 border-b p-8">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-black flex items-center gap-3 tracking-tighter">
+                <BookOpen className="h-6 w-6 text-primary" /> LP 획득 및 성장 가이드
+              </CardTitle>
+              <Badge className="bg-primary/5 text-primary border-none font-black text-[9px] uppercase tracking-widest">Guide</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-black text-xs text-primary uppercase"><Zap className="h-4 w-4 text-accent fill-current" /> 행동 보상</div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
+                    <span className="text-[11px] font-bold">출석/계획/성장/6H</span>
+                    <span className="text-xs font-black text-primary">각 +200 LP</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
+                    <span className="text-[11px] font-bold">실시간 몰입 학습</span>
+                    <span className="text-xs font-black text-primary">1분당 1 LP</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-black text-xs text-emerald-600 uppercase"><TrendingUp className="h-4 w-4" /> 실력 지수 (티어)</div>
+                <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-[88px] flex items-center">
+                  <p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">
+                    4대 품질 스탯(집중, 꾸준함, 성취, 회복)의 평균이 당신의 **티어**를 결정합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-black text-xs text-purple-600 uppercase"><Star className="h-4 w-4 fill-current" /> 마스터리 부스트</div>
+                <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 h-[88px] flex items-center">
+                  <p className="text-[11px] font-bold leading-relaxed text-purple-900/70">
+                    누적 마스터리가 높을수록 다음 시즌에도 더 강력한 LP 획득 배율을 유지합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <SystemGuideDialog />
+          </CardContent>
+        </Card>
+      </section>
 
       {/* 시즌 메인 대시보드 */}
       <Card className={cn(
@@ -283,7 +352,6 @@ export default function GrowthPage() {
               </div>
               <Progress value={(avgStat / (TIERS[TIERS.indexOf(currentTier) + 1]?.min || 100)) * 100} className="h-1.5" />
             </div>
-            <SystemGuideDialog />
           </div>
         </Card>
       </div>

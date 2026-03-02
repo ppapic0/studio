@@ -35,6 +35,7 @@ export interface InviteCode {
   createdByUserId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  centerId: string;
 }
 
 export interface MonthlyFinance {
@@ -198,7 +199,7 @@ export interface DailyReport {
 
 export interface GrowthProgress {
   seasonLp: number; // 시즌 리셋 대상
-  mastery: number; // 0-100 영구 성장
+  mastery: number; // 0-100 영구 성장 (부스트 영향)
   stats: {
     focus: number;
     consistency: number;
@@ -211,9 +212,10 @@ export interface GrowthProgress {
       plan: boolean;
       growth: boolean;
       bonus6h: boolean;
+      dailyLpAmount?: number; // 해당 일자에 획득한 총 LP (기록용)
     };
   };
-  totalLpEarned: number; // 마스터리 계산용 누적 LP
+  totalLpEarned: number; // 누적 LP
   lastResetAt: Timestamp;
   updatedAt: Timestamp;
 }
