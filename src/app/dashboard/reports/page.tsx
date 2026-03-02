@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -355,9 +356,9 @@ export default function DailyReportsPage() {
         </div>
       </div>
 
-      {/* 리포트 작성 다이얼로그 - 상담 페이지 스타일 동기화 */}
+      {/* 리포트 작성 다이얼로그 - 팝업 중앙 정렬 최적화 */}
       <Dialog open={isWriteModalOpen} onOpenChange={setIsWriteModalOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "max-w-4xl h-[90vh]")}>
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "max-w-4xl h-[90vh]")}>
           <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-12")}>
             <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
               <Sparkles className={cn(isMobile ? "h-20 w-20" : "h-48 w-48")} />
@@ -367,13 +368,13 @@ export default function DailyReportsPage() {
                 <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">Premium AI Analysis</Badge>
                 <span className="text-white/60 font-black text-[10px] tracking-widest">{dateKey}</span>
               </div>
-              <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-5xl")}>{selectedStudent?.name} 학생</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold text-sm sm:text-base mt-1">성장 데이터를 바탕으로 AI가 최적의 분석 리포트를 생성합니다.</DialogDescription>
+              <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-5xl")}>{selectedStudent?.name} 학생</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold text-sm mt-1">성장 데이터를 바탕으로 AI가 최적의 분석 리포트를 생성합니다.</DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-            <div className={cn("space-y-8", isMobile ? "p-6" : "p-12")}>
+            <div className={cn("space-y-8", isMobile ? "p-5" : "p-12")}>
               {/* 교사 노트 & AI 실행 */}
               <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "md:grid-cols-5")}>
                 <Card className={cn("rounded-[2rem] border-none shadow-xl bg-white ring-1 ring-border/50", isMobile ? "" : "md:col-span-3")}>
@@ -430,7 +431,7 @@ export default function DailyReportsPage() {
                     onChange={(e) => setReportContent(e.target.value)}
                     className={cn(
                       "rounded-[2.5rem] border-2 border-muted font-bold leading-relaxed text-base resize-none shadow-2xl bg-white group-hover:border-primary/20 focus-visible:ring-primary/10 transition-all",
-                      isMobile ? "min-h-[400px] p-6" : "min-h-[500px] p-10"
+                      isMobile ? "min-h-[300px] p-5" : "min-h-[500px] p-10"
                     )}
                   />
                   {!reportContent && !aiLoading && (
@@ -444,7 +445,7 @@ export default function DailyReportsPage() {
             </div>
           </div>
 
-          <DialogFooter className={cn("bg-white border-t shrink-0 backdrop-blur-xl bg-white/80", isMobile ? "p-6 flex-col gap-3" : "p-10 flex-row justify-between items-center")}>
+          <DialogFooter className={cn("bg-white border-t shrink-0 backdrop-blur-xl bg-white/80", isMobile ? "p-5 flex-col gap-3" : "p-10 flex-row justify-between items-center")}>
             {!isMobile && (
               <div className="font-bold text-muted-foreground italic text-xs flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
@@ -454,7 +455,7 @@ export default function DailyReportsPage() {
             <div className={cn("flex gap-3", isMobile ? "w-full" : "")}>
               <Button variant="outline" className="rounded-2xl h-14 px-8 font-black flex-1 sm:flex-none border-2 shadow-sm" onClick={() => handleSaveReport('draft')} disabled={isSaving}>임시 저장</Button>
               <Button className="rounded-2xl h-14 px-12 font-black gap-3 shadow-xl flex-1 sm:flex-none active:scale-95 transition-all" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim()}>
-                <Send className="h-5 w-5" /> 학부모님께 최종 발송
+                <Send className="h-5 w-5" /> 발송
               </Button>
             </div>
           </DialogFooter>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -215,8 +216,8 @@ export default function StudentListPage() {
               <UserPlus className="h-5 w-5" /> 신규 학생 가입
             </Button>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-md")}>
-            <div className={cn("bg-primary p-8 text-white relative overflow-hidden", isMobile ? "p-6" : "p-10")}>
+          <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-md")}>
+            <div className={cn("bg-primary p-8 text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-10")}>
                <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
                  <UserPlus className={isMobile ? "h-20 w-20" : "h-32 w-32"} />
                </div>
@@ -226,7 +227,7 @@ export default function StudentListPage() {
                </DialogHeader>
             </div>
             
-            <div className={cn("grid gap-5 overflow-y-auto custom-scrollbar", isMobile ? "p-6 max-h-[calc(100vh-200px)]" : "p-8 max-h-[60vh]")}>
+            <div className={cn("grid gap-5 overflow-y-auto custom-scrollbar flex-1", isMobile ? "p-6" : "p-8 max-h-[60vh]")}>
               <div className="grid gap-2">
                 <Label className="text-[10px] font-black uppercase text-primary/70">이름</Label>
                 <Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" />
@@ -260,11 +261,10 @@ export default function StudentListPage() {
                 </Select>
               </div>
             </div>
-            <DialogFooter className={cn("bg-muted/30 border-t", isMobile ? "p-6" : "p-8")}>
+            <DialogFooter className={cn("bg-muted/30 border-t shrink-0", isMobile ? "p-5" : "p-8")}>
               <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}
               </Button>
-              {isMobile && <Button variant="ghost" onClick={() => setIsAddModalOpen(false)} className="w-full mt-2 font-bold">닫기</Button>}
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -384,7 +385,7 @@ export default function RevenuePage() {
       </div>
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-xl")}>
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-xl")}>
           <div className="bg-primary p-10 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
             <DialogHeader>
@@ -397,7 +398,7 @@ export default function RevenuePage() {
             </DialogHeader>
           </div>
 
-          <div className="p-8 space-y-8 bg-white max-h-[60vh] overflow-y-auto custom-scrollbar">
+          <div className="p-8 space-y-8 bg-white flex-1 overflow-y-auto custom-scrollbar">
             {/* 고정비 월별 설정 */}
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-2">

@@ -505,12 +505,12 @@ export default function StudyHistoryPage() {
       </Card>
 
       <Dialog open={!!selectedDateForPlan} onOpenChange={(open) => !open && setSelectedDateForPlan(null)}>
-        <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed bottom-0 top-auto translate-y-0 left-0 right-0 max-w-none rounded-t-[2.5rem] rounded-b-none" : "sm:max-w-xl rounded-[3rem]")}>
+        <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2.5rem]" : "sm:max-w-xl rounded-[3rem]")}>
           <div className="bg-primary p-8 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
             <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
           </div>
-          <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[500px]")}>
+          <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[50vh]" : "max-h-[500px]")}>
             <Tabs defaultValue="schedule" className="w-full">
               <TabsList className="grid w-full grid-cols-3 rounded-none h-16 bg-muted/20 p-0 border-b">
                 <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] sm:text-xs uppercase tracking-widest">ROUTINE</TabsTrigger>
@@ -523,7 +523,7 @@ export default function StudyHistoryPage() {
                     <div className="flex justify-end">
                       <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                         <DialogTrigger asChild><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black gap-1 bg-white shadow-sm border rounded-xl"><Plus className="h-3.5 w-3.5" /> 루틴 추가</Button></DialogTrigger>
-                        <DialogContent className="rounded-3xl p-10 border-none shadow-2xl">
+                        <DialogContent className="rounded-3xl p-10 border-none shadow-2xl fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[380px]">
                           <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">생활 루틴 추가</DialogTitle></DialogHeader>
                           <Input placeholder="루틴 이름 (예: 영어 학원, 점심 식사)" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 border-2 rounded-2xl font-bold" />
                           <Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">루틴 생성</Button>
