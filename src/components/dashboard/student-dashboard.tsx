@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -555,7 +554,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       <Card className={cn("border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.03]", isMobile ? "rounded-[1.25rem]" : "")}>
         <div className="grid grid-cols-1 lg:grid-cols-3">
-          <div className="lg:col-span-2 border-r border-dashed border-muted">
+          <div className={cn("lg:col-span-2 border-r border-dashed border-muted", isMobile && "border-r-0")}>
             <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-3.5" : "p-10")}>
               <div className="flex items-center justify-between">
                 <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-primary", isMobile ? "text-base" : "text-3xl")}>
@@ -587,31 +586,36 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </CardContent>
           </div>
 
-          <div className="lg:col-span-1 bg-amber-50/20">
-            <CardHeader className={cn("bg-amber-100/30 border-b", isMobile ? "p-3.5" : "p-10")}>
-              <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-amber-700", isMobile ? "text-base" : "text-2xl")}>
-                <Timer className={cn("text-amber-600", isMobile ? "h-4 w-4" : "h-8 w-8")} /> 루틴
-              </CardTitle>
-            </CardHeader>
-            <CardContent className={cn(isMobile ? "p-3.5" : "p-10")}>
-              {scheduleItems.length === 0 ? (
-                <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-amber-200 rounded-xl">루틴이 없습니다.</div>
-              ) : (
-                <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "flex flex-col")}>
-                  {scheduleItems.map((item) => (
-                    <div key={item.id} className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border-2 border-amber-100/50 shadow-sm text-center">
-                      <span className={cn("font-black tracking-tighter text-primary truncate w-full px-1", isMobile ? "text-[10px]" : "text-xs")}>
-                        {item.title.split(': ')[0]}
-                      </span>
-                      <Badge variant="outline" className={cn("font-mono font-black text-amber-600 border-amber-200 bg-amber-50/50 mt-1 h-5", isMobile ? "text-[8px] px-1" : "text-[10px] px-2")}>
-                        {item.title.split(': ')[1] || '--:--'}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </div>
+          {!isMobile && (
+            <div className="lg:col-span-1 bg-amber-50/20">
+              <CardHeader className="p-10 bg-amber-100/30 border-b">
+                <CardTitle className="font-black flex items-center gap-2.5 tracking-tighter text-amber-700 text-2xl sm:text-3xl">
+                  <Timer className="h-8 w-8 text-amber-600" /> 루틴
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-10 flex flex-col gap-4">
+                {scheduleItems.length === 0 ? (
+                  <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-amber-200 rounded-xl">루틴이 없습니다.</div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {scheduleItems.map((item) => (
+                      <div key={item.id} className="flex flex-col items-center justify-center p-6 rounded-2xl bg-white border-2 border-amber-100/50 shadow-sm text-center group hover:border-amber-300 transition-all">
+                        <div className="p-3 rounded-2xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white transition-all text-amber-600 mb-2">
+                          <Timer className="h-6 w-6" />
+                        </div>
+                        <span className="font-black tracking-tighter text-primary truncate w-full px-1 text-lg">
+                          {item.title.split(': ')[0]}
+                        </span>
+                        <Badge variant="outline" className="font-mono font-black text-amber-600 border-amber-200 bg-amber-50/50 mt-2 h-8 px-4 text-sm rounded-xl">
+                          {item.title.split(': ')[1] || '--:--'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </div>
+          )}
         </div>
       </Card>
 
