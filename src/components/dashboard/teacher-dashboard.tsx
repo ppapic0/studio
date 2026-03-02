@@ -31,7 +31,7 @@ import {
   Search,
   Check,
   X,
-  Map,
+  Map as MapIcon,
   ArrowRightLeft,
   Grid3X3,
   Save,
@@ -77,7 +77,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
   
-  // Hydration safety
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<number>(0);
   const [selectedSeat, setSelectedSeat] = useState<AttendanceCurrent | null>(null);
@@ -195,6 +194,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const stats = useMemo(() => {
+    if (!mounted) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
+
     let studying = 0;
     let absent = 0;
     let away = 0;
@@ -202,7 +203,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let totalMins = 0;
     let allLiveMinutes: number[] = [];
 
-    const attendanceMap = new Map(attendanceList?.map(a => [a.id, a]));
+    // Use built-in Map constructor by prefixing with globalThis to avoid collision with lucide icon
+    const attendanceMap = new globalThis.Map(attendanceList?.map(a => [a.id, a]));
 
     for (let col = 0; col < gridCols; col++) {
       for (let row = 0; row < gridRows; row++) {
@@ -244,7 +246,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
 
     return { studying, absent, away, total: totalSeatsCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
-  }, [attendanceList, todayLogs, now, gridCols, gridRows]);
+  }, [attendanceList, todayLogs, now, gridCols, gridRows, mounted]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -532,7 +534,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           )}
                           
                           {isAisle ? (
-                            isEditMode && <Map className="h-3 w-3 opacity-40" />
+                            isEditMode && <MapIcon className="h-3 w-3 opacity-40" />
                           ) : student ? (
                             <div className="flex flex-col items-center gap-0 w-full px-0.5">
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
@@ -708,7 +710,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
             <DialogHeader className="relative z-10">
               <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-3">
-                {selectedSeat?.type === 'aisle' ? <Map className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}
+                {selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}
                 {selectedSeat?.type === 'aisle' ? '공간 설정' : '학생 좌석 배정'}
               </DialogTitle>
               <p className="text-white/60 font-bold mt-1 text-sm">GRID ID: {selectedSeat?.seatNo}</p>
