@@ -187,54 +187,6 @@ export default function GrowthPage() {
         <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px] uppercase tracking-widest" : "text-sm")}>Season LP & Quality Management</p>
       </header>
 
-      {/* LP 성취 가이드 섹션 */}
-      <section className="animate-in slide-in-from-top-4 duration-1000">
-        <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]">
-          <CardHeader className="bg-muted/5 border-b p-8">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-black flex items-center gap-3 tracking-tighter">
-                <BookOpen className="h-6 w-6 text-primary" /> LP 획득 및 성장 가이드
-              </CardTitle>
-              <Badge className="bg-primary/5 text-primary border-none font-black text-[9px] uppercase tracking-widest">Guide</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 font-black text-xs text-primary uppercase"><Zap className="h-4 w-4 text-accent fill-current" /> 행동 보상</div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
-                    <span className="text-[11px] font-bold">출석/계획/성장/6H</span>
-                    <span className="text-xs font-black text-primary">각 +200 LP</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
-                    <span className="text-[11px] font-bold">실시간 몰입 학습</span>
-                    <span className="text-xs font-black text-primary">1분당 1 LP</span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 font-black text-xs text-emerald-600 uppercase"><TrendingUp className="h-4 w-4" /> 실력 지수 (티어)</div>
-                <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-[88px] flex items-center">
-                  <p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">
-                    4대 품질 스탯(집중, 꾸준함, 성취, 회복)의 평균이 당신의 **티어**를 결정합니다.
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 font-black text-xs text-purple-600 uppercase"><Star className="h-4 w-4 fill-current" /> 마스터리 부스트</div>
-                <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 h-[88px] flex items-center">
-                  <p className="text-[11px] font-bold leading-relaxed text-purple-900/70">
-                    누적 마스터리가 높을수록 다음 시즌에도 더 강력한 LP 획득 배율을 유지합니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <SystemGuideDialog />
-          </CardContent>
-        </Card>
-      </section>
-
       {/* 시즌 메인 대시보드 */}
       <Card className={cn(
         "border-none text-white shadow-2xl rounded-[3rem] overflow-hidden relative group transition-all duration-700",
@@ -355,6 +307,54 @@ export default function GrowthPage() {
           </div>
         </Card>
       </div>
+
+      {/* LP 성취 가이드 섹션 - 페이지 최하단으로 이동 */}
+      <section className="animate-in slide-in-from-top-4 duration-1000">
+        <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]">
+          <CardHeader className="bg-muted/5 border-b p-8">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-black flex items-center gap-3 tracking-tighter">
+                <BookOpen className="h-6 w-6 text-primary" /> LP 획득 및 성장 가이드
+              </CardTitle>
+              <Badge className="bg-primary/5 text-primary border-none font-black text-[9px] uppercase tracking-widest">Guide</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-black text-xs text-primary uppercase"><Zap className="h-4 w-4 text-accent fill-current" /> 행동 보상</div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
+                    <span className="text-[11px] font-bold">출석/계획/성장/6H</span>
+                    <span className="text-xs font-black text-primary">각 +200 LP</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-[#fafafa] border">
+                    <span className="text-[11px] font-bold">실시간 몰입 학습</span>
+                    <span className="text-xs font-black text-primary">1분당 1 LP</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-black text-xs text-emerald-600 uppercase"><TrendingUp className="h-4 w-4" /> 실력 지수 (티어)</div>
+                <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-[88px] flex items-center">
+                  <p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">
+                    4대 품질 스탯(집중, 꾸준함, 성취, 회복)의 평균이 당신의 **티어**를 결정합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-black text-xs text-purple-600 uppercase"><Star className="h-4 w-4 fill-current" /> 마스터리 부스트</div>
+                <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 h-[88px] flex items-center">
+                  <p className="text-[11px] font-bold leading-relaxed text-purple-900/70">
+                    누적 마스터리가 높을수록 다음 시즌에도 더 강력한 LP 획득 배율을 유지합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <SystemGuideDialog />
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
