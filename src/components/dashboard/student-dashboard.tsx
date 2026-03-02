@@ -395,11 +395,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const penaltyPoints = progress?.penaltyPoints || 0;
   const penaltyRate = useMemo(() => {
-    if (penaltyPoints >= 80) return 0.10;
-    if (penaltyPoints >= 60) return 0.08;
-    if (penaltyPoints >= 40) return 0.05;
-    if (penaltyPoints >= 20) return 0.03;
-    return 0;
+    if (penaltyPoints >= 30) return 0.15; // 30점 이상: 15% (강등 상태)
+    if (penaltyPoints >= 20) return 0.10; // 20-29점: 10%
+    if (penaltyPoints >= 10) return 0.06; // 10-19점: 6%
+    return 0.03; // 0-9점: 3%
   }, [penaltyPoints]);
 
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
@@ -873,13 +872,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 flex flex-col items-center text-center gap-4 ring-1 ring-black/5">
                     <div className={cn(
                       "text-7xl font-black tracking-tighter leading-none",
-                      penaltyPoints < 20 ? "text-emerald-500" : penaltyPoints < 40 ? "text-amber-500" : "text-rose-600"
+                      penaltyPoints < 10 ? "text-emerald-500" : penaltyPoints < 20 ? "text-amber-500" : "text-rose-600"
                     )}>
                       {penaltyPoints}<span className="text-lg opacity-40 ml-1">점</span>
                     </div>
                     <div className="grid gap-1">
                       <p className="font-black text-lg text-primary tracking-tight">
-                        {penaltyPoints < 20 ? "매우 양호한 상태입니다! ✨" : penaltyPoints < 40 ? "주의가 필요한 단계입니다. ⚠️" : "강력한 집중 관리가 필요합니다. 🔥"}
+                        {penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : penaltyPoints < 30 ? "주의 및 강등 위험 상태입니다. ⚠️" : "강등 및 즉시 면담 대상입니다. 🔥"}
                       </p>
                       {penaltyRate > 0 && (
                         <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
@@ -894,15 +893,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <AlertOctagon className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">벌점 부여 기준</h4>
+                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">벌점 부여 기준 (강도형)</h4>
                   </div>
                   <div className="grid gap-2">
                     {[
-                      { l: '지각 (10분 이상)', v: '+5', d: '정해진 등원 시간 미준수 시' },
-                      { l: '무단 결석', v: '+10', d: '사전 연락 없이 결석 시' },
-                      { l: '자리 이탈 (20분 이상)', v: '+5', d: '학습 중 장시간 부재 적발 시' },
-                      { l: '졸음/수면 반복 경고', v: '+5', d: '선생님의 지도를 따르지 않을 때' },
-                      { l: '휴대폰 사용/태도 불량', v: '+10', d: '학습 분위기 저해 행동' }
+                      { l: '지각 (10분 이상)', v: '+3', d: '정해진 등원 시간 미준수 시' },
+                      { l: '무단 결석', v: '+7', d: '사전 연락 없이 결석 시' },
+                      { l: '휴대폰 적발', v: '+5', d: '학습 중 휴대폰 무단 사용 시' },
+                      { l: '수면 반복 경고', v: '+3', d: '졸음으로 인한 지도를 따르지 않을 때' },
+                      { l: '태도 문제', v: '+5', d: '학습 분위기 저해 및 불손 태도' }
                     ].map(item => (
                       <div key={item.l} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-border/50 shadow-sm group hover:border-rose-200 transition-all">
                         <div className="grid gap-0.5">
@@ -912,7 +911,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         <Badge variant="outline" className="h-8 w-12 flex justify-center font-black text-rose-600 border-rose-100 bg-rose-50 rounded-xl">{item.v}</Badge>
                       </div>
                     ))}
-                    <p className="text-[9px] font-bold text-muted-foreground/60 text-center mt-2 italic">※ 감정적 폭주 방지를 위해 하루 최대 벌점은 15점으로 제한됩니다.</p>
+                    <p className="text-[9px] font-black text-rose-600 text-center mt-2 italic">※ 하루 최대 벌점은 10점으로 제한됩니다.</p>
                   </div>
                 </section>
 
@@ -920,15 +919,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <TrendingUp className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">단계별 학습 영향</h4>
+                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">구간별 영향</h4>
                   </div>
                   <div className="space-y-3">
                     {[
-                      { range: '0 ~ 19', label: '정상', effect: '영향 없음 (Perfect)', color: 'bg-emerald-500' },
-                      { range: '20 ~ 39', label: '주의', effect: '시즌 LP 획득량 -3%', color: 'bg-amber-500' },
-                      { range: '40 ~ 59', label: '경고', effect: 'LP -5% & 티어 승급 제한', color: 'bg-orange-500' },
-                      { range: '60 ~ 79', label: '위험', effect: 'LP -8% & 강등 카운트 +1', color: 'bg-rose-500' },
-                      { range: '80 이상', label: '제재', effect: '강등 즉시 검토 & 학부모 상담', color: 'bg-black' }
+                      { range: '0 ~ 9', label: '정상', effect: 'LP -3% 적용', color: 'bg-emerald-500' },
+                      { range: '10 ~ 19', label: '주의', effect: 'LP -6% & 학부모 자동 알림', color: 'bg-amber-500' },
+                      { range: '20 ~ 29', label: '경고', effect: 'LP -10% & 승급 불가 & 강등 경고', color: 'bg-rose-500' },
+                      { range: '30 이상', label: '강등', effect: '즉시 1단계 강등 & 3자 대면 상담', color: 'bg-black' }
                     ].map(step => (
                       <div key={step.range} className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-border/50 shadow-sm">
                         <div className={cn("w-1.5 h-10 rounded-full", step.color)} />
@@ -975,7 +973,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         <span className="text-xs font-black text-purple-700 uppercase">시즌 종료 리셋</span>
                         <p className="text-xs font-bold text-purple-900/70 leading-relaxed">
                           - 매 시즌 종료 시 **벌점 50%가 자동 감쇠**됩니다.<br/>
-                          <span className="text-[10px] opacity-60">(예: 40점 → 20점 잔류)</span>
+                          <span className="text-[10px] opacity-60">(예: 20점 → 10점 잔류)</span>
                         </p>
                       </div>
                     </Card>
