@@ -6,7 +6,8 @@
 
 @layer base {
   :root {
-    --background: 40 25% 96%;
+    /* 기존 40 25% 96%에서 더욱 차분하고 고급스러운 샌드 오프화이트로 변경 */
+    --background: 36 20% 95%;
     --foreground: 0 0% 18%;
 
     --card: 0 0% 100%;
@@ -34,7 +35,7 @@
     --input: 36 17% 87%;
     --ring: 30 31% 48%;
 
-    --radius: 1rem;
+    --radius: 1.5rem;
 
     --chart-1: 27 25% 28%;
     --chart-2: 30 31% 48%;
