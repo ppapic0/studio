@@ -183,7 +183,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !studyLogRef) return;
 
     if (isTimerActive) {
-      // 종료 시 좌석 상태 업데이트 - setDoc merge 사용하여 문서가 없어도 생성되게 함
+      // 공부 종료 -> 퇴실 처리
       if (studentProfile?.seatNo) {
         const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
         const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
@@ -194,16 +194,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setIsTimerActive(false);
       setStartTime(null);
       setLastActiveCheckTime(null);
-      toast({ title: "트랙 종료 및 기록 완료" });
+      toast({ title: "트랙 종료 및 퇴실 기록 완료" });
     } else {
       const now = Date.now();
       
-      // 시작 시 좌석 상태 업데이트 - setDoc merge 사용하여 더 안정적으로 업데이트
+      // 공부 시작 -> 즉시 입실 처리
       if (studentProfile?.seatNo) {
         const seatId = `seat_${studentProfile.seatNo.toString().padStart(3, '0')}`;
         const seatRef = doc(firestore, 'centers', activeMembership.id, 'attendanceCurrent', seatId);
         setDoc(seatRef, { 
           status: 'studying', 
+          studentId: user.uid,
           lastCheckInAt: serverTimestamp(),
           updatedAt: serverTimestamp() 
         }, { merge: true });
@@ -212,7 +213,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setStartTime(now);
       setLastActiveCheckTime(now);
       setIsTimerActive(true);
-      toast({ title: "학습 트랙을 시작합니다!" });
+      toast({ title: "입실 확인! 학습 트랙을 시작합니다." });
     }
   };
 

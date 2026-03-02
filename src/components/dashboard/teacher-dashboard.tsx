@@ -82,7 +82,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 그리드 설정 상태
+  // 그리드 설정 상태 (기본 가로 10, 세로 7)
   const [gridRows, setGridRows] = useState(7);
   const [gridCols, setGridCols] = useState(10);
 
@@ -167,13 +167,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     let totalMins = studentLog?.totalMinutes || 0;
     
-    // 만약 학생의 로그가 1분 이내에 업데이트되었다면 강제로 studying 상태인 것으로 간주하여 라이브 합산 (김재윤 학생 케이스 해결)
+    // 세션 감지 보정 로직 (김재윤 학생 케이스 대응)
     const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
-    const isRecentlyActive = (now - logUpdatedAt) < 60000;
+    const isRecentlyActive = (now - logUpdatedAt) < 60000; // 1분 이내 활동 시 강제 실시간 합산
 
     if ((status === 'studying' || isRecentlyActive) && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
-      // 세션 시작 이후 흐른 시간 합산
       const elapsed = Math.floor((now - startTime) / 60000);
       if (elapsed > 0) totalMins += elapsed;
     }
@@ -207,12 +206,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 0 };
     const actualSeats = attendanceList.filter(a => a.type !== 'aisle');
     return {
-      studying: actualSeats.filter(a => a.status === 'studying').length,
+      studying: actualSeats.filter(a => {
+        if (a.status === 'studying') return true;
+        // 보정 로직 적용된 상태 집계
+        const log = todayLogs?.find(l => l.studentId === a.studentId);
+        return log && (now - (log.updatedAt?.toMillis() || 0)) < 60000;
+      }).length,
       absent: actualSeats.filter(a => a.studentId && a.status === 'absent').length,
       away: actualSeats.filter(a => a.status === 'away' || a.status === 'break').length,
       total: actualSeats.length
     };
-  }, [attendanceList]);
+  }, [attendanceList, todayLogs, now]);
 
   const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -418,31 +422,30 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               {isEditMode ? '공간 배치 및 통로 수정' : '실시간 좌석 상황판'}
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6 uppercase">Seat Plan: {gridCols}x{gridRows}</Badge>
+              <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6 uppercase">Grid Map: {gridCols}x{gridRows}</Badge>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6 sm:p-10">
+        <CardContent className="p-6 sm:p-10 flex justify-center">
           <ScrollArea className="w-full max-w-full">
-            <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-max mx-auto">
+            <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] w-fit mx-auto">
               <div 
-                className="grid gap-2 sm:gap-3" 
+                className="grid gap-2" 
                 style={{ 
-                  gridTemplateColumns: `repeat(${gridCols}, minmax(85px, 1fr))`,
+                  gridTemplateColumns: `repeat(${gridCols}, minmax(72px, 1fr))`,
                 }}
               >
                 {Array.from({ length: gridCols }).map((_, colIndex) => (
-                  <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
+                  <div key={colIndex} className="flex flex-col gap-2">
                     {Array.from({ length: gridRows }).map((_, rowIndex) => {
                       const seatNo = colIndex * gridRows + rowIndex + 1;
                       const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
                       const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
                       
-                      // 김재윤 학생 케이스 보정: 로그가 최근 갱신되었다면 강제로 studying 상태로 간주
+                      // 김재윤 학생 등 실시간 감지 보정 로직 적용된 상태 판별
                       const studentLog = todayLogs?.find(l => l.studentId === student?.id);
-                      const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
-                      const isRecentlyActive = (now - logUpdatedAt) < 60000;
+                      const isRecentlyActive = studentLog && (now - (studentLog.updatedAt?.toMillis() || 0)) < 60000;
 
                       const isAisle = seat?.type === 'aisle';
                       const isStudying = seat?.status === 'studying' || (student && isRecentlyActive);
@@ -454,7 +457,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           key={seatNo} 
                           onClick={() => handleSeatClick(seat)}
                           className={cn(
-                            "aspect-square min-w-[85px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-2 cursor-pointer shadow-sm border-2",
+                            "aspect-square min-w-[72px] rounded-xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1.5 cursor-pointer shadow-sm border-2",
                             isAisle 
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 
                               : isStudying 
@@ -470,25 +473,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           )}
                         >
                           {!isAisle && (
-                            <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
+                            <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
                               {seatNo}
                             </span>
                           )}
                           
                           {isAisle ? (
-                            isEditMode && <Map className="h-4 w-4 opacity-40" />
+                            isEditMode && <Map className="h-3 w-3 opacity-40" />
                           ) : student ? (
-                            <div className="flex flex-col items-center gap-0 w-full px-1">
-                              <span className="text-[10px] sm:text-[11px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
-                              <span className={cn("text-[7px] sm:text-[8px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
+                            <div className="flex flex-col items-center gap-0 w-full px-0.5">
+                              <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
+                              <span className={cn("text-[7px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
                                 {getLiveTimeLabel(student.id, isStudying ? 'studying' : seat.status, seat.lastCheckInAt)}
                               </span>
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
                           ) : (
                             <div className="flex flex-col items-center">
-                              <span className="text-[8px] font-black tracking-tighter opacity-100 uppercase">Empty</span>
-                              {isEditMode && <UserPlus className="h-3 w-3 mt-1 text-primary/40" />}
+                              <span className="text-[7px] font-black tracking-tighter opacity-100 uppercase">Empty</span>
+                              {isEditMode && <UserPlus className="h-2.5 w-2.5 mt-0.5 text-primary/40" />}
                             </div>
                           )}
                         </div>
@@ -570,11 +573,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   <div className="grid grid-cols-2 gap-4">
                     <Button onClick={() => handleStatusUpdate('studying')} className="h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-3 flex flex-col shadow-xl active:scale-95 transition-all">
                       <Zap className="h-6 w-6 fill-current" />
-                      <span className="text-lg">입실 처리</span>
+                      <span className="text-lg">입실(공부 시작)</span>
                     </Button>
                     <Button variant="outline" onClick={() => handleStatusUpdate('absent')} className="h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-3 flex flex-col active:scale-95 transition-all">
                       <AlertCircle className="h-6 w-6" />
-                      <span className="text-lg">퇴실 처리</span>
+                      <span className="text-lg">퇴실(공부 종료)</span>
                     </Button>
                   </div>
                 )}
