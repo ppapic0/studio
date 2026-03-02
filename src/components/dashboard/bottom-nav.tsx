@@ -21,12 +21,13 @@ import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 
 export function BottomNav() {
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, currentTier } = useAppContext();
   const pathname = usePathname();
 
   if (!activeMembership) return null;
 
   const role = activeMembership.role;
+  const isStudent = role === 'student';
   const isForcedMobile = viewMode === 'mobile';
 
   const navItems: Record<string, { href: string; label: string; icon: any }[]> = {
@@ -79,7 +80,9 @@ export function BottomNav() {
             >
               <div className={cn(
                 "p-1.5 rounded-2xl transition-all duration-300",
-                isActive ? "bg-primary/5 shadow-inner" : "group-hover:bg-muted/50"
+                isActive 
+                  ? (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg` : "bg-primary text-white shadow-inner") 
+                  : "group-hover:bg-muted/50"
               )}>
                 <item.icon className={cn(
                   "h-5.5 w-5.5 transition-all duration-300", 
@@ -88,12 +91,17 @@ export function BottomNav() {
               </div>
               <span className={cn(
                 "text-[10px] font-black tracking-tighter transition-all duration-300", 
-                isActive ? "opacity-100 translate-y-0" : "opacity-60 translate-y-0.5"
+                isActive 
+                  ? (isStudent ? "text-primary opacity-100 translate-y-0" : "text-primary opacity-100 translate-y-0") 
+                  : "opacity-60 translate-y-0.5"
               )}>
                 {item.label}
               </span>
-              {isActive && (
+              {isActive && !isStudent && (
                 <div className="absolute top-0 w-8 h-1 rounded-full bg-primary animate-in fade-in slide-in-from-top-1" />
+              )}
+              {isActive && isStudent && (
+                <div className={cn("absolute top-0 w-8 h-1 rounded-full animate-in fade-in slide-in-from-top-1 bg-gradient-to-r", currentTier.gradient)} />
               )}
             </Link>
           );
