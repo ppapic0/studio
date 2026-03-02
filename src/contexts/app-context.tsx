@@ -53,7 +53,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const activeMembershipRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Load view mode from local storage
+    // Load view mode from local storage (UI preference is fine to keep global)
     const savedMode = localStorage.getItem('app_view_mode') as ViewMode;
     if (savedMode) setViewModeState(savedMode);
   }, []);
@@ -99,25 +99,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  // Timer Persistence Sync
+  // Timer Persistence Sync - User-Specific Keys
   useEffect(() => {
-    const savedStartTime = localStorage.getItem('study_start_time');
-    const savedCheckTime = localStorage.getItem('study_last_check_time');
-    
-    if (savedStartTime) {
-      setStartTime(parseInt(savedStartTime, 10));
-      setIsTimerActive(true);
-    }
-    if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
-  }, []);
+    // 사용자가 로그아웃하거나 바뀌면 이전 사용자의 타이머 상태를 클라이언트 메모리에서 즉시 초기화
+    setIsTimerActive(false);
+    setStartTime(null);
+    setLastActiveCheckTime(null);
 
-  useEffect(() => {
-    if (isTimerActive && startTime) {
-      localStorage.setItem('study_start_time', startTime.toString());
-    } else {
-      localStorage.removeItem('study_start_time');
+    if (user) {
+      const savedStartTime = localStorage.getItem(`study_start_time_${user.uid}`);
+      const savedCheckTime = localStorage.getItem(`study_last_check_time_${user.uid}`);
+      
+      if (savedStartTime) {
+        setStartTime(parseInt(savedStartTime, 10));
+        setIsTimerActive(true);
+      }
+      if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
     }
-  }, [isTimerActive, startTime]);
+  }, [user?.uid]);
+
+  // Save Timer State - User-Specific Keys
+  useEffect(() => {
+    if (!user) return;
+
+    const startTimeKey = `study_start_time_${user.uid}`;
+    const checkTimeKey = `study_last_check_time_${user.uid}`;
+
+    if (isTimerActive && startTime) {
+      localStorage.setItem(startTimeKey, startTime.toString());
+    } else {
+      localStorage.removeItem(startTimeKey);
+    }
+
+    if (lastActiveCheckTime) {
+      localStorage.setItem(checkTimeKey, lastActiveCheckTime.toString());
+    } else {
+      localStorage.removeItem(checkTimeKey);
+    }
+  }, [isTimerActive, startTime, lastActiveCheckTime, user?.uid]);
 
   const contextValue = useMemo(() => ({
     memberships,
