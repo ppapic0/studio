@@ -1,8 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 모든 문서에 대해 로그인한 사용자라면 읽고 쓰기를 허용합니다.
-    // 이는 상담 예약 및 일지 조회 시 발생하는 모든 보안 규칙 충돌을 방지합니다.
+    // 초대 코드는 회원가입 전(비로그인 상태)에도 조회가 가능해야 합니다.
+    match /inviteCodes/{codeId} {
+      // 특정 코드 하나를 가져오는 것(get)은 모두에게 허용
+      allow get: if true;
+      // 목록을 보거나(list) 생성/수정하는 것은 로그인한 사용자만 가능
+      allow list, write: if request.auth != null;
+    }
+
+    // 그 외 모든 문서에 대해 로그인한 사용자라면 읽고 쓰기를 허용합니다.
     match /{allPaths=**} {
       allow read, write: if request.auth != null;
     }
