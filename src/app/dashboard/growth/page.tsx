@@ -228,7 +228,7 @@ export default function GrowthPage() {
         <p className={cn("font-bold text-muted-foreground ml-1", isMobile ? "text-[10px] uppercase tracking-widest" : "text-sm")}>Season Tier & Skill Track Management</p>
       </header>
 
-      {/* 시즌 메인 대시보드 */}
+      {/* 시즌 메인 대시보드 - 프리미엄 강화 */}
       <Card className={cn(
         "border-none text-white shadow-2xl rounded-[3rem] overflow-hidden relative group transition-all duration-700",
         "bg-gradient-to-br", currentTier.gradient

@@ -233,15 +233,15 @@ function LPHistoryDialog({ dailyLpStatus }: { dailyLpStatus?: GrowthProgress['da
         <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">시즌 러닝 포인트 (LP)</CardTitle>
-            <div className="bg-accent/5 p-2.5 rounded-xl group-hover:bg-accent/10 transition-colors shadow-sm"><Zap className="h-6 w-6 text-accent" /></div>
+            <div className="bg-amber-50 p-2.5 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md"><Zap className="h-6 w-6 text-amber-600 group-hover:text-white" /></div>
           </CardHeader>
           <CardContent className="px-10 pb-10">
-            <div className="font-black tracking-tighter text-primary text-6xl sm:text-7xl">
+            <div className="font-black tracking-tighter text-amber-600 text-6xl sm:text-7xl drop-shadow-sm">
               {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className="text-2xl ml-1.5 opacity-40 font-bold uppercase">lp</span>
             </div>
             <div className="flex items-center gap-2 mt-6">
-              <Badge variant="secondary" className="bg-accent/10 text-accent border-none font-black text-[10px] px-4 py-1.5 rounded-full shadow-sm hover:bg-accent hover:text-white transition-all">히스토리 분석하기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
-              <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse ml-2" />
+              <Badge variant="secondary" className="bg-amber-50 text-amber-700 border border-amber-100 font-black text-[10px] px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all">히스토리 분석하기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse ml-2" />
               <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Season Active Track</span>
             </div>
           </CardContent>
@@ -558,15 +558,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 2. 요약 지표 (공부시간, LP) */}
+      {/* 2. 요약 지표 (공부시간, LP) - 프리미엄 컬러 테마 개편 */}
       <div className={cn("grid gap-4 sm:gap-6", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
-        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer">
+        {/* 오늘의 누적 트랙 - 몰입의 블루 테마 */}
+        <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 relative">
+          <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-10 pt-10">
             <CardTitle className="font-black uppercase tracking-widest text-muted-foreground text-[10px]">오늘의 누적 트랙</CardTitle>
-            <div className="bg-primary/5 p-2.5 rounded-xl group-hover:bg-primary/10 transition-colors shadow-sm"><Clock className="h-6 w-6 text-primary/60" /></div>
+            <div className="bg-blue-50 p-2.5 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md"><Clock className="h-6 w-6 text-blue-600 group-hover:text-white" /></div>
           </CardHeader>
           <CardContent className="px-10 pb-10">
-            <div className="font-black tracking-tighter text-primary text-6xl sm:text-7xl">
+            <div className="font-black tracking-tighter text-blue-600 text-6xl sm:text-7xl drop-shadow-sm">
               {h}<span className="text-2xl ml-1.5 opacity-40 font-bold uppercase">h</span> {m}<span className="text-2xl ml-1.5 opacity-40 font-bold uppercase">m</span>
             </div>
             <div className="mt-6 flex items-center gap-2">
@@ -576,7 +578,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 시즌 LP 카드 (클릭 시 히스토리 팝업) */}
+        {/* 시즌 러닝 포인트 카드 (클릭 시 히스토리 팝업) - 성취의 앰버 테마 */}
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} />
       </div>
 
