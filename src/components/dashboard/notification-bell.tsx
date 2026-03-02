@@ -71,7 +71,11 @@ export function NotificationBell() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[320px] rounded-[2rem] border-none shadow-2xl p-4 animate-in fade-in zoom-in duration-300">
+      <DropdownMenuContent 
+        align="end" 
+        className="w-[320px] rounded-[2rem] border-none shadow-2xl p-4 animate-in fade-in zoom-in duration-300"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <DropdownMenuLabel className="font-black text-xs uppercase tracking-[0.2em] opacity-40 px-2 py-2 flex items-center justify-between">
           <span>최근 학습 알림</span>
           <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[8px]">RECENTS</Badge>

@@ -84,15 +84,23 @@
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground font-body transition-colors duration-300;
+    touch-action: manipulation;
   }
 }
 
 @layer components {
   .premium-card {
-    @apply bg-card text-card-foreground shadow-sm hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 ease-out border border-border/50;
+    @apply bg-card text-card-foreground shadow-sm active:scale-[0.99] transition-all duration-300 ease-out border border-border/50;
+  }
+  
+  @media (hover: hover) {
+    .premium-card:hover {
+      @apply shadow-xl scale-[1.01];
+    }
   }
   
   .glass-panel {
@@ -100,6 +108,12 @@
   }
   
   .interactive-button {
-    @apply active:scale-95 hover:scale-105 transition-all duration-200 ease-in-out;
+    @apply active:scale-95 transition-all duration-200 ease-in-out;
+  }
+
+  @media (hover: hover) {
+    .interactive-button:hover {
+      @apply scale-105;
+    }
   }
 }

@@ -641,8 +641,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <div 
                           key={seatNo} 
                           onClick={() => handleSeatClick(seat)}
+                          role="button"
+                          tabIndex={isFilteredOut ? -1 : 0}
                           className={cn(
-                            "aspect-square min-w-[64px] rounded-xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1 cursor-pointer shadow-sm border-2",
+                            "aspect-square min-w-[64px] rounded-xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1 cursor-pointer shadow-sm border-2 outline-none",
                             isFilteredOut ? "opacity-20 grayscale border-transparent bg-muted/10" : 
                             isAisle 
                               ? "bg-transparent border-transparent text-transparent hover:bg-muted/10 hover:border-dashed hover:border-muted-foreground/20" 

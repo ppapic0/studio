@@ -224,7 +224,11 @@ export function DashboardHeader() {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-2xl border-none shadow-2xl min-w-[200px] p-2 animate-in fade-in zoom-in duration-200">
+          <DropdownMenuContent 
+            align="end" 
+            className="rounded-2xl border-none shadow-2xl min-w-[200px] p-2 animate-in fade-in zoom-in duration-200"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
             <DropdownMenuLabel className="font-black px-3 py-2 text-xs uppercase tracking-widest opacity-60">내 계정 관리</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
