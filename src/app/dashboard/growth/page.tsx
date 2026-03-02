@@ -5,7 +5,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { doc, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
-import { GrowthProgress, LeaderboardEntry } from '@/lib/types';
+import { GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -160,7 +160,26 @@ export default function GrowthPage() {
     );
   }, [firestore, activeMembership, user, periodKey]);
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 999;
+  const currentRank = rankEntries?.[0]?.rank || 0;
+
+  // 전체 학생 수 조회 (백분위 계산용)
+  const totalStudentsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership]);
+  const { data: activeStudents } = useCollection<CenterMembership>(totalStudentsQuery);
+  const totalCount = activeStudents?.length || 1;
+
+  const rankDisplay = useMemo(() => {
+    if (currentRank === 0) return '산정 중';
+    if (currentRank <= 3) return `${currentRank}위`;
+    const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
+    return `상위 ${percent}%`;
+  }, [currentRank, totalCount]);
 
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
@@ -202,7 +221,7 @@ export default function GrowthPage() {
       <Card className={cn(
         "border-none text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
         "bg-gradient-to-br", currentTier.gradient,
-        isMobile ? "rounded-[1.5rem] p-6" : "rounded-[3rem] p-12"
+        isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
       )}>
         <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-700 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
@@ -226,7 +245,7 @@ export default function GrowthPage() {
 
           <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-4")}>
             {[
-              { label: '센터 랭킹', val: `${currentRank}위`, icon: Trophy, color: 'text-yellow-400' },
+              { label: '센터 랭킹', val: rankDisplay, icon: Trophy, color: 'text-yellow-400' },
               { label: '실력 지수', val: avgStat.toFixed(1), icon: Activity, color: 'text-orange-400' },
               { label: '부스트', val: `x${totalBoost.toFixed(2)}`, icon: Zap, color: 'text-emerald-400' },
               { label: '시즌 리셋', val: '매월 1일', icon: RefreshCw, color: 'text-blue-400' }

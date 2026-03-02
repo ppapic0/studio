@@ -49,7 +49,7 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
@@ -389,7 +389,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'), where('studentId', '==', user.uid));
   }, [firestore, activeMembership?.id, user?.uid, periodKey]);
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 999;
+  const currentRank = rankEntries?.[0]?.rank || 0;
+
+  // 전체 학생 수 조회
+  const totalStudentsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership]);
+  const { data: activeStudentsCount } = useCollection<CenterMembership>(totalStudentsQuery);
+  const totalCount = activeStudentsCount?.length || 1;
+
+  const rankDisplay = useMemo(() => {
+    if (currentRank === 0) return '산정 중';
+    if (currentRank <= 3) return `${currentRank}위`;
+    const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
+    return `상위 ${percent}%`;
+  }, [currentRank, totalCount]);
 
   const currentLp = progress?.seasonLp || 0;
   
