@@ -17,11 +17,13 @@ import {
   MessageSquare, 
   ChevronRight, 
   Activity, 
-  ArrowRight,
+  Monitor,
+  AlertCircle,
   Clock,
   Zap,
   Users,
-  AlertCircle
+  Info,
+  Pulse
 } from 'lucide-react';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -30,14 +32,11 @@ import {
   collection, 
   query, 
   orderBy, 
-  doc, 
-  serverTimestamp,
   where,
   Timestamp,
-  updateDoc,
   collectionGroup
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, CenterMembership, StudyLogDay } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay } from 'date-fns';
 
@@ -56,7 +55,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // 데이터 로딩 로직
+  // 데이터 로딩
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), orderBy('seatNo', 'asc'));
@@ -84,7 +83,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       where('scheduledAt', '<=', Timestamp.fromDate(endOfDay(todayDate)))
     );
   }, [firestore, centerId]);
-  const { data: rawAppointments, isLoading: aptLoading } = useCollection<any>(appointmentsQuery, { enabled: isActive });
+  const { data: rawAppointments } = useCollection<any>(appointmentsQuery, { enabled: isActive });
 
   const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.scheduledAt?.toMillis()||0)) : [], [rawAppointments]);
 
@@ -96,198 +95,116 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const startTime = seat.lastCheckInAt.toMillis();
       totalMins += Math.floor((now - startTime) / 60000);
     }
-    const h = Math.floor(totalMins / 60); const m = totalMins % 60;
-    return `${h}h ${m}m`;
+    return `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
   };
 
   const stats = useMemo(() => {
-    if (!attendanceList) return { studying: 0, absent: 0, total: 48, registered: 0 };
+    if (!attendanceList) return { studying: 0, absent: 0, away: 0, total: 48 };
     return {
       studying: attendanceList.filter(a => a.status === 'studying').length,
       absent: attendanceList.filter(a => a.studentId && a.status === 'absent').length,
-      total: attendanceList.length || 48,
-      registered: students?.length || 0
+      away: attendanceList.filter(a => a.status === 'away' || a.status === 'break').length,
+      total: Math.max(48, attendanceList.length)
     };
-  }, [attendanceList, students]);
+  }, [attendanceList]);
 
   if (!isActive) return null;
 
   return (
-    <div className="flex flex-col gap-10 w-full max-w-[1400px] mx-auto pb-24">
-      {/* 1. 상단 타이틀 */}
-      <header className="flex flex-col gap-1 px-2">
-        <h1 className="text-[44px] font-black tracking-tighter text-[#5A4636] leading-none">실시간 관제 홈</h1>
-        <p className="text-[13px] font-bold text-[#A07855] uppercase tracking-[0.2em] opacity-70">COMMAND & CONTROL DASHBOARD</p>
+    <div className="flex flex-col gap-8 w-full max-w-[1400px] mx-auto pb-24 bg-[#F8F7F4]/30 min-h-screen">
+      {/* 1. 상단 타이틀 섹션 */}
+      <header className="flex items-center gap-3 px-4 pt-6">
+        <Monitor className="h-8 w-8 text-[#4A3F35]" />
+        <h1 className="text-3xl font-black tracking-tight text-[#4A3F35]">실시간 관제 홈</h1>
+        <Badge className="bg-blue-500 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 flex items-center justify-center tracking-tighter">LIVE</Badge>
       </header>
 
-      {/* 2. 4대 핵심 지표 카드 (이미지 스타일) */}
-      <section className={cn("grid gap-6", isMobile ? "grid-cols-2" : "grid-cols-4")}>
-        <Card className="rounded-[2.5rem] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-8 group relative overflow-hidden">
-          <div className="flex justify-between items-start mb-2">
-            <Activity className="h-6 w-6 text-blue-500" />
-            <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">학습 중</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-6xl font-black text-blue-600 tracking-tighter">{stats.studying}</span>
-            <span className="text-xl font-bold text-blue-600/40 ml-1">명</span>
-          </div>
-        </Card>
-
-        <Card className="rounded-[2.5rem] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-[#FFF5F5] p-8 group relative overflow-hidden">
-          <div className="flex justify-between items-start mb-2">
-            <AlertCircle className="h-6 w-6 text-rose-500" />
-            <span className="text-[11px] font-black text-rose-500 uppercase tracking-widest">미입실</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-6xl font-black text-rose-600 tracking-tighter">{stats.absent}</span>
-            <span className="text-xl font-bold text-rose-600/40 ml-1">명</span>
-          </div>
-        </Card>
-
-        <Card className="rounded-[2.5rem] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-8 group relative overflow-hidden">
-          <div className="flex justify-between items-start mb-2">
-            <Armchair className="h-6 w-6 text-[#A07855]" />
-            <span className="text-[11px] font-black text-[#A07855] uppercase tracking-widest">총 좌석</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-6xl font-black text-[#5A4636] tracking-tighter">{stats.total}</span>
-            <span className="text-xl font-bold text-[#5A4636]/40 ml-1">석</span>
-          </div>
-        </Card>
-
-        <Card className="rounded-[2.5rem] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-8 group relative overflow-hidden">
-          <div className="flex justify-between items-start mb-2">
-            <Users className="h-6 w-6 text-[#2F2F2F]" />
-            <span className="text-[11px] font-black text-[#2F2F2F] uppercase tracking-widest">등록 학생</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-6xl font-black text-[#2F2F2F] tracking-tighter">{stats.registered}</span>
-            <span className="text-xl font-bold text-[#2F2F2F]/40 ml-1">명</span>
-          </div>
-        </Card>
+      {/* 2. 4대 핵심 지표 카드 (이미지 디자인) */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
+        {[
+          { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity, bg: 'bg-white' },
+          { label: '미입실', val: stats.absent, color: 'text-rose-500', icon: Info, bg: 'bg-white' },
+          { label: '외출/휴식', val: stats.away, color: 'text-amber-500', icon: Clock, bg: 'bg-white' },
+          { label: '배치 좌석', val: stats.total, color: 'text-[#4A3F35]', icon: Armchair, bg: 'bg-white' }
+        ].map((item, i) => (
+          <Card key={i} className="rounded-[2.5rem] border-none shadow-[0_15px_40px_rgba(0,0,0,0.04)] bg-white p-8 group transition-all hover:shadow-xl">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">{item.label}</span>
+              <item.icon className={cn("h-5 w-5", item.color)} />
+            </div>
+            <div className={cn("text-5xl font-black tracking-tighter", item.color)}>{item.val}</div>
+          </Card>
+        ))}
       </section>
 
-      {/* 3. 실시간 좌석 상황판 (이미지 스타일) */}
-      <Card className="rounded-[3.5rem] border-none shadow-[0_30px_100px_rgba(0,0,0,0.08)] bg-white overflow-hidden">
+      {/* 3. 실시간 좌석 상황판 (이미지 디자인의 6x8 그리드) */}
+      <Card className="rounded-[3.5rem] border-none shadow-[0_20px_60px_rgba(0,0,0,0.06)] bg-white mx-4 overflow-hidden">
         <CardHeader className="p-10 pb-6">
           <div className="flex justify-between items-center">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-3">
-                <Armchair className="h-7 w-7 text-[#5A4636]" />
-                <CardTitle className="text-3xl font-black tracking-tighter text-[#5A4636]">실시간 좌석 상황판</CardTitle>
-              </div>
-              <p className="text-[11px] font-bold text-[#A07855] uppercase tracking-[0.2em] opacity-70 ml-10">LIVE SEAT MATRIX & STUDY PERFORMANCE</p>
+            <div className="flex items-center gap-3">
+              <Armchair className="h-6 w-6 text-[#4A3F35]" />
+              <CardTitle className="text-2xl font-black tracking-tighter text-[#4A3F35]">실시간 좌석 상황판</CardTitle>
             </div>
-            <Button variant="outline" className="rounded-2xl h-14 px-10 font-black border-2 border-[#E3DFD8] text-[#5A4636] hover:bg-[#F8F6F2] transition-all" asChild>
-              <Link href="/dashboard/teacher/layout-view">전체 도면 보기</Link>
+            <Button variant="outline" className="rounded-2xl h-12 px-8 font-black border-2 border-[#EAE6E1] text-[#4A3F35] hover:bg-muted/10 transition-all">
+              도면 보기
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-10 pt-4 bg-[#F8F6F2]/30 min-h-[300px]">
-          {attendanceLoading ? (
-            <div className="py-24 flex flex-col items-center gap-4">
-              <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Syncing Matrix...</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-              {students?.map((student) => {
-                const seatId = `seat_${student.seatNo.toString().padStart(3, '0')}`;
-                const seat = attendanceList?.find(a => a.id === seatId);
-                const isStudying = seat?.status === 'studying';
-                const isAbsent = student.id && seat?.status === 'absent';
+        <CardContent className="p-10 pt-4">
+          <div className="rounded-[2.5rem] border-2 border-[#F0EDE8] p-10 bg-white">
+            {/* 6행 8열 그리드 구현 (1-6번이 첫 열) */}
+            <div className="grid grid-cols-8 gap-4">
+              {Array.from({ length: 8 }).map((_, colIndex) => (
+                <div key={colIndex} className="flex flex-col gap-4">
+                  {Array.from({ length: 6 }).map((_, rowIndex) => {
+                    const seatNo = colIndex * 6 + rowIndex + 1;
+                    const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
+                    const seat = attendanceList?.find(a => a.id === seatId);
+                    const student = students?.find(s => s.id === seat?.studentId);
+                    
+                    const isStudying = seat?.status === 'studying';
+                    const isAbsent = student && seat?.status === 'absent';
 
-                return (
-                  <Link key={student.id} href={`/dashboard/teacher/students/${student.id}`}>
-                    <div className={cn(
-                      "aspect-[1.2/1] rounded-[1.5rem] border-2 flex flex-col items-center justify-center gap-1 transition-all duration-500 cursor-pointer relative overflow-hidden group shadow-sm active:scale-95",
-                      isStudying 
-                        ? "bg-blue-600 border-blue-700 text-white shadow-xl shadow-blue-200 scale-105 z-10" 
-                        : isAbsent 
-                          ? "bg-white border-[#E3DFD8] text-[#2F2F2F] hover:border-primary/30" 
-                          : "bg-white border-[#E3DFD8] text-[#2F2F2F] opacity-40"
-                    )}>
-                      <span className={cn("text-[9px] font-black absolute top-2 left-3", isStudying ? "opacity-60" : "opacity-30")}>
-                        {student.seatNo}
-                      </span>
-                      <span className="text-[15px] font-black truncate w-full text-center px-2 tracking-tighter">
-                        {student.name}
-                      </span>
-                      <span className={cn("text-[10px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
-                        {seat ? getLiveTimeLabel(seat) : '0h 0m'}
-                      </span>
-                      {isStudying && (
-                        <div className="absolute bottom-2 flex justify-center w-full">
-                          <Zap className="h-3 w-3 fill-current animate-pulse text-white/50" />
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 4. 오늘 상담 일정 (이미지 스타일) */}
-      <Card className="rounded-[3.5rem] border-none shadow-[0_30px_100px_rgba(0,0,0,0.08)] bg-white overflow-hidden">
-        <CardHeader className="p-10 pb-6 border-b border-[#E3DFD8]/50">
-          <div className="flex justify-between items-center">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-3">
-                <MessageSquare className="h-7 w-7 text-[#5A4636]" />
-                <CardTitle className="text-3xl font-black tracking-tighter text-[#5A4636]">오늘 상담 일정</CardTitle>
-              </div>
-              <p className="text-[11px] font-bold text-[#A07855] uppercase tracking-[0.2em] opacity-70 ml-10">TODAY'S APPOINTMENT QUEUE</p>
-            </div>
-            <Badge className="bg-[#F8F6F2] text-[#5A4636] border-none font-black text-xs px-4 py-1.5 rounded-xl">{appointments.length} 건</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {aptLoading ? (
-            <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
-          ) : appointments.length === 0 ? (
-            <div className="py-24 text-center flex flex-col items-center gap-4 text-muted-foreground/30 font-black italic">
-              <MessageSquare className="h-12 w-12 opacity-10" />
-              <p className="text-base">오늘 예정된 상담이 없습니다.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#E3DFD8]/30">
-              {appointments.map((apt: any) => (
-                <Link key={apt.id} href={`/dashboard/teacher/students/${apt.studentId}`}>
-                  <div className="p-10 flex items-center justify-between hover:bg-[#F8F6F2]/50 transition-all group">
-                    <div className="flex items-center gap-10">
-                      <div className="h-20 w-20 rounded-full bg-white border-2 border-[#E3DFD8] flex flex-col items-center justify-center shrink-0 shadow-sm group-hover:border-primary group-hover:scale-105 transition-all duration-500">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase leading-none mb-0.5">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'aaa') : ''}</span>
-                        <span className="text-xl font-black text-[#5A4636]">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'h:mm') : ''}</span>
+                    return (
+                      <div 
+                        key={seatNo} 
+                        className={cn(
+                          "aspect-[1.1/1] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-2",
+                          isStudying 
+                            ? "bg-blue-600 border-blue-700 text-white shadow-xl shadow-blue-200" 
+                            : isAbsent 
+                              ? "bg-[#FFF5F5] border-rose-300 text-rose-600" 
+                              : "bg-transparent border-[#F5F2EE] text-[#EAE6E1]"
+                        )}
+                      >
+                        <span className={cn("text-[8px] font-black absolute top-1.5 left-2.5", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
+                          {seatNo}
+                        </span>
+                        
+                        {student ? (
+                          <div className="flex flex-col items-center gap-0.5 w-full">
+                            <span className="text-[13px] font-black truncate w-full text-center tracking-tighter">{student.name}</span>
+                            <span className={cn("text-[9px] font-bold tracking-tight", isStudying ? "text-white/80" : "text-muted-foreground")}>
+                              {getLiveTimeLabel(seat!)}
+                            </span>
+                            {isStudying && <Zap className="h-2.5 w-2.5 fill-current animate-pulse text-white/50 mt-1" />}
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="space-y-1.5">
-                        <h3 className="text-2xl font-black text-[#2F2F2F] group-hover:text-primary transition-colors tracking-tight">{apt.studentName} 학생</h3>
-                        <p className="text-[15px] font-bold text-muted-foreground">{apt.studentNote || '..'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      {apt.status === 'requested' ? (
-                        <Badge className="bg-[#FFF9E6] text-[#D97706] border-none font-black text-xs px-4 py-1.5 rounded-lg shadow-sm">승인 대기</Badge>
-                      ) : (
-                        <Badge className="bg-[#E6FFFA] text-[#059669] border-none font-black text-xs px-4 py-1.5 rounded-lg shadow-sm">상담 확정</Badge>
-                      )}
-                      <ChevronRight className="h-6 w-6 text-[#E3DFD8] group-hover:translate-x-2 group-hover:text-primary transition-all" />
-                    </div>
-                  </div>
-                </Link>
+                    );
+                  })}
+                </div>
               ))}
             </div>
-          )}
-          <div className="p-10 border-t border-[#E3DFD8]/30 text-center">
-            <Link href="/dashboard/appointments" className="inline-flex items-center gap-3 text-sm font-black text-[#A07855] hover:text-[#5A4636] transition-colors group">
-              상담 관리 센터 전체보기
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-2 transition-transform" />
-            </Link>
           </div>
         </CardContent>
       </Card>
+
+      {/* 4. 하단 섹션 타이틀 (오늘 상담 현황) */}
+      <section className="px-6 flex items-center gap-3 opacity-80">
+        <MessageSquare className="h-6 w-6 text-[#4A3F35]" />
+        <h2 className="text-2xl font-black tracking-tighter text-[#4A3F35]">오늘 상담 현황</h2>
+      </section>
     </div>
   );
 }

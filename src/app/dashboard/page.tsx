@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
-import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -89,7 +88,7 @@ export default function DashboardPage() {
 
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-3 mb-4 flex-wrap px-2">
           <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>
             {userRole === 'parent' ? `${user?.displayName} 학부모님, 반갑습니다!` : `${user?.displayName}님, 반가워요!`}
           </h1>
