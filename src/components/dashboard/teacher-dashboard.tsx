@@ -169,11 +169,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1400px] mx-auto pb-24 min-h-screen">
-      {/* 1. 고도화된 상단 지표 섹션 */}
+      {/* 1. 정밀 센터 지표 헤더 */}
       <header className="flex flex-col md:flex-row md:items-center justify-between px-4 pt-6 gap-4">
         <div className="flex items-center gap-3">
-          <Monitor className="h-8 w-8 text-[#4A3F35]" />
-          <h1 className="text-3xl font-black tracking-tight text-[#4A3F35]">실시간 관제 홈</h1>
+          <Monitor className="h-8 w-8 text-primary" />
+          <h1 className="text-3xl font-black tracking-tight">실시간 관제 홈</h1>
           <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">LIVE</Badge>
         </div>
         
@@ -202,15 +202,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      {/* 2. 핵심 4대 지표 카드 */}
+      {/* 2. 핵심 요약 카드 */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
         {[
           { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity, bg: 'bg-white' },
           { label: '미입실', val: stats.absent, color: 'text-rose-500', icon: AlertCircle, bg: 'bg-white' },
           { label: '외출/휴식', val: stats.away, color: 'text-amber-500', icon: Clock, bg: 'bg-white' },
-          { label: '배치 좌석', val: stats.total, color: 'text-[#4A3F35]', icon: Armchair, bg: 'bg-white' }
+          { label: '배치 좌석', val: stats.total, color: 'text-primary', icon: Armchair, bg: 'bg-white' }
         ].map((item, i) => (
-          <Card key={i} className="rounded-[2.5rem] border-none shadow-[0_15px_40px_rgba(0,0,0,0.04)] bg-white p-6 sm:p-8 group transition-all hover:shadow-xl active:scale-[0.98]">
+          <Card key={i} className="rounded-[2.5rem] border-none shadow-sm bg-white p-6 sm:p-8 transition-all hover:shadow-md">
             <div className="flex justify-between items-start mb-2">
               <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">{item.label}</span>
               <item.icon className={cn("h-5 w-5", item.color)} />
@@ -220,10 +220,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {/* 3. 실시간 좌석 상황판 (이미지 완벽 매칭 수직 그리드 - 가로 10, 세로 7) */}
-      <Card className="rounded-[3.5rem] border-none shadow-[0_20px_60px_rgba(0,0,0,0.06)] bg-white mx-4 overflow-hidden">
+      {/* 3. 10x7 실시간 상황판 (Layout View 로직 이식) */}
+      <Card className="rounded-[3.5rem] border-none shadow-xl bg-white mx-4 overflow-hidden">
         <CardContent className="p-6 sm:p-10">
-          <div className="rounded-[2.5rem] border-2 border-[#F0EDE8] p-6 sm:p-8 bg-white overflow-x-auto custom-scrollbar">
+          <div className="rounded-[2.5rem] border-2 border-muted/30 p-6 sm:p-8 bg-[#fafafa] overflow-x-auto custom-scrollbar">
             <div className="grid grid-cols-10 gap-2 sm:gap-3 min-w-[1000px]">
               {Array.from({ length: 10 }).map((_, colIndex) => (
                 <div key={colIndex} className="flex flex-col gap-2 sm:gap-3">
@@ -253,8 +253,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             : isAway
                               ? "bg-amber-500 border-amber-600 text-white"
                               : isAbsent 
-                                ? "bg-[#FFF5F5] border-rose-300 text-rose-600" 
-                                : "bg-transparent border-[#F5F2EE] text-[#EAE6E1] hover:border-primary/10"
+                                ? "bg-rose-50 border-rose-300 text-rose-600" 
+                                : student 
+                                  ? "bg-white border-primary/20 text-primary" 
+                                  : "bg-transparent border-muted/20 text-muted-foreground/30 hover:border-primary/10"
                         )}
                       >
                         <span className={cn("text-[8px] font-black absolute top-1 left-2", isStudying ? "opacity-60" : isAbsent ? "text-rose-300" : "opacity-40")}>
@@ -269,7 +271,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </span>
                             {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                           </div>
-                        ) : null}
+                        ) : (
+                          <span className="text-[10px] font-black opacity-10">EMPTY</span>
+                        )}
                       </div>
                     );
                   })}
@@ -280,16 +284,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
-      {/* 4. 하단 상담 현황 섹션 */}
+      {/* 4. 오늘 상담 현황 */}
       <section className="px-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <MessageSquare className="h-6 w-6 text-[#4A3F35]" />
-            <h2 className="text-2xl font-black tracking-tighter text-[#4A3F35]">오늘 상담 현황</h2>
+            <MessageSquare className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-black tracking-tighter">오늘 상담 현황</h2>
             <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black h-6">{appointments.length}건</Badge>
           </div>
           <Button asChild variant="ghost" className="font-black text-xs text-muted-foreground hover:text-primary gap-2">
-            <Link href="/dashboard/appointments">상담 관리 센터 전체보기 <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/dashboard/appointments">상담 관리 바로가기 <ArrowRight className="h-4 w-4" /></Link>
           </Button>
         </div>
 
@@ -313,11 +317,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {apt.status === 'requested' ? (
-                    <Badge className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[9px]">승인대기</Badge>
-                  ) : (
-                    <Badge className="bg-emerald-500 text-white border-none font-black text-[9px] shadow-sm">예약확정</Badge>
-                  )}
+                  <Badge className={cn("font-black text-[9px] border-none", apt.status === 'requested' ? "bg-amber-50 text-amber-600" : "bg-emerald-500 text-white")}>
+                    {apt.status === 'requested' ? '승인대기' : '예약확정'}
+                  </Badge>
                   <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
                 </div>
               </Card>
@@ -326,7 +328,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      {/* 실시간 좌석 관리 다이얼로그 */}
+      {/* 좌석 관리 다이얼로그 */}
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
           {selectedSeat && (
