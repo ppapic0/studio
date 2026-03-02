@@ -139,7 +139,7 @@ function SystemGuideDialog() {
             </h4>
             <div className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100">
               <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
-                - **아이언 ~ 다이아몬드**: 0 ~ 25,000 LP 구간 (포인트로 결정)<br/>
+                - **브론즈 ~ 다이아몬드**: 0 ~ 25,000 LP 구간 (포인트로 결정)<br/>
                 - **챌린저**: 25,000 LP 이상 중 **센터 1위**<br/>
                 - **그랜드마스터**: 25,000 LP 이상 중 **센터 2, 3위**<br/>
                 - **마스터**: 25,000 LP 이상 상위권

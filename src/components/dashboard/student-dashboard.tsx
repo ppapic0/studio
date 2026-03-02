@@ -61,26 +61,25 @@ import {
 } from "@/components/ui/dialog";
 
 const TIERS = [
-  { name: '아이언', min: 0, color: 'text-slate-400', bg: 'bg-slate-400', border: 'border-slate-200', gradient: 'from-slate-500 via-slate-600 to-slate-800', shadow: 'shadow-slate-200/50' },
-  { name: '브론즈', min: 5000, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
-  { name: '실버', min: 10000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
-  { name: '골드', min: 15000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
-  { name: '플래티넘', min: 20000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
-  { name: '다이아몬드', min: 25000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
-  { name: '마스터', min: 30000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
-  { name: '그랜드마스터', min: 30000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
-  { name: '챌린저', min: 30000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
+  { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
+  { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
+  { name: '골드', min: 10000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
+  { name: '플래티넘', min: 15000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
+  { name: '다이아몬드', min: 20000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
+  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
+  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
+  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
 ];
 
 const TIER_PRESETS = [
-  { label: '아이언', lp: 0, stats: 10, rank: 999, color: 'bg-slate-400' },
-  { label: '실버', lp: 10000, stats: 45, rank: 50, color: 'bg-slate-300' },
-  { label: '골드', lp: 15000, stats: 65, rank: 20, color: 'bg-yellow-500' },
-  { label: '플래티넘', lp: 20000, stats: 80, rank: 10, color: 'bg-emerald-400' },
-  { label: '다이아', lp: 25000, stats: 90, rank: 5, color: 'bg-blue-400' },
-  { label: '마스터', lp: 31000, stats: 95, rank: 4, color: 'bg-purple-500' },
-  { label: '그마', lp: 35000, stats: 98, rank: 2, color: 'bg-rose-500' },
-  { label: '챌린저', lp: 40000, stats: 100, rank: 1, color: 'bg-cyan-400' },
+  { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
+  { label: '실버', lp: 5000, stats: 45, rank: 50, color: 'bg-slate-300' },
+  { label: '골드', lp: 10000, stats: 65, rank: 20, color: 'bg-yellow-500' },
+  { label: '플래티넘', lp: 15000, stats: 80, rank: 10, color: 'bg-emerald-400' },
+  { label: '다이아', lp: 20000, stats: 90, rank: 5, color: 'bg-blue-400' },
+  { label: '마스터', lp: 26000, stats: 95, rank: 4, color: 'bg-purple-500' },
+  { label: '그마', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
+  { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
 function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string }) {
@@ -375,13 +374,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const currentLp = progress?.seasonLp || 0;
   const currentTier = useMemo(() => {
-    // 엘리트 티어 기준을 30,000점으로 상향 (25,000~30,000은 다이아몬드 구간)
-    if (currentLp >= 30000) {
+    // 엘리트 티어 기준을 25,000점으로 조정
+    if (currentLp >= 25000) {
       if (currentRank === 1) return TIERS.find(t => t.name === '챌린저')!;
       if (currentRank === 2 || currentRank === 3) return TIERS.find(t => t.name === '그랜드마스터')!;
       return TIERS.find(t => t.name === '마스터')!;
     }
-    return TIERS.slice(0, 6).reverse().find(t => currentLp >= t.min) || TIERS[0];
+    return TIERS.slice(0, 5).reverse().find(t => currentLp >= t.min) || TIERS[0];
   }, [currentLp, currentRank]);
 
   // 각 스킬 100점당 5% 부스트 (최대 20%)
