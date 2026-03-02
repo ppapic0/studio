@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -284,12 +283,12 @@ export default function StudyHistoryPage() {
   };
 
   const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-white';
-    if (minutes < 60) return 'bg-emerald-50 text-emerald-700';
-    if (minutes < 180) return 'bg-emerald-100 text-emerald-800';
-    if (minutes < 300) return 'bg-emerald-200 text-emerald-900';
-    if (minutes < 480) return 'bg-emerald-400 text-white';
-    return 'bg-emerald-600 text-white shadow-inner';
+    if (minutes === 0) return 'bg-white/50';
+    if (minutes < 60) return 'bg-emerald-50 text-emerald-700 ring-inset ring-1 ring-emerald-100';
+    if (minutes < 180) return 'bg-emerald-100 text-emerald-800 ring-inset ring-1 ring-emerald-200';
+    if (minutes < 300) return 'bg-emerald-200 text-emerald-900 ring-inset ring-1 ring-emerald-300';
+    if (minutes < 480) return 'bg-emerald-400 text-white shadow-sm';
+    return 'bg-emerald-600 text-white shadow-md';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -410,30 +409,54 @@ export default function StudyHistoryPage() {
         )}
       </div>
 
-      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full">
+      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full border-2 border-primary/5">
         <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b bg-muted/10">
+          <div className="grid grid-cols-7 border-b-2 border-primary/10 bg-muted/20">
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
-              <div key={day} className={cn("py-4 text-center text-[10px] font-black uppercase", i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-muted-foreground")}>{day}</div>
+              <div key={day} className={cn("py-5 text-center text-[11px] font-black uppercase tracking-widest", i === 5 ? "text-blue-600" : i === 6 ? "text-red-600" : "text-primary/60")}>{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 auto-rows-fr">
-            {logsLoading ? <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : calendarData.days.map((day, idx) => {
+            {logsLoading ? <div className="col-span-7 h-[400px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const minutes = logs?.find(l => l.dateKey === dateKey)?.totalMinutes || 0;
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isToday = isSameDay(day, new Date());
               return (
-                <div key={dateKey} onClick={() => setSelectedDateForPlan(day)} className={cn("p-2 border-r border-b relative transition-all cursor-pointer bg-white overflow-hidden", isMobile ? "aspect-square" : "min-h-[120px]", !isCurrentMonth ? "opacity-10" : getHeatmapColor(minutes), isToday && "ring-2 ring-inset ring-primary/20 z-10")}>
-                  <div className="flex justify-between items-start">
-                    <span className={cn("text-[9px] font-black", idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "")}>{format(day, 'd')}</span>
-                    <div className="flex flex-col items-end gap-1">
-                      {minutes >= 180 && <Zap className="h-2.5 w-2.5 text-yellow-500 fill-yellow-500" />}
-                      {hasPlans && <div className="w-1 h-1 rounded-full bg-primary/30" />}
+                <div 
+                  key={dateKey} 
+                  onClick={() => setSelectedDateForPlan(day)} 
+                  className={cn(
+                    "p-3 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white overflow-hidden group hover:z-20 hover:scale-[1.02] hover:shadow-2xl", 
+                    isMobile ? "aspect-square" : "min-h-[140px]", 
+                    !isCurrentMonth ? "opacity-[0.08]" : getHeatmapColor(minutes), 
+                    isToday && "ring-4 ring-inset ring-primary/30 z-10 shadow-xl"
+                  )}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={cn(
+                      "text-[11px] font-black tracking-tighter", 
+                      idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-red-600" : "text-primary/40",
+                      isToday && "text-primary scale-125"
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                    <div className="flex flex-col items-end gap-1.5">
+                      {minutes >= 180 && <Zap className="h-3 w-3 text-yellow-500 fill-yellow-500 drop-shadow-sm animate-pulse" />}
+                      {hasPlans && <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />}
                     </div>
                   </div>
-                  {minutes > 0 && <div className="mt-auto flex justify-center"><span className={cn("font-mono font-black tracking-tighter text-primary", isMobile ? "text-[10px]" : "text-xl")}>{formatMinutes(minutes)}</span></div>}
+                  {minutes > 0 && (
+                    <div className="mt-auto flex flex-col items-center gap-1">
+                      <span className={cn("font-mono font-black tracking-tighter tabular-nums drop-shadow-sm", isMobile ? "text-[11px]" : "text-2xl")}>
+                        {formatMinutes(minutes)}
+                      </span>
+                      {!isMobile && minutes >= 360 && (
+                        <Badge className="bg-white/30 text-primary border-none font-black text-[8px] h-4 px-1.5">FOCUS MAX</Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
