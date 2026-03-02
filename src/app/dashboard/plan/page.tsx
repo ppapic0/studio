@@ -54,7 +54,9 @@ import {
   ChevronRight,
   CircleDot,
   BarChart3,
-  BookOpen
+  BookOpen,
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -247,6 +249,10 @@ export default function StudyPlanPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
+  // 등하원 필수 설정 상태
+  const [inTime, setInTime] = useState('09:00');
+  const [outTime, setOutTime] = useState('22:00');
+
   useEffect(() => {
     setSelectedDate(new Date());
   }, []);
@@ -285,6 +291,11 @@ export default function StudyPlanPage() {
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
+
+  // 필수 항목 존재 여부 체크
+  const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원')), [scheduleItems]);
+  const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원')), [scheduleItems]);
+  const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -336,7 +347,7 @@ export default function StudyPlanPage() {
         updatedAt: serverTimestamp(),
       };
 
-      if (category === 'schedule') {
+      if (category === 'schedule' && !title.includes('등원하지 않습니다')) {
         data.title = `${title.trim()}: 09:00 ~ 10:00`;
       } else if (category === 'study') {
         data.subject = newStudySubject;
@@ -355,6 +366,53 @@ export default function StudyPlanPage() {
       }
     } catch (error) {
       console.error("Error adding task:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSetAttendance = async (type: 'attend' | 'absent') => {
+    if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
+    setIsSubmitting(true);
+    
+    const batch = writeBatch(firestore);
+    const colRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
+
+    try {
+      // 기존 등하원/미등원 항목 삭제
+      scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원')).forEach(i => {
+        batch.delete(doc(colRef, i.id));
+      });
+
+      if (type === 'attend') {
+        // 등원 항목 추가
+        batch.set(doc(colRef), {
+          title: `등원 예정: ${inTime}`,
+          done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
+          studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+        // 하원 항목 추가
+        batch.set(doc(colRef), {
+          title: `하원 예정: ${outTime}`,
+          done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
+          studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+      } else {
+        // 미등원 항목 추가
+        batch.set(doc(colRef), {
+          title: `이날 등원하지 않습니다`,
+          done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
+          studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+      }
+
+      await batch.commit();
+      toast({ title: type === 'attend' ? "출석 일정이 등록되었습니다." : "미등원 처리가 완료되었습니다." });
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsSubmitting(false);
     }
@@ -429,6 +487,91 @@ export default function StudyPlanPage() {
         </div>
       </header>
 
+      <div className={cn("grid grid-cols-7 gap-1.5 sm:gap-4", isMobile ? "px-0" : "px-0")}>
+        {weekDays.map((day) => {
+          const isSelected = isSameDay(day, selectedDate);
+          const isToday = isSameDay(day, new Date());
+          return (
+            <Button
+              key={day.toISOString()}
+              variant={isSelected ? "default" : "outline"}
+              className={cn(
+                "flex flex-col transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-3.5 sm:py-4",
+                isMobile ? "px-0" : "px-4",
+                isSelected ? "bg-primary border-primary shadow-lg scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
+                isToday && !isSelected && "border-primary/30"
+              )}
+              onClick={() => setSelectedDate(day)}
+            >
+              <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[8px] mb-1.5" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-lg" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
+            </Button>
+          );
+        })}
+      </div>
+
+      {/* 필수 등하원 설정 섹션 */}
+      {!isPast && (
+        <Card className="border-2 border-primary/20 shadow-xl rounded-[2.5rem] overflow-hidden bg-white animate-in slide-in-from-top-4 duration-500">
+          <CardHeader className="bg-primary/5 p-6 border-b border-primary/10">
+            <CardTitle className="text-xl font-black tracking-tighter flex items-center gap-2">
+              <CalendarClock className="h-6 w-6 text-primary" /> 오늘의 출석 설정 (필수)
+            </CardTitle>
+            <CardDescription className="font-bold text-xs">선생님의 관제를 위해 반드시 오늘 등원 정보를 입력해 주세요.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            {(!hasInPlan || !hasOutPlan) && !isAbsentMode ? (
+              <div className="flex flex-col gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-black text-primary uppercase ml-1">오늘 등원합니다</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-black opacity-40 ml-1">등원 예정 시간</span>
+                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-lg" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-black opacity-40 ml-1">하원 예정 시간</span>
+                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className="h-14 rounded-2xl border-2 font-black text-lg" />
+                        </div>
+                      </div>
+                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-14 px-8 rounded-2xl font-black shadow-lg shadow-primary/20 mt-5">설정 완료</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col justify-center items-center border-l border-dashed pl-6">
+                    <p className="text-xs font-bold text-muted-foreground mb-4">오늘은 공부를 쉬어갑니다.</p>
+                    <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="w-full h-14 rounded-2xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-2">
+                      <XCircle className="h-5 w-5" /> 이날 등원하지 않습니다
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-6 rounded-[2rem] bg-muted/20 border-2 border-transparent">
+                <div className="flex items-center gap-4">
+                  <div className={cn("p-3 rounded-2xl", isAbsentMode ? "bg-rose-100" : "bg-emerald-100")}>
+                    {isAbsentMode ? <XCircle className="h-6 w-6 text-rose-600" /> : <CheckCircle2 className="h-6 w-6 text-emerald-600" />}
+                  </div>
+                  <div className="grid">
+                    <span className="text-xl font-black tracking-tight">{isAbsentMode ? '오늘 휴무 (미등원)' : '출석 시간 설정 완료'}</span>
+                    {!isAbsentMode && <span className="text-xs font-bold text-muted-foreground">{inTime} 등원 ~ {outTime} 하원</span>}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  // 해당 날짜의 필수 항목들을 찾아 상태를 초기화하도록 유도
+                  const batch = writeBatch(firestore!);
+                  const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
+                  scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원')).forEach(i => batch.delete(doc(colRef, i.id)));
+                  batch.commit().then(() => toast({ title: "설정을 재설정합니다." }));
+                }} className="text-[10px] font-black uppercase text-muted-foreground underline underline-offset-4">다시 설정하기</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* 학습 밸런스 요약 카드 */}
       <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white ring-1 ring-black/[0.03]">
         <CardHeader className="p-6 pb-2">
@@ -460,29 +603,6 @@ export default function StudyPlanPage() {
           </div>
         </CardContent>
       </Card>
-
-      <div className={cn("grid grid-cols-7 gap-1.5 sm:gap-4", isMobile ? "px-0" : "px-0")}>
-        {weekDays.map((day) => {
-          const isSelected = isSameDay(day, selectedDate);
-          const isToday = isSameDay(day, new Date());
-          return (
-            <Button
-              key={day.toISOString()}
-              variant={isSelected ? "default" : "outline"}
-              className={cn(
-                "flex flex-col transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-3.5 sm:py-4",
-                isMobile ? "px-0" : "px-4",
-                isSelected ? "bg-primary border-primary shadow-lg scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
-                isToday && !isSelected && "border-primary/30"
-              )}
-              onClick={() => setSelectedDate(day)}
-            >
-              <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[8px] mb-1.5" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-lg" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
-            </Button>
-          );
-        })}
-      </div>
 
       <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1 px-0" : "md:grid-cols-12")}>
         {/* 생활 루틴 */}

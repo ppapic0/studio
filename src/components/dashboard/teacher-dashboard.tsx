@@ -144,7 +144,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
-  // 센터 전체 학생의 오늘 계획 데이터 가져오기 (지각/미작성 체크용)
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return query(
@@ -177,22 +176,29 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, studentMembers, searchTerm]);
 
-  // 학생별 지각 및 계획 작성 여부 판단 로직
   const getStudentStatusLogic = (studentId: string, status: string, totalMinutes: number) => {
-    if (!centerTodayPlans) return { isAlert: false, schedule: { in: null, out: null } };
+    if (!centerTodayPlans) return { isAlert: false, schedule: { in: null, out: null }, isAbsentMode: false };
 
     const myPlans = centerTodayPlans.filter(p => p.studentId === studentId);
-    const inItem = myPlans.find(p => p.title.includes('등원'));
-    const outItem = myPlans.find(p => p.title.includes('하원'));
+    
+    // 미등원 모드 체크
+    const isAbsentMode = myPlans.some(p => p.title.includes('등원하지 않습니다'));
+    if (isAbsentMode) {
+      return { isAlert: false, schedule: { in: '미등원', out: '미등원' }, isAbsentMode: true };
+    }
+
+    const inItem = myPlans.find(p => p.title.includes('등원 예정'));
+    const outItem = myPlans.find(p => p.title.includes('하원 예정'));
 
     const schedule = {
       in: inItem ? inItem.title.split(': ')[1] || null : null,
       out: outItem ? outItem.title.split(': ')[1] || null : null
     };
 
-    // 1. 미작성자 체크 (등원 혹은 하원 중 하나라도 없으면)
+    // 1. 미작성자 체크
     if (!schedule.in || !schedule.out) {
-      return { isAlert: status === 'absent' && totalMinutes === 0, schedule };
+      // 퇴실 기록이 이미 있다면 미작성 경고 해제
+      return { isAlert: status === 'absent' && totalMinutes === 0, schedule, isAbsentMode: false };
     }
 
     // 2. 지각 체크
@@ -202,11 +208,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       plannedTime.setHours(h, m, 0, 0);
       
       if (now > plannedTime.getTime()) {
-        return { isAlert: true, schedule };
+        return { isAlert: true, schedule, isAbsentMode: false };
       }
     }
 
-    return { isAlert: false, schedule };
+    return { isAlert: false, schedule, isAbsentMode: false };
   };
 
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
@@ -544,12 +550,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       const student = students?.find(s => s.id === seat?.studentId);
                       
                       const timeInfo = student ? getStudentStudyTimes(student.id, seat.status, seat.lastCheckInAt) : null;
-                      const statusLogic = student ? getStudentStatusLogic(student.id, seat.status, timeInfo?.totalMins || 0) : { isAlert: false };
+                      const statusLogic = student ? getStudentStatusLogic(student.id, seat.status, timeInfo?.totalMins || 0) : { isAlert: false, isAbsentMode: false };
 
                       const isAisle = seat?.type === 'aisle';
                       const isStudying = timeInfo?.isStudying;
                       const isAlert = !isEditMode && statusLogic.isAlert;
                       const isAway = !isEditMode && (seat?.status === 'away' || seat?.status === 'break');
+                      const isAbsentMode = statusLogic.isAbsentMode;
 
                       return (
                         <div 
@@ -565,9 +572,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   ? "bg-rose-500 border-rose-600 text-white animate-pulse shadow-lg shadow-rose-200"
                                   : isAway
                                     ? "bg-amber-500 border-amber-600 text-white"
-                                    : student 
-                                      ? "bg-white border-primary/30 text-primary" 
-                                      : "bg-white border-primary/40 text-primary/10 hover:border-primary/60",
+                                    : isAbsentMode
+                                      ? "bg-slate-100 border-slate-300 text-slate-400"
+                                      : student 
+                                        ? "bg-white border-primary/30 text-primary" 
+                                        : "bg-white border-primary/40 text-primary/10 hover:border-primary/60",
                             isEditMode && isAisle && "border-dashed border-muted-foreground/20 text-muted-foreground/20 bg-muted/5"
                           )}
                         >
@@ -584,10 +593,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <div className="flex flex-col items-center leading-tight">
                                 <span className={cn("text-[7px] font-bold tracking-tight", isStudying || isAlert || isAway ? "text-white/90" : "text-muted-foreground")}>
-                                  LIVE: {timeInfo?.session}
+                                  {isAbsentMode ? '미등원' : `LIVE: ${timeInfo?.session}`}
                                 </span>
                                 <span className={cn("text-[7px] font-bold tracking-tight opacity-60", isStudying || isAlert || isAway ? "text-white/70" : "text-muted-foreground/60")}>
-                                  T: {timeInfo?.total}
+                                  {isAbsentMode ? '-' : `T: ${timeInfo?.total}`}
                                 </span>
                               </div>
                               {isAlert && <AlertCircle className="h-2 w-2 text-white/80 mt-0.5" />}
@@ -659,6 +668,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 const timeInfo = studentId ? getStudentStudyTimes(studentId, selectedSeat.status, selectedSeat.lastCheckInAt) : null;
                 const statusLogic = studentId ? getStudentStatusLogic(studentId, selectedSeat.status, timeInfo?.totalMins || 0) : null;
                 const isAlert = !isEditMode && statusLogic?.isAlert;
+                const isAbsentMode = statusLogic?.isAbsentMode;
 
                 return (
                   <>
@@ -669,7 +679,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <DialogTitle className="text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge className="bg-white/20 text-white border-none font-black px-3 py-1">SEAT {selectedSeat.seatNo}</Badge>
-                          <Badge className="bg-white/20 text-white border-none font-black px-3 py-1 uppercase">{selectedSeat.status}</Badge>
+                          <Badge className="bg-white/20 text-white border-none font-black px-3 py-1 uppercase">{isAbsentMode ? 'ABSENT' : selectedSeat.status}</Badge>
                           {isAlert && <Badge className="bg-white text-rose-600 border-none font-black px-3 py-1 uppercase">LATE / NO PLAN</Badge>}
                         </div>
                       </DialogHeader>
@@ -693,7 +703,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </div>
                         </div>
 
-                        {selectedSeat.studentId && (
+                        {selectedSeat.studentId && !isAbsentMode && (
                           <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
                             <div className="flex-1 text-center">
                               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Live Session</p>
