@@ -84,14 +84,14 @@ export function SignupForm() {
         form.setError('schoolName', { message: '학교명을 입력해주세요.' });
         return;
       }
-      if (!values.parentLinkCode || values.parentLinkCode.length !== 4) {
-        form.setError('parentLinkCode', { message: '부모님 연동을 위한 4자리 숫자를 입력해주세요.' });
+      if (!values.parentLinkCode || values.parentLinkCode.length !== 6) {
+        form.setError('parentLinkCode', { message: '부모님 연동을 위한 6자리 숫자를 입력해주세요.' });
         return;
       }
     }
 
-    if (values.role === 'parent' && (!values.studentLinkCode || values.studentLinkCode.length !== 4)) {
-      form.setError('studentLinkCode', { message: '자녀의 4자리 연동 코드를 입력해주세요.' });
+    if (values.role === 'parent' && (!values.studentLinkCode || values.studentLinkCode.length !== 6)) {
+      form.setError('studentLinkCode', { message: '자녀의 6자리 연동 코드를 입력해주세요.' });
       return;
     }
 
@@ -168,7 +168,6 @@ export function SignupForm() {
       }
 
       setLoadingStatus('계정 생성 중...');
-      // 이메일 주소 전후 공백 제거 (트림 처리)
       const trimmedEmail = values.email.trim();
       const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, values.password);
       const user = userCredential.user;
@@ -248,7 +247,6 @@ export function SignupForm() {
         description: `${finalDisplayName}님의 계정이 성공적으로 생성되었습니다. 로그인 창으로 이동합니다.` 
       });
       
-      // 명확한 확인을 위해 로그아웃 후 로그인 페이지로 이동
       await signOut(auth);
 
       setTimeout(() => {
@@ -361,7 +359,7 @@ export function SignupForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-2 font-bold">부모님 연동 코드 <ShieldCheck className="h-3 w-3 text-primary" /></FormLabel>
-                  <FormControl><Input placeholder="4자리 숫자" maxLength={4} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
+                  <FormControl><Input placeholder="6자리 숫자" maxLength={6} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
                   <FormDescription className="text-[10px] font-bold">부모님이 가입하실 때 이 코드를 입력하면 자녀의 정보를 볼 수 있습니다.</FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -377,8 +375,8 @@ export function SignupForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="flex items-center gap-2 font-bold">자녀 연동 코드 <UserCheck className="h-3 w-3 text-primary" /></FormLabel>
-                <FormControl><Input placeholder="자녀가 설정한 4자리 숫자" maxLength={4} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
-                <FormDescription className="text-[10px] font-bold">자녀에게 물어보고 4자리 코드를 입력해 주세요.</FormDescription>
+                <FormControl><Input placeholder="자녀가 설정한 6자리 숫자" maxLength={6} {...field} className="h-12 rounded-xl border-2 font-black tracking-[0.5em] text-center" disabled={isLoading} /></FormControl>
+                <FormDescription className="text-[10px] font-bold">자녀에게 물어보고 6자리 코드를 입력해 주세요.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

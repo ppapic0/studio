@@ -208,7 +208,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={cn("rounded-lg shrink-0 flex items-center justify-center", isMobile ? "bg-primary/5 p-1.5" : "bg-primary/10 p-2")}>
-            <Icon className={cn(isMobile ? "h-3.5 w-3.5 text-primary" : "h-4 w-4")} />
+            <Icon className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
           </div>
           <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         </div>
@@ -275,7 +275,6 @@ export default function StudyHistoryPage() {
 
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
 
-  // 데일리 리포트 데이터 조회
   const reportRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid || !selectedDateKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${selectedDateKey}_${targetUid}`);
@@ -449,7 +448,7 @@ export default function StudyHistoryPage() {
                 {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 시즌 LP가 대폭 상승합니다.'}
               </p>
             </div>
-            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-95"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
+            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-[0.95]"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
           </Card>
         )}
       </div>
@@ -625,3 +624,15 @@ export default function StudyHistoryPage() {
     </div>
   );
 }
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'requested': return <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[10px]">승인 대기</Badge>;
+    case 'confirmed': return <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-sm">예약 확정</Badge>;
+    case 'done': return <Badge variant="outline" className="opacity-40 font-black text-[10px]">상담 완료</Badge>;
+    case 'canceled': return <Badge variant="destructive" className="font-black text-[10px]">취소됨</Badge>;
+    default: return <Badge variant="outline" className="font-black text-[10px]">{status}</Badge>;
+  }
+};
+
+const UserMinus = ({ className }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;

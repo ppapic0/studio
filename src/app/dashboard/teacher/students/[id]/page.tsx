@@ -113,7 +113,7 @@ function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMo
   const content = (
     <Card className={cn(
       "border-none shadow-md overflow-hidden relative bg-white rounded-[1.5rem] sm:rounded-[2rem] transition-all",
-      (onClick || href) && "hover:shadow-xl active:scale-95 cursor-pointer hover:bg-muted/5",
+      (onClick || href) && "hover:shadow-xl active:scale-[0.98] cursor-pointer hover:bg-muted/5",
       isActive && "ring-4 ring-primary ring-offset-4 scale-[1.02] shadow-2xl z-10"
     )}>
       <div className={cn("absolute top-0 left-0 w-1 h-full", colorClass.replace('text-', 'bg-'))} />
@@ -149,11 +149,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const hasInitializedForm = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  // 탭 및 차트 뷰 제어 상태
   const [activeTab, setActiveTab] = useState('overview');
   const [focusedChartView, setFocusedChartView] = useState<'today' | 'weekly' | 'monthly'>('monthly');
-
-  // 계획 탭을 위한 일자 선택 상태
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -215,7 +212,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: rawCounselLogs } = useCollection<CounselingLog>(counselLogsQuery);
 
-  // 계획 데이터 조회 로직 (상세 분석용)
   const selectedDateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
   const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
   const plansQuery = useMemoFirebase(() => {
@@ -343,7 +339,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const handleFocusChart = (view: 'today' | 'weekly' | 'monthly') => {
     setActiveTab('overview');
     setFocusedChartView(view);
-    // 차트 영역으로 부드럽게 스크롤 (데스크톱의 경우)
     if (!isMobile) {
       setTimeout(() => {
         const chartArea = document.getElementById('analytics-chart-area');
@@ -393,7 +388,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         <TabsContent value="overview" className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div id="analytics-chart-area" className="grid gap-6 md:grid-cols-3">
-            {/* 오늘 현황 파이 차트 */}
             <Card className={cn(
               "rounded-[2rem] border-none shadow-xl bg-white p-8 flex flex-col items-center justify-center transition-all duration-500",
               focusedChartView === 'today' ? "ring-4 ring-emerald-500/20 bg-emerald-50/10 scale-[1.02]" : ""
@@ -427,7 +421,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <p className="mt-4 font-black text-sm">{Math.floor(stats.today/60)}h {stats.today%60}m 완료</p>
             </Card>
 
-            {/* 주간 리듬 바 차트 */}
             <Card className={cn(
               "rounded-[2rem] border-none shadow-xl bg-white p-6 transition-all duration-500",
               focusedChartView === 'weekly' ? "ring-4 ring-blue-500/20 bg-blue-50/10 scale-[1.02]" : ""
@@ -457,7 +450,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </Card>
 
-            {/* 월간 요약 프로그레스 */}
             <Card className={cn(
               "rounded-[2rem] border-none shadow-xl bg-white p-8 transition-all duration-500",
               focusedChartView === 'monthly' ? "ring-4 ring-amber-500/20 bg-amber-50/10 scale-[1.02]" : ""
@@ -519,7 +511,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               variant="outline" 
               size="icon" 
               onClick={() => setSelectedDateForPlan(prev => addDays(prev, -7))} 
-              className="rounded-2xl h-14 w-14 shrink-0 border-2 shadow-sm hover:bg-primary hover:text-white transition-all active:scale-90"
+              className="rounded-2xl h-14 w-14 shrink-0 border-2 shadow-sm hover:bg-primary hover:text-white transition-all active:scale-[0.9]"
             >
               <ChevronLeft className="h-6 w-6" />
             </Button>
@@ -550,7 +542,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               variant="outline" 
               size="icon" 
               onClick={() => setSelectedDateForPlan(prev => addDays(prev, 7))} 
-              className="rounded-2xl h-14 w-14 shrink-0 border-2 shadow-sm hover:bg-primary hover:text-white transition-all active:scale-90"
+              className="rounded-2xl h-14 w-14 shrink-0 border-2 shadow-sm hover:bg-primary hover:text-white transition-all active:scale-[0.9]"
             >
               <ChevronRight className="h-6 w-6" />
             </Button>
@@ -790,12 +782,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학생 이름</Label><Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} placeholder="이름" className="rounded-xl border-2 h-12 font-bold" /></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} placeholder="학교" className="rounded-xl border-2 h-12 font-bold" /></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">현재 학년</Label><Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}><SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl border-none shadow-2xl"><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
-              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학부모 연동 코드 (4자리)</Label><Input value={editForm.parentLinkCode} onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value})} placeholder="4자리 코드" maxLength={4} className="rounded-xl border-2 h-12 font-black tracking-[0.5em] text-center" /></div>
+              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학부모 연동 코드 (6자리)</Label><Input value={editForm.parentLinkCode} onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value})} placeholder="6자리 코드" maxLength={6} className="rounded-xl border-2 h-12 font-black tracking-[0.5em] text-center" /></div>
               <div className="space-y-1.5 pt-2"><Label className="text-[10px] font-black uppercase text-rose-600 ml-1">비밀번호 재설정 (최소 6자)</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="미입력 시 기존 비밀번호 유지" className="rounded-xl border-2 h-12" /></div>
             </div>
           </div>
           <DialogFooter className="p-8 bg-muted/20 border-t">
-            <Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">수정 사항 저장</Button>
+            <Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-[0.95] transition-all">수정 사항 저장</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -825,7 +817,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             ))}
           </div>
           <DialogFooter className="p-8 bg-muted/20 border-t">
-            <Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">상태 업데이트 적용</Button>
+            <Button onClick={handleUpdateStatus} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-[0.95] transition-all">상태 업데이트 적용</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

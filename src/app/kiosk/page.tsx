@@ -61,10 +61,10 @@ export default function KioskPage() {
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
 
   const handleNumberClick = (num: string) => {
-    if (pin.length < 4) {
+    if (pin.length < 6) {
       const nextPin = pin + num;
       setPin(nextPin);
-      if (nextPin.length === 4) {
+      if (nextPin.length === 6) {
         searchStudent(nextPin);
       }
     }
@@ -134,7 +134,6 @@ export default function KioskPage() {
         const durationMinutes = Math.floor((Date.now() - startTime) / 60000);
 
         if (durationMinutes > 0) {
-          // (1) 일일 총 시간 업데이트
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
           batch.set(logRef, {
             totalMinutes: increment(durationMinutes),
@@ -144,7 +143,6 @@ export default function KioskPage() {
             updatedAt: serverTimestamp()
           }, { merge: true });
 
-          // (2) 세션 기록 추가
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions'));
           batch.set(sessionRef, {
             startTime: seat.lastCheckInAt,
@@ -153,7 +151,6 @@ export default function KioskPage() {
             createdAt: serverTimestamp()
           });
 
-          // (3) 마스터리 경험치 업데이트 (LP)
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
           batch.set(progressRef, {
             stats: { focus: increment(durationMinutes / 1000), consistency: increment(0.1) },
@@ -163,13 +160,11 @@ export default function KioskPage() {
         }
       }
 
-      // 2. 좌석 상태 업데이트
       const updateData: any = {
         status: nextStatus,
         updatedAt: serverTimestamp()
       };
 
-      // 공부 시작일 때만 체크인 시간 기록
       if (nextStatus === 'studying') {
         updateData.lastCheckInAt = serverTimestamp();
       }
@@ -211,11 +206,9 @@ export default function KioskPage() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Back to Dashboard Button - Only for Staff */}
       {canGoBack && (
         <div className="fixed top-8 left-8 z-50">
           <Button 
@@ -241,15 +234,15 @@ export default function KioskPage() {
           <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
             <CardHeader className="bg-muted/5 border-b p-12 text-center">
               <CardTitle className="text-3xl font-black tracking-tighter">핀번호를 입력하세요</CardTitle>
-              <CardDescription className="font-bold pt-3 text-base">학부모 연동 코드 4자리를 입력해 주세요.</CardDescription>
+              <CardDescription className="font-bold pt-3 text-base">학부모 연동 코드 6자리를 입력해 주세요.</CardDescription>
             </CardHeader>
             <CardContent className="p-12 space-y-12">
-              <div className="flex justify-center gap-5">
-                {[...Array(4)].map((_, i) => (
+              <div className="flex justify-center gap-4">
+                {[...Array(6)].map((_, i) => (
                   <div 
                     key={i} 
                     className={cn(
-                      "w-16 h-20 rounded-3xl border-4 flex items-center justify-center text-4xl font-black transition-all duration-300",
+                      "w-14 h-18 rounded-3xl border-4 flex items-center justify-center text-3xl font-black transition-all duration-300",
                       pin.length > i ? "border-primary bg-primary text-white scale-110 shadow-2xl shadow-primary/20" : "border-muted bg-muted/20"
                     )}
                   >
@@ -307,7 +300,6 @@ export default function KioskPage() {
                   </div>
                   
                   <CardContent className="p-12 sm:p-16 flex flex-col items-center text-center gap-8">
-                    {/* 상단 현재 상태 표시 */}
                     <div className="space-y-4 w-full">
                       <div className="flex flex-col items-center gap-2">
                         <Badge className={cn("rounded-full font-black text-xs px-4 py-1 border-none shadow-lg mb-2 text-white animate-pulse", statusInfo.color)}>
@@ -318,9 +310,7 @@ export default function KioskPage() {
                       </div>
                     </div>
 
-                    {/* 중앙 대형 선택 버튼들 */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mt-4">
-                      {/* 1. 입실 / 복귀 */}
                       <Button 
                         disabled={isProcessing || seat?.status === 'studying'}
                         onClick={() => handleStatusUpdate(student, 'studying')}
@@ -336,7 +326,6 @@ export default function KioskPage() {
                         </div>
                       </Button>
 
-                      {/* 2. 외출 / 휴식 */}
                       <Button 
                         disabled={isProcessing || seat?.status === 'away' || seat?.status === 'absent'}
                         onClick={() => handleStatusUpdate(student, 'away')}
@@ -352,7 +341,6 @@ export default function KioskPage() {
                         </div>
                       </Button>
 
-                      {/* 3. 퇴실 / 종료 */}
                       <Button 
                         disabled={isProcessing || seat?.status === 'absent'}
                         onClick={() => handleStatusUpdate(student, 'absent')}
