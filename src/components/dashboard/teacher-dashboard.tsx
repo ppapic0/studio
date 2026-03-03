@@ -90,7 +90,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const isMobile = viewMode === 'mobile';
   
   const [mounted, setMounted] = useState(false);
-  const [now, setNow] = useState<number>(0);
+  const [now, setNow] = useState<number>(Date.now());
   const [selectedSeat, setSelectedSeat] = useState<AttendanceCurrent | null>(null);
   const [isManaging, setIsManaging] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -195,7 +195,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: rawAppointments, isLoading: aptLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
 
-  const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.scheduledAt?.toMillis()||0)) : [], [rawAppointments]);
+  const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.createdAt?.toMillis()||0)) : [], [rawAppointments]);
 
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
@@ -228,11 +228,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     if (status === 'absent' && totalMinutes === 0) {
       const [h, m] = schedule.in.split(':').map(Number);
-      const plannedTime = new Date();
-      plannedTime.setHours(h, m, 0, 0);
-      
-      if (now > plannedTime.getTime()) {
-        return { isAlert: true, schedule, isAbsentMode: false };
+      if (!isNaN(h) && !isNaN(m)) {
+        const plannedTime = new Date();
+        plannedTime.setHours(h, m, 0, 0);
+        if (now > plannedTime.getTime()) {
+          return { isAlert: true, schedule, isAbsentMode: false };
+        }
       }
     }
 
@@ -240,21 +241,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
-    if (!mounted || now === 0) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
+    if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
     
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     const cumulativeMinutes = studentLog?.totalMinutes || 0;
     
     let sessionMinutes = 0;
-    const logUpdatedAt = studentLog?.updatedAt?.toMillis() || 0;
-    const isRecentlyActive = (now - logUpdatedAt) < 60000;
-
-    if ((status === 'studying' || isRecentlyActive) && lastCheckInAt) {
+    if (status === 'studying' && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
       sessionMinutes = Math.floor((now - startTime) / 60000);
     }
 
-    const totalMinutes = cumulativeMinutes + (sessionMinutes > 0 ? sessionMinutes : 0);
+    const totalMinutes = cumulativeMinutes + Math.max(0, sessionMinutes);
 
     const formatTime = (mins: number) => {
       const hh = Math.floor(mins / 60);
@@ -263,10 +261,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
 
     return {
-      session: formatTime(sessionMinutes),
+      session: formatTime(Math.max(0, sessionMinutes)),
       total: formatTime(totalMinutes),
       totalMins: totalMinutes,
-      isStudying: status === 'studying' || isRecentlyActive
+      isStudying: status === 'studying'
     };
   };
 
@@ -306,7 +304,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             sessionMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
           }
 
-          const currentTotal = logMins + sessionMins;
+          const currentTotal = logMins + Math.max(0, sessionMins);
           totalMins += currentTotal;
           filteredLiveMinutes.push(currentTotal);
 
@@ -316,16 +314,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     });
 
-    let absent = 0;
-    let totalDisplayCount = 0;
-
-    if (selectedClass !== 'all') {
-        totalDisplayCount = filteredMemberIds.size;
-        absent = Math.max(0, totalDisplayCount - studying - away);
-    } else {
-        totalDisplayCount = totalPhysicalSeats;
-        absent = Math.max(0, totalDisplayCount - studying - away);
-    }
+    let totalDisplayCount = selectedClass !== 'all' ? filteredMemberIds.size : totalPhysicalSeats;
+    let absent = Math.max(0, totalDisplayCount - studying - away);
 
     const avgMinutes = filteredLiveMinutes.length > 0 ? Math.round(totalMins / filteredLiveMinutes.length) : 0;
     const sortedMinutes = [...filteredLiveMinutes].sort((a, b) => b - a);
