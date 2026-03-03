@@ -45,7 +45,9 @@ import {
   TrendingUp,
   FileText,
   FileSearch,
-  ChevronLeft
+  ChevronLeft,
+  CheckCircle2,
+  Eye
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -912,7 +914,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   <div key={report.id} className="p-5 rounded-2xl bg-white border border-amber-100 shadow-sm space-y-2 relative group hover:shadow-md transition-all">
                                     <div className="flex justify-between items-center">
                                       <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter">{report.dateKey}</span>
-                                      {report.viewedAt && <Badge className="bg-emerald-500 text-white border-none font-black text-[7px] px-1.5 h-4">열람함</Badge>}
+                                      {report.viewedAt && <Badge className="bg-emerald-50 text-white border-none font-black text-[7px] px-1.5 h-4">열람함</Badge>}
                                     </div>
                                     <p className="text-xs font-bold text-foreground/70 line-clamp-2 leading-relaxed">{report.content.substring(0, 100)}...</p>
                                   </div>
