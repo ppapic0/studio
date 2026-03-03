@@ -157,32 +157,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
+    // collectionGroup 쿼리는 인덱스가 필요하므로 오류 방지를 위해 필터링을 최소화합니다.
     return query(
       collectionGroup(firestore, 'days'),
-      where('centerId', '==', centerId)
+      where('centerId', '==', centerId),
+      where('dateKey', '==', todayKey)
     );
-  }, [firestore, centerId]);
-  const { data: allCenterLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
-
-  const todayLogs = useMemo(() => {
-    if (!allCenterLogs) return [];
-    return allCenterLogs.filter(l => l.dateKey === todayKey);
-  }, [allCenterLogs, todayKey]);
+  }, [firestore, centerId, todayKey]);
+  const { data: todayLogs } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collectionGroup(firestore, 'items'),
       where('centerId', '==', centerId),
-      where('category', '==', 'schedule')
+      where('category', '==', 'schedule'),
+      where('dateKey', '==', todayKey)
     );
-  }, [firestore, centerId]);
-  const { data: allCenterPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive });
-
-  const centerTodayPlans = useMemo(() => {
-    if (!allCenterPlans) return [];
-    return allCenterPlans.filter(p => p.dateKey === todayKey);
-  }, [allCenterPlans, todayKey]);
+  }, [firestore, centerId, todayKey]);
+  const { data: centerTodayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive });
 
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -243,9 +236,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
     if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
     
+    // 1. 이미 저장된 오늘의 누적 공부 시간
     const studentLog = todayLogs?.find(l => l.studentId === studentId);
     const cumulativeMinutes = studentLog?.totalMinutes || 0;
     
+    // 2. 현재 입실 중인 경우, 입실 시점부터 현재까지의 실시간 시간 계산
     let sessionMinutes = 0;
     if (status === 'studying' && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
@@ -295,18 +290,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         const isTargetStudent = filteredMemberIds.has(seat.studentId);
         
         if (isTargetStudent) {
-          const studentLog = todayLogs?.find(l => l.studentId === seat.studentId);
-          const logMins = studentLog?.totalMinutes || 0;
           const status = seat.status || 'absent';
-
-          let sessionMins = 0;
-          if (status === 'studying' && seat.lastCheckInAt) {
-            sessionMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
-          }
-
-          const currentTotal = logMins + Math.max(0, sessionMins);
-          totalMins += currentTotal;
-          filteredLiveMinutes.push(currentTotal);
+          const timeInfo = getStudentStudyTimes(seat.studentId, status, seat.lastCheckInAt);
+          
+          totalMins += timeInfo.totalMins;
+          filteredLiveMinutes.push(timeInfo.totalMins);
 
           if (status === 'studying') studying++;
           else if (status === 'away' || status === 'break') away++;

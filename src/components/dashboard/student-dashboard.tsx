@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -50,8 +49,8 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership } from '@/lib/types';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit } from 'firebase/firestore';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -284,7 +283,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
     <Dialog>
       <DialogTrigger asChild>
         <Card className={cn(
-          "border-none shadow-[0_20px_50px_rgba(0,0,0,0.08)] bg-white/90 backdrop-blur-xl rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 relative cursor-pointer",
+          "border-none shadow-[0_20px_50px_rgba(0,0,0,0.08)] bg-white/90 backdrop-blur-xl rounded-[2.5rem] overflow-hidden ring-1 ring-black/[0.03] group hover:-translate-y-1 transition-all duration-500 cursor-pointer",
           isMobile ? "rounded-[1.5rem]" : ""
         )}>
           <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600" />
@@ -520,6 +519,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
+    // 실시간 좌석 상태 동기화 로직
+    const centerId = activeMembership.id;
+    const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
+    
     if (isTimerActive) {
       const nowTs = Date.now();
       const sessionMinutes = Math.floor((nowTs - (startTime || nowTs)) / 60000);
@@ -555,24 +558,50 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
         
         batch.update(progressRef, updateData);
-        await batch.commit();
+      }
+
+      // 선생님 화면에서도 즉시 퇴실(absent)로 보이도록 처리
+      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
+      const seatSnap = await getDocs(seatQuery);
+      if (!seatSnap.empty) {
+        batch.update(doc(attendanceCurrentRef, seatSnap.docs[0].id), { 
+          status: 'absent', 
+          updatedAt: serverTimestamp() 
+        });
       }
       
+      await batch.commit();
       setIsTimerActive(false); 
       setStartTime(null); 
       toast({ title: "트랙 종료됨" });
     } else {
-      setStartTime(Date.now()); 
+      const now = Date.now();
+      setStartTime(now); 
       setIsTimerActive(true);
       
+      const batch = writeBatch(firestore);
+
       if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-        await updateDoc(progressRef, {
+        batch.update(progressRef, {
           'stats.consistency': increment(0.5),
           [`dailyLpStatus.${todayKey}.checkedIn`]: true,
           updatedAt: serverTimestamp()
         });
         toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
       }
+
+      // 선생님 화면에서도 즉시 공부 중(studying)으로 보이도록 처리
+      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
+      const seatSnap = await getDocs(seatQuery);
+      if (!seatSnap.empty) {
+        batch.update(doc(attendanceCurrentRef, seatSnap.docs[0].id), { 
+          status: 'studying', 
+          lastCheckInAt: serverTimestamp(),
+          updatedAt: serverTimestamp() 
+        });
+      }
+
+      await batch.commit();
     }
   };
 
