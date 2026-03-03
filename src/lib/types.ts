@@ -133,7 +133,7 @@ export interface StudentProfile {
   schoolName: string;
   className?: string; // 소속 반 이름
   seatNo: number;
-  seatZone?: 'A' | 'B' | 'Fixed' | 'Flex'; // 좌석 구역 정보
+  seatZone?: string; // 사용자가 직접 설정한 구역 (A존, B존 등)
   targetDailyMinutes: number;
   parentUids: string[];
   createdAt: Timestamp;
@@ -156,6 +156,7 @@ export interface AttendanceCurrent {
   seatNo: number;
   status: "studying" | "away" | "break" | "absent";
   type?: "seat" | "aisle";
+  seatZone?: string; // 구역 정보 (A존, B존, 자유석 등)
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
   gridX?: number; 

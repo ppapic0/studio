@@ -64,7 +64,7 @@ import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { CenterMembership, StudentProfile } from '@/lib/types';
+import { CenterMembership, StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { format, eachMonthOfInterval, subMonths, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -87,7 +87,7 @@ export function RevenueAnalysis() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 멤버십 정보 조회
+  // 1. 멤버십 정보 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -95,18 +95,24 @@ export function RevenueAnalysis() {
       where('role', '==', 'student')
     );
   }, [firestore, centerId]);
-  
   const { data: rawMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery);
 
-  // 학생 프로필 정보 조회
+  // 2. 학생 프로필 정보 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'students');
   }, [firestore, centerId]);
   const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery);
 
+  // 3. 실시간 좌석 구역 정보 조회
+  const attendanceQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'attendanceCurrent');
+  }, [firestore, centerId]);
+  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
+
   const businessMetrics = useMemo(() => {
-    if (!rawMembers) return null;
+    if (!rawMembers || !attendanceList) return null;
 
     const members = [...rawMembers].sort((a, b) => {
       const timeA = a.joinedAt?.toMillis() || 0;
@@ -117,7 +123,6 @@ export function RevenueAnalysis() {
     const activeMembers = members.filter(m => m.status === 'active');
     const withdrawnMembers = members.filter(m => m.status === 'withdrawn');
     
-    // 수강료 데이터 보정 및 합산
     let totalActualRevenue = 0;
     let totalPotentialRevenue = 0;
     let tutoringDiscountTotal = 0;
@@ -138,36 +143,46 @@ export function RevenueAnalysis() {
     const totalDiscountAmount = totalPotentialRevenue - totalActualRevenue;
     const discountDependencyRate = totalPotentialRevenue > 0 ? (totalDiscountAmount / totalPotentialRevenue) * 100 : 0;
 
-    // --- 좌석 구역별 분석 ---
-    const zoneData: Record<string, { count: number, revenue: number, potential: number }> = {
-      'A존 (Focus)': { count: 0, revenue: 0, potential: 0 },
-      'B존 (Standard)': { count: 0, revenue: 0, potential: 0 },
-      '자유석 (Flex)': { count: 0, revenue: 0, potential: 0 },
-    };
+    // --- 동적 좌석 구역별 분석 ---
+    const zoneData: Record<string, { count: number, revenue: number, potential: number }> = {};
 
+    // 1. 모든 좌석 정보를 순회하며 구역 초기화
+    attendanceList.forEach(seat => {
+      if (seat.type === 'aisle') return;
+      const zoneName = seat.seatZone || '자유석 (Flex)';
+      if (!zoneData[zoneName]) {
+        zoneData[zoneName] = { count: 0, revenue: 0, potential: 0 };
+      }
+    });
+
+    // 2. 현재 재원생의 좌석 정보를 바탕으로 수익 합산
     activeMembers.forEach(m => {
       const profile = studentsProfiles?.find(p => p.id === m.id);
       const baseFee = profile?.grade?.includes('N수생') ? 540000 : 390000;
       const actualFee = m.monthlyFee ?? baseFee;
-      const seatNo = profile?.seatNo || 0;
       
-      let zone = '자유석 (Flex)';
-      if (seatNo > 0 && seatNo <= 30) zone = 'A존 (Focus)';
-      else if (seatNo > 30) zone = 'B존 (Standard)';
+      // 해당 학생이 배정된 좌석의 실시간 구역 정보를 가져옴
+      const seat = attendanceList.find(a => a.studentId === m.id);
+      const zoneName = seat?.seatZone || '자유석 (Flex)';
 
-      if (zoneData[zone]) {
-        zoneData[zone].count++;
-        zoneData[zone].revenue += actualFee;
-        zoneData[zone].potential += baseFee;
+      if (!zoneData[zoneName]) {
+        zoneData[zoneName] = { count: 0, revenue: 0, potential: 0 };
       }
+      
+      zoneData[zoneName].count++;
+      zoneData[zoneName].revenue += actualFee;
+      zoneData[zoneName].potential += baseFee;
     });
 
-    const zoneChartData = Object.entries(zoneData).map(([name, data]) => ({
-      name,
-      revenue: data.revenue,
-      arpu: data.count > 0 ? Math.round(data.revenue / data.count) : 0,
-      discountRate: data.potential > 0 ? Math.round(((data.potential - data.revenue) / data.potential) * 100) : 0
-    }));
+    const zoneChartData = Object.entries(zoneData)
+      .map(([name, data]) => ({
+        name,
+        revenue: data.revenue,
+        count: data.count,
+        arpu: data.count > 0 ? Math.round(data.revenue / data.count) : 0,
+        discountRate: data.potential > 0 ? Math.round(((data.potential - data.revenue) / data.potential) * 100) : 0
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
 
     // --- 가격 탄력성 가설 분석 ---
     const discountGroup = activeMembers.filter(m => m.tutoringDiscount || m.siblingDiscount);
@@ -194,7 +209,7 @@ export function RevenueAnalysis() {
       allMembers: members,
       registrationTrend: registrationTrend(members)
     };
-  }, [rawMembers, studentsProfiles]);
+  }, [rawMembers, studentsProfiles, attendanceList]);
 
   function registrationTrend(members: CenterMembership[]) {
     const now = new Date();
@@ -277,7 +292,7 @@ export function RevenueAnalysis() {
           <CardHeader className="p-8 pb-2"><p className={cn("text-[10px] font-black uppercase tracking-widest", activeDrillDown === 'zones' ? "text-white/60" : "text-muted-foreground")}>좌석별 수익성</p></CardHeader>
           <CardContent className="p-8 pt-0"><h3 className="text-4xl font-black tracking-tighter">Inventory<span className="text-lg opacity-40 ml-2">Efficiency</span></h3>
             <div className="flex items-center justify-between mt-6">
-              <div className="flex items-center gap-2 text-[10px] font-bold"><Map className="h-3 w-3 opacity-40" />구역별 최적화</div>
+              <div className="flex items-center gap-2 text-[10px] font-bold"><Map className="h-3 w-3 opacity-40" />설정된 구역 기반</div>
               <ChevronRight className={cn("h-5 w-5 transition-all", activeDrillDown === 'zones' ? "rotate-90" : "opacity-20")} />
             </div>
           </CardContent>
@@ -303,17 +318,20 @@ export function RevenueAnalysis() {
           <CardHeader className="bg-white/50 border-b border-blue-100 p-8">
             <div className="flex items-center gap-3">
               <div className="bg-blue-500 p-2 rounded-xl shadow-lg shadow-blue-200"><LayoutGrid className="h-5 w-5 text-white" /></div>
-              <div className="space-y-0.5"><CardTitle className="text-2xl font-black tracking-tighter text-blue-700">공간별 수익 기여도 분석</CardTitle><CardDescription className="text-[10px] font-bold uppercase tracking-widest text-blue-600/60">Revenue per Seat Zone & Inventory Policy</CardDescription></div>
+              <div className="space-y-0.5"><CardTitle className="text-2xl font-black tracking-tighter text-blue-700">설정 구역별 수익 기여도</CardTitle><CardDescription className="text-[10px] font-bold uppercase tracking-widest text-blue-600/60">Revenue per Configured Seat Zone</CardDescription></div>
             </div>
           </CardHeader>
           <CardContent className="p-8"><div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-            {businessMetrics.zoneChartData.map((zone) => (
+            {businessMetrics.zoneChartData.length === 0 ? (
+              <div className="col-span-3 py-20 text-center opacity-20 italic font-black text-sm">관제 화면에서 좌석별 구역을 설정해 주세요.</div>
+            ) : businessMetrics.zoneChartData.map((zone) => (
               <Card key={zone.name} className="rounded-2xl border-none shadow-sm bg-white p-6 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Map className="h-12 w-12" /></div>
                 <p className="text-[10px] font-black text-muted-foreground uppercase mb-4">{zone.name}</p>
                 <div className="space-y-4">
                   <div><span className="text-[10px] font-bold opacity-40 block uppercase">Average Revenue</span><span className="text-2xl font-black text-blue-600">₩{zone.arpu.toLocaleString()}</span></div>
                   <div className="pt-4 border-t border-dashed">
+                    <div className="flex justify-between items-center mb-1.5"><span className="text-[9px] font-black uppercase text-muted-foreground">Active Seats</span><span className="text-xs font-black text-primary">{zone.count}명</span></div>
                     <div className="flex justify-between items-center mb-1.5"><span className="text-[9px] font-black uppercase text-muted-foreground">Discount Rate</span><span className="text-xs font-black text-primary">{zone.discountRate}%</span></div>
                     <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${zone.discountRate}%` }} /></div>
                   </div>
@@ -406,10 +424,10 @@ export function RevenueAnalysis() {
                     const profile = studentsProfiles?.find(p => p.id === student.id);
                     const basePrice = profile?.grade?.includes('N수생') ? 540000 : 390000;
                     const finalFee = student.monthlyFee !== undefined ? student.monthlyFee : basePrice;
-                    const seatNo = profile?.seatNo || 0;
-                    let zone = 'Flex';
-                    if (seatNo > 0 && seatNo <= 30) zone = 'A';
-                    else if (seatNo > 30) zone = 'B';
+                    
+                    // 해당 학생의 실시간 좌석 정보를 통해 설정된 구역을 가져옴
+                    const seat = attendanceList?.find(a => a.studentId === student.id);
+                    const zone = seat?.seatZone || 'Flex';
 
                     return (
                       <TableRow key={student.id} className="hover:bg-muted/5 transition-all duration-300 h-24 group">
@@ -420,7 +438,12 @@ export function RevenueAnalysis() {
                           </Link>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn("font-black text-[9px] border-2 uppercase", zone === 'A' ? "border-blue-200 text-blue-600 bg-blue-50" : zone === 'B' ? "border-emerald-200 text-emerald-600 bg-emerald-50" : "border-slate-200 text-slate-600 bg-slate-50")}>{zone} ZONE</Badge>
+                          <Badge variant="outline" className={cn(
+                            "font-black text-[9px] border-2 uppercase", 
+                            zone.includes('A') ? "border-blue-200 text-blue-600 bg-blue-50" : 
+                            zone.includes('B') ? "border-emerald-200 text-emerald-600 bg-emerald-50" : 
+                            "border-slate-200 text-slate-600 bg-slate-50"
+                          )}>{zone}</Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

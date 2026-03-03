@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -48,7 +47,8 @@ import {
   FileSearch,
   ChevronLeft,
   CheckCircle2,
-  Eye
+  Eye,
+  MapPin
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useAppContext, TIERS } from '@/contexts/app-context';
@@ -413,19 +413,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
 
         if (sessionSeconds > 0) {
-          // 1. 학습 로그 업데이트
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
           batch.set(logRef, { totalMinutes: increment(sessionMinutes), studentId, centerId, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
 
-          // 2. 세션 추가
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
           batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
 
-          // 3. 일일 통계 업데이트
           const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
           batch.set(statRef, { totalStudyMinutes: increment(sessionMinutes), studentId, centerId, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
 
-          // 4. 성장 스탯 및 LP 업데이트 (부스트 계산 포함)
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
           const progressSnap = await getDoc(progressRef);
           
@@ -468,6 +464,27 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleUpdateZone = async (zone: string) => {
+    if (!firestore || !centerId || !selectedSeat) return;
+    setIsSaving(true);
+    try {
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
+      await updateDoc(seatRef, { seatZone: zone, updatedAt: serverTimestamp() });
+      
+      if (selectedSeat.studentId) {
+        const studentRef = doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId);
+        await updateDoc(studentRef, { seatZone: zone, updatedAt: serverTimestamp() });
+      }
+      
+      toast({ title: "구역 설정이 완료되었습니다." });
+      setSelectedSeat({ ...selectedSeat, seatZone: zone });
+    } catch (e) {
+      toast({ variant: "destructive", title: "설정 실패" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveGridSettings = async () => {
     if (!firestore || !centerId) return;
     setIsSaving(true);
@@ -504,7 +521,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
-      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { seatNo: selectedSeat.seatNo, updatedAt: serverTimestamp() });
+      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { 
+        seatNo: selectedSeat.seatNo, 
+        seatZone: selectedSeat.seatZone || null,
+        updatedAt: serverTimestamp() 
+      });
       batch.set(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { studentId: student.id, status: 'absent', type: 'seat', updatedAt: serverTimestamp() }, { merge: true });
       await batch.commit();
       toast({ title: `${student.name} 학생 배정 완료` });
@@ -709,6 +730,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           isEditMode && isAisle && "border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20"
                         )}>
                           {!isAisle && <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAway ? "opacity-60" : "opacity-40")}>{seatNo}</span>}
+                          {seat?.seatZone && !isAisle && (
+                            <Badge variant="outline" className={cn("absolute top-1 right-1 h-3.5 px-1 border-none font-black text-[6px]", isStudying || isAway ? "bg-white/20 text-white" : "bg-primary/5 text-primary/40")}>{seat.seatZone.charAt(0)}</Badge>
+                          )}
                           {isAisle ? (isEditMode && <MapIcon className="h-3 w-3 opacity-40" />) : student ? (
                             <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
@@ -815,6 +839,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">SEAT {selectedSeat.seatNo}</Badge>
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.status}</Badge>
+                          {selectedSeat.seatZone && <Badge className="bg-white text-primary border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.seatZone}</Badge>}
                         </div>
                       </DialogHeader>
                     </div>
@@ -844,9 +869,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             )}
 
                             {isEditMode ? (
-                              <div className="grid gap-3">
-                                <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">좌석 배정 해제</Button>
-                                <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="w-full h-12 rounded-xl font-black gap-2 border-2"><ArrowRightLeft className="h-4 w-4" /> 통로로 전환하기</Button>
+                              <div className="grid gap-4">
+                                <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
+                                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
+                                  <Select value={selectedSeat.seatZone || 'Flex'} onValueChange={handleUpdateZone}>
+                                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
+                                      <SelectValue placeholder="구역 선택" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                                      <SelectItem value="A존 (Focus)" className="font-bold">A존 (Focus)</SelectItem>
+                                      <SelectItem value="B존 (Standard)" className="font-bold">B존 (Standard)</SelectItem>
+                                      <SelectItem value="고정석 (Fixed)" className="font-bold">고정석 (Fixed)</SelectItem>
+                                      <SelectItem value="자유석 (Flex)" className="font-bold">자유석 (Flex)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="grid gap-3">
+                                  <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">좌석 배정 해제</Button>
+                                  <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="w-full h-12 rounded-xl font-black gap-2 border-2"><ArrowRightLeft className="h-4 w-4" /> 통로로 전환하기</Button>
+                                </div>
                               </div>
                             ) : (
                               <div className="grid grid-cols-2 gap-4">
@@ -980,7 +1021,29 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">GRID ID: {selectedSeat?.seatNo}</p></DialogHeader>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-white space-y-6">
-            {isEditMode && <div className="p-4 rounded-2xl bg-muted/30 border-2 border-dashed border-primary/20"><Button onClick={handleToggleCellType} className={cn("w-full h-12 rounded-xl font-black gap-2 transition-all", selectedSeat?.type === 'aisle' ? "bg-primary text-white" : "bg-white text-primary border-2")}><ArrowRightLeft className="h-4 w-4" />{selectedSeat?.type === 'aisle' ? '좌석으로 사용' : '통로로 전환'}</Button></div>}
+            {isEditMode && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-muted/30 border-2 border-dashed border-primary/20"><Button onClick={handleToggleCellType} className={cn("w-full h-12 rounded-xl font-black gap-2 transition-all", selectedSeat?.type === 'aisle' ? "bg-primary text-white" : "bg-white text-primary border-2")}><ArrowRightLeft className="h-4 w-4" />{selectedSeat?.type === 'aisle' ? '좌석으로 사용' : '통로로 전환'}</Button></div>
+                
+                {selectedSeat?.type !== 'aisle' && (
+                  <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
+                    <Select value={selectedSeat?.seatZone || '자유석 (Flex)'} onValueChange={handleUpdateZone}>
+                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
+                        <SelectValue placeholder="구역 선택" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-2xl">
+                        <SelectItem value="A존 (Focus)" className="font-bold">A존 (Focus)</SelectItem>
+                        <SelectItem value="B존 (Standard)" className="font-bold">B존 (Standard)</SelectItem>
+                        <SelectItem value="고정석 (Fixed)" className="font-bold">고정석 (Fixed)</SelectItem>
+                        <SelectItem value="자유석 (Flex)" className="font-bold">자유석 (Flex)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {selectedSeat?.type !== 'aisle' && (
               <div className="space-y-4">
                 <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" /><Input placeholder="이름 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-11 text-sm font-bold" /></div>
