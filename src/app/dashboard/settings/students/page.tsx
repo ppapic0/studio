@@ -166,14 +166,16 @@ export default function StudentAccountManagementPage() {
         toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
         setIsEditModalOpen(false);
       } else {
-        throw new Error(result.data?.message || "수정 작업 중 서버 응답 오류가 발생했습니다.");
+        throw new Error(result.data?.message || "수정 작업 중 오류가 발생했습니다.");
       }
     } catch (e: any) {
-      console.error("[Update Student Error]", e);
+      console.error("[Update Student Error Full]", e);
+      // internal 에러 발생 시 상세 메시지 표시
+      const errorMessage = e.details?.message || e.message || "서버 내부 오류가 발생했습니다.";
       toast({ 
         variant: "destructive", 
         title: "수정 실패", 
-        description: e.message || "서버 내부 오류가 발생했습니다." 
+        description: errorMessage
       });
     } finally {
       setIsUpdating(null);
@@ -191,14 +193,15 @@ export default function StudentAccountManagementPage() {
       if (result.data?.ok) {
         toast({ title: "삭제 완료", description: result.data.message });
       } else {
-        throw new Error(result.data?.message || "삭제 작업 중 서버 응답 오류가 발생했습니다.");
+        throw new Error(result.data?.message || "삭제 작업 중 오류가 발생했습니다.");
       }
     } catch (e: any) {
-      console.error("[Delete Student Error]", e);
+      console.error("[Delete Student Error Full]", e);
+      const errorMessage = e.details?.message || e.message || "계정 삭제 중 오류가 발생했습니다.";
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
+        description: errorMessage
       });
     } finally {
       setIsDeleting(null);

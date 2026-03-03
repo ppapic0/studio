@@ -2,11 +2,13 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
+// Firebase Admin SDK 초기화 (싱글톤 보장)
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
 
 const db = admin.firestore();
+const auth = admin.auth();
 const region = "asia-northeast3";
 
 /**
@@ -26,6 +28,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
   const callerId = context.auth.uid;
 
   try {
+    // 권한 확인
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     const callerData = callerMemberSnap.data();
     
@@ -33,9 +36,10 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
     }
 
+    // 1. Auth 계정 생성
     let userRecord;
     try {
-      userRecord = await admin.auth().createUser({
+      userRecord = await auth.createUser({
         email,
         password,
         displayName,
@@ -45,15 +49,13 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       if (authError.code === 'auth/email-already-exists') {
         throw new functions.https.HttpsError("already-exists", "이미 가입된 이메일 주소입니다.");
       }
-      if (authError.code === 'auth/invalid-password') {
-        throw new functions.https.HttpsError("invalid-argument", "비밀번호가 너무 취약합니다.");
-      }
-      throw new functions.https.HttpsError("internal", `계정 생성 중 오류: ${authError.message}`);
+      throw new functions.https.HttpsError("invalid-argument", `인증 계정 생성 실패: ${authError.message}`);
     }
 
     const uid = userRecord.uid;
     const timestamp = admin.firestore.Timestamp.now();
 
+    // 2. DB 데이터 일괄 생성 (트랜잭션)
     await db.runTransaction(async (transaction) => {
       transaction.set(db.doc(`users/${uid}`), {
         id: uid,
@@ -106,9 +108,9 @@ export const registerStudent = functions.region(region).https.onCall(async (data
     return { ok: true, uid, message: "학생 등록이 완료되었습니다." };
 
   } catch (error: any) {
-    console.error("[RegisterStudent Error]", error);
+    console.error("[RegisterStudent Global Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류가 발생했습니다.");
+    throw new functions.https.HttpsError("internal", `서버 오류: ${error.message}`);
   }
 });
 
@@ -130,17 +132,19 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     }
 
     // 1. Auth 업데이트 (비밀번호/이름)
-    try {
-      const authUpdates: any = {};
-      if (password && password.length >= 6) authUpdates.password = password;
-      if (displayName) authUpdates.displayName = displayName;
-      
-      if (Object.keys(authUpdates).length > 0) {
-        await admin.auth().updateUser(studentId, authUpdates);
+    if (password || displayName) {
+      try {
+        const authUpdates: any = {};
+        if (password && password.length >= 6) authUpdates.password = password;
+        if (displayName) authUpdates.displayName = displayName;
+        
+        if (Object.keys(authUpdates).length > 0) {
+          await auth.updateUser(studentId, authUpdates);
+        }
+      } catch (authError: any) {
+        console.error("[Auth Update Error]", authError);
+        throw new functions.https.HttpsError("invalid-argument", `인증 정보 수정 실패: ${authError.message}`);
       }
-    } catch (authError: any) {
-      console.error("[Auth Update Error]", authError);
-      throw new functions.https.HttpsError("invalid-argument", `인증 정보 수정 실패: ${authError.message}`);
     }
 
     // 2. DB 업데이트
@@ -173,7 +177,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   } catch (error: any) {
     console.error("[updateStudentAccount Global Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message || "데이터베이스 처리 중 오류가 발생했습니다.");
+    throw new functions.https.HttpsError("internal", `데이터베이스 처리 오류: ${error.message}`);
   }
 });
 
@@ -203,9 +207,9 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    // 2. Auth 유저 삭제 (실패해도 Firestore 정리는 진행하도록 유연하게 대처)
+    // 2. Auth 유저 삭제
     try {
-      await admin.auth().deleteUser(studentId);
+      await auth.deleteUser(studentId);
     } catch (authError: any) {
       console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or error:`, authError.message);
       // 이미 삭제된 경우(auth/user-not-found) 등은 무시하고 DB 정리를 진행합니다.
@@ -231,7 +235,7 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   } catch (error: any) {
     console.error("[DeleteStudent Global Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message || "서버 내부 오류가 발생했습니다.");
+    throw new functions.https.HttpsError("internal", `영구 삭제 중 오류: ${error.message}`);
   }
 });
 
@@ -297,8 +301,8 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       return { ok: true, message: "센터 가입이 완료되었습니다." };
     });
   } catch (error: any) {
-    console.error("[RedeemInviteCode Error]", error);
+    console.error("[RedeemInviteCode Global Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", error.message);
+    throw new functions.https.HttpsError("internal", `초대 코드 처리 오류: ${error.message}`);
   }
 });

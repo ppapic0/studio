@@ -1,4 +1,3 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -18,6 +17,7 @@ import { getFunctions, Functions } from 'firebase/functions';
 
 /**
  * 프로젝트 전역 싱글톤 Firebase 서비스 인스턴스
+ * Firebase Studio 환경에서는 에뮬레이터를 사용하지 않고 프로덕션 서비스를 직접 연결합니다.
  */
 let firebaseApp: FirebaseApp | null = null;
 let firestore: Firestore | null = null;
@@ -39,9 +39,7 @@ function ensureApp(): FirebaseApp {
 function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
-  // INTERNAL ASSERTION FAILED 에러를 방지하기 위해 로컬 캐시 설정을 단순화합니다.
-  // 특히 Workstation 환경에서 multi-tab manager가 IndexedDB와 충돌을 일으키는 경우가 많아 
-  // 다중 탭 관리자 대신 기본 지속성 캐시 설정만 사용하며, 네트워크 안정성을 위해 롱 폴링을 유지합니다.
+  // INTERNAL ASSERTION FAILED 에러 방지를 위해 로컬 캐시 및 롱 폴링 설정 유지
   firestore = initializeFirestore(app, {
     localCache: persistentLocalCache(),
     experimentalForceLongPolling: true,
@@ -58,6 +56,7 @@ function ensureAuth(app: FirebaseApp): Auth {
 
 function ensureFunctions(app: FirebaseApp): Functions {
   if (functions) return functions;
+  // 센터가 위치한 서울 리전(asia-northeast3)을 명시적으로 설정
   functions = getFunctions(app, 'asia-northeast3');
   return functions;
 }
