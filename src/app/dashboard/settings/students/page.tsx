@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, query, where, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { 
   Search, 
@@ -144,9 +144,8 @@ export default function StudentAccountManagementPage() {
     
     setIsUpdating(selectedStudentForEdit.id);
     try {
-      // 1. 서버 함수 호출
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
-      const result: any = await updateFn({
+      await updateFn({
         studentId: selectedStudentForEdit.id,
         centerId,
         displayName: editForm.displayName.trim(),
@@ -156,15 +155,10 @@ export default function StudentAccountManagementPage() {
         parentLinkCode: editForm.parentLinkCode.trim()
       });
 
-      if (result.data?.ok) {
-        toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
-        setIsEditModalOpen(false);
-      } else {
-        throw new Error(result.data?.message || "수정 중 원인 모를 오류가 발생했습니다.");
-      }
+      toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
+      setIsEditModalOpen(false);
     } catch (e: any) {
       console.error("[Update Student Error]", e);
-      // 서버에서 반환한 구체적인 에러 메시지 표시
       toast({ 
         variant: "destructive", 
         title: "수정 실패", 
@@ -181,13 +175,8 @@ export default function StudentAccountManagementPage() {
     setIsDeleting(studentId);
     try {
       const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
-      const result: any = await deleteFn({ studentId, centerId });
-      
-      if (result.data?.ok) {
-        toast({ title: "삭제 완료", description: result.data.message });
-      } else {
-        throw new Error(result.data?.message || "삭제 작업 중 오류가 발생했습니다.");
-      }
+      await deleteFn({ studentId, centerId });
+      toast({ title: "삭제 완료", description: "계정이 영구 삭제되었습니다." });
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
       toast({ 
@@ -204,18 +193,20 @@ export default function StudentAccountManagementPage() {
     if (!firestore || !centerId) return;
     setIsUpdating(studentId);
     try {
-      const batch = writeBatch(firestore);
       const finalClass = newClassName === 'none' ? '' : newClassName;
       
       const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
       const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
 
-      batch.update(memberRef, { className: finalClass, updatedAt: serverTimestamp() });
-      batch.update(userCenterRef, { className: finalClass, updatedAt: serverTimestamp() });
-      batch.update(studentRef, { className: finalClass, updatedAt: serverTimestamp() });
+      const updateData = { className: finalClass, updatedAt: serverTimestamp() };
 
-      await batch.commit();
+      await Promise.all([
+        setDoc(memberRef, updateData, { merge: true }),
+        setDoc(userCenterRef, updateData, { merge: true }),
+        setDoc(studentRef, updateData, { merge: true })
+      ]);
+
       toast({ title: "반 이동 완료" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "이동 실패", description: e.message });
@@ -375,7 +366,6 @@ export default function StudentAccountManagementPage() {
         </CardContent>
       </Card>
 
-      {/* 계정 정보 수정 모달 */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "w-[95vw] h-[85vh] rounded-[2rem]" : "sm:max-w-lg max-h-[90vh]")}>
           <div className="bg-primary p-10 text-white relative shrink-0">

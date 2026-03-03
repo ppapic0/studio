@@ -3,18 +3,23 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
 // Firebase Admin SDK 초기화 (싱글톤 보장)
-if (admin.apps.length === 0) {
-  admin.initializeApp();
+function getAdminApp() {
+  if (admin.apps.length === 0) {
+    return admin.initializeApp();
+  }
+  return admin.app();
 }
 
-const db = admin.firestore();
-const auth = admin.auth();
 const region = "asia-northeast3";
 
 /**
  * 선생님이 학생 계정을 직접 생성하고 센터에 등록하는 함수
  */
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
+  getAdminApp();
+  const db = admin.firestore();
+  const auth = admin.auth();
+
   // 1. 인증 체크
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
@@ -101,6 +106,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
         level: 1,
         stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
         totalLpEarned: 0,
+        lastResetAt: timestamp,
         updatedAt: timestamp,
       });
     });
@@ -118,6 +124,10 @@ export const registerStudent = functions.region(region).https.onCall(async (data
  * 학생의 계정 정보(비밀번호 등)를 업데이트하는 함수
  */
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
+  getAdminApp();
+  const db = admin.firestore();
+  const auth = admin.auth();
+
   // 1. 인증 체크
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
@@ -191,6 +201,10 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
  * 학생 계정을 영구 삭제하는 함수 (관리자 전용)
  */
 export const deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
+  getAdminApp();
+  const db = admin.firestore();
+  const auth = admin.auth();
+
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   }
@@ -216,7 +230,7 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
     try {
       await auth.deleteUser(studentId);
     } catch (authError: any) {
-      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or error:`, authError.message);
+      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found 또는 이미 삭제됨:`, authError.message);
     }
 
     // 3. Firestore 데이터 일괄 정리
@@ -247,6 +261,9 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
  * 초대 코드 사용 및 센터 가입 함수
  */
 export const redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
+  getAdminApp();
+  const db = admin.firestore();
+
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
   
   const { code } = data;

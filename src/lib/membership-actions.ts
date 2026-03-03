@@ -1,3 +1,4 @@
+
 import { 
   doc, 
   collection, 
@@ -34,16 +35,13 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
   ];
 
   const today = new Date();
-  const todayKey = format(today, 'yyyy-MM-dd');
-  const weekKey = format(today, "yyyy-'W'II");
-  const periodKey = format(today, 'yyyy-MM');
+  const timestamp = serverTimestamp();
 
   // 학생별 시퀀셜 데이터 생성
   for (const sInfo of testStudents) {
     const sUid = sInfo.id;
     const memberRef = doc(db, 'centers', centerId, 'members', sUid);
     const userCenterRef = doc(db, 'userCenters', sUid, 'centers', centerId);
-    const timestamp = serverTimestamp();
 
     batch.set(memberRef, {
       id: sUid, centerId, role: 'student', status: 'active', className: sInfo.class,
@@ -58,7 +56,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     const studentProfileRef = doc(db, 'centers', centerId, 'students', sUid);
     batch.set(studentProfileRef, {
       id: sUid, name: sInfo.name, className: sInfo.class, schoolName: '트랙고등학교',
-      grade: '3학년', seatNo: 0, targetDailyMinutes: 360, createdAt: timestamp,
+      grade: '3학년', seatNo: 0, targetDailyMinutes: 360, createdAt: timestamp, updatedAt: timestamp,
     }, { merge: true });
 
     // 최근 14일간의 개인 학습 로그 생성
@@ -85,7 +83,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
     batch.set(progressRef, {
       seasonLp: 5000, level: 5, stats: { focus: 50, consistency: 60, achievement: 40, resilience: 55 },
-      totalLpEarned: 15000, updatedAt: timestamp
+      totalLpEarned: 15000, lastResetAt: timestamp, updatedAt: timestamp
     }, { merge: true });
   }
 
@@ -95,7 +93,6 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     const dateStr = format(date, 'yyyy-MM-dd');
     const kpiRef = doc(db, 'centers', centerId, 'kpiDaily', dateStr);
     
-    // 센터 전체 평균 6~7시간 몰입 가정
     const estimatedTotalMinutes = testStudents.length * (360 + Math.floor(Math.random() * 120));
     
     batch.set(kpiRef, {
