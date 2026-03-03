@@ -363,9 +363,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive && startTime) {
-      setLocalSeconds(Math.floor((Date.now() - startTime) / 1000));
-      interval = setInterval(() => { setLocalSeconds(Math.floor((Date.now() - startTime) / 1000)); }, 1000);
-    } else { setLocalSeconds(0); }
+      const updateSeconds = () => {
+        const diff = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+        setLocalSeconds(diff);
+      };
+      updateSeconds();
+      interval = setInterval(updateSeconds, 1000);
+    } else { 
+      setLocalSeconds(0); 
+    }
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
@@ -421,18 +427,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
     const centerId = activeMembership.id;
-    const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
+    const attendanceCurrentRef = collection(firestore, centerId ? `centers/${centerId}/attendanceCurrent` : '');
     
     // 학생의 좌석 정보를 찾기 위해 현재 좌석 목록 조회
     const studentProfileRef = doc(firestore, 'centers', centerId, 'students', user.uid);
     const profileSnap = await getDoc(studentProfileRef);
     const seatNo = profileSnap.exists() ? profileSnap.data()?.seatNo : 0;
     const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
-    const seatRef = doc(attendanceCurrentRef, seatId);
+    const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId);
 
     if (isTimerActive) {
       const nowTs = Date.now();
-      const sessionSeconds = Math.floor((nowTs - (startTime || nowTs)) / 1000);
+      const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
       // 1초라도 공부하면 1분으로 기록되도록 Math.ceil(올림) 사용
       const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
       
@@ -508,7 +514,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       if (seatNo > 0) {
         batch.update(seatRef, { 
           status: 'studying', 
-          lastCheckInAt: serverTimestamp(), 
+          lastCheckInAt: Timestamp.fromMillis(nowTs), // 즉각적인 동기화를 위해 현재 클라이언트 시간을 전송
           updatedAt: serverTimestamp() 
         });
       }
@@ -556,6 +562,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const m = totalMinutes % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
 
+  const formatTimer = (totalSecs: number) => {
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-2.5" : "gap-10")}>
       <section className={cn(
@@ -584,7 +596,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-xl border border-white/10 shadow-2xl px-4 py-2", isMobile ? "w-full" : "")}>
                 <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
                 <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
-                  {Math.max(1, Math.ceil(localSeconds / 60)).toString().padStart(2, '0')}:00
+                  {formatTimer(localSeconds)}
                 </span>
               </div>
             )}

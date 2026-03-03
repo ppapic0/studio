@@ -203,30 +203,37 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { data: kpiHistory } = useCollection<KpiDaily>(historicalLogsQuery, { enabled: isActive });
 
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
-    if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
+    if (!mounted) return { session: '00:00', total: '0h 0m', isStudying: false, totalMins: 0, sessionSecs: 0 };
     
     const studentStat = todayStats?.find(s => s.studentId === studentId);
     const cumulativeMinutes = studentStat?.totalStudyMinutes || 0;
     
-    let sessionMinutes = 0;
+    let sessionSeconds = 0;
     if (status === 'studying' && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
-      // 1초라도 공부하면 1분으로 기록되도록 Math.ceil(올림) 사용
-      sessionMinutes = Math.max(1, Math.ceil((now - startTime) / 60000));
+      sessionSeconds = Math.max(0, Math.floor((now - startTime) / 1000));
     }
 
+    const sessionMinutes = Math.ceil(sessionSeconds / 60);
     const totalMinutes = cumulativeMinutes + Math.max(0, sessionMinutes);
 
-    const formatTime = (mins: number) => {
+    const formatSession = (secs: number) => {
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const formatTotal = (mins: number) => {
       const hh = Math.floor(mins / 60);
       const mm = mins % 60;
       return `${hh}h ${mm}m`;
     };
 
     return {
-      session: formatTime(Math.max(0, sessionMinutes)),
-      total: formatTime(totalMinutes),
+      session: formatSession(sessionSeconds),
+      total: formatTotal(totalMinutes),
       totalMins: totalMinutes,
+      sessionSecs: sessionSeconds,
       isStudying: status === 'studying'
     };
   };
@@ -643,7 +650,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           isFilteredOut ? "opacity-20 grayscale border-transparent bg-muted/10" : 
                           isAisle ? "bg-transparent border-transparent text-transparent hover:bg-muted/10" : 
                           isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" : 
-                          isAway ? "bg-amber-500 border-amber-600 text-white" : 
+                          isAway ? "bg-amber-50 border-amber-600 text-white" : 
                           student ? "bg-white border-primary/30 text-primary" : "bg-white border-primary/40 text-primary/5 hover:border-primary/60",
                           isEditMode && isAisle && "border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20"
                         )}>
@@ -809,12 +816,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                         <div className="flex items-center gap-3">
                                           <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center"><Zap className="h-4 w-4 fill-current text-white" /></div>
                                           <div className="grid leading-tight">
-                                            <span className="font-black text-xs">{format(selectedSeat.lastCheckInAt.toDate(), 'HH:mm')} ~ 진행 중</span>
+                                            <span className="font-black text-xs">{format(selectedSeat.lastCheckInAt.toDate(), 'HH:mm:ss')} ~ 진행 중</span>
                                             <span className="text-[8px] font-bold text-white/60 uppercase">Active Session</span>
                                           </div>
                                         </div>
                                         <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 h-6">
-                                          {Math.max(1, Math.ceil((now - selectedSeat.lastCheckInAt.toMillis()) / 60000))}분째
+                                          {timeInfo?.session}
                                         </Badge>
                                       </div>
                                     )}
