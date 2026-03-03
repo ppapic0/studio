@@ -96,7 +96,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery, { enabled: isActive });
 
-  // 사용 가능한 반 목록 추출 (학생 멤버십 + 초대 코드 설정 조사)
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
     activeMembers?.forEach(m => { 
@@ -115,15 +114,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 실시간 학습 로그 집계
+  // 4. 실시간 학습 로그 집계 (인덱스 에러 방지: centerId로만 필터링 후 클라이언트 측 필터링)
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collectionGroup(firestore, 'days'),
-      where('centerId', '==', centerId),
-      where('dateKey', 'in', [todayKey, yesterdayKey])
+      where('centerId', '==', centerId)
     );
-  }, [firestore, centerId, todayKey, yesterdayKey]);
+  }, [firestore, centerId]);
   const { data: centerLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
 
   // 5. 데일리 리포트 데이터

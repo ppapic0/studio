@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -169,13 +170,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 실시간 및 과거 로그 집계 (복잡한 인덱스 요구사항을 피하기 위해 단순화된 쿼리 사용)
   const historicalLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collectionGroup(firestore, 'days'),
       where('centerId', '==', centerId)
-      // 인덱스 문제를 방지하기 위해 orderBy와 dateKey 필터링을 최소화하거나 클라이언트에서 수행합니다.
     );
   }, [firestore, centerId]);
   
@@ -207,16 +206,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return historicalLogs?.filter(l => l.dateKey === todayKey) || [];
   }, [historicalLogs, todayKey]);
 
+  // 인덱스 에러 방지: orderBy 제거 후 클라이언트에서 정렬
   const recentReportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'dailyReports'),
-      where('status', '==', 'sent'),
-      orderBy('updatedAt', 'desc'),
-      limit(5)
+      where('status', '==', 'sent')
     );
   }, [firestore, centerId]);
-  const { data: recentReportsFeed } = useCollection<DailyReport>(recentReportsQuery, { enabled: isActive });
+  const { data: rawRecentReports } = useCollection<DailyReport>(recentReportsQuery, { enabled: isActive });
+
+  const recentReportsFeed = useMemo(() => {
+    if (!rawRecentReports) return [];
+    return [...rawRecentReports]
+      .sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [rawRecentReports]);
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -373,15 +378,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const sessionSnap = await getDocs(sessionQ);
       setSelectedStudentSessions(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession)));
 
+      // 인덱스 에러 방지: orderBy 제거 후 수동 정렬
       const reportQ = query(
         collection(firestore, 'centers', centerId, 'dailyReports'),
         where('studentId', '==', studentId),
-        where('status', '==', 'sent'),
-        orderBy('dateKey', 'desc'),
-        limit(5)
+        where('status', '==', 'sent')
       );
       const reportSnap = await getDocs(reportQ);
-      setSelectedStudentReports(reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport)));
+      const reports = reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport));
+      setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
 
       const historyQ = query(
         collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
