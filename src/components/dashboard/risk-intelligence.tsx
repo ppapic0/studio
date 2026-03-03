@@ -26,6 +26,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Link from 'next/link';
 
 export function RiskIntelligence() {
   const firestore = useFirestore();
