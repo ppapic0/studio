@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -40,7 +39,10 @@ import {
   Info,
   ShieldAlert,
   ArrowRight,
-  ClipboardCheck
+  ClipboardCheck,
+  UserCheck,
+  CalendarX,
+  UserMinus
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -69,17 +71,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-
-const TIERS = [
-  { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
-  { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
-  { name: '골드', min: 10000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
-  { name: '플래티넘', min: 15000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
-  { name: '다이아몬드', min: 20000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
-  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
-  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
-  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
-];
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -354,6 +346,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [localSeconds, setLocalSeconds] = useState(0);
   const isMobile = viewMode === 'mobile';
   
+  // 지각/결석 신청서 상태
+  const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
+  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [requestReason, setRequestReason] = useState('');
+  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+
   useEffect(() => { setToday(new Date()); }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
@@ -417,12 +415,73 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
+  const myRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+
+  const myRequests = useMemo(() => {
+    if (!rawRequests) return [];
+    return [...rawRequests]
+      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [rawRequests]);
+
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
+    if (requestReason.trim().length < 10) {
+      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
+      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
+      
+      const requestData: any = {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: requestReason.trim(),
+        status: 'requested',
+        penaltyApplied: isTodayRequest,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
+
+      if (isTodayRequest) {
+        const pointsToAdd = requestType === 'late' ? 3 : 5;
+        batch.update(progressRef!, {
+          penaltyPoints: increment(pointsToAdd),
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
+      }
+
+      await batch.commit();
+      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      setRequestReason('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
+
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
     const centerId = activeMembership.id;
-    
-    // 학생의 좌석 정보를 'studentId' 쿼리로 직접 조회
     const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
     const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
     const seatSnap = await getDocs(seatQuery);
@@ -763,11 +822,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   )}
 
                   <Button 
-                    onClick={() => {}} // 구현 예정
+                    onClick={handleRequestSubmit} 
+                    disabled={isRequestSubmitting || requestReason.length < 10} 
                     className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 active:scale-95 transition-all"
                   >
                     {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
                   </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
+                    <History className="h-3.5 w-3.5" /> 최근 신청 내역 (최근 5건)
+                  </h4>
+                  <div className="grid gap-2">
+                    {myRequests?.length === 0 ? (
+                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">신청 내역이 없습니다.</div>
+                    ) : (
+                      myRequests?.map(req => (
+                        <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>
+                              {req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}
+                            </div>
+                            <div className="grid leading-tight">
+                              <span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span>
+                            </div>
+                          </div>
+                          <Badge className={cn(
+                            "font-black text-[9px] border-none px-2",
+                            req.status === 'requested' ? "bg-muted text-muted-foreground" : 
+                            req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+                          )}>
+                            {req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -815,6 +907,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       penaltyPoints < 10 ? "text-emerald-500" : penaltyPoints < 20 ? "text-amber-500" : "text-rose-600"
                     )}>
                       {penaltyPoints}<span className="text-lg opacity-40 ml-1">점</span>
+                    </div>
+                    <div className="grid gap-1">
+                      <p className="font-black text-lg text-primary tracking-tight">
+                        {penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : penaltyPoints < 30 ? "주의 및 강등 위험 상태입니다. ⚠️" : "강등 및 즉시 면담 대상입니다. 🔥"}
+                      </p>
+                      {penaltyRate > 0 && (
+                        <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
+                          LP 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
+                        </Badge>
+                      )}
                     </div>
                   </Card>
                 </section>
