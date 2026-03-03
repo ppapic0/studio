@@ -211,7 +211,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let sessionMinutes = 0;
     if (status === 'studying' && lastCheckInAt) {
       const startTime = lastCheckInAt.toMillis();
-      sessionMinutes = Math.floor((now - startTime) / 60000);
+      // 1초라도 공부하면 1분으로 기록되도록 Math.ceil(올림) 사용
+      sessionMinutes = Math.max(1, Math.ceil((now - startTime) / 60000));
     }
 
     const totalMinutes = cumulativeMinutes + Math.max(0, sessionMinutes);
@@ -346,7 +347,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
     try {
-      // 1. 오늘의 세션 (병렬 로드)
+      // 1. 오늘의 세션
       const sessionRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
       const sessionSnap = await getDocs(sessionRef);
       const sessions = sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession));
@@ -363,7 +364,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         const data = d.data();
         return { 
           ...data, 
-          dateKey: data.dateKey || d.id 
+          dateKey: data.dateKey || d.id,
+          totalMinutes: Number(data.totalMinutes || 0)
         } as StudyLogDay;
       });
 
@@ -812,7 +814,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                           </div>
                                         </div>
                                         <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 h-6">
-                                          {Math.floor((now - selectedSeat.lastCheckInAt.toMillis()) / 60000)}분째
+                                          {Math.max(1, Math.ceil((now - selectedSeat.lastCheckInAt.toMillis()) / 60000))}분째
                                         </Badge>
                                       </div>
                                     )}
@@ -850,7 +852,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 selectedStudentHistory.map((hLog) => (
                                   <div key={hLog.dateKey} className="p-4 rounded-2xl bg-white border shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
                                     <div className="flex flex-col gap-0.5">
-                                      <span className="text-xs font-black text-primary">{format(new Date(hLog.dateKey), 'MM/dd (EEE)', {locale: ko})}</span>
+                                      <span className="text-xs font-black text-primary">{format(new Date(hLog.dateKey.replace(/-/g, '/')), 'MM/dd (EEE)', {locale: ko})}</span>
                                       <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Daily Log</span>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -874,7 +876,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <div className="grid gap-3">
                               {sessionsLoading ? (
-                                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-amber-500 opacity-20" /></div>
+                                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                               ) : selectedStudentReports.length === 0 ? (
                                 <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">발송된 리포트가 없습니다.</div>
                               ) : (

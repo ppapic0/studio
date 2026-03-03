@@ -421,8 +421,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
     const centerId = activeMembership.id;
-    // 실시간 좌석 동기화를 위해 현재 배정된 좌석 찾기
     const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
+    
+    // 학생의 좌석 정보를 찾기 위해 현재 좌석 목록 조회
     const studentProfileRef = doc(firestore, 'centers', centerId, 'students', user.uid);
     const profileSnap = await getDoc(studentProfileRef);
     const seatNo = profileSnap.exists() ? profileSnap.data()?.seatNo : 0;
@@ -431,12 +432,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     if (isTimerActive) {
       const nowTs = Date.now();
-      const sessionMinutes = Math.floor((nowTs - (startTime || nowTs)) / 60000);
+      const sessionSeconds = Math.floor((nowTs - (startTime || nowTs)) / 1000);
+      // 1초라도 공부하면 1분으로 기록되도록 Math.ceil(올림) 사용
+      const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
       
       const batch = writeBatch(firestore);
       const updateData: any = { updatedAt: serverTimestamp() };
       
-      if (sessionMinutes > 0) {
+      if (sessionSeconds > 0) {
         let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
         updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
@@ -548,7 +551,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   if (!isActive) return null;
-  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.floor(localSeconds / 60);
+  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.ceil(localSeconds / 60);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
@@ -581,7 +584,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-xl border border-white/10 shadow-2xl px-4 py-2", isMobile ? "w-full" : "")}>
                 <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
                 <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
-                  {Math.floor(localSeconds / 60).toString().padStart(2, '0')}:{(localSeconds % 60).toString().padStart(2, '0')}
+                  {Math.max(1, Math.ceil(localSeconds / 60)).toString().padStart(2, '0')}:00
                 </span>
               </div>
             )}
