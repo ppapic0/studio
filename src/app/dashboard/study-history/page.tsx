@@ -64,7 +64,8 @@ import {
   MessageCircle,
   BrainCircuit,
   TrendingUp,
-  Target
+  Target,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -107,7 +108,7 @@ const SUBJECTS = [
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
 
-function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disabled }: any) {
+function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
   const from24h = (t: string) => {
@@ -146,7 +147,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
   }, [timePart]);
 
   const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
-    if (disabled) return;
+    if (disabled || isToday || isPast) return;
     let nextSH = sHour, nextSM = sMin, nextSP = sPer;
     let nextEH = eHour, nextEM = eMin, nextEP = ePer;
 
@@ -173,8 +174,11 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
   const Icon = getIcon(titlePart);
 
   const TimePicker = ({ type, h, m, p }: any) => (
-    <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
-      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)}>
+    <div className={cn(
+      "flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30",
+      (disabled || isToday || isPast) && "opacity-60 pointer-events-none"
+    )}>
+      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)} disabled={disabled || isToday || isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[48px] text-[10px]" : "w-[55px] text-xs")}>
           <SelectValue />
         </SelectTrigger>
@@ -184,14 +188,14 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
         </SelectContent>
       </Select>
       <div className="w-px h-2 bg-border/50 mx-0.5" />
-      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)}>
+      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)} disabled={disabled || isToday || isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{HOURS.map(hour => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}</SelectContent>
       </Select>
       <span className="text-[9px] font-black opacity-30 px-0.5">:</span>
-      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)}>
+      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)} disabled={disabled || isToday || isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
@@ -212,15 +216,24 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isMobile, disa
           </div>
           <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         </div>
-        {!isPast && !disabled && (
-          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDelete(item)}>
+        {!isPast && !disabled && !isToday && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn(
+              "h-7 w-7 rounded-full text-muted-foreground hover:text-destructive transition-all",
+              isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )} 
+            onClick={() => onDelete(item)}
+          >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
+        {isToday && <Lock className="h-3 w-3 text-muted-foreground/20" />}
       </div>
 
       <div className="flex items-center gap-1.5 w-full justify-start sm:justify-start">
-        {(isPast || disabled) ? (
+        {(isPast || disabled || isToday) ? (
           <Badge variant="outline" className="font-mono font-black text-primary border-primary/10 bg-primary/5 text-[9px] px-2 py-1">
             {timePart || '--:--'}
           </Badge>
@@ -323,6 +336,13 @@ export default function StudyHistoryPage() {
 
   const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !title.trim() || !targetUid) return;
+    
+    const isToday = isSameDay(selectedDateForPlan, new Date());
+    if (category === 'schedule' && isToday) {
+      toast({ variant: "destructive", title: "수정 불가", description: "당일 루틴은 변경할 수 없습니다." });
+      return;
+    }
+
     setIsSubmitting(true);
     const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
@@ -363,6 +383,9 @@ export default function StudyHistoryPage() {
 
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
     if (isParent || !selectedDateForPlan || !firestore || !user || !activeMembership || !targetUid) return;
+    const isToday = isSameDay(selectedDateForPlan, new Date());
+    if (isToday) return;
+
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
     const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
@@ -394,11 +417,20 @@ export default function StudyHistoryPage() {
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
+    
+    const isToday = isSameDay(selectedDateForPlan, new Date());
+    if (item.category === 'schedule' && isToday) {
+      toast({ variant: "destructive", title: "삭제 불가", description: "오늘의 루틴은 삭제할 수 없습니다." });
+      return;
+    }
+
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id));
+    toast({ title: "항목이 삭제되었습니다." });
   };
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
+  const isToday = selectedDateForPlan ? isSameDay(selectedDateForPlan, new Date()) : false;
 
   if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
@@ -470,7 +502,7 @@ export default function StudyHistoryPage() {
               const minutes = logs?.find(l => l.dateKey === dateKey)?.totalMinutes || 0;
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
-              const isToday = isSameDay(day, new Date());
+              const isTodayCalendar = isSameDay(day, new Date());
               
               return (
                 <div 
@@ -480,14 +512,14 @@ export default function StudyHistoryPage() {
                     "p-2 sm:p-4 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white group overflow-hidden", 
                     isMobile ? "aspect-square" : "min-h-[160px]", 
                     !isCurrentMonth ? "opacity-[0.05] grayscale" : getHeatmapColor(minutes), 
-                    isToday && "ring-4 ring-inset ring-primary/30 z-10 shadow-2xl scale-[1.02] rounded-xl"
+                    isTodayCalendar && "ring-4 ring-inset ring-primary/30 z-10 shadow-2xl scale-[1.02] rounded-xl"
                   )}
                 >
                   <div className="flex justify-between items-start mb-1 sm:mb-3">
                     <span className={cn(
                       "text-[10px] sm:text-xs font-black tracking-tighter tabular-nums", 
                       idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-rose-600" : "text-primary/40",
-                      isToday && "text-primary scale-110 sm:scale-125"
+                      isTodayCalendar && "text-primary scale-110 sm:scale-125"
                     )}>
                       {format(day, 'd')}
                     </span>
@@ -506,7 +538,7 @@ export default function StudyHistoryPage() {
                       )}
                     </div>
                   )}
-                  {isToday && (
+                  {isTodayCalendar && (
                     <div className="absolute bottom-1 right-1">
                       <div className="bg-primary text-white p-0.5 rounded-full shadow-lg"><Activity className="h-1.5 w-1.5" /></div>
                     </div>
@@ -554,7 +586,13 @@ export default function StudyHistoryPage() {
                   )}
                 </TabsContent>
                 <TabsContent value="schedule" className="mt-0 space-y-4">
-                  {!isActuallyPast && !isParent && (
+                  {isToday && (
+                    <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-start gap-3 mb-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                      <p className="text-[10px] font-bold text-amber-900 leading-relaxed">오늘의 루틴은 변경할 수 없습니다.</p>
+                    </div>
+                  )}
+                  {!isActuallyPast && !isParent && !isToday && (
                     <div className="flex justify-end">
                       <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                         <DialogTrigger asChild><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black gap-1 bg-white shadow-sm border rounded-xl"><Plus className="h-3.5 w-3.5" /> 루틴 추가</Button></DialogTrigger>
@@ -566,14 +604,14 @@ export default function StudyHistoryPage() {
                       </Dialog>
                     </div>
                   )}
-                  {scheduleItems.length === 0 ? <div className="py-16 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">등록된 루틴이 없습니다.</div> : scheduleItems.map(item => <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isActuallyPast} isMobile={isMobile} disabled={isParent} />)}
+                  {scheduleItems.length === 0 ? <div className="py-16 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">등록된 루틴이 없습니다.</div> : scheduleItems.map(item => <ScheduleItemRow key={item.id} item={item} onUpdateRange={handleUpdateScheduleRange} onDelete={handleDeleteTask} isPast={isActuallyPast} isToday={isToday} isMobile={isMobile} disabled={isParent} />)}
                 </TabsContent>
                 <TabsContent value="study" className="mt-0 space-y-4">
                   <div className="grid gap-3">
                     {studyTasks.map(task => {
                       const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
                       return (
-                        <div key={task.id} className={cn("flex items-start gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white shadow-sm hover:shadow-md")}>
+                        <div key={task.id} className={cn("flex items-start gap-4 p-5 rounded-[1.75rem] border-2 transition-all group", task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white shadow-sm hover:shadow-md")}>
                           <Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="mt-1 h-6 w-6 rounded-lg" />
                           <div className="flex-1 grid gap-1.5">
                             <div className="flex items-center gap-2">
@@ -582,6 +620,19 @@ export default function StudyHistoryPage() {
                             </div>
                             <Label className={cn("text-base font-bold tracking-tight transition-all leading-snug break-keep", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
                           </div>
+                          {!isActuallyPast && !isParent && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className={cn(
+                                "h-8 w-8 text-muted-foreground hover:text-destructive transition-all shrink-0",
+                                isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              )} 
+                              onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       );
                     })}
@@ -604,7 +655,25 @@ export default function StudyHistoryPage() {
                 </TabsContent>
                 <TabsContent value="personal" className="mt-0 space-y-4">
                   <div className="grid gap-3">
-                    {personalTasks.map(task => <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.75rem] border-2 transition-all", task.done ? "bg-rose-50/20 border-rose-100/50" : "bg-white shadow-sm")}><Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="h-6 w-6 rounded-lg" /><Label className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label></div>)}
+                    {personalTasks.map(task => (
+                      <div key={task.id} className={cn("flex items-center gap-4 p-5 rounded-[1.75rem] border-2 transition-all group", task.done ? "bg-rose-50/20 border-rose-100/50" : "bg-white shadow-sm")}>
+                        <Checkbox checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isActuallyPast || isParent} className="h-6 w-6 rounded-lg" />
+                        <Label className={cn("flex-1 text-base font-bold transition-all", task.done && "line-through opacity-40")}>{task.title}</Label>
+                        {!isActuallyPast && !isParent && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className={cn(
+                              "h-8 w-8 text-muted-foreground hover:text-destructive transition-all shrink-0",
+                              isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )} 
+                            onClick={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                   {!isActuallyPast && !isParent && (
                     <div className="relative flex items-center bg-white border-2 border-rose-100 rounded-2xl p-1.5 shadow-sm mt-4 gap-1.5">
