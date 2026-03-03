@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -48,7 +47,7 @@ import {
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, collectionGroup, Timestamp } from 'firebase/firestore';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -114,7 +113,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 실시간 학습 로그 집계 (인덱스 에러 방지: centerId로만 필터링 후 클라이언트 측 필터링)
+  // 4. 실시간 학습 로그 집계
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(

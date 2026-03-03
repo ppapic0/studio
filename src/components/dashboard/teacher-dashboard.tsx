@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -187,26 +186,62 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
   }, [rawHistoricalLogs, thirtyDaysAgoKey]);
 
+  const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
+    if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
+    
+    const studentLog = historicalLogs?.find(l => l.studentId === studentId && l.dateKey === todayKey);
+    const cumulativeMinutes = studentLog?.totalMinutes || 0;
+    
+    let sessionMinutes = 0;
+    if (status === 'studying' && lastCheckInAt) {
+      const startTime = lastCheckInAt.toMillis();
+      sessionMinutes = Math.floor((now - startTime) / 60000);
+    }
+
+    const totalMinutes = cumulativeMinutes + Math.max(0, sessionMinutes);
+
+    const formatTime = (mins: number) => {
+      const hh = Math.floor(mins / 60);
+      const mm = mins % 60;
+      return `${hh}h ${mm}m`;
+    };
+
+    return {
+      session: formatTime(Math.max(0, sessionMinutes)),
+      total: formatTime(totalMinutes),
+      totalMins: totalMinutes,
+      isStudying: status === 'studying'
+    };
+  };
+
   const centerTrendData = useMemo(() => {
-    if (!historicalLogs) return [];
+    if (!historicalLogs || !mounted) return [];
     const days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
+    
     return days.map(day => {
       const dStr = format(day, 'yyyy-MM-dd');
       const dayLogs = historicalLogs.filter(l => l.dateKey === dStr);
-      const totalMinutes = dayLogs.reduce((acc, curr) => acc + (curr.totalMinutes || 0), 0);
+      
+      // 실시간 데이터 보정 (오늘 날짜인 경우)
+      let totalMinutes = dayLogs.reduce((acc, curr) => acc + (curr.totalMinutes || 0), 0);
+      
+      if (dStr === todayKey && attendanceList) {
+        attendanceList.forEach(seat => {
+          if (seat.status === 'studying' && seat.lastCheckInAt) {
+            const liveMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
+            if (liveMins > 0) totalMinutes += liveMins;
+          }
+        });
+      }
+
       return {
         name: format(day, 'MM/dd'),
         hours: Number((totalMinutes / 60).toFixed(1)),
         dateKey: dStr
       };
     });
-  }, [historicalLogs]);
+  }, [historicalLogs, todayKey, attendanceList, now, mounted]);
 
-  const todayLogs = useMemo(() => {
-    return historicalLogs?.filter(l => l.dateKey === todayKey) || [];
-  }, [historicalLogs, todayKey]);
-
-  // 인덱스 에러 방지: orderBy 제거 후 클라이언트에서 정렬
   const recentReportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -288,34 +323,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
 
     return { isAlert: false, schedule, isAbsentMode: false };
-  };
-
-  const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
-    if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
-    
-    const studentLog = todayLogs?.find(l => l.studentId === studentId);
-    const cumulativeMinutes = studentLog?.totalMinutes || 0;
-    
-    let sessionMinutes = 0;
-    if (status === 'studying' && lastCheckInAt) {
-      const startTime = lastCheckInAt.toMillis();
-      sessionMinutes = Math.floor((now - startTime) / 60000);
-    }
-
-    const totalMinutes = cumulativeMinutes + Math.max(0, sessionMinutes);
-
-    const formatTime = (mins: number) => {
-      const hh = Math.floor(mins / 60);
-      const mm = mins % 60;
-      return `${hh}h ${mm}m`;
-    };
-
-    return {
-      session: formatTime(Math.max(0, sessionMinutes)),
-      total: formatTime(totalMinutes),
-      totalMins: totalMinutes,
-      isStudying: status === 'studying'
-    };
   };
 
   const stats = useMemo(() => {
