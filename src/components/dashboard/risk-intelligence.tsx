@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -164,7 +166,11 @@ export function RiskIntelligence() {
                         </div>
                       </div>
                     </div>
-                    <Button asChild variant="ghost" size="icon" className="rounded-full h-12 w-12 group-hover:bg-primary group-hover:text-white transition-all"><a href={`/dashboard/teacher/students/${risk.id}`}><ChevronRight className="h-6 w-6" /></a></Button>
+                    <Button asChild variant="ghost" size="icon" className="rounded-full h-12 w-12 group-hover:bg-primary group-hover:text-white transition-all">
+                      <Link href={`/dashboard/teacher/students/${risk.id}`}>
+                        <ChevronRight className="h-6 w-6" />
+                      </Link>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -201,9 +207,3 @@ export function RiskIntelligence() {
     </div>
   );
 }
-
-const Progress = ({ value, className }: { value: number, className?: string }) => (
-  <div className={cn("h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner", className)}>
-    <div className="h-full bg-current transition-all duration-1000" style={{ width: `${value}%` }} />
-  </div>
-);

@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -23,7 +25,8 @@ import {
   UserCheck,
   CheckCircle2,
   PieChart,
-  Armchair
+  Armchair,
+  Loader2
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -176,12 +179,7 @@ export function OperationalIntelligence() {
                     <p className="text-base font-black text-primary">₩{slot.profit.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                  <div 
-                    className={cn("h-full transition-all duration-1000", slot.occupancy < 50 ? "bg-rose-400" : "bg-amber-500")} 
-                    style={{ width: `${slot.occupancy}%` }} 
-                  />
-                </div>
+                <Progress value={slot.occupancy} className={cn("h-2 bg-muted", slot.occupancy < 50 ? "text-rose-400" : "text-amber-500")} />
                 {slot.occupancy < 50 && (
                   <div className="flex items-center gap-2 text-[9px] font-black text-rose-600 uppercase tracking-widest animate-pulse">
                     <Zap className="h-3 w-3 fill-current" /> 오전 시간대 특별 프로모션 제안
@@ -200,10 +198,3 @@ export function OperationalIntelligence() {
     </div>
   );
 }
-
-const Loader2 = ({ className }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("animate-spin", className)}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
-const Progress = ({ value, className }: { value: number, className?: string }) => (
-  <div className={cn("h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner", className)}>
-    <div className="h-full bg-current transition-all duration-1000" style={{ width: `${value}%` }} />
-  </div>
-);
