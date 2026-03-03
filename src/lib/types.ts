@@ -21,6 +21,7 @@ export interface CenterMembership {
   className?: string; // 소속 반 이름
   linkedStudentIds?: string[];
   monthlyFee?: number;
+  baseFee?: number; // 할인 전 기본 수강료
   tutoringDiscount?: boolean;
   siblingDiscount?: boolean;
 }
@@ -132,6 +133,7 @@ export interface StudentProfile {
   schoolName: string;
   className?: string; // 소속 반 이름
   seatNo: number;
+  seatZone?: 'A' | 'B' | 'Fixed' | 'Flex'; // 좌석 구역 정보
   targetDailyMinutes: number;
   parentUids: string[];
   createdAt: Timestamp;
