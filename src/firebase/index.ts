@@ -12,7 +12,6 @@ import { getAuth, Auth } from 'firebase/auth';
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
   Firestore,
 } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
@@ -40,12 +39,11 @@ function ensureApp(): FirebaseApp {
 function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
-  // 내부 어설션 에러 방지를 위해 타브 관리자 설정을 표준으로 유지하며,
-  // 워크스테이션 환경의 시간 동기화 및 스트리밍 문제를 방지하기 위해 롱 폴링을 강제합니다.
+  // INTERNAL ASSERTION FAILED 에러를 방지하기 위해 로컬 캐시 설정을 단순화합니다.
+  // 특히 Workstation 환경에서 multi-tab manager가 IndexedDB와 충돌을 일으키는 경우가 많아 
+  // 다중 탭 관리자 대신 기본 지속성 캐시 설정만 사용하며, 네트워크 안정성을 위해 롱 폴링을 유지합니다.
   firestore = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
+    localCache: persistentLocalCache(),
     experimentalForceLongPolling: true,
   });
 
