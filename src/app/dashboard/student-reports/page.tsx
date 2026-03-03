@@ -134,13 +134,13 @@ export default function StudentReportsPage() {
             >
               <CardContent className="p-0">
                 <div className={cn("flex items-center justify-between p-6 sm:p-10", isMobile ? "p-5" : "")}>
-                  <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+                  <div className="flex items-center gap-4 sm:gap-6 min-w-0 flex-1">
                     <div className={cn("h-12 w-12 sm:h-16 sm:w-16 rounded-2xl sm:rounded-[1.5rem] bg-primary/5 flex flex-col items-center justify-center shrink-0 border-2 border-primary/10 group-hover:bg-primary group-hover:border-primary transition-all duration-500 shadow-inner")}>
                       <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:text-white" />
                     </div>
-                    <div className="grid gap-0.5 min-w-0 overflow-hidden">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base sm:text-xl font-black tracking-tighter text-primary truncate whitespace-nowrap">{report.dateKey} 리포트</h3>
+                    <div className="grid gap-1 min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] sm:text-xs font-black text-primary/40 uppercase tracking-widest leading-none">{report.dateKey}</span>
                         <Badge variant="secondary" className={cn(
                           "border-none font-black text-[8px] px-1.5 h-4 flex-shrink-0",
                           report.viewedAt ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
@@ -148,12 +148,13 @@ export default function StudentReportsPage() {
                           {report.viewedAt ? '읽음' : 'NEW'}
                         </Badge>
                       </div>
+                      <h3 className="text-base sm:text-xl font-black tracking-tighter text-primary truncate">데일리 정밀 분석 리포트</h3>
                       <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/60 truncate whitespace-nowrap max-w-full">
                         {report.content.replace(/[🕒✅📊💬🧠]/g, '').trim().substring(0, 50)}...
                       </p>
                     </div>
                   </div>
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm shrink-0 ml-2">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm shrink-0 ml-4">
                     <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
                 </div>
