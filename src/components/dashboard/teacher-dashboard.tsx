@@ -169,17 +169,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 실시간 및 과거 로그 집계 (트렌드 차트용)
+  // 실시간 및 과거 로그 집계 (복잡한 인덱스 요구사항을 피하기 위해 단순화된 쿼리 사용)
   const historicalLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collectionGroup(firestore, 'days'),
-      where('centerId', '==', centerId),
-      where('dateKey', '>=', thirtyDaysAgoKey),
-      orderBy('dateKey', 'asc')
+      where('centerId', '==', centerId)
+      // 인덱스 문제를 방지하기 위해 orderBy와 dateKey 필터링을 최소화하거나 클라이언트에서 수행합니다.
     );
-  }, [firestore, centerId, thirtyDaysAgoKey]);
-  const { data: historicalLogs } = useCollection<StudyLogDay>(historicalLogsQuery, { enabled: isActive });
+  }, [firestore, centerId]);
+  
+  const { data: rawHistoricalLogs } = useCollection<StudyLogDay>(historicalLogsQuery, { enabled: isActive });
+
+  const historicalLogs = useMemo(() => {
+    if (!rawHistoricalLogs) return [];
+    return [...rawHistoricalLogs]
+      .filter(l => l.dateKey >= thirtyDaysAgoKey)
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  }, [rawHistoricalLogs, thirtyDaysAgoKey]);
 
   const centerTrendData = useMemo(() => {
     if (!historicalLogs) return [];
@@ -196,7 +203,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [historicalLogs]);
 
-  // 최근 발송된 리포트 피드
+  const todayLogs = useMemo(() => {
+    return historicalLogs?.filter(l => l.dateKey === todayKey) || [];
+  }, [historicalLogs, todayKey]);
+
   const recentReportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -207,10 +217,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId]);
   const { data: recentReportsFeed } = useCollection<DailyReport>(recentReportsQuery, { enabled: isActive });
-
-  const todayLogs = useMemo(() => {
-    return historicalLogs?.filter(l => l.dateKey === todayKey) || [];
-  }, [historicalLogs, todayKey]);
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -341,7 +347,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const aisleIds = new Set(attendanceList.filter(s => s.type === 'aisle').map(s => s.id));
     let totalPhysicalSeats = 0;
     for(let i = 1; i <= gridRows * gridCols; i++) {
-        if(!aisleIds.has(`seat_${i.toString().padStart(3, '0')}`)) totalPhysicalSeats++;
+        const sid = `seat_${i.toString().padStart(3, '0')}`;
+        if(!aisleIds.has(sid)) totalPhysicalSeats++;
     }
 
     let totalDisplayCount = selectedClass !== 'all' ? filteredMemberIds.size : totalPhysicalSeats;
@@ -359,7 +366,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
     try {
-      // 1. 오늘 세션 조회
       const sessionQ = query(
         collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'),
         orderBy('startTime', 'desc')
@@ -367,7 +373,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const sessionSnap = await getDocs(sessionQ);
       setSelectedStudentSessions(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession)));
 
-      // 2. 최근 5개 리포트 조회
       const reportQ = query(
         collection(firestore, 'centers', centerId, 'dailyReports'),
         where('studentId', '==', studentId),
@@ -378,7 +383,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const reportSnap = await getDocs(reportQ);
       setSelectedStudentReports(reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport)));
 
-      // 3. 최근 7일 학습 히스토리 조회
       const historyQ = query(
         collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
         orderBy('dateKey', 'desc'),
@@ -539,7 +543,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      {/* 과거 기록 가시성을 위한 센터 트렌드 차트 */}
       <section className="px-4">
         <Card className="rounded-[2.5rem] border-none shadow-sm bg-white p-6 sm:p-8 overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform duration-1000"><TrendingUp className="h-32 w-32" /></div>
@@ -720,7 +723,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Card>
 
       <div className={cn("grid gap-6 px-4", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
-        {/* 오늘 상담 현황 */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
@@ -753,7 +755,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </div>
         </div>
 
-        {/* 최근 리포트 피드 (과거 기록 확인용) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
@@ -786,7 +787,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </div>
 
-      {/* 좌석 관리 및 상세 히스토리 다이얼로그 */}
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
           {selectedSeat && (
