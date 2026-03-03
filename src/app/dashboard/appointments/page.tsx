@@ -303,8 +303,8 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <div className={cn("flex flex-col gap-6 max-w-4xl mx-auto pb-20", isMobile ? "px-1" : "px-4")}>
-      <header className={cn("flex justify-between items-center", isMobile ? "flex-col gap-4 items-start" : "flex-row")}>
+    <div className={cn("flex flex-col gap-6 max-w-4xl mx-auto pb-20", isMobile ? "px-1 items-center" : "px-4")}>
+      <header className={cn("flex justify-between items-center w-full", isMobile ? "flex-col gap-4 items-center text-center" : "flex-row")}>
         <div className="space-y-1">
           <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
@@ -314,7 +314,7 @@ export default function AppointmentsPage() {
         {isStudent && (
           <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
             <DialogTrigger asChild>
-              <Button size="lg" className={cn("rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full h-14" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
+              <Button size="lg" className={cn("rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-[340px] h-14" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
                 <CalendarPlus className="h-5 w-5" /> 새 상담 신청
               </Button>
             </DialogTrigger>
@@ -378,7 +378,7 @@ export default function AppointmentsPage() {
       </header>
 
       <Tabs defaultValue="reservations" className="w-full">
-        <TabsList className={cn("grid w-full grid-cols-2 rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isMobile ? "h-14" : "h-16 max-w-sm mx-auto")}>
+        <TabsList className={cn("grid w-full grid-cols-2 rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isMobile ? "h-14 max-w-[340px] mx-auto" : "h-16 max-w-sm mx-auto")}>
           <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
             <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
           </TabsTrigger>
@@ -387,8 +387,8 @@ export default function AppointmentsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+        <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
+          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
             <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
               <CardTitle className="text-xl font-black text-primary flex items-center gap-3">
                 <History className="h-6 w-6 opacity-40" /> 예약 및 신청 내역
@@ -461,10 +461,10 @@ export default function AppointmentsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="logs" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+        <TabsContent value="logs" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
+          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
             <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <CardTitle className={cn("font-black text-emerald-700 flex items-center gap-3", isMobile ? "text-lg" : "text-xl")}>
                   <CheckCircle2 className="h-6 w-6 opacity-60" /> 피드백 및 결과 일지
                 </CardTitle>
@@ -498,36 +498,36 @@ export default function AppointmentsPage() {
               ) : (
                 <div className="divide-y divide-muted/10">
                   {filteredLogs.map((log) => (
-                    <div key={log.id} className={cn("space-y-5 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
+                    <div key={log.id} className={cn("space-y-4 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                          <Badge variant="outline" className="rounded-lg font-black uppercase text-[9px] sm:text-[10px] px-2 py-1 border-primary/20 text-primary">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="rounded-lg font-black uppercase text-[9px] px-2 py-0.5 border-primary/20 text-primary">
                             {log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로'}
                           </Badge>
-                          <span className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5">
                             <Clock className="h-3 w-3 opacity-40" />
                             {log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd') : ''}
                           </span>
-                          {!isStudent && (
-                            <Badge variant="secondary" className="font-black text-[9px] gap-1.5 px-2 py-0.5">
-                              <GraduationCap className="h-3 w-3" /> {log.studentName}
-                            </Badge>
-                          )}
                           <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0.5 whitespace-nowrap">
                             {log.createdAt ? getSeasonName(log.createdAt.toDate()) : ''}
                           </Badge>
+                          {!isStudent && (
+                            <Badge variant="secondary" className="font-black text-[9px] gap-1 px-2 py-0.5">
+                              <GraduationCap className="h-2.5 w-2.5" /> {log.studentName}
+                            </Badge>
+                          )}
                         </div>
-                        <span className="text-[8px] font-black text-primary/30 uppercase tracking-[0.3em] hidden sm:inline">Counseling Verified</span>
+                        <span className="text-[8px] font-black text-primary/30 uppercase tracking-[0.3em] hidden sm:inline">Verified</span>
                       </div>
-                      <div className="space-y-4">
-                        <div className={cn("rounded-[1.5rem] bg-[#fafafa] border shadow-inner", isMobile ? "p-4" : "p-5")}>
-                          <p className={cn("font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap", isMobile ? "text-xs" : "text-sm sm:text-base")}>{log.content}</p>
+                      <div className="space-y-3">
+                        <div className={cn("rounded-[1.25rem] bg-[#fafafa] border shadow-inner", isMobile ? "p-4" : "p-5")}>
+                          <p className={cn("font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap", isMobile ? "text-sm" : "text-base")}>{log.content}</p>
                         </div>
                         {log.improvement && (
-                          <div className={cn("rounded-[1.5rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3 sm:gap-4", isMobile ? "p-4" : "p-5")}>
-                            <div className="p-2 rounded-xl bg-white shadow-sm shrink-0"><AlertCircle className="h-4 w-4 text-emerald-600" /></div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest leading-none">실천 권고 사항</p>
+                          <div className={cn("rounded-[1.25rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
+                            <div className="p-1.5 rounded-lg bg-white shadow-sm shrink-0"><AlertCircle className="h-3.5 w-3.5 text-emerald-600" /></div>
+                            <div className="space-y-0.5">
+                              <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest leading-none">실천 권고</p>
                               <p className={cn("font-bold text-emerald-900 leading-relaxed", isMobile ? "text-xs" : "text-sm")}>{log.improvement}</p>
                             </div>
                           </div>
