@@ -51,7 +51,7 @@ import {
   Eye
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { useAppContext } from '@/contexts/app-context';
+import { useAppContext, TIERS } from '@/contexts/app-context';
 import { 
   collection, 
   query, 
@@ -64,9 +64,11 @@ import {
   writeBatch,
   setDoc,
   getDocs,
-  limit
+  limit,
+  increment,
+  getDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, KpiDaily } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, KpiDaily, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -252,7 +254,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const targetMemberIds = new Set(filteredMembers.map(m => m.id));
 
     filteredMembers.forEach(member => {
-      // 해당 학생의 좌석 정보를 찾음
       const seat = attendanceList.find(a => a.studentId === member.id);
       const status = seat?.status || 'absent';
       const timeInfo = getStudentStudyTimes(member.id, status, seat?.lastCheckInAt);
@@ -349,17 +350,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
     try {
-      // 1. 오늘의 세션
       const sessionRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
       const sessionSnap = await getDocs(sessionRef);
       const sessions = sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession));
       
-      // 2. 과거 리포트
       const reportRef = collection(firestore, 'centers', centerId, 'dailyReports');
       const reportSnap = await getDocs(query(reportRef, where('studentId', '==', studentId), where('status', '==', 'sent')));
       const reports = reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport));
 
-      // 3. 학습 히스토리 (최근 30일)
       const historyRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
       const historySnap = await getDocs(query(historyRef, limit(30)));
       const history = historySnap.docs.map(d => {
@@ -396,17 +394,78 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
-  const handleStatusUpdate = async (status: AttendanceCurrent['status']) => {
+  const handleStatusUpdate = async (nextStatus: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
+    const studentId = selectedSeat.studentId;
+    if (!studentId) return;
+
+    setIsSaving(true);
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { 
-        status, 
+      const batch = writeBatch(firestore);
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
+      const prevStatus = selectedSeat.status;
+
+      // 퇴실 처리 시 공부 시간 강제 저장 로직
+      if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedSeat.lastCheckInAt) {
+        const nowTs = Date.now();
+        const startTime = selectedSeat.lastCheckInAt.toMillis();
+        const sessionSeconds = Math.max(0, Math.floor((nowTs - startTime) / 1000));
+        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+
+        if (sessionSeconds > 0) {
+          // 1. 학습 로그 업데이트
+          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
+          batch.set(logRef, { totalMinutes: increment(sessionMinutes), studentId, centerId, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+
+          // 2. 세션 추가
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
+          batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+
+          // 3. 일일 통계 업데이트
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
+          batch.set(statRef, { totalStudyMinutes: increment(sessionMinutes), studentId, centerId, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+
+          // 4. 성장 스탯 및 LP 업데이트 (부스트 계산 포함)
+          const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+          const progressSnap = await getDoc(progressRef);
+          
+          if (progressSnap.exists()) {
+            const p = progressSnap.data() as GrowthProgress;
+            const stats = p.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+            const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+            const penaltyPoints = p.penaltyPoints || 0;
+            const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
+            const finalMultiplier = totalBoost * (1 - penaltyRate);
+            
+            let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
+            const updateData: any = { 
+              seasonLp: increment(studyLpEarned), 
+              'stats.focus': increment((sessionMinutes / 60) * 0.1),
+              [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(studyLpEarned),
+              updatedAt: serverTimestamp() 
+            };
+            batch.update(progressRef, updateData);
+          }
+        }
+      }
+
+      const updateData: any = { 
+        status: nextStatus, 
         updatedAt: serverTimestamp(),
-        ...(status === 'studying' ? { lastCheckInAt: serverTimestamp() } : {})
-      });
-      toast({ title: "상태 변경 완료" });
+        ...(nextStatus === 'studying' ? { lastCheckInAt: serverTimestamp() } : {})
+      };
+
+      batch.update(seatRef, updateData);
+      await batch.commit();
+      
+      toast({ title: "학생 상태가 업데이트되었습니다." });
       setIsManaging(false);
-    } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); }
+    } catch (e: any) {
+      console.error("Manual Status Update Error:", e);
+      toast({ variant: "destructive", title: "변경 실패", description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveGridSettings = async () => {
@@ -791,8 +850,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               </div>
                             ) : (
                               <div className="grid grid-cols-2 gap-4">
-                                <Button onClick={() => handleStatusUpdate('studying')} className="h-20 sm:h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-2 flex flex-col items-center justify-center shadow-xl active:scale-95 transition-all"><Zap className="h-5 w-5 fill-current" /><span className="text-base sm:text-lg leading-none">입실 확인</span></Button>
-                                <Button variant="outline" onClick={() => handleStatusUpdate('absent')} className="h-20 sm:h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-2 flex flex-col items-center justify-center active:scale-95 transition-all"><AlertCircle className="h-5 w-5" /><span className="text-base sm:text-lg leading-none">퇴실 처리</span></Button>
+                                <Button onClick={() => handleStatusUpdate('studying')} disabled={isSaving} className="h-20 sm:h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-2 flex flex-col items-center justify-center shadow-xl active:scale-95 transition-all"><Zap className="h-5 w-5 fill-current" /><span className="text-base sm:text-lg leading-none">입실 확인</span></Button>
+                                <Button variant="outline" onClick={() => handleStatusUpdate('absent')} disabled={isSaving} className="h-20 sm:h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-2 flex flex-col items-center justify-center active:scale-95 transition-all"><AlertCircle className="h-5 w-5" /><span className="text-base sm:text-lg leading-none">퇴실 처리</span></Button>
                               </div>
                             )}
 
@@ -915,7 +974,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-md")}>
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-none rounded-none" : "sm:max-w-md")}>
           <div className="bg-primary p-8 text-white relative shrink-0">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
             <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">GRID ID: {selectedSeat?.seatNo}</p></DialogHeader>

@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -13,6 +13,7 @@ export type CenterMembership = {
   joinedAt: any;
   displayName?: string;
   linkedStudentIds?: string[];
+  className?: string;
 };
 
 export type ViewMode = 'responsive' | 'mobile';
@@ -136,13 +137,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const lp = progressData?.seasonLp || 0;
       const rank = rankData?.rank || 999;
 
-      // 엘리트 티어 기준을 25,000점으로 조정
       if (lp >= 25000) {
         if (rank === 1) setCurrentTier(TIERS.find(t => t.name === '챌린저')!);
         else if (rank === 2 || rank === 3) setCurrentTier(TIERS.find(t => t.name === '그랜드마스터')!);
         else setCurrentTier(TIERS.find(t => t.name === '마스터')!);
       } else {
-        // 하위 티어 (브론즈~다이아몬드)
         const found = TIERS.slice(0, 5).reverse().find(t => lp >= t.min) || TIERS[0];
         setCurrentTier(found);
       }
@@ -168,12 +167,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [user, firestore, activeMembership]);
 
+  // 실시간 좌석 상태 동기화 (학생 타이머 외부 강제 종료/시작 대응)
+  useEffect(() => {
+    if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') return;
+
+    const centerId = activeMembership.id;
+    const q = query(
+      collection(firestore, 'centers', centerId, 'attendanceCurrent'),
+      where('studentId', '==', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const seatData = snapshot.docs[0].data();
+        // 선생님이나 키오스크에서 퇴실 처리된 경우 로컬 타이머 종료
+        if (seatData.status !== 'studying' && isTimerActive) {
+          setIsTimerActive(false);
+          setStartTime(null);
+        }
+        // 선생님이 입실 확인을 해준 경우 로컬 타이머 자동 시작
+        if (seatData.status === 'studying' && !isTimerActive && seatData.lastCheckInAt) {
+          setIsTimerActive(true);
+          setStartTime(seatData.lastCheckInAt.toMillis());
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, firestore, activeMembership, isTimerActive]);
+
   // Timer Persistence Sync - User-Specific Keys
   useEffect(() => {
-    setIsTimerActive(false);
-    setStartTime(null);
-    setLastActiveCheckTime(null);
-
     if (user) {
       const savedStartTime = localStorage.getItem(`study_start_time_${user.uid}`);
       const savedCheckTime = localStorage.getItem(`study_last_check_time_${user.uid}`);
@@ -181,8 +205,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (savedStartTime) {
         setStartTime(parseInt(savedStartTime, 10));
         setIsTimerActive(true);
+      } else {
+        setStartTime(null);
+        setIsTimerActive(false);
       }
       if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
+    } else {
+      setIsTimerActive(false);
+      setStartTime(null);
+      setLastActiveCheckTime(null);
     }
   }, [user?.uid]);
 
