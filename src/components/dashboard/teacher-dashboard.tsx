@@ -92,6 +92,24 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
+const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 backdrop-blur-xl border-2 border-primary/10 p-5 rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] ring-1 ring-black/5 animate-in fade-in zoom-in duration-300">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{label}</p>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-3xl font-black text-primary tracking-tighter drop-shadow-sm">{payload[0].value}</span>
+          <span className="text-xs font-black text-primary/60">{unit}</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
@@ -212,53 +230,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   };
 
-  const centerTrendData = useMemo(() => {
-    if (!kpiHistory || !mounted) return [];
-    return kpiHistory.map(k => ({
-      name: k.date.split('-').slice(1).join('/'),
-      hours: Number(((k.totalStudyMinutes || 0) / 60).toFixed(1)), 
-      totalMinutes: k.totalStudyMinutes || 0, 
-      dateKey: k.date
-    }));
-  }, [kpiHistory, mounted]);
-
-  const recentReportsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'dailyReports'),
-      where('status', '==', 'sent')
-    );
-  }, [firestore, centerId]);
-  const { data: rawRecentReports } = useCollection<DailyReport>(recentReportsQuery, { enabled: isActive });
-
-  const recentReportsFeed = useMemo(() => {
-    if (!rawRecentReports) return [];
-    return [...rawRecentReports]
-      .sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0))
-      .slice(0, 5);
-  }, [rawRecentReports]);
-
-  const appointmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    const todayDate = new Date();
-    return query(
-      collection(firestore, 'centers', centerId, 'counselingReservations'), 
-      where('scheduledAt', '>=', Timestamp.fromDate(startOfDay(todayDate))), 
-      where('scheduledAt', '<=', Timestamp.fromDate(endOfDay(todayDate)))
-    );
-  }, [firestore, centerId]);
-  const { data: rawAppointments, isLoading: aptLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
-
-  const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.createdAt?.toMillis()||0)) : [], [rawAppointments]);
-
-  const unassignedStudents = useMemo(() => {
-    if (!students || !studentMembers) return [];
-    return students.filter(s => {
-      const membership = studentMembers.find(m => m.id === s.id);
-      return membership?.status === 'active' && (!s.seatNo || s.seatNo === 0);
-    }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [students, studentMembers, searchTerm]);
-
   const stats = useMemo(() => {
     if (!mounted || !attendanceList || !studentMembers) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
 
@@ -307,6 +278,72 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     return { studying, absent, away, total: totalDisplayCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
   }, [attendanceList, todayStats, studentMembers, selectedClass, now, mounted, gridRows, gridCols]);
+
+  const centerTrendData = useMemo(() => {
+    if (!mounted) return [];
+    
+    // 1. Get historical data excluding today to avoid duplicates
+    let data = kpiHistory 
+      ? kpiHistory
+          .filter(k => k.date !== todayKey)
+          .map(k => ({
+            name: k.date.split('-').slice(1).join('/'),
+            hours: Number(((k.totalStudyMinutes || 0) / 60).toFixed(1)), 
+            totalMinutes: k.totalStudyMinutes || 0, 
+            dateKey: k.date
+          }))
+      : [];
+
+    // 2. Add live data point for today using calculated live stats
+    data.push({
+      name: todayKey.split('-').slice(1).join('/'),
+      hours: Number((stats.totalCenterMinutes / 60).toFixed(1)),
+      totalMinutes: stats.totalCenterMinutes,
+      dateKey: todayKey
+    });
+
+    // 3. Ensure we only show last 30 days and they are sorted by date
+    return data
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+      .slice(-30);
+  }, [kpiHistory, stats.totalCenterMinutes, todayKey, mounted]);
+
+  const recentReportsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'dailyReports'),
+      where('status', '==', 'sent')
+    );
+  }, [firestore, centerId]);
+  const { data: rawRecentReports } = useCollection<DailyReport>(recentReportsQuery, { enabled: isActive });
+
+  const recentReportsFeed = useMemo(() => {
+    if (!rawRecentReports) return [];
+    return [...rawRecentReports]
+      .sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [rawRecentReports]);
+
+  const appointmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    const todayDate = new Date();
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingReservations'), 
+      where('scheduledAt', '>=', Timestamp.fromDate(startOfDay(todayDate))), 
+      where('scheduledAt', '<=', Timestamp.fromDate(endOfDay(todayDate)))
+    );
+  }, [firestore, centerId]);
+  const { data: rawAppointments, isLoading: aptLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
+
+  const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.createdAt?.toMillis()||0)) : [], [rawAppointments]);
+
+  const unassignedStudents = useMemo(() => {
+    if (!students || !studentMembers) return [];
+    return students.filter(s => {
+      const membership = studentMembers.find(m => m.id === s.id);
+      return membership?.status === 'active' && (!s.seatNo || s.seatNo === 0);
+    }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [students, studentMembers, searchTerm]);
 
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;

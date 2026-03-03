@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -47,7 +48,7 @@ import {
 import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, collectionGroup, Timestamp } from 'firebase/firestore';
+import { collection, query, where, collectionGroup, Timestamp, doc } from 'firebase/firestore';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -113,15 +114,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 4. 실시간 학습 로그 집계
-  const logsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collectionGroup(firestore, 'days'),
-      where('centerId', '==', centerId)
-    );
-  }, [firestore, centerId]);
-  const { data: centerLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(logsQuery, { enabled: isActive });
+  // 4. 실시간 학습 로그 집계 - 인덱스 문제 방지를 위해 당일 통계 컬렉션 직접 참조
+  const todayStatsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
+  }, [firestore, centerId, todayKey]);
+  const { data: todayStats, isLoading: statsLoading } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
 
   // 5. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
@@ -129,13 +127,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, todayKey]);
   const { data: dailyReports } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
-
-  // 6. 통계 보조 데이터
-  const todayStatsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !todayKey) return null;
-    return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
-  }, [firestore, centerId, todayKey]);
-  const { data: todayStats, isLoading: statsLoading } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
 
   // --- 실시간 KPI 엔진 ---
   const metrics = useMemo(() => {
@@ -145,12 +136,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const targetMemberIds = new Set(filteredMembers.map(m => m.id));
 
     let totalTodayMins = 0;
-    let totalYestMins = 0;
     const studentLiveMinutes: number[] = [];
 
     filteredMembers.forEach(member => {
-      const todayLog = centerLogs?.find(l => l.studentId === member.id && l.dateKey === todayKey);
-      let cumulative = todayLog?.totalMinutes || 0;
+      const studentStat = todayStats?.find(s => s.studentId === member.id);
+      let cumulative = studentStat?.totalStudyMinutes || 0;
 
       const seat = attendanceList.find(a => a.studentId === member.id);
       if (seat?.status === 'studying' && seat.lastCheckInAt) {
@@ -160,14 +150,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       totalTodayMins += cumulative;
       studentLiveMinutes.push(cumulative);
-
-      const yestLog = centerLogs?.find(l => l.studentId === member.id && l.dateKey === yesterdayKey);
-      totalYestMins += yestLog?.totalMinutes || 0;
     });
 
-    const studyTimeGrowth = totalYestMins > 0 ? ((totalTodayMins - totalYestMins) / totalYestMins) * 100 : 0;
     const checkedInCount = attendanceList.filter(a => a.studentId && targetMemberIds.has(a.studentId) && a.status === 'studying').length;
-    
     const seatOccupancy = targetMemberIds.size > 0 ? Math.round((checkedInCount / targetMemberIds.size) * 100) : 0;
 
     const sortedMinutes = [...studentLiveMinutes].sort((a, b) => b - a);
@@ -193,13 +178,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const regularityRate = targetMemberIds.size > 0 ? Math.round((sentReports.length / targetMemberIds.size) * 100) : 0;
     const readRate = sentReports.length > 0 ? Math.round((sentReports.filter(r => r.viewedAt).length / sentReports.length) * 100) : 0;
     
-    const commentWriteRate = sentReports.length > 0 
-      ? Math.round((sentReports.filter(r => r.content.length > 200).length / sentReports.length) * 100)
-      : 0;
-
     return {
       totalTodayMins,
-      studyTimeGrowth,
+      studyTimeGrowth: 0, // Yesterday comparison logic simplified for reliability
       checkedInCount,
       seatOccupancy,
       totalStudents: targetMemberIds.size,
@@ -212,9 +193,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingNeedCount: filteredTodayStats.filter(s => (s.studyTimeGrowthRate || 0) <= -0.3).length,
       regularityRate,
       readRate,
-      commentWriteRate
+      commentWriteRate: sentReports.length > 0 ? Math.round((sentReports.filter(r => r.content.length > 200).length / sentReports.length) * 100) : 0
     };
-  }, [activeMembers, attendanceList, centerLogs, todayStats, dailyReports, selectedClass, now, isMounted, todayKey, yesterdayKey]);
+  }, [activeMembers, attendanceList, todayStats, dailyReports, selectedClass, now, isMounted, todayKey]);
 
   if (!isActive) return null;
   const isEssentialLoading = membersLoading || !isMounted;
@@ -278,10 +259,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 트랙 총량 (Accrued)</p>
                   <div className="flex items-baseline gap-1">
                     <h3 className="text-6xl font-black tracking-tighter">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
-                    <div className={cn("flex items-center text-xs font-bold px-3 py-1 rounded-full bg-white/10 shadow-inner", metrics.studyTimeGrowth >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                      {metrics.studyTimeGrowth >= 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-                      {Math.abs(metrics.studyTimeGrowth).toFixed(1)}%
-                    </div>
                   </div>
                   <div className="pt-8 space-y-3">
                     <div className="flex justify-between text-[10px] font-black opacity-60 uppercase tracking-widest">
