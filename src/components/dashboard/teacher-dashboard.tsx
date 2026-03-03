@@ -246,27 +246,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     let totalMins = 0;
     let filteredLiveMinutes: number[] = [];
 
-    const filteredMemberIds = new Set(
-      studentMembers
-        .filter(m => (selectedClass === 'all' || m.className === selectedClass) && m.status === 'active')
-        .map(m => m.id)
+    const filteredMembers = studentMembers.filter(m => 
+      (selectedClass === 'all' || m.className === selectedClass) && m.status === 'active'
     );
+    const targetMemberIds = new Set(filteredMembers.map(m => m.id));
 
-    attendanceList.forEach(seat => {
-      if (seat.type !== 'aisle' && seat.studentId) {
-        const isTargetStudent = filteredMemberIds.has(seat.studentId);
-        
-        if (isTargetStudent) {
-          const status = seat.status || 'absent';
-          const timeInfo = getStudentStudyTimes(seat.studentId, status, seat.lastCheckInAt);
-          
-          totalMins += timeInfo.totalMins;
-          filteredLiveMinutes.push(timeInfo.totalMins);
+    filteredMembers.forEach(member => {
+      // 해당 학생의 좌석 정보를 찾음
+      const seat = attendanceList.find(a => a.studentId === member.id);
+      const status = seat?.status || 'absent';
+      const timeInfo = getStudentStudyTimes(member.id, status, seat?.lastCheckInAt);
+      
+      totalMins += timeInfo.totalMins;
+      filteredLiveMinutes.push(timeInfo.totalMins);
 
-          if (status === 'studying') studying++;
-          else if (status === 'away' || status === 'break') away++;
-        }
-      }
+      if (status === 'studying') studying++;
+      else if (status === 'away' || status === 'break') away++;
     });
 
     const aisleIds = new Set(attendanceList.filter(s => s.type === 'aisle').map(s => s.id));
@@ -276,7 +271,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         if(!aisleIds.has(sid)) totalPhysicalSeats++;
     }
 
-    let totalDisplayCount = selectedClass !== 'all' ? filteredMemberIds.size : totalPhysicalSeats;
+    let totalDisplayCount = selectedClass !== 'all' ? targetMemberIds.size : totalPhysicalSeats;
     let absent = Math.max(0, totalDisplayCount - studying - away);
 
     const avgMinutes = filteredLiveMinutes.length > 0 ? Math.round(totalMins / filteredLiveMinutes.length) : 0;
@@ -728,7 +723,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex items-center gap-4">
                   <div className="h-11 w-11 rounded-2xl bg-emerald-50 flex flex-col items-center justify-center shrink-0">
                     <span className="text-[10px] font-black text-emerald-600 leading-none">{report.dateKey.split('-')[2]}</span>
-                    <span className="text-[7px] font-bold text-emerald-400 uppercase mt-0.5">{format(new Date(report.dateKey), 'MMM')}</span>
+                    <span className="text-[7px] font-bold text-emerald-400 uppercase mt-0.5">{format(new Date(report.dateKey.replace(/-/g, '/')), 'MMM')}</span>
                   </div>
                   <div className="grid leading-tight min-w-0">
                     <span className="font-black text-sm truncate">{report.studentName} 학생</span>

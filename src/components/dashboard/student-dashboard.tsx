@@ -417,29 +417,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
-  // 지각/결석 신청서 상태
-  const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
-  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [requestReason, setRequestReason] = useState('');
-  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
-
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
     const centerId = activeMembership.id;
-    const attendanceCurrentRef = collection(firestore, centerId ? `centers/${centerId}/attendanceCurrent` : '');
     
-    // 학생의 좌석 정보를 찾기 위해 현재 좌석 목록 조회
-    const studentProfileRef = doc(firestore, 'centers', centerId, 'students', user.uid);
-    const profileSnap = await getDoc(studentProfileRef);
-    const seatNo = profileSnap.exists() ? profileSnap.data()?.seatNo : 0;
-    const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
-    const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId);
+    // 학생의 좌석 정보를 'studentId' 쿼리로 직접 조회
+    const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
+    const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
+    const seatSnap = await getDocs(seatQuery);
+    const seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
 
     if (isTimerActive) {
       const nowTs = Date.now();
       const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
-      // 1초라도 공부하면 1분으로 기록되도록 Math.ceil(올림) 사용
       const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
       
       const batch = writeBatch(firestore);
@@ -469,7 +460,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         
         batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
         
-        // 일일 통계 문서(Teacher/Admin용)에도 누적 시간 업데이트
         const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
         batch.set(statRef, { 
           totalStudyMinutes: increment(sessionMinutes), 
@@ -485,9 +475,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         batch.update(progressRef, updateData);
       }
 
-      // 좌석 상태: 퇴실(absent)
-      if (seatNo > 0) {
-        batch.update(seatRef, { status: 'absent', updatedAt: serverTimestamp() });
+      if (seatDoc) {
+        batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
       }
       
       await batch.commit();
@@ -510,11 +499,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
       }
 
-      // 좌석 상태: 입실(studying) 및 체크인 시각 기록
-      if (seatNo > 0) {
-        batch.update(seatRef, { 
+      if (seatDoc) {
+        batch.update(seatDoc.ref, { 
           status: 'studying', 
-          lastCheckInAt: Timestamp.fromMillis(nowTs), // 즉각적인 동기화를 위해 현재 클라이언트 시간을 전송
+          lastCheckInAt: Timestamp.fromMillis(nowTs),
           updatedAt: serverTimestamp() 
         });
       }
