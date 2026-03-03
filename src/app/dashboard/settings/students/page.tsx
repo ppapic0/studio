@@ -21,7 +21,13 @@ import {
   UserX,
   Users,
   LayoutGrid,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Edit2,
+  Lock,
+  School,
+  Hash,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import { StudentProfile, CenterMembership, InviteCode } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -43,6 +49,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 export default function StudentAccountManagementPage() {
@@ -54,7 +69,18 @@ export default function StudentAccountManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
   
+  // 수정 폼 상태
+  const [editForm, setEditForm] = useState({
+    displayName: '',
+    password: '',
+    schoolName: '',
+    grade: '',
+    parentLinkCode: ''
+  });
+
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const isAdmin = activeMembership?.role === 'centerAdmin';
@@ -85,14 +111,10 @@ export default function StudentAccountManagementPage() {
   
   const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isAdmin });
 
-  // 사용 가능한 모든 반 목록 추출 (학생 소속 + 초대 코드 설정 기반)
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
-    // 현재 학생들의 데이터에서 추출
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
-    // 초대 코드 설정에서 추출 (학생이 없는 반도 표시하기 위함)
     inviteCodes?.forEach(i => { if (i.targetClassName) classes.add(i.targetClassName); });
-    // 프로필 데이터에서도 추출
     studentsProfiles?.forEach(p => { if (p.className) classes.add(p.className); });
     return Array.from(classes).sort();
   }, [studentMembers, inviteCodes, studentsProfiles]);
@@ -108,6 +130,48 @@ export default function StudentAccountManagementPage() {
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
   }, [studentMembers, searchTerm]);
 
+  const handleOpenEditModal = (member: CenterMembership) => {
+    const profile = studentsProfiles?.find(p => p.id === member.id);
+    setSelectedStudentForEdit(member);
+    setEditForm({
+      displayName: member.displayName || '',
+      password: '',
+      schoolName: profile?.schoolName || '',
+      grade: profile?.grade || '1학년',
+      parentLinkCode: profile?.parentLinkCode || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!functions || !centerId || !selectedStudentForEdit) return;
+    
+    setIsUpdating(selectedStudentForEdit.id);
+    try {
+      const updateFn = httpsCallable(functions, 'updateStudentAccount');
+      const result: any = await updateFn({
+        studentId: selectedStudentForEdit.id,
+        centerId,
+        displayName: editForm.displayName,
+        password: editForm.password.length >= 6 ? editForm.password : undefined,
+        schoolName: editForm.schoolName,
+        grade: editForm.grade,
+        parentLinkCode: editForm.parentLinkCode
+      });
+
+      if (result.data?.ok) {
+        toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
+        setIsEditModalOpen(false);
+      } else {
+        throw new Error(result.data?.message || "수정 실패");
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "수정 실패", description: e.message });
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
   const handleDeleteAccount = async (studentId: string) => {
     if (!functions || !centerId) return;
     
@@ -122,12 +186,7 @@ export default function StudentAccountManagementPage() {
         throw new Error(result.data?.message || "삭제 실패");
       }
     } catch (e: any) {
-      console.error("[Account Deletion Detailed Error]", e);
-      toast({ 
-        variant: "destructive", 
-        title: "삭제 실패", 
-        description: e.message || "서버 통신 중 오류가 발생했습니다." 
-      });
+      toast({ variant: "destructive", title: "삭제 실패", description: e.message });
     } finally {
       setIsDeleting(null);
     }
@@ -196,7 +255,7 @@ export default function StudentAccountManagementPage() {
           <CardTitle className="text-xl font-black flex items-center gap-2">
             <Users className="h-5 w-5 opacity-40" /> 관리 대상 학생 리스트
           </CardTitle>
-          <CardDescription className="font-bold">소속 반을 변경하거나 계정을 영구적으로 삭제할 수 있습니다.</CardDescription>
+          <CardDescription className="font-bold">상세 정보 수정, 반 이동, 또는 계정 삭제를 수행할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {membersLoading ? (
@@ -237,7 +296,7 @@ export default function StudentAccountManagementPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <div className="flex-1 sm:w-48">
+                      <div className="flex-1 sm:w-40">
                         <Select 
                           value={member.className || 'none'} 
                           onValueChange={(val) => handleMoveClass(member.id, val)}
@@ -257,6 +316,15 @@ export default function StudentAccountManagementPage() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => handleOpenEditModal(member)}
+                        className="h-11 w-11 rounded-xl text-primary border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
 
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -299,13 +367,87 @@ export default function StudentAccountManagementPage() {
         </CardContent>
       </Card>
 
+      {/* 계정 정보 수정 모달 */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "w-[95vw] h-[85vh] rounded-[2rem]" : "sm:max-w-lg max-h-[90vh]")}>
+          <div className="bg-primary p-10 text-white relative shrink-0">
+            <UserCog className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10 rotate-12" />
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-black tracking-tighter">계정 상세 관리</DialogTitle>
+              <DialogDescription className="text-white/60 font-bold mt-1">학생의 주요 정보 및 비밀번호를 관리합니다.</DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-8 space-y-6">
+            <div className="grid gap-5">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-primary/60 ml-1">이름</Label>
+                <div className="relative">
+                  <UserCog className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                  <Input value={editForm.displayName} onChange={e => setEditForm({...editForm, displayName: e.target.value})} className="h-12 pl-10 rounded-xl border-2 font-bold" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-primary/60 ml-1">비밀번호 재설정 (선택)</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                  <Input type="password" placeholder="새 비밀번호 (6자 이상)" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} className="h-12 pl-10 rounded-xl border-2 font-bold" />
+                </div>
+                <p className="text-[9px] font-bold text-muted-foreground ml-1">※ 입력 시에만 해당 비밀번호로 강제 변경됩니다.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/60 ml-1">소속 학교</Label>
+                  <div className="relative">
+                    <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                    <Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} className="h-12 pl-10 rounded-xl border-2 font-bold" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/60 ml-1">학년</Label>
+                  <Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}>
+                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      <SelectItem value="1학년">1학년</SelectItem>
+                      <SelectItem value="2학년">2학년</SelectItem>
+                      <SelectItem value="3학년">3학년</SelectItem>
+                      <SelectItem value="N수생">N수생</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-primary/60 ml-1 flex items-center gap-2">부모님 연동 코드 <ShieldCheck className="h-3 w-3" /></Label>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                  <Input maxLength={6} value={editForm.parentLinkCode} onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value})} className="h-12 pl-10 rounded-xl border-2 font-black tracking-widest text-lg" placeholder="6자리 숫자" />
+                </div>
+                <p className="text-[9px] font-bold text-muted-foreground ml-1">부모님 가입 시 자녀 연동을 위한 코드입니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-8 bg-muted/20 border-t shrink-0">
+            <Button onClick={handleUpdateStudent} disabled={!!isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
+              {isUpdating === selectedStudentForEdit?.id ? <Loader2 className="animate-spin h-5 w-5" /> : <Check className="h-5 w-5" />}
+              관리자 권한으로 정보 저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <footer className="pt-10 flex flex-col items-center gap-4 opacity-30">
         <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.4em] text-primary">
           Administrator Control Panel
         </div>
         <p className="text-[9px] font-bold text-center leading-relaxed">
-          학생의 반 정보는 초대 코드 설정 및 멤버십 데이터와 실시간 연동됩니다.<br/>
-          계정 삭제 시 Firebase 인증 계정과 Firestore의 모든 데이터가 영구적으로 제거됩니다.
+          관리자 모드에서는 학생의 인증 정보 및 연동 코드를 강제 제어할 수 있습니다.<br/>
+          민감한 정보 수정을 시도할 때는 반드시 학생/학부모의 동의를 구하세요.
         </p>
       </footer>
     </div>
