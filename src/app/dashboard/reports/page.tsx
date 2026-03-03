@@ -58,14 +58,12 @@ export default function DailyReportsPage() {
   
   const isMobile = viewMode === 'mobile';
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
-  useEffect(() => {
-    setSelectedDate(subDays(new Date(), 1));
-  }, []);
+  // 초기 날짜를 어제로 즉시 설정하여 로딩 지연 방지
+  const [selectedDate, setSelectedDate] = useState<Date>(() => subDays(new Date(), 1));
 
-  const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
+  const dateKey = format(selectedDate, 'yyyy-MM-dd');
+  const weekKey = format(selectedDate, "yyyy-'W'II");
   const centerId = activeMembership?.id;
 
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
@@ -191,15 +189,7 @@ export default function DailyReportsPage() {
     }
   };
 
-  const isLoading = !selectedDate || membersLoading || reportsLoading;
-
-  if (!selectedDate) {
-    return (
-      <div className="flex h-[70vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-      </div>
-    );
-  }
+  const isFullLoading = membersLoading || reportsLoading;
 
   return (
     <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-20 px-1", isMobile ? "gap-4" : "gap-8")}>
@@ -225,7 +215,6 @@ export default function DailyReportsPage() {
       </header>
 
       <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-4")}>
-        {/* 학생 목록 사이드바 - 데스크톱 전용 */}
         {!isMobile && (
           <Card className="rounded-[2.5rem] border-none shadow-lg bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-muted/30 border-b p-6">
@@ -262,7 +251,6 @@ export default function DailyReportsPage() {
           </Card>
         )}
 
-        {/* 리포트 피드 - 앱 스타일 */}
         <div className={cn("flex flex-col gap-4", isMobile ? "col-span-1" : "md:col-span-3")}>
           {isMobile && (
             <div className="px-1 relative">
@@ -277,7 +265,7 @@ export default function DailyReportsPage() {
           )}
 
           <div className="grid gap-4">
-            {isLoading ? (
+            {isFullLoading ? (
               <div className="flex flex-col items-center justify-center py-40 gap-4">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
                 <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-[0.2em]">Syncing Reports...</p>
@@ -302,7 +290,7 @@ export default function DailyReportsPage() {
                     isSent ? "bg-emerald-50/30 ring-1 ring-emerald-100" : "bg-white ring-1 ring-border/50"
                   )}
                 >
-                  <CardContent className={cn("p-0", isMobile ? "" : "")}>
+                  <CardContent className="p-0">
                     <div className={cn("flex items-center justify-between p-5 sm:p-8", isMobile ? "gap-3" : "gap-8")}>
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
                         <div className="relative">
@@ -355,7 +343,6 @@ export default function DailyReportsPage() {
         </div>
       </div>
 
-      {/* 리포트 작성 다이얼로그 - 팝업 중앙 정렬 최적화 */}
       <Dialog open={isWriteModalOpen} onOpenChange={setIsWriteModalOpen}>
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "max-w-4xl h-[90vh]")}>
           <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-12")}>
@@ -374,7 +361,6 @@ export default function DailyReportsPage() {
 
           <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
             <div className={cn("space-y-8", isMobile ? "p-5" : "p-12")}>
-              {/* 교사 노트 & AI 실행 */}
               <div className={cn("grid gap-6 items-start", isMobile ? "grid-cols-1" : "md:grid-cols-5")}>
                 <Card className={cn("rounded-[2rem] border-none shadow-xl bg-white ring-1 ring-border/50", isMobile ? "" : "md:col-span-3")}>
                   <CardHeader className="bg-muted/10 pb-4 border-b py-5 px-6">
@@ -419,7 +405,6 @@ export default function DailyReportsPage() {
                 )}
               </div>
 
-              {/* 편집 영역 */}
               <div className="flex flex-col gap-3">
                 <Label className="text-[10px] font-black uppercase text-primary/70 tracking-widest ml-2 flex items-center gap-2">
                   <Zap className="h-4 w-4" /> 생성된 리포트 최종 검토 및 편집

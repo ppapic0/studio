@@ -8,28 +8,20 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { 
   FileText, 
-  CheckCircle, 
   Loader2, 
   Clock, 
-  MapPin, 
-  LogOut, 
   TrendingUp, 
   Zap, 
-  CalendarCheck,
-  ArrowUpRight,
-  Activity,
   Sparkles,
   History,
-  ArrowRightLeft,
-  MessageCircle
+  MessageCircle,
+  Activity
 } from 'lucide-react';
 import { ResponsiveContainer, Bar, XAxis, YAxis, Tooltip, BarChart as RechartsBarChart, CartesianGrid } from 'recharts';
-import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { doc, collection, query, where, getDocs, limit, orderBy, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { type DailyStudentStat, type StudyLogDay, type StudyPlanItem, type ParentAiCache, type DailyReport } from '@/lib/types';
 import { generateParentSummary, type ParentSummaryOutput, type ParentSummaryInput } from '@/ai/flows/parent-receives-weekly-summary';
@@ -51,7 +43,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const isMobile = viewMode === 'mobile';
 
   const [summary, setSummary] = useState<ParentSummaryOutput | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState<Date | null>(null);
 
@@ -69,20 +61,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const studentStatRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentId || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students', studentId);
-  }, [firestore, activeMembership, studentId, todayKey]);
+  }, [firestore, activeMembership?.id, studentId, todayKey]);
   const { data: studentStat, isLoading: studentStatLoading } = useDoc<DailyStudentStat>(studentStatRef, { enabled: isActive && !!studentId });
 
   // 2. 자녀의 오늘/어제 공부 시간 로그
   const todayStudyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentId || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentId, 'days', todayKey);
-  }, [firestore, activeMembership, studentId, todayKey]);
+  }, [firestore, activeMembership?.id, studentId, todayKey]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(todayStudyLogRef, { enabled: isActive && !!studentId });
 
   const yesterdayStudyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentId || !yesterdayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentId, 'days', yesterdayKey);
-  }, [firestore, activeMembership, studentId, yesterdayKey]);
+  }, [firestore, activeMembership?.id, studentId, yesterdayKey]);
   const { data: yesterdayStudyLog } = useDoc<StudyLogDay>(yesterdayStudyLogRef, { enabled: isActive && !!studentId });
 
   // 3. 자녀의 오늘 계획 (등/하원 시간 추출용)
@@ -93,7 +85,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       where('dateKey', '==', todayKey),
       where('category', '==', 'schedule')
     );
-  }, [firestore, activeMembership, studentId, weekKey, todayKey]);
+  }, [firestore, activeMembership?.id, studentId, weekKey, todayKey]);
   const { data: todayScheduleItems } = useCollection<StudyPlanItem>(todayPlansQuery, { enabled: isActive && !!studentId });
 
   // 4. 자녀의 어제 계획 (등/하원 기록 추출용)
@@ -105,14 +97,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       where('dateKey', '==', yesterdayKey),
       where('category', '==', 'schedule')
     );
-  }, [firestore, activeMembership, studentId, today, yesterdayKey]);
+  }, [firestore, activeMembership?.id, studentId, today, yesterdayKey]);
   const { data: yesterdayScheduleItems } = useCollection<StudyPlanItem>(yesterdayPlansQuery, { enabled: isActive && !!studentId });
 
   // 5. 선생님이 작성한 어제 리포트 (선생님의 한 마디)
   const yesterdayReportRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentId || !yesterdayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${yesterdayKey}_${studentId}`);
-  }, [firestore, activeMembership, studentId, yesterdayKey]);
+  }, [firestore, activeMembership?.id, studentId, yesterdayKey]);
   const { data: yesterdayReport } = useDoc<DailyReport>(yesterdayReportRef, { enabled: isActive && !!studentId });
 
   const attendanceTimes = useMemo(() => {
@@ -131,13 +123,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [todayScheduleItems, yesterdayScheduleItems]);
 
+  // AI 요약 생성 로직 - 무한 루프 방지를 위해 의존성 최적화
   useEffect(() => {
-    if (!isActive || !studentId || !isMounted || !firestore || !activeMembership || !today || !todayKey || !yesterdayKey) return;
+    if (!isActive || !studentId || !isMounted || !firestore || !activeMembership?.id || !todayKey || !yesterdayKey) return;
 
     const fetchSummary = async () => {
         setSummaryLoading(true);
         try {
-          // 1. 먼저 오늘자 캐시된 요약이 있는지 확인 (API 비용 절감)
+          // 1. 캐시 확인
           const cacheRef = doc(firestore, 'centers', activeMembership.id, 'parentAiCache', studentId, 'days', todayKey);
           const cacheSnap = await getDoc(cacheRef);
 
@@ -148,9 +141,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             return;
           }
 
-          // 2. 캐시가 없으면 어제 데이터를 분석하여 AI 호출
+          // 2. 캐시 없으면 생성
           let yestCompletion = 0;
-          const yestWeekKey = format(subDays(today, 1), "yyyy-'W'II");
+          const yestWeekKey = format(subDays(today || new Date(), 1), "yyyy-'W'II");
           const yestPlansRef = collection(firestore, 'centers', activeMembership.id, 'plans', studentId, 'weeks', yestWeekKey, 'items');
           const snap = await getDocs(query(yestPlansRef, where('dateKey', '==', yesterdayKey)));
           const items = snap.docs.map(d => d.data() as StudyPlanItem);
@@ -173,7 +166,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           
           const result = await generateParentSummary(input);
           
-          // 3. 생성된 결과를 Firestore에 캐싱 (오늘 다시 실행되지 않도록)
           await setDoc(cacheRef, {
             content: result,
             dateKey: todayKey,
@@ -190,7 +182,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
     
     fetchSummary();
-  }, [isActive, studentId, studentStat, yesterdayStudyLog, isMounted, firestore, activeMembership, today, todayKey, yesterdayKey]);
+  }, [isActive, studentId, isMounted, firestore, activeMembership?.id, todayKey, yesterdayKey]);
 
   if (!isActive) return null;
   
@@ -206,15 +198,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     );
   }
   
-  const isLoading = studentStatLoading || summaryLoading;
+  const isFullLoading = studentStatLoading || summaryLoading;
   const todayMins = todayStudyLog?.totalMinutes || 0;
   const yestMins = yesterdayStudyLog?.totalMinutes || 0;
 
   return (
     <div className={cn("grid gap-6", isMobile ? "px-0" : "px-0")}>
-      {/* 1. 실시간/전날 학습 현황 섹션 */}
       <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-3")}>
-        {/* 오늘 현황 */}
         <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500 relative">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
           <CardHeader className="pb-2 px-6 pt-6">
@@ -244,7 +234,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </CardContent>
         </Card>
 
-        {/* 어제 기록 */}
         <Card className="rounded-[1.5rem] border-none shadow-md bg-muted/20 overflow-hidden group hover:shadow-xl transition-all duration-500 relative">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400" />
           <CardHeader className="pb-2 px-6 pt-6">
@@ -297,7 +286,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </section>
 
-      {/* 2. AI 분석 & 선생님의 한 마디 섹션 */}
       <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-6" : "p-8")}>
           <div className="flex justify-between items-center">
@@ -311,7 +299,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </div>
         </CardHeader>
         <CardContent className={cn("space-y-8", isMobile ? "p-6" : "p-8")}>
-          {isLoading ? (
+          {isFullLoading ? (
             <div className="space-y-6">
               <Skeleton className="h-32 w-full rounded-[1.5rem]" />
               <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-3")}>
@@ -325,7 +313,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <p className="text-base font-bold leading-relaxed text-foreground/80 italic">"{summary.message}"</p>
               </div>
               
-              {/* 지표 리스트 - 수직 최적화 */}
               <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
                 {summary.keyMetrics.map((metric) => (
                   <div key={metric.name} className="p-5 rounded-[1.5rem] bg-[#fafafa] border shadow-inner flex items-center justify-between group hover:bg-white transition-all">
@@ -338,7 +325,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 ))}
               </div>
 
-              {/* 선생님의 한 마디 - 선생님이 직접 쓴 내용 노출 */}
               <div className="space-y-4 pt-4 border-t border-dashed">
                 <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
                   <MessageCircle className="h-3.5 w-3.5 text-blue-500 fill-blue-500/10" /> 선생님의 데일리 리포트
@@ -373,7 +359,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
-      {/* 3. 성과 추이 차트 섹션 */}
       <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
         <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-6" : "p-8")}>
           <CardTitle className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
