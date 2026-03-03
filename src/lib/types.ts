@@ -192,7 +192,7 @@ export interface AttendanceRequest {
 export interface CounselingLog {
   id: string;
   studentId: string;
-  studentName: string;
+  studentName?: string;
   teacherId: string;
   teacherName: string;
   type: "academic" | "life" | "career";
