@@ -145,18 +145,29 @@ export default function StudentAccountManagementPage() {
     setIsUpdating(selectedStudentForEdit.id);
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
-      await updateFn({
+      
+      // 값이 있는 필드만 객체로 구성하여 전달
+      const payload: any = {
         studentId: selectedStudentForEdit.id,
         centerId,
-        displayName: editForm.displayName.trim(),
-        password: editForm.password.length >= 6 ? editForm.password : undefined,
-        schoolName: editForm.schoolName.trim(),
-        grade: editForm.grade,
-        parentLinkCode: editForm.parentLinkCode.trim()
-      });
+        displayName: editForm.displayName.trim() || undefined,
+        schoolName: editForm.schoolName.trim() || undefined,
+        grade: editForm.grade || undefined,
+        parentLinkCode: editForm.parentLinkCode.trim() || undefined
+      };
 
-      toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
-      setIsEditModalOpen(false);
+      if (editForm.password.trim().length >= 6) {
+        payload.password = editForm.password.trim();
+      }
+
+      const result: any = await updateFn(payload);
+
+      if (result.data?.ok) {
+        toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
+        setIsEditModalOpen(false);
+      } else {
+        throw new Error(result.data?.message || "알 수 없는 서버 오류");
+      }
     } catch (e: any) {
       console.error("[Update Student Error]", e);
       toast({ 
@@ -175,8 +186,13 @@ export default function StudentAccountManagementPage() {
     setIsDeleting(studentId);
     try {
       const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
-      await deleteFn({ studentId, centerId });
-      toast({ title: "삭제 완료", description: "계정이 영구 삭제되었습니다." });
+      const result: any = await deleteFn({ studentId, centerId });
+      
+      if (result.data?.ok) {
+        toast({ title: "삭제 완료", description: "계정이 영구 삭제되었습니다." });
+      } else {
+        throw new Error(result.data?.message || "삭제 처리 실패");
+      }
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
       toast({ 
