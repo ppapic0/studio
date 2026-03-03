@@ -55,7 +55,8 @@ import {
   X,
   FileEdit,
   GraduationCap,
-  Filter
+  Filter,
+  ClipboardCheck
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -387,8 +388,8 @@ export default function AppointmentsPage() {
         </TabsList>
 
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
-            <CardHeader className="bg-muted/5 border-b p-6 sm:p-8">
+          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+            <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
               <CardTitle className="text-xl font-black text-primary flex items-center gap-3">
                 <History className="h-6 w-6 opacity-40" /> 예약 및 신청 내역
               </CardTitle>
@@ -404,18 +405,18 @@ export default function AppointmentsPage() {
               ) : (
                 <div className="divide-y divide-muted/10">
                   {reservations.map((res) => (
-                    <div key={res.id} className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4">
+                    <div key={res.id} className={cn("flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4", isMobile ? "p-5" : "p-6 sm:p-8")}>
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
-                        <div className={cn("h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
-                          <span className="text-[8px] sm:text-[10px] font-black text-primary/60 uppercase group-hover:text-white/60 tracking-tighter">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'MMM') : ''}</span>
-                          <span className="text-xl sm:text-2xl font-black text-primary group-hover:text-white leading-none mt-0.5">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
+                        <div className={cn("rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
+                          <span className={cn("font-black text-primary/60 uppercase group-hover:text-white/60 tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'MMM') : ''}</span>
+                          <span className={cn("font-black text-primary group-hover:text-white leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
                         </div>
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-base sm:text-lg font-black tracking-tight">{res.scheduledAt ? format(res.scheduledAt.toDate(), 'p') : ''} 상담</h3>
+                            <h3 className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-base sm:text-lg")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'p') : ''} 상담</h3>
                             {getStatusBadge(res.status)}
                           </div>
-                          <p className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 truncate">
+                          <p className={cn("font-bold text-muted-foreground flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs")}>
                             <User className="h-3.5 w-3.5 opacity-40 shrink-0" /> 
                             {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생 (담당: ${res.teacherName})`}
                           </p>
@@ -461,14 +462,13 @@ export default function AppointmentsPage() {
         </TabsContent>
 
         <TabsContent value="logs" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
-            <CardHeader className="bg-emerald-50/30 border-b p-6 sm:p-8">
+          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <CardTitle className="text-xl font-black text-emerald-700 flex items-center gap-3">
+                <CardTitle className={cn("font-black text-emerald-700 flex items-center gap-3", isMobile ? "text-lg" : "text-xl")}>
                   <CheckCircle2 className="h-6 w-6 opacity-60" /> 피드백 및 결과 일지
                 </CardTitle>
                 
-                {/* 시즌 필터 드롭다운 */}
                 <div className="flex items-center gap-2 w-full sm:w-auto bg-white/50 p-1.5 rounded-2xl border shadow-sm">
                   <Filter className="h-3.5 w-3.5 text-emerald-600 ml-2" />
                   <Select value={selectedSeason} onValueChange={setSelectedSeason}>
@@ -498,9 +498,9 @@ export default function AppointmentsPage() {
               ) : (
                 <div className="divide-y divide-muted/10">
                   {filteredLogs.map((log) => (
-                    <div key={log.id} className="p-6 sm:p-10 space-y-5 hover:bg-muted/5 transition-colors">
+                    <div key={log.id} className={cn("space-y-5 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                           <Badge variant="outline" className="rounded-lg font-black uppercase text-[9px] sm:text-[10px] px-2 py-1 border-primary/20 text-primary">
                             {log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로'}
                           </Badge>
@@ -510,25 +510,25 @@ export default function AppointmentsPage() {
                           </span>
                           {!isStudent && (
                             <Badge variant="secondary" className="font-black text-[9px] gap-1.5 px-2 py-0.5">
-                              <GraduationCap className="h-3 w-3" /> {log.studentName} 학생
+                              <GraduationCap className="h-3 w-3" /> {log.studentName}
                             </Badge>
                           )}
-                          <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0.5">
+                          <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0.5 whitespace-nowrap">
                             {log.createdAt ? getSeasonName(log.createdAt.toDate()) : ''}
                           </Badge>
                         </div>
                         <span className="text-[8px] font-black text-primary/30 uppercase tracking-[0.3em] hidden sm:inline">Counseling Verified</span>
                       </div>
                       <div className="space-y-4">
-                        <div className="p-5 rounded-[1.5rem] bg-[#fafafa] border shadow-inner">
-                          <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap">{log.content}</p>
+                        <div className={cn("rounded-[1.5rem] bg-[#fafafa] border shadow-inner", isMobile ? "p-4" : "p-5")}>
+                          <p className={cn("font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap", isMobile ? "text-xs" : "text-sm sm:text-base")}>{log.content}</p>
                         </div>
                         {log.improvement && (
-                          <div className="p-5 rounded-[1.5rem] bg-emerald-50 border border-emerald-100 flex items-start gap-4">
-                            <div className="p-2 rounded-xl bg-white shadow-sm"><AlertCircle className="h-4 w-4 text-emerald-600" /></div>
+                          <div className={cn("rounded-[1.5rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3 sm:gap-4", isMobile ? "p-4" : "p-5")}>
+                            <div className="p-2 rounded-xl bg-white shadow-sm shrink-0"><AlertCircle className="h-4 w-4 text-emerald-600" /></div>
                             <div className="space-y-1">
-                              <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">실천 권고 사항</p>
-                              <p className="text-sm font-bold text-emerald-900 leading-relaxed">{log.improvement}</p>
+                              <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest leading-none">실천 권고 사항</p>
+                              <p className={cn("font-bold text-emerald-900 leading-relaxed", isMobile ? "text-xs" : "text-sm")}>{log.improvement}</p>
                             </div>
                           </div>
                         )}
