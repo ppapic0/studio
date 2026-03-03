@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -86,7 +85,12 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
   const formatRank = (idx: number) => {
     const rank = idx + 1;
     if (rank <= 3) return `${rank}위`;
+    
     const denominator = classNameFilter ? filteredEntries.length : totalStudents;
+    
+    // 인원수가 적을 때는 백분율이 오히려 정확하지 않은 인상을 줄 수 있습니다.
+    if (denominator < 10) return `${rank}위 / ${denominator}명`;
+    
     const percent = Math.max(1, Math.ceil((rank / (denominator || 1)) * 100));
     return `상위 ${percent}%`;
   };
@@ -320,7 +324,7 @@ export default function LeaderboardsPage() {
     return allLpEntries.find(e => e.studentId === user.uid) || null;
   }, [allLpEntries, user]);
 
-  const totalCount = studentMembers?.length || 1;
+  const totalCount = studentMembers?.length || 0;
 
   if (!isMember) {
     return (

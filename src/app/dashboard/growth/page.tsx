@@ -172,11 +172,16 @@ export default function GrowthPage() {
     );
   }, [firestore, activeMembership]);
   const { data: activeStudents } = useCollection<CenterMembership>(totalStudentsQuery);
-  const totalCount = activeStudents?.length || 1;
+  const totalCount = activeStudents?.length || 0;
 
   const rankDisplay = useMemo(() => {
-    if (currentRank === 0) return '산정 중';
+    // 999는 시딩된 초기값이거나 아직 순위가 매겨지지 않은 상태입니다.
+    if (currentRank === 0 || currentRank >= 999) return '산정 중';
     if (currentRank <= 3) return `${currentRank}위`;
+    
+    // 전체 인원수가 로딩되지 않았거나 너무 적을 때는 백분율이 어색할 수 있습니다.
+    if (totalCount < 10) return `${currentRank}위 / ${totalCount}명`;
+    
     const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
     return `상위 ${percent}%`;
   }, [currentRank, totalCount]);
@@ -325,7 +330,7 @@ export default function GrowthPage() {
               <>
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-emerald-600"><TrendingUp className="h-3 w-3" /> Season Tier</div>
-                  <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-full flex items-center"><p className="text-[11px] font-bold leading-relaxed text-emerald-900/70">2.5만 LP 이상은 센터 내 상대 순위로 결정됩니다. (1위: 챌린저, 2~3위: 그랜드마스터)</p></div>
+                  <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-full flex items-center"><p className="text-11px] font-bold leading-relaxed text-emerald-900/70">2.5만 LP 이상은 센터 내 상대 순위로 결정됩니다. (1위: 챌린저, 2~3위: 그랜드마스터)</p></div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-purple-600"><Star className="h-3 w-3 fill-current" /> Decay Rule</div>
