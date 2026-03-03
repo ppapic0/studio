@@ -346,24 +346,30 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
     try {
-      // 1. 세션 정보 (인덱스 문제 방지를 위해 정렬 제거 후 클라이언트에서 수행)
+      // 1. 오늘의 세션 (병렬 로드)
       const sessionRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
       const sessionSnap = await getDocs(sessionRef);
       const sessions = sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession));
       
-      // 2. 리포트 정보 (동일하게 클라이언트 정렬)
+      // 2. 과거 리포트
       const reportRef = collection(firestore, 'centers', centerId, 'dailyReports');
       const reportSnap = await getDocs(query(reportRef, where('studentId', '==', studentId), where('status', '==', 'sent')));
       const reports = reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport));
 
-      // 3. 최근 히스토리
+      // 3. 학습 히스토리 (최근 30일)
       const historyRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
-      const historySnap = await getDocs(query(historyRef, limit(14)));
-      const history = historySnap.docs.map(d => d.data() as StudyLogDay);
+      const historySnap = await getDocs(query(historyRef, limit(30)));
+      const history = historySnap.docs.map(d => {
+        const data = d.data();
+        return { 
+          ...data, 
+          dateKey: data.dateKey || d.id 
+        } as StudyLogDay;
+      });
 
       setSelectedStudentSessions(sessions.sort((a, b) => b.startTime.toMillis() - a.startTime.toMillis()));
       setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
-      setSelectedStudentHistory(history.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 7));
+      setSelectedStudentHistory(history.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 14));
 
     } catch (e) {
       console.error("Student Details Fetch Error:", e);
@@ -796,7 +802,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
                                 ) : (
                                   <>
-                                    {/* 현재 진행 중인 세션 표시 */}
                                     {selectedSeat.status === 'studying' && selectedSeat.lastCheckInAt && (
                                       <div className="p-4 rounded-2xl bg-blue-600 text-white border border-blue-700 shadow-lg flex items-center justify-between animate-pulse">
                                         <div className="flex items-center gap-3">
@@ -812,7 +817,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                       </div>
                                     )}
                                     
-                                    {/* 완료된 세션 목록 */}
                                     {selectedStudentSessions.length === 0 && selectedSeat.status !== 'studying' ? (
                                       <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">기록된 세션이 없습니다.</div>
                                     ) : (
@@ -835,22 +839,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <TabsContent value="history" className="mt-0 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <TrendingUp className="h-4 w-4 text-emerald-600" />
-                              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">최근 7일 학습 시간 변화</h4>
+                              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">최근 학습 시간 변화</h4>
                             </div>
                             <div className="grid gap-2">
-                              {selectedStudentHistory.length === 0 ? <div className="py-20 text-center opacity-20 italic font-black text-sm">기록이 없습니다.</div> :
+                              {sessionsLoading ? (
+                                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                              ) : selectedStudentHistory.length === 0 ? (
+                                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">학습 기록이 없습니다.</div>
+                              ) : (
                                 selectedStudentHistory.map((hLog) => (
                                   <div key={hLog.dateKey} className="p-4 rounded-2xl bg-white border shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
-                                    <span className="text-xs font-black text-muted-foreground">{format(new Date(hLog.dateKey), 'MM/dd (EEE)', {locale: ko})}</span>
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-xs font-black text-primary">{format(new Date(hLog.dateKey), 'MM/dd (EEE)', {locale: ko})}</span>
+                                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Daily Log</span>
+                                    </div>
                                     <div className="flex items-center gap-3">
-                                      <div className="h-1 w-20 bg-muted rounded-full overflow-hidden shadow-inner">
-                                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, (hLog.totalMinutes / 480) * 100)}%` }} />
+                                      <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden shadow-inner">
+                                        <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (hLog.totalMinutes / 480) * 100)}%` }} />
                                       </div>
-                                      <span className="text-sm font-black tracking-tight">{Math.floor(hLog.totalMinutes / 60)}h {hLog.totalMinutes % 60}m</span>
+                                      <div className="text-right min-w-[60px]">
+                                        <span className="text-sm font-black tracking-tighter">{Math.floor(hLog.totalMinutes / 60)}h {hLog.totalMinutes % 60}m</span>
+                                      </div>
                                     </div>
                                   </div>
                                 ))
-                              }
+                              )}
                             </div>
                           </TabsContent>
 
@@ -860,7 +873,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest">최근 발송된 리포트 (5건)</h4>
                             </div>
                             <div className="grid gap-3">
-                              {selectedStudentReports.length === 0 ? <div className="py-20 text-center opacity-20 italic font-black text-sm">발송된 리포트가 없습니다.</div> :
+                              {sessionsLoading ? (
+                                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-amber-500 opacity-20" /></div>
+                              ) : selectedStudentReports.length === 0 ? (
+                                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">발송된 리포트가 없습니다.</div>
+                              ) : (
                                 selectedStudentReports.map((report) => (
                                   <div key={report.id} className="p-5 rounded-2xl bg-white border border-amber-100 shadow-sm space-y-2 relative group hover:shadow-md transition-all">
                                     <div className="flex justify-between items-center">
@@ -870,7 +887,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                     <p className="text-xs font-bold text-foreground/70 line-clamp-2 leading-relaxed">{report.content.substring(0, 100)}...</p>
                                   </div>
                                 ))
-                              }
+                              )}
                             </div>
                           </TabsContent>
                         </div>
