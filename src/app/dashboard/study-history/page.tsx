@@ -65,7 +65,8 @@ import {
   BrainCircuit,
   TrendingUp,
   Target,
-  Lock
+  Lock,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
