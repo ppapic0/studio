@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -344,6 +345,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   const isMobile = viewMode === 'mobile';
   
   // 지각/결석 신청서 상태
@@ -479,94 +481,102 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleStudyStartStop = async () => {
-    if (!firestore || !user || !activeMembership || !progressRef) return;
+    if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
     
-    const centerId = activeMembership.id;
-    const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
-    const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
-    const seatSnap = await getDocs(seatQuery);
-    const seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
+    setIsProcessingAction(true);
+    try {
+      const centerId = activeMembership.id;
+      const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
+      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
+      const seatSnap = await getDocs(seatQuery);
+      const seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
 
-    if (isTimerActive) {
-      const nowTs = Date.now();
-      const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
-      const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
-      
-      const batch = writeBatch(firestore);
-      const updateData: any = { updatedAt: serverTimestamp() };
-      
-      if (sessionSeconds > 0) {
-        let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
-        updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
-
-        const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
-        const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
+      if (isTimerActive) {
+        const nowTs = Date.now();
+        const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
+        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
         
-        if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
-          studyLpEarned += Math.round(100 * finalMultiplier);
-          updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
-          toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+        const batch = writeBatch(firestore);
+        const updateData: any = { updatedAt: serverTimestamp() };
+        
+        if (sessionSeconds > 0) {
+          let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
+          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
+
+          const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
+          const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
+          
+          if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
+            studyLpEarned += Math.round(100 * finalMultiplier);
+            updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
+            toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+          }
+
+          if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
+            updateData['stats.resilience'] = increment(0.5);
+            updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
+            toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
+          }
+
+          updateData.seasonLp = increment(studyLpEarned);
+          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
+          
+          batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+          
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
+          batch.set(statRef, { 
+            totalStudyMinutes: increment(sessionMinutes), 
+            studentId: user.uid, 
+            centerId, 
+            dateKey: todayKey, 
+            updatedAt: serverTimestamp() 
+          }, { merge: true });
+
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
+          batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          
+          batch.update(progressRef, updateData);
         }
 
-        if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
-          updateData['stats.resilience'] = increment(0.5);
-          updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
-          toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
+        if (seatDoc) {
+          batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
+        }
+        
+        await batch.commit();
+        setIsTimerActive(false); 
+        setStartTime(null); 
+        toast({ title: "트랙 종료됨" });
+      } else {
+        const nowTs = Date.now();
+        
+        const batch = writeBatch(firestore);
+
+        if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
+          batch.update(progressRef, {
+            'stats.consistency': increment(0.5),
+            [`dailyLpStatus.${todayKey}.checkedIn`]: true,
+            updatedAt: serverTimestamp()
+          });
+          toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
         }
 
-        updateData.seasonLp = increment(studyLpEarned);
-        updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
-        
-        batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
-        
-        const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
-        batch.set(statRef, { 
-          totalStudyMinutes: increment(sessionMinutes), 
-          studentId: user.uid, 
-          centerId, 
-          dateKey: todayKey, 
-          updatedAt: serverTimestamp() 
-        }, { merge: true });
+        if (seatDoc) {
+          batch.update(seatDoc.ref, { 
+            status: 'studying', 
+            lastCheckInAt: Timestamp.fromMillis(nowTs),
+            updatedAt: serverTimestamp() 
+          });
+        }
 
-        const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-        batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
-        
-        batch.update(progressRef, updateData);
+        await batch.commit();
+        setStartTime(nowTs); 
+        setIsTimerActive(true);
       }
-
-      if (seatDoc) {
-        batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
-      }
-      
-      await batch.commit();
-      setIsTimerActive(false); 
-      setStartTime(null); 
-      toast({ title: "트랙 종료됨" });
-    } else {
-      const nowTs = Date.now();
-      setStartTime(nowTs); 
-      setIsTimerActive(true);
-      
-      const batch = writeBatch(firestore);
-
-      if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-        batch.update(progressRef, {
-          'stats.consistency': increment(0.5),
-          [`dailyLpStatus.${todayKey}.checkedIn`]: true,
-          updatedAt: serverTimestamp()
-        });
-        toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
-      }
-
-      if (seatDoc) {
-        batch.update(seatDoc.ref, { 
-          status: 'studying', 
-          lastCheckInAt: Timestamp.fromMillis(nowTs),
-          updatedAt: serverTimestamp() 
-        });
-      }
-
-      await batch.commit();
+    } catch (e: any) {
+      console.error("Action error:", e);
+      toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
+    } finally {
+      setIsProcessingAction(false);
     }
   };
 
@@ -647,12 +657,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </span>
               </div>
             )}
-            <button className={cn(
-              "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap",
-              isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
-              isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
-            )} onClick={handleStudyStartStop}>
-              {isTimerActive ? <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></> : <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>}
+            <button 
+              disabled={isProcessingAction}
+              className={cn(
+                "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+                isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
+                isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
+              )} 
+              onClick={handleStudyStartStop}
+            >
+              {isProcessingAction ? (
+                <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
+              ) : isTimerActive ? (
+                <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+              ) : (
+                <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+              )}
             </button>
           </div>
         </div>
