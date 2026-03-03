@@ -1,3 +1,4 @@
+
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -17,7 +18,7 @@ import { getFunctions, Functions } from 'firebase/functions';
 
 /**
  * 프로젝트 전역 싱글톤 Firebase 서비스 인스턴스
- * Firebase Studio 환경에서는 에뮬레이터를 사용하지 않고 프로덕션 서비스를 직접 연결합니다.
+ * Firebase Studio 운영 지침에 따라 에뮬레이터 코드를 절대 사용하지 않습니다.
  */
 let firebaseApp: FirebaseApp | null = null;
 let firestore: Firestore | null = null;
@@ -39,7 +40,6 @@ function ensureApp(): FirebaseApp {
 function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
-  // INTERNAL ASSERTION FAILED 에러 방지를 위해 로컬 캐시 및 롱 폴링 설정 유지
   firestore = initializeFirestore(app, {
     localCache: persistentLocalCache(),
     experimentalForceLongPolling: true,
@@ -56,7 +56,7 @@ function ensureAuth(app: FirebaseApp): Auth {
 
 function ensureFunctions(app: FirebaseApp): Functions {
   if (functions) return functions;
-  // 센터가 위치한 서울 리전(asia-northeast3)을 명시적으로 설정
+  // 서버 리전(asia-northeast3)을 명시적으로 설정하여 CORS 및 404 에러 방지
   functions = getFunctions(app, 'asia-northeast3');
   return functions;
 }

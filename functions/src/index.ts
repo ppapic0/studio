@@ -15,6 +15,7 @@ const region = "asia-northeast3";
  * 선생님이 학생 계정을 직접 생성하고 센터에 등록하는 함수
  */
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
+  // 1. 인증 체크
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   }
@@ -28,7 +29,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
   const callerId = context.auth.uid;
 
   try {
-    // 권한 확인
+    // 2. 권한 확인 (관리자 또는 선생님만 가능)
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     const callerData = callerMemberSnap.data();
     
@@ -36,7 +37,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
     }
 
-    // 1. Auth 계정 생성
+    // 3. Auth 계정 생성
     let userRecord;
     try {
       userRecord = await auth.createUser({
@@ -49,13 +50,13 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       if (authError.code === 'auth/email-already-exists') {
         throw new functions.https.HttpsError("already-exists", "이미 가입된 이메일 주소입니다.");
       }
-      throw new functions.https.HttpsError("invalid-argument", `인증 계정 생성 실패: ${authError.message}`);
+      throw new functions.https.HttpsError("internal", `인증 계정 생성 실패: ${authError.message}`);
     }
 
     const uid = userRecord.uid;
     const timestamp = admin.firestore.Timestamp.now();
 
-    // 2. DB 데이터 일괄 생성 (트랜잭션)
+    // 4. DB 데이터 일괄 생성 (트랜잭션)
     await db.runTransaction(async (transaction) => {
       transaction.set(db.doc(`users/${uid}`), {
         id: uid,
@@ -96,11 +97,10 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       });
 
       transaction.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
+        seasonLp: 0,
         level: 1,
-        currentXp: 0,
-        nextLevelXp: 1000,
         stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
-        skills: {},
+        totalLpEarned: 0,
         updatedAt: timestamp,
       });
     });
@@ -118,20 +118,26 @@ export const registerStudent = functions.region(region).https.onCall(async (data
  * 학생의 계정 정보(비밀번호 등)를 업데이트하는 함수
  */
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
+  // 1. 인증 체크
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
+  }
   
   const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
-  if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
+  if (!studentId || !centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
+  }
 
   const callerId = context.auth.uid;
 
   try {
+    // 2. 권한 확인
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
       throw new functions.https.HttpsError("permission-denied", "정보를 수정할 권한이 없습니다.");
     }
 
-    // 1. Auth 업데이트 (비밀번호/이름)
+    // 3. Auth 업데이트 (비밀번호/이름)
     if (password || displayName) {
       try {
         const authUpdates: any = {};
@@ -143,11 +149,11 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
         }
       } catch (authError: any) {
         console.error("[Auth Update Error]", authError);
-        throw new functions.https.HttpsError("invalid-argument", `인증 정보 수정 실패: ${authError.message}`);
+        throw new functions.https.HttpsError("internal", `인증 서버 업데이트 실패: ${authError.message}`);
       }
     }
 
-    // 2. DB 업데이트
+    // 4. Firestore 업데이트
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
 
@@ -172,7 +178,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     }
 
     await batch.commit();
-    return { ok: true, message: "학생 정보가 성공적으로 업데이트되었습니다." };
+    return { ok: true, message: "학생 정보가 업데이트되었습니다." };
 
   } catch (error: any) {
     console.error("[updateStudentAccount Global Error]", error);
@@ -189,8 +195,7 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
     throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
   }
   
-  const studentId = data.studentId ? data.studentId.toString().trim() : null;
-  const centerId = data.centerId ? data.centerId.toString().trim() : null;
+  const { studentId, centerId } = data;
 
   if (!studentId || !centerId) {
     throw new functions.https.HttpsError("invalid-argument", "유효한 학생 ID와 센터 ID가 필요합니다.");
@@ -212,7 +217,6 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
       await auth.deleteUser(studentId);
     } catch (authError: any) {
       console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or error:`, authError.message);
-      // 이미 삭제된 경우(auth/user-not-found) 등은 무시하고 DB 정리를 진행합니다.
     }
 
     // 3. Firestore 데이터 일괄 정리
@@ -230,12 +234,12 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
     });
 
     await batch.commit();
-    return { ok: true, message: "계정 및 모든 데이터가 영구 삭제되었습니다." };
+    return { ok: true, message: "계정 및 모든 데이터가 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Global Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `영구 삭제 중 오류: ${error.message}`);
+    throw new functions.https.HttpsError("internal", `삭제 중 서버 오류: ${error.message}`);
   }
 });
 

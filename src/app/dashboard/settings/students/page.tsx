@@ -72,7 +72,6 @@ export default function StudentAccountManagementPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
   
-  // 수정 폼 상태
   const [editForm, setEditForm] = useState({
     displayName: '',
     password: '',
@@ -85,7 +84,6 @@ export default function StudentAccountManagementPage() {
   const centerId = activeMembership?.id;
   const isAdmin = activeMembership?.role === 'centerAdmin';
 
-  // 1. 센터 모든 학생 멤버 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(
@@ -96,14 +94,12 @@ export default function StudentAccountManagementPage() {
   
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isAdmin });
 
-  // 2. 초대 코드 조회 (반 목록 추출용)
   const invitesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
   }, [firestore, centerId, isAdmin]);
   const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery, { enabled: isAdmin });
 
-  // 3. 학생 상세 프로필 조회
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return collection(firestore, 'centers', centerId, 'students');
@@ -144,13 +140,11 @@ export default function StudentAccountManagementPage() {
   };
 
   const handleUpdateStudent = async () => {
-    if (!functions || !centerId || !selectedStudentForEdit) {
-      toast({ variant: "destructive", title: "필수 정보가 누락되었습니다." });
-      return;
-    }
+    if (!functions || !centerId || !selectedStudentForEdit) return;
     
     setIsUpdating(selectedStudentForEdit.id);
     try {
+      // 1. 서버 함수 호출
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
       const result: any = await updateFn({
         studentId: selectedStudentForEdit.id,
@@ -166,16 +160,15 @@ export default function StudentAccountManagementPage() {
         toast({ title: "정보 수정 완료", description: "학생의 계정 정보가 업데이트되었습니다." });
         setIsEditModalOpen(false);
       } else {
-        throw new Error(result.data?.message || "수정 작업 중 오류가 발생했습니다.");
+        throw new Error(result.data?.message || "수정 중 원인 모를 오류가 발생했습니다.");
       }
     } catch (e: any) {
-      console.error("[Update Student Error Full]", e);
-      // internal 에러 발생 시 상세 메시지 표시
-      const errorMessage = e.details?.message || e.message || "서버 내부 오류가 발생했습니다.";
+      console.error("[Update Student Error]", e);
+      // 서버에서 반환한 구체적인 에러 메시지 표시
       toast({ 
         variant: "destructive", 
         title: "수정 실패", 
-        description: errorMessage
+        description: e.message || "서버 통신 중 오류가 발생했습니다." 
       });
     } finally {
       setIsUpdating(null);
@@ -196,12 +189,11 @@ export default function StudentAccountManagementPage() {
         throw new Error(result.data?.message || "삭제 작업 중 오류가 발생했습니다.");
       }
     } catch (e: any) {
-      console.error("[Delete Student Error Full]", e);
-      const errorMessage = e.details?.message || e.message || "계정 삭제 중 오류가 발생했습니다.";
+      console.error("[Delete Student Error]", e);
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: errorMessage
+        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
       });
     } finally {
       setIsDeleting(null);
