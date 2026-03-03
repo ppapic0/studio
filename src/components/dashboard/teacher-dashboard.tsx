@@ -282,7 +282,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const centerTrendData = useMemo(() => {
     if (!mounted) return [];
     
-    // 1. Get historical data excluding today to avoid duplicates
     let data = kpiHistory 
       ? kpiHistory
           .filter(k => k.date !== todayKey)
@@ -294,7 +293,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           }))
       : [];
 
-    // 2. Add live data point for today using calculated live stats
     data.push({
       name: todayKey.split('-').slice(1).join('/'),
       hours: Number((stats.totalCenterMinutes / 60).toFixed(1)),
@@ -302,7 +300,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       dateKey: todayKey
     });
 
-    // 3. Ensure we only show last 30 days and they are sorted by date
     return data
       .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
       .slice(-30);
@@ -349,32 +346,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
     try {
-      const sessionQ = query(
-        collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'),
-        orderBy('startTime', 'desc')
-      );
-      const sessionSnap = await getDocs(sessionQ);
-      setSelectedStudentSessions(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession)));
-
-      const reportQ = query(
-        collection(firestore, 'centers', centerId, 'dailyReports'),
-        where('studentId', '==', studentId),
-        where('status', '==', 'sent')
-      );
-      const reportSnap = await getDocs(reportQ);
+      // 1. 세션 정보 (인덱스 문제 방지를 위해 정렬 제거 후 클라이언트에서 수행)
+      const sessionRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
+      const sessionSnap = await getDocs(sessionRef);
+      const sessions = sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession));
+      
+      // 2. 리포트 정보 (동일하게 클라이언트 정렬)
+      const reportRef = collection(firestore, 'centers', centerId, 'dailyReports');
+      const reportSnap = await getDocs(query(reportRef, where('studentId', '==', studentId), where('status', '==', 'sent')));
       const reports = reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport));
-      setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
 
-      const historyQ = query(
-        collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
-        orderBy('dateKey', 'desc'),
-        limit(7)
-      );
-      const historySnap = await getDocs(historyQ);
-      setSelectedStudentHistory(historySnap.docs.map(d => d.data() as StudyLogDay));
+      // 3. 최근 히스토리
+      const historyRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
+      const historySnap = await getDocs(query(historyRef, limit(14)));
+      const history = historySnap.docs.map(d => d.data() as StudyLogDay);
+
+      setSelectedStudentSessions(sessions.sort((a, b) => b.startTime.toMillis() - a.startTime.toMillis()));
+      setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
+      setSelectedStudentHistory(history.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 7));
 
     } catch (e) {
-      console.error(e);
+      console.error("Student Details Fetch Error:", e);
+      toast({ variant: "destructive", title: "정보 로드 실패", description: "데이터를 불러오는 중 문제가 발생했습니다." });
     } finally {
       setSessionsLoading(false);
     }
@@ -799,17 +792,42 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 <span className="text-[9px] font-bold text-muted-foreground uppercase">{todayKey}</span>
                               </div>
                               <div className="grid gap-2">
-                                {sessionsLoading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div> : selectedStudentSessions.length === 0 ? <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">기록된 세션이 없습니다.</div> :
-                                  selectedStudentSessions.map((session) => (
-                                    <div key={session.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                        <div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center"><Timer className="h-4 w-4 text-primary/40" /></div>
-                                        <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase">Captured</span></div>
+                                {sessionsLoading ? (
+                                  <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
+                                ) : (
+                                  <>
+                                    {/* 현재 진행 중인 세션 표시 */}
+                                    {selectedSeat.status === 'studying' && selectedSeat.lastCheckInAt && (
+                                      <div className="p-4 rounded-2xl bg-blue-600 text-white border border-blue-700 shadow-lg flex items-center justify-between animate-pulse">
+                                        <div className="flex items-center gap-3">
+                                          <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center"><Zap className="h-4 w-4 fill-current text-white" /></div>
+                                          <div className="grid leading-tight">
+                                            <span className="font-black text-xs">{format(selectedSeat.lastCheckInAt.toDate(), 'HH:mm')} ~ 진행 중</span>
+                                            <span className="text-[8px] font-bold text-white/60 uppercase">Active Session</span>
+                                          </div>
+                                        </div>
+                                        <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 h-6">
+                                          {Math.floor((now - selectedSeat.lastCheckInAt.toMillis()) / 60000)}분째
+                                        </Badge>
                                       </div>
-                                      <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[10px] px-2.5 h-6">{session.durationMinutes}분</Badge>
-                                    </div>
-                                  ))
-                                }
+                                    )}
+                                    
+                                    {/* 완료된 세션 목록 */}
+                                    {selectedStudentSessions.length === 0 && selectedSeat.status !== 'studying' ? (
+                                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">기록된 세션이 없습니다.</div>
+                                    ) : (
+                                      selectedStudentSessions.map((session) => (
+                                        <div key={session.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center"><Timer className="h-4 w-4 text-primary/40" /></div>
+                                            <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase">Captured</span></div>
+                                          </div>
+                                          <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[10px] px-2.5 h-6">{session.durationMinutes}분</Badge>
+                                        </div>
+                                      ))
+                                    )}
+                                  </>
+                                )}
                               </div>
                             </div>
                           </TabsContent>
