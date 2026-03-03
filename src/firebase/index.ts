@@ -40,11 +40,13 @@ function ensureApp(): FirebaseApp {
 function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
-  // 내부 어설션 에러 방지를 위해 타브 관리자 설정을 표준으로 유지합니다.
+  // 내부 어설션 에러 방지를 위해 타브 관리자 설정을 표준으로 유지하며,
+  // 워크스테이션 환경의 시간 동기화 및 스트리밍 문제를 방지하기 위해 롱 폴링을 강제합니다.
   firestore = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
+    experimentalForceLongPolling: true,
   });
 
   return firestore;
