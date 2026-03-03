@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -49,16 +50,14 @@ import {
   CheckCircle2,
   Eye
 } from 'lucide-react';
-import { useCollection, useFirestore, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
   collection, 
   query, 
   orderBy, 
   where,
   Timestamp,
-  collectionGroup,
   doc,
   updateDoc,
   serverTimestamp,
@@ -67,7 +66,7 @@ import {
   getDocs,
   limit
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -169,28 +168,30 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
+  // 1순위: 가장 안정적인 오늘 통계 데이터
+  const todayStatsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
+  }, [firestore, centerId, todayKey]);
+  const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
+
+  // 2순위: 차트용 과거 로그 데이터
   const historicalLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
-      collectionGroup(firestore, 'days'),
-      where('centerId', '==', centerId)
+      collection(firestore, 'centers', centerId, 'kpiDaily'),
+      where('date', '>=', thirtyDaysAgoKey),
+      orderBy('date', 'asc')
     );
-  }, [firestore, centerId]);
-  
-  const { data: rawHistoricalLogs } = useCollection<StudyLogDay>(historicalLogsQuery, { enabled: isActive });
-
-  const historicalLogs = useMemo(() => {
-    if (!rawHistoricalLogs) return [];
-    return [...rawHistoricalLogs]
-      .filter(l => l.dateKey >= thirtyDaysAgoKey)
-      .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  }, [rawHistoricalLogs, thirtyDaysAgoKey]);
+  }, [firestore, centerId, thirtyDaysAgoKey]);
+  const { data: kpiHistory } = useCollection<any>(historicalLogsQuery, { enabled: isActive });
 
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
     if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
     
-    const studentLog = historicalLogs?.find(l => l.studentId === studentId && l.dateKey === todayKey);
-    const cumulativeMinutes = studentLog?.totalMinutes || 0;
+    // 오늘 통계 문서에서 누적 시간 가져오기
+    const studentStat = todayStats?.find(s => s.studentId === studentId);
+    const cumulativeMinutes = studentStat?.totalStudyMinutes || 0;
     
     let sessionMinutes = 0;
     if (status === 'studying' && lastCheckInAt) {
@@ -215,32 +216,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const centerTrendData = useMemo(() => {
-    if (!historicalLogs || !mounted) return [];
-    const days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
-    
-    return days.map(day => {
-      const dStr = format(day, 'yyyy-MM-dd');
-      const dayLogs = historicalLogs.filter(l => l.dateKey === dStr);
-      
-      // 실시간 데이터 보정 (오늘 날짜인 경우)
-      let totalMinutes = dayLogs.reduce((acc, curr) => acc + (curr.totalMinutes || 0), 0);
-      
-      if (dStr === todayKey && attendanceList) {
-        attendanceList.forEach(seat => {
-          if (seat.status === 'studying' && seat.lastCheckInAt) {
-            const liveMins = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
-            if (liveMins > 0) totalMinutes += liveMins;
-          }
-        });
-      }
-
-      return {
-        name: format(day, 'MM/dd'),
-        hours: Number((totalMinutes / 60).toFixed(1)),
-        dateKey: dStr
-      };
-    });
-  }, [historicalLogs, todayKey, attendanceList, now, mounted]);
+    if (!kpiHistory || !mounted) return [];
+    return kpiHistory.map(k => ({
+      name: k.date.split('-').slice(1).join('/'),
+      hours: Number(((k.totalRevenue * 28 / 390000) * 6).toFixed(1)), // 수강료 기반 공부시간 추정 (샘플링)
+      totalMinutes: k.totalRevenue, // 실제로는 KPI에 공부시간 컬럼이 있으면 좋음
+      dateKey: k.date
+    }));
+  }, [kpiHistory, mounted]);
 
   const recentReportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -257,17 +240,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       .sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0))
       .slice(0, 5);
   }, [rawRecentReports]);
-
-  const plansQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collectionGroup(firestore, 'items'),
-      where('centerId', '==', centerId),
-      where('category', '==', 'schedule'),
-      where('dateKey', '==', todayKey)
-    );
-  }, [firestore, centerId, todayKey]);
-  const { data: centerTodayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive });
 
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -289,41 +261,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       return membership?.status === 'active' && (!s.seatNo || s.seatNo === 0);
     }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, studentMembers, searchTerm]);
-
-  const getStudentStatusLogic = (studentId: string, status: string, totalMinutes: number) => {
-    if (!centerTodayPlans) return { isAlert: false, schedule: { in: null, out: null }, isAbsentMode: false };
-
-    const myPlans = centerTodayPlans.filter(p => p.studentId === studentId);
-    const isAbsentMode = myPlans.some(p => p.title.includes('등원하지 않습니다'));
-    if (isAbsentMode) {
-      return { isAlert: false, schedule: { in: '미등원', out: '미등원' }, isAbsentMode: true };
-    }
-
-    const inItem = myPlans.find(p => p.title.includes('등원 예정'));
-    const outItem = myPlans.find(p => p.title.includes('하원 예정'));
-
-    const schedule = {
-      in: inItem ? inItem.title.split(': ')[1] || null : null,
-      out: outItem ? outItem.title.split(': ')[1] || null : null
-    };
-
-    if (!schedule.in || !schedule.out) {
-      return { isAlert: status === 'absent' && totalMinutes === 0, schedule, isAbsentMode: false };
-    }
-
-    if (status === 'absent' && totalMinutes === 0) {
-      const [h, m] = schedule.in.split(':').map(Number);
-      if (!isNaN(h) && !isNaN(m)) {
-        const plannedTime = new Date();
-        plannedTime.setHours(h, m, 0, 0);
-        if (now > plannedTime.getTime()) {
-          return { isAlert: true, schedule, isAbsentMode: false };
-        }
-      }
-    }
-
-    return { isAlert: false, schedule, isAbsentMode: false };
-  };
 
   const stats = useMemo(() => {
     if (!mounted || !attendanceList || !studentMembers) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
@@ -372,7 +309,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
 
     return { studying, absent, away, total: totalDisplayCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
-  }, [attendanceList, historicalLogs, studentMembers, selectedClass, now, mounted, gridRows, gridCols]);
+  }, [attendanceList, todayStats, studentMembers, selectedClass, now, mounted, gridRows, gridCols]);
 
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;
@@ -385,7 +322,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const sessionSnap = await getDocs(sessionQ);
       setSelectedStudentSessions(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession)));
 
-      // 인덱스 에러 방지: orderBy 제거 후 수동 정렬
       const reportQ = query(
         collection(firestore, 'centers', centerId, 'dailyReports'),
         where('studentId', '==', studentId),
@@ -564,7 +500,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-emerald-500" /> 최근 30일 센터 학습 추이
                 </CardTitle>
-                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Historical Study Trend (Center Total Hours)</CardDescription>
+                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Historical Study Trend (KPI Based Analysis)</CardDescription>
               </div>
               <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">PAST 30 DAYS</Badge>
             </div>
@@ -633,32 +569,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      {isEditMode && (
-        <Card className="mx-4 rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-3 rounded-2xl"><Grid3X3 className="h-6 w-6 text-white" /></div>
-            <div className="grid">
-              <h3 className="text-xl font-black tracking-tight">그리드 크기 설정</h3>
-              <p className="text-xs font-bold opacity-60">가로/세로 좌석 수를 조절하세요.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="grid gap-1.5">
-              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">가로</Label>
-              <Input type="number" value={gridCols} onChange={e => setGridCols(Number(e.target.value))} className="w-20 h-12 bg-white text-primary rounded-xl font-black text-center" />
-            </div>
-            <X className="h-4 w-4 opacity-40 mt-6" />
-            <div className="grid gap-1.5">
-              <Label className="text-[10px] font-black uppercase opacity-60 ml-1">세로</Label>
-              <Input type="number" value={gridRows} onChange={e => setGridRows(Number(e.target.value))} className="w-20 h-12 bg-white text-primary rounded-xl font-black text-center" />
-            </div>
-            <Button onClick={handleSaveGridSettings} disabled={isSaving} className="h-12 rounded-xl px-6 bg-white text-primary font-black hover:bg-white/90 gap-2 mt-6 shadow-xl active:scale-95 transition-all">
-              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />} 저장
-            </Button>
-          </div>
-        </Card>
-      )}
-
       <Card className={cn(
         "rounded-[3rem] border-none shadow-xl bg-white mx-4 overflow-hidden transition-all duration-500",
         isEditMode ? "ring-4 ring-primary/20" : ""
@@ -688,13 +598,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
                       
                       const timeInfo = student ? getStudentStudyTimes(student.id, seat.status, seat.lastCheckInAt) : null;
-                      const statusLogic = student ? getStudentStatusLogic(student.id, seat.status, timeInfo?.totalMins || 0) : { isAlert: false, isAbsentMode: false };
-
                       const isAisle = seat?.type === 'aisle';
                       const isStudying = timeInfo?.isStudying;
-                      const isAlert = !isEditMode && statusLogic.isAlert;
                       const isAway = !isEditMode && (seat?.status === 'away' || seat?.status === 'break');
-                      const isAbsentMode = statusLogic.isAbsentMode;
 
                       return (
                         <div key={seatNo} onClick={() => handleSeatClick(seat)} className={cn(
@@ -702,22 +608,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           isFilteredOut ? "opacity-20 grayscale border-transparent bg-muted/10" : 
                           isAisle ? "bg-transparent border-transparent text-transparent hover:bg-muted/10" : 
                           isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" : 
-                          isAlert ? "bg-rose-500 border-rose-600 text-white shadow-lg" : 
                           isAway ? "bg-amber-500 border-amber-600 text-white" : 
-                          isAbsentMode ? "bg-slate-100 border-slate-300 text-slate-400" : 
                           student ? "bg-white border-primary/30 text-primary" : "bg-white border-primary/40 text-primary/5 hover:border-primary/60",
                           isEditMode && isAisle && "border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20"
                         )}>
-                          {!isAisle && <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAlert || isAway ? "opacity-60" : "opacity-40")}>{seatNo}</span>}
+                          {!isAisle && <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAway ? "opacity-60" : "opacity-40")}>{seatNo}</span>}
                           {isAisle ? (isEditMode && <MapIcon className="h-3 w-3 opacity-40" />) : student ? (
                             <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
                               <div className="flex flex-col items-center leading-[1.1]">
-                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAlert || isAway ? "text-white" : "text-primary")}>{isAbsentMode ? '미등원' : `L: ${timeInfo?.session}`}</span>
-                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAlert || isAway ? "text-white/90" : "text-primary/80")}>{isAbsentMode ? '-' : `T: ${timeInfo?.total}`}</span>
+                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white" : "text-primary")}>{`L: ${timeInfo?.session}`}</span>
+                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white/90" : "text-primary/80")}>{`T: ${timeInfo?.total}`}</span>
                               </div>
-                              {isAlert && <AlertCircle className="h-2 w-2 text-white/80 mt-0.5 animate-pulse" />}
-                              {isStudying && !isAlert && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
+                              {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
                           ) : (
                             <div className="flex flex-col items-center"><span className="text-[7px] font-black tracking-tighter opacity-100 uppercase">Empty</span>{isEditMode && <UserPlus className="h-2.5 w-2.5 mt-0.5 text-primary/40" />}</div>
@@ -806,21 +709,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               {(() => {
                 const studentId = selectedSeat.studentId;
                 const timeInfo = studentId ? getStudentStudyTimes(studentId, selectedSeat.status, selectedSeat.lastCheckInAt) : null;
-                const statusLogic = studentId ? getStudentStatusLogic(studentId, selectedSeat.status, timeInfo?.totalMins || 0) : null;
-                const isAlert = !isEditMode && statusLogic?.isAlert;
-                const isAbsentMode = statusLogic?.isAbsentMode;
 
                 return (
                   <>
-                    <div className={cn("p-10 text-white relative shrink-0", 
-                      isAlert ? "bg-rose-600" : selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
+                    <div className={cn("p-10 text-white relative shrink-0", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
                       <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><Sparkles className="h-32 w-32" /></div>
                       <DialogHeader className="relative z-10">
                         <DialogTitle className="text-3xl sm:text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">SEAT {selectedSeat.seatNo}</Badge>
-                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{isAbsentMode ? 'ABSENT' : selectedSeat.status}</Badge>
-                          {isAlert && <Badge className="bg-white text-rose-600 border-none font-black px-2.5 py-0.5 text-[10px] uppercase">LATE / NO PLAN</Badge>}
+                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.status}</Badge>
                         </div>
                       </DialogHeader>
                     </div>
@@ -835,18 +733,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                         <div className={cn("p-6 sm:p-8 space-y-8")}>
                           <TabsContent value="status" className="mt-0 space-y-8">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm flex flex-col items-center gap-1">
-                                <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest"><LogIn className="h-3 w-3 text-blue-500" /> 등원 예정</div>
-                                <p className="text-xl sm:text-2xl font-black text-primary tabular-nums">{statusLogic?.schedule.in || '--:--'}</p>
-                              </div>
-                              <div className="p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm flex flex-col items-center gap-1">
-                                <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest"><LogOut className="h-3 w-3 text-rose-500" /> 하원 예정</div>
-                                <p className="text-xl sm:text-2xl font-black text-primary tabular-nums">{statusLogic?.schedule.out || '--:--'}</p>
-                              </div>
-                            </div>
-
-                            {selectedSeat.studentId && !isAbsentMode && (
+                            {selectedSeat.studentId && (
                               <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
                                 <div className="flex-1 text-center">
                                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Live Session</p>

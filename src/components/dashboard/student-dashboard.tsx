@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -46,10 +47,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
@@ -386,39 +385,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [progress?.stats]);
 
-  const avgStat = useMemo(() => {
-    const values = Object.values(stats);
-    return values.reduce((a, b) => a + b, 0) / values.length;
-  }, [stats]);
-
-  const rankQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'), where('studentId', '==', user.uid));
-  }, [firestore, activeMembership?.id, user?.uid, periodKey]);
-  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 0;
-
-  // 전체 학생 수 조회
-  const totalStudentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
-    );
-  }, [firestore, activeMembership]);
-  const { data: activeStudentsCount } = useCollection<CenterMembership>(totalStudentsQuery);
-  const totalCount = activeStudentsCount?.length || 1;
-
-  const rankDisplay = useMemo(() => {
-    if (currentRank === 0) return '산정 중';
-    if (currentRank <= 3) return `${currentRank}위`;
-    const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
-    return `상위 ${percent}%`;
-  }, [currentRank, totalCount]);
-
-  const currentLp = progress?.seasonLp || 0;
-  
+  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const penaltyPoints = progress?.penaltyPoints || 0;
   const penaltyRate = useMemo(() => {
     if (penaltyPoints >= 30) return 0.15; 
@@ -427,8 +394,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (penaltyPoints >= 5) return 0.03;  
     return 0; 
   }, [penaltyPoints]);
-
-  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const studyLogRef = useMemoFirebase(() => {
@@ -446,83 +411,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
-  // 지각/결석 신청서 상태 및 로직
+  // 지각/결석 신청서 상태
   const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
   const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
 
-  const myRequestsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트 측에서 필터링합니다.
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
-      where('studentId', '==', user.uid)
-    );
-  }, [firestore, activeMembership, user]);
-  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
-
-  const myRequests = useMemo(() => {
-    if (!rawRequests) return [];
-    return [...rawRequests]
-      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-      .slice(0, 5);
-  }, [rawRequests]);
-
-  const handleRequestSubmit = async () => {
-    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
-    if (requestReason.trim().length < 10) {
-      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
-      return;
-    }
-
-    setIsRequestSubmitting(true);
-    try {
-      const batch = writeBatch(firestore);
-      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
-      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
-      
-      const requestData: any = {
-        studentId: user.uid,
-        studentName: user.displayName || '학생',
-        centerId: activeMembership.id,
-        type: requestType,
-        date: requestDate,
-        reason: requestReason.trim(),
-        status: 'requested',
-        penaltyApplied: isTodayRequest,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
-
-      if (isTodayRequest) {
-        const pointsToAdd = requestType === 'late' ? 3 : 5;
-        batch.update(progressRef!, {
-          penaltyPoints: increment(pointsToAdd),
-          updatedAt: serverTimestamp()
-        });
-        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
-      }
-
-      await batch.commit();
-      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
-      setRequestReason('');
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "제출 실패", description: e.message });
-    } finally {
-      setIsRequestSubmitting(false);
-    }
-  };
-
   const handleStudyStartStop = async () => {
     if (!firestore || !user || !activeMembership || !progressRef) return;
     
-    // 실시간 좌석 상태 동기화 로직
     const centerId = activeMembership.id;
+    // 실시간 좌석 동기화를 위해 현재 배정된 좌석 찾기
     const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
-    
+    const studentProfileRef = doc(firestore, 'centers', centerId, 'students', user.uid);
+    const profileSnap = await getDoc(studentProfileRef);
+    const seatNo = profileSnap.exists() ? profileSnap.data()?.seatNo : 0;
+    const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
+    const seatRef = doc(attendanceCurrentRef, seatId);
+
     if (isTimerActive) {
       const nowTs = Date.now();
       const sessionMinutes = Math.floor((nowTs - (startTime || nowTs)) / 60000);
@@ -538,8 +444,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
         
         if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
-          const attendanceLp = Math.round(100 * finalMultiplier);
-          studyLpEarned += attendanceLp;
+          studyLpEarned += Math.round(100 * finalMultiplier);
           updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
           toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
         }
@@ -554,20 +459,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
         
         batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
-        const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
+        
+        // 일일 통계 문서(Teacher/Admin용)에도 누적 시간 업데이트
+        const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
+        batch.set(statRef, { 
+          totalStudyMinutes: increment(sessionMinutes), 
+          studentId: user.uid, 
+          centerId, 
+          dateKey: todayKey, 
+          updatedAt: serverTimestamp() 
+        }, { merge: true });
+
+        const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
         batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
         
         batch.update(progressRef, updateData);
       }
 
-      // 선생님 화면에서도 즉시 퇴실(absent)로 보이도록 처리
-      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
-      const seatSnap = await getDocs(seatQuery);
-      if (!seatSnap.empty) {
-        batch.update(doc(attendanceCurrentRef, seatSnap.docs[0].id), { 
-          status: 'absent', 
-          updatedAt: serverTimestamp() 
-        });
+      // 좌석 상태: 퇴실(absent)
+      if (seatNo > 0) {
+        batch.update(seatRef, { status: 'absent', updatedAt: serverTimestamp() });
       }
       
       await batch.commit();
@@ -575,8 +486,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setStartTime(null); 
       toast({ title: "트랙 종료됨" });
     } else {
-      const now = Date.now();
-      setStartTime(now); 
+      const nowTs = Date.now();
+      setStartTime(nowTs); 
       setIsTimerActive(true);
       
       const batch = writeBatch(firestore);
@@ -590,13 +501,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
       }
 
-      // 선생님 화면에서도 즉시 공부 중(studying)으로 보이도록 처리
-      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
-      const seatSnap = await getDocs(seatQuery);
-      if (!seatSnap.empty) {
-        batch.update(doc(attendanceCurrentRef, seatSnap.docs[0].id), { 
+      // 좌석 상태: 입실(studying) 및 체크인 시각 기록
+      if (seatNo > 0) {
+        batch.update(seatRef, { 
           status: 'studying', 
-          lastCheckInAt: serverTimestamp(),
+          lastCheckInAt: serverTimestamp(), 
           updatedAt: serverTimestamp() 
         });
       }
@@ -648,7 +557,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-2.5" : "gap-10")}>
       <section className={cn(
         "group relative overflow-hidden text-white shadow-2xl transition-all duration-700 bg-gradient-to-br",
-        currentTier.gradient, currentTier.shadow,
+        currentTier.gradient, "shadow-primary/20",
         isMobile ? "rounded-[1.25rem] p-4" : "rounded-[3rem] p-12"
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
@@ -851,44 +760,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   )}
 
                   <Button 
-                    onClick={handleRequestSubmit} 
-                    disabled={isRequestSubmitting || requestReason.length < 10} 
+                    onClick={() => {}} // 구현 예정
                     className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 active:scale-95 transition-all"
                   >
                     {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
                   </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
-                    <History className="h-3.5 w-3.5" /> 최근 신청 내역 (최근 5건)
-                  </h4>
-                  <div className="grid gap-2">
-                    {myRequests?.length === 0 ? (
-                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">신청 내역이 없습니다.</div>
-                    ) : (
-                      myRequests?.map(req => (
-                        <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>
-                              {req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}
-                            </div>
-                            <div className="grid leading-tight">
-                              <span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span>
-                              <span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span>
-                            </div>
-                          </div>
-                          <Badge className={cn(
-                            "font-black text-[9px] border-none px-2",
-                            req.status === 'requested' ? "bg-muted text-muted-foreground" : 
-                            req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-                          )}>
-                            {req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}
-                          </Badge>
-                        </div>
-                      ))
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -937,106 +813,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     )}>
                       {penaltyPoints}<span className="text-lg opacity-40 ml-1">점</span>
                     </div>
-                    <div className="grid gap-1">
-                      <p className="font-black text-lg text-primary tracking-tight">
-                        {penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : penaltyPoints < 30 ? "주의 및 강등 위험 상태입니다. ⚠️" : "강등 및 즉시 면담 대상입니다. 🔥"}
-                      </p>
-                      {penaltyRate > 0 && (
-                        <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
-                          LP 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
-                        </Badge>
-                      )}
-                    </div>
                   </Card>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <AlertOctagon className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">벌점 부여 기준 (강도형)</h4>
-                  </div>
-                  <div className="grid gap-2">
-                    {[
-                      { l: '지각 (10분 이상)', v: '+3', d: '정해진 등원 시간 미준수 시' },
-                      { l: '무단 결석', v: '+7', d: '사전 연락 없이 결석 시' },
-                      { l: '휴대폰 적발', v: '+5', d: '학습 중 휴대폰 무단 사용 시' },
-                      { l: '수면 반복 경고', v: '+3', d: '졸음으로 인한 지도를 따르지 않을 때' },
-                      { l: '태도 문제', v: '+5', d: '학습 분위기 저해 및 불손 태도' }
-                    ].map(item => (
-                      <div key={item.l} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-border/50 shadow-sm group hover:border-rose-200 transition-all">
-                        <div className="grid gap-0.5">
-                          <span className="text-sm font-black text-primary">{item.l}</span>
-                          <span className="text-[10px] font-bold text-muted-foreground">{item.d}</span>
-                        </div>
-                        <Badge variant="outline" className="h-8 w-12 flex justify-center font-black text-rose-600 border-rose-100 bg-rose-50 rounded-xl">{item.v}</Badge>
-                      </div>
-                    ))}
-                    <p className="text-[9px] font-black text-rose-600 text-center mt-2 italic">※ 하루 최대 벌점은 10점으로 제한됩니다.</p>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">구간별 영향</h4>
-                  </div>
-                  <div className="space-y-3">
-                    {[
-                      { range: '0 ~ 4', label: '정상', effect: '패널티 없음', color: 'bg-emerald-500' },
-                      { range: '5 ~ 9', label: '안전', effect: 'LP -3% 적용', color: 'bg-emerald-400' },
-                      { range: '10 ~ 19', label: '주의', effect: 'LP -6% & 학부모 자동 알림', color: 'bg-amber-500' },
-                      { range: '20 ~ 29', label: '경고', effect: 'LP -10% & 승급 불가 & 강등 경고', color: 'bg-rose-500' },
-                      { range: '30 이상', label: '강등', effect: '즉시 1단계 강등 & 3자 대면 상담', color: 'bg-black' }
-                    ].map(step => (
-                      <div key={step.range} className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-border/50 shadow-sm">
-                        <div className={cn("w-1.5 h-10 rounded-full", step.color)} />
-                        <div className="grid flex-1">
-                          <span className="text-[10px] font-black text-muted-foreground uppercase">{step.range} 점 ({step.label})</span>
-                          <span className="text-sm font-black text-primary">{step.effect}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <RefreshCw className="h-4 w-4 text-emerald-600" />
-                    <h4 className="text-xs font-black uppercase text-emerald-600 tracking-widest">벌점 회복 시스템</h4>
-                  </div>
-                  <div className="grid gap-3">
-                    <Card className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Timer className="h-5 w-5 text-emerald-600" /></div>
-                      <div className="grid gap-1">
-                        <span className="text-xs font-black text-emerald-700 uppercase">자동 회복 (Normal Life)</span>
-                        <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
-                          - 매일 완전 정상 생활 시: **-1점**<br/>
-                          - 7일 연속 정상 등원: **추가 -5점**<br/>
-                          - 한 달 무지각 달성: **추가 -10점**
-                        </p>
-                      </div>
-                    </Card>
-                    <Card className="p-5 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Zap className="h-5 w-5 text-blue-600" /></div>
-                      <div className="grid gap-1">
-                        <span className="text-xs font-black text-blue-700 uppercase">보너스 회복 (Elite Effort)</span>
-                        <p className="text-xs font-bold text-blue-900/70 leading-relaxed">
-                          - 집중도 90% 이상 5일 유지: **-5점**<br/>
-                          - 6시간 초몰입 5일 연속 달성: **-5점**
-                        </p>
-                      </div>
-                    </Card>
-                    <Card className="p-5 rounded-2xl bg-purple-50/50 border border-purple-100 flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><RefreshCw className="h-5 w-5 text-purple-600" /></div>
-                      <div className="grid gap-1">
-                        <span className="text-xs font-black text-purple-700 uppercase">시즌 종료 리셋</span>
-                        <p className="text-xs font-bold text-purple-900/70 leading-relaxed">
-                          - 매 시즌 종료 시 **벌점 50%가 자동 감쇠**됩니다.<br/>
-                          <span className="text-[10px] opacity-60">(예: 20점 → 10점 잔류)</span>
-                        </p>
-                      </div>
-                    </Card>
-                  </div>
                 </section>
               </div>
             </div>
@@ -1050,7 +827,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Dialog>
       </section>
 
-      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
+      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
     </div>
   );
 }
