@@ -156,7 +156,7 @@ export async function requestRefund(db: Firestore, centerId: string, invoiceId: 
 }
 
 /**
- * 발생주의 방식의 Daily KPI 집계
+ * 발생주의 방식의 Daily KPI 집계 (실제 학습 시간 합산 포함)
  */
 export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: string) {
   const targetDate = startOfDay(new Date(dateStr));
@@ -171,14 +171,28 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
 
   let dailyAccruedRevenue = 0;
   let activeStudentCount = 0;
+  let totalStudyMinutes = 0;
 
-  membersSnap.forEach(doc => {
+  // 각 학생의 해당 날짜 학습 로그를 가져오기 위한 프로미스 생성
+  const logPromises = membersSnap.docs.map(memberDoc => {
+    const studentId = memberDoc.id;
+    return getDoc(doc(db, 'centers', centerId, 'studyLogs', studentId, 'days', dateStr));
+  });
+  
+  const logSnaps = await Promise.all(logPromises);
+
+  membersSnap.docs.forEach((doc, index) => {
     const data = doc.data();
     const monthlyFee = data.monthlyFee || 390000; // 기본가 39만 가정
     const dailyFee = Math.floor(monthlyFee / 28); // 28일 기준 일할
     
     dailyAccruedRevenue += dailyFee;
     activeStudentCount++;
+
+    const logSnap = logSnaps[index];
+    if (logSnap.exists()) {
+      totalStudyMinutes += logSnap.data().totalMinutes || 0;
+    }
   });
 
   // 2. 월별 고정비 가져오기 (BEP 계산용)
@@ -195,6 +209,7 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
   const kpiData = {
     date: dateStr,
     totalRevenue: dailyAccruedRevenue,
+    totalStudyMinutes,
     activeStudentCount,
     breakevenStudents,
     updatedAt: serverTimestamp()

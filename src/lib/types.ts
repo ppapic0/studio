@@ -117,6 +117,7 @@ export interface KpiDaily {
   totalRevenue: number; 
   totalDiscount: number;
   totalRefund: number;
+  totalStudyMinutes: number; // 실제 총 공부 시간 (분)
   paidInvoiceCount: number;
   activeStudentCount: number;
   avgFinalPrice: number;

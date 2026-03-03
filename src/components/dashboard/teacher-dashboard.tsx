@@ -66,7 +66,7 @@ import {
   getDocs,
   limit
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, KpiDaily } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -168,14 +168,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  // 1순위: 가장 안정적인 오늘 통계 데이터
   const todayStatsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
 
-  // 2순위: 차트용 과거 로그 데이터
   const historicalLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -184,12 +182,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       orderBy('date', 'asc')
     );
   }, [firestore, centerId, thirtyDaysAgoKey]);
-  const { data: kpiHistory } = useCollection<any>(historicalLogsQuery, { enabled: isActive });
+  const { data: kpiHistory } = useCollection<KpiDaily>(historicalLogsQuery, { enabled: isActive });
 
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
     if (!mounted) return { session: '0h 0m', total: '0h 0m', isStudying: false, totalMins: 0 };
     
-    // 오늘 통계 문서에서 누적 시간 가져오기
     const studentStat = todayStats?.find(s => s.studentId === studentId);
     const cumulativeMinutes = studentStat?.totalStudyMinutes || 0;
     
@@ -219,8 +216,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!kpiHistory || !mounted) return [];
     return kpiHistory.map(k => ({
       name: k.date.split('-').slice(1).join('/'),
-      hours: Number(((k.totalRevenue * 28 / 390000) * 6).toFixed(1)), // 수강료 기반 공부시간 추정 (샘플링)
-      totalMinutes: k.totalRevenue, // 실제로는 KPI에 공부시간 컬럼이 있으면 좋음
+      hours: Number(((k.totalStudyMinutes || 0) / 60).toFixed(1)), 
+      totalMinutes: k.totalStudyMinutes || 0, 
       dateKey: k.date
     }));
   }, [kpiHistory, mounted]);
@@ -500,7 +497,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-emerald-500" /> 최근 30일 센터 학습 추이
                 </CardTitle>
-                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Historical Study Trend (KPI Based Analysis)</CardDescription>
+                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Historical Study Trend (Actual Study Minutes Analysis)</CardDescription>
               </div>
               <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">PAST 30 DAYS</Badge>
             </div>
@@ -523,7 +520,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       return (
                         <div className="bg-white p-3 rounded-xl shadow-2xl border-none ring-1 ring-black/5">
                           <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">{label}</p>
-                          <p className="text-base font-black text-emerald-600">{payload[0].value}h</p>
+                          <p className="text-base font-black text-emerald-600">{payload[0].value}h ({Number(payload[0].payload.totalMinutes).toLocaleString()}m)</p>
                         </div>
                       );
                     }
