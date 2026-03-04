@@ -74,65 +74,56 @@ export function RiskIntelligence() {
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(statsQuery);
 
-  // 4. 상담 예약 내역 (취소 횟수 확인용)
-  const aptsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'counselingReservations'), where('status', '==', 'canceled'));
-  }, [firestore, centerId]);
-  const { data: canceledApts } = useCollection<CounselingReservation>(aptsQuery);
-
   const riskAnalysis = useMemo(() => {
     if (!members) return null;
 
     return members.map(m => {
       const stats = todayStats?.find(s => s.studentId === m.id);
       const progress = progressList?.find(p => p.id === m.id);
-      const canceledCount = canceledApts?.filter(a => a.studentId === m.id).length || 0;
 
       let score = 0;
       const detailedReasons: { label: string, value: string, score: number, icon: any, color: string }[] = [];
 
-      // 1. 학습량 급감 (비중 30점)
-      if (stats && stats.studyTimeGrowthRate <= -0.2) {
-        const weight = 30;
+      // 1. 학습량 감소 세분화
+      if (stats) {
+        if (stats.studyTimeGrowthRate <= -0.2) {
+          const weight = 30;
+          score += weight;
+          detailedReasons.push({
+            label: '학습량 위험 급감',
+            value: `${Math.round(stats.studyTimeGrowthRate * 100)}% 감소`,
+            score: weight,
+            icon: TrendingDown,
+            color: 'text-rose-600'
+          });
+        } else if (stats.studyTimeGrowthRate <= -0.1) {
+          const weight = 15;
+          score += weight;
+          detailedReasons.push({
+            label: '학습량 주의 감소',
+            value: `${Math.round(stats.studyTimeGrowthRate * 100)}% 감소`,
+            score: weight,
+            icon: History,
+            color: 'text-amber-600'
+          });
+        }
+      }
+
+      // 2. 누적 벌점 강화 (10점 이상 시 +40점)
+      const penalty = progress?.penaltyPoints || 0;
+      if (penalty >= 10) {
+        const weight = 40;
         score += weight;
         detailedReasons.push({
-          label: '학습량 급감',
-          value: `${Math.round(stats.studyTimeGrowthRate * 100)}% 감소`,
+          label: '규정 위반 (벌점 10점↑)',
+          value: `${penalty}점 누적`,
           score: weight,
-          icon: TrendingDown,
+          icon: ShieldAlert,
           color: 'text-rose-600'
         });
       }
 
-      // 2. 벌점 누적 (비중 최대 40점)
-      const penalty = progress?.penaltyPoints || 0;
-      if (penalty >= 10) {
-        const weight = penalty >= 20 ? 40 : 20;
-        score += weight;
-        detailedReasons.push({
-          label: '규정 위반 (벌점)',
-          value: `${penalty}점 누적`,
-          score: weight,
-          icon: ShieldAlert,
-          color: penalty >= 20 ? 'text-rose-600' : 'text-amber-600'
-        });
-      }
-
-      // 3. 상담 취소 반복 (비중 20점)
-      if (canceledCount >= 2) {
-        const weight = 20;
-        score += weight;
-        detailedReasons.push({
-          label: '상담 기피 징후',
-          value: `예약 취소 ${canceledCount}회`,
-          score: weight,
-          icon: MessageCircle,
-          color: 'text-amber-600'
-        });
-      }
-
-      // 4. 성취도 저조 (비중 20점)
+      // 3. 성취도 저조 (비중 20점)
       if (stats && stats.todayPlanCompletionRate < 50) {
         const weight = 20;
         score += weight;
@@ -152,16 +143,15 @@ export function RiskIntelligence() {
         score: Math.min(100, score),
         detailedReasons,
         stats,
-        penalty,
-        canceledCount
+        penalty
       };
     }).sort((a, b) => b.score - a.score);
-  }, [members, todayStats, progressList, canceledApts]);
+  }, [members, todayStats, progressList]);
 
   const clusters = useMemo(() => {
     if (!riskAnalysis) return null;
     return {
-      highPenalty: riskAnalysis.filter(r => r.penalty >= 15).slice(0, 5),
+      highPenalty: riskAnalysis.filter(r => r.penalty >= 10).slice(0, 5),
       lowStudy: riskAnalysis.filter(r => r.stats && r.stats.totalStudyMinutes < 180).slice(0, 5),
       highRisk: riskAnalysis.filter(r => r.score >= 70)
     };
@@ -258,9 +248,9 @@ export function RiskIntelligence() {
               </div>
               <div className="space-y-4">
                 {[
-                  { label: '학습량 급감 (-20%↑)', pts: '+30', icon: TrendingDown, color: 'text-rose-300' },
-                  { label: '누적 벌점 (20점↑)', pts: '+40', icon: ShieldAlert, color: 'text-amber-300' },
-                  { label: '상담 취소 (2회↑)', pts: '+20', icon: MessageCircle, color: 'text-blue-300' },
+                  { label: '벌점 누적 (10점↑)', pts: '+40', icon: ShieldAlert, color: 'text-rose-300' },
+                  { label: '학습량 급감 (-20%↑)', pts: '+30', icon: TrendingDown, color: 'text-rose-200' },
+                  { label: '학습량 주의 (-10%↑)', pts: '+15', icon: History, color: 'text-amber-200' },
                   { label: '완수율 저조 (50%↓)', pts: '+20', icon: Target, color: 'text-emerald-300' }
                 ].map(item => (
                   <div key={item.label} className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
@@ -273,15 +263,17 @@ export function RiskIntelligence() {
                 ))}
               </div>
               <p className="text-[10px] font-bold text-white/60 leading-relaxed italic pt-2">
-                ※ 총점 100점 만점으로 환산되며, 70점 이상은 "즉시 개입"이 필요한 고위험군으로 자동 분류됩니다.
+                ※ 총점 100점 만점 기준이며, 벌점 10점 돌파 시 관리를 위한 가장 높은 가중치가 부여됩니다.
               </p>
             </div>
           </Card>
 
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group">
-            <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Zap className="h-5 w-5 text-amber-500 fill-current" /> 벌점 상위 클러스터</CardTitle>
+            <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Zap className="h-5 w-5 text-amber-500 fill-current" /> 벌점 관리 대상</CardTitle>
             <div className="space-y-3">
-              {clusters?.highPenalty.map(s => (
+              {clusters?.highPenalty.length === 0 ? (
+                <p className="text-xs font-bold text-muted-foreground/40 text-center py-4">관리 대상이 없습니다.</p>
+              ) : clusters?.highPenalty.map(s => (
                 <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-rose-50/30 border border-rose-100/50">
                   <span className="font-bold text-sm">{s.name}</span>
                   <Badge className="bg-rose-600 text-white border-none font-black">{s.penalty}점</Badge>
@@ -291,9 +283,11 @@ export function RiskIntelligence() {
           </Card>
 
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group">
-            <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Clock className="h-5 w-5 text-blue-500" /> 공부시간 하위 클러스터</CardTitle>
+            <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Clock className="h-5 w-5 text-blue-500" /> 집중 관리 대상</CardTitle>
             <div className="space-y-3">
-              {clusters?.lowStudy.map(s => (
+              {clusters?.lowStudy.length === 0 ? (
+                <p className="text-xs font-bold text-muted-foreground/40 text-center py-4">관리 대상이 없습니다.</p>
+              ) : clusters?.lowStudy.map(s => (
                 <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-blue-50/30 border border-blue-100/50">
                   <span className="font-bold text-sm">{s.name}</span>
                   <Badge className="bg-blue-600 text-white border-none font-black">{Math.floor((s.stats?.totalStudyMinutes || 0)/60)}h {(s.stats?.totalStudyMinutes || 0)%60}m</Badge>
@@ -327,7 +321,7 @@ export function RiskIntelligence() {
                     {selectedRiskStudent.name} 학생 분석
                   </DialogTitle>
                   <DialogDescription className="text-white/70 font-bold mt-1 text-sm">
-                    복합 데이터를 기반으로 산출된 이탈 위험 지수입니다.
+                    강화된 규정 및 학습량 지표를 기반으로 한 분석 결과입니다.
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -381,11 +375,11 @@ export function RiskIntelligence() {
                   </div>
                   <p className="text-xs font-bold leading-relaxed text-foreground/70">
                     {selectedRiskStudent.score >= 70 ? (
-                      "🚨 **긴급 상담 대상**: 학습 리듬이 붕괴된 상태입니다. 즉시 부모님께 연락하여 현재 상황을 공유하고, 학생과의 심층 면담을 통해 원인을 파악해야 합니다."
+                      "🚨 **긴급 면담 및 부모님 공유**: 규정 위반(벌점)이나 학습량 급감이 심각한 수준입니다. 학생의 심리적 상태나 센터 부적응 여부를 즉시 파악해야 합니다."
                     ) : selectedRiskStudent.score >= 40 ? (
-                      "⚠️ **주의 관찰 대상**: 학습 의욕이 하락하고 있는 징후가 보입니다. 가벼운 면담을 통해 학습 환경의 불편함을 체크하고 성취감을 느낄 수 있는 단기 목표 설정을 제안하세요."
+                      "⚠️ **주의 깊은 관찰**: 학습 리듬이 흔들리기 시작했습니다. 벌점이 더 쌓이기 전에 가벼운 상담을 통해 생활 패턴을 바로잡아 주어야 합니다."
                     ) : (
-                      "✨ **안정적 상태**: 현재 특별한 이탈 징후가 없습니다. 칭찬 리포트를 발송하여 긍정적인 학습 경험을 강화해 주세요."
+                      "✨ **안정적 상태**: 현재 특별한 이탈 징후가 없습니다. 꾸준한 학습이 유지될 수 있도록 긍정적인 피드백을 유지하세요."
                     )}
                   </p>
                 </Card>
