@@ -29,7 +29,9 @@ import {
   Target,
   History,
   AlertCircle,
-  BrainCircuit
+  BrainCircuit,
+  Info,
+  Scale
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -87,11 +89,10 @@ export function RiskIntelligence() {
       const progress = progressList?.find(p => p.id === m.id);
       const canceledCount = canceledApts?.filter(a => a.studentId === m.id).length || 0;
 
-      // 리스크 점수 계산 로직
       let score = 0;
       const detailedReasons: { label: string, value: string, score: number, icon: any, color: string }[] = [];
 
-      // 1. 공부시간 감소 (20% 이상 감소 시 +30점)
+      // 1. 학습량 급감 (비중 30점)
       if (stats && stats.studyTimeGrowthRate <= -0.2) {
         const weight = 30;
         score += weight;
@@ -104,7 +105,7 @@ export function RiskIntelligence() {
         });
       }
 
-      // 2. 벌점 급증 (10점 이상 시 +20점, 20점 이상 시 +40점)
+      // 2. 벌점 누적 (비중 최대 40점)
       const penalty = progress?.penaltyPoints || 0;
       if (penalty >= 10) {
         const weight = penalty >= 20 ? 40 : 20;
@@ -118,7 +119,7 @@ export function RiskIntelligence() {
         });
       }
 
-      // 3. 상담 취소 반복 (2회 이상 시 +20점)
+      // 3. 상담 취소 반복 (비중 20점)
       if (canceledCount >= 2) {
         const weight = 20;
         score += weight;
@@ -131,7 +132,7 @@ export function RiskIntelligence() {
         });
       }
 
-      // 4. 계획 완수율 저조 (50% 미만 시 +20점)
+      // 4. 성취도 저조 (비중 20점)
       if (stats && stats.todayPlanCompletionRate < 50) {
         const weight = 20;
         score += weight;
@@ -171,8 +172,8 @@ export function RiskIntelligence() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <section className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-rose-600 text-white p-10 relative overflow-hidden">
-          <ShieldAlert className="absolute -right-4 -top-4 h-48 w-48 opacity-10 rotate-12" />
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-rose-600 text-white p-10 relative overflow-hidden group">
+          <ShieldAlert className="absolute -right-4 -top-4 h-48 w-48 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000" />
           <div className="relative z-10 space-y-6">
             <p className="text-[10px] font-black uppercase tracking-widest opacity-60">조기 이탈 고위험군</p>
             <h3 className="text-7xl font-black tracking-tighter">{clusters?.highRisk.length || 0}<span className="text-2xl opacity-40 ml-2">명</span></h3>
@@ -182,14 +183,14 @@ export function RiskIntelligence() {
           </div>
         </Card>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group">
           <div className="flex items-center gap-3"><Activity className="h-6 w-6 text-emerald-500" /><h4 className="text-sm font-black uppercase tracking-widest">평균 학습 집중도</h4></div>
           <div className="text-5xl font-black tracking-tighter text-primary">82.4<span className="text-xl opacity-40 ml-1">%</span></div>
           <Progress value={82.4} className="h-2 bg-emerald-100" />
-          <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic">"자리 이탈 빈도 및 유효 공부 시간 데이터를 기반으로 산출된 센터 평균입니다."</p>
+          <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic mt-2">"전체 입실 인원 대비 순수 몰입 시간 비율입니다."</p>
         </Card>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group">
           <div className="flex items-center gap-3"><AlertTriangle className="h-6 w-6 text-amber-500" /><h4 className="text-sm font-black uppercase tracking-widest">관리 주의군 (40~69점)</h4></div>
           <div className="text-5xl font-black tracking-tighter text-amber-600">{riskAnalysis?.filter(r => r.score >= 40 && r.score < 70).length || 0}<span className="text-xl opacity-40 ml-1">명</span></div>
           <p className="text-[10px] font-bold text-muted-foreground leading-relaxed mt-2">주의 관찰 단계로 곧 상담이 필요한 그룹입니다.</p>
@@ -197,51 +198,86 @@ export function RiskIntelligence() {
       </section>
 
       <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
-        <Card className="md:col-span-8 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
-          <CardHeader className="bg-muted/5 border-b p-10">
-            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3"><TrendingDown className="h-6 w-6 text-rose-600" /> 학생별 이탈 위험도 랭킹</CardTitle>
-            <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Ranked by composite churn risk score (Max 100)</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px]">
-              <div className="divide-y divide-muted/10">
-                {riskAnalysis?.slice(0, 20).map((risk) => (
-                  <div 
-                    key={risk.id} 
-                    onClick={() => setSelectedRiskStudent(risk)}
-                    className="p-8 hover:bg-muted/5 transition-all flex items-center justify-between group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-6">
-                      <div className={cn(
-                        "h-16 w-16 rounded-3xl flex items-center justify-center font-black text-2xl shadow-xl transition-all group-hover:scale-110",
-                        risk.score >= 70 ? "bg-rose-600 text-white shadow-rose-200" : risk.score >= 40 ? "bg-amber-500 text-white shadow-amber-100" : "bg-primary/5 text-primary border"
-                      )}>{risk.score}</div>
-                      <div className="grid gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-xl tracking-tight">{risk.name} 학생</span>
-                          <Badge variant="outline" className="text-[9px] font-black border-primary/20">{risk.className || '반 미지정'}</Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {risk.detailedReasons.slice(0, 2).map((r: any, i: number) => (
-                            <Badge key={i} className={cn("border-none font-black text-[8px] px-2 bg-muted/50", r.color)}>{r.label}</Badge>
-                          ))}
-                          {risk.detailedReasons.length > 2 && <span className="text-[8px] font-bold text-muted-foreground/40">+{risk.detailedReasons.length - 2} more</span>}
-                          {risk.detailedReasons.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">특이 징후 없음</span>}
+        <div className="md:col-span-8 space-y-6">
+          <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
+            <CardHeader className="bg-muted/5 border-b p-10">
+              <div className="flex justify-between items-center">
+                <div className="space-y-1">
+                  <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3"><TrendingDown className="h-6 w-6 text-rose-600" /> 학생별 이탈 위험도 랭킹</CardTitle>
+                  <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Composite churn risk analysis (Max 100)</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[550px]">
+                <div className="divide-y divide-muted/10">
+                  {riskAnalysis?.slice(0, 30).map((risk) => (
+                    <div 
+                      key={risk.id} 
+                      onClick={() => setSelectedRiskStudent(risk)}
+                      className="p-8 hover:bg-muted/5 transition-all flex items-center justify-between group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className={cn(
+                          "h-16 w-16 rounded-3xl flex items-center justify-center font-black text-2xl shadow-xl transition-all group-hover:scale-110",
+                          risk.score >= 70 ? "bg-rose-600 text-white shadow-rose-200" : risk.score >= 40 ? "bg-amber-500 text-white shadow-amber-100" : "bg-primary/5 text-primary border"
+                        )}>{risk.score}</div>
+                        <div className="grid gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-xl tracking-tight">{risk.name} 학생</span>
+                            <Badge variant="outline" className="text-[9px] font-black border-primary/20">{risk.className || '반 미지정'}</Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {risk.detailedReasons.slice(0, 2).map((r: any, i: number) => (
+                              <Badge key={i} className={cn("border-none font-black text-[8px] px-2 bg-muted/50", r.color)}>{r.label}</Badge>
+                            ))}
+                            {risk.detailedReasons.length > 2 && <span className="text-[8px] font-bold text-muted-foreground/40">+{risk.detailedReasons.length - 2} more</span>}
+                            {risk.detailedReasons.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">특이 징후 없음</span>}
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Details</span>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Analyze Details</span>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-4 space-y-6">
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
+            <div className="absolute -right-4 -top-4 opacity-10"><Info className="h-32 w-32" /></div>
+            <div className="relative z-10 space-y-6">
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="h-5 w-5 text-accent" />
+                <h4 className="text-sm font-black uppercase tracking-widest">AI 점수 산정 가이드</h4>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { label: '학습량 급감 (-20%↑)', pts: '+30', icon: TrendingDown, color: 'text-rose-300' },
+                  { label: '누적 벌점 (20점↑)', pts: '+40', icon: ShieldAlert, color: 'text-amber-300' },
+                  { label: '상담 취소 (2회↑)', pts: '+20', icon: MessageCircle, color: 'text-blue-300' },
+                  { label: '완수율 저조 (50%↓)', pts: '+20', icon: Target, color: 'text-emerald-300' }
+                ].map(item => (
+                  <div key={item.label} className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
+                    <div className="flex items-center gap-3">
+                      <item.icon className={cn("h-4 w-4", item.color)} />
+                      <span className="text-xs font-bold">{item.label}</span>
                     </div>
+                    <span className="font-black text-xs text-white">{item.pts}</span>
                   </div>
                 ))}
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+              <p className="text-[10px] font-bold text-white/60 leading-relaxed italic pt-2">
+                ※ 총점 100점 만점으로 환산되며, 70점 이상은 "즉시 개입"이 필요한 고위험군으로 자동 분류됩니다.
+              </p>
+            </div>
+          </Card>
 
-        <div className="md:col-span-4 space-y-6">
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group">
             <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Zap className="h-5 w-5 text-amber-500 fill-current" /> 벌점 상위 클러스터</CardTitle>
             <div className="space-y-3">
@@ -260,7 +296,7 @@ export function RiskIntelligence() {
               {clusters?.lowStudy.map(s => (
                 <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-blue-50/30 border border-blue-100/50">
                   <span className="font-bold text-sm">{s.name}</span>
-                  <Badge className="bg-blue-600 text-white border-none font-black">{Math.floor((s.stats?.totalStudyMinutes || 0)/60)}h { (s.stats?.totalStudyMinutes || 0)%60}m</Badge>
+                  <Badge className="bg-blue-600 text-white border-none font-black">{Math.floor((s.stats?.totalStudyMinutes || 0)/60)}h {(s.stats?.totalStudyMinutes || 0)%60}m</Badge>
                 </div>
               ))}
             </div>
