@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -9,7 +10,7 @@ import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { DailyStudentStat, CenterMembership, GrowthProgress, CounselingReservation } from '@/lib/types';
+import { DailyStudentStat, CenterMembership, GrowthProgress } from '@/lib/types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { 
@@ -53,27 +54,32 @@ export function RiskIntelligence() {
 
   const [selectedRiskStudent, setSelectedRiskStudent] = useState<any>(null);
 
-  // 1. 모든 재원생 조회
+  // 1. 모든 재원생 조회 (실제 Firestore 쿼리)
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'), where('status', '==', 'active'));
+    return query(
+      collection(firestore, 'centers', centerId, 'members'), 
+      where('role', '==', 'student'), 
+      where('status', '==', 'active')
+    );
   }, [firestore, centerId]);
   const { data: members, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery);
 
-  // 2. 학생 성장 프로필 (벌점 확인용)
+  // 2. 학생 성장 프로필 - 벌점 데이터 소스 (실제 Firestore 쿼리)
   const progressQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'growthProgress');
   }, [firestore, centerId]);
   const { data: progressList } = useCollection<GrowthProgress>(progressQuery);
 
-  // 3. 최근 일일 통계 (공부시간 감소 확인용)
+  // 3. 당일 통계 - 학습량 감소/완수율 데이터 소스 (실제 Firestore 쿼리)
   const statsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(statsQuery);
 
+  // 리스크 분석 엔진 (요청하신 가중치 반영)
   const riskAnalysis = useMemo(() => {
     if (!members) return null;
 
@@ -84,14 +90,14 @@ export function RiskIntelligence() {
       let score = 0;
       const detailedReasons: { label: string, value: string, score: number, icon: any, color: string }[] = [];
 
-      // 1. 학습량 감소 세분화
+      // [기준 1] 학습량 급감 (세분화 단계)
       if (stats) {
         if (stats.studyTimeGrowthRate <= -0.2) {
           const weight = 30;
           score += weight;
           detailedReasons.push({
             label: '학습량 위험 급감',
-            value: `${Math.round(stats.studyTimeGrowthRate * 100)}% 감소`,
+            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% 감소`,
             score: weight,
             icon: TrendingDown,
             color: 'text-rose-600'
@@ -101,7 +107,7 @@ export function RiskIntelligence() {
           score += weight;
           detailedReasons.push({
             label: '학습량 주의 감소',
-            value: `${Math.round(stats.studyTimeGrowthRate * 100)}% 감소`,
+            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% 감소`,
             score: weight,
             icon: History,
             color: 'text-amber-600'
@@ -109,7 +115,7 @@ export function RiskIntelligence() {
         }
       }
 
-      // 2. 누적 벌점 강화 (10점 이상 시 +40점)
+      // [기준 2] 누적 벌점 (벌점 10점 이상 시 +40점)
       const penalty = progress?.penaltyPoints || 0;
       if (penalty >= 10) {
         const weight = 40;
@@ -123,12 +129,12 @@ export function RiskIntelligence() {
         });
       }
 
-      // 3. 성취도 저조 (비중 20점)
+      // [기준 3] 성취도 저조 (완수율 50% 미만 시 +20점)
       if (stats && stats.todayPlanCompletionRate < 50) {
         const weight = 20;
         score += weight;
         detailedReasons.push({
-          label: '성취도 저조',
+          label: '계획 성취도 저조',
           value: `완수율 ${stats.todayPlanCompletionRate}%`,
           score: weight,
           icon: Target,
@@ -157,7 +163,14 @@ export function RiskIntelligence() {
     };
   }, [riskAnalysis]);
 
-  if (membersLoading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-rose-500 opacity-20" /></div>;
+  if (membersLoading) {
+    return (
+      <div className="py-40 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin h-10 w-10 text-rose-500 opacity-20" />
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 italic">Scanning Core Indicators...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -173,14 +186,14 @@ export function RiskIntelligence() {
           </div>
         </Card>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group ring-1 ring-black/[0.03]">
           <div className="flex items-center gap-3"><Activity className="h-6 w-6 text-emerald-500" /><h4 className="text-sm font-black uppercase tracking-widest">평균 학습 집중도</h4></div>
           <div className="text-5xl font-black tracking-tighter text-primary">82.4<span className="text-xl opacity-40 ml-1">%</span></div>
           <Progress value={82.4} className="h-2 bg-emerald-100" />
           <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic mt-2">"전체 입실 인원 대비 순수 몰입 시간 비율입니다."</p>
         </Card>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group ring-1 ring-black/[0.03]">
           <div className="flex items-center gap-3"><AlertTriangle className="h-6 w-6 text-amber-500" /><h4 className="text-sm font-black uppercase tracking-widest">관리 주의군 (40~69점)</h4></div>
           <div className="text-5xl font-black tracking-tighter text-amber-600">{riskAnalysis?.filter(r => r.score >= 40 && r.score < 70).length || 0}<span className="text-xl opacity-40 ml-1">명</span></div>
           <p className="text-[10px] font-bold text-muted-foreground leading-relaxed mt-2">주의 관찰 단계로 곧 상담이 필요한 그룹입니다.</p>
@@ -194,7 +207,7 @@ export function RiskIntelligence() {
               <div className="flex justify-between items-center">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3"><TrendingDown className="h-6 w-6 text-rose-600" /> 학생별 이탈 위험도 랭킹</CardTitle>
-                  <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Composite churn risk analysis (Max 100)</CardDescription>
+                  <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Composite churn risk analysis (Actual Firestore Data)</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -227,7 +240,7 @@ export function RiskIntelligence() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Details</span>
+                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Analyze</span>
                         <ChevronRight className="h-5 w-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
                       </div>
                     </div>
@@ -263,12 +276,12 @@ export function RiskIntelligence() {
                 ))}
               </div>
               <p className="text-[10px] font-bold text-white/60 leading-relaxed italic pt-2">
-                ※ 총점 100점 만점 기준이며, 벌점 10점 돌파 시 관리를 위한 가장 높은 가중치가 부여됩니다.
+                ※ 총점 100점 만점 기준이며, 실제 Firestore 데이터를 실시간 가공하여 산출됩니다.
               </p>
             </div>
           </Card>
 
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group">
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group ring-1 ring-black/[0.03]">
             <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Zap className="h-5 w-5 text-amber-500 fill-current" /> 벌점 관리 대상</CardTitle>
             <div className="space-y-3">
               {clusters?.highPenalty.length === 0 ? (
@@ -282,7 +295,7 @@ export function RiskIntelligence() {
             </div>
           </Card>
 
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group">
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group ring-1 ring-black/[0.03]">
             <CardTitle className="text-lg font-black flex items-center gap-2 mb-6"><Clock className="h-5 w-5 text-blue-500" /> 집중 관리 대상</CardTitle>
             <div className="space-y-3">
               {clusters?.lowStudy.length === 0 ? (
@@ -298,7 +311,6 @@ export function RiskIntelligence() {
         </div>
       </div>
 
-      {/* 리스크 상세 분석 모달 */}
       <Dialog open={!!selectedRiskStudent} onOpenChange={(open) => !open && setSelectedRiskStudent(null)}>
         <DialogContent className={cn(
           "rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500",
@@ -321,7 +333,7 @@ export function RiskIntelligence() {
                     {selectedRiskStudent.name} 학생 분석
                   </DialogTitle>
                   <DialogDescription className="text-white/70 font-bold mt-1 text-sm">
-                    강화된 규정 및 학습량 지표를 기반으로 한 분석 결과입니다.
+                    강화된 규정 및 학습량 지표를 기반으로 한 정밀 분석 결과입니다.
                   </DialogDescription>
                 </DialogHeader>
               </div>
