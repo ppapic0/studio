@@ -22,7 +22,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
-import { LeaderboardEntry, WithId, StudentProfile, CenterMembership, InviteCode } from '@/lib/types';
+import { LeaderboardEntry, WithId, StudentProfile, CenterMembership } from '@/lib/types';
 import { 
   Loader2, 
   Trophy, 
@@ -281,7 +281,7 @@ export default function LeaderboardsPage() {
   const { activeMembership, viewMode } = useAppContext();
   
   const [seasonOffset, setSeasonOffset] = useState<0 | -1>(0); 
-  const [rankingScope, setRankingScope] = useState<'class' | 'total'>('class');
+  const [rankingScope, setRankingScope] = useState<'class' | 'total'>('total');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   
   const isMember = !!activeMembership;
@@ -401,18 +401,18 @@ export default function LeaderboardsPage() {
             "grid grid-cols-2 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner w-full",
             isMobile ? "h-12 max-w-[240px]" : "h-20 max-w-md rounded-[2.5rem]"
           )}>
+            <TabsTrigger value="total" className={cn(
+              "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
+              isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
+            )}>
+              <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span>전체 랭킹</span>
+            </TabsTrigger>
             <TabsTrigger value="class" className={cn(
               "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
               isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
             )}>
               <LayoutGrid className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", rankingScope === 'class' ? "text-primary" : "text-muted-foreground")} /> 
               <span>반별 랭킹</span>
-            </TabsTrigger>
-            <TabsTrigger value="total" className={cn(
-              "font-black data-[state=active]:bg-white data-[state=active]:shadow-xl transition-all uppercase tracking-tighter gap-1.5",
-              isMobile ? "text-[10px] rounded-xl" : "text-base rounded-[2rem] px-4"
-            )}>
-              <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-amber-500")} /> <span>전체 랭킹</span>
             </TabsTrigger>
           </TabsList>
 

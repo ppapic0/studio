@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -39,17 +40,18 @@ import {
   Info,
   ShieldAlert,
   ArrowRight,
-  ClipboardCheck
+  ClipboardCheck,
+  UserCheck,
+  CalendarX,
+  UserMinus
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
@@ -70,17 +72,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-
-const TIERS = [
-  { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900', shadow: 'shadow-orange-200/50' },
-  { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600', shadow: 'shadow-slate-100/50' },
-  { name: '골드', min: 10000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700', shadow: 'shadow-yellow-200/50' },
-  { name: '플래티넘', min: 15000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700', shadow: 'shadow-emerald-200/50' },
-  { name: '다이아몬드', min: 20000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700', shadow: 'shadow-blue-200/50' },
-  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800', shadow: 'shadow-purple-200/50' },
-  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800', shadow: 'shadow-rose-500/50' },
-  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', shadow: 'shadow-cyan-400/50' },
-];
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -321,13 +313,8 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               {sessions.map((session) => (
                 <div key={session.id} className="bg-white p-4 rounded-xl border-2 border-primary/5 flex items-center justify-between shadow-sm group">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                      <Timer className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div className="grid leading-tight">
-                      <span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
-                    </div>
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center"><Timer className="h-4 w-4 text-blue-600" /></div>
+                    <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span></div>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-2">{session.durationMinutes}분</Badge>
                 </div>
@@ -353,8 +340,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   const isMobile = viewMode === 'mobile';
   
+  // 지각/결석 신청서 상태
+  const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
+  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [requestReason, setRequestReason] = useState('');
+  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+
   useEffect(() => { setToday(new Date()); }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
@@ -364,9 +358,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTimerActive && startTime) {
-      setLocalSeconds(Math.floor((Date.now() - startTime) / 1000));
-      interval = setInterval(() => { setLocalSeconds(Math.floor((Date.now() - startTime) / 1000)); }, 1000);
-    } else { setLocalSeconds(0); }
+      const updateSeconds = () => {
+        const diff = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+        setLocalSeconds(diff);
+      };
+      updateSeconds();
+      interval = setInterval(updateSeconds, 1000);
+    } else { 
+      setLocalSeconds(0); 
+    }
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
@@ -386,39 +386,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [progress?.stats]);
 
-  const avgStat = useMemo(() => {
-    const values = Object.values(stats);
-    return values.reduce((a, b) => a + b, 0) / values.length;
-  }, [stats]);
-
-  const rankQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'), where('studentId', '==', user.uid));
-  }, [firestore, activeMembership?.id, user?.uid, periodKey]);
-  const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 0;
-
-  // 전체 학생 수 조회
-  const totalStudentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
-    );
-  }, [firestore, activeMembership]);
-  const { data: activeStudentsCount } = useCollection<CenterMembership>(totalStudentsQuery);
-  const totalCount = activeStudentsCount?.length || 1;
-
-  const rankDisplay = useMemo(() => {
-    if (currentRank === 0) return '산정 중';
-    if (currentRank <= 3) return `${currentRank}위`;
-    const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
-    return `상위 ${percent}%`;
-  }, [currentRank, totalCount]);
-
-  const currentLp = progress?.seasonLp || 0;
-  
+  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const penaltyPoints = progress?.penaltyPoints || 0;
   const penaltyRate = useMemo(() => {
     if (penaltyPoints >= 30) return 0.15; 
@@ -427,8 +395,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (penaltyPoints >= 5) return 0.03;  
     return 0; 
   }, [penaltyPoints]);
-
-  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const studyLogRef = useMemoFirebase(() => {
@@ -446,15 +412,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
-  // 지각/결석 신청서 상태 및 로직
-  const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
-  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [requestReason, setRequestReason] = useState('');
-  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
-
   const myRequestsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
-    // 복합 색인 에러 방지를 위해 orderBy를 제거하고 클라이언트 측에서 필터링합니다.
     return query(
       collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
       where('studentId', '==', user.uid)
@@ -517,91 +476,114 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleStudyStartStop = async () => {
-    if (!firestore || !user || !activeMembership || !progressRef) return;
+    if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
     
-    // 실시간 좌석 상태 동기화 로직
-    const centerId = activeMembership.id;
-    const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
-    
-    if (isTimerActive) {
-      const nowTs = Date.now();
-      const sessionMinutes = Math.floor((nowTs - (startTime || nowTs)) / 60000);
-      
-      const batch = writeBatch(firestore);
-      const updateData: any = { updatedAt: serverTimestamp() };
-      
-      if (sessionMinutes > 0) {
-        let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
-        updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
-
-        const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
-        const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
-        
-        if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
-          const attendanceLp = Math.round(100 * finalMultiplier);
-          studyLpEarned += attendanceLp;
-          updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
-          toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
-        }
-
-        if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
-          updateData['stats.resilience'] = increment(0.5);
-          updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
-          toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
-        }
-
-        updateData.seasonLp = increment(studyLpEarned);
-        updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
-        
-        batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
-        const sessionRef = doc(collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-        batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
-        
-        batch.update(progressRef, updateData);
-      }
-
-      // 선생님 화면에서도 즉시 퇴실(absent)로 보이도록 처리
+    setIsProcessingAction(true);
+    try {
+      const centerId = activeMembership.id;
+      const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
       const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
       const seatSnap = await getDocs(seatQuery);
-      if (!seatSnap.empty) {
-        batch.update(doc(attendanceCurrentRef, seatSnap.docs[0].id), { 
-          status: 'absent', 
-          updatedAt: serverTimestamp() 
-        });
-      }
-      
-      await batch.commit();
-      setIsTimerActive(false); 
-      setStartTime(null); 
-      toast({ title: "트랙 종료됨" });
-    } else {
-      const now = Date.now();
-      setStartTime(now); 
-      setIsTimerActive(true);
-      
-      const batch = writeBatch(firestore);
+      const seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
 
-      if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-        batch.update(progressRef, {
-          'stats.consistency': increment(0.5),
-          [`dailyLpStatus.${todayKey}.checkedIn`]: true,
-          updatedAt: serverTimestamp()
-        });
-        toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
-      }
+      if (isTimerActive) {
+        const nowTs = Date.now();
+        const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
+        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+        
+        const batch = writeBatch(firestore);
+        const updateData: any = { updatedAt: serverTimestamp() };
+        let finalNewLp = progress?.seasonLp || 0;
+        
+        if (sessionSeconds > 0) {
+          let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
+          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
-      // 선생님 화면에서도 즉시 공부 중(studying)으로 보이도록 처리
-      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
-      const seatSnap = await getDocs(seatQuery);
-      if (!seatSnap.empty) {
-        batch.update(doc(attendanceCurrentRef, seatSnap.docs[0].id), { 
-          status: 'studying', 
-          lastCheckInAt: serverTimestamp(),
-          updatedAt: serverTimestamp() 
-        });
-      }
+          const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
+          const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
+          
+          if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
+            studyLpEarned += Math.round(100 * finalMultiplier);
+            updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
+            toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+          }
 
-      await batch.commit();
+          if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
+            updateData['stats.resilience'] = increment(0.5);
+            updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
+            toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
+          }
+
+          finalNewLp += studyLpEarned;
+          updateData.seasonLp = increment(studyLpEarned);
+          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
+          
+          batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+          
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
+          batch.set(statRef, { 
+            totalStudyMinutes: increment(sessionMinutes), 
+            studentId: user.uid, 
+            centerId, 
+            dateKey: todayKey, 
+            updatedAt: serverTimestamp() 
+          }, { merge: true });
+
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
+          batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          
+          batch.update(progressRef, updateData);
+
+          // 랭킹 보드 스냅샷 업데이트
+          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+          batch.set(rankRef, {
+            studentId: user.uid,
+            displayNameSnapshot: user.displayName || '학생',
+            classNameSnapshot: activeMembership.className || null,
+            value: finalNewLp,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+
+        if (seatDoc) {
+          batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
+        }
+        
+        await batch.commit();
+        setIsTimerActive(false); 
+        setStartTime(null); 
+        toast({ title: "트랙 종료됨" });
+      } else {
+        const nowTs = Date.now();
+        
+        const batch = writeBatch(firestore);
+
+        if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
+          batch.update(progressRef, {
+            'stats.consistency': increment(0.5),
+            [`dailyLpStatus.${todayKey}.checkedIn`]: true,
+            updatedAt: serverTimestamp()
+          });
+          toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
+        }
+
+        if (seatDoc) {
+          batch.update(seatDoc.ref, { 
+            status: 'studying', 
+            lastCheckInAt: Timestamp.fromMillis(nowTs),
+            updatedAt: serverTimestamp() 
+          });
+        }
+
+        await batch.commit();
+        setStartTime(nowTs); 
+        setIsTimerActive(true);
+      }
+    } catch (e: any) {
+      console.error("Action error:", e);
+      toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
+    } finally {
+      setIsProcessingAction(false);
     }
   };
 
@@ -625,30 +607,49 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const currentStudyTasks = todayPlans.filter(p => p.category === 'study' || !p.category);
       const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
       
+      let finalNewLp = progress?.seasonLp || 0;
+
       if (currentStudyTasks.length >= 3 && willBeDoneCount === currentStudyTasks.length && !progress?.dailyLpStatus?.[todayKey]?.plan) {
         const planLp = Math.round(100 * finalMultiplier);
+        finalNewLp += planLp;
         batch.update(progressRef, {
           seasonLp: increment(planLp),
           [`dailyLpStatus.${todayKey}.plan`]: true,
           [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
         });
         toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+
+        // 랭킹 보드 스냅샷 업데이트
+        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+        batch.set(rankRef, {
+          studentId: user.uid,
+          displayNameSnapshot: user.displayName || '학생',
+          classNameSnapshot: activeMembership.className || null,
+          value: finalNewLp,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       }
       await batch.commit();
     }
   };
 
   if (!isActive) return null;
-  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.floor(localSeconds / 60);
+  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.ceil(localSeconds / 60);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
+
+  const formatTimer = (totalSecs: number) => {
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-2.5" : "gap-10")}>
       <section className={cn(
         "group relative overflow-hidden text-white shadow-2xl transition-all duration-700 bg-gradient-to-br",
-        currentTier.gradient, currentTier.shadow,
+        currentTier.gradient, "shadow-primary/20",
         isMobile ? "rounded-[1.25rem] p-4" : "rounded-[3rem] p-12"
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
@@ -672,16 +673,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-xl border border-white/10 shadow-2xl px-4 py-2", isMobile ? "w-full" : "")}>
                 <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
                 <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
-                  {Math.floor(localSeconds / 60).toString().padStart(2, '0')}:{(localSeconds % 60).toString().padStart(2, '0')}
+                  {formatTimer(localSeconds)}
                 </span>
               </div>
             )}
-            <button className={cn(
-              "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap",
-              isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
-              isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
-            )} onClick={handleStudyStartStop}>
-              {isTimerActive ? <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></> : <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>}
+            <button 
+              disabled={isProcessingAction}
+              className={cn(
+                "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+                isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
+                isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
+              )} 
+              onClick={handleStudyStartStop}
+            >
+              {isProcessingAction ? (
+                <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
+              ) : isTimerActive ? (
+                <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+              ) : (
+                <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+              )}
             </button>
           </div>
         </div>
@@ -949,95 +960,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   </Card>
                 </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <AlertOctagon className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">벌점 부여 기준 (강도형)</h4>
-                  </div>
-                  <div className="grid gap-2">
-                    {[
-                      { l: '지각 (10분 이상)', v: '+3', d: '정해진 등원 시간 미준수 시' },
-                      { l: '무단 결석', v: '+7', d: '사전 연락 없이 결석 시' },
-                      { l: '휴대폰 적발', v: '+5', d: '학습 중 휴대폰 무단 사용 시' },
-                      { l: '수면 반복 경고', v: '+3', d: '졸음으로 인한 지도를 따르지 않을 때' },
-                      { l: '태도 문제', v: '+5', d: '학습 분위기 저해 및 불손 태도' }
-                    ].map(item => (
-                      <div key={item.l} className="flex items-center justify-between p-4 rounded-2xl bg-white border border-border/50 shadow-sm group hover:border-rose-200 transition-all">
-                        <div className="grid gap-0.5">
-                          <span className="text-sm font-black text-primary">{item.l}</span>
-                          <span className="text-[10px] font-bold text-muted-foreground">{item.d}</span>
-                        </div>
-                        <Badge variant="outline" className="h-8 w-12 flex justify-center font-black text-rose-600 border-rose-100 bg-rose-50 rounded-xl">{item.v}</Badge>
-                      </div>
-                    ))}
-                    <p className="text-[9px] font-black text-rose-600 text-center mt-2 italic">※ 하루 최대 벌점은 10점으로 제한됩니다.</p>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <h4 className="text-xs font-black uppercase text-primary tracking-widest">구간별 영향</h4>
-                  </div>
-                  <div className="space-y-3">
-                    {[
-                      { range: '0 ~ 4', label: '정상', effect: '패널티 없음', color: 'bg-emerald-500' },
-                      { range: '5 ~ 9', label: '안전', effect: 'LP -3% 적용', color: 'bg-emerald-400' },
-                      { range: '10 ~ 19', label: '주의', effect: 'LP -6% & 학부모 자동 알림', color: 'bg-amber-500' },
-                      { range: '20 ~ 29', label: '경고', effect: 'LP -10% & 승급 불가 & 강등 경고', color: 'bg-rose-500' },
-                      { range: '30 이상', label: '강등', effect: '즉시 1단계 강등 & 3자 대면 상담', color: 'bg-black' }
-                    ].map(step => (
-                      <div key={step.range} className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-border/50 shadow-sm">
-                        <div className={cn("w-1.5 h-10 rounded-full", step.color)} />
-                        <div className="grid flex-1">
-                          <span className="text-[10px] font-black text-muted-foreground uppercase">{step.range} 점 ({step.label})</span>
-                          <span className="text-sm font-black text-primary">{step.effect}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <RefreshCw className="h-4 w-4 text-emerald-600" />
-                    <h4 className="text-xs font-black uppercase text-emerald-600 tracking-widest">벌점 회복 시스템</h4>
-                  </div>
-                  <div className="grid gap-3">
-                    <Card className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Timer className="h-5 w-5 text-emerald-600" /></div>
-                      <div className="grid gap-1">
-                        <span className="text-xs font-black text-emerald-700 uppercase">자동 회복 (Normal Life)</span>
-                        <p className="text-xs font-bold text-emerald-900/70 leading-relaxed">
-                          - 매일 완전 정상 생활 시: **-1점**<br/>
-                          - 7일 연속 정상 등원: **추가 -5점**<br/>
-                          - 한 달 무지각 달성: **추가 -10점**
-                        </p>
-                      </div>
-                    </Card>
-                    <Card className="p-5 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><Zap className="h-5 w-5 text-blue-600" /></div>
-                      <div className="grid gap-1">
-                        <span className="text-xs font-black text-blue-700 uppercase">보너스 회복 (Elite Effort)</span>
-                        <p className="text-xs font-bold text-blue-900/70 leading-relaxed">
-                          - 집중도 90% 이상 5일 유지: **-5점**<br/>
-                          - 6시간 초몰입 5일 연속 달성: **-5점**
-                        </p>
-                      </div>
-                    </Card>
-                    <Card className="p-5 rounded-2xl bg-purple-50/50 border border-purple-100 flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-white shadow-sm"><RefreshCw className="h-5 w-5 text-purple-600" /></div>
-                      <div className="grid gap-1">
-                        <span className="text-xs font-black text-purple-700 uppercase">시즌 종료 리셋</span>
-                        <p className="text-xs font-bold text-purple-900/70 leading-relaxed">
-                          - 매 시즌 종료 시 **벌점 50%가 자동 감쇠**됩니다.<br/>
-                          <span className="text-[10px] opacity-60">(예: 20점 → 10점 잔류)</span>
-                        </p>
-                      </div>
-                    </Card>
-                  </div>
-                </section>
               </div>
             </div>
 
@@ -1050,7 +972,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Dialog>
       </section>
 
-      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={currentLp} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
+      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
     </div>
   );
 }
