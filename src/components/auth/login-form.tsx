@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,9 +20,7 @@ import { useAuth } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Monitor, Smartphone } from 'lucide-react';
-import { useAppContext } from '@/contexts/app-context';
-import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -36,7 +35,6 @@ export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
   const { toast } = useToast();
-  const { viewMode, setViewMode } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -51,10 +49,8 @@ export function LoginForm() {
     if (!auth) return;
     setIsLoading(true);
     try {
-      // 이메일 주소 전후 공백 제거 (트림 처리)
       const trimmedEmail = values.email.trim();
       await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
-      // router.replace를 사용하여 인증 상태 변경 후 AuthGuard가 자연스럽게 대시보드로 이동시키도록 합니다.
       router.replace('/dashboard');
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -76,41 +72,6 @@ export function LoginForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 접속 모드 선택 섹션 */}
-      <div className="space-y-3">
-        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">접속 모드 선택</label>
-        <div className="grid grid-cols-2 gap-2 p-1.5 bg-muted/40 rounded-2xl border border-border/50">
-          <Button
-            type="button"
-            variant="ghost"
-            className={cn(
-              "rounded-xl h-12 font-black gap-2 transition-all duration-300",
-              viewMode === 'responsive' 
-                ? "bg-white shadow-md text-primary ring-1 ring-black/[0.05]" 
-                : "text-muted-foreground/50 hover:text-primary hover:bg-white/50"
-            )}
-            onClick={() => setViewMode('responsive')}
-          >
-            <Monitor className={cn("h-4 w-4", viewMode === 'responsive' ? "text-primary" : "opacity-40")} />
-            웹모드
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className={cn(
-              "rounded-xl h-12 font-black gap-2 transition-all duration-300",
-              viewMode === 'mobile' 
-                ? "bg-white shadow-md text-primary ring-1 ring-black/[0.05]" 
-                : "text-muted-foreground/50 hover:text-primary hover:bg-white/50"
-            )}
-            onClick={() => setViewMode('mobile')}
-          >
-            <Smartphone className={cn("h-4 w-4", viewMode === 'mobile' ? "text-primary" : "opacity-40")} />
-            앱모드
-          </Button>
-        </div>
-      </div>
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
           <FormField
@@ -153,7 +114,7 @@ export function LoginForm() {
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 로그인 중...
               </>
-            ) : `${viewMode === 'mobile' ? '앱모드로 ' : '웹모드로 '}로그인`}
+            ) : '로그인'}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm font-bold text-muted-foreground">

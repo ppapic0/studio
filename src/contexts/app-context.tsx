@@ -16,8 +16,6 @@ export type CenterMembership = {
   className?: string;
 };
 
-export type ViewMode = 'responsive' | 'mobile';
-
 export const TIERS = [
   { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
   { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
@@ -34,10 +32,6 @@ interface AppContextType {
   activeMembership: CenterMembership | null;
   membershipsLoading: boolean;
   
-  // View Mode
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-
   // Timer Global State
   isTimerActive: boolean;
   setIsTimerActive: (active: boolean) => void;
@@ -59,8 +53,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
   
-  const [viewMode, setViewModeState] = useState<ViewMode>('responsive');
-
   // Timer States
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -70,16 +62,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentTier, setCurrentTier] = useState(TIERS[0]);
 
   const activeMembershipRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const savedMode = localStorage.getItem('app_view_mode') as ViewMode;
-    if (savedMode) setViewModeState(savedMode);
-  }, []);
-
-  const setViewMode = (mode: ViewMode) => {
-    setViewModeState(mode);
-    localStorage.setItem('app_view_mode', mode);
-  };
 
   useEffect(() => {
     if (!user || !firestore) {
@@ -241,8 +223,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     memberships,
     activeMembership,
     membershipsLoading,
-    viewMode,
-    setViewMode,
     isTimerActive,
     setIsTimerActive,
     startTime,
@@ -254,7 +234,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     memberships, 
     activeMembership, 
     membershipsLoading, 
-    viewMode,
     isTimerActive, 
     startTime, 
     lastActiveCheckTime,

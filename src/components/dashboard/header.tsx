@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -79,10 +80,8 @@ export function DashboardHeader() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  const { viewMode, setViewMode, activeMembership } = useAppContext();
+  const { activeMembership } = useAppContext();
 
-  const isMobileView = viewMode === 'mobile';
-  const isAdmin = activeMembership?.role === 'centerAdmin';
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -91,17 +90,14 @@ export function DashboardHeader() {
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
 
-  // 1. 전역 사용자 프로필 조회
   const userRef = (firestore && user) ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile } = useDoc<UserType>(userRef as any);
 
-  // 2. 센터 내 학생 프로필 조회
   const studentRef = (firestore && activeMembership && user) 
     ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
     : null;
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
 
-  // 데이터 로딩 시 폼 초기값 설정
   useEffect(() => {
     if (studentProfile) {
       setSchoolName(studentProfile.schoolName || '');
@@ -117,35 +113,25 @@ export function DashboardHeader() {
     router.push('/login');
   };
 
-  const toggleViewMode = () => {
-    setViewMode(viewMode === 'responsive' ? 'mobile' : 'responsive');
-  };
-
   const handleUpdateSettings = async () => {
     if (!firestore || !user || !activeMembership) return;
     setIsUpdating(true);
     try {
       const batch = writeBatch(firestore);
-      
       const commonUpdate = {
         schoolName: schoolName.trim(),
         updatedAt: serverTimestamp()
       };
-
-      // 1. 전역 프로필 업데이트 (set merge 사용하여 문서가 없으면 생성)
       const uRef = doc(firestore, 'users', user.uid);
       batch.set(uRef, commonUpdate, { merge: true });
-
-      // 2. 센터 내 학생 프로필 업데이트
       if (activeMembership.role === 'student') {
         const sRef = doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
         batch.set(sRef, {
           ...commonUpdate,
           grade: grade,
-          name: user.displayName || '학생' // 필수 필드 보완
+          name: user.displayName || '학생'
         }, { merge: true });
       }
-
       await batch.commit();
       toast({ title: "정보가 성공적으로 업데이트되었습니다." });
       setIsSettingsOpen(false);
@@ -158,57 +144,34 @@ export function DashboardHeader() {
   };
 
   return (
-    <header className={cn(
-      "sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4",
-      viewMode === 'responsive' && "sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6"
-    )}>
-      {viewMode === 'responsive' && (
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button size="icon" variant="outline" className="md:hidden">
-              <PanelLeft className="h-5 w-5" />
-              <span className="sr-only">메뉴 열기</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="sm:max-w-xs">
-            <MainNav isMobile={true} />
-          </SheetContent>
-        </Sheet>
-      )}
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:static md:h-auto md:border-0 md:bg-transparent md:px-6">
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button size="icon" variant="outline" className="md:hidden">
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">메뉴 열기</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="sm:max-w-xs">
+          <MainNav isMobile={true} />
+        </SheetContent>
+      </Sheet>
 
-      {viewMode === 'responsive' && (
-        <Breadcrumb className="hidden md:flex">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">대시보드</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      )}
+      <Breadcrumb className="hidden md:flex">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">대시보드</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       <div className="relative ml-auto flex items-center gap-2">
-        {/* 관리자가 아닐 때만 앱 모드 시뮬레이션 버튼 표시 */}
-        {!isAdmin && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className={cn(
-              "rounded-full transition-all",
-              isMobileView ? "bg-primary text-white" : "text-muted-foreground"
-            )}
-            onClick={toggleViewMode}
-            title={isMobileView ? "데스크톱 모드로 전환" : "앱 모드 시뮬레이션"}
-          >
-            {isMobileView ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
-          </Button>
-        )}
-
         <NotificationBell />
 
         <DropdownMenu modal={false}>
@@ -252,18 +215,14 @@ export function DashboardHeader() {
         </DropdownMenu>
       </div>
 
-      {/* 설정 다이얼로그 - 앱모드 대응 (중앙 팝업) */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className={cn(
-          "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500",
-          isMobileView ? "w-[90vw] max-w-[350px]" : ""
-        )}>
-          <div className={cn("bg-primary text-white relative overflow-hidden", isMobileView ? "p-6" : "p-8")}>
+        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500 w-[90vw] max-w-[350px] sm:w-auto">
+          <div className="bg-primary text-white relative overflow-hidden p-6 sm:p-8">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogTitle className={cn("font-black tracking-tighter", isMobileView ? "text-xl" : "text-2xl")}>프로필 설정</DialogTitle>
+            <DialogTitle className="font-black tracking-tighter text-xl sm:text-2xl">프로필 설정</DialogTitle>
             <DialogDescription className="text-white/60 font-bold mt-1 text-xs">정보를 수정할 수 있습니다.</DialogDescription>
           </div>
-          <div className={cn("space-y-6 bg-white", isMobileView ? "p-6" : "p-8")}>
+          <div className="space-y-6 bg-white p-6 sm:p-8">
             <div className="grid gap-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label>
               <div className="relative">
@@ -288,7 +247,7 @@ export function DashboardHeader() {
               </div>
             )}
           </div>
-          <DialogFooter className={cn("bg-muted/20 border-t", isMobileView ? "p-6" : "p-8")}>
+          <DialogFooter className="bg-muted/20 border-t p-6 sm:p-8">
             <Button onClick={handleUpdateSettings} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
               {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '저장'}
             </Button>
@@ -296,20 +255,16 @@ export function DashboardHeader() {
         </DialogContent>
       </Dialog>
 
-      {/* 지원/메뉴얼 다이얼로그 - 앱모드 대응 (중앙 팝업) */}
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
-        <DialogContent className={cn(
-          "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500",
-          isMobileView ? "w-[95vw] max-w-[370px] h-[80vh]" : "max-h-[85vh]"
-        )}>
-          <div className={cn("bg-accent text-white shrink-0 relative overflow-hidden", isMobileView ? "p-6" : "p-8")}>
+        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500 w-[95vw] max-w-[370px] sm:w-auto h-[80vh] sm:h-auto max-h-[85vh]">
+          <div className="bg-accent text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
             <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
-            <DialogTitle className={cn("font-black tracking-tighter flex items-center gap-3", isMobileView ? "text-xl" : "text-3xl")}>
+            <DialogTitle className="font-black tracking-tighter flex items-center gap-3 text-xl sm:text-3xl">
               <BookOpen className="h-6 w-6" /> 가이드
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">앱 사용 메뉴얼입니다.</DialogDescription>
           </div>
-          <div className={cn("flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar", isMobileView ? "p-6" : "p-8")}>
+          <div className="flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar p-6 sm:p-8">
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
                 <Zap className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
@@ -320,7 +275,6 @@ export function DashboardHeader() {
                 </p>
               </div>
             </section>
-
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
                 <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 계획 및 루틴
@@ -331,7 +285,6 @@ export function DashboardHeader() {
                 </p>
               </div>
             </section>
-
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
                 <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 상담 및 피드백
@@ -343,7 +296,7 @@ export function DashboardHeader() {
               </div>
             </section>
           </div>
-          <div className={cn("bg-white border-t shrink-0 flex justify-end", isMobileView ? "p-4" : "p-6")}>
+          <div className="bg-white border-t shrink-0 flex justify-end p-4 sm:p-6">
             <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">닫기</Button>
           </div>
         </DialogContent>
