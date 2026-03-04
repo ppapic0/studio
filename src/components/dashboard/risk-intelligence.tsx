@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { DailyStudentStat, CenterMembership, GrowthProgress, CounselingReservation } from '@/lib/types';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { 
   AlertTriangle, 
@@ -23,9 +23,23 @@ import {
   Users,
   Search,
   ChevronRight,
-  Loader2
+  Loader2,
+  Sparkles,
+  ArrowRight,
+  Target,
+  History,
+  AlertCircle,
+  BrainCircuit
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import Link from 'next/link';
 
 export function RiskIntelligence() {
@@ -34,6 +48,8 @@ export function RiskIntelligence() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  const [selectedRiskStudent, setSelectedRiskStudent] = useState<any>(null);
 
   // 1. 모든 재원생 조회
   const membersQuery = useMemoFirebase(() => {
@@ -73,33 +89,70 @@ export function RiskIntelligence() {
 
       // 리스크 점수 계산 로직
       let score = 0;
-      const reasons: string[] = [];
+      const detailedReasons: { label: string, value: string, score: number, icon: any, color: string }[] = [];
 
       // 1. 공부시간 감소 (20% 이상 감소 시 +30점)
       if (stats && stats.studyTimeGrowthRate <= -0.2) {
-        score += 30;
-        reasons.push(`학습량 급감 (${Math.round(stats.studyTimeGrowthRate * 100)}%)`);
+        const weight = 30;
+        score += weight;
+        detailedReasons.push({
+          label: '학습량 급감',
+          value: `${Math.round(stats.studyTimeGrowthRate * 100)}% 감소`,
+          score: weight,
+          icon: TrendingDown,
+          color: 'text-rose-600'
+        });
       }
 
       // 2. 벌점 급증 (10점 이상 시 +20점, 20점 이상 시 +40점)
       const penalty = progress?.penaltyPoints || 0;
-      if (penalty >= 20) { score += 40; reasons.push(`위험 수준 벌점 (${penalty}점)`); }
-      else if (penalty >= 10) { score += 20; reasons.push(`주의 수준 벌점 (${penalty}점)`); }
+      if (penalty >= 10) {
+        const weight = penalty >= 20 ? 40 : 20;
+        score += weight;
+        detailedReasons.push({
+          label: '규정 위반 (벌점)',
+          value: `${penalty}점 누적`,
+          score: weight,
+          icon: ShieldAlert,
+          color: penalty >= 20 ? 'text-rose-600' : 'text-amber-600'
+        });
+      }
 
       // 3. 상담 취소 반복 (2회 이상 시 +20점)
-      if (canceledCount >= 2) { score += 20; reasons.push(`상담 취소 반복 (${canceledCount}회)`); }
+      if (canceledCount >= 2) {
+        const weight = 20;
+        score += weight;
+        detailedReasons.push({
+          label: '상담 기피 징후',
+          value: `예약 취소 ${canceledCount}회`,
+          score: weight,
+          icon: MessageCircle,
+          color: 'text-amber-600'
+        });
+      }
 
       // 4. 계획 완수율 저조 (50% 미만 시 +20점)
-      if (stats && stats.todayPlanCompletionRate < 50) { score += 20; reasons.push('학습 계획 완수율 저조'); }
+      if (stats && stats.todayPlanCompletionRate < 50) {
+        const weight = 20;
+        score += weight;
+        detailedReasons.push({
+          label: '성취도 저조',
+          value: `완수율 ${stats.todayPlanCompletionRate}%`,
+          score: weight,
+          icon: Target,
+          color: 'text-rose-600'
+        });
+      }
 
       return {
         id: m.id,
         name: m.displayName,
         className: m.className,
         score: Math.min(100, score),
-        reasons,
+        detailedReasons,
         stats,
-        penalty
+        penalty,
+        canceledCount
       };
     }).sort((a, b) => b.score - a.score);
   }, [members, todayStats, progressList, canceledApts]);
@@ -153,25 +206,34 @@ export function RiskIntelligence() {
             <ScrollArea className="h-[500px]">
               <div className="divide-y divide-muted/10">
                 {riskAnalysis?.slice(0, 20).map((risk) => (
-                  <div key={risk.id} className="p-8 hover:bg-muted/5 transition-all flex items-center justify-between group">
+                  <div 
+                    key={risk.id} 
+                    onClick={() => setSelectedRiskStudent(risk)}
+                    className="p-8 hover:bg-muted/5 transition-all flex items-center justify-between group cursor-pointer"
+                  >
                     <div className="flex items-center gap-6">
                       <div className={cn(
                         "h-16 w-16 rounded-3xl flex items-center justify-center font-black text-2xl shadow-xl transition-all group-hover:scale-110",
                         risk.score >= 70 ? "bg-rose-600 text-white shadow-rose-200" : risk.score >= 40 ? "bg-amber-500 text-white shadow-amber-100" : "bg-primary/5 text-primary border"
                       )}>{risk.score}</div>
                       <div className="grid gap-1">
-                        <div className="flex items-center gap-2"><span className="font-black text-xl">{risk.name}</span><Badge variant="outline" className="text-[9px] font-black">{risk.className || '반 미지정'}</Badge></div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-xl tracking-tight">{risk.name} 학생</span>
+                          <Badge variant="outline" className="text-[9px] font-black border-primary/20">{risk.className || '반 미지정'}</Badge>
+                        </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {risk.reasons.map((r, i) => <Badge key={i} className="bg-rose-50 text-rose-600 border-none font-black text-[8px] px-2">{r}</Badge>)}
-                          {risk.reasons.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">특이 징후 없음</span>}
+                          {risk.detailedReasons.slice(0, 2).map((r: any, i: number) => (
+                            <Badge key={i} className={cn("border-none font-black text-[8px] px-2 bg-muted/50", r.color)}>{r.label}</Badge>
+                          ))}
+                          {risk.detailedReasons.length > 2 && <span className="text-[8px] font-bold text-muted-foreground/40">+{risk.detailedReasons.length - 2} more</span>}
+                          {risk.detailedReasons.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">특이 징후 없음</span>}
                         </div>
                       </div>
                     </div>
-                    <Button asChild variant="ghost" size="icon" className="rounded-full h-12 w-12 group-hover:bg-primary group-hover:text-white transition-all">
-                      <Link href={`/dashboard/teacher/students/${risk.id}`}>
-                        <ChevronRight className="h-6 w-6" />
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Analyze Details</span>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -205,6 +267,106 @@ export function RiskIntelligence() {
           </Card>
         </div>
       </div>
+
+      {/* 리스크 상세 분석 모달 */}
+      <Dialog open={!!selectedRiskStudent} onOpenChange={(open) => !open && setSelectedRiskStudent(null)}>
+        <DialogContent className={cn(
+          "rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500",
+          isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-xl max-h-[90vh]"
+        )}>
+          {selectedRiskStudent && (
+            <>
+              <div className={cn(
+                "p-10 text-white relative shrink-0",
+                selectedRiskStudent.score >= 70 ? "bg-rose-600" : selectedRiskStudent.score >= 40 ? "bg-amber-500" : "bg-primary"
+              )}>
+                <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
+                  <ShieldAlert className="h-48 w-48" />
+                </div>
+                <DialogHeader className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest">AI Risk Diagnostic</Badge>
+                  </div>
+                  <DialogTitle className="text-4xl font-black tracking-tighter">
+                    {selectedRiskStudent.name} 학생 분석
+                  </DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold mt-1 text-sm">
+                    복합 데이터를 기반으로 산출된 이탈 위험 지수입니다.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-8 sm:p-10 space-y-10">
+                <div className="text-center space-y-4">
+                  <div className="inline-flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Composite Risk Score</span>
+                    <h3 className={cn(
+                      "text-8xl font-black tracking-tighter leading-none",
+                      selectedRiskStudent.score >= 70 ? "text-rose-600" : selectedRiskStudent.score >= 40 ? "text-amber-600" : "text-primary"
+                    )}>
+                      {selectedRiskStudent.score}<span className="text-3xl opacity-20 ml-1">/100</span>
+                    </h3>
+                  </div>
+                  <Progress value={selectedRiskStudent.score} className="h-3 bg-muted" />
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
+                    <BrainCircuit className="h-4 w-4" /> 감지된 주요 리스크 요인
+                  </h4>
+                  <div className="grid gap-3">
+                    {selectedRiskStudent.detailedReasons.length === 0 ? (
+                      <div className="p-6 rounded-2xl bg-emerald-50/50 border-2 border-dashed border-emerald-100 text-center">
+                        <p className="text-sm font-bold text-emerald-700">현재 감지된 특이 징후가 없습니다.</p>
+                      </div>
+                    ) : (
+                      selectedRiskStudent.detailedReasons.map((reason: any, i: number) => (
+                        <div key={i} className="p-5 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between group hover:border-rose-200 transition-all">
+                          <div className="flex items-center gap-4">
+                            <div className={cn("p-2.5 rounded-xl bg-opacity-10", reason.color.replace('text-', 'bg-'))}>
+                              <reason.icon className={cn("h-5 w-5", reason.color)} />
+                            </div>
+                            <div className="grid gap-0.5">
+                              <span className="font-black text-sm">{reason.label}</span>
+                              <span className={cn("text-xs font-bold", reason.color)}>{reason.value}</span>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="font-black text-[10px] border-none bg-muted/30">+{reason.score}pts</Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 space-y-4 ring-1 ring-black/5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-amber-500 fill-current" />
+                    <h4 className="text-sm font-black tracking-tight">운영자 권장 조치 (Intervention)</h4>
+                  </div>
+                  <p className="text-xs font-bold leading-relaxed text-foreground/70">
+                    {selectedRiskStudent.score >= 70 ? (
+                      "🚨 **긴급 상담 대상**: 학습 리듬이 붕괴된 상태입니다. 즉시 부모님께 연락하여 현재 상황을 공유하고, 학생과의 심층 면담을 통해 원인을 파악해야 합니다."
+                    ) : selectedRiskStudent.score >= 40 ? (
+                      "⚠️ **주의 관찰 대상**: 학습 의욕이 하락하고 있는 징후가 보입니다. 가벼운 면담을 통해 학습 환경의 불편함을 체크하고 성취감을 느낄 수 있는 단기 목표 설정을 제안하세요."
+                    ) : (
+                      "✨ **안정적 상태**: 현재 특별한 이탈 징후가 없습니다. 칭찬 리포트를 발송하여 긍정적인 학습 경험을 강화해 주세요."
+                    )}
+                  </p>
+                </Card>
+              </div>
+
+              <DialogFooter className="p-8 bg-white border-t shrink-0 flex flex-col sm:flex-row gap-3">
+                <Button variant="outline" className="h-14 rounded-2xl font-black flex-1 border-2" onClick={() => setSelectedRiskStudent(null)}>분석 창 닫기</Button>
+                <Button asChild className="h-14 rounded-2xl font-black flex-1 shadow-xl gap-2 active:scale-95 transition-all">
+                  <Link href={`/dashboard/teacher/students/${selectedRiskStudent.id}`}>
+                    학생 정밀 상세페이지 <ChevronRight className="h-5 w-5" />
+                  </Link>
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
