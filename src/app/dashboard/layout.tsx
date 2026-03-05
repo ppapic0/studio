@@ -18,7 +18,7 @@ export default function DashboardLayout({
 
   return (
     <div className={cn(
-      "min-h-screen w-full bg-[#f0f0f0] transition-all duration-500 relative overflow-x-hidden font-body flex items-center justify-center",
+      "min-h-screen w-full bg-[#f0f0f0] transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center",
       !isMobileView && "md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-background"
     )}>
       {/* Premium Background Decoration */}
@@ -30,7 +30,7 @@ export default function DashboardLayout({
       {/* Sidebar - Desktop/Tablet Mode */}
       {!isMobileView && (
         <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20">
-          <div className="flex h-full flex-col">
+          <div className="flex h-full flex-col justify-start">
             <MainNav />
           </div>
         </div>
@@ -40,7 +40,7 @@ export default function DashboardLayout({
       <div className={cn(
         "flex flex-col transition-all duration-700 relative z-10",
         isMobileView 
-          ? "w-full max-w-[430px] aspect-[9/19.5] h-[92vh] max-h-[932px] bg-white rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[12px] border-black overflow-hidden ring-[4px] ring-gray-800 relative" 
+          ? "w-full max-w-[430px] aspect-[9/19.5] h-[92vh] max-h-[932px] bg-white rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[12px] border-black overflow-hidden ring-[4px] ring-gray-800 relative mt-8" 
           : "w-full min-h-screen"
       )}>
         {/* Header */}
