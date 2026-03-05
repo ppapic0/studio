@@ -19,17 +19,16 @@ export default function DashboardLayout({
 
   return (
     <div className={cn(
-      "min-h-screen w-full bg-background transition-all duration-500 relative overflow-x-hidden font-body",
-      isMobileView ? "flex items-center justify-center p-0 md:p-8 lg:p-12" : "grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]"
+      "min-h-screen w-full bg-[#f0f0f0] transition-all duration-500 relative overflow-x-hidden font-body flex items-center justify-center",
+      !isMobileView && "md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-background"
     )}>
       {/* Premium Background Decoration */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:40px_40px] opacity-[0.04]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background)/0.8))]" />
       </div>
 
-      {/* Sidebar - Desktop/Tablet Mode (Hidden in Mobile Preview) */}
+      {/* Sidebar - Desktop/Tablet Mode */}
       {!isMobileView && (
         <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20">
           <div className="flex h-full flex-col gap-2">
@@ -45,16 +44,23 @@ export default function DashboardLayout({
       <div className={cn(
         "flex flex-col transition-all duration-700 relative z-10",
         isMobileView 
-          ? "w-full max-w-[430px] aspect-[9/19.5] h-[90vh] max-h-[932px] bg-white rounded-[3.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.25)] border-[8px] border-primary/10 overflow-hidden ring-[12px] ring-white" 
+          ? "w-full max-w-[430px] aspect-[9/19.5] h-[92vh] max-h-[932px] bg-white rounded-[3.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[12px] border-black overflow-hidden ring-[4px] ring-gray-800 relative" 
           : "w-full min-h-screen"
       )}>
+        {/* iPhone Pro Specific: Dynamic Island */}
+        {isMobileView && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-2xl z-[60] flex items-center justify-center">
+            <div className="w-10 h-1 bg-white/10 rounded-full" />
+          </div>
+        )}
+
         {/* Header */}
         <DashboardHeader />
         
         {/* Scrollable Content */}
         <main className={cn(
-          "flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10 pb-32 md:pb-12",
-          isMobileView ? "p-4 px-5" : "p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px]"
+          "flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10",
+          isMobileView ? "p-4 px-5 pb-24" : "p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12"
         )}>
           {children}
         </main>
@@ -63,8 +69,12 @@ export default function DashboardLayout({
         <AppointmentNotifier />
         <ReportNotifier />
 
-        {/* Bottom Nav - Only on Mobile or Mobile Preview */}
-        {(isMobileView || typeof window !== 'undefined' && window.innerWidth < 768) && <BottomNav />}
+        {/* Bottom Nav - Shown in Mobile View Mode or on actual small screens */}
+        {(isMobileView || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
+          <div className={isMobileView ? "absolute bottom-0 left-0 right-0 z-50" : ""}>
+            <BottomNav />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -113,7 +113,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
             href={item.href} 
             className={cn(
               linkClass, 
-              isActive && (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-xl shadow-black/10` : 'bg-primary text-primary-foreground shadow-primary/20 shadow-xl shadow-black/10')
+              isActive && (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-xl` : 'bg-primary text-primary-foreground shadow-xl')
             )}
           >
             <item.icon className={cn("h-5 w-5 transition-transform duration-300 group-hover:scale-110", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
