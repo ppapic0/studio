@@ -97,7 +97,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
     <nav className={navClass}>
       <Link
         href="/dashboard"
-        className="flex items-center gap-3 text-2xl font-black text-primary mb-6 px-2 pt-6 tracking-tighter"
+        className="flex items-center gap-3 text-2xl font-black text-primary mb-4 px-2 pt-4 tracking-tighter"
       >
         <div className="bg-primary p-2 rounded-xl">
           <BookOpen className="h-6 w-6 text-white" />
