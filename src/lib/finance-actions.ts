@@ -19,14 +19,15 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * 수납 처리 (결제 완료)
- * 실제 PG 연동 시 이 함수가 결제 성공 콜백에서 호출됩니다.
+ * 수납 상태 수동 업데이트 (고도화)
+ * 관리자가 인보이스의 상태를 직접 변경할 때 사용 (Paid, Issued, Overdue 등)
  */
-export async function completePayment(
-  db: Firestore, 
-  centerId: string, 
-  invoiceId: string, 
-  method: 'card' | 'transfer' | 'cash'
+export async function updateInvoiceStatus(
+  db: Firestore,
+  centerId: string,
+  invoiceId: string,
+  status: Invoice['status'],
+  method: Invoice['paymentMethod'] = 'none'
 ) {
   const invoiceRef = doc(db, 'centers', centerId, 'invoices', invoiceId);
   const invoiceSnap = await getDoc(invoiceRef);
@@ -34,46 +35,60 @@ export async function completePayment(
   if (!invoiceSnap.exists()) throw new Error('인보이스를 찾을 수 없습니다.');
   const invoice = invoiceSnap.data() as Invoice;
 
-  if (invoice.status === 'paid') throw new Error('이미 결제된 항목입니다.');
-
   const batch = writeBatch(db);
   const now = serverTimestamp();
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  // 1. 인보이스 상태 업데이트
-  batch.update(invoiceRef, {
-    status: 'paid',
-    paymentMethod: method,
-    paidAt: now,
+  const updateData: any = {
+    status,
     updatedAt: now
-  });
+  };
 
-  // 2. 결제 트랜잭션 로그 생성
-  const paymentRef = doc(collection(db, `centers/${centerId}/payments`));
-  batch.set(paymentRef, {
-    invoiceId,
-    studentId: invoice.studentId,
-    studentName: invoice.studentName,
-    amount: invoice.finalPrice,
-    method,
-    status: 'success',
-    processedAt: now,
-    centerId
-  });
+  if (status === 'paid') {
+    updateData.paymentMethod = method;
+    updateData.paidAt = now;
 
-  // 3. 당일 KPI 수납액(Collected Revenue) 업데이트
-  const kpiRef = doc(db, 'centers', centerId, 'kpiDaily', todayKey);
-  batch.set(kpiRef, {
-    collectedRevenue: (await getDoc(kpiRef)).data()?.collectedRevenue || 0 + invoice.finalPrice,
-    updatedAt: now
-  }, { merge: true });
+    // 결제 로그 생성
+    const paymentRef = doc(collection(db, `centers/${centerId}/payments`));
+    batch.set(paymentRef, {
+      invoiceId,
+      studentId: invoice.studentId,
+      studentName: invoice.studentName,
+      amount: invoice.finalPrice,
+      method,
+      status: 'success',
+      processedAt: now,
+      centerId
+    });
+  } else {
+    // 유료 상태에서 다른 상태로 변경 시 (환불 등은 별도 로직이 필요하지만 여기서는 단순 상태 전환)
+    updateData.paidAt = null;
+    updateData.paymentMethod = 'none';
+  }
 
+  batch.update(invoiceRef, updateData);
   await batch.commit();
+
+  // 변경된 내용을 바탕으로 KPI 즉시 동기화
+  await syncDailyKpi(db, centerId, todayKey);
+
   return { ok: true };
 }
 
 /**
- * 신규 인보이스 수동 생성
+ * 수납 처리 (결제 완료 - 기존 함수 유지 및 보강)
+ */
+export async function completePayment(
+  db: Firestore, 
+  centerId: string, 
+  invoiceId: string, 
+  method: 'card' | 'transfer' | 'cash'
+) {
+  return updateInvoiceStatus(db, centerId, invoiceId, 'paid', method);
+}
+
+/**
+ * 신규 인보이스 생성 (관리형 독서실 표준 28일 주기 적용)
  */
 export async function issueInvoice(
   db: Firestore,
@@ -88,6 +103,7 @@ export async function issueInvoice(
   const student = studentSnap.data() as StudentProfile;
   const now = serverTimestamp();
   const startDate = new Date();
+  // 관리형 독서실 표준: 28일(4주) 주기 자동 설정
   const endDate = addDays(startDate, 28);
 
   const invoiceData = {
@@ -100,9 +116,9 @@ export async function issueInvoice(
     issuedAt: now,
     updatedAt: now,
     priceSnapshot: {
-      productId: 'manual',
-      season: 'none',
-      studentType: 'none',
+      productId: 'manual_28d',
+      season: 'regular',
+      studentType: 'student',
       basePrice: amount
     },
     discountsSnapshot: []
@@ -115,7 +131,7 @@ export async function issueInvoice(
 }
 
 /**
- * 발생주의 방식의 Daily KPI 집계 고도화
+ * 발생주의 방식의 Daily KPI 집계
  */
 export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: string) {
   const targetDate = startOfDay(new Date(dateStr));
@@ -134,15 +150,16 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
   membersSnap.docs.forEach((doc) => {
     const data = doc.data();
     const monthlyFee = data.monthlyFee || 390000;
+    // 28일 기준 일할 계산
     dailyAccruedRevenue += Math.floor(monthlyFee / 28);
     activeStudentCount++;
   });
 
-  // 2. 실제 수납액(Cash Flow) 계산 - 결제 컬렉션에서 해당 날짜 합산
+  // 2. 실제 수납액(Cash Flow) 계산
   const paymentsQuery = query(
     collection(db, `centers/${centerId}/payments`),
     where('processedAt', '>=', Timestamp.fromDate(startOfDay(targetDate))),
-    where('processedAt', '<=', Timestamp.fromDate(endOfDay(targetDate)))
+    where('processedAt', '<=', Timestamp.fromDate(new Date(targetDate.getTime() + 86399999)))
   );
   const paymentsSnap = await getDocs(paymentsQuery);
   const collectedRevenue = paymentsSnap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
@@ -157,10 +174,4 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
 
   await setDoc(doc(db, 'centers', centerId, 'kpiDaily', dateStr), kpiData, { merge: true });
   return { ok: true };
-}
-
-function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
 }
