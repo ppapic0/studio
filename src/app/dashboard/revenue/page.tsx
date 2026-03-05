@@ -48,7 +48,8 @@ import {
   CalendarCheck,
   History,
   AlertTriangle,
-  CalendarX
+  CalendarX,
+  Search
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -83,6 +84,7 @@ import { useToast } from '@/hooks/use-toast';
 import { syncMonthKpis, completePayment, updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
 import { useRouter } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
+import Link from 'next/link';
 
 export default function RevenuePage() {
   const { user } = useUser();
@@ -111,7 +113,7 @@ export default function RevenuePage() {
   }, [firestore, centerId, currentChartMonth]);
   const { data: kpiHistory, isLoading: isKpiLoading } = useCollection<KpiDaily>(kpiQuery);
 
-  // 2. 인보이스 조회 (실시간 연동)
+  // 2. 인보이스 조회
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -121,14 +123,14 @@ export default function RevenuePage() {
   }, [firestore, centerId]);
   const { data: allInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesQuery);
 
-  // 3. 실시간 좌석 배정 현황 (재원생 연동용)
+  // 3. 실시간 좌석 배정 현황
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
 
-  // 4. 학생 목록 조회 (이름 매칭용)
+  // 4. 학생 목록 조회
   const studentMembersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -138,6 +140,53 @@ export default function RevenuePage() {
     );
   }, [firestore, centerId]);
   const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery);
+
+  // --- 수납 시급도 기반 정렬 로직 ---
+  const sortedAssignedStudents = useMemo(() => {
+    if (!attendanceList || !allInvoices || !studentMembers) return [];
+    
+    const assignedSeats = attendanceList.filter(a => a.studentId);
+    
+    const list = assignedSeats.map(seat => {
+      const student = studentMembers.find(m => m.id === seat.studentId);
+      const studentInvoices = allInvoices.filter(i => i.studentId === seat.studentId)
+        .sort((a, b) => b.cycleEndDate.toMillis() - a.cycleEndDate.toMillis());
+      const latestInvoice = studentInvoices?.[0];
+      
+      let priority = 0;
+      let overdueDays = 0;
+      
+      if (!latestInvoice) {
+        priority = 100; // 가장 시급: 인보이스 없음
+      } else if (latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date()) {
+        priority = 90; // 매우 시급: 연체 중
+        overdueDays = differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate());
+      } else if (latestInvoice.status !== 'paid') {
+        priority = 80; // 시급: 청구됨 (미납)
+      } else {
+        priority = 10; // 안정: 완납됨
+      }
+      
+      return { 
+        seat, 
+        student, 
+        latestInvoice, 
+        priority, 
+        overdueDays 
+      };
+    });
+
+    // 우선순위 높은 순 -> 납기일 빠른 순
+    return list.sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      if (a.latestInvoice && b.latestInvoice) {
+        return a.latestInvoice.cycleEndDate.toMillis() - b.latestInvoice.cycleEndDate.toMillis();
+      }
+      return 0;
+    });
+  }, [attendanceList, allInvoices, studentMembers]);
+
+  const top3Assigned = useMemo(() => sortedAssignedStudents.slice(0, 3), [sortedAssignedStudents]);
 
   const filteredInvoices = useMemo(() => {
     if (!allInvoices) return [];
@@ -370,22 +419,10 @@ export default function RevenuePage() {
                 <div className="relative z-10 space-y-6">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg font-black tracking-tighter">배정 재원생 현황</CardTitle>
-                    <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px]">LIVE SEATS</Badge>
+                    <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px]">PRIORITY</Badge>
                   </div>
                   <div className="space-y-3">
-                    {attendanceList?.filter(a => a.studentId).map(seat => {
-                      const student = studentMembers?.find(m => m.id === seat.studentId);
-                      
-                      // 가장 최신 인보이스 찾기
-                      const studentInvoices = allInvoices?.filter(i => i.studentId === seat.studentId)
-                        .sort((a, b) => b.cycleEndDate.toMillis() - a.cycleEndDate.toMillis());
-                      const latestInvoice = studentInvoices?.[0];
-                      const hasInvoice = !!latestInvoice;
-
-                      // 연체 계산
-                      const isOverdue = latestInvoice && latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date();
-                      const overdueDays = isOverdue ? differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate()) : 0;
-
+                    {top3Assigned.map(({ seat, student, latestInvoice, isOverdue, overdueDays }: any) => {
                       return (
                         <div key={seat.id} className="flex flex-col p-5 rounded-3xl bg-[#fafafa] border border-border/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group/seat">
                           <div className="flex items-center justify-between mb-4">
@@ -401,12 +438,12 @@ export default function RevenuePage() {
                             {latestInvoice ? (
                               <Badge className={cn(
                                 "font-black text-[9px] border-none px-2 h-5",
-                                latestInvoice.status === 'paid' ? "bg-emerald-500" : isOverdue ? "bg-rose-500 animate-pulse" : "bg-amber-500"
+                                latestInvoice.status === 'paid' ? "bg-emerald-500" : (latestInvoice.cycleEndDate.toDate() < new Date() ? "bg-rose-500 animate-pulse" : "bg-amber-500")
                               )}>
-                                {latestInvoice.status === 'paid' ? '수납 완료' : isOverdue ? '미납/연체' : '수납 대기'}
+                                {latestInvoice.status === 'paid' ? '수납 완료' : (latestInvoice.cycleEndDate.toDate() < new Date() ? '미납/연체' : '수납 대기')}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="font-black text-[9px] opacity-40">이력 없음</Badge>
+                              <Badge variant="outline" className="font-black text-[9px] opacity-40">미관리</Badge>
                             )}
                           </div>
 
@@ -418,12 +455,12 @@ export default function RevenuePage() {
                               </div>
                               <div className="flex justify-between items-center text-[10px] font-bold">
                                 <span className="text-muted-foreground">차기 결제 예정</span>
-                                <span className="text-blue-600">{format(latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd')} (28일 주기)</span>
+                                <span className="text-blue-600">{format(latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd')}</span>
                               </div>
-                              {isOverdue && (
+                              {latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date() && (
                                 <div className="flex items-center gap-2 p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
                                   <AlertTriangle className="h-3.5 w-3.5" />
-                                  <span className="text-[10px] font-black uppercase">미납 D+{overdueDays}일 경과</span>
+                                  <span className="text-[10px] font-black uppercase">미납 D+{differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate())}일 경과</span>
                                 </div>
                               )}
                             </div>
@@ -435,6 +472,15 @@ export default function RevenuePage() {
                         </div>
                       );
                     })}
+                    
+                    {sortedAssignedStudents.length > 3 && (
+                      <Button asChild variant="ghost" className="w-full h-12 rounded-2xl font-black text-xs text-muted-foreground hover:text-primary border-2 border-dashed">
+                        <Link href="/dashboard/revenue/assigned-students">
+                          배정 재원생 전체 보기 ({sortedAssignedStudents.length}명) <ChevronRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    )}
+
                     {(!attendanceList || attendanceList.filter(a => a.studentId).length === 0) && (
                       <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
                         <Users className="h-12 w-12" />
