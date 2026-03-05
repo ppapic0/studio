@@ -43,7 +43,9 @@ import {
   ClipboardCheck,
   UserCheck,
   CalendarX,
-  UserMinus
+  UserMinus,
+  QrCode,
+  Scan
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -73,6 +75,8 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
+import { sendKakaoNotification } from '@/lib/kakao-service';
+import { QRCodeSVG } from 'qrcode.react';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -313,8 +317,13 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               {sessions.map((session) => (
                 <div key={session.id} className="bg-white p-4 rounded-xl border-2 border-primary/5 flex items-center justify-between shadow-sm group">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center"><Timer className="h-4 w-4 text-blue-600" /></div>
-                    <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span></div>
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                      <Timer className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="grid leading-tight">
+                      <span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
+                    </div>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-2">{session.durationMinutes}분</Badge>
                 </div>
@@ -550,6 +559,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
         
         await batch.commit();
+
+        // 카카오 알림톡 발송 (퇴실)
+        sendKakaoNotification(firestore, centerId, {
+          studentName: user.displayName || '학생',
+          type: 'exit'
+        });
+
         setIsTimerActive(false); 
         setStartTime(null); 
         toast({ title: "트랙 종료됨" });
@@ -576,6 +592,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
 
         await batch.commit();
+
+        // 카카오 알림톡 발송 (입실)
+        sendKakaoNotification(firestore, centerId, {
+          studentName: user.displayName || '학생',
+          type: 'entry'
+        });
+
         setStartTime(nowTs); 
         setIsTimerActive(true);
       }
@@ -645,6 +668,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // QR 데이터 생성 (보안을 위해 간단한 프리픽스 추가)
+  const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
+
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-2.5" : "gap-10")}>
       <section className={cn(
@@ -677,23 +703,68 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </span>
               </div>
             )}
-            <button 
-              disabled={isProcessingAction}
-              className={cn(
-                "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
-                isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
-                isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
-              )} 
-              onClick={handleStudyStartStop}
-            >
-              {isProcessingAction ? (
-                <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
-              ) : isTimerActive ? (
-                <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
-              ) : (
-                <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
-              )}
-            </button>
+            <div className="flex flex-col gap-2 w-full md:w-auto">
+              <button 
+                disabled={isProcessingAction}
+                className={cn(
+                  "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+                  isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
+                  isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
+                )} 
+                onClick={handleStudyStartStop}
+              >
+                {isProcessingAction ? (
+                  <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
+                ) : isTimerActive ? (
+                  <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                ) : (
+                  <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                )}
+              </button>
+              
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full h-10 rounded-xl bg-white/10 border-white/20 text-white font-black hover:bg-white hover:text-primary gap-2 backdrop-blur-sm shadow-xl">
+                    <QrCode className="h-4 w-4" /> 나의 출입 QR
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-sm">
+                  <div className="bg-primary p-8 text-white text-center">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-black tracking-tighter">나의 출입 QR</DialogTitle>
+                      <DialogDescription className="text-white/70 font-bold">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
+                    </DialogHeader>
+                  </div>
+                  <div className="p-10 bg-white flex flex-col items-center gap-6">
+                    <div className="p-6 rounded-[2.5rem] bg-[#fafafa] border-4 border-primary/5 shadow-inner">
+                      <QRCodeSVG 
+                        value={qrData}
+                        size={200}
+                        level="H"
+                        includeMargin={false}
+                        imageSettings={{
+                          src: "/favicon.ico",
+                          x: undefined,
+                          y: undefined,
+                          height: 40,
+                          width: 40,
+                          excavate: true,
+                        }}
+                      />
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="font-black text-primary text-xl tracking-tight">{user?.displayName}</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Attendance Authentication</p>
+                    </div>
+                  </div>
+                  <DialogFooter className="p-6 bg-muted/30">
+                    <DialogClose asChild>
+                      <Button className="w-full h-12 rounded-xl font-black">닫기</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </section>
