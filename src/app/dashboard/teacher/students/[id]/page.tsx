@@ -25,6 +25,17 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -73,9 +84,12 @@ import {
   ArrowRightLeft,
   LayoutGrid,
   Save,
-  Wand2
+  Wand2,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, InviteCode, StudySession, KpiDaily } from '@/lib/types';
 import { format, subDays, addDays, startOfDay, startOfWeek, isSameDay, endOfDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -187,6 +201,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const firestore = useFirestore();
   const functions = useFunctions();
   const { toast } = useToast();
+  const router = useRouter();
 
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
@@ -244,7 +259,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId]);
   const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery);
 
-  // Fix: ReferenceError: availableClasses is not defined 해결을 위한 로직 추가
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
@@ -478,6 +492,32 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!functions || !centerId || !studentId) return;
+    
+    setIsUpdating(true);
+    try {
+      const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
+      const result: any = await deleteFn({ studentId, centerId });
+      
+      if (result.data?.ok) {
+        toast({ title: "삭제 완료", description: "계정이 영구 삭제되었습니다." });
+        router.replace('/dashboard/teacher/students');
+      } else {
+        throw new Error(result.data?.message || "삭제 처리 실패");
+      }
+    } catch (e: any) {
+      console.error("[Delete Student Error]", e);
+      toast({ 
+        variant: "destructive", 
+        title: "삭제 실패", 
+        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleFocusChart = (view: 'today' | 'weekly' | 'monthly') => {
     setActiveTab('overview');
     setFocusedChartView(view);
@@ -489,44 +529,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const fetchStudentDetails = async (studentId: string) => {
-    if (!firestore || !centerId) return;
-    setIsSubmitting(true);
-    try {
-      const sessionRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
-      const sessionSnap = await getDocs(sessionRef);
-      const sessions = sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession));
-      
-      const reportRef = collection(firestore, 'centers', centerId, 'dailyReports');
-      const reportSnap = await getDocs(query(reportRef, where('studentId', '==', studentId), where('status', '==', 'sent')));
-      const reports = reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport));
-
-      const historyRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
-      const historySnap = await getDocs(query(historyRef, limit(30)));
-      const history = historySnap.docs.map(d => {
-        const data = d.data();
-        return { 
-          ...data, 
-          dateKey: data.dateKey || d.id,
-          totalMinutes: Number(data.totalMinutes || 0)
-        } as StudyLogDay;
-      });
-
-      setSelectedStudentSessions(sessions.sort((a, b) => b.startTime.toMillis() - a.startTime.toMillis()));
-      setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
-      setSelectedStudentHistory(history.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 14));
-
-    } catch (e) {
-      console.error("Student Details Fetch Error:", e);
-      toast({ variant: "destructive", title: "정보 로드 실패", description: "데이터를 불러오는 중 문제가 발생했습니다." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
-  const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
-  const [selectedStudentHistory, setSelectedStudentHistory] = useState<StudyLogDay[]>([]);
+  const isAdmin = activeMembership?.role === 'centerAdmin';
 
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
@@ -550,6 +553,36 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex gap-2 w-full sm:w-auto">
           <Button variant="outline" className="rounded-2xl font-black h-11 flex-1 sm:px-6 text-xs gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>
           <Button className="rounded-2xl font-black h-11 flex-1 sm:px-6 text-xs gap-2" onClick={() => setIsStatusModalOpen(true)}><UserCheck className="h-4 w-4" /> 상태 변경</Button>
+          
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="rounded-2xl font-black h-11 flex-1 sm:px-6 text-xs gap-2 shadow-lg shadow-rose-100">
+                  <Trash2 className="h-4 w-4" /> 계정 삭제
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
+                <AlertDialogHeader>
+                  <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4">
+                    <AlertTriangle className="h-10 w-10 text-rose-600" />
+                  </div>
+                  <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">계정을 영구 삭제하시겠습니까?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
+                    <span className="text-rose-600">[{student?.name || studentMembership?.displayName}]</span> 학생의 모든 데이터가 삭제되며 **절대 복구할 수 없습니다.**
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-8 flex flex-col gap-2">
+                  <AlertDialogAction 
+                    onClick={handleDeleteAccount}
+                    className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
+                  >
+                    영구 삭제 승인
+                  </AlertDialogAction>
+                  <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 

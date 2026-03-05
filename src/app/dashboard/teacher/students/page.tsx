@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -26,7 +25,8 @@ import {
   UserMinus,
   PauseCircle,
   Users,
-  Activity
+  Activity,
+  UserCog
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
@@ -210,64 +210,73 @@ export default function StudentListPage() {
           <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>Student Roster & Management</p>
         </div>
         
-        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-          <DialogTrigger asChild>
-            <Button className={cn("rounded-2xl font-black gap-2 shadow-lg interactive-button", isMobile ? "h-12 w-full" : "h-14 px-8 text-base")}>
-              <UserPlus className="h-5 w-5" /> 신규 학생 가입
+        <div className="flex gap-2 w-full sm:w-auto">
+          {activeMembership?.role === 'centerAdmin' && (
+            <Button variant="outline" className={cn("rounded-2xl font-black gap-2 border-2", isMobile ? "h-12 flex-1" : "h-14 px-6")} asChild>
+              <Link href="/dashboard/settings/students">
+                <UserCog className="h-5 w-5" /> 계정 통합 관리
+              </Link>
             </Button>
-          </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-md")}>
-            <div className={cn("bg-primary p-8 text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-10")}>
-               <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
-                 <UserPlus className={isMobile ? "h-20 w-20" : "h-32 w-32"} />
-               </div>
-               <DialogHeader className="relative z-10">
-                 <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-3xl")}>학생 등록</DialogTitle>
-                 <DialogDescription className="text-white/70 font-bold">센터에 학생 계정을 직접 생성합니다.</DialogDescription>
-               </DialogHeader>
-            </div>
-            
-            <div className={cn("grid gap-5 overflow-y-auto custom-scrollbar flex-1", isMobile ? "p-6" : "p-8 max-h-[60vh]")}>
-              <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase text-primary/70">이름</Label>
-                <Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" />
+          )}
+          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+            <DialogTrigger asChild>
+              <Button className={cn("rounded-2xl font-black gap-2 shadow-lg interactive-button", isMobile ? "h-12 flex-1" : "h-14 px-8 text-base")}>
+                <UserPlus className="h-5 w-5" /> 신규 가입
+              </Button>
+            </DialogTrigger>
+            <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-md")}>
+              <div className={cn("bg-primary p-8 text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-10")}>
+                 <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+                   <UserPlus className={isMobile ? "h-20 w-20" : "h-32 w-32"} />
+                 </div>
+                 <DialogHeader className="relative z-10">
+                   <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-3xl")}>학생 등록</DialogTitle>
+                   <DialogDescription className="text-white/70 font-bold">센터에 학생 계정을 직접 생성합니다.</DialogDescription>
+                 </DialogHeader>
               </div>
               
-              <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label>
-                <Input type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" />
-              </div>
+              <div className={cn("grid gap-5 overflow-y-auto custom-scrollbar flex-1", isMobile ? "p-6" : "p-8 max-h-[60vh]")}>
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/70">이름</Label>
+                  <Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" />
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label>
+                  <Input type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" />
+                </div>
 
-              <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label>
-                <Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" />
-              </div>
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label>
+                  <Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" />
+                </div>
 
-              <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label>
-                <Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" />
-              </div>
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label>
+                  <Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" />
+                </div>
 
-              <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase text-primary/70">학년</Label>
-                <Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}>
-                  <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1학년">1학년</SelectItem>
-                    <SelectItem value="2학년">2학년</SelectItem>
-                    <SelectItem value="3학년">3학년</SelectItem>
-                    <SelectItem value="N수생">N수생</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-primary/70">학년</Label>
+                  <Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}>
+                    <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1학년">1학년</SelectItem>
+                      <SelectItem value="2학년">2학년</SelectItem>
+                      <SelectItem value="3학년">3학년</SelectItem>
+                      <SelectItem value="N수생">N수생</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-            <DialogFooter className={cn("bg-muted/30 border-t shrink-0", isMobile ? "p-5" : "p-8")}>
-              <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter className={cn("bg-muted/30 border-t shrink-0", isMobile ? "p-5" : "p-8")}>
+                <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
+                  {isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
       <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
