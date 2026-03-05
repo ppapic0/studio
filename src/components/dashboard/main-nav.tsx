@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -85,7 +84,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   const isStudent = userRole === 'student';
   
   const navClass = cn(
-    'flex-1 items-start px-4 text-sm font-medium pt-8',
+    'flex-1 items-start px-4 text-sm font-medium pt-6',
     isMobile ? 'grid gap-6 text-lg' : 'flex flex-col gap-2'
   );
   
@@ -98,7 +97,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
     <nav className={navClass}>
       <Link
         href="/dashboard"
-        className="flex items-center gap-3 text-2xl font-black text-primary mb-10 px-2 tracking-tighter"
+        className="flex items-center gap-3 text-2xl font-black text-primary mb-6 px-2 tracking-tighter"
       >
         <div className="bg-primary p-2 rounded-xl">
           <BookOpen className="h-6 w-6 text-white" />

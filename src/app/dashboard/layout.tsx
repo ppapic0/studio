@@ -30,10 +30,7 @@ export default function DashboardLayout({
       {/* Sidebar - Desktop/Tablet Mode */}
       {!isMobileView && (
         <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20">
-          <div className="flex h-full flex-col gap-2">
-            <div className="flex h-14 items-center border-b px-6 lg:h-[70px]">
-              <span className="text-xl font-black tracking-tighter text-primary italic uppercase">Track Engine</span>
-            </div>
+          <div className="flex h-full flex-col">
             <MainNav />
           </div>
         </div>
