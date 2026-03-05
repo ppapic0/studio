@@ -498,6 +498,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         
         const batch = writeBatch(firestore);
         const updateData: any = { updatedAt: serverTimestamp() };
+        let finalNewLp = progress?.seasonLp || 0;
         
         if (sessionSeconds > 0) {
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
@@ -518,6 +519,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
           }
 
+          finalNewLp += studyLpEarned;
           updateData.seasonLp = increment(studyLpEarned);
           updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
           
@@ -536,6 +538,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
           
           batch.update(progressRef, updateData);
+
+          // 랭킹 보드 스냅샷 업데이트
+          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+          batch.set(rankRef, {
+            studentId: user.uid,
+            displayNameSnapshot: user.displayName || '학생',
+            classNameSnapshot: activeMembership.className || null,
+            value: finalNewLp,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
         }
 
         if (seatDoc) {
@@ -600,14 +612,27 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const currentStudyTasks = todayPlans.filter(p => p.category === 'study' || !p.category);
       const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
       
+      let finalNewLp = progress?.seasonLp || 0;
+
       if (currentStudyTasks.length >= 3 && willBeDoneCount === currentStudyTasks.length && !progress?.dailyLpStatus?.[todayKey]?.plan) {
         const planLp = Math.round(100 * finalMultiplier);
+        finalNewLp += planLp;
         batch.update(progressRef, {
           seasonLp: increment(planLp),
           [`dailyLpStatus.${todayKey}.plan`]: true,
           [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
         });
         toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+
+        // 랭킹 보드 스냅샷 업데이트
+        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+        batch.set(rankRef, {
+          studentId: user.uid,
+          displayNameSnapshot: user.displayName || '학생',
+          classNameSnapshot: activeMembership.className || null,
+          value: finalNewLp,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       }
       await batch.commit();
     }

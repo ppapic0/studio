@@ -68,6 +68,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
     if (classNameFilter) {
       list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
     }
+    // value 기준 내림차순 정렬 보장
     return list.sort((a, b) => b.value - a.value);
   }, [entries, classNameFilter]);
 
@@ -93,7 +94,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
   };
 
   const formatName = (name: string) => {
-    if (!name) return "";
+    if (!name) return "익명 학생";
     return name.length > 1 ? name.charAt(0) + "*O" : name; 
   };
 
@@ -172,7 +173,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                             isMobile ? "h-14 w-14" : "h-24 w-24"
                           )}>
                             <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
-                              {entry.displayNameSnapshot?.charAt(0)}
+                              {entry.displayNameSnapshot?.charAt(0) || "S"}
                             </AvatarFallback>
                           </Avatar>
                           {idx === 0 && (
@@ -191,7 +192,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                           </div>
                           <div className="flex items-center gap-1.5 text-muted-foreground font-bold">
                             <History className="h-3 w-3 opacity-40" />
-                            <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{profile?.schoolName || "비공개 학교"}</span>
+                            <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{profile?.schoolName || entry.classNameSnapshot || "비공개 소속"}</span>
                           </div>
                         </div>
                       </div>
@@ -202,7 +203,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                           isMobile ? "text-xl" : "text-6xl",
                           idx === 0 && "text-amber-600"
                         )}>
-                          {entry.value.toLocaleString()}<span className={cn("opacity-30 uppercase font-bold", isMobile ? "text-[10px] ml-1" : "text-2xl ml-1.5")}>lp</span>
+                          {(entry.value || 0).toLocaleString()}<span className={cn("opacity-30 uppercase font-bold", isMobile ? "text-[10px] ml-1" : "text-2xl ml-1.5")}>lp</span>
                         </div>
                         <span className="text-[8px] font-black text-muted-foreground/30 uppercase tracking-[0.2em] mt-1.5 block">Achievement</span>
                       </div>
@@ -223,15 +224,15 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                           <div className="flex items-center gap-4">
                             <div className="w-8 flex justify-center text-sm font-black text-muted-foreground/40">{rank}</div>
                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50">
-                              <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{entry.displayNameSnapshot?.charAt(0)}</AvatarFallback>
+                              <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{entry.displayNameSnapshot?.charAt(0) || "S"}</AvatarFallback>
                             </Avatar>
                             <div className="grid">
                               <span className="font-black text-sm">{formatName(entry.displayNameSnapshot)}</span>
-                              <span className="text-[10px] font-bold text-muted-foreground/60">{profile?.schoolName || '비공개'}</span>
+                              <span className="text-[10px] font-bold text-muted-foreground/60">{profile?.schoolName || entry.classNameSnapshot || '비공개'}</span>
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className="text-base font-black text-primary/80 tabular-nums">{entry.value.toLocaleString()}</span>
+                            <span className="text-base font-black text-primary/80 tabular-nums">{(entry.value || 0).toLocaleString()}</span>
                             <span className="text-[8px] font-bold text-muted-foreground/40 ml-1 uppercase">lp</span>
                           </div>
                         </div>
@@ -265,7 +266,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl sm:text-4xl font-black tabular-nums tracking-tighter">{myEntry?.value.toLocaleString()}<span className="text-sm sm:text-lg opacity-40 ml-1 uppercase">lp</span></div>
+              <div className="text-2xl sm:text-4xl font-black tabular-nums tracking-tighter">{(myEntry?.value || 0).toLocaleString()}<span className="text-sm sm:text-lg opacity-40 ml-1 uppercase">lp</span></div>
               <p className="text-[10px] font-bold opacity-60 mt-1 uppercase">Season Points Earned</p>
             </div>
           </div>

@@ -41,7 +41,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     }, { merge: true });
   });
 
-  // 테스트 학생 그룹 (이현우 2위 설정 포함)
+  // 테스트 학생 그룹 (랭킹 형성을 위한 LP 점수 차등 부여)
   const testStudents = [
     { id: 'test-student-03-1', name: '김철수', class: '03반', lp: 32500, rank: 1 },
     { id: 'test-student-03-2', name: '이현우', class: '03반', lp: 28200, rank: 2 },
@@ -57,6 +57,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     const memberRef = doc(db, 'centers', centerId, 'members', sUid);
     const userCenterRef = doc(db, 'userCenters', sUid, 'centers', centerId);
 
+    // 멤버십 정보
     batch.set(memberRef, {
       id: sUid, centerId, role: 'student', status: 'active', className: sInfo.class,
       displayName: sInfo.name, joinedAt: timestamp, updatedAt: timestamp, monthlyFee: 390000
@@ -67,6 +68,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       joinedAt: timestamp, updatedAt: timestamp
     }, { merge: true });
 
+    // 학생 프로필
     const studentProfileRef = doc(db, 'centers', centerId, 'students', sUid);
     batch.set(studentProfileRef, {
       id: sUid, name: sInfo.name, className: sInfo.class, schoolName: '트랙고등학교',
@@ -74,34 +76,14 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       createdAt: timestamp, updatedAt: timestamp,
     }, { merge: true });
 
-    // 최근 14일간의 개인 학습 로그 생성
-    for (let i = 0; i < 14; i++) {
-      const date = subDays(today, i);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const logRef = doc(db, 'centers', centerId, 'studyLogs', sUid, 'days', dateStr);
-      const randomMins = 240 + Math.floor(Math.random() * 240); 
-
-      batch.set(logRef, {
-        totalMinutes: randomMins, studentId: sUid, dateKey: dateStr, centerId,
-        updatedAt: timestamp, createdAt: timestamp
-      }, { merge: true });
-
-      if (i === 0) { 
-        const statRef = doc(db, 'centers', centerId, 'dailyStudentStats', dateStr, 'students', sUid);
-        batch.set(statRef, {
-          centerId, studentId: sUid, dateKey: dateStr, todayPlanCompletionRate: 70 + Math.floor(Math.random() * 20),
-          totalStudyMinutes: randomMins, updatedAt: timestamp
-        }, { merge: true });
-      }
-    }
-
+    // 성장 지표 초기화
     const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
     batch.set(progressRef, {
       seasonLp: sInfo.lp, level: 5, stats: { focus: 50, consistency: 60, achievement: 40, resilience: 55 },
       totalLpEarned: 15000, lastResetAt: timestamp, updatedAt: timestamp, penaltyPoints: 0
     }, { merge: true });
 
-    // 랭킹 엔트리 추가
+    // 핵심: 랭킹 보드 엔트리 추가 (이 부분이 누락되면 랭킹에 안 뜸)
     const rankRef = doc(db, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', sUid);
     batch.set(rankRef, {
       studentId: sUid,
@@ -111,9 +93,17 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       rank: sInfo.rank,
       updatedAt: timestamp
     }, { merge: true });
+
+    // 최근 14일간의 학습 로그 (간략화)
+    const dateStr = format(today, 'yyyy-MM-dd');
+    const logRef = doc(db, 'centers', centerId, 'studyLogs', sUid, 'days', dateStr);
+    batch.set(logRef, {
+      totalMinutes: 300, studentId: sUid, dateKey: dateStr, centerId,
+      updatedAt: timestamp, createdAt: timestamp
+    }, { merge: true });
   }
 
-  // 2. 센터 KPI 데이터 생성 (최근 30일)
+  // 2. 센터 KPI 데이터 생성 (최근 30일 그래프용)
   for (let i = 0; i < 30; i++) {
     const date = subDays(today, i);
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -122,7 +112,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     batch.set(kpiRef, {
       date: dateStr,
       totalRevenue: testStudents.length * Math.floor(390000 / 28),
-      totalStudyMinutes: testStudents.length * (360 + Math.floor(Math.random() * 120)),
+      totalStudyMinutes: testStudents.length * 360,
       activeStudentCount: testStudents.length,
       updatedAt: serverTimestamp()
     }, { merge: true });
