@@ -38,7 +38,11 @@ import {
   ChevronRight,
   ExternalLink,
   PlusCircle,
-  BellRing
+  BellRing,
+  CheckCircle2,
+  FileText,
+  Clock,
+  Filter
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -83,7 +87,8 @@ export default function RevenuePage() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
 
-  const [activeTab, setActiveTab] = useState('payments'); // 수납 관리를 기본 탭으로 설정하여 바로 확인 가능하게 함
+  const [activeTab, setActiveTab] = useState('payments'); 
+  const [paymentSubTab, setPaymentSubTab] = useState('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [currentChartMonth, setCurrentChartMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -100,16 +105,25 @@ export default function RevenuePage() {
   }, [firestore, centerId, currentChartMonth]);
   const { data: kpiHistory, isLoading: isKpiLoading } = useCollection<KpiDaily>(kpiQuery);
 
-  // 2. 미납 인보이스 조회 (issued 상태인 것만)
-  const unpaidInvoicesQuery = useMemoFirebase(() => {
+  // 2. 인보이스 전체 조회 (필터링을 위해 더 넓게 가져옴)
+  const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
-      where('status', '==', 'issued'),
-      limit(20)
+      orderBy('cycleEndDate', 'desc'),
+      limit(50)
     );
   }, [firestore, centerId]);
-  const { data: unpaidInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(unpaidInvoicesQuery);
+  const { data: allInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesQuery);
+
+  const filteredInvoices = useMemo(() => {
+    if (!allInvoices) return [];
+    if (paymentSubTab === 'all') return allInvoices;
+    if (paymentSubTab === 'unpaid') return allInvoices.filter(i => i.status === 'issued' || i.status === 'overdue');
+    if (paymentSubTab === 'paid') return allInvoices.filter(i => i.status === 'paid');
+    if (paymentSubTab === 'overdue') return allInvoices.filter(i => i.status === 'overdue');
+    return allInvoices;
+  }, [allInvoices, paymentSubTab]);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayKpi = useMemo(() => kpiHistory?.find(k => k.date === todayStr) || kpiHistory?.[kpiHistory.length - 1], [kpiHistory, todayStr]);
@@ -140,7 +154,7 @@ export default function RevenuePage() {
     setIsSaving(true);
     try {
       const count = await autoCheckPaymentReminders(firestore, centerId);
-      toast({ title: "알림 발송 완료", description: `결제일 3일 전인 ${count}명의 학생에게 카톡을 보냈습니다.` });
+      toast({ title: "알림 발송 완료", description: `결제일 3일 전인 ${count}명의 학생에게 문자를 보냈습니다.` });
     } catch (e: any) {
       toast({ variant: "destructive", title: "발송 실패", description: e.message });
     } finally {
@@ -148,7 +162,6 @@ export default function RevenuePage() {
     }
   };
 
-  // 테스트 인보이스 생성 (버튼이 안보일 경우 데이터 생성을 위해 추가)
   const createTestInvoice = async () => {
     if (!firestore || !centerId || !user) return;
     setIsSaving(true);
@@ -158,7 +171,7 @@ export default function RevenuePage() {
         studentId: user.uid,
         studentName: user.displayName || '테스트 학생',
         cycleStartDate: Timestamp.fromDate(now),
-        cycleEndDate: Timestamp.fromDate(addDays(now, 3)), // 테스트용: 3일 남은걸로 생성
+        cycleEndDate: Timestamp.fromDate(addDays(now, 3)),
         finalPrice: 50000, 
         status: 'issued',
         issuedAt: serverTimestamp(),
@@ -172,11 +185,20 @@ export default function RevenuePage() {
         discountsSnapshot: []
       };
       await addDoc(collection(firestore, 'centers', centerId, 'invoices'), invoiceData);
-      toast({ title: "테스트 인보이스가 생성되었습니다.", description: "이제 목록에서 결제 버튼을 확인하실 수 있습니다." });
+      toast({ title: "테스트 인보이스 생성 완료" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "생성 실패", description: e.message });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'paid': return <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] px-2 py-0.5">수납 완료</Badge>;
+      case 'issued': return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 font-black text-[10px] px-2 py-0.5">수납 대기</Badge>;
+      case 'overdue': return <Badge variant="destructive" className="font-black text-[10px] px-2 py-0.5 shadow-sm">연체/미납</Badge>;
+      default: return <Badge variant="secondary" className="font-black text-[10px] px-2 py-0.5">{status}</Badge>;
     }
   };
 
@@ -221,101 +243,147 @@ export default function RevenuePage() {
         </TabsList>
 
         <TabsContent value="payments" className="space-y-8 animate-in fade-in duration-500">
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="md:col-span-2 rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
-              <CardHeader className="bg-muted/5 border-b p-8">
-                <div className="flex justify-between items-center">
-                  <div className="space-y-1">
-                    <CardTitle className="text-2xl font-black tracking-tighter">최근 발급 인보이스 (수납 대기)</CardTitle>
-                    <CardDescription className="font-bold text-xs">결제 대기 중인 학생들의 명단입니다. '실제 카드 결제 진행' 버튼을 통해 테스트를 진행하세요.</CardDescription>
-                  </div>
-                  <Button variant="outline" className="rounded-xl h-10 px-4 font-black text-[10px] border-2">전체 발송</Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-muted/10">
-                  {isInvoicesLoading ? (
-                    <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
-                  ) : (!unpaidInvoices || unpaidInvoices.length === 0) ? (
-                    <div className="py-24 text-center flex flex-col items-center gap-6">
-                      <div className="p-8 rounded-full bg-muted/20">
-                        <Receipt className="h-16 w-16 text-muted-foreground opacity-10" />
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-lg font-black text-muted-foreground/40 uppercase tracking-widest">수납 대기 중인 항목이 없습니다.</p>
-                        <p className="text-xs font-bold text-muted-foreground/30">결제 테스트를 위해 아래 버튼을 눌러 테스트용 인보이스를 생성해보세요.</p>
-                      </div>
-                      <Button onClick={createTestInvoice} disabled={isSaving} className="rounded-2xl h-14 px-8 font-black gap-2 shadow-xl active:scale-95 transition-all">
-                        {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
-                        테스트 결제용 인보이스 생성
-                      </Button>
+          <div className="grid gap-6 md:grid-cols-12">
+            <div className="md:col-span-8 space-y-6">
+              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
+                <CardHeader className="bg-muted/5 border-b p-8">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="space-y-1">
+                      <CardTitle className="text-2xl font-black tracking-tighter">인보이스 타임라인</CardTitle>
+                      <CardDescription className="font-bold text-xs">센터의 모든 결제 요청 및 수납 기록을 관리합니다.</CardDescription>
                     </div>
-                  ) : unpaidInvoices.map((inv) => (
-                    <div key={inv.id} className="p-8 flex flex-col gap-6 hover:bg-muted/5 transition-all group">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-5">
-                          <div className="h-14 w-14 rounded-2xl bg-primary/5 flex items-center justify-center font-black text-xl text-primary border-2 border-primary/10 group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-inner">{inv.studentName?.charAt(0)}</div>
-                          <div className="grid gap-1">
-                            <span className="font-black text-xl tracking-tight">{inv.studentName} 학생</span>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[9px] font-black uppercase text-amber-600 border-amber-200 bg-amber-50">Pending</Badge>
-                              <span className="text-[10px] font-bold text-muted-foreground">납기일: {inv.cycleEndDate ? format(inv.cycleEndDate.toDate(), 'yyyy.MM.dd') : 'N/A'}</span>
+                    <Tabs value={paymentSubTab} onValueChange={setPaymentSubTab} className="w-full sm:w-auto">
+                      <TabsList className="bg-muted/50 p-1 rounded-xl h-10 border shadow-inner">
+                        <TabsTrigger value="all" className="rounded-lg text-[10px] font-black px-3">전체</TabsTrigger>
+                        <TabsTrigger value="unpaid" className="rounded-lg text-[10px] font-black px-3 text-amber-600">수납 대기</TabsTrigger>
+                        <TabsTrigger value="paid" className="rounded-lg text-[10px] font-black px-3 text-emerald-600">수납 완료</TabsTrigger>
+                        <TabsTrigger value="overdue" className="rounded-lg text-[10px] font-black px-3 text-rose-600">미납/연체</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-muted/10">
+                    {isInvoicesLoading ? (
+                      <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                    ) : filteredInvoices.length === 0 ? (
+                      <div className="py-24 text-center flex flex-col items-center gap-6">
+                        <div className="p-8 rounded-full bg-muted/20">
+                          <Receipt className="h-16 w-16 text-muted-foreground opacity-10" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-lg font-black text-muted-foreground/40 uppercase tracking-widest">조회된 항목이 없습니다.</p>
+                          <Button onClick={createTestInvoice} variant="ghost" className="text-primary font-black underline">테스트 인보이스 생성</Button>
+                        </div>
+                      </div>
+                    ) : filteredInvoices.map((inv) => (
+                      <div key={inv.id} className={cn(
+                        "p-8 flex flex-col gap-6 hover:bg-muted/5 transition-all group",
+                        inv.status === 'paid' ? "bg-emerald-50/5" : ""
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-5">
+                            <div className={cn(
+                              "h-14 w-14 rounded-2xl flex items-center justify-center font-black text-xl border-2 transition-all duration-500 shadow-inner",
+                              inv.status === 'paid' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-primary/5 text-primary border-primary/10 group-hover:bg-primary group-hover:text-white"
+                            )}>
+                              {inv.studentName?.charAt(0)}
+                            </div>
+                            <div className="grid gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-xl tracking-tight">{inv.studentName} 학생</span>
+                                {getStatusBadge(inv.status)}
+                              </div>
+                              <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
+                                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> 납기: {inv.cycleEndDate ? format(inv.cycleEndDate.toDate(), 'yyyy.MM.dd') : 'N/A'}</span>
+                                {inv.paidAt && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> 수납일: {format(inv.paidAt.toDate(), 'MM.dd HH:mm')}</span>}
+                              </div>
                             </div>
                           </div>
+                          <div className="text-right">
+                            <p className={cn(
+                              "text-2xl font-black tracking-tighter",
+                              inv.status === 'paid' ? "text-emerald-600" : "text-primary"
+                            )}>₩{inv.finalPrice.toLocaleString()}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                              {inv.paymentMethod ? `${inv.paymentMethod.toUpperCase()} PAYMENT` : 'Total Amount'}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-black tracking-tighter text-primary">₩{inv.finalPrice.toLocaleString()}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Total Amount</p>
-                        </div>
+                        
+                        {inv.status !== 'paid' && (
+                          <div className="flex items-center gap-3">
+                            <Button 
+                              onClick={() => handleRealPayment(inv.id)}
+                              className="flex-1 h-12 rounded-xl font-black text-sm gap-3 bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 active:scale-[0.98] transition-all"
+                            >
+                              <CreditCard className="h-5 w-5" /> 실제 카드 결제 진행
+                            </Button>
+                            <Select onValueChange={(val) => handleProcessPayment(inv.id, val)}>
+                              <SelectTrigger className="w-[160px] h-12 rounded-xl font-black text-xs border-2 bg-white text-emerald-600 border-emerald-100 shadow-md">
+                                <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4" /><SelectValue placeholder="수동 처리" /></div>
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-none shadow-2xl p-2">
+                                <SelectItem value="card" className="font-bold py-3 rounded-xl">💳 카드 결제 완료</SelectItem>
+                                <SelectItem value="transfer" className="font-bold py-3 rounded-xl">🏦 계좌 이체 완료</SelectItem>
+                                <SelectItem value="cash" className="font-bold py-3 rounded-xl">💵 현금 수납 완료</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="flex items-center gap-3">
-                        <Button 
-                          onClick={() => handleRealPayment(inv.id)}
-                          className="flex-1 h-14 rounded-2xl font-black text-base gap-3 bg-blue-600 hover:bg-blue-700 shadow-2xl shadow-blue-200 active:scale-[0.98] transition-all"
-                        >
-                          <CreditCard className="h-6 w-6" /> 실제 카드 결제 진행 (토스 연동)
-                        </Button>
-                        <Select onValueChange={(val) => handleProcessPayment(inv.id, val)}>
-                          <SelectTrigger className="w-[180px] h-14 rounded-2xl font-black text-xs border-2 bg-white text-emerald-600 border-emerald-100 shadow-lg shadow-emerald-50">
-                            <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4" /><SelectValue placeholder="수동 수납 처리" /></div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
-                            <SelectItem value="card" className="font-bold py-3 rounded-xl">💳 카드 결제 완료</SelectItem>
-                            <SelectItem value="transfer" className="font-bold py-3 rounded-xl">🏦 계좌 이체 완료</SelectItem>
-                            <SelectItem value="cash" className="font-bold py-3 rounded-xl">💵 현금 수납 완료</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-            <div className="space-y-6">
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-amber-500 text-white p-8 overflow-hidden relative">
+            <div className="md:col-span-4 space-y-6">
+              <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
                 <Sparkles className="absolute -right-4 -top-4 h-32 w-32 opacity-20 rotate-12" />
-                <div className="flex items-center gap-2 mb-6 relative z-10">
-                  <AlertCircle className="h-5 w-5 opacity-60" />
-                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Smart Collection Advice</span>
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 opacity-60" />
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Finance Health Score</span>
+                  </div>
+                  <div className="grid gap-1">
+                    <h3 className="text-5xl font-black tracking-tighter">{(metrics?.collected && metrics?.accrued) ? Math.round((metrics.collected / metrics.accrued) * 100) : 0}%</h3>
+                    <p className="text-xs font-bold opacity-60">이번 달 수납 달성률</p>
+                  </div>
+                  <div className="space-y-4 pt-4 border-t border-white/10">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60">
+                      <span>Accrued Revenue</span>
+                      <span>₩{metrics?.accrued.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60">
+                      <span>Collected Cash</span>
+                      <span>₩{metrics?.collected.toLocaleString()}</span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm font-bold leading-relaxed relative z-10">
-                  현재 **{unpaidInvoices?.length || 0}명**의 학생이 결제 대기 중입니다.<br/><br/>
-                  수납 기한이 3일 이내인 학생들에게 **알림톡 결제 예고** 발송을 권장합니다.
-                </p>
-                <Button onClick={handleSendPaymentReminders} className="w-full mt-6 h-12 rounded-xl bg-white text-amber-600 hover:bg-white/90 font-black text-xs shadow-xl shadow-amber-600/20 relative z-10">결제 예고톡 일괄 발송</Button>
               </Card>
 
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 overflow-hidden relative group">
                 <div className="absolute -right-4 -top-4 opacity-5 rotate-12 group-hover:scale-110 transition-transform"><Receipt className="h-32 w-32" /></div>
                 <CardTitle className="text-base font-black mb-6 uppercase tracking-widest text-primary/40">수납 수단 비중</CardTitle>
                 <div className="space-y-4 relative z-10">
-                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">카드 (토스 포함)</span><span className="text-lg font-black">72%</span></div>
+                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">카드 (Toss SDK)</span><span className="text-lg font-black text-blue-600">72%</span></div>
                   <Progress value={72} className="h-1.5" />
-                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">계좌 이체 / 현금</span><span className="text-lg font-black">28%</span></div>
+                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">직접 이체/현금</span><span className="text-lg font-black text-emerald-600">28%</span></div>
                   <Progress value={28} className="h-1.5 bg-muted" />
                 </div>
+              </Card>
+
+              <Card className="rounded-[2.5rem] border-none shadow-xl bg-amber-500 text-white p-8 overflow-hidden relative">
+                <div className="flex items-center gap-2 mb-6 relative z-10">
+                  <AlertCircle className="h-5 w-5 opacity-60" />
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Pending Notice</span>
+                </div>
+                <p className="text-sm font-bold leading-relaxed relative z-10">
+                  미납 상태인 인보이스가 **{allInvoices?.filter(i => i.status === 'issued' || i.status === 'overdue').length || 0}건** 있습니다. <br/><br/>
+                  연체 방지를 위해 결제일 3일 전인 학생들에게 **자동 문자 알림**을 발송하세요.
+                </p>
+                <Button onClick={handleSendPaymentReminders} className="w-full mt-6 h-12 rounded-xl bg-white text-amber-600 hover:bg-white/90 font-black text-xs shadow-xl relative z-10">결제 예고톡 일괄 발송</Button>
               </Card>
             </div>
           </div>
@@ -326,7 +394,7 @@ export default function RevenuePage() {
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
               <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
               <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">이번 달 예상 매출 (발생)</p>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">이번 달 발생 매출</p>
                 <h3 className="text-4xl font-black tracking-tighter">₩{(metrics?.accrued || 0).toLocaleString()}</h3>
                 <Badge className="bg-white/20 border-none text-[10px] px-3 text-emerald-400">Accrued Basis</Badge>
               </div>
@@ -334,13 +402,13 @@ export default function RevenuePage() {
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-emerald-600 text-white p-8 overflow-hidden relative">
               <Wallet className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
               <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">실제 수납 완료액 (현금흐름)</p>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">실제 수납 완료액</p>
                 <h3 className="text-4xl font-black tracking-tighter">₩{(metrics?.collected || 0).toLocaleString()}</h3>
                 <Badge className="bg-white/20 border-none text-[10px] px-3 text-white">Cash Basis</Badge>
               </div>
             </Card>
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2"><Receipt className="h-3 w-3 text-rose-500" /> 미수금 (Receivables)</p>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2"><Receipt className="h-3 w-3 text-rose-500" /> 미수금 합계</p>
               <h3 className="text-4xl font-black tracking-tighter text-rose-600">₩{(metrics?.uncollected || 0).toLocaleString()}</h3>
               <p className="text-[10px] font-bold text-muted-foreground mt-1">Outstanding Balance</p>
             </Card>
