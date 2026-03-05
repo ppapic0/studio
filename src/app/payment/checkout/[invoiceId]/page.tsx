@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, use } from 'react';
@@ -8,6 +7,7 @@ import { doc } from 'firebase/firestore';
 import { Invoice } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader2, CreditCard, ShieldCheck, Sparkles, ArrowLeft, Lock, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -141,12 +141,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: 
           </div>
 
           <div className="space-y-4">
-            <Button 
+            <button 
               onClick={handlePayment}
               className="w-full h-24 rounded-[2rem] font-black text-2xl bg-primary hover:bg-primary/90 text-white shadow-2xl shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-4 group"
             >
               <CreditCard className="h-8 w-8 group-hover:rotate-12 transition-transform" /> 지금 결제하기
-            </Button>
+            </button>
             <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
               <Lock className="h-3 w-3" /> Encrypted Transaction Processing
             </div>
