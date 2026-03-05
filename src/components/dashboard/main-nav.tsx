@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -93,14 +94,6 @@ export function MainNav({ isMobile = false }: MainNavProps) {
     isMobile ? 'text-lg' : ''
   );
   
-  // 티어 기반 활성 탭 스타일
-  const activeLinkClass = cn(
-    'text-white shadow-xl shadow-black/10',
-    isStudent 
-      ? `bg-gradient-to-br ${currentTier.gradient}` 
-      : 'bg-primary text-primary-foreground shadow-primary/20'
-  );
-
   return (
     <nav className={navClass}>
       <Link
@@ -112,16 +105,22 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         </div>
         <span>트랙학습센터</span>
       </Link>
-      {userNavItems.map((item) => (
-        <Link 
-          key={item.href} 
-          href={item.href} 
-          className={cn(linkClass, pathname === item.href ? activeLinkClass : '')}
-        >
-          <item.icon className={cn("h-5 w-5 transition-transform duration-300 group-hover:scale-110", pathname === item.href ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
-          <span className="font-bold">{item.label}</span>
-        </Link>
-      ))}
+      {userNavItems.map((item) => {
+        const isActive = pathname === item.href;
+        return (
+          <Link 
+            key={item.href} 
+            href={item.href} 
+            className={cn(
+              linkClass, 
+              isActive && (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-xl shadow-black/10` : 'bg-primary text-primary-foreground shadow-primary/20 shadow-xl shadow-black/10')
+            )}
+          >
+            <item.icon className={cn("h-5 w-5 transition-transform duration-300 group-hover:scale-110", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
+            <span className="font-bold">{item.label}</span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

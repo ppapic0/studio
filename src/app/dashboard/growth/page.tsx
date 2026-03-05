@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -222,13 +223,13 @@ export default function GrowthPage() {
         </div>
       </header>
 
-      {/* 시즌 메인 대시보드 - 모바일 최적화 */}
+      {/* 시즌 메인 대시보드 - 현재 티어 그라디언트 적용 */}
       <Card className={cn(
         "border-none text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
         "bg-gradient-to-br", currentTier.gradient,
         isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
       )}>
-        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-700 group-hover:scale-110">
+        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 space-y-6", isMobile ? "space-y-4" : "space-y-10")}>

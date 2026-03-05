@@ -44,8 +44,7 @@ import {
   UserCheck,
   CalendarX,
   UserMinus,
-  QrCode,
-  Scan
+  QrCode
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -643,7 +642,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
 
         // 랭킹 보드 스냅샷 업데이트
-        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+        const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
         batch.set(rankRef, {
           studentId: user.uid,
           displayNameSnapshot: user.displayName || '학생',

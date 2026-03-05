@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -576,7 +577,7 @@ export default function StudyPlanPage() {
           {isPast ? (
             <Badge variant="destructive" className={cn("rounded-full font-black px-3 py-1 shadow-lg", isMobile ? "text-[8px] h-6" : "text-[10px]")}>History Mode</Badge>
           ) : (
-            <Badge variant="secondary" className={cn("rounded-full font-black gap-2 border-none text-white shadow-lg bg-gradient-to-r", isMobile ? "text-[8px] h-7 px-3" : "text-[10px] h-9 px-4", currentTier.gradient)}>
+            <Badge className={cn("rounded-full font-black gap-2 border-none text-white shadow-lg bg-gradient-to-r", isMobile ? "text-[8px] h-7 px-3" : "text-[10px] h-9 px-4", currentTier.gradient)}>
               {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} /> : <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />} {currentTier.name} Tier Active
             </Badge>
           )}
@@ -668,12 +669,12 @@ export default function StudyPlanPage() {
                   </div>
                 </div>
                 {!isToday && (
-                  <Button variant="ghost" size="sm" onClick={() => {
+                  <button onClick={() => {
                     const batch = writeBatch(firestore!);
                     const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
                     scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다')).forEach(i => batch.delete(doc(colRef, i.id)));
                     batch.commit().then(() => toast({ title: "설정을 재설정합니다." }));
-                  }} className={cn("font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10", isMobile ? "text-[8px]" : "text-[10px]")}>재설정</Button>
+                  }} className={cn("font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10", isMobile ? "text-[8px]" : "text-[10px]")}>재설정</button>
                 )}
                 {isToday && <Lock className="h-4 w-4 text-muted-foreground/20" />}
               </div>
@@ -852,12 +853,15 @@ export default function StudyPlanPage() {
                 <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                   <DialogTrigger asChild><Button variant="ghost" size="icon" className={cn("rounded-full hover:bg-primary/10 transition-all", isMobile ? "h-8 w-8" : "h-10 w-10")}><PlusCircle className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /></Button></DialogTrigger>
                   <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-8", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2rem]" : "sm:max-w-md")}>
-                    <DialogHeader><DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl")}>새 루틴 추가</DialogTitle></DialogHeader>
-                    <div className="space-y-6 pt-4">
+                    <div className={cn("p-10 text-white relative", `bg-gradient-to-br ${currentTier.gradient}`)}>
+                      <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
+                      <DialogHeader><DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-2xl")}>새 루틴 추가</DialogTitle></DialogHeader>
+                    </div>
+                    <div className="space-y-6 p-8 bg-white">
                       <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-2xl border-2 font-bold text-base" />
                       <div className="flex flex-wrap gap-2">{['점심', '저녁', '학원', '독서실'].map(tag => <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white py-1.5 px-4 rounded-xl font-black text-xs" onClick={() => setNewRoutineTitle(tag)}>+{tag}</Badge>)}</div>
                     </div>
-                    <DialogFooter className="pt-6"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white bg-gradient-to-br", currentTier.gradient)}>{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
+                    <DialogFooter className="p-8 bg-muted/30"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white bg-gradient-to-br", currentTier.gradient)}>{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
                   </DialogContent>
                 </Dialog>
               )}
@@ -887,7 +891,7 @@ export default function StudyPlanPage() {
                   onClick={handleApplyRoutineToAllWeekdays} 
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Copy className="h-3 w-3" />} 루틴 반복 복사
+                  {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Copy className="h-3.5 w-3.5" />} 루틴 반복 복사
                 </Button>
               </div>
             )}

@@ -18,7 +18,7 @@ export type CenterMembership = {
 
 export const TIERS = [
   { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
-  { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-blue-300 via-slate-400 to-slate-600' },
+  { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-slate-400 via-slate-500 to-slate-700' },
   { name: '골드', min: 10000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
   { name: '플래티넘', min: 15000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
   { name: '다이아몬드', min: 20000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
@@ -65,7 +65,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // View Mode State
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('desktop');
 
-  // Tier State
+  // Tier State (Default to Bronze)
   const [currentTier, setCurrentTier] = useState(TIERS[0]);
 
   const activeMembershipRef = useRef<string | null>(null);
@@ -119,34 +119,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', user.uid);
     const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
 
-    let progressData: any = null;
-    let rankData: any = null;
+    let currentLp = 0;
+    let currentRank = 999;
 
-    const updateTier = () => {
-      const lp = progressData?.seasonLp || 0;
-      const rank = rankData?.rank || 999;
-
+    const updateTierState = (lp: number, rank: number) => {
       if (lp >= 25000) {
         if (rank === 1) setCurrentTier(TIERS.find(t => t.name === '챌린저')!);
         else if (rank === 2 || rank === 3) setCurrentTier(TIERS.find(t => t.name === '그랜드마스터')!);
         else setCurrentTier(TIERS.find(t => t.name === '마스터')!);
       } else {
-        const found = TIERS.slice(0, 5).reverse().find(t => lp >= t.min) || TIERS[0];
+        const found = [...TIERS.slice(0, 5)].reverse().find(t => lp >= t.min) || TIERS[0];
         setCurrentTier(found);
       }
     };
 
     const unsubProgress = onSnapshot(progressRef, (snap) => {
       if (snap.exists()) {
-        progressData = snap.data();
-        updateTier();
+        const data = snap.data();
+        currentLp = data.seasonLp || 0;
+        updateTierState(currentLp, currentRank);
       }
     });
 
     const unsubRank = onSnapshot(rankRef, (snap) => {
       if (snap.exists()) {
-        rankData = snap.data();
-        updateTier();
+        const data = snap.data();
+        currentRank = data.rank || 999;
+        updateTierState(currentLp, currentRank);
       }
     });
 
@@ -155,60 +154,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubRank();
     };
   }, [user, firestore, activeMembership]);
-
-  // 실시간 좌석 상태 동기화
-  useEffect(() => {
-    if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') return;
-
-    const centerId = activeMembership.id;
-    const q = query(
-      collection(firestore, 'centers', centerId, 'attendanceCurrent'),
-      where('studentId', '==', user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const seatData = snapshot.docs[0].data();
-        if (seatData.status !== 'studying' && isTimerActive) {
-          setIsTimerActive(false);
-          setStartTime(null);
-        }
-        if (seatData.status === 'studying' && !isTimerActive && seatData.lastCheckInAt) {
-          setIsTimerActive(true);
-          setStartTime(seatData.lastCheckInAt.toMillis());
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user, firestore, activeMembership, isTimerActive]);
-
-  // Timer Persistence
-  useEffect(() => {
-    if (user) {
-      const savedStartTime = localStorage.getItem(`study_start_time_${user.uid}`);
-      const savedCheckTime = localStorage.getItem(`study_last_check_time_${user.uid}`);
-      
-      if (savedStartTime) {
-        setStartTime(parseInt(savedStartTime, 10));
-        setIsTimerActive(true);
-      } else {
-        setStartTime(null);
-        setIsTimerActive(false);
-      }
-      if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (!user) return;
-    const startTimeKey = `study_start_time_${user.uid}`;
-    if (isTimerActive && startTime) {
-      localStorage.setItem(startTimeKey, startTime.toString());
-    } else {
-      localStorage.removeItem(startTimeKey);
-    }
-  }, [isTimerActive, startTime, user?.uid]);
 
   const contextValue = useMemo(() => ({
     memberships,
