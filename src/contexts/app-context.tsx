@@ -40,6 +40,10 @@ interface AppContextType {
   lastActiveCheckTime: number | null;
   setLastActiveCheckTime: (time: number | null) => void;
 
+  // View Mode (App Mode Toggle)
+  viewMode: 'mobile' | 'desktop';
+  setViewMode: (mode: 'mobile' | 'desktop') => void;
+
   // Global Tier State
   currentTier: typeof TIERS[0];
 }
@@ -57,6 +61,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
+
+  // View Mode State
+  const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('desktop');
 
   // Tier State
   const [currentTier, setCurrentTier] = useState(TIERS[0]);
@@ -149,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [user, firestore, activeMembership]);
 
-  // 실시간 좌석 상태 동기화 (학생 타이머 외부 강제 종료/시작 대응)
+  // 실시간 좌석 상태 동기화
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') return;
 
@@ -162,12 +169,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const seatData = snapshot.docs[0].data();
-        // 선생님이나 키오스크에서 퇴실 처리된 경우 로컬 타이머 종료
         if (seatData.status !== 'studying' && isTimerActive) {
           setIsTimerActive(false);
           setStartTime(null);
         }
-        // 선생님이 입실 확인을 해준 경우 로컬 타이머 자동 시작
         if (seatData.status === 'studying' && !isTimerActive && seatData.lastCheckInAt) {
           setIsTimerActive(true);
           setStartTime(seatData.lastCheckInAt.toMillis());
@@ -178,7 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore, activeMembership, isTimerActive]);
 
-  // Timer Persistence Sync - User-Specific Keys
+  // Timer Persistence
   useEffect(() => {
     if (user) {
       const savedStartTime = localStorage.getItem(`study_start_time_${user.uid}`);
@@ -192,32 +197,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsTimerActive(false);
       }
       if (savedCheckTime) setLastActiveCheckTime(parseInt(savedCheckTime, 10));
-    } else {
-      setIsTimerActive(false);
-      setStartTime(null);
-      setLastActiveCheckTime(null);
     }
   }, [user?.uid]);
 
-  // Save Timer State - User-Specific Keys
   useEffect(() => {
     if (!user) return;
-
     const startTimeKey = `study_start_time_${user.uid}`;
-    const checkTimeKey = `study_last_check_time_${user.uid}`;
-
     if (isTimerActive && startTime) {
       localStorage.setItem(startTimeKey, startTime.toString());
     } else {
       localStorage.removeItem(startTimeKey);
     }
-
-    if (lastActiveCheckTime) {
-      localStorage.setItem(checkTimeKey, lastActiveCheckTime.toString());
-    } else {
-      localStorage.removeItem(checkTimeKey);
-    }
-  }, [isTimerActive, startTime, lastActiveCheckTime, user?.uid]);
+  }, [isTimerActive, startTime, user?.uid]);
 
   const contextValue = useMemo(() => ({
     memberships,
@@ -229,6 +220,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStartTime,
     lastActiveCheckTime,
     setLastActiveCheckTime,
+    viewMode,
+    setViewMode,
     currentTier
   }), [
     memberships, 
@@ -237,6 +230,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isTimerActive, 
     startTime, 
     lastActiveCheckTime,
+    viewMode,
     currentTier
   ]);
 

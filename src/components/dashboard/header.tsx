@@ -80,7 +80,7 @@ export function DashboardHeader() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, viewMode, setViewMode } = useAppContext();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -172,6 +172,17 @@ export function DashboardHeader() {
       </Breadcrumb>
 
       <div className="relative ml-auto flex items-center gap-2">
+        {/* 앱 모드 토글 버튼 ( Smartphone / Monitor ) */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="rounded-full text-muted-foreground hover:bg-primary/5 transition-all"
+          onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
+          title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
+        >
+          {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+        </Button>
+
         <NotificationBell />
 
         <DropdownMenu modal={false}>
