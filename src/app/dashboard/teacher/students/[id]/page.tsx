@@ -1,3 +1,4 @@
+
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
@@ -508,10 +509,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
+      // HttpsError의 경우 e.message에 서버에서 보낸 메시지가 들어있습니다.
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
+        description: e.message || "계정 삭제 중 오류가 발생했습니다. 권한이나 연결 리전을 확인하세요." 
       });
     } finally {
       setIsUpdating(false);
@@ -576,7 +578,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     onClick={handleDeleteAccount}
                     className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
                   >
-                    영구 삭제 승인
+                    {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '영구 삭제 승인'}
                   </AlertDialogAction>
                   <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
                 </AlertDialogFooter>
