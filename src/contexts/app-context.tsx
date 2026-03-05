@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
@@ -119,33 +118,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', user.uid);
     const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
 
-    let currentLp = 0;
-    let currentRank = 999;
+    let latestLp = 0;
+    let latestRank = 999;
 
-    const updateTierState = (lp: number, rank: number) => {
-      if (lp >= 25000) {
-        if (rank === 1) setCurrentTier(TIERS.find(t => t.name === '챌린저')!);
-        else if (rank === 2 || rank === 3) setCurrentTier(TIERS.find(t => t.name === '그랜드마스터')!);
+    const updateTierState = () => {
+      if (latestLp >= 25000) {
+        if (latestRank === 1) setCurrentTier(TIERS.find(t => t.name === '챌린저')!);
+        else if (latestRank === 2 || latestRank === 3) setCurrentTier(TIERS.find(t => t.name === '그랜드마스터')!);
         else setCurrentTier(TIERS.find(t => t.name === '마스터')!);
       } else {
-        const found = [...TIERS.slice(0, 5)].reverse().find(t => lp >= t.min) || TIERS[0];
+        // 하위 티어 판정 (순서대로 뒤집어서 찾기)
+        const lowerTiers = TIERS.slice(0, 5);
+        const found = [...lowerTiers].reverse().find(t => latestLp >= t.min) || TIERS[0];
         setCurrentTier(found);
       }
     };
 
     const unsubProgress = onSnapshot(progressRef, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        currentLp = data.seasonLp || 0;
-        updateTierState(currentLp, currentRank);
+        latestLp = snap.data().seasonLp || 0;
+        updateTierState();
       }
     });
 
     const unsubRank = onSnapshot(rankRef, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        currentRank = data.rank || 999;
-        updateTierState(currentLp, currentRank);
+        latestRank = snap.data().rank || 999;
+        updateTierState();
       }
     });
 
