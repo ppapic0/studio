@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -39,6 +40,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { sendKakaoNotification } from '@/lib/kakao-service';
 
 export default function KioskPage() {
   const firestore = useFirestore();
@@ -171,6 +173,13 @@ export default function KioskPage() {
 
       batch.update(seatRef, updateData);
       await batch.commit();
+
+      // 2. 카카오톡 알림 발송 (비동기)
+      const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
+      sendKakaoNotification(firestore, centerId, {
+        studentName: student.name,
+        type: kakaoType
+      });
 
       const statusLabels = { studying: '입실', away: '외출/휴식', absent: '퇴실' };
       toast({ 

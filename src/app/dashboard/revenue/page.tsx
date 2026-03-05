@@ -37,7 +37,8 @@ import {
   AlertCircle,
   ChevronRight,
   ExternalLink,
-  PlusCircle
+  PlusCircle,
+  BellRing
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -71,6 +72,7 @@ import { OperationalIntelligence } from '@/components/dashboard/operational-inte
 import { useToast } from '@/hooks/use-toast';
 import { syncMonthKpis, completePayment } from '@/lib/finance-actions';
 import { useRouter } from 'next/navigation';
+import { autoCheckPaymentReminders } from '@/lib/kakao-service';
 
 export default function RevenuePage() {
   const { user } = useUser();
@@ -133,6 +135,19 @@ export default function RevenuePage() {
     router.push(`/payment/checkout/${invoiceId}`);
   };
 
+  const handleSendPaymentReminders = async () => {
+    if (!firestore || !centerId) return;
+    setIsSaving(true);
+    try {
+      const count = await autoCheckPaymentReminders(firestore, centerId);
+      toast({ title: "알림 발송 완료", description: `결제일 3일 전인 ${count}명의 학생에게 카톡을 보냈습니다.` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "발송 실패", description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // 테스트 인보이스 생성 (버튼이 안보일 경우 데이터 생성을 위해 추가)
   const createTestInvoice = async () => {
     if (!firestore || !centerId || !user) return;
@@ -143,8 +158,8 @@ export default function RevenuePage() {
         studentId: user.uid,
         studentName: user.displayName || '테스트 학생',
         cycleStartDate: Timestamp.fromDate(now),
-        cycleEndDate: Timestamp.fromDate(addDays(now, 28)),
-        finalPrice: 50000, // 테스트용 5만원
+        cycleEndDate: Timestamp.fromDate(addDays(now, 3)), // 테스트용: 3일 남은걸로 생성
+        finalPrice: 50000, 
         status: 'issued',
         issuedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -180,6 +195,9 @@ export default function RevenuePage() {
           </h1>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleSendPaymentReminders} disabled={isSaving} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all">
+            <BellRing className="h-4 w-4" /> 결제 예정 알림 일괄 발송
+          </Button>
           <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-2xl font-black gap-2 h-12 border-2 bg-white shadow-sm hover:bg-primary hover:text-white transition-all">
             <Settings className="h-4 w-4" /> 재무 정책 설정
           </Button>
@@ -284,9 +302,9 @@ export default function RevenuePage() {
                 </div>
                 <p className="text-sm font-bold leading-relaxed relative z-10">
                   현재 **{unpaidInvoices?.length || 0}명**의 학생이 결제 대기 중입니다.<br/><br/>
-                  수납 기한이 3일 이상 경과한 학생들에게 **알림톡 재발송**을 권장합니다.
+                  수납 기한이 3일 이내인 학생들에게 **알림톡 결제 예고** 발송을 권장합니다.
                 </p>
-                <Button className="w-full mt-6 h-12 rounded-xl bg-white text-amber-600 hover:bg-white/90 font-black text-xs shadow-xl shadow-amber-600/20 relative z-10">미납 알림 일괄 발송</Button>
+                <Button onClick={handleSendPaymentReminders} className="w-full mt-6 h-12 rounded-xl bg-white text-amber-600 hover:bg-white/90 font-black text-xs shadow-xl shadow-amber-600/20 relative z-10">결제 예고톡 일괄 발송</Button>
               </Card>
 
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 overflow-hidden relative group">

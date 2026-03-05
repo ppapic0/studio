@@ -73,6 +73,7 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
+import { sendKakaoNotification } from '@/lib/kakao-service';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -555,6 +556,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
         
         await batch.commit();
+
+        // 카카오 알림톡 발송 (퇴실)
+        sendKakaoNotification(firestore, centerId, {
+          studentName: user.displayName || '학생',
+          type: 'exit'
+        });
+
         setIsTimerActive(false); 
         setStartTime(null); 
         toast({ title: "트랙 종료됨" });
@@ -581,6 +589,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
 
         await batch.commit();
+
+        // 카카오 알림톡 발송 (입실)
+        sendKakaoNotification(firestore, centerId, {
+          studentName: user.displayName || '학생',
+          type: 'entry'
+        });
+
         setStartTime(nowTs); 
         setIsTimerActive(true);
       }
@@ -625,7 +640,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
 
         // 랭킹 보드 스냅샷 업데이트
-        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+        const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
         batch.set(rankRef, {
           studentId: user.uid,
           displayNameSnapshot: user.displayName || '학생',

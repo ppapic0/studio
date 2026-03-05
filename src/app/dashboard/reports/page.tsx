@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -49,6 +50,7 @@ import { format, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generateDailyReport } from '@/ai/flows/generate-daily-report';
+import { sendKakaoNotification } from '@/lib/kakao-service';
 
 export default function DailyReportsPage() {
   const { user } = useUser();
@@ -179,6 +181,14 @@ export default function DailyReportsPage() {
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       }, { merge: true });
+
+      // 리포트 발송 시 카카오톡 알림
+      if (status === 'sent') {
+        sendKakaoNotification(firestore, centerId, {
+          studentName: selectedStudent.name,
+          type: 'report'
+        });
+      }
 
       toast({ title: status === 'sent' ? "발송 완료" : "저장 완료" });
       setIsWriteModalOpen(false);

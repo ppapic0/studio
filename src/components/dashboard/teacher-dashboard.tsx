@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -93,6 +94,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { sendKakaoNotification } from '@/lib/kakao-service';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -453,6 +455,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       batch.update(seatRef, updateData);
       await batch.commit();
+
+      // 카카오 알림톡 발송 (선생님 수동 조작)
+      const studentName = students?.find(s => s.id === studentId)?.name || '학생';
+      const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
+      sendKakaoNotification(firestore, centerId, {
+        studentName,
+        type: kakaoType
+      });
       
       toast({ title: "학생 상태가 업데이트되었습니다." });
       setIsManaging(false);
