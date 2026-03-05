@@ -46,7 +46,9 @@ import {
   Armchair,
   Info,
   CalendarCheck,
-  History
+  History,
+  AlertTriangle,
+  CalendarX
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -72,7 +74,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { RiskIntelligence } from '@/components/dashboard/risk-intelligence';
@@ -114,8 +116,7 @@ export default function RevenuePage() {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
-      orderBy('cycleEndDate', 'desc'),
-      limit(50)
+      orderBy('cycleEndDate', 'desc')
     );
   }, [firestore, centerId]);
   const { data: allInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesQuery);
@@ -374,26 +375,71 @@ export default function RevenuePage() {
                   <div className="space-y-3">
                     {attendanceList?.filter(a => a.studentId).map(seat => {
                       const student = studentMembers?.find(m => m.id === seat.studentId);
-                      const hasInvoice = allInvoices?.some(i => i.studentId === seat.studentId && i.status !== 'void');
+                      
+                      // 가장 최신 인보이스 찾기
+                      const studentInvoices = allInvoices?.filter(i => i.studentId === seat.studentId)
+                        .sort((a, b) => b.cycleEndDate.toMillis() - a.cycleEndDate.toMillis());
+                      const latestInvoice = studentInvoices?.[0];
+                      const hasInvoice = !!latestInvoice;
+
+                      // 연체 계산
+                      const isOverdue = latestInvoice && latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date();
+                      const overdueDays = isOverdue ? differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate()) : 0;
+
                       return (
-                        <div key={seat.id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/50 group/seat hover:bg-white hover:shadow-md transition-all">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-xl bg-white border flex items-center justify-center font-black text-[10px] text-primary/40">{seat.seatNo}</div>
-                            <div className="grid">
-                              <span className="font-black text-sm">{student?.displayName || '학생'}</span>
-                              <span className="text-[8px] font-bold text-muted-foreground uppercase">{seat.seatZone || 'Flex'}</span>
+                        <div key={seat.id} className="flex flex-col p-5 rounded-3xl bg-[#fafafa] border border-border/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group/seat">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-2xl bg-white border-2 border-primary/5 flex items-center justify-center font-black text-xs text-primary/40 shadow-inner group-hover/seat:bg-primary group-hover/seat:text-white transition-all">
+                                {seat.seatNo}
+                              </div>
+                              <div className="grid">
+                                <span className="font-black text-base tracking-tight">{student?.displayName || '학생'}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{seat.seatZone || '자유석'}</span>
+                              </div>
                             </div>
+                            {latestInvoice ? (
+                              <Badge className={cn(
+                                "font-black text-[9px] border-none px-2 h-5",
+                                latestInvoice.status === 'paid' ? "bg-emerald-500" : isOverdue ? "bg-rose-500 animate-pulse" : "bg-amber-500"
+                              )}>
+                                {latestInvoice.status === 'paid' ? '수납 완료' : isOverdue ? '미납/연체' : '수납 대기'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="font-black text-[9px] opacity-40">이력 없음</Badge>
+                            )}
                           </div>
-                          {!hasInvoice ? (
-                            <Button size="sm" onClick={() => createAutoInvoice(seat.studentId!, student?.displayName || '학생')} className="h-8 rounded-lg font-black text-[9px] bg-emerald-500 hover:bg-emerald-600 gap-1.5"><PlusCircle className="h-3 w-3" /> 인보이스 발행</Button>
+
+                          {latestInvoice ? (
+                            <div className="space-y-2.5">
+                              <div className="flex justify-between items-center text-[10px] font-bold">
+                                <span className="text-muted-foreground">이전 수납</span>
+                                <span className="text-primary">{latestInvoice.paidAt ? format(latestInvoice.paidAt.toDate(), 'yyyy.MM.dd') : '기록 없음'}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-[10px] font-bold">
+                                <span className="text-muted-foreground">차기 결제 예정</span>
+                                <span className="text-blue-600">{format(latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd')} (28일 주기)</span>
+                              </div>
+                              {isOverdue && (
+                                <div className="flex items-center gap-2 p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  <span className="text-[10px] font-black uppercase">미납 D+{overdueDays}일 경과</span>
+                                </div>
+                              )}
+                            </div>
                           ) : (
-                            <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                            <Button size="sm" onClick={() => createAutoInvoice(seat.studentId!, student?.displayName || '학생')} className="w-full h-10 rounded-xl font-black text-xs bg-primary hover:bg-primary/90 gap-2 shadow-lg shadow-primary/10">
+                              <PlusCircle className="h-4 w-4" /> 첫 인보이스 발행
+                            </Button>
                           )}
                         </div>
                       );
                     })}
                     {(!attendanceList || attendanceList.filter(a => a.studentId).length === 0) && (
-                      <p className="text-center py-10 text-[10px] font-bold text-muted-foreground/40 italic">배정된 학생이 없습니다.</p>
+                      <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
+                        <Users className="h-12 w-12" />
+                        <p className="text-[10px] font-black uppercase">현재 좌석에 배정된 학생이 없습니다.</p>
+                      </div>
                     )}
                   </div>
                 </div>
