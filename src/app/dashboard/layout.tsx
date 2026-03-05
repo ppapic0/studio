@@ -46,13 +46,6 @@ export default function DashboardLayout({
           ? "w-full max-w-[430px] aspect-[9/19.5] h-[92vh] max-h-[932px] bg-white rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[12px] border-black overflow-hidden ring-[4px] ring-gray-800 relative" 
           : "w-full min-h-screen"
       )}>
-        {/* iPhone Pro Specific: Dynamic Island (Floating Capsule Style) */}
-        {isMobileView && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-[60] flex items-center justify-center shadow-lg">
-            <div className="w-10 h-1 bg-white/10 rounded-full" />
-          </div>
-        )}
-
         {/* Header */}
         <DashboardHeader />
         
