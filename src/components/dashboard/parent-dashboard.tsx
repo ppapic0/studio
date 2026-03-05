@@ -17,18 +17,25 @@ import {
   Sparkles,
   History,
   MessageCircle,
-  Activity
+  Activity,
+  CreditCard,
+  Receipt,
+  ChevronRight,
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react';
 import { ResponsiveContainer, Bar, XAxis, YAxis, Tooltip, BarChart as RechartsBarChart, CartesianGrid } from 'recharts';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, getDocs, limit, orderBy, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { type DailyStudentStat, type StudyLogDay, type StudyPlanItem, type ParentAiCache, type DailyReport } from '@/lib/types';
+import { type DailyStudentStat, type StudyLogDay, type StudyPlanItem, type ParentAiCache, type DailyReport, type Invoice } from '@/lib/types';
 import { generateParentSummary, type ParentSummaryOutput, type ParentSummaryInput } from '@/ai/flows/parent-receives-weekly-summary';
 import { Skeleton } from '../ui/skeleton';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import Link from 'next/link';
 
 const chartData = [
   { name: '1주차', completion: 75, attendance: 95 },
@@ -56,6 +63,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+
+  // 0. 자녀의 미납 인보이스 조회
+  const invoicesQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !studentId) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'invoices'),
+      where('studentId', '==', studentId),
+      where('status', '==', 'issued'),
+      orderBy('cycleEndDate', 'asc')
+    );
+  }, [firestore, activeMembership?.id, studentId]);
+  const { data: unpaidInvoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery, { enabled: isActive && !!studentId });
 
   // 1. 자녀의 전체 통계 데이터
   const studentStatRef = useMemoFirebase(() => {
@@ -123,7 +142,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [todayScheduleItems, yesterdayScheduleItems]);
 
-  // AI 요약 생성 로직 - 무한 루프 방지를 위해 의존성 최적화
+  // AI 요약 생성 로직
   useEffect(() => {
     if (!isActive || !studentId || !isMounted || !firestore || !activeMembership?.id || !todayKey || !yesterdayKey) return;
 
@@ -182,7 +201,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
     
     fetchSummary();
-  }, [isActive, studentId, isMounted, firestore, activeMembership?.id, todayKey, yesterdayKey]);
+  }, [isActive, studentId, isMounted, firestore, activeMembership?.id, todayKey, yesterdayKey, studentStat, yesterdayStudyLog]);
 
   if (!isActive) return null;
   
@@ -204,6 +223,41 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className={cn("grid gap-6", isMobile ? "px-0" : "px-0")}>
+      {/* 💳 수강료 결제 안내 섹션 (미납 항목이 있을 때만 노출) */}
+      {!invoicesLoading && unpaidInvoices && unpaidInvoices.length > 0 && (
+        <Card className="rounded-[2.5rem] border-none shadow-2xl bg-blue-600 text-white overflow-hidden relative group animate-in slide-in-from-top-4 duration-700">
+          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000">
+            <Receipt className="h-48 w-48" />
+          </div>
+          <CardContent className={cn("p-8 sm:p-10 relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6")}>
+            <div className="flex items-center gap-6">
+              <div className="h-16 w-16 rounded-[1.5rem] bg-white/20 backdrop-blur-xl flex items-center justify-center border border-white/30 shadow-inner">
+                <CreditCard className="h-8 w-8 text-white" />
+              </div>
+              <div className="grid gap-1">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-white text-blue-600 border-none font-black text-[10px] px-2 py-0.5">PAYMENT DUE</Badge>
+                  <span className="text-xs font-bold text-white/60">납부 기한: {format(unpaidInvoices[0].cycleEndDate.toDate(), 'yyyy년 M월 d일')}</span>
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-black tracking-tighter">이번 달 수강료를 결제해 주세요</h3>
+                <p className="text-sm font-bold text-white/70">총 {unpaidInvoices.length}건의 미납 항목이 있습니다.</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center sm:items-end gap-3 w-full sm:w-auto">
+              <div className="text-right">
+                <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Total Amount</span>
+                <p className="text-4xl font-black tracking-tighter tabular-nums">₩{unpaidInvoices.reduce((acc, inv) => acc + inv.finalPrice, 0).toLocaleString()}</p>
+              </div>
+              <Button asChild className="w-full sm:w-auto h-14 px-8 rounded-2xl bg-white text-blue-600 hover:bg-white/90 font-black text-lg shadow-xl shadow-blue-900/20 gap-2 transition-all active:scale-95">
+                <Link href={`/payment/checkout/${unpaidInvoices[0].id}`}>
+                  지금 수강료 결제하기 <ChevronRight className="h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-3")}>
         <Card className="rounded-[1.5rem] border-none shadow-md bg-white overflow-hidden group hover:shadow-xl transition-all duration-500 relative">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
