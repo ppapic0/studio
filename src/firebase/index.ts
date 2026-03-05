@@ -56,7 +56,7 @@ function ensureAuth(app: FirebaseApp): Auth {
 
 function ensureFunctions(app: FirebaseApp): Functions {
   if (functions) return functions;
-  // 서버 리전(asia-northeast3)을 명시적으로 설정하여 CORS 및 404 에러 방지
+  // 서버 배포 리전(asia-northeast3)을 명시적으로 설정하여 CORS 및 404/internal 에러 방지
   functions = getFunctions(app, 'asia-northeast3');
   return functions;
 }

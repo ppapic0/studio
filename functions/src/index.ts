@@ -30,7 +30,8 @@ export const registerStudent = functions.region(region).https.onCall(async (data
 
   try {
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
+    const callerData = callerMemberSnap.data();
+    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
       throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
     }
 
@@ -129,7 +130,8 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
   try {
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerMemberSnap.data()?.role)) {
+    const callerData = callerMemberSnap.data();
+    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
       throw new functions.https.HttpsError("permission-denied", "정보를 수정할 권한이 없습니다.");
     }
 
@@ -198,16 +200,19 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
 
   try {
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    if (!callerMemberSnap.exists || !['centerAdmin'].includes(callerMemberSnap.data()?.role)) {
+    const callerData = callerMemberSnap.data();
+    if (!callerMemberSnap.exists || !['centerAdmin'].includes(callerData?.role)) {
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
+    // 1. Auth 계정 삭제 (비동기 처리, 실패해도 Firestore 데이터는 삭제 시도)
     try {
       await auth.deleteUser(studentId);
     } catch (authError: any) {
-      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found:`, authError.message);
+      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or error:`, authError.message);
     }
 
+    // 2. 관련 모든 데이터 삭제
     const batch = db.batch();
     const paths = [
       `users/${studentId}`,
@@ -221,13 +226,18 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
       batch.delete(db.doc(path));
     });
 
-    await batch.commit();
-    return { ok: true, message: "계정 및 모든 데이터가 삭제되었습니다." };
+    try {
+      await batch.commit();
+    } catch (batchError: any) {
+      throw new functions.https.HttpsError("internal", `DB 데이터 삭제 실패: ${batchError.message}`);
+    }
+
+    return { ok: true, message: "계정 및 모든 데이터가 성공적으로 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `삭제 중 오류: ${error.message}`);
+    throw new functions.https.HttpsError("internal", `서버 처리 중 오류 발생: ${error.message}`);
   }
 });
 
