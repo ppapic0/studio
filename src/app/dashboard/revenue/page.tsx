@@ -45,7 +45,8 @@ import {
   Filter,
   Armchair,
   Info,
-  CalendarCheck
+  CalendarCheck,
+  History
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
