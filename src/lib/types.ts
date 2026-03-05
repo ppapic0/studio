@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
@@ -18,69 +19,16 @@ export interface CenterMembership {
   status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;
-  className?: string; // 소속 반 이름
+  className?: string;
   linkedStudentIds?: string[];
   monthlyFee?: number;
-  baseFee?: number; // 할인 전 기본 수강료
+  baseFee?: number;
   tutoringDiscount?: boolean;
   siblingDiscount?: boolean;
 }
 
-export interface InviteCode {
-  id: string;
-  centerId: string;
-  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
-  targetClassName?: string; // 이 코드로 가입 시 자동 배정될 반 이름
-  maxUses: number;
-  usedCount: number;
-  expiresAt: Timestamp | null;
-  isActive: boolean;
-  createdByUserId: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface MonthlyFinance {
-  yearMonth: string; // YYYY-MM
-  rent: number;
-  labor: number;
-  maintenance: number;
-  other: number;
-  totalFixedCosts: number;
-  updatedAt: Timestamp;
-}
-
-export interface FinanceSettings {
-  fixedCosts: number; 
-  refundPolicy: {
-    penaltyType: 'none' | 'rate' | 'fixed';
-    penaltyRate?: number;
-    penaltyFixed?: number;
-    perDayRounding: 'floor' | 'round';
-  };
-  discountPolicy: {
-    order: ('rateFirst' | 'fixedFirst')[];
-  };
-}
-
-export interface PricingMatrix {
-  productId: string;
-  season: 'semester' | 'vacation';
-  studentType: 'student' | 'n_student';
-  basePrice: number;
-  isActive: boolean;
-  updatedAt: Timestamp;
-}
-
-export interface DiscountSnapshot {
-  type: 'tutoring' | 'sibling' | 'coupon';
-  method: 'fixed' | 'rate';
-  value: number;
-  amount: number;
-  order: number;
-}
-
 export interface Invoice {
+  id: string;
   studentId: string;
   studentName: string;
   cycleStartDate: Timestamp;
@@ -91,37 +39,35 @@ export interface Invoice {
     studentType: string;
     basePrice: number;
   };
-  discountsSnapshot: DiscountSnapshot[];
+  discountsSnapshot: any[];
   finalPrice: number;
-  status: 'issued' | 'paid' | 'refunded' | 'void';
-  issuedAt: Timestamp;
+  status: 'issued' | 'paid' | 'refunded' | 'void' | 'overdue';
+  paymentMethod?: 'card' | 'transfer' | 'cash' | 'none';
   paidAt?: Timestamp;
-  metadata?: any;
+  issuedAt: Timestamp;
+  updatedAt: Timestamp;
+  transactionId?: string;
 }
 
-export interface RefundRecord {
+export interface PaymentRecord {
+  id: string;
   invoiceId: string;
   studentId: string;
-  requestedAt: Timestamp;
-  approvedAt?: Timestamp;
-  usedDays: number;
-  perDay: number;
-  usedAmount: number;
-  penalty: number;
-  refundAmount: number;
-  status: 'requested' | 'approved' | 'paid';
-  reason?: string;
+  centerId: string;
+  amount: number;
+  method: 'card' | 'transfer' | 'cash';
+  status: 'success' | 'failed' | 'cancelled';
+  processedAt: Timestamp;
 }
 
 export interface KpiDaily {
   date: string; // YYYY-MM-DD
   totalRevenue: number; 
+  collectedRevenue: number; // 실제 수납된 현금 흐름
   totalDiscount: number;
   totalRefund: number;
-  totalStudyMinutes: number; // 실제 총 공부 시간 (분)
-  paidInvoiceCount: number;
+  totalStudyMinutes: number;
   activeStudentCount: number;
-  avgFinalPrice: number;
   breakevenStudents: number | null;
   updatedAt: Timestamp;
 }
@@ -131,18 +77,14 @@ export interface StudentProfile {
   name: string;
   grade: string;
   schoolName: string;
-  className?: string; // 소속 반 이름
+  className?: string;
   seatNo: number;
-  seatZone?: string; // 사용자가 직접 설정한 구역 (A존, B존 등)
+  seatZone?: string;
   targetDailyMinutes: number;
   parentUids: string[];
   createdAt: Timestamp;
   parentLinkCode?: string;
-  flags?: {
-    tutoringDiscountEnabled: boolean;
-    siblingDiscountEnabled: boolean;
-    siblingGroupId?: string;
-  };
+  monthlyFee?: number;
   currentEnrollment?: {
     productId: string;
     season: 'semester' | 'vacation';
@@ -156,51 +98,63 @@ export interface AttendanceCurrent {
   seatNo: number;
   status: "studying" | "away" | "break" | "absent";
   type?: "seat" | "aisle";
-  seatZone?: string; // 구역 정보 (A존, B존, 자유석 등)
+  seatZone?: string;
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
-  gridX?: number; 
-  gridY?: number; 
   studentId?: string; 
 }
 
-export interface AttendanceRecord {
+export interface GrowthProgress {
+  seasonLp: number;
+  penaltyPoints: number;
+  stats: {
+    focus: number;
+    consistency: number;
+    achievement: number;
+    resilience: number;
+  };
+  dailyLpStatus?: {
+    [dateKey: string]: any;
+  };
+  totalLpEarned: number;
+  lastResetAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface StudyPlanItem {
   id: string;
+  studyPlanWeekId: string;
+  centerId: string;
   studentId: string;
-  studentName?: string;
+  title: string;
+  weight: number;
+  done: boolean;
+  dateKey: string;
+  category?: 'schedule' | 'personal' | 'study';
+  subject?: string;
+  targetMinutes?: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface StudyLogDay {
+  studentId: string;
   centerId: string;
   dateKey: string;
-  status: 'confirmed_present' | 'confirmed_absent' | 'confirmed_late' | 'excused_absent' | 'requested';
-  updatedAt: Timestamp;
-  confirmedByUserId?: string;
+  totalMinutes: number;
 }
 
-export interface AttendanceRequest {
+export interface DailyReport {
   id: string;
   studentId: string;
-  studentName: string;
-  centerId: string;
-  type: 'late' | 'absence';
-  date: string; // YYYY-MM-DD
-  reason: string;
-  status: 'requested' | 'approved' | 'rejected';
-  penaltyApplied: boolean;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface CounselingLog {
-  id: string;
-  studentId: string;
-  studentName?: string;
   teacherId: string;
-  teacherName: string;
-  type: "academic" | "life" | "career";
+  dateKey: string;
   content: string;
-  improvement: string;
-  attachedStudySummary?: { yyyymmdd: string, totalMinutes: number };
+  status: "draft" | "sent";
+  studentName?: string;
+  viewedAt?: Timestamp;
   createdAt: Timestamp;
-  reservationId?: string;
+  updatedAt: Timestamp;
 }
 
 export interface CounselingReservation {
@@ -217,87 +171,15 @@ export interface CounselingReservation {
   updatedAt: Timestamp;
 }
 
-export interface DailyReport {
+export interface CounselingLog {
+  id: string;
   studentId: string;
-  teacherId: string;
-  dateKey: string;
-  content: string;
-  status: "draft" | "sent";
   studentName?: string;
-  viewedAt?: Timestamp; // 학부모 열람 시점
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface GrowthProgress {
-  seasonLp: number; // 시즌 리셋 대상
-  mastery: number; // 0-100 영구 성장 (부스트 영향)
-  penaltyPoints: number; // 0-100 벌점
-  stats: {
-    focus: number;
-    consistency: number;
-    achievement: number;
-    resilience: number;
-  };
-  dailyLpStatus?: {
-    [dateKey: string]: {
-      attendance: boolean;
-      plan: boolean;
-      routine: boolean;
-      growth: boolean;
-      dailyLpAmount?: number;
-      bonus6h?: boolean;
-      achievementCount?: number;
-      checkedIn?: boolean;
-    };
-  };
-  totalLpEarned: number; // 누적 LP
-  lastResetAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface SkillNode {
-  id: string;
-  branch: 'focus' | 'consistency' | 'achievement' | 'resilience';
-  name: string;
-  description: string;
-  maxLevel: number;
-  prerequisites: string[];
-  unlockCondition: { stat: string; value: number };
-  effects: { lp: number };
-  iconKey: string;
-}
-
-export interface StudyPlanItem {
-  studyPlanWeekId: string;
-  centerId: string;
-  studentId: string;
-  title: string;
-  weight: number;
-  done: boolean;
-  doneAt?: Timestamp;
-  dateKey?: string;
-  category?: 'schedule' | 'personal' | 'study';
-  subject?: string;
-  targetMinutes?: number;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export interface StudyLogDay {
-  studentId: string;
-  centerId: string;
-  dateKey: string;
-  totalMinutes: number;
-  updatedAt: Timestamp;
-  createdAt: Timestamp;
-}
-
-export interface StudySession {
-  id: string;
-  startTime: Timestamp;
-  endTime: Timestamp;
-  durationMinutes: number;
+  teacherId: string;
+  teacherName: string;
+  type: "academic" | "life" | "career";
+  content: string;
+  improvement: string;
   createdAt: Timestamp;
 }
 
@@ -307,26 +189,35 @@ export interface DailyStudentStat {
     dateKey: string;
     todayPlanCompletionRate: number;
     totalStudyMinutes: number;
-    attendanceStreakDays: number;
-    weeklyPlanCompletionRate: number;
     studyTimeGrowthRate: number;
-    riskDetected: boolean;
     createdAt: Timestamp;
-    updatedAt: Timestamp;
-}
-
-export interface ParentAiCache {
-  content: any;
-  dateKey: string;
-  createdAt: Timestamp;
 }
 
 export interface LeaderboardEntry {
   id: string;
   studentId: string;
   displayNameSnapshot: string;
-  classNameSnapshot?: string; // 순위 집계 시점의 반 이름
+  classNameSnapshot?: string;
   value: number;
   rank: number;
-  updatedAt: Timestamp;
+}
+
+export interface StudySession {
+  id: string;
+  startTime: Timestamp;
+  endTime: Timestamp;
+  durationMinutes: number;
+}
+
+export interface AttendanceRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  centerId: string;
+  type: 'late' | 'absence';
+  date: string;
+  reason: string;
+  status: 'requested' | 'approved' | 'rejected';
+  penaltyApplied: boolean;
+  createdAt: Timestamp;
 }

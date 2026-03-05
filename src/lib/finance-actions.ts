@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   query, 
@@ -9,159 +10,117 @@ import {
   serverTimestamp, 
   Timestamp, 
   Firestore,
-  updateDoc
+  updateDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { addDays, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-import { DiscountSnapshot, FinanceSettings, PricingMatrix, StudentProfile } from './types';
+import { Invoice, KpiDaily, StudentProfile } from './types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * 결제 인보이스 생성 로직 (28일 주기 스냅샷)
+ * 수납 처리 (결제 완료)
+ * 실제 PG 연동 시 이 함수가 결제 성공 콜백에서 호출됩니다.
  */
-export async function createInvoice(db: Firestore, centerId: string, studentId: string) {
-  const studentRef = doc(db, 'centers', centerId, 'students', studentId);
-  const settingsRef = doc(db, 'centers', centerId);
+export async function completePayment(
+  db: Firestore, 
+  centerId: string, 
+  invoiceId: string, 
+  method: 'card' | 'transfer' | 'cash'
+) {
+  const invoiceRef = doc(db, 'centers', centerId, 'invoices', invoiceId);
+  const invoiceSnap = await getDoc(invoiceRef);
   
-  const [studentSnap, centerSnap] = await Promise.all([getDoc(studentRef), getDoc(settingsRef)]);
+  if (!invoiceSnap.exists()) throw new Error('인보이스를 찾을 수 없습니다.');
+  const invoice = invoiceSnap.data() as Invoice;
+
+  if (invoice.status === 'paid') throw new Error('이미 결제된 항목입니다.');
+
+  const batch = writeBatch(db);
+  const now = serverTimestamp();
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  // 1. 인보이스 상태 업데이트
+  batch.update(invoiceRef, {
+    status: 'paid',
+    paymentMethod: method,
+    paidAt: now,
+    updatedAt: now
+  });
+
+  // 2. 결제 트랜잭션 로그 생성
+  const paymentRef = doc(collection(db, `centers/${centerId}/payments`));
+  batch.set(paymentRef, {
+    invoiceId,
+    studentId: invoice.studentId,
+    studentName: invoice.studentName,
+    amount: invoice.finalPrice,
+    method,
+    status: 'success',
+    processedAt: now,
+    centerId
+  });
+
+  // 3. 당일 KPI 수납액(Collected Revenue) 업데이트
+  const kpiRef = doc(db, 'centers', centerId, 'kpiDaily', todayKey);
+  batch.set(kpiRef, {
+    collectedRevenue: (await getDoc(kpiRef)).data()?.collectedRevenue || 0 + invoice.finalPrice,
+    updatedAt: now
+  }, { merge: true });
+
+  await batch.commit();
+  return { ok: true };
+}
+
+/**
+ * 신규 인보이스 수동 생성
+ */
+export async function issueInvoice(
+  db: Firestore,
+  centerId: string,
+  studentId: string,
+  amount: number,
+  title: string
+) {
+  const studentSnap = await getDoc(doc(db, 'centers', centerId, 'students', studentId));
+  if (!studentSnap.exists()) throw new Error('학생을 찾을 수 없습니다.');
   
-  if (!studentSnap.exists()) throw new Error('학생 정보를 찾을 수 없습니다.');
   const student = studentSnap.data() as StudentProfile;
-  const enrollment = student.currentEnrollment;
-  if (!enrollment) throw new Error('등록된 수강 정보가 없습니다.');
-
-  const pricingId = `${enrollment.productId}_${enrollment.season}_${enrollment.studentType}`;
-  const pricingSnap = await getDoc(doc(db, 'centers', centerId, 'pricing', pricingId));
-  if (!pricingSnap.exists()) throw new Error('해당 조건의 가격 설정이 없습니다.');
-  const pricing = pricingSnap.data() as PricingMatrix;
-
-  const centerData = centerSnap.data();
-  const financeSettings = (centerData?.financeSettings as FinanceSettings) || {
-    discountPolicy: { order: ['rateFirst'] }
-  };
-
-  let currentPrice = pricing.basePrice;
-  const discounts: DiscountSnapshot[] = [];
-  let order = 1;
-
-  const applySibling = () => {
-    if (student.flags?.siblingDiscountEnabled) {
-      const amount = Math.floor(currentPrice * 0.05);
-      discounts.push({ type: 'sibling', method: 'rate', value: 0.05, amount, order: order++ });
-      currentPrice -= amount;
-    }
-  };
-
-  const applyTutoring = () => {
-    if (student.flags?.tutoringDiscountEnabled) {
-      const amount = 50000;
-      discounts.push({ type: 'tutoring', method: 'fixed', value: 50000, amount, order: order++ });
-      currentPrice -= amount;
-    }
-  };
-
-  if (financeSettings.discountPolicy?.order?.[0] === 'rateFirst') {
-    applySibling(); applyTutoring();
-  } else {
-    applyTutoring(); applySibling();
-  }
-
-  const finalPrice = Math.max(0, currentPrice);
-  const startDate = enrollment.cycleStartDate.toDate();
-  const endDate = addDays(startDate, 27); 
+  const now = serverTimestamp();
+  const startDate = new Date();
+  const endDate = addDays(startDate, 28);
 
   const invoiceData = {
     studentId,
     studentName: student.name,
     cycleStartDate: Timestamp.fromDate(startDate),
     cycleEndDate: Timestamp.fromDate(endDate),
-    priceSnapshot: {
-      productId: enrollment.productId,
-      season: enrollment.season,
-      studentType: enrollment.studentType,
-      basePrice: pricing.basePrice
-    },
-    discountsSnapshot: discounts,
-    finalPrice,
+    finalPrice: amount,
     status: 'issued',
-    issuedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    issuedAt: now,
+    updatedAt: now,
+    priceSnapshot: {
+      productId: 'manual',
+      season: 'none',
+      studentType: 'none',
+      basePrice: amount
+    },
+    discountsSnapshot: []
   };
 
-  const newInvoiceRef = doc(collection(db, `centers/${centerId}/invoices`));
-  setDoc(newInvoiceRef, invoiceData).catch(async (err) => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: newInvoiceRef.path,
-      operation: 'create',
-      requestResourceData: invoiceData
-    }));
-  });
-
-  return { ok: true, invoiceId: newInvoiceRef.id, finalPrice };
+  const invoiceRef = doc(collection(db, `centers/${centerId}/invoices`));
+  await setDoc(invoiceRef, invoiceData);
+  
+  return { ok: true, invoiceId: invoiceRef.id };
 }
 
 /**
- * 환불 계산 및 요청 (28일 일할 계산)
- */
-export async function requestRefund(db: Firestore, centerId: string, invoiceId: string, reason: string) {
-  const invoiceRef = doc(db, 'centers', centerId, 'invoices', invoiceId);
-  const invoiceSnap = await getDoc(invoiceRef);
-  
-  if (!invoiceSnap.exists()) throw new Error('인보이스를 찾을 수 없습니다.');
-  
-  const invoice = invoiceSnap.data() as any;
-  const now = new Date();
-  const start = invoice.cycleStartDate.toDate();
-  
-  const diffTime = now.getTime() - start.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const usedDays = Math.min(28, Math.max(0, diffDays));
-
-  const perDay = Math.floor(invoice.finalPrice / 28);
-  const usedAmount = perDay * usedDays;
-  const refundAmount = Math.max(0, invoice.finalPrice - usedAmount);
-
-  const refundData = {
-    invoiceId,
-    studentId: invoice.studentId,
-    requestedAt: serverTimestamp(),
-    usedDays,
-    perDay,
-    usedAmount,
-    penalty: 0,
-    refundAmount,
-    status: 'requested',
-    reason,
-    updatedAt: serverTimestamp()
-  };
-
-  const refundRef = doc(collection(db, `centers/${centerId}/refunds`));
-  setDoc(refundRef, refundData).catch(async (err) => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: refundRef.path,
-      operation: 'create',
-      requestResourceData: refundData
-    }));
-  });
-
-  updateDoc(invoiceRef, { status: 'refunded', updatedAt: serverTimestamp() }).catch(async (err) => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: invoiceRef.path,
-      operation: 'update',
-      requestResourceData: { status: 'refunded' }
-    }));
-  });
-
-  return { ok: true, refundAmount };
-}
-
-/**
- * 발생주의 방식의 Daily KPI 집계 (실제 학습 시간 합산 포함)
+ * 발생주의 방식의 Daily KPI 집계 고도화
  */
 export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: string) {
   const targetDate = startOfDay(new Date(dateStr));
 
-  // 1. 현재 센터의 모든 '재원생' 조회
+  // 1. 재원생 정보 기반 발생 매출 계산
   const membersQuery = query(
     collection(db, `centers/${centerId}/members`),
     where('role', '==', 'student'),
@@ -171,89 +130,37 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
 
   let dailyAccruedRevenue = 0;
   let activeStudentCount = 0;
-  let totalStudyMinutes = 0;
 
-  // 각 학생의 해당 날짜 학습 로그를 가져오기 위한 프로미스 생성
-  const logPromises = membersSnap.docs.map(memberDoc => {
-    const studentId = memberDoc.id;
-    return getDoc(doc(db, 'centers', centerId, 'studyLogs', studentId, 'days', dateStr));
-  });
-  
-  const logSnaps = await Promise.all(logPromises);
-
-  membersSnap.docs.forEach((doc, index) => {
+  membersSnap.docs.forEach((doc) => {
     const data = doc.data();
-    const monthlyFee = data.monthlyFee || 390000; // 기본가 39만 가정
-    const dailyFee = Math.floor(monthlyFee / 28); // 28일 기준 일할
-    
-    dailyAccruedRevenue += dailyFee;
+    const monthlyFee = data.monthlyFee || 390000;
+    dailyAccruedRevenue += Math.floor(monthlyFee / 28);
     activeStudentCount++;
-
-    const logSnap = logSnaps[index];
-    if (logSnap.exists()) {
-      totalStudyMinutes += logSnap.data().totalMinutes || 0;
-    }
   });
 
-  // 2. 월별 고정비 가져오기 (BEP 계산용)
-  const monthKey = format(targetDate, 'yyyy-MM');
-  const monthFinanceSnap = await getDoc(doc(db, 'centers', centerId, 'financeMonthly', monthKey));
-  const monthlyFixedCosts = monthFinanceSnap.exists() ? monthFinanceSnap.data()?.totalFixedCosts || 0 : 0;
-  
-  // 3. 손익분기점(BEP) 학생 수 계산 (28일 주기 기준)
-  const avgDailyFee = activeStudentCount > 0 ? dailyAccruedRevenue / activeStudentCount : 0;
-  const breakevenStudents = (avgDailyFee > 0 && monthlyFixedCosts > 0) 
-    ? Math.ceil(monthlyFixedCosts / (avgDailyFee * 28)) 
-    : null;
+  // 2. 실제 수납액(Cash Flow) 계산 - 결제 컬렉션에서 해당 날짜 합산
+  const paymentsQuery = query(
+    collection(db, `centers/${centerId}/payments`),
+    where('processedAt', '>=', Timestamp.fromDate(startOfDay(targetDate))),
+    where('processedAt', '<=', Timestamp.fromDate(endOfDay(targetDate)))
+  );
+  const paymentsSnap = await getDocs(paymentsQuery);
+  const collectedRevenue = paymentsSnap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
 
   const kpiData = {
     date: dateStr,
     totalRevenue: dailyAccruedRevenue,
-    totalStudyMinutes,
+    collectedRevenue,
     activeStudentCount,
-    breakevenStudents,
     updatedAt: serverTimestamp()
   };
 
-  const kpiRef = doc(db, 'centers', centerId, 'kpiDaily', dateStr);
-  setDoc(kpiRef, kpiData, { merge: true }).catch(async (err) => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: kpiRef.path,
-      operation: 'write',
-      requestResourceData: kpiData
-    }));
-  });
-
+  await setDoc(doc(db, 'centers', centerId, 'kpiDaily', dateStr), kpiData, { merge: true });
   return { ok: true };
 }
 
-/**
- * 최근 30일간의 모든 KPI를 동기화합니다.
- */
-export async function syncRecentKpis(db: Firestore, centerId: string) {
-  const today = new Date();
-  const syncPromises = [];
-
-  for (let i = 0; i < 30; i++) {
-    const dateStr = format(subDays(today, i), 'yyyy-MM-dd');
-    syncPromises.push(syncDailyKpi(db, centerId, dateStr));
-  }
-
-  await Promise.all(syncPromises);
-  return { ok: true };
-}
-
-/**
- * 특정 월의 모든 날짜에 대해 KPI를 동기화합니다.
- */
-export async function syncMonthKpis(db: Firestore, centerId: string, yearMonth: string) {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = endOfMonth(startDate);
-  
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
-  const syncPromises = days.map(day => syncDailyKpi(db, centerId, format(day, 'yyyy-MM-dd')));
-
-  await Promise.all(syncPromises);
-  return { ok: true };
+function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
 }
