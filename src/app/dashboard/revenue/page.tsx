@@ -127,6 +127,17 @@ export default function RevenuePage() {
   }, [firestore, centerId]);
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
 
+  // 4. 학생 목록 조회 (이름 매칭용)
+  const studentMembersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, centerId]);
+  const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery);
+
   const filteredInvoices = useMemo(() => {
     if (!allInvoices) return [];
     if (paymentSubTab === 'all') return allInvoices;
