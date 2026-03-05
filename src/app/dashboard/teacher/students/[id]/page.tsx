@@ -5,7 +5,7 @@ import { use, useState, useMemo, useEffect, useRef } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc, orderBy, getDocs, limit } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc, orderBy, getDocs, limit, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 import { 
   Dialog,
   DialogContent,
@@ -71,7 +72,9 @@ import {
   Coffee,
   School,
   ArrowRightLeft,
-  LayoutGrid
+  LayoutGrid,
+  Save,
+  Wand2
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, InviteCode, StudySession } from '@/lib/types';
@@ -189,6 +192,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const periodKey = format(new Date(), 'yyyy-MM');
   const hasInitializedForm = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -211,6 +215,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedResForLog, setSelectedResForLog] = useState<CounselingReservation | null>(null);
+
+  // 성장 지표 수정 상태
+  const [isEditStats, setIsEditStats] = useState(false);
+  const [editLp, setEditLp] = useState(0);
+  const [editStats, setEditStats] = useState({ focus: 0, consistency: 0, achievement: 0, resilience: 0 });
 
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -236,13 +245,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId]);
   const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery);
 
-  const availableClasses = useMemo(() => {
-    const classes = new Set<string>();
-    allMembers?.forEach(m => { if (m.className) classes.add(m.className); });
-    inviteCodes?.forEach(i => { if (i.targetClassName) classes.add(i.targetClassName); });
-    return Array.from(classes).sort();
-  }, [allMembers, inviteCodes]);
-
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
@@ -255,11 +257,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, centerId, studentId]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef);
 
+  useEffect(() => {
+    if (progress) {
+      setEditLp(progress.seasonLp || 0);
+      setEditStats({
+        focus: progress.stats?.focus || 0,
+        consistency: progress.stats?.consistency || 0,
+        achievement: progress.stats?.achievement || 0,
+        resilience: progress.stats?.resilience || 0,
+      });
+    }
+  }, [progress]);
+
   const rankingQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    const periodKey = format(new Date(), 'yyyy-MM');
     return query(collection(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries'), where('studentId', '==', studentId));
-  }, [firestore, centerId, studentId]);
+  }, [firestore, centerId, studentId, periodKey]);
   const { data: rankEntry } = useCollection<LeaderboardEntry>(rankingQuery);
 
   const aptsQuery = useMemoFirebase(() => {
@@ -417,6 +430,40 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       setIsStatusModalOpen(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "업데이트 실패", description: e.message });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdateGrowthData = async () => {
+    if (!firestore || !centerId || !studentId) return;
+    setIsUpdating(true);
+    try {
+      const batch = writeBatch(firestore);
+      const progRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+      const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
+
+      // 1. 성장 데이터 업데이트
+      batch.update(progRef, {
+        seasonLp: editLp,
+        stats: editStats,
+        updatedAt: serverTimestamp()
+      });
+
+      // 2. 랭킹 데이터 동기화
+      batch.set(rankRef, {
+        studentId,
+        displayNameSnapshot: student?.name || studentMembership?.displayName || '학생',
+        classNameSnapshot: student?.className || studentMembership?.className || null,
+        value: editLp,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
+      toast({ title: "성장 지표가 수정되었습니다." });
+      setIsEditStats(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "수정 실패", description: e.message });
     } finally {
       setIsUpdating(false);
     }
@@ -593,7 +640,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
 
         <TabsContent value="plans" className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {/* 공부 계획 탭 내용은 기존과 동일하게 유지 */}
           <div className="flex items-center gap-3 mb-8 bg-white/50 p-2 rounded-[2rem] border shadow-sm">
             <Button 
               variant="outline" 
@@ -747,54 +793,109 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
       </Tabs>
 
-      {/* 스킬트랙 상세 모달 */}
+      {/* 스킬트랙 및 LP 상세 관리 모달 */}
       <Dialog open={isMasteryModalOpen} onOpenChange={setIsMasteryModalOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "w-[95vw] max-w-[400px]" : "sm:max-w-lg")}>
-          <div className="bg-purple-600 p-10 text-white relative">
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all", isMobile ? "w-[95vw] h-[85vh] rounded-[2rem]" : "sm:max-w-xl max-h-[90vh]")}>
+          <div className="bg-purple-600 p-10 text-white relative shrink-0">
             <Zap className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
             <DialogHeader>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-widest">Skill Track Index</Badge>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest">Growth Management</Badge>
+                </div>
+                {!isEditStats && (
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditStats(true)} className="text-white hover:bg-white/10 gap-2 h-8 rounded-lg font-black text-xs">
+                    <Settings2 className="h-3.5 w-3.5" /> 수동 보정 모드
+                  </Button>
+                )}
               </div>
-              <DialogTitle className="text-3xl font-black tracking-tighter">개인 스킬 분석</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold mt-1 text-sm">학생의 학습 활동을 기반으로 한 4대 핵심 역량 지표입니다.</DialogDescription>
+              <DialogTitle className="text-3xl font-black tracking-tighter">성장 및 스킬 관리</DialogTitle>
+              <DialogDescription className="text-white/70 font-bold mt-1 text-sm">학생의 학습 포인트(LP)와 4대 핵심 역량 지표를 관리합니다.</DialogDescription>
             </DialogHeader>
           </div>
 
-          <div className="p-10 space-y-6 bg-white">
-            {Object.entries(STAT_CONFIG).map(([key, config]) => {
-              const val = progress?.stats?.[key as keyof typeof progress.stats] || 0;
-              const Icon = config.icon;
-              return (
-                <div key={key} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-2 rounded-xl", config.accent)}>
-                        <Icon className={cn("h-5 w-5", config.color)} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-black tracking-tight">{config.label}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase">{config.sub}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black tabular-nums">{val.toFixed(1)}</span>
-                      <span className="text-[10px] font-bold text-muted-foreground/40 ml-1">/ 100</span>
-                    </div>
-                  </div>
-                  <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                    <div className={cn("h-full transition-all duration-1000", config.bg)} style={{ width: `${val}%` }} />
-                  </div>
-                  <p className="text-[9px] font-bold text-muted-foreground/60 ml-1">{config.guide}</p>
+          <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+            <div className="p-10 space-y-10">
+              {/* 시즌 LP 관리 섹션 */}
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase text-primary/60 tracking-widest flex items-center gap-2"><Trophy className="h-4 w-4" /> 시즌 러닝 포인트 (LP)</h4>
+                  {isEditStats && <Badge className="bg-primary text-white border-none font-black">수정 중</Badge>}
                 </div>
-              );
-            })}
+                <Card className="rounded-[1.5rem] border-2 border-primary/5 bg-muted/5 p-6 flex flex-col items-center text-center gap-2 group">
+                  {isEditStats ? (
+                    <div className="w-full space-y-4">
+                      <div className="flex justify-between items-center px-1">
+                        <Label className="text-[10px] font-black uppercase opacity-40">Set Season LP</Label>
+                        <span className="text-xs font-black text-primary bg-white px-3 py-1 rounded-lg border shadow-sm">{editLp.toLocaleString()} LP</span>
+                      </div>
+                      <Slider value={[editLp]} max={50000} step={100} onValueChange={([v]) => setEditLp(v)} />
+                      <Input type="number" value={editLp} onChange={(e) => setEditLp(Number(e.target.value))} className="h-12 rounded-xl text-center font-black text-xl border-2" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-5xl font-black tracking-tighter text-primary">{(progress?.seasonLp || 0).toLocaleString()}<span className="text-xl opacity-20 ml-1">LP</span></div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Current Season Points</p>
+                    </>
+                  )}
+                </Card>
+              </section>
+
+              {/* 4대 스킬 관리 섹션 */}
+              <section className="space-y-6">
+                <h4 className="text-xs font-black uppercase text-primary/60 tracking-widest flex items-center gap-2"><Activity className="h-4 w-4" /> 핵심 역량 분석 (Stats)</h4>
+                <div className="grid gap-8">
+                  {Object.entries(STAT_CONFIG).map(([key, config]) => {
+                    const val = isEditStats ? (editStats[key as keyof typeof editStats] || 0) : (progress?.stats?.[key as keyof typeof progress.stats] || 0);
+                    const Icon = config.icon;
+                    return (
+                      <div key={key} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("p-2 rounded-xl", config.accent)}>
+                              <Icon className={cn("h-5 w-5", config.color)} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-black tracking-tight">{config.label}</p>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase">{config.sub}</p>
+                            </div>
+                          </div>
+                          <div className="text-right flex items-baseline gap-1">
+                            <span className="text-2xl font-black tabular-nums">{val.toFixed(1)}</span>
+                            <span className="text-[10px] font-bold text-muted-foreground/40">/ 100</span>
+                          </div>
+                        </div>
+                        {isEditStats ? (
+                          <div className="space-y-4 px-1">
+                            <Slider value={[val]} max={100} step={0.5} onValueChange={([v]) => setEditStats({...editStats, [key]: v})} />
+                          </div>
+                        ) : (
+                          <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
+                            <div className={cn("h-full transition-all duration-1000", config.bg)} style={{ width: `${val}%` }} />
+                          </div>
+                        )}
+                        {!isEditStats && <p className="text-[9px] font-bold text-muted-foreground/60 ml-1">{config.guide}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
           </div>
 
-          <DialogFooter className="p-8 bg-muted/20 border-t">
-            <DialogClose asChild>
-              <Button className="w-full h-14 rounded-2xl font-black text-lg">상세 분석 종료</Button>
-            </DialogClose>
+          <DialogFooter className="p-8 bg-muted/20 border-t shrink-0">
+            {isEditStats ? (
+              <div className="flex gap-3 w-full">
+                <Button variant="outline" onClick={() => { setIsEditStats(false); if (progress) setEditLp(progress.seasonLp); }} className="flex-1 h-14 rounded-2xl font-black border-2">취소</Button>
+                <Button onClick={handleUpdateGrowthData} disabled={isUpdating} className="flex-2 h-14 px-10 rounded-2xl font-black text-lg shadow-xl gap-2">
+                  {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />} 정보 저장
+                </Button>
+              </div>
+            ) : (
+              <DialogClose asChild>
+                <Button className="w-full h-14 rounded-2xl font-black text-lg">상세 분석 종료</Button>
+              </DialogClose>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -851,13 +952,3 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     </div>
   );
 }
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'requested': return <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[10px]">승인 대기</Badge>;
-    case 'confirmed': return <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-sm">예약 확정</Badge>;
-    case 'done': return <Badge variant="outline" className="opacity-40 font-black text-[10px]">상담 완료</Badge>;
-    case 'canceled': return <Badge variant="destructive" className="font-black text-[10px]">취소됨</Badge>;
-    default: return <Badge variant="outline" className="font-black text-[10px]">{status}</Badge>;
-  }
-};
