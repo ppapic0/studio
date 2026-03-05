@@ -19,7 +19,7 @@ import { useAppContext } from '@/contexts/app-context';
  * 2. 내 상점 정보 -> API 키 확인
  * 3. 아래 clientKey를 발급받으신 '클라이언트 키'로 교체하세요.
  */
-const TOSS_CLIENT_KEY = 'test_ck_D5yaAdvZdA1qWDQ9YvD83V5E0RY'; // 현재는 테스트 키입니다.
+const TOSS_CLIENT_KEY = 'test_ck_AQ92ymxN34NDobpk74e0rajRKXvd'; // 현재는 테스트 키입니다.
 
 export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = use(params);
