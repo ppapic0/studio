@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -34,7 +35,8 @@ import {
   CreditCard,
   Receipt,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -67,11 +69,13 @@ import { RiskIntelligence } from '@/components/dashboard/risk-intelligence';
 import { OperationalIntelligence } from '@/components/dashboard/operational-intelligence';
 import { useToast } from '@/hooks/use-toast';
 import { syncMonthKpis, completePayment } from '@/lib/finance-actions';
+import { useRouter } from 'next/navigation';
 
 export default function RevenuePage() {
   const { activeMembership, viewMode, membershipsLoading } = useAppContext();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
 
@@ -123,6 +127,11 @@ export default function RevenuePage() {
     } catch (e: any) {
       toast({ variant: "destructive", title: "수납 실패", description: e.message });
     }
+  };
+
+  const handleRealPayment = (invoiceId: string) => {
+    // 실제 결제 체크아웃 페이지로 이동
+    router.push(`/payment/checkout/${invoiceId}`);
   };
 
   if (membershipsLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
@@ -212,27 +221,36 @@ export default function RevenuePage() {
                   {(!unpaidInvoices || unpaidInvoices.length === 0) ? (
                     <div className="py-20 text-center opacity-20 italic font-black text-sm">대기 중인 인보이스가 없습니다.</div>
                   ) : unpaidInvoices.map((inv) => (
-                    <div key={inv.id} className="p-6 flex items-center justify-between hover:bg-muted/5 transition-all group">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10">{inv.studentName?.charAt(0)}</div>
-                        <div className="grid gap-0.5">
-                          <span className="font-black text-base">{inv.studentName}</span>
-                          <span className="text-[10px] font-bold text-muted-foreground">기한: {format(inv.cycleEndDate.toDate(), 'yyyy.MM.dd')}까지</span>
+                    <div key={inv.id} className="p-6 flex flex-col gap-4 hover:bg-muted/5 transition-all group">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10">{inv.studentName?.charAt(0)}</div>
+                          <div className="grid gap-0.5">
+                            <span className="font-black text-base">{inv.studentName}</span>
+                            <span className="text-[10px] font-bold text-muted-foreground">기한: {format(inv.cycleEndDate.toDate(), 'yyyy.MM.dd')}까지</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-6">
                         <div className="text-right">
                           <p className="text-lg font-black tracking-tighter text-primary">₩{inv.finalPrice.toLocaleString()}</p>
                           <Badge variant="outline" className="text-[8px] font-black uppercase text-amber-600 border-amber-200 bg-amber-50">Pending</Badge>
                         </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          onClick={() => handleRealPayment(inv.id)}
+                          className="flex-1 rounded-xl font-black text-xs gap-2 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 h-11"
+                        >
+                          <CreditCard className="h-4 w-4" /> 실제 카드 결제 진행
+                        </Button>
                         <Select onValueChange={(val) => handleProcessPayment(inv.id, val)}>
-                          <SelectTrigger className="w-[120px] h-10 rounded-xl font-black text-[10px] border-2 bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-100">
-                            <SelectValue placeholder="수납 처리" />
+                          <SelectTrigger className="w-[140px] h-11 rounded-xl font-black text-[10px] border-2 bg-white text-emerald-600 border-emerald-100">
+                            <SelectValue placeholder="수동 수납 처리" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl border-none shadow-2xl">
-                            <SelectItem value="card" className="font-bold">카드 결제</SelectItem>
-                            <SelectItem value="transfer" className="font-bold">계좌 이체</SelectItem>
-                            <SelectItem value="cash" className="font-bold">현금 수납</SelectItem>
+                            <SelectItem value="card" className="font-bold">카드 결제 완료</SelectItem>
+                            <SelectItem value="transfer" className="font-bold">계좌 이체 완료</SelectItem>
+                            <SelectItem value="cash" className="font-bold">현금 수납 완료</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

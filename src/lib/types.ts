@@ -47,6 +47,8 @@ export interface Invoice {
   issuedAt: Timestamp;
   updatedAt: Timestamp;
   transactionId?: string;
+  paymentKey?: string; // Toss Payments
+  orderId?: string;    // Toss Payments
 }
 
 export interface PaymentRecord {
