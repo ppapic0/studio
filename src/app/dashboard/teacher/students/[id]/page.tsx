@@ -1,11 +1,10 @@
-
 'use client';
 
 import { use, useState, useMemo, useEffect, useRef } from 'react';
 import { useDoc, useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc, orderBy, getDocs, limit, setDoc } from 'firebase/firestore';
+import { doc, collection, query, where, writeBatch, serverTimestamp, addDoc, Timestamp, updateDoc, orderBy, getDocs, limit, setDoc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -77,8 +76,8 @@ import {
   Wand2
 } from 'lucide-react';
 import Link from 'next/link';
-import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, InviteCode, StudySession } from '@/lib/types';
-import { format, subDays, addDays, startOfDay, startOfWeek, isSameDay } from 'date-fns';
+import { StudentProfile, StudyLogDay, GrowthProgress, LeaderboardEntry, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, InviteCode, StudySession, KpiDaily } from '@/lib/types';
+import { format, subDays, addDays, startOfDay, startOfWeek, isSameDay, endOfDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -237,13 +236,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'));
   }, [firestore, centerId]);
-  const { data: allMembers } = useCollection<CenterMembership>(allMembersQuery);
+  const { data: studentMembers } = useCollection<CenterMembership>(allMembersQuery);
 
   const invitesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
   }, [firestore, centerId]);
   const { data: inviteCodes } = useCollection<InviteCode>(invitesQuery);
+
+  // Fix: ReferenceError: availableClasses is not defined 해결을 위한 로직 추가
+  const availableClasses = useMemo(() => {
+    const classes = new Set<string>();
+    studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
+    inviteCodes?.forEach(i => { if (i.targetClassName) classes.add(i.targetClassName); });
+    if (student?.className) classes.add(student.className);
+    if (studentMembership?.className) classes.add(studentMembership.className);
+    return Array.from(classes).sort();
+  }, [studentMembers, inviteCodes, student, studentMembership]);
 
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -311,7 +320,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const counselingLogs = useMemo(() => rawCounselLogs ? [...rawCounselLogs].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)) : [], [rawCounselLogs]);
   const logs = useMemo(() => rawLogs ? [...rawLogs].sort((a, b) => b.dateKey.localeCompare(a.dateKey)) : [], [rawLogs]);
 
-  const stats = useMemo(() => {
+  const studentStats = useMemo(() => {
     const todayLog = logs.find(l => l.dateKey === todayKey);
     const last7Days = subDays(new Date(), 7);
     const weeklyLogs = logs.filter(l => new Date(l.dateKey) >= startOfDay(last7Days));
@@ -480,6 +489,45 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const fetchStudentDetails = async (studentId: string) => {
+    if (!firestore || !centerId) return;
+    setIsSubmitting(true);
+    try {
+      const sessionRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
+      const sessionSnap = await getDocs(sessionRef);
+      const sessions = sessionSnap.docs.map(d => ({ id: d.id, ...d.data() } as StudySession));
+      
+      const reportRef = collection(firestore, 'centers', centerId, 'dailyReports');
+      const reportSnap = await getDocs(query(reportRef, where('studentId', '==', studentId), where('status', '==', 'sent')));
+      const reports = reportSnap.docs.map(d => ({ id: d.id, ...d.data() } as DailyReport));
+
+      const historyRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
+      const historySnap = await getDocs(query(historyRef, limit(30)));
+      const history = historySnap.docs.map(d => {
+        const data = d.data();
+        return { 
+          ...data, 
+          dateKey: data.dateKey || d.id,
+          totalMinutes: Number(data.totalMinutes || 0)
+        } as StudyLogDay;
+      });
+
+      setSelectedStudentSessions(sessions.sort((a, b) => b.startTime.toMillis() - a.startTime.toMillis()));
+      setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
+      setSelectedStudentHistory(history.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 14));
+
+    } catch (e) {
+      console.error("Student Details Fetch Error:", e);
+      toast({ variant: "destructive", title: "정보 로드 실패", description: "데이터를 불러오는 중 문제가 발생했습니다." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
+  const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
+  const [selectedStudentHistory, setSelectedStudentHistory] = useState<StudyLogDay[]>([]);
+
   if (studentLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
 
   return (
@@ -506,9 +554,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <section className={cn("grid gap-3 sm:gap-4", isMobile ? "grid-cols-2" : "lg:grid-cols-5")}>
-        <StatAnalysisCard title="오늘 공부" value={`${Math.floor(stats.today / 60)}h ${stats.today % 60}m`} subValue="목표 달성 추적" icon={Clock} colorClass="text-emerald-500" isMobile={isMobile} onClick={() => handleFocusChart('today')} isActive={focusedChartView === 'today' && activeTab === 'overview'} />
-        <StatAnalysisCard title="주간 평균" value={`${Math.floor(stats.weeklyAvg / 60)}h ${stats.weeklyAvg % 60}m`} subValue="최근 학습 리듬" icon={TrendingUp} colorClass="text-blue-500" isMobile={isMobile} onClick={() => handleFocusChart('weekly')} isActive={focusedChartView === 'weekly' && activeTab === 'overview'} />
-        <StatAnalysisCard title="월간 평균" value={`${Math.floor(stats.monthlyAvg / 60)}h ${stats.monthlyAvg % 60}m`} subValue="장기 집중 분석" icon={CalendarDays} colorClass="text-amber-500" isMobile={isMobile} onClick={() => handleFocusChart('monthly')} isActive={focusedChartView === 'monthly' && activeTab === 'overview'} />
+        <StatAnalysisCard title="오늘 공부" value={`${Math.floor(studentStats.today / 60)}h ${studentStats.today % 60}m`} subValue="목표 달성 추적" icon={Clock} colorClass="text-emerald-500" isMobile={isMobile} onClick={() => handleFocusChart('today')} isActive={focusedChartView === 'today' && activeTab === 'overview'} />
+        <StatAnalysisCard title="주간 평균" value={`${Math.floor(studentStats.weeklyAvg / 60)}h ${studentStats.weeklyAvg % 60}m`} subValue="최근 학습 리듬" icon={TrendingUp} colorClass="text-blue-500" isMobile={isMobile} onClick={() => handleFocusChart('weekly')} isActive={focusedChartView === 'weekly' && activeTab === 'overview'} />
+        <StatAnalysisCard title="월간 평균" value={`${Math.floor(studentStats.monthlyAvg / 60)}h ${studentStats.monthlyAvg % 60}m`} subValue="장기 집중 분석" icon={CalendarDays} colorClass="text-amber-500" isMobile={isMobile} onClick={() => handleFocusChart('monthly')} isActive={focusedChartView === 'monthly' && activeTab === 'overview'} />
         <StatAnalysisCard title="성장 지표" value="스킬 트랙" subValue="4대 핵심 역량" icon={Zap} colorClass="text-purple-500" isMobile={isMobile} onClick={() => setIsMasteryModalOpen(true)} />
         <StatAnalysisCard title="시즌 랭킹" value={rankEntry?.[0]?.rank ? `${rankEntry[0].rank}위` : '산정 중'} subValue="상대 위치" icon={Trophy} colorClass="text-rose-500" isMobile={isMobile} href="/dashboard/leaderboards" />
       </section>
@@ -532,8 +580,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <PieChart>
                     <Pie 
                       data={[
-                        { name: 'Done', value: stats.today }, 
-                        { name: 'Remaining', value: Math.max(0, stats.todayTarget - stats.today) }
+                        { name: 'Done', value: studentStats.today }, 
+                        { name: 'Remaining', value: Math.max(0, studentStats.todayTarget - studentStats.today) }
                       ]} 
                       innerRadius={50} 
                       outerRadius={70} 
@@ -548,11 +596,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-emerald-600">{stats.todayPercent}%</span>
+                  <span className="text-2xl font-black text-emerald-600">{studentStats.todayPercent}%</span>
                   <span className="text-[8px] font-bold text-muted-foreground uppercase">of target</span>
                 </div>
               </div>
-              <p className="mt-4 font-black text-sm">{Math.floor(stats.today/60)}h {stats.today%60}m 완료</p>
+              <p className="mt-4 font-black text-sm">{Math.floor(studentStats.today/60)}h {studentStats.today%60}m 완료</p>
             </Card>
 
             <Card className={cn(
@@ -562,7 +610,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <CardTitle className="text-sm font-black mb-4 uppercase tracking-widest text-blue-700">최근 7일 학습 리듬</CardTitle>
               <div className="h-40 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.weeklyChartData}>
+                  <BarChart data={studentStats.weeklyChartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                     <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} />
                     <YAxis hide />
@@ -574,7 +622,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <div className="mt-4 flex justify-between items-center px-2">
                 <div className="grid">
                   <span className="text-[8px] font-black text-muted-foreground uppercase">Weekly Avg</span>
-                  <span className="text-sm font-black">{Math.floor(stats.weeklyAvg / 60)}h {stats.weeklyAvg % 60}m</span>
+                  <span className="text-sm font-black">{Math.floor(studentStats.weeklyAvg / 60)}h {studentStats.weeklyAvg % 60}m</span>
                 </div>
                 <div className="h-8 w-px bg-border/50" />
                 <div className="grid text-right">
@@ -591,19 +639,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <CardTitle className="text-sm font-black mb-4 uppercase tracking-widest text-amber-700">30일 누적 성과</CardTitle>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-4xl font-black text-amber-600 tracking-tighter">{Math.floor(stats.monthlyTotal/60)}<span className="text-lg opacity-40 ml-1">시간</span></h3>
+                  <h3 className="text-4xl font-black text-amber-600 tracking-tighter">{Math.floor(studentStats.monthlyTotal/60)}<span className="text-lg opacity-40 ml-1">시간</span></h3>
                   <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase">Total Focus Minutes</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-black uppercase opacity-60">
                     <span>Target Efficiency</span>
-                    <span>{Math.round((stats.monthlyAvg / stats.todayTarget) * 100)}%</span>
+                    <span>{Math.round((studentStats.monthlyAvg / studentStats.todayTarget) * 100)}%</span>
                   </div>
-                  <Progress value={(stats.monthlyAvg / stats.todayTarget) * 100} className="h-2 bg-amber-100" />
+                  <Progress value={(studentStats.monthlyAvg / studentStats.todayTarget) * 100} className="h-2 bg-amber-100" />
                 </div>
                 <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
                   <p className="text-[9px] font-bold text-amber-900/60 leading-relaxed italic">
-                    "최근 30일간 하루 평균 {Math.floor(stats.monthlyAvg/60)}시간 {stats.monthlyAvg%60}분 몰입하며 안정적인 페이스를 유지하고 있습니다."
+                    "최근 30일간 하루 평균 {Math.floor(studentStats.monthlyAvg/60)}시간 {studentStats.monthlyAvg%60}분 몰입하며 안정적인 페이스를 유지하고 있습니다."
                   </p>
                 </div>
               </div>
@@ -621,7 +669,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardHeader>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={studentStats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorH" x1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
@@ -653,7 +701,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="grid grid-cols-7 gap-2 flex-1">
               {weekDays.map((day) => {
                 const isSelected = isSameDay(day, selectedDateForPlan);
-                const isToday = isSameDay(day, new Date());
+                const isTodayBtn = isSameDay(day, new Date());
                 return (
                   <Button 
                     key={day.toISOString()} 
@@ -661,7 +709,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     className={cn(
                       "flex flex-col h-auto py-3.5 rounded-2xl transition-all duration-300 border-2", 
                       isSelected ? "bg-primary border-primary shadow-lg scale-105 z-10" : "bg-white border-transparent hover:border-primary/20",
-                      isToday && !isSelected && "border-emerald-200"
+                      isTodayBtn && !isSelected && "border-emerald-200"
                     )} 
                     onClick={() => setSelectedDateForPlan(day)}
                   >
