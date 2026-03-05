@@ -1,30 +1,38 @@
+'use client';
 
-import { Firestore, doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { Firestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { format, differenceInDays } from 'date-fns';
 
 /**
- * 카카오 알림톡 서비스 (알리고/솔라피 등 외부 API 연동용)
- * 실제 서비스 시에는 발급받은 API Key와 발신번호를 환경변수에 등록하여 사용하세요.
+ * 알리고(Aligo) SMS API 서비스 연동
+ * 
+ * [운영 가이드]
+ * 1. 알리고(https://aligo.in) 가입 및 포인트 충전
+ * 2. API Key, User ID 발급
+ * 3. 발신번호 등록 및 인증
+ * 4. .env.local 파일에 아래 키값을 등록하거나 직접 수정하세요.
  */
 
-const KAKAO_API_KEY = process.env.NEXT_PUBLIC_KAKAO_API_KEY || 'YOUR_API_KEY';
-const SENDER_NUMBER = '01012345678'; // 센터 인증 발신번호
+const ALIGO_API_KEY = process.env.NEXT_PUBLIC_ALIGO_API_KEY || 'YOUR_API_KEY';
+const ALIGO_USER_ID = process.env.NEXT_PUBLIC_ALIGO_USER_ID || 'YOUR_USER_ID';
+const SENDER_NUMBER = process.env.NEXT_PUBLIC_ALIGO_SENDER || '01012345678';
 
 type KakaoMessageType = 'entry' | 'exit' | 'away' | 'report' | 'payment_reminder';
 
 interface SendMessageParams {
   studentName: string;
-  parentPhone?: string;
+  parentPhone?: string; // 학부모 연락처 (01012345678 형식)
   type: KakaoMessageType;
   customData?: any;
 }
 
+/**
+ * 알리고 API를 통해 SMS를 발송하는 핵심 함수
+ */
 export async function sendKakaoNotification(db: Firestore, centerId: string, params: SendMessageParams) {
-  const { studentName, type, customData } = params;
+  const { studentName, type, customData, parentPhone } = params;
   
-  // 1. 부모님 연락처 조회 로직 (실제 운영 시 StudentProfile 이나 User 문서에 저장된 연락처 사용)
-  // 여기서는 시스템 로그에 출력하는 것으로 프로세스를 증명합니다.
-  
+  // 1. 메시지 내용 구성
   let message = '';
   const nowStr = format(new Date(), 'HH:mm');
 
@@ -46,25 +54,51 @@ export async function sendKakaoNotification(db: Firestore, centerId: string, par
       break;
   }
 
-  // --- 실제 API 호출 영역 (예시: Aligo API) ---
-  /*
-  const response = await fetch('https://apis.aligo.in/send/', {
-    method: 'POST',
-    body: new URLSearchParams({
-      key: KAKAO_API_KEY,
-      msg: message,
-      receiver: params.parentPhone || '01000000000',
-      sender: SENDER_NUMBER
-    })
-  });
-  */
-  
-  console.log(`[KAKAO NOTIFICATION] To: ${studentName} Parent | Content: ${message}`);
-  return { success: true, message: '발송 예약 완료' };
+  // 2. 알리고 API 호출용 데이터 구성
+  // 주의: 브라우저 환경에서 직접 호출 시 CORS 정책에 의해 차단될 수 있습니다. 
+  // 실제 상용 환경에서는 Next.js API Route(서버측)를 통해 호출하도록 구성하는 것이 정석입니다.
+  try {
+    const formData = new URLSearchParams();
+    formData.append('key', ALIGO_API_KEY);
+    formData.append('userid', ALIGO_USER_ID);
+    formData.append('sender', SENDER_NUMBER);
+    formData.append('receiver', parentPhone || '01000000000'); // 수신자 번호 (없을 시 테스트 번호)
+    formData.append('msg', message);
+    
+    // 알리고 API 특화 필드
+    formData.append('msg_type', 'SMS'); // 단문 기준
+    formData.append('testbar', 'Y');    // 'Y'인 경우 실제 발송되지 않고 테스트 성공만 반환함. 실제 서비스 시 'N'으로 변경.
+
+    console.log(`[ALIGO SMS LOG]
+------------------------------------
+Recipient: ${studentName} (${parentPhone || 'No Phone'})
+Type: ${type}
+Message: ${message}
+------------------------------------`);
+
+    // 실제 API 연동 시 아래 주석을 해제하세요.
+    /*
+    const response = await fetch('https://apis.aligo.in/send/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
+    });
+    const result = await response.json();
+    console.log('[ALIGO RESPONSE]', result);
+    return result;
+    */
+    
+    return { success: true, message: '알림 전송 요청 완료 (시뮬레이션)' };
+  } catch (error) {
+    console.error('[ALIGO API ERROR]', error);
+    throw error;
+  }
 }
 
 /**
- * 결제 3일 전 학생들 찾아서 일괄 알림 발송
+ * 수납 관리 탭에서 호출: 결제일 3일 전인 미납 항목을 찾아 일괄 알림 발송
  */
 export async function autoCheckPaymentReminders(db: Firestore, centerId: string) {
   const invoicesRef = collection(db, 'centers', centerId, 'invoices');
@@ -76,11 +110,14 @@ export async function autoCheckPaymentReminders(db: Firestore, centerId: string)
 
   for (const d of snap.docs) {
     const data = d.data();
+    if (!data.cycleEndDate) continue;
+    
     const dueDate = data.cycleEndDate.toDate();
     const daysLeft = differenceInDays(dueDate, today);
 
-    // 딱 3일 남았을 때 발송
+    // 딱 3일 남았을 때 발송 로직
     if (daysLeft === 3) {
+      // 실제 학생/부모의 연락처 정보를 Firestore에서 조회하여 parentPhone에 넣어줄 수 있습니다.
       await sendKakaoNotification(db, centerId, {
         studentName: data.studentName,
         type: 'payment_reminder',
