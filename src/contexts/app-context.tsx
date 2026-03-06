@@ -106,6 +106,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore]);
 
+  // 실시간 타이머 세션 동기화 (학생인 경우에만)
+  useEffect(() => {
+    if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
+      setIsTimerActive(false);
+      setStartTime(null);
+      return;
+    }
+
+    const centerId = activeMembership.id;
+    const q = query(
+      collection(firestore, 'centers', centerId, 'attendanceCurrent'),
+      where('studentId', '==', user.uid)
+    );
+
+    // 실시간 좌석 상태를 감시하여 타이머 동기화
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setIsTimerActive(false);
+        setStartTime(null);
+        return;
+      }
+
+      const seat = snapshot.docs[0].data();
+      if (seat?.status === 'studying' && seat.lastCheckInAt) {
+        setIsTimerActive(true);
+        setStartTime(seat.lastCheckInAt.toMillis());
+      } else {
+        setIsTimerActive(false);
+        setStartTime(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, firestore, activeMembership]);
+
   // 실시간 티어 동기화 (학생인 경우에만)
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
