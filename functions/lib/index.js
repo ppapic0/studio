@@ -1,7 +1,7 @@
 
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.redeemInviteCode = exports.deleteStudentAccount = exports.updateStudentAccount = exports.registerStudent = void 0;
+exports.redeemInviteCode = exports.updateStudentAccount = exports.registerStudent = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -11,16 +11,20 @@ const region = "asia-northeast3";
 
 async function deleteRecursive(ref) {
     if (ref instanceof admin.firestore.DocumentReference) {
+        console.log(`[DeleteRecursive] Processing Document: ${ref.path}`);
         const subcollections = await ref.listCollections();
         for (const sub of subcollections) {
             await deleteRecursive(sub);
         }
         await ref.delete();
+        console.log(`[DeleteRecursive] Deleted Document: ${ref.path}`);
     }
     else {
+        console.log(`[DeleteRecursive] Processing Collection: ${ref.path}`);
         const snapshot = await ref.get();
         const tasks = snapshot.docs.map(doc => deleteRecursive(doc.ref));
         await Promise.all(tasks);
+        console.log(`[DeleteRecursive] Processed all docs in Collection: ${ref.path}`);
     }
 }
 
@@ -34,10 +38,14 @@ exports.deleteStudentAccount = functions.region(region).runWith({
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     const { studentId, centerId } = data;
     try {
+        console.log(`[DeleteProcess] Starting deletion for student: ${studentId}`);
         try {
             await auth.deleteUser(studentId);
+            console.log(`[DeleteProcess] Auth account deleted: ${studentId}`);
         }
-        catch (e) { }
+        catch (e) {
+            console.warn(`[DeleteProcess] Auth account already gone or error: ${e.message}`);
+        }
         const docPaths = [
             `users/${studentId}`,
             `userCenters/${studentId}`,
@@ -57,6 +65,7 @@ exports.deleteStudentAccount = functions.region(region).runWith({
                 try {
                     const docRef = db.doc(path);
                     await deleteRecursive(docRef);
+                    console.log(`[DeleteProcess] Recursively deleted: ${path}`);
                 }
                 catch (e) { }
             }),
@@ -65,13 +74,18 @@ exports.deleteStudentAccount = functions.region(region).runWith({
                     const q = await db.collection(colPath).where('studentId', '==', studentId).get();
                     const tasks = q.docs.map(doc => deleteRecursive(doc.ref));
                     await Promise.all(tasks);
+                    console.log(`[DeleteProcess] Filter-deleted from: ${colPath}`);
                 }
                 catch (e) { }
             })
         ]);
+        console.log(`[DeleteProcess] Finalized deletion for student: ${studentId}`);
         return { ok: true, message: "수동 재귀 삭제 완료" };
     }
-    catch (e) { throw new functions.https.HttpsError("internal", e.message); }
+    catch (e) {
+        console.error("[DeleteStudent Main Error]", e);
+        throw new functions.https.HttpsError("internal", e.message);
+    }
 });
 
 exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
@@ -104,24 +118,34 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
     try {
         const authUpdates = {};
-        if (password) authUpdates.password = password;
-        if (displayName) authUpdates.displayName = displayName;
-        if (Object.keys(authUpdates).length > 0) await auth.updateUser(studentId, authUpdates);
+        if (password)
+            authUpdates.password = password;
+        if (displayName)
+            authUpdates.displayName = displayName;
+        if (Object.keys(authUpdates).length > 0)
+            await auth.updateUser(studentId, authUpdates);
         const timestamp = admin.firestore.Timestamp.now();
         const batch = db.batch();
         if (displayName || schoolName) {
             const uUp = { updatedAt: timestamp };
-            if (displayName) uUp.displayName = displayName;
-            if (schoolName) uUp.schoolName = schoolName;
+            if (displayName)
+                uUp.displayName = displayName;
+            if (schoolName)
+                uUp.schoolName = schoolName;
             batch.set(db.doc(`users/${studentId}`), uUp, { merge: true });
         }
         const sUp = { updatedAt: timestamp };
-        if (displayName) sUp.name = displayName;
-        if (schoolName) sUp.schoolName = schoolName;
-        if (grade) sUp.grade = grade;
-        if (parentLinkCode !== undefined) sUp.parentLinkCode = parentLinkCode;
+        if (displayName)
+            sUp.name = displayName;
+        if (schoolName)
+            sUp.schoolName = schoolName;
+        if (grade)
+            sUp.grade = grade;
+        if (parentLinkCode !== undefined)
+            sUp.parentLinkCode = parentLinkCode;
         batch.set(db.doc(`centers/${centerId}/students/${studentId}`), sUp, { merge: true });
-        if (displayName) batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
+        if (displayName)
+            batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
         await batch.commit();
         return { ok: true };
     }
@@ -130,18 +154,20 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
 
 exports.redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
-    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+    if (!context.auth)
+        throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     const { code } = data;
     const uid = context.auth.uid;
     try {
         return await db.runTransaction(async (t) => {
             const snap = await t.get(db.doc(`inviteCodes/${code}`));
-            if (!snap.exists) throw new Error("Invalid code");
+            if (!snap.exists)
+                throw new Error("Invalid code");
             const inv = snap.data();
             const ts = admin.firestore.Timestamp.now();
             t.set(db.doc(`userCenters/${uid}/centers/${inv.centerId}`), { id: inv.centerId, role: inv.intendedRole, status: 'active', joinedAt: ts });
             t.set(db.doc(`centers/${inv.centerId}/members/${uid}`), { id: uid, role: inv.intendedRole, status: 'active', joinedAt: ts, displayName: context.auth.token.name });
-            t.update(db.doc(`inviteCodes/${code}`), { usedCount: admin.FieldValue.increment(1), updatedAt: ts });
+            t.update(db.doc(`inviteCodes/${code}`), { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
             return { ok: true };
         });
     }

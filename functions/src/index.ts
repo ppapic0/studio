@@ -17,6 +17,7 @@ async function deleteRecursive(ref: admin.firestore.DocumentReference | admin.fi
   const db = admin.firestore();
   
   if (ref instanceof admin.firestore.DocumentReference) {
+    console.log(`[DeleteRecursive] Processing Document: ${ref.path}`);
     // 1. 하위 컬렉션 목록 가져오기 (listCollections는 Admin SDK 전용)
     const subcollections = await ref.listCollections();
     for (const sub of subcollections) {
@@ -24,11 +25,14 @@ async function deleteRecursive(ref: admin.firestore.DocumentReference | admin.fi
     }
     // 2. 본인 문서 삭제
     await ref.delete();
+    console.log(`[DeleteRecursive] Deleted Document: ${ref.path}`);
   } else {
+    console.log(`[DeleteRecursive] Processing Collection: ${ref.path}`);
     // 컬렉션인 경우 내부 모든 문서를 가져와서 재귀 삭제
     const snapshot = await ref.get();
     const tasks = snapshot.docs.map(doc => deleteRecursive(doc.ref));
     await Promise.all(tasks);
+    console.log(`[DeleteRecursive] Processed all docs in Collection: ${ref.path}`);
   }
 }
 
@@ -57,8 +61,9 @@ export const deleteStudentAccount = functions.region(region).runWith({
     // 1. Firebase Auth 계정 삭제 (실패해도 무시)
     try {
       await auth.deleteUser(studentId);
+      console.log(`[DeleteProcess] Auth account deleted: ${studentId}`);
     } catch (authError: any) {
-      console.warn(`[DeleteProcess] Auth account already gone or error: ${authError.message}`);
+      console.warn(`[DeleteProcess] Auth account error (might be already deleted): ${authError.message}`);
     }
 
     // 2. 삭제할 주요 문서 경로 (직접 참조 가능)
@@ -86,8 +91,10 @@ export const deleteStudentAccount = functions.region(region).runWith({
         try {
           const docRef = db.doc(path);
           await deleteRecursive(docRef);
-          console.log(`[DeleteProcess] Recursively deleted: ${path}`);
-        } catch (e) {}
+          console.log(`[DeleteProcess] Successfully deleted: ${path}`);
+        } catch (e: any) {
+          console.error(`[DeleteProcess] Error deleting path ${path}: ${e.message}`);
+        }
       }),
       // 필터링 삭제 (해당 학생의 기록만 골라내서 삭제)
       ...collectionsToFilter.map(async (colPath) => {
@@ -96,10 +103,13 @@ export const deleteStudentAccount = functions.region(region).runWith({
           const tasks = q.docs.map(doc => deleteRecursive(doc.ref));
           await Promise.all(tasks);
           console.log(`[DeleteProcess] Filter-deleted from: ${colPath}`);
-        } catch (e) {}
+        } catch (e: any) {
+          console.error(`[DeleteProcess] Error in filter-delete ${colPath}: ${e.message}`);
+        }
       })
     ]);
 
+    console.log(`[DeleteProcess] Finalized deletion for student: ${studentId}`);
     return { ok: true, message: "모든 하위 데이터가 수동 재귀 로직에 의해 완전 삭제되었습니다." };
 
   } catch (error: any) {
@@ -108,9 +118,6 @@ export const deleteStudentAccount = functions.region(region).runWith({
   }
 });
 
-/**
- * 초대 코드 사용 및 학생 등록 등 기존 함수들 유지...
- */
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
