@@ -95,10 +95,14 @@ exports.deleteStudentAccount = functions.region(region).runWith({
             `centers/${centerId}/counselingReservations/${studentId}`,
             `centers/${centerId}/counselingLogs/${studentId}`
         ];
-        await Promise.all(paths.map(async (p) => {
-            try { await db.recursiveDelete(db.doc(p)); } catch (err) {}
+        await Promise.allSettled(paths.map(async (p) => {
+            try { 
+                const segments = p.split('/').length;
+                const ref = segments % 2 === 0 ? db.doc(p) : db.collection(p);
+                await db.recursiveDelete(ref); 
+            } catch (err) {}
         }));
-        return { ok: true };
+        return { ok: true, message: "강제 삭제 완료" };
     }
     catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });

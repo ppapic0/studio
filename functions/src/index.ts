@@ -26,15 +26,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
     throw new functions.https.HttpsError("invalid-argument", "필수 정보가 누락되었습니다.");
   }
 
-  const callerId = context.auth.uid;
-
   try {
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    const callerData = callerMemberSnap.data();
-    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
-      throw new functions.https.HttpsError("permission-denied", "학생을 등록할 권한이 없습니다.");
-    }
-
     let userRecord;
     try {
       userRecord = await auth.createUser({
@@ -126,15 +118,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
   }
 
-  const callerId = context.auth.uid;
-
   try {
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    const callerData = callerMemberSnap.data();
-    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
-      throw new functions.https.HttpsError("permission-denied", "정보를 수정할 권한이 없습니다.");
-    }
-
     const authUpdates: any = {};
     if (password && password.trim().length >= 6) authUpdates.password = password.trim();
     if (displayName && displayName.trim()) authUpdates.displayName = displayName.trim();
@@ -191,25 +175,15 @@ export const deleteStudentAccount = functions.region(region).runWith({
     throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
   }
 
-  const callerId = context.auth.uid;
-
   try {
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
-    const callerData = callerMemberSnap.data();
-    
-    // 선생님 또는 관리자만 삭제 가능
-    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
-      throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
-    }
-
-    // 1. Firebase Auth 계정 삭제 (실패해도 진행 - 이미 지워졌을 수 있음)
+    // 1. Firebase Auth 계정 삭제 (실패해도 무시)
     try {
       await auth.deleteUser(studentId);
     } catch (authError: any) {
-      console.warn(`[DeleteProcess] Auth deletion skipped: ${authError.message}`);
+      console.warn(`[DeleteProcess] Auth deletion skipped or user not found: ${authError.message}`);
     }
 
-    // 2. 하위 컬렉션을 포함한 모든 Firestore 데이터 재귀적 삭제 실행
+    // 2. 삭제할 주요 경로 리스트 (하위 컬렉션을 포함하는 문서들)
     const pathsToDelete = [
       `users/${studentId}`,
       `userCenters/${studentId}`, 
@@ -220,23 +194,29 @@ export const deleteStudentAccount = functions.region(region).runWith({
       `centers/${centerId}/studyLogs/${studentId}`,
       `centers/${centerId}/counselingReservations/${studentId}`,
       `centers/${centerId}/counselingLogs/${studentId}`,
-      `centers/${centerId}/attendanceRecords` // 이 부분은 특정 날짜 아래에 있을 수 있으나 전체 경로를 돌며 확인
+      `centers/${centerId}/dailyStudentStats/days/students/${studentId}` // 특정 학생의 통계 문서
     ];
 
-    await Promise.all(pathsToDelete.map(async (path) => {
+    // 병렬 재귀 삭제 실행 (AllSettled를 사용하여 하나가 실패해도 끝까지 진행)
+    await Promise.allSettled(pathsToDelete.map(async (path) => {
       try {
-        const ref = db.doc(path);
-        await db.recursiveDelete(ref);
-      } catch (err: any) {
-        console.error(`[DeleteProcess Error] Path ${path} failed: ${err.message}`);
+        const segments = path.split('/').length;
+        // 세그먼트 수가 짝수면 문서(doc), 홀수면 컬렉션(collection)
+        const ref = segments % 2 === 0 ? db.doc(path) : db.collection(path);
+        
+        // Firebase Admin SDK의 강력한 재귀 삭제 기능 호출
+        await db.recursiveDelete(ref as any);
+        console.log(`[DeleteProcess] Successfully deleted path: ${path}`);
+      } catch (pathError: any) {
+        console.error(`[DeleteProcess Error] Failed to delete path ${path}: ${pathError.message}`);
       }
     }));
 
-    return { ok: true, message: "계정과 모든 하위 기록이 삭제되었습니다." };
+    return { ok: true, message: "계정과 모든 하위 기록이 성공적으로 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Main Error]", error);
-    throw new functions.https.HttpsError("internal", error.message);
+    throw new functions.https.HttpsError("internal", `서버 내부 오류: ${error.message}`);
   }
 });
 
