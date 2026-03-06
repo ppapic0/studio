@@ -21,6 +21,7 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
         await db.runTransaction(async (t) => {
             t.set(db.doc(`users/${uid}`), { id: uid, email, displayName, schoolName, createdAt: timestamp, updatedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: 'student', status: 'active', joinedAt: timestamp, displayName });
+            t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: 'student', status: 'active', joinedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), { seasonLp: 0, stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 }, updatedAt: timestamp });
         });
@@ -83,18 +84,20 @@ exports.deleteStudentAccount = functions.region(region).runWith({
             await auth.deleteUser(studentId);
         }
         catch (e) { }
-        const refs = [
-            db.doc(`users/${studentId}`),
-            db.doc(`userCenters/${studentId}`),
-            db.doc(`centers/${centerId}/members/${studentId}`),
-            db.doc(`centers/${centerId}/students/${studentId}`),
-            db.doc(`centers/${centerId}/growthProgress/${studentId}`),
-            db.doc(`centers/${centerId}/plans/${studentId}`),
-            db.doc(`centers/${centerId}/studyLogs/${studentId}`),
+        const paths = [
+            `users/${studentId}`,
+            `userCenters/${studentId}`,
+            `centers/${centerId}/members/${studentId}`,
+            `centers/${centerId}/students/${studentId}`,
+            `centers/${centerId}/growthProgress/${studentId}`,
+            `centers/${centerId}/plans/${studentId}`,
+            `centers/${centerId}/studyLogs/${studentId}`,
+            `centers/${centerId}/counselingReservations/${studentId}`,
+            `centers/${centerId}/counselingLogs/${studentId}`
         ];
-        for (const ref of refs) {
-            await db.recursiveDelete(ref);
-        }
+        await Promise.all(paths.map(async (p) => {
+            try { await db.recursiveDelete(db.doc(p)); } catch (err) {}
+        }));
         return { ok: true };
     }
     catch (e) { throw new functions.https.HttpsError("internal", e.message); }

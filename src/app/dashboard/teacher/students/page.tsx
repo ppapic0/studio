@@ -187,7 +187,8 @@ export default function StudentListPage() {
     
     setIsDeleting(studentId);
     try {
-      const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
+      // 대량 데이터 삭제를 위해 클라이언트 측 제한 시간을 10분으로 연장
+      const deleteFn = httpsCallable(functions, 'deleteStudentAccount', { timeout: 600000 });
       const result: any = await deleteFn({ studentId, centerId });
       
       if (result.data?.ok) {
@@ -197,10 +198,16 @@ export default function StudentListPage() {
       }
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
+      let errorMsg = "계정 삭제 중 오류가 발생했습니다.";
+      if (e.code === 'deadline-exceeded') {
+        errorMsg = "서버 처리 시간이 너무 오래 걸립니다. 하지만 삭제 작업은 백그라운드에서 계속 진행될 수 있습니다. 잠시 후 확인해 보세요.";
+      } else if (e.message) {
+        errorMsg = e.message;
+      }
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message === "internal" ? "서버 내부 오류가 발생했습니다. (데이터가 너무 많아 타임아웃이 발생했을 수 있습니다. 다시 시도해 주세요.)" : e.message 
+        description: errorMsg
       });
     } finally {
       setIsDeleting(null);

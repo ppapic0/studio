@@ -174,6 +174,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
 /**
  * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive 모사)
+ * 넉넉한 타임아웃과 메모리 설정을 통해 대량 데이터 삭제 보장
  */
 export const deleteStudentAccount = functions.region(region).runWith({
   timeoutSeconds: 540, // 최대 9분
@@ -202,37 +203,43 @@ export const deleteStudentAccount = functions.region(region).runWith({
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    // 1. Firebase Auth 계정 삭제 (실패해도 진행)
+    // 1. Firebase Auth 계정 삭제 (실패해도 진행 - 이미 지워졌을 수 있음)
     try {
       await auth.deleteUser(studentId);
     } catch (authError: any) {
-      console.warn(`[DeleteProcess] Auth deletion skipped: ${authError.message}`);
+      console.warn(`[DeleteProcess] Auth deletion skipped or already deleted: ${authError.message}`);
     }
 
-    // 2. 하위 컬렉션을 포함한 모든 Firestore 데이터 재귀적 삭제
-    const refsToDelete = [
-      db.doc(`users/${studentId}`),
-      db.doc(`userCenters/${studentId}`), // 유저 센터 연결 정보 전체
-      db.doc(`centers/${centerId}/members/${studentId}`),
-      db.doc(`centers/${centerId}/students/${studentId}`),
-      db.doc(`centers/${centerId}/growthProgress/${studentId}`),
-      db.doc(`centers/${centerId}/plans/${studentId}`),
-      db.doc(`centers/${centerId}/studyLogs/${studentId}`),
+    // 2. 하위 컬렉션을 포함한 모든 Firestore 데이터 재귀적 삭제 실행
+    // 데이터가 많으므로 병렬로 처리하여 속도 향상
+    const pathsToDelete = [
+      `users/${studentId}`,
+      `userCenters/${studentId}`, 
+      `centers/${centerId}/members/${studentId}`,
+      `centers/${centerId}/students/${studentId}`,
+      `centers/${centerId}/growthProgress/${studentId}`,
+      `centers/${centerId}/plans/${studentId}`,
+      `centers/${centerId}/studyLogs/${studentId}`,
+      `centers/${centerId}/counselingReservations/${studentId}`,
+      `centers/${centerId}/counselingLogs/${studentId}`
     ];
 
-    for (const ref of refsToDelete) {
+    // 병렬로 recursiveDelete 실행
+    await Promise.all(pathsToDelete.map(async (path) => {
       try {
+        const ref = db.doc(path);
         await db.recursiveDelete(ref);
-      } catch (e: any) {
-        console.error(`[DeleteProcess Error] Failed at ${ref.path}: ${e.message}`);
+      } catch (err: any) {
+        // 특정 경로 삭제 실패 시 로깅만 하고 계속 진행
+        console.error(`[DeleteProcess Error] Path ${path} failed: ${err.message}`);
       }
-    }
+    }));
 
     return { ok: true, message: "계정과 모든 하위 기록이 성공적으로 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Main Error]", error);
-    throw new functions.https.HttpsError("internal", `서버 오류: ${error.message}`);
+    throw new functions.https.HttpsError("internal", `서버 처리 중 치명적 오류: ${error.message}`);
   }
 });
 

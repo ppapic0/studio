@@ -146,7 +146,6 @@ export default function StudentAccountManagementPage() {
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount');
       
-      // 값이 있는 필드만 객체로 구성하여 전달
       const payload: any = {
         studentId: selectedStudentForEdit.id,
         centerId,
@@ -185,7 +184,8 @@ export default function StudentAccountManagementPage() {
     
     setIsDeleting(studentId);
     try {
-      const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
+      // 대량 데이터 삭제를 위해 클라이언트 측 제한 시간을 10분으로 연장
+      const deleteFn = httpsCallable(functions, 'deleteStudentAccount', { timeout: 600000 });
       const result: any = await deleteFn({ studentId, centerId });
       
       if (result.data?.ok) {
@@ -195,10 +195,16 @@ export default function StudentAccountManagementPage() {
       }
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
+      let errorMsg = "계정 삭제 중 오류가 발생했습니다.";
+      if (e.code === 'deadline-exceeded') {
+        errorMsg = "서버 처리 시간이 너무 오래 걸립니다. 하지만 삭제 작업은 백그라운드에서 계속 진행될 수 있습니다. 잠시 후 확인해 보세요.";
+      } else if (e.message) {
+        errorMsg = e.message;
+      }
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
+        description: errorMsg
       });
     } finally {
       setIsDeleting(null);
