@@ -55,7 +55,7 @@ import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
@@ -363,47 +363,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
   const periodKey = today ? format(today, 'yyyy-MM') : '';
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isTimerActive && startTime) {
-      const updateSeconds = () => {
-        const diff = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-        setLocalSeconds(diff);
-      };
-      updateSeconds();
-      interval = setInterval(updateSeconds, 1000);
-    } else { 
-      setLocalSeconds(0); 
-    }
-    return () => clearInterval(interval);
-  }, [isTimerActive, startTime]);
-
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
-
-  const stats = useMemo(() => {
-    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-    return {
-      focus: Math.min(100, raw.focus),
-      consistency: Math.min(100, raw.consistency),
-      achievement: Math.min(100, raw.achievement),
-      resilience: Math.min(100, raw.resilience),
-    };
-  }, [progress?.stats]);
-
-  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
-  const penaltyPoints = progress?.penaltyPoints || 0;
-  const penaltyRate = useMemo(() => {
-    if (penaltyPoints >= 30) return 0.15; 
-    if (penaltyPoints >= 20) return 0.10; 
-    if (penaltyPoints >= 10) return 0.06; 
-    if (penaltyPoints >= 5) return 0.03;  
-    return 0; 
-  }, [penaltyPoints]);
-  const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -416,74 +380,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'), where('dateKey', '==', todayKey));
   }, [firestore, activeMembership, user, weekKey, todayKey]);
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
-  
-  const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
-  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
-  const myRequestsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
-      where('studentId', '==', user.uid)
-    );
-  }, [firestore, activeMembership, user]);
-  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
-
-  const myRequests = useMemo(() => {
-    if (!rawRequests) return [];
-    return [...rawRequests]
-      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-      .slice(0, 5);
-  }, [rawRequests]);
-
-  const handleRequestSubmit = async () => {
-    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
-    if (requestReason.trim().length < 10) {
-      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
-      return;
-    }
-
-    setIsRequestSubmitting(true);
-    try {
-      const batch = writeBatch(firestore);
-      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
-      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
-      
-      const requestData: any = {
-        studentId: user.uid,
-        studentName: user.displayName || '학생',
-        centerId: activeMembership.id,
-        type: requestType,
-        date: requestDate,
-        reason: requestReason.trim(),
-        status: 'requested',
-        penaltyApplied: isTodayRequest,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
-
-      if (isTodayRequest) {
-        const pointsToAdd = requestType === 'late' ? 3 : 5;
-        batch.update(progressRef!, {
-          penaltyPoints: increment(pointsToAdd),
-          updatedAt: serverTimestamp()
-        });
-        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
-      }
-
-      await batch.commit();
-      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
-      setRequestReason('');
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "제출 실패", description: e.message });
-    } finally {
-      setIsRequestSubmitting(false);
-    }
-  };
-
-  const handleStudyStartStop = async () => {
+  const handleStudyStartStop = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
     
     setIsProcessingAction(true);
@@ -504,6 +402,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         let finalNewLp = progress?.seasonLp || 0;
         
         if (sessionSeconds > 0) {
+          const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+          const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+          const penaltyPoints = progress?.penaltyPoints || 0;
+          const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
+          const finalMultiplier = totalBoost * (1 - penaltyRate);
+
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
           updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
@@ -570,7 +474,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         toast({ title: "트랙 종료됨" });
       } else {
         const nowTs = Date.now();
-        
         const batch = writeBatch(firestore);
 
         if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
@@ -606,6 +509,120 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
     } finally {
       setIsProcessingAction(false);
+    }
+  }, [firestore, user, activeMembership, progressRef, isTimerActive, startTime, progress, todayStudyLog, todayKey, periodKey, setIsTimerActive, setStartTime, toast]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerActive && startTime) {
+      const updateSeconds = () => {
+        const diff = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+        
+        // 4시간 (14400초) 초과 시 자동 종료
+        if (diff >= 14400) {
+          handleStudyStartStop();
+          toast({ 
+            variant: "destructive", 
+            title: "학습 세션 자동 종료", 
+            description: "집중 보호를 위해 4시간이 경과하여 세션이 자동으로 종료되었습니다." 
+          });
+          return;
+        }
+        
+        setLocalSeconds(diff);
+      };
+      updateSeconds();
+      interval = setInterval(updateSeconds, 1000);
+    } else { 
+      setLocalSeconds(0); 
+    }
+    return () => clearInterval(interval);
+  }, [isTimerActive, startTime, handleStudyStartStop, toast]);
+
+  const stats = useMemo(() => {
+    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+    return {
+      focus: Math.min(100, raw.focus),
+      consistency: Math.min(100, raw.consistency),
+      achievement: Math.min(100, raw.achievement),
+      resilience: Math.min(100, raw.resilience),
+    };
+  }, [progress?.stats]);
+
+  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+  const penaltyPoints = progress?.penaltyPoints || 0;
+  const penaltyRate = useMemo(() => {
+    if (penaltyPoints >= 30) return 0.15; 
+    if (penaltyPoints >= 20) return 0.10; 
+    if (penaltyPoints >= 10) return 0.06; 
+    if (penaltyPoints >= 5) return 0.03;  
+    return 0; 
+  }, [penaltyPoints]);
+  const finalMultiplier = totalBoost * (1 - penaltyRate);
+
+  const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
+  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
+
+  const myRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+
+  const myRequests = useMemo(() => {
+    if (!rawRequests) return [];
+    return [...rawRequests]
+      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [rawRequests]);
+
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
+    if (requestReason.trim().length < 10) {
+      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
+      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
+      
+      const requestData: any = {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: requestReason.trim(),
+        status: 'requested',
+        penaltyApplied: isTodayRequest,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
+
+      if (isTodayRequest) {
+        const pointsToAdd = requestType === 'late' ? 3 : 5;
+        batch.update(progressRef!, {
+          penaltyPoints: increment(pointsToAdd),
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
+      }
+
+      await batch.commit();
+      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      setRequestReason('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+    } finally {
+      setIsRequestSubmitting(false);
     }
   };
 
@@ -667,7 +684,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // QR 데이터 생성 (보안을 위해 간단한 프리픽스 추가)
   const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
   return (
