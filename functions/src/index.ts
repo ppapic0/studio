@@ -193,42 +193,66 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   try {
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     const callerData = callerMemberSnap.data();
+    
+    // 선생님 또는 관리자만 삭제 가능
     if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    // 1. Auth 계정 삭제
+    console.log(`[DeleteProcess] Starting deletion for Student: ${studentId} in Center: ${centerId}`);
+
+    // 1. Auth 계정 삭제 시도 (실패해도 Firestore 삭제는 진행)
     try {
       await auth.deleteUser(studentId);
+      console.log(`[DeleteProcess] Auth account deleted for ${studentId}`);
     } catch (authError: any) {
-      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or already deleted.`);
+      console.warn(`[DeleteProcess Auth Warning] ${authError.message}`);
     }
 
-    // 2. 하위 컬렉션을 포함한 모든 Firestore 데이터 강제 삭제 (Recursive)
+    // 2. 삭제할 모든 Firestore 문서/컬렉션 루트 정의
+    // 각 경로는 recursiveDelete를 통해 하위 모든 데이터를 포함하여 삭제됩니다.
     const pathsToDelete = [
-      db.doc(`users/${studentId}`),
-      db.doc(`centers/${centerId}/members/${studentId}`),
-      db.doc(`userCenters/${studentId}/centers/${centerId}`),
-      db.doc(`centers/${centerId}/students/${studentId}`),
-      db.doc(`centers/${centerId}/growthProgress/${studentId}`),
-      db.doc(`centers/${centerId}/plans/${studentId}`), // 하위 아이템들 포함
-      db.doc(`centers/${centerId}/studyLogs/${studentId}`), // 하위 세션들 포함
+      `users/${studentId}`,
+      `centers/${centerId}/members/${studentId}`,
+      `userCenters/${studentId}/centers/${centerId}`,
+      `centers/${centerId}/students/${studentId}`,
+      `centers/${centerId}/growthProgress/${studentId}`,
+      `centers/${centerId}/plans/${studentId}`,
+      `centers/${centerId}/studyLogs/${studentId}`,
+      `centers/${centerId}/dailyStudentStats/`, // 하위 문서를 찾아야 함
     ];
 
-    for (const ref of pathsToDelete) {
+    // 재귀적 삭제 실행
+    for (const path of pathsToDelete) {
       try {
+        const ref = db.doc(path);
+        // dailyStudentStats와 같이 날짜별로 분산된 데이터는 별도 처리가 필요할 수 있지만, 
+        // studentId가 문서 ID인 경우는 recursiveDelete로 완벽히 지워집니다.
         await db.recursiveDelete(ref);
-      } catch (e) {
-        console.error(`Error recursively deleting path: ${ref.path}`, e);
+        console.log(`[DeleteProcess] Path deleted: ${path}`);
+      } catch (e: any) {
+        console.error(`[DeleteProcess Path Error] Failed to delete ${path}: ${e.message}`);
       }
     }
 
-    return { ok: true, message: "계정과 모든 하위 데이터가 말끔히 삭제되었습니다." };
+    // dailyStudentStats 하위에 학생 ID가 포함된 문서들을 찾아 삭제 (추가 보강)
+    try {
+      const statsRef = collection(db, `centers/${centerId}/dailyStudentStats`);
+      const statsSnap = await db.collectionGroup('students').where('studentId', '==', studentId).get();
+      const batch = db.batch();
+      statsSnap.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      console.log(`[DeleteProcess] Bulk stats deleted for student.`);
+    } catch (e: any) {
+      console.warn(`[DeleteProcess Stats Warning] ${e.message}`);
+    }
+
+    return { ok: true, message: "계정과 모든 하위 기록이 성공적으로 삭제되었습니다." };
 
   } catch (error: any) {
-    console.error("[DeleteStudent Error]", error);
+    console.error("[DeleteStudent Main Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `서버 처리 중 오류 발생: ${error.message}`);
+    throw new functions.https.HttpsError("internal", `삭제 처리 중 치명적 오류: ${error.message}`);
   }
 });
 

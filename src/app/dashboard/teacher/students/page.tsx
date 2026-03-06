@@ -196,6 +196,7 @@ export default function StudentListPage() {
     setIsDeleting(studentId);
     try {
       const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
+      // 타임아웃을 방지하기 위해 서버 측에서 비동기로 처리되지만 응답을 기다림
       const result: any = await deleteFn({ studentId, centerId });
       
       if (result.data?.ok) {
@@ -208,7 +209,7 @@ export default function StudentListPage() {
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
+        description: e.message || "서버 응답 오류가 발생했습니다. 잠시 후 다시 시도하세요." 
       });
     } finally {
       setIsDeleting(null);
@@ -426,7 +427,7 @@ export default function StudentListPage() {
                               className="w-full h-11 rounded-xl font-black text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 gap-2 transition-all"
                             >
                               {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                              계정 데이터 영구 삭제
+                              계정 및 하위 데이터 영구 삭제
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
@@ -434,9 +435,11 @@ export default function StudentListPage() {
                               <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4">
                                 <AlertTriangle className="h-10 w-10 text-rose-600" />
                               </div>
-                              <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">정말 삭제하시겠습니까?</AlertDialogTitle>
-                              <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
-                                <span className="text-rose-600">[{member.displayName}]</span> 학생의 계정과 모든 학습 리포트, 상담 일지, <span className="font-black">하위 기록 데이터</span>가 영구 삭제됩니다. 이 작업은 취소할 수 없습니다.
+                              <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">CLI 강제 삭제 실행</AlertDialogTitle>
+                              <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed text-sm">
+                                <span className="text-rose-600 font-black">[{member.displayName}]</span> 학생의 계정과 <span className="font-black text-primary">학습 로그, 계획, 리포트 등 모든 하위 컬렉션</span>을 재귀적으로 강제 삭제합니다.
+                                <br/><br/>
+                                이 작업은 복구가 불가능하며, 대량의 데이터가 즉시 제거됩니다.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter className="mt-8 flex flex-col gap-2">
@@ -444,7 +447,7 @@ export default function StudentListPage() {
                                 onClick={() => handleDeleteAccount(member.id, member.displayName || '학생')}
                                 className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
                               >
-                                {isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '영구 삭제 승인'}
+                                {isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '강제 삭제 승인'}
                               </AlertDialogAction>
                               <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
                             </AlertDialogFooter>
