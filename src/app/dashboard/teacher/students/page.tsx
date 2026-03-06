@@ -20,8 +20,6 @@ import {
   Loader2, 
   Armchair, 
   Building2, 
-  Mail, 
-  Lock,
   UserCheck,
   UserMinus,
   PauseCircle,
@@ -438,7 +436,7 @@ export default function StudentListPage() {
                               </div>
                               <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">정말 삭제하시겠습니까?</AlertDialogTitle>
                               <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
-                                <span className="text-rose-600">[{member.displayName}]</span> 학생의 계정과 모든 학습 리포트, 상담 일지가 영구 삭제됩니다. 이 작업은 취소할 수 없습니다.
+                                <span className="text-rose-600">[{member.displayName}]</span> 학생의 계정과 모든 학습 리포트, 상담 일지, <span className="font-black">하위 기록 데이터</span>가 영구 삭제됩니다. 이 작업은 취소할 수 없습니다.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter className="mt-8 flex flex-col gap-2">

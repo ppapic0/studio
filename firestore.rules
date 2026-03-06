@@ -6,12 +6,12 @@ service cloud.firestore {
       // 특정 코드 하나를 가져오는 것(get)은 모두에게 허용
       allow get: if true;
       // 목록을 보거나(list) 생성/수정하는 것은 로그인한 사용자만 가능
-      allow list, write: if request.auth != null;
+      allow list, write, delete: if request.auth != null;
     }
 
-    // 그 외 모든 문서에 대해 로그인한 사용자라면 읽고 쓰기를 허용합니다.
+    // 그 외 모든 문서에 대해 누구나 읽고 쓰고 지울 수 있도록 허용합니다. (개발 단계 임시 개방)
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write, delete: if true;
     }
   }
 }

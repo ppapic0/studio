@@ -2,7 +2,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
-// Firebase Admin SDK 초기화 (최상단에서 한 번만 수행)
+// Firebase Admin SDK 초기화
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
@@ -111,7 +111,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
 });
 
 /**
- * 학생의 계정 정보(비밀번호 등)를 업데이트하는 함수
+ * 학생의 계정 정보 업데이트
  */
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
@@ -140,34 +140,26 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (displayName && displayName.trim()) authUpdates.displayName = displayName.trim();
     
     if (Object.keys(authUpdates).length > 0) {
-      try {
-        await auth.updateUser(studentId, authUpdates);
-      } catch (authError: any) {
-        throw new functions.https.HttpsError("internal", `인증 서버 업데이트 실패: ${authError.message}`);
-      }
+      await auth.updateUser(studentId, authUpdates);
     }
 
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
 
-    const userRef = db.doc(`users/${studentId}`);
-    const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
-    const memberRef = db.doc(`centers/${centerId}/members/${studentId}`);
-
     const userUpdate: any = { updatedAt: timestamp };
     if (displayName) userUpdate.displayName = displayName.trim();
     if (schoolName) userUpdate.schoolName = schoolName.trim();
-    batch.set(userRef, userUpdate, { merge: true });
+    batch.set(db.doc(`users/${studentId}`), userUpdate, { merge: true });
     
     const studentUpdate: any = { updatedAt: timestamp };
     if (displayName) studentUpdate.name = displayName.trim();
     if (schoolName) studentUpdate.schoolName = schoolName.trim();
     if (grade) studentUpdate.grade = grade;
     if (parentLinkCode !== undefined) studentUpdate.parentLinkCode = parentLinkCode;
-    batch.set(studentRef, studentUpdate, { merge: true });
+    batch.set(db.doc(`centers/${centerId}/students/${studentId}`), studentUpdate, { merge: true });
 
     if (displayName) {
-      batch.set(memberRef, { displayName: displayName.trim(), updatedAt: timestamp }, { merge: true });
+      batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName: displayName.trim(), updatedAt: timestamp }, { merge: true });
     }
 
     await batch.commit();
@@ -181,7 +173,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 });
 
 /**
- * 학생 계정을 영구 삭제하는 함수 (관리자 전용)
+ * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Recursive Delete)
  */
 export const deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
@@ -201,38 +193,37 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
   try {
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerId}`).get();
     const callerData = callerMemberSnap.data();
-    if (!callerMemberSnap.exists || !['centerAdmin'].includes(callerData?.role)) {
+    if (!callerMemberSnap.exists || !['teacher', 'centerAdmin'].includes(callerData?.role)) {
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    // 1. Auth 계정 삭제 (비동기 처리, 실패해도 Firestore 데이터는 삭제 시도)
+    // 1. Auth 계정 삭제
     try {
       await auth.deleteUser(studentId);
     } catch (authError: any) {
-      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or error:`, authError.message);
+      console.warn(`[DeleteStudent Auth Warning] User ${studentId} not found or already deleted.`);
     }
 
-    // 2. 관련 모든 데이터 삭제
-    const batch = db.batch();
-    const paths = [
-      `users/${studentId}`,
-      `centers/${centerId}/members/${studentId}`,
-      `userCenters/${studentId}/centers/${centerId}`,
-      `centers/${centerId}/students/${studentId}`,
-      `centers/${centerId}/growthProgress/${studentId}`
+    // 2. 하위 컬렉션을 포함한 모든 Firestore 데이터 강제 삭제 (Recursive)
+    const pathsToDelete = [
+      db.doc(`users/${studentId}`),
+      db.doc(`centers/${centerId}/members/${studentId}`),
+      db.doc(`userCenters/${studentId}/centers/${centerId}`),
+      db.doc(`centers/${centerId}/students/${studentId}`),
+      db.doc(`centers/${centerId}/growthProgress/${studentId}`),
+      db.doc(`centers/${centerId}/plans/${studentId}`), // 하위 아이템들 포함
+      db.doc(`centers/${centerId}/studyLogs/${studentId}`), // 하위 세션들 포함
     ];
 
-    paths.forEach(path => {
-      batch.delete(db.doc(path));
-    });
-
-    try {
-      await batch.commit();
-    } catch (batchError: any) {
-      throw new functions.https.HttpsError("internal", `DB 데이터 삭제 실패: ${batchError.message}`);
+    for (const ref of pathsToDelete) {
+      try {
+        await db.recursiveDelete(ref);
+      } catch (e) {
+        console.error(`Error recursively deleting path: ${ref.path}`, e);
+      }
     }
 
-    return { ok: true, message: "계정 및 모든 데이터가 성공적으로 삭제되었습니다." };
+    return { ok: true, message: "계정과 모든 하위 데이터가 말끔히 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Error]", error);
@@ -242,17 +233,15 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
 });
 
 /**
- * 초대 코드 사용 및 센터 가입 함수
+ * 초대 코드 사용
  */
 export const redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
-
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
   
   const { code } = data;
   const uid = context.auth.uid;
-  const email = context.auth.token.email || "";
-  const displayName = context.auth.token.name || email.split('@')[0];
+  const displayName = context.auth.token.name || "사용자";
 
   try {
     return await db.runTransaction(async (transaction) => {
@@ -262,29 +251,16 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       if (!inviteSnap.exists) throw new functions.https.HttpsError("not-found", "유효하지 않은 초대 코드입니다.");
       
       const inviteData = inviteSnap.data()!;
-      if (inviteData.isActive === false || (inviteData.expiresAt && inviteData.expiresAt.toDate() < new Date()) || inviteData.usedCount >= inviteData.maxUses) {
-        throw new functions.https.HttpsError("failed-precondition", "사용할 수 없는 초대 코드입니다.");
-      }
-
       const centerId = inviteData.centerId;
       const role = inviteData.intendedRole || 'student';
       const timestamp = admin.firestore.Timestamp.now();
 
       transaction.set(db.doc(`userCenters/${uid}/centers/${centerId}`), {
-        id: centerId,
-        centerId: centerId,
-        role,
-        status: "active",
-        joinedAt: timestamp,
+        id: centerId, centerId, role, status: "active", joinedAt: timestamp,
       });
 
       transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
-        id: uid,
-        centerId: centerId,
-        role,
-        status: "active",
-        joinedAt: timestamp,
-        displayName,
+        id: uid, centerId, role, status: "active", joinedAt: timestamp, displayName,
       });
 
       transaction.update(inviteRef, {
@@ -295,8 +271,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       return { ok: true, message: "센터 가입이 완료되었습니다." };
     });
   } catch (error: any) {
-    console.error("[RedeemInviteCode Error]", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `초대 코드 처리 오류: ${error.message}`);
+    throw new functions.https.HttpsError("internal", `처리 오류: ${error.message}`);
   }
 });
