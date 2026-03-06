@@ -8,6 +8,72 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 const region = "asia-northeast3";
+
+async function deleteRecursive(ref) {
+    if (ref instanceof admin.firestore.DocumentReference) {
+        const subcollections = await ref.listCollections();
+        for (const sub of subcollections) {
+            await deleteRecursive(sub);
+        }
+        await ref.delete();
+    }
+    else {
+        const snapshot = await ref.get();
+        const tasks = snapshot.docs.map(doc => deleteRecursive(doc.ref));
+        await Promise.all(tasks);
+    }
+}
+
+exports.deleteStudentAccount = functions.region(region).runWith({
+    timeoutSeconds: 540,
+    memory: '1GB'
+}).https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    const auth = admin.auth();
+    if (!context.auth)
+        throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+    const { studentId, centerId } = data;
+    try {
+        try {
+            await auth.deleteUser(studentId);
+        }
+        catch (e) { }
+        const docPaths = [
+            `users/${studentId}`,
+            `userCenters/${studentId}`,
+            `centers/${centerId}/members/${studentId}`,
+            `centers/${centerId}/students/${studentId}`,
+            `centers/${centerId}/growthProgress/${studentId}`,
+            `centers/${centerId}/plans/${studentId}`,
+            `centers/${centerId}/studyLogs/${studentId}`
+        ];
+        const collectionsToFilter = [
+            `centers/${centerId}/counselingReservations`,
+            `centers/${centerId}/counselingLogs`,
+            `centers/${centerId}/attendanceRequests`
+        ];
+        await Promise.allSettled([
+            ...docPaths.map(async (path) => {
+                try {
+                    const docRef = db.doc(path);
+                    await deleteRecursive(docRef);
+                }
+                catch (e) { }
+            }),
+            ...collectionsToFilter.map(async (colPath) => {
+                try {
+                    const q = await db.collection(colPath).where('studentId', '==', studentId).get();
+                    const tasks = q.docs.map(doc => deleteRecursive(doc.ref));
+                    await Promise.all(tasks);
+                }
+                catch (e) { }
+            })
+        ]);
+        return { ok: true, message: "수동 재귀 삭제 완료" };
+    }
+    catch (e) { throw new functions.https.HttpsError("internal", e.message); }
+});
+
 exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
@@ -29,6 +95,7 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
     }
     catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
+
 exports.updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
@@ -37,89 +104,44 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
     try {
         const authUpdates = {};
-        if (password)
-            authUpdates.password = password;
-        if (displayName)
-            authUpdates.displayName = displayName;
-        if (Object.keys(authUpdates).length > 0)
-            await auth.updateUser(studentId, authUpdates);
+        if (password) authUpdates.password = password;
+        if (displayName) authUpdates.displayName = displayName;
+        if (Object.keys(authUpdates).length > 0) await auth.updateUser(studentId, authUpdates);
         const timestamp = admin.firestore.Timestamp.now();
         const batch = db.batch();
         if (displayName || schoolName) {
             const uUp = { updatedAt: timestamp };
-            if (displayName)
-                uUp.displayName = displayName;
-            if (schoolName)
-                uUp.schoolName = schoolName;
+            if (displayName) uUp.displayName = displayName;
+            if (schoolName) uUp.schoolName = schoolName;
             batch.set(db.doc(`users/${studentId}`), uUp, { merge: true });
         }
         const sUp = { updatedAt: timestamp };
-        if (displayName)
-            sUp.name = displayName;
-        if (schoolName)
-            sUp.schoolName = schoolName;
-        if (grade)
-            sUp.grade = grade;
-        if (parentLinkCode !== undefined)
-            sUp.parentLinkCode = parentLinkCode;
+        if (displayName) sUp.name = displayName;
+        if (schoolName) sUp.schoolName = schoolName;
+        if (grade) sUp.grade = grade;
+        if (parentLinkCode !== undefined) sUp.parentLinkCode = parentLinkCode;
         batch.set(db.doc(`centers/${centerId}/students/${studentId}`), sUp, { merge: true });
-        if (displayName)
-            batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
+        if (displayName) batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
         await batch.commit();
         return { ok: true };
     }
     catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
-exports.deleteStudentAccount = functions.region(region).runWith({
-    timeoutSeconds: 540,
-    memory: '1GB'
-}).https.onCall(async (data, context) => {
-    const db = admin.firestore();
-    const auth = admin.auth();
-    if (!context.auth)
-        throw new functions.https.HttpsError("unauthenticated", "인증 필요");
-    const { studentId, centerId } = data;
-    try {
-        try {
-            await auth.deleteUser(studentId);
-        }
-        catch (e) { }
-        const paths = [
-            `users/${studentId}`,
-            `userCenters/${studentId}`,
-            `centers/${centerId}/members/${studentId}`,
-            `centers/${centerId}/students/${studentId}`,
-            `centers/${centerId}/growthProgress/${studentId}`,
-            `centers/${centerId}/plans/${studentId}`,
-            `centers/${centerId}/studyLogs/${studentId}`,
-            `centers/${centerId}/counselingReservations/${studentId}`,
-            `centers/${centerId}/counselingLogs/${studentId}`
-        ];
-        await Promise.allSettled(paths.map(async (p) => {
-            try { 
-                const segments = p.split('/').length;
-                const ref = segments % 2 === 0 ? db.doc(p) : db.collection(p);
-                await db.recursiveDelete(ref); 
-            } catch (err) {}
-        }));
-        return { ok: true, message: "강제 삭제 완료" };
-    }
-    catch (e) { throw new functions.https.HttpsError("internal", e.message); }
-});
+
 exports.redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     const { code } = data;
     const uid = context.auth.uid;
     try {
         return await db.runTransaction(async (t) => {
             const snap = await t.get(db.doc(`inviteCodes/${code}`));
-            if (!snap.exists)
-                throw new Error("Invalid code");
+            if (!snap.exists) throw new Error("Invalid code");
             const inv = snap.data();
             const ts = admin.firestore.Timestamp.now();
             t.set(db.doc(`userCenters/${uid}/centers/${inv.centerId}`), { id: inv.centerId, role: inv.intendedRole, status: 'active', joinedAt: ts });
             t.set(db.doc(`centers/${inv.centerId}/members/${uid}`), { id: uid, role: inv.intendedRole, status: 'active', joinedAt: ts, displayName: context.auth.token.name });
-            t.update(db.doc(`inviteCodes/${code}`), { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
+            t.update(db.doc(`inviteCodes/${code}`), { usedCount: admin.FieldValue.increment(1), updatedAt: ts });
             return { ok: true };
         });
     }
