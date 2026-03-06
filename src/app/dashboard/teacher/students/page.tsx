@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -26,7 +27,9 @@ import {
   PauseCircle,
   Users,
   Activity,
-  UserCog
+  UserCog,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
@@ -40,6 +43,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -69,6 +83,7 @@ export default function StudentListPage() {
   // 신규 학생 등록 상태
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [newStudent, setNewStudent] = useState({
     name: '',
     email: '',
@@ -174,6 +189,31 @@ export default function StudentListPage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteAccount = async (studentId: string, name: string) => {
+    if (!functions || !centerId) return;
+    
+    setIsDeleting(studentId);
+    try {
+      const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
+      const result: any = await deleteFn({ studentId, centerId });
+      
+      if (result.data?.ok) {
+        toast({ title: "삭제 완료", description: `${name} 학생의 모든 데이터가 영구적으로 삭제되었습니다.` });
+      } else {
+        throw new Error(result.data?.message || "삭제 처리 실패");
+      }
+    } catch (e: any) {
+      console.error("[Delete Student Error]", e);
+      toast({ 
+        variant: "destructive", 
+        title: "삭제 실패", 
+        description: e.message || "계정 삭제 중 오류가 발생했습니다." 
+      });
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -325,16 +365,16 @@ export default function StudentListPage() {
               const attendance = attendanceList?.find(a => a.studentId === member.id);
               
               return (
-                <Link key={member.id} href={`/dashboard/teacher/students/${member.id}`}>
-                  <Card className={cn(
-                    "rounded-[2rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden bg-white ring-1 ring-border/50",
-                    member.status === 'withdrawn' && "opacity-60 grayscale"
-                  )}>
-                    <div className={cn(
-                      "h-1.5 w-full transition-colors duration-500",
-                      attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
-                    )} />
-                    <CardContent className={isMobile ? "p-5" : "p-6"}>
+                <Card key={member.id} className={cn(
+                  "rounded-[2rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden bg-white ring-1 ring-border/50",
+                  member.status === 'withdrawn' && "bg-muted/5"
+                )}>
+                  <div className={cn(
+                    "h-1.5 w-full transition-colors duration-500",
+                    attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
+                  )} />
+                  <CardContent className={isMobile ? "p-5" : "p-6"}>
+                    <Link href={`/dashboard/teacher/students/${member.id}`} className="block">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="relative">
@@ -364,21 +404,58 @@ export default function StudentListPage() {
                           <ChevronRight className="h-5 w-5" />
                         </div>
                       </div>
-                      
-                      <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-white shadow-sm">
-                            <Armchair className="h-3.5 w-3.5 text-primary/60" />
-                          </div>
-                          <span className="text-xs font-black text-primary/80">
-                            {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
-                          </span>
+                    </Link>
+                    
+                    <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-white shadow-sm">
+                          <Armchair className="h-3.5 w-3.5 text-primary/60" />
                         </div>
-                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Manage Data</span>
+                        <span className="text-xs font-black text-primary/80">
+                          {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
+                        </span>
                       </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                      <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Manage Data</span>
+                    </div>
+
+                    {statusTab === 'withdrawn' && (
+                      <div className="mt-4 pt-4 border-t border-dashed border-rose-100">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              disabled={isDeleting === member.id}
+                              className="w-full h-11 rounded-xl font-black text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 gap-2 transition-all"
+                            >
+                              {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                              계정 데이터 영구 삭제
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
+                            <AlertDialogHeader>
+                              <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4">
+                                <AlertTriangle className="h-10 w-10 text-rose-600" />
+                              </div>
+                              <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">정말 삭제하시겠습니까?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
+                                <span className="text-rose-600">[{member.displayName}]</span> 학생의 계정과 모든 학습 리포트, 상담 일지가 영구 삭제됩니다. 이 작업은 취소할 수 없습니다.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="mt-8 flex flex-col gap-2">
+                              <AlertDialogAction 
+                                onClick={() => handleDeleteAccount(member.id, member.displayName || '학생')}
+                                className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
+                              >
+                                {isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '영구 삭제 승인'}
+                              </AlertDialogAction>
+                              <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
