@@ -173,9 +173,12 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 });
 
 /**
- * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Recursive Delete)
+ * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive 모사)
  */
-export const deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
+export const deleteStudentAccount = functions.region(region).runWith({
+  timeoutSeconds: 300, // 대량 데이터 삭제를 위해 5분 부여
+  memory: '512MB'
+}).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
 
@@ -199,55 +202,55 @@ export const deleteStudentAccount = functions.region(region).https.onCall(async 
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    console.log(`[DeleteProcess] Starting deletion for Student: ${studentId} in Center: ${centerId}`);
+    console.log(`[DeleteProcess] Start: Student(${studentId}) Center(${centerId})`);
 
-    // 1. Auth 계정 삭제 시도 (실패해도 Firestore 삭제는 진행)
+    // 1. Firebase Auth 계정 삭제 (실패해도 Firestore 삭제는 계속 진행)
     try {
       await auth.deleteUser(studentId);
-      console.log(`[DeleteProcess] Auth account deleted for ${studentId}`);
+      console.log(`[DeleteProcess] Auth account deleted.`);
     } catch (authError: any) {
       console.warn(`[DeleteProcess Auth Warning] ${authError.message}`);
     }
 
-    // 2. 삭제할 모든 Firestore 문서/컬렉션 루트 정의
-    // 각 경로는 recursiveDelete를 통해 하위 모든 데이터를 포함하여 삭제됩니다.
-    const pathsToDelete = [
-      `users/${studentId}`,
-      `centers/${centerId}/members/${studentId}`,
-      `userCenters/${studentId}/centers/${centerId}`,
-      `centers/${centerId}/students/${studentId}`,
-      `centers/${centerId}/growthProgress/${studentId}`,
-      `centers/${centerId}/plans/${studentId}`,
-      `centers/${centerId}/studyLogs/${studentId}`,
-      `centers/${centerId}/dailyStudentStats/`, // 하위 문서를 찾아야 함
+    // 2. 재귀적으로 삭제할 문서 목록 정의
+    // recursiveDelete는 해당 문서와 그 아래의 모든 하위 컬렉션을 찾아 지웁니다.
+    const refsToDelete = [
+      db.doc(`users/${studentId}`),
+      db.doc(`userCenters/${studentId}/centers/${centerId}`),
+      db.doc(`centers/${centerId}/members/${studentId}`),
+      db.doc(`centers/${centerId}/students/${studentId}`),
+      db.doc(`centers/${centerId}/growthProgress/${studentId}`),
+      db.doc(`centers/${centerId}/plans/${studentId}`),
+      db.doc(`centers/${centerId}/studyLogs/${studentId}`),
     ];
 
-    // 재귀적 삭제 실행
-    for (const path of pathsToDelete) {
+    for (const ref of refsToDelete) {
       try {
-        const ref = db.doc(path);
-        // dailyStudentStats와 같이 날짜별로 분산된 데이터는 별도 처리가 필요할 수 있지만, 
-        // studentId가 문서 ID인 경우는 recursiveDelete로 완벽히 지워집니다.
         await db.recursiveDelete(ref);
-        console.log(`[DeleteProcess] Path deleted: ${path}`);
+        console.log(`[DeleteProcess] Recursive deleted: ${ref.path}`);
       } catch (e: any) {
-        console.error(`[DeleteProcess Path Error] Failed to delete ${path}: ${e.message}`);
+        console.error(`[DeleteProcess Error] Failed to delete ${ref.path}: ${e.message}`);
       }
     }
 
-    // dailyStudentStats 하위에 학생 ID가 포함된 문서들을 찾아 삭제 (추가 보강)
+    // 3. 흩어져 있는 일일 통계 문서(Collection Group) 삭제 시도
+    // dailyStudentStats/{date}/students/{studentId} 형태의 문서들을 찾습니다.
     try {
-      const statsRef = collection(db, `centers/${centerId}/dailyStudentStats`);
-      const statsSnap = await db.collectionGroup('students').where('studentId', '==', studentId).get();
-      const batch = db.batch();
-      statsSnap.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-      console.log(`[DeleteProcess] Bulk stats deleted for student.`);
+      const statsSnap = await db.collectionGroup('students')
+        .where('studentId', '==', studentId)
+        .get();
+      
+      if (!statsSnap.empty) {
+        const batch = db.batch();
+        statsSnap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        console.log(`[DeleteProcess] Bulk stats docs deleted: ${statsSnap.size} items.`);
+      }
     } catch (e: any) {
-      console.warn(`[DeleteProcess Stats Warning] ${e.message}`);
+      console.warn(`[DeleteProcess Stats Warning] Collection group delete failed: ${e.message}`);
     }
 
-    return { ok: true, message: "계정과 모든 하위 기록이 성공적으로 삭제되었습니다." };
+    return { ok: true, message: "계정과 모든 하위 기록이 강제 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Main Error]", error);
