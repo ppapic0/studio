@@ -69,7 +69,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     }
     catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
-exports.deleteStudentAccount = functions.region(region).https.onCall(async (data, context) => {
+exports.deleteStudentAccount = functions.region(region).runWith({
+    timeoutSeconds: 540,
+    memory: '1GB'
+}).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
     if (!context.auth)
@@ -80,9 +83,18 @@ exports.deleteStudentAccount = functions.region(region).https.onCall(async (data
             await auth.deleteUser(studentId);
         }
         catch (e) { }
-        const batch = db.batch();
-        [`users/${studentId}`, `centers/${centerId}/members/${studentId}`, `userCenters/${studentId}/centers/${centerId}`, `centers/${centerId}/students/${studentId}`, `centers/${centerId}/growthProgress/${studentId}`].forEach(p => batch.delete(db.doc(p)));
-        await batch.commit();
+        const refs = [
+            db.doc(`users/${studentId}`),
+            db.doc(`userCenters/${studentId}`),
+            db.doc(`centers/${centerId}/members/${studentId}`),
+            db.doc(`centers/${centerId}/students/${studentId}`),
+            db.doc(`centers/${centerId}/growthProgress/${studentId}`),
+            db.doc(`centers/${centerId}/plans/${studentId}`),
+            db.doc(`centers/${centerId}/studyLogs/${studentId}`),
+        ];
+        for (const ref of refs) {
+            await db.recursiveDelete(ref);
+        }
         return { ok: true };
     }
     catch (e) { throw new functions.https.HttpsError("internal", e.message); }

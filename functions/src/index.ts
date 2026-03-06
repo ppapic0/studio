@@ -174,7 +174,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
 /**
  * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive 모사)
- * 대량의 데이터를 지워야 하므로 리소스를 넉넉히 할당합니다.
  */
 export const deleteStudentAccount = functions.region(region).runWith({
   timeoutSeconds: 540, // 최대 9분
@@ -203,26 +202,17 @@ export const deleteStudentAccount = functions.region(region).runWith({
       throw new functions.https.HttpsError("permission-denied", "계정을 삭제할 권한이 없습니다.");
     }
 
-    console.log(`[DeleteProcess] 시작: 학생(${studentId}) 센터(${centerId})`);
-
-    // 1. Firebase Auth 계정 삭제
+    // 1. Firebase Auth 계정 삭제 (실패해도 진행)
     try {
       await auth.deleteUser(studentId);
-      console.log(`[DeleteProcess] Auth 계정 삭제 성공.`);
     } catch (authError: any) {
-      if (authError.code === 'auth/user-not-found') {
-        console.warn(`[DeleteProcess Warning] 삭제할 Auth 계정이 이미 존재하지 않습니다.`);
-      } else {
-        console.error(`[DeleteProcess Auth Error] ${authError.message}`);
-        // Auth 삭제 실패가 치명적이지 않다면 계속 진행할 수도 있지만, 안전을 위해 로깅만 합니다.
-      }
+      console.warn(`[DeleteProcess] Auth deletion skipped: ${authError.message}`);
     }
 
     // 2. 하위 컬렉션을 포함한 모든 Firestore 데이터 재귀적 삭제
-    // recursiveDelete는 지정된 문서와 그 아래의 모든 subcollection을 찾아 강제 삭제합니다.
     const refsToDelete = [
       db.doc(`users/${studentId}`),
-      db.doc(`userCenters/${studentId}/centers/${centerId}`),
+      db.doc(`userCenters/${studentId}`), // 유저 센터 연결 정보 전체
       db.doc(`centers/${centerId}/members/${studentId}`),
       db.doc(`centers/${centerId}/students/${studentId}`),
       db.doc(`centers/${centerId}/growthProgress/${studentId}`),
@@ -232,36 +222,17 @@ export const deleteStudentAccount = functions.region(region).runWith({
 
     for (const ref of refsToDelete) {
       try {
-        // 해당 경로가 존재하는지 확인하지 않고 바로 recursiveDelete 호출 (Admin SDK는 존재하지 않아도 오류를 내지 않음)
         await db.recursiveDelete(ref);
-        console.log(`[DeleteProcess] 재귀 삭제 완료: ${ref.path}`);
       } catch (e: any) {
-        console.error(`[DeleteProcess Error] 삭제 실패 (${ref.path}): ${e.message}`);
+        console.error(`[DeleteProcess Error] Failed at ${ref.path}: ${e.message}`);
       }
     }
 
-    // 3. 컬렉션 그룹 기반 일일 통계 문서 삭제 (구조상 별도로 찾아야 함)
-    try {
-      const statsSnap = await db.collectionGroup('students')
-        .where('studentId', '==', studentId)
-        .get();
-      
-      if (!statsSnap.empty) {
-        console.log(`[DeleteProcess] 일일 통계 문서 ${statsSnap.size}개 발견. 삭제 중...`);
-        const batch = db.batch();
-        statsSnap.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      }
-    } catch (e: any) {
-      console.warn(`[DeleteProcess Stats Warning] 통계 문서 삭제 중 오류: ${e.message}`);
-    }
-
-    console.log(`[DeleteProcess] 모든 작업이 완료되었습니다.`);
     return { ok: true, message: "계정과 모든 하위 기록이 성공적으로 삭제되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Main Error]", error);
-    throw new functions.https.HttpsError("internal", `계정 삭제 중 서버 오류가 발생했습니다: ${error.message}`);
+    throw new functions.https.HttpsError("internal", `서버 오류: ${error.message}`);
   }
 });
 
@@ -292,7 +263,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
         id: centerId, centerId, role, status: "active", joinedAt: timestamp,
       });
 
-      transaction.set(db.doc(`centers/${centerId}/members/${uid}`), {
+      transaction.set(db.doc(`centers/${inviteData.centerId}/members/${uid}`), {
         id: uid, centerId, role, status: "active", joinedAt: timestamp, displayName,
       });
 

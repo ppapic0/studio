@@ -152,11 +152,7 @@ export default function StudentListPage() {
   }, [studentMembers]);
 
   const handleAddStudent = async () => {
-    if (!centerId || !functions) {
-      toast({ variant: "destructive", title: "시스템 오류", description: "센터 정보 또는 서버 함수를 불러올 수 없습니다." });
-      return;
-    }
-    
+    if (!centerId || !functions) return;
     if (!newStudent.name || !newStudent.email || !newStudent.password || !newStudent.schoolName) {
       toast({ variant: "destructive", title: "정보 미입력", description: "모든 필수 정보를 입력해 주세요." });
       return;
@@ -180,11 +176,7 @@ export default function StudentListPage() {
         setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
       }
     } catch (e: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "등록 실패", 
-        description: e.message || "학생 등록 중 오류가 발생했습니다."
-      });
+      toast({ variant: "destructive", title: "등록 실패", description: e.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -196,7 +188,6 @@ export default function StudentListPage() {
     setIsDeleting(studentId);
     try {
       const deleteFn = httpsCallable(functions, 'deleteStudentAccount');
-      // 타임아웃을 방지하기 위해 서버 측에서 비동기로 처리되지만 응답을 기다림
       const result: any = await deleteFn({ studentId, centerId });
       
       if (result.data?.ok) {
@@ -209,7 +200,7 @@ export default function StudentListPage() {
       toast({ 
         variant: "destructive", 
         title: "삭제 실패", 
-        description: e.message || "서버 응답 오류가 발생했습니다. 잠시 후 다시 시도하세요." 
+        description: e.message === "internal" ? "서버 내부 오류가 발생했습니다. (데이터가 너무 많아 타임아웃이 발생했을 수 있습니다. 다시 시도해 주세요.)" : e.message 
       });
     } finally {
       setIsDeleting(null);
@@ -226,16 +217,7 @@ export default function StudentListPage() {
   };
 
   if (!isTeacherOrAdmin) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>접근 권한 없음</CardTitle>
-            <CardDescription>선생님 또는 관리자 계정만 이 페이지를 볼 수 있습니다.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
+    return <div className="flex items-center justify-center h-[60vh]"><p>권한이 없습니다.</p></div>;
   }
 
   return (
@@ -250,69 +232,28 @@ export default function StudentListPage() {
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
-          {activeMembership?.role === 'centerAdmin' && (
-            <Button variant="outline" className={cn("rounded-2xl font-black gap-2 border-2", isMobile ? "h-12 flex-1" : "h-14 px-6")} asChild>
-              <Link href="/dashboard/settings/students">
-                <UserCog className="h-5 w-5" /> 계정 통합 관리
-              </Link>
-            </Button>
-          )}
           <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
             <DialogTrigger asChild>
               <Button className={cn("rounded-2xl font-black gap-2 shadow-lg interactive-button", isMobile ? "h-12 flex-1" : "h-14 px-8 text-base")}>
                 <UserPlus className="h-5 w-5" /> 신규 가입
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-md")}>
-              <div className={cn("bg-primary p-8 text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-10")}>
-                 <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
-                   <UserPlus className={isMobile ? "h-20 w-20" : "h-32 w-32"} />
-                 </div>
+            <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-md")}>
+              <div className="bg-primary p-10 text-white relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-32 w-32" /></div>
                  <DialogHeader className="relative z-10">
-                   <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-3xl")}>학생 등록</DialogTitle>
+                   <DialogTitle className="text-3xl font-black">학생 등록</DialogTitle>
                    <DialogDescription className="text-white/70 font-bold">센터에 학생 계정을 직접 생성합니다.</DialogDescription>
                  </DialogHeader>
               </div>
-              
-              <div className={cn("grid gap-5 overflow-y-auto custom-scrollbar flex-1", isMobile ? "p-6" : "p-8 max-h-[60vh]")}>
-                <div className="grid gap-2">
-                  <Label className="text-[10px] font-black uppercase text-primary/70">이름</Label>
-                  <Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" />
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label>
-                  <Input type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label>
-                  <Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label>
-                  <Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label className="text-[10px] font-black uppercase text-primary/70">학년</Label>
-                  <Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}>
-                    <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1학년">1학년</SelectItem>
-                      <SelectItem value="2학년">2학년</SelectItem>
-                      <SelectItem value="3학년">3학년</SelectItem>
-                      <SelectItem value="N수생">N수생</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="p-8 space-y-5 bg-white overflow-y-auto custom-scrollbar max-h-[50vh]">
+                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이름</Label><Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" /></div>
+                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label><Input type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" /></div>
+                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label><Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" /></div>
+                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label><Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" /></div>
+                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">학년</Label><Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}><SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
               </div>
-              <DialogFooter className={cn("bg-muted/30 border-t shrink-0", isMobile ? "p-5" : "p-8")}>
-                <Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
-                  {isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}
-                </Button>
-              </DialogFooter>
+              <DialogFooter className="bg-muted/30 p-8 border-t"><Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">{isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -320,135 +261,62 @@ export default function StudentListPage() {
 
       <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
         <TabsList className={cn("grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border border-border/50 shadow-inner", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
-          <TabsTrigger value="active" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all">
-            <UserCheck className="h-4 w-4" /> 
-            <span className="hidden sm:inline">재원생</span>
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-emerald-50 text-emerald-600">{counts.active}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="onHold" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all">
-            <PauseCircle className="h-4 w-4" /> 
-            <span className="hidden sm:inline">휴학생</span>
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-amber-50 text-amber-600">{counts.onHold}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="withdrawn" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all">
-            <UserMinus className="h-4 w-4" /> 
-            <span className="hidden sm:inline">퇴원생</span>
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-slate-100 text-slate-600">{counts.withdrawn}</Badge>
-          </TabsTrigger>
+          <TabsTrigger value="active" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><UserCheck className="h-4 w-4" /><span className="hidden sm:inline">재원생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-emerald-50 text-emerald-600">{counts.active}</Badge></TabsTrigger>
+          <TabsTrigger value="onHold" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><PauseCircle className="h-4 w-4" /><span className="hidden sm:inline">휴학생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-amber-50 text-amber-600">{counts.onHold}</Badge></TabsTrigger>
+          <TabsTrigger value="withdrawn" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><UserMinus className="h-4 w-4" /><span className="hidden sm:inline">퇴원생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-slate-100 text-slate-600">{counts.withdrawn}</Badge></TabsTrigger>
         </TabsList>
 
         <div className={cn("relative group mb-6", isMobile ? "px-1" : "")}>
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-          <Input 
-            placeholder="이름, 학교 또는 좌석 번호로 검색..." 
-            className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all", isMobile ? "h-14 text-base" : "h-16 text-lg")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <Input placeholder="이름, 학교 또는 좌석 번호로 검색..." className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all bg-white", isMobile ? "h-14 text-base" : "h-16 text-lg")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
 
-        {membersLoading ? (
-          <div className="flex flex-col items-center justify-center py-40 gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-            <p className="font-black text-muted-foreground/40 uppercase tracking-[0.2em] italic">Accessing Student Records...</p>
-          </div>
-        ) : filteredStudents.length === 0 ? (
-          <div className="text-center py-32 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
-            <Users className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" />
-            <p className="font-black text-muted-foreground/40 uppercase">해당 상태의 학생이 없습니다.</p>
-          </div>
+        {membersLoading ? (<div className="flex flex-col items-center justify-center py-40"><Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" /></div>) : filteredStudents.length === 0 ? (
+          <div className="text-center py-32 bg-white/50 rounded-[3rem] border-2 border-dashed"><Users className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" /><p className="font-black text-muted-foreground/40 uppercase">데이터가 없습니다.</p></div>
         ) : (
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-2 lg:grid-cols-3")}>
             {filteredStudents.map((member) => {
               const profile = studentsProfiles?.find(p => p.id === member.id);
               const attendance = attendanceList?.find(a => a.studentId === member.id);
-              
               return (
-                <Card key={member.id} className={cn(
-                  "rounded-[2rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden bg-white ring-1 ring-border/50",
-                  member.status === 'withdrawn' && "bg-muted/5"
-                )}>
-                  <div className={cn(
-                    "h-1.5 w-full transition-colors duration-500",
-                    attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted"
-                  )} />
+                <Card key={member.id} className={cn("rounded-[2rem] border-none shadow-lg hover:shadow-2xl transition-all group overflow-hidden bg-white ring-1 ring-border/50", member.status === 'withdrawn' && "bg-muted/5")}>
+                  <div className={cn("h-1.5 w-full", attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted")} />
                   <CardContent className={isMobile ? "p-5" : "p-6"}>
                     <Link href={`/dashboard/teacher/students/${member.id}`} className="block">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0">
-                          <div className="relative">
-                            <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50">
-                              <AvatarFallback className="bg-primary/5 text-primary font-black text-xl">
-                                {member.displayName?.charAt(0) || 'S'}
-                              </AvatarFallback>
-                            </Avatar>
-                            {attendance?.status === 'studying' && member.status === 'active' && (
-                              <div className="absolute -top-1 -right-1">
-                                <Activity className="h-4 w-4 text-emerald-500 animate-pulse" />
-                              </div>
-                            )}
-                          </div>
+                          <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xl">{member.displayName?.charAt(0) || 'S'}</AvatarFallback></Avatar>
                           <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>
-                              {member.status === 'active' && getStatusBadge(attendance?.status)}
-                            </div>
-                            <div className="flex flex-col text-[10px] font-bold text-muted-foreground leading-tight">
-                              <span className="truncate">{profile?.schoolName || '학교 정보 없음'}</span>
-                              <span className="opacity-60">{profile?.grade || '학년 정보 없음'}</span>
-                            </div>
+                            <div className="flex items-center gap-2"><h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>{member.status === 'active' && getStatusBadge(attendance?.status)}</div>
+                            <div className="flex flex-col text-[10px] font-bold text-muted-foreground leading-tight"><span className="truncate">{profile?.schoolName || '학교 정보 없음'}</span><span className="opacity-60">{profile?.grade || '학년 정보 없음'}</span></div>
                           </div>
                         </div>
-                        <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                          <ChevronRight className="h-5 w-5" />
-                        </div>
+                        <ChevronRight className="h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
                       </div>
                     </Link>
                     
                     <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-white shadow-sm">
-                          <Armchair className="h-3.5 w-3.5 text-primary/60" />
-                        </div>
-                        <span className="text-xs font-black text-primary/80">
-                          {profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Manage Data</span>
+                      <div className="flex items-center gap-2"><div className="p-1.5 rounded-lg bg-white shadow-sm"><Armchair className="h-3.5 w-3.5 text-primary/60" /></div><span className="text-xs font-black text-primary/80">{profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}</span></div>
                     </div>
 
                     {statusTab === 'withdrawn' && (
                       <div className="mt-4 pt-4 border-t border-dashed border-rose-100">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              disabled={isDeleting === member.id}
-                              className="w-full h-11 rounded-xl font-black text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 gap-2 transition-all"
-                            >
-                              {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                              계정 및 하위 데이터 영구 삭제
+                            <Button variant="ghost" disabled={isDeleting === member.id} className="w-full h-11 rounded-xl font-black text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 gap-2 transition-all">
+                              {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} 강제 삭제 실행 (Recursive)
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
                             <AlertDialogHeader>
-                              <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4">
-                                <AlertTriangle className="h-10 w-10 text-rose-600" />
-                              </div>
-                              <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">CLI 강제 삭제 실행</AlertDialogTitle>
+                              <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4"><AlertTriangle className="h-10 w-10 text-rose-600" /></div>
+                              <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">데이터 강제 삭제</AlertDialogTitle>
                               <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed text-sm">
-                                <span className="text-rose-600 font-black">[{member.displayName}]</span> 학생의 계정과 <span className="font-black text-primary">학습 로그, 계획, 리포트 등 모든 하위 컬렉션</span>을 재귀적으로 강제 삭제합니다.
-                                <br/><br/>
-                                이 작업은 복구가 불가능하며, 대량의 데이터가 즉시 제거됩니다.
+                                <span className="text-rose-600 font-black">[{member.displayName}]</span> 학생의 계정과 <span className="font-black text-primary">학습 로그, 계획 등 모든 하위 데이터</span>를 강제로 삭제합니다. 복구가 불가능합니다.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter className="mt-8 flex flex-col gap-2">
-                              <AlertDialogAction 
-                                onClick={() => handleDeleteAccount(member.id, member.displayName || '학생')}
-                                className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all"
-                              >
-                                {isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '강제 삭제 승인'}
-                              </AlertDialogAction>
+                              <AlertDialogAction onClick={() => handleDeleteAccount(member.id, member.displayName || '학생')} className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all">{isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '강제 삭제 승인'}</AlertDialogAction>
                               <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
                             </AlertDialogFooter>
                           </AlertDialogContent>
