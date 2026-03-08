@@ -6,32 +6,58 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function memberPath(centerId) {
+      return /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
+    }
+
+    function hasMembership(centerId) {
+      return isSignedIn() && exists(memberPath(centerId));
+    }
+
     function getMemberRole(centerId) {
-      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role;
+      return hasMembership(centerId) ? get(memberPath(centerId)).data.role : null;
     }
 
     function getMemberStatus(centerId) {
-      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.status;
+      return hasMembership(centerId) ? get(memberPath(centerId)).data.status : null;
     }
 
     function isActiveMember(centerId) {
-      return isSignedIn() && getMemberStatus(centerId) == 'active';
+      return getMemberStatus(centerId) == 'active';
     }
 
     function isCenterAdmin(centerId) {
-      return isSignedIn() && getMemberRole(centerId) == 'centerAdmin';
+      return getMemberRole(centerId) == 'centerAdmin';
     }
 
     function isTeacherOrAdmin(centerId) {
-      return isSignedIn() && (getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin');
+      return getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin';
     }
 
     function isStudent(centerId) {
-      return isSignedIn() && getMemberRole(centerId) == 'student';
+      return getMemberRole(centerId) == 'student';
     }
 
     function isParent(centerId) {
-      return isSignedIn() && getMemberRole(centerId) == 'parent';
+      return getMemberRole(centerId) == 'parent';
+    }
+
+    function isLinkedParent(centerId, studentId) {
+      return isParent(centerId)
+        && get(memberPath(centerId)).data.linkedStudentIds != null
+        && get(memberPath(centerId)).data.linkedStudentIds.hasAny([studentId]);
+    }
+
+    function isLinkedParentFromResource(centerId) {
+      return isParent(centerId)
+        && resource.data.studentId != null
+        && isLinkedParent(centerId, resource.data.studentId);
+    }
+
+    function isLinkedParentFromRequest(centerId) {
+      return isParent(centerId)
+        && request.resource.data.studentId != null
+        && isLinkedParent(centerId, request.resource.data.studentId);
     }
 
     match /users/{userId} {
@@ -60,35 +86,65 @@ service cloud.firestore {
       match /students/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == studentId)
-          || isParent(centerId);
+          || isLinkedParent(centerId, studentId);
         allow write: if isCenterAdmin(centerId);
       }
 
       match /growthProgress/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == studentId)
-          || isParent(centerId);
+          || isLinkedParent(centerId, studentId);
         allow write: if isCenterAdmin(centerId);
       }
 
       match /attendanceCurrent/{seatId} {
         allow read: if isActiveMember(centerId);
         allow write: if isTeacherOrAdmin(centerId)
-          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+          || (isStudent(centerId)
+              && (resource.data.studentId == request.auth.uid || request.resource.data.studentId == request.auth.uid));
       }
 
-      match /studyLogs/{studentId}/days/{dateKey} {
+      match /studyLogs/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == studentId)
-          || isParent(centerId);
+          || isLinkedParent(centerId, studentId);
         allow write: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == studentId);
+
+        match /days/{dateKey} {
+          allow read: if isTeacherOrAdmin(centerId)
+            || (isSignedIn() && request.auth.uid == studentId)
+            || isLinkedParent(centerId, studentId);
+          allow write: if isTeacherOrAdmin(centerId)
+            || (isSignedIn() && request.auth.uid == studentId);
+
+          match /sessions/{sessionId} {
+            allow read: if isTeacherOrAdmin(centerId)
+              || (isSignedIn() && request.auth.uid == studentId)
+              || isLinkedParent(centerId, studentId);
+            allow write: if isTeacherOrAdmin(centerId)
+              || (isSignedIn() && request.auth.uid == studentId);
+          }
+        }
+      }
+
+      match /plans/{studentId}/weeks/{weekKey}/items/{itemId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId)
+          || isLinkedParent(centerId, studentId);
+        allow write: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId);
+      }
+
+      match /parentAiCache/{studentId}/days/{dateKey} {
+        allow read: if isTeacherOrAdmin(centerId) || isLinkedParent(centerId, studentId);
+        allow write: if isTeacherOrAdmin(centerId) || isLinkedParent(centerId, studentId);
       }
 
       match /dailyStudentStats/{dateKey}/students/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == studentId)
-          || isParent(centerId);
+          || isLinkedParent(centerId, studentId);
         allow write: if isTeacherOrAdmin(centerId);
       }
 
@@ -100,46 +156,53 @@ service cloud.firestore {
       match /invoices/{invoiceId} {
         allow read: if isCenterAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
-          || isParent(centerId);
+          || isLinkedParentFromResource(centerId);
         allow write: if isCenterAdmin(centerId);
       }
 
       match /payments/{paymentId} {
         allow read: if isCenterAdmin(centerId)
-          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
         allow write: if isCenterAdmin(centerId);
       }
 
       match /dailyReports/{reportId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isSignedIn() && request.auth.uid == reportId)
-          || isParent(centerId);
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
         allow create: if isTeacherOrAdmin(centerId);
         allow update: if isTeacherOrAdmin(centerId)
-          || (isStudent(centerId) && resource.data.studentId == request.auth.uid
+          || (isStudent(centerId)
+              && resource.data.studentId == request.auth.uid
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt']));
         allow delete: if isCenterAdmin(centerId);
       }
 
       match /counselingReservations/{resId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
-        allow create: if isActiveMember(centerId);
+          || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid))
+          || isLinkedParentFromResource(centerId);
+        allow create: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && request.resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromRequest(centerId);
         allow update: if isTeacherOrAdmin(centerId)
-          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 
       match /counselingLogs/{logId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
-          || isParent(centerId);
+          || isLinkedParentFromResource(centerId);
         allow write: if isTeacherOrAdmin(centerId);
       }
 
       match /attendanceRequests/{reqId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
         allow create: if isStudent(centerId) && request.resource.data.studentId == request.auth.uid;
         allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
