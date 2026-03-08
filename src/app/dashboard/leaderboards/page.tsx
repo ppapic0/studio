@@ -59,18 +59,22 @@ type LeaderboardTabProps = {
   isMobile: boolean;
   studentsMap: Record<string, StudentProfile>;
   classNameFilter?: string | null;
+  activeStudentIds: Set<string>;
 };
 
-function LeaderboardTab({ title, description, entries, myEntry, totalStudents, isLoading, metricType, isMobile, studentsMap, classNameFilter }: LeaderboardTabProps) {
+function LeaderboardTab({ title, description, entries, myEntry, totalStudents, isLoading, metricType, isMobile, studentsMap, classNameFilter, activeStudentIds }: LeaderboardTabProps) {
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
-    let list = [...entries];
+    // 1. 퇴원생 제외 (activeStudentIds에 있는 학생만)
+    let list = entries.filter(entry => activeStudentIds.has(entry.studentId));
+    
+    // 2. 반 필터링
     if (classNameFilter) {
       list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
     }
-    // value 기준 내림차순 정렬 보장
+    // 3. value 기준 내림차순 정렬 보장
     return list.sort((a, b) => b.value - a.value);
-  }, [entries, classNameFilter]);
+  }, [entries, classNameFilter, activeStudentIds]);
 
   const topThree = useMemo(() => filteredEntries.slice(0, 3), [filteredEntries]);
   const others = useMemo(() => filteredEntries.slice(3), [filteredEntries]);
@@ -302,8 +306,13 @@ export default function LeaderboardsPage() {
       where('role', '==', 'student'),
       where('status', '==', 'active')
     );
-  }, [firestore, activeMembership]);
+  }, [firestore, activeMembership, periodKey]); // periodKey 추가로 갱신 유도
   const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember });
+
+  const activeStudentIds = useMemo(() => {
+    if (!studentMembers) return new Set<string>();
+    return new Set(studentMembers.map(m => m.id));
+  }, [studentMembers]);
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -330,9 +339,9 @@ export default function LeaderboardsPage() {
     const classes = new Set<string>();
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
     if (myClassName) classes.add(myClassName);
-    allLpEntries?.forEach(e => { if (e.classNameSnapshot) classes.add(e.classNameSnapshot); });
+    allLpEntries?.forEach(e => { if (e.classNameSnapshot && activeStudentIds.has(e.studentId)) classes.add(e.classNameSnapshot); });
     return Array.from(classes).sort();
-  }, [studentMembers, allLpEntries, myClassName]);
+  }, [studentMembers, allLpEntries, myClassName, activeStudentIds]);
 
   useEffect(() => {
     if (myClassName && selectedClass === 'all') {
@@ -392,7 +401,7 @@ export default function LeaderboardsPage() {
 
         <p className={cn("font-bold text-muted-foreground leading-relaxed mt-2", isMobile ? "text-xs max-w-xs" : "text-xl max-w-2xl")}>
           {format(targetDate, 'yyyy년 M월')} 시즌 실시간 랭킹입니다. <br/>
-          누적 LP를 통해 여러분의 성장을 증명하세요.
+          퇴원생을 제외한 재원생 중 누적 LP를 통해 여러분의 성장을 증명하세요.
         </p>
       </header>
 
@@ -451,6 +460,7 @@ export default function LeaderboardsPage() {
             isMobile={isMobile}
             studentsMap={studentsMap}
             classNameFilter={selectedClass === 'all' ? null : selectedClass}
+            activeStudentIds={activeStudentIds}
           />
         </TabsContent>
 
@@ -465,6 +475,7 @@ export default function LeaderboardsPage() {
             metricType="lp"
             isMobile={isMobile}
             studentsMap={studentsMap}
+            activeStudentIds={activeStudentIds}
           />
         </TabsContent>
       </Tabs>

@@ -235,6 +235,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isEditStats, setIsEditStats] = useState(false);
   const [editLp, setEditLp] = useState(0);
   const [editStats, setEditStats] = useState({ focus: 0, consistency: 0, achievement: 0, resilience: 0 });
+  const [editTodayMinutes, setEditTodayMinutes] = useState(0);
 
   const studentRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -352,6 +353,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     };
   }, [logs, todayKey, student?.targetDailyMinutes]);
 
+  useEffect(() => {
+    if (studentStats.today) setEditTodayMinutes(studentStats.today);
+  }, [studentStats.today]);
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -466,6 +471,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const batch = writeBatch(firestore);
       const progRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
       const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
+      const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
 
       // 1. 성장 데이터 업데이트
       batch.update(progRef, {
@@ -474,7 +480,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         updatedAt: serverTimestamp()
       });
 
-      // 2. 랭킹 데이터 동기화
+      // 2. 오늘 공부 시간 보정
+      batch.set(statRef, {
+        totalStudyMinutes: editTodayMinutes,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      // 3. 랭킹 데이터 동기화
       batch.set(rankRef, {
         studentId,
         displayNameSnapshot: student?.name || studentMembership?.displayName || '학생',
@@ -484,7 +496,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }, { merge: true });
 
       await batch.commit();
-      toast({ title: "성장 지표가 수정되었습니다." });
+      toast({ title: "성장 지표 및 공부 시간 보정 완료" });
       setIsEditStats(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "수정 실패", description: e.message });
@@ -498,7 +510,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     
     setIsUpdating(true);
     try {
-      // 대량 데이터 삭제를 위해 클라이언트 측 제한 시간을 10분으로 연장
       const deleteFn = httpsCallable(functions, 'deleteStudentAccount', { timeout: 600000 });
       const result: any = await deleteFn({ studentId, centerId });
       
@@ -510,17 +521,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
-      let errorMsg = "계정 삭제 중 오류가 발생했습니다.";
-      if (e.code === 'deadline-exceeded') {
-        errorMsg = "서버 처리 시간이 너무 오래 걸립니다. 하지만 삭제 작업은 백그라운드에서 계속 진행될 수 있습니다. 잠시 후 확인해 보세요.";
-      } else if (e.message) {
-        errorMsg = e.message;
-      }
-      toast({ 
-        variant: "destructive", 
-        title: "삭제 실패", 
-        description: errorMsg
-      });
+      toast({ variant: "destructive", title: "삭제 실패", description: e.message });
     } finally {
       setIsUpdating(false);
     }
@@ -814,7 +815,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     {studyTasks.map(task => (
                       <div key={task.id} className={cn(
                         "flex items-start gap-5 p-5 rounded-[1.75rem] border-2 transition-all group", 
-                        task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md"
+                        task.done ? "bg-emerald-50/20 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md"
                       )}>
                         <div className={cn(
                           "h-7 w-7 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all", 
@@ -930,6 +931,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </Card>
               </section>
 
+              {/* 오늘 공부 시간 보정 섹션 */}
+              {isEditStats && (
+                <section className="space-y-4 animate-in fade-in duration-500">
+                  <h4 className="text-xs font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Timer className="h-4 w-4" /> 오늘 공부 시간 강제 보정</h4>
+                  <div className="flex items-center gap-4 p-5 rounded-2xl bg-blue-50/50 border-2 border-blue-100 shadow-sm">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex justify-between">
+                        <Label className="text-[10px] font-black uppercase opacity-40">Today Minutes</Label>
+                        <span className="text-sm font-black text-blue-600">{Math.floor(editTodayMinutes/60)}h {editTodayMinutes%60}m</span>
+                      </div>
+                      <Input type="number" value={editTodayMinutes} onChange={e => setEditTodayMinutes(Number(e.target.value))} className="h-11 rounded-xl border-blue-200 font-black text-center" />
+                    </div>
+                  </div>
+                </section>
+              )}
+
               {/* 4대 스킬 관리 섹션 */}
               <section className="space-y-6">
                 <h4 className="text-xs font-black uppercase text-primary/60 tracking-widest flex items-center gap-2"><Activity className="h-4 w-4" /> 핵심 역량 분석 (Stats)</h4>
@@ -975,7 +992,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <DialogFooter className="p-8 bg-muted/20 border-t shrink-0">
             {isEditStats ? (
               <div className="flex gap-3 w-full">
-                <Button variant="outline" onClick={() => { setIsEditStats(false); if (progress) setEditLp(progress.seasonLp); }} className="flex-1 h-14 rounded-2xl font-black border-2">취소</Button>
+                <Button variant="outline" onClick={() => { setIsEditStats(false); if (progress) { setEditLp(progress.seasonLp); setEditStats(progress.stats); } }} className="flex-1 h-14 rounded-2xl font-black border-2">취소</Button>
                 <Button onClick={handleUpdateGrowthData} disabled={isUpdating} className="flex-2 h-14 px-10 rounded-2xl font-black text-lg shadow-xl gap-2">
                   {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />} 정보 저장
                 </Button>
