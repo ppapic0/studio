@@ -2,7 +2,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
-// Firebase Admin SDK 초기화
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
@@ -10,92 +9,67 @@ if (admin.apps.length === 0) {
 const region = "asia-northeast3";
 
 /**
- * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive와 동일한 공식 로직)
+ * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive와 동일한 로직)
  */
 export const deleteStudentAccount = functions.region(region).runWith({
-  timeoutSeconds: 540, // 9분
-  memory: '1GB'        // 1GB
+  timeoutSeconds: 540,
+  memory: '1GB'
 }).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
 
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "인증이 필요합니다.");
-  }
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
   
   const { studentId, centerId } = data;
-  if (!studentId || !centerId) {
-    throw new functions.https.HttpsError("invalid-argument", "학생 ID와 센터 ID가 필요합니다.");
-  }
+  if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
   try {
-    console.log(`[DeleteProcess] Starting deletion for student: ${studentId}`);
+    console.log(`[DeleteProcess] Starting for student: ${studentId}`);
 
-    // 1. Firebase Auth 계정 삭제 (실패해도 무시)
-    try {
-      await auth.deleteUser(studentId);
-      console.log(`[DeleteProcess] Auth account deleted: ${studentId}`);
-    } catch (authError: any) {
-      console.warn(`[DeleteProcess] Auth account error (might be already deleted): ${authError.message}`);
-    }
+    // 1. Auth 계정 삭제 (실패 시 무시)
+    try { await auth.deleteUser(studentId); } catch (e) {}
 
-    // 2. 삭제할 주요 문서/컬렉션 참조 리스트
-    // 공식 recursiveDelete를 사용하여 각 경로의 모든 하위 데이터를 뿌리까지 지웁니다.
-    const refsToDelete = [
-      db.doc(`users/${studentId}`),
-      db.doc(`userCenters/${studentId}`), 
-      db.doc(`centers/${centerId}/members/${studentId}`),
-      db.doc(`centers/${centerId}/students/${studentId}`),
-      db.doc(`centers/${centerId}/growthProgress/${studentId}`),
-      db.doc(`centers/${centerId}/plans/${studentId}`),
-      db.doc(`centers/${centerId}/studyLogs/${studentId}`)
+    // 2. 삭제할 문서/컬렉션 참조 리스트
+    const paths = [
+      `users/${studentId}`,
+      `userCenters/${studentId}`,
+      `centers/${centerId}/members/${studentId}`,
+      `centers/${centerId}/students/${studentId}`,
+      `centers/${centerId}/growthProgress/${studentId}`,
+      `centers/${centerId}/plans/${studentId}`,
+      `centers/${centerId}/studyLogs/${studentId}`
     ];
 
-    // 3. 필터링이 필요한 데이터 (컬렉션 내에서 studentId로 찾아야 하는 것들)
-    const collectionsToFilter = [
+    // 3. 필터링 삭제 대상
+    const filterCols = [
       `centers/${centerId}/counselingReservations`,
       `centers/${centerId}/counselingLogs`,
-      `centers/${centerId}/attendanceRequests`
+      `centers/${centerId}/attendanceRequests`,
+      `centers/${centerId}/dailyReports`
     ];
 
-    // 실행 시작
     await Promise.allSettled([
-      // 문서 경로 재귀 삭제 (가장 강력한 방식)
-      ...refsToDelete.map(async (ref) => {
-        try {
-          // Firebase Admin SDK의 공식 재귀 삭제 도구 사용
-          await db.recursiveDelete(ref);
-          console.log(`[DeleteProcess] Successfully recursively deleted: ${ref.path}`);
-        } catch (e: any) {
-          console.error(`[DeleteProcess] Error recursively deleting path ${ref.path}: ${e.message}`);
-        }
+      ...paths.map(async (p) => {
+        try { await db.recursiveDelete(db.doc(p)); } catch (e) {}
       }),
-      // 필터링 삭제 (해당 학생의 기록만 골라내서 삭제)
-      ...collectionsToFilter.map(async (colPath) => {
+      ...filterCols.map(async (cp) => {
         try {
-          const q = await db.collection(colPath).where('studentId', '==', studentId).get();
+          const q = await db.collection(cp).where('studentId', '==', studentId).get();
           const tasks = q.docs.map(doc => db.recursiveDelete(doc.ref));
           await Promise.all(tasks);
-          console.log(`[DeleteProcess] Filter-deleted from: ${colPath}`);
-        } catch (e: any) {
-          console.error(`[DeleteProcess] Error in filter-delete ${colPath}: ${e.message}`);
-        }
+        } catch (e) {}
       })
     ]);
 
-    console.log(`[DeleteProcess] Finalized deletion for student: ${studentId}`);
-    return { ok: true, message: "모든 데이터가 성공적으로 정리되었습니다." };
-
+    return { ok: true, message: "완벽히 정리되었습니다." };
   } catch (error: any) {
-    console.error("[DeleteStudent Main Error]", error);
-    throw new functions.https.HttpsError("internal", `서버 내부 오류: ${error.message}`);
+    throw new functions.https.HttpsError("internal", error.message);
   }
 });
 
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
   const { email, password, displayName, schoolName, grade, centerId } = data;
   try {
     const userRecord = await auth.createUser({ email, password, displayName });
@@ -106,7 +80,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: 'student', status: 'active', joinedAt: timestamp, displayName });
       t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: 'student', status: 'active', joinedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
-      t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), { seasonLp: 0, stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 }, updatedAt: timestamp });
+      t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), { seasonLp: 0, penaltyPoints: 0, stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 }, updatedAt: timestamp });
     });
     return { ok: true, uid };
   } catch (e: any) { throw new functions.https.HttpsError("internal", e.message); }
@@ -115,7 +89,6 @@ export const registerStudent = functions.region(region).https.onCall(async (data
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
   const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
   try {
     const authUpdates: any = {};
@@ -144,17 +117,16 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
 export const redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
   const { code } = data;
-  const uid = context.auth.uid;
+  const uid = context.auth!.uid;
   try {
     return await db.runTransaction(async (t) => {
       const snap = await t.get(db.doc(`inviteCodes/${code}`));
       if (!snap.exists) throw new Error("Invalid code");
       const inv = snap.data()!;
       const ts = admin.firestore.Timestamp.now();
-      t.set(db.doc(`userCenters/${uid}/centers/${inv.centerId}`), { id: inv.centerId, role: inv.intendedRole, status: 'active', joinedAt: ts });
-      t.set(db.doc(`centers/${inv.centerId}/members/${uid}`), { id: uid, role: inv.intendedRole, status: 'active', joinedAt: ts, displayName: context.auth.token.name });
+      t.set(db.doc(`userCenters/${uid}/centers/${inv.centerId}`), { id: inv.centerId, role: inv.intendedRole, status: 'active', joinedAt: ts, className: inv.targetClassName || null });
+      t.set(db.doc(`centers/${inv.centerId}/members/${uid}`), { id: uid, role: inv.intendedRole, status: 'active', joinedAt: ts, displayName: context.auth!.token.name, className: inv.targetClassName || null });
       t.update(db.doc(`inviteCodes/${code}`), { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
       return { ok: true };
     });

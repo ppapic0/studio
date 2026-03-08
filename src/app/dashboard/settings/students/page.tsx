@@ -35,7 +35,8 @@ import {
   Timer,
   Clock,
   ChevronRight,
-  Building2
+  Building2,
+  Save
 } from 'lucide-react';
 import { StudentProfile, CenterMembership, InviteCode, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -180,7 +181,6 @@ export default function StudentAccountManagementPage() {
     
     setIsUpdating(selectedStudentForEdit.id);
     try {
-      // 10분 타임아웃 적용 (데이터 수정도 안전하게)
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
       
       const authPayload: any = {
@@ -247,7 +247,6 @@ export default function StudentAccountManagementPage() {
     
     setIsDeleting(studentId);
     try {
-      // 강제 삭제 함수에 10분 타임아웃 적용 (핵심 해결책)
       const deleteFn = httpsCallable(functions, 'deleteStudentAccount', { timeout: 600000 });
       const result: any = await deleteFn({ studentId, centerId });
       
@@ -261,7 +260,7 @@ export default function StudentAccountManagementPage() {
       toast({ 
         variant: "destructive", 
         title: "삭제 실패 (서버 내부 오류)", 
-        description: "데이터가 너무 많아 백그라운드에서 작업이 계속 진행 중일 수 있습니다. 잠시 후 새로고침하여 확인해 보세요."
+        description: "데이터가 너무 많아 백그라운드에서 작업이 계속 진행 중일 수 있습니다."
       });
     } finally {
       setIsDeleting(null);
@@ -280,7 +279,7 @@ export default function StudentAccountManagementPage() {
       batch.set(doc(firestore, 'centers', centerId, 'students', studentId), updateData, { merge: true });
       await batch.commit();
       toast({ title: "반 이동 완료" });
-    } catch (e: any) {
+    } catch (e) {
       toast({ variant: "destructive", title: "이동 실패" });
     } finally {
       setIsUpdating(null);
@@ -313,7 +312,7 @@ export default function StudentAccountManagementPage() {
           <CardTitle className="text-xl font-black flex items-center gap-2">
             <Users className="h-5 w-5 opacity-40" /> 관리 대상 학생 리스트
           </CardTitle>
-          <CardDescription className="font-bold">계정 정보, LP, 스킬 지표 및 오늘 공부 시간을 강제 보정하거나 영구 삭제합니다.</CardDescription>
+          <CardDescription className="font-bold">계정 정보, LP, 스킬 지표 및 공부 시간을 직접 보정하거나 영구 삭제합니다.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {membersLoading ? (
@@ -372,7 +371,7 @@ export default function StudentAccountManagementPage() {
                             <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4"><AlertTriangle className="h-10 w-10 text-rose-600" /></div>
                             <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">영구 강제 삭제 (Recursive)</AlertDialogTitle>
                             <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
-                              [{member.displayName}] 학생의 계정과 <span className="text-rose-600">학습 로그, 계획 등 모든 하위 컬렉션</span>을 뿌리까지 찾아내어 삭제합니다. 절대 복구할 수 없습니다.
+                              [{member.displayName}] 학생의 모든 데이터와 하위 기록을 뿌리까지 찾아내어 삭제합니다. 절대 복구할 수 없습니다.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter className="mt-8 flex flex-col gap-2">
@@ -453,7 +452,7 @@ export default function StudentAccountManagementPage() {
 
           <DialogFooter className="p-8 bg-muted/20 border-t shrink-0">
             <Button onClick={handleUpdateStudent} disabled={!!isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
-              {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />} 전체 데이터 통합 저장
+              {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />} 전체 데이터 통합 저장
             </Button>
           </DialogFooter>
         </DialogContent>
