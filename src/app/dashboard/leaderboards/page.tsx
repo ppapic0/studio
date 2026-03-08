@@ -90,24 +90,10 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
     }
   };
 
-  const formatRank = (idx: number) => {
-    const rank = idx + 1;
-    if (rank <= 3) return `${rank}위`;
-    const denominator = classNameFilter ? filteredEntries.length : totalStudents;
-    if (denominator < 10) return `${rank}위`;
-    const percent = Math.max(1, Math.ceil((rank / (denominator || 1)) * 100));
-    return `상위 ${percent}%`;
-  };
-
   const formatName = (name: string) => {
     if (!name) return "익명 학생";
     return name.length > 1 ? name.charAt(0) + "*O" : name; 
   };
-
-  const myFilteredRankIdx = useMemo(() => {
-    if (!myEntry) return -1;
-    return filteredEntries.findIndex(e => e.studentId === myEntry.studentId);
-  }, [filteredEntries, myEntry]);
 
   return (
     <div className="space-y-6">
@@ -237,6 +223,7 @@ export default function LeaderboardsPage() {
   const targetDate = useMemo(() => seasonOffset === 0 ? new Date() : subMonths(new Date(), 1), [seasonOffset]);
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
+  // 1. 현재 재원생(active) 목록 조회 (퇴원생 필터링 핵심)
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(

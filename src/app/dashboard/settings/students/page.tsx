@@ -101,6 +101,7 @@ export default function StudentAccountManagementPage() {
   const periodKey = format(new Date(), 'yyyy-MM');
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
+  // 1. 센터 모든 학생 멤버 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(
@@ -111,6 +112,7 @@ export default function StudentAccountManagementPage() {
   
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isAdmin });
 
+  // 2. 가용 반 리스트 추출을 위한 초대코드/프로필 조회
   const invitesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
@@ -146,10 +148,12 @@ export default function StudentAccountManagementPage() {
   const handleOpenEditModal = async (member: CenterMembership) => {
     if (!firestore || !centerId) return;
     
+    // 성장 지표 로드
     const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', member.id);
     const progressSnap = await getDoc(progressRef);
     const progress = progressSnap.data() as GrowthProgress;
 
+    // 오늘 공부 시간 로드
     const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', member.id);
     const statSnap = await getDoc(statRef);
     const dailyStat = statSnap.data() as any;
@@ -183,6 +187,7 @@ export default function StudentAccountManagementPage() {
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
       
+      // 1. Auth 및 기본 프로필 업데이트 (Cloud Function)
       const authPayload: any = {
         studentId: selectedStudentForEdit.id,
         centerId,
@@ -198,9 +203,11 @@ export default function StudentAccountManagementPage() {
 
       await updateFn(authPayload);
 
+      // 2. Firestore 파편화 데이터 통합 업데이트
       const batch = writeBatch(firestore);
       const studentId = selectedStudentForEdit.id;
 
+      // 반 이동 처리
       const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
       const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
@@ -210,6 +217,7 @@ export default function StudentAccountManagementPage() {
       batch.update(studentRef, classData);
       batch.update(userCenterRef, classData);
 
+      // 성장 지표(LP, Stats) 보정
       const progRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
       batch.set(progRef, {
         seasonLp: editForm.seasonLp,
@@ -217,12 +225,14 @@ export default function StudentAccountManagementPage() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      // 오늘 공부 시간 강제 보정
       const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
       batch.set(statRef, { 
         totalStudyMinutes: editForm.todayStudyMinutes,
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      // 랭킹 스냅샷 업데이트
       const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
       batch.set(rankRef, {
         studentId,
@@ -233,7 +243,7 @@ export default function StudentAccountManagementPage() {
       }, { merge: true });
 
       await batch.commit();
-      toast({ title: "정보 수정 완료" });
+      toast({ title: "데이터 마스터 보정 완료" });
       setIsEditModalOpen(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "수정 실패", description: e.message });
@@ -251,38 +261,14 @@ export default function StudentAccountManagementPage() {
       const result: any = await deleteFn({ studentId, centerId });
       
       if (result.data?.ok) {
-        toast({ title: "삭제 완료", description: `${name} 학생의 모든 데이터가 정리되었습니다.` });
+        toast({ title: "영구 삭제 완료", description: `${name} 학생의 모든 데이터가 정리되었습니다.` });
       } else {
         throw new Error(result.data?.message || "처리 실패");
       }
     } catch (e: any) {
-      console.error("[Delete Error]", e);
-      toast({ 
-        variant: "destructive", 
-        title: "삭제 실패 (서버 내부 오류)", 
-        description: "데이터가 너무 많아 백그라운드에서 작업이 계속 진행 중일 수 있습니다."
-      });
+      toast({ variant: "destructive", title: "삭제 실패", description: "데이터가 너무 많아 백그라운드에서 작업이 계속 진행 중일 수 있습니다." });
     } finally {
       setIsDeleting(null);
-    }
-  };
-
-  const handleMoveClass = async (studentId: string, newClassName: string) => {
-    if (!firestore || !centerId) return;
-    setIsUpdating(studentId);
-    try {
-      const finalClass = newClassName === 'none' ? '' : newClassName;
-      const batch = writeBatch(firestore);
-      const updateData = { className: finalClass, updatedAt: serverTimestamp() };
-      batch.set(doc(firestore, 'centers', centerId, 'members', studentId), updateData, { merge: true });
-      batch.set(doc(firestore, 'userCenters', studentId, 'centers', centerId), updateData, { merge: true });
-      batch.set(doc(firestore, 'centers', centerId, 'students', studentId), updateData, { merge: true });
-      await batch.commit();
-      toast({ title: "반 이동 완료" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "이동 실패" });
-    } finally {
-      setIsUpdating(null);
     }
   };
 
@@ -348,16 +334,6 @@ export default function StudentAccountManagementPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <Select value={member.className || 'none'} onValueChange={(val) => handleMoveClass(member.id, val)}>
-                        <SelectTrigger className="rounded-xl border-2 h-11 font-black text-xs bg-white w-32 shadow-sm">
-                          <div className="flex items-center gap-2"><LayoutGrid className="h-3 w-3 opacity-40" /><SelectValue placeholder="반 미지정" /></div>
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value="none" className="font-bold">반 미지정</SelectItem>
-                          {availableClasses.map(c => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
                       <Button variant="outline" size="icon" onClick={() => handleOpenEditModal(member)} className="h-11 w-11 rounded-xl border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all"><Edit2 className="h-4 w-4" /></Button>
 
                       <AlertDialog>
