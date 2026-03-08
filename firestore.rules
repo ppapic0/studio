@@ -53,14 +53,12 @@ service cloud.firestore {
       allow write: if isCenterAdmin(centerId);
 
       match /members/{memberId} {
-        allow read: if isTeacherOrAdmin(centerId) || (isSignedIn() && request.auth.uid == memberId);
+        allow read: if isActiveMember(centerId);
         allow write: if isCenterAdmin(centerId);
       }
 
       match /students/{studentId} {
-        allow read: if isTeacherOrAdmin(centerId)
-          || (isSignedIn() && request.auth.uid == studentId)
-          || isParent(centerId);
+        allow read: if isActiveMember(centerId);
         allow write: if isCenterAdmin(centerId);
       }
 
@@ -123,11 +121,20 @@ service cloud.firestore {
 
       match /counselingReservations/{resId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
+          || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid))
+          || isParent(centerId);
         allow create: if isActiveMember(centerId);
         allow update: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
         allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /plans/{studentId}/weeks/{weekKey}/items/{itemId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId)
+          || isParent(centerId);
+        allow write: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId);
       }
 
       match /counselingLogs/{logId} {
