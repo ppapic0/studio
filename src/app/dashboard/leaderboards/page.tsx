@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, orderBy, limit, where } from 'firebase/firestore';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
 import { LeaderboardEntry, WithId, StudentProfile, CenterMembership } from '@/lib/types';
 import { 
@@ -32,12 +32,10 @@ import {
   Flame, 
   History, 
   Zap, 
-  User, 
   LayoutGrid,
   Filter,
   ChevronRight
 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,8 +50,6 @@ type LeaderboardTabProps = {
   title: string;
   description: string;
   entries: WithId<LeaderboardEntry>[] | null;
-  myEntry: LeaderboardEntry | null;
-  totalStudents: number;
   isLoading: boolean;
   metricType: 'lp';
   isMobile: boolean;
@@ -62,11 +58,11 @@ type LeaderboardTabProps = {
   activeStudentIds: Set<string>;
 };
 
-function LeaderboardTab({ title, description, entries, myEntry, totalStudents, isLoading, metricType, isMobile, studentsMap, classNameFilter, activeStudentIds }: LeaderboardTabProps) {
+function LeaderboardTab({ title, description, entries, isLoading, isMobile, studentsMap, classNameFilter, activeStudentIds }: LeaderboardTabProps) {
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     
-    // 1. 퇴원생 제외 (activeStudentIds에 있는 학생만)
+    // 1. 퇴원생 및 비활성 학생 제외
     let list = entries.filter(entry => activeStudentIds.has(entry.studentId));
     
     // 2. 반 필터링
@@ -74,7 +70,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
       list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
     }
     
-    // 3. value 기준 내림차순 정렬 보장
+    // 3. 값 기준 정렬
     return list.sort((a, b) => b.value - a.value);
   }, [entries, classNameFilter, activeStudentIds]);
 
@@ -134,7 +130,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
               <div className="p-8 rounded-full bg-muted/20">
                 <Trophy className="h-16 w-16 text-muted-foreground opacity-10" />
               </div>
-              <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-widest">해당 데이터가 없습니다.</p>
+              <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-widest">현재 시즌 기록이 없습니다.</p>
             </div>
           ) : (
             <>
@@ -168,7 +164,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                           </div>
                           <div className="flex items-center gap-1.5 text-muted-foreground font-bold">
                             <History className="h-3 w-3 opacity-40" />
-                            <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{profile?.schoolName || entry.classNameSnapshot || "비공개 소속"}</span>
+                            <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{profile?.schoolName || entry.classNameSnapshot || "센터 소속"}</span>
                           </div>
                         </div>
                       </div>
@@ -190,7 +186,7 @@ function LeaderboardTab({ title, description, entries, myEntry, totalStudents, i
                           <div className="flex items-center gap-4">
                             <div className="w-8 flex justify-center text-sm font-black text-muted-foreground/40">{rank}</div>
                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{entry.displayNameSnapshot?.charAt(0) || "S"}</AvatarFallback></Avatar>
-                            <div className="grid"><span className="font-black text-sm">{formatName(entry.displayNameSnapshot)}</span><span className="text-[10px] font-bold text-muted-foreground/60">{profile?.schoolName || entry.classNameSnapshot || '비공개'}</span></div>
+                            <div className="grid"><span className="font-black text-sm">{formatName(entry.displayNameSnapshot)}</span><span className="text-[10px] font-bold text-muted-foreground/60">{profile?.schoolName || entry.classNameSnapshot || '센터'}</span></div>
                           </div>
                           <div className="text-right"><span className="text-base font-black text-primary/80 tabular-nums">{(entry.value || 0).toLocaleString()}</span><span className="text-[8px] font-bold text-muted-foreground/40 ml-1 uppercase">lp</span></div>
                         </div>
@@ -218,12 +214,11 @@ export default function LeaderboardsPage() {
   
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
-  const myClassName = activeMembership?.className;
   
   const targetDate = useMemo(() => seasonOffset === 0 ? new Date() : subMonths(new Date(), 1), [seasonOffset]);
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
-  // 1. 현재 재원생(active) 목록 조회 (퇴원생 필터링 핵심)
+  // 1. 현재 재원생(active) 목록만 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -263,19 +258,8 @@ export default function LeaderboardsPage() {
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
-    if (myClassName) classes.add(myClassName);
-    allLpEntries?.forEach(e => { if (e.classNameSnapshot && activeStudentIds.has(e.studentId)) classes.add(e.classNameSnapshot); });
     return Array.from(classes).sort();
-  }, [studentMembers, allLpEntries, myClassName, activeStudentIds]);
-
-  useEffect(() => {
-    if (myClassName && selectedClass === 'all') setSelectedClass(myClassName);
-  }, [myClassName, selectedClass]);
-
-  const myRankEntry = useMemo(() => {
-    if (!allLpEntries || !user) return null;
-    return allLpEntries.find(e => e.studentId === user.uid) || null;
-  }, [allLpEntries, user]);
+  }, [studentMembers]);
 
   if (!isMember) return null;
 
@@ -309,16 +293,16 @@ export default function LeaderboardsPage() {
               <Filter className="h-4 w-4 text-primary opacity-40 ml-2" />
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger className="h-10 w-[220px] border-none bg-transparent font-black text-sm focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl border-none shadow-2xl">{availableClasses.map(c => <SelectItem key={c} value={c} className="font-black">{c} {c === myClassName ? '(우리 반)' : ''}</SelectItem>)}</SelectContent>
+                <SelectContent className="rounded-xl border-none shadow-2xl">{availableClasses.map(c => <SelectItem key={c} value={c} className="font-black">{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           )}
         </div>
         <TabsContent value="class" className="mt-0 animate-in fade-in duration-500">
-          <LeaderboardTab title={selectedClass !== 'all' ? `${selectedClass} 랭킹` : '반별 랭킹'} description={`${selectedClass} 학생들의 이번 시즌 성적입니다.`} entries={allLpEntries} myEntry={myRankEntry} totalStudents={studentMembers?.length || 0} isLoading={lpLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} classNameFilter={selectedClass === 'all' ? null : selectedClass} activeStudentIds={activeStudentIds} />
+          <LeaderboardTab title={selectedClass !== 'all' ? `${selectedClass} 랭킹` : '반별 랭킹'} description={`${selectedClass} 학생들의 성적입니다.`} entries={allLpEntries} isLoading={lpLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} classNameFilter={selectedClass === 'all' ? null : selectedClass} activeStudentIds={activeStudentIds} />
         </TabsContent>
         <TabsContent value="total" className="mt-0 animate-in fade-in duration-500">
-          <LeaderboardTab title="전체 랭킹" description="센터 전체 학생 중 이번 시즌 가장 앞서가는 러너들입니다." entries={allLpEntries} myEntry={myRankEntry} totalStudents={studentMembers?.length || 0} isLoading={lpLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} activeStudentIds={activeStudentIds} />
+          <LeaderboardTab title="전체 랭킹" description="센터 전체 학생 중 이번 시즌 가장 앞서가는 러너들입니다." entries={allLpEntries} isLoading={lpLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} activeStudentIds={activeStudentIds} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,15 +1,12 @@
 
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.redeemInviteCode = exports.updateStudentAccount = exports.registerStudent = exports.deleteStudentAccount = void 0;
+exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) { admin.initializeApp(); }
 const region = "asia-northeast3";
 
-/**
- * 컴파일된 실행 파일도 소스와 동일하게 recursiveDelete 로직으로 강제 업데이트합니다.
- */
 exports.deleteStudentAccount = functions.region(region).runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
@@ -18,25 +15,10 @@ exports.deleteStudentAccount = functions.region(region).runWith({ timeoutSeconds
     if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
     try {
         try { await auth.deleteUser(studentId); } catch (e) { }
-        const paths = [
-            `users/${studentId}`, 
-            `userCenters/${studentId}`, 
-            `centers/${centerId}/members/${studentId}`, 
-            `centers/${centerId}/students/${studentId}`, 
-            `centers/${centerId}/growthProgress/${studentId}`, 
-            `centers/${centerId}/plans/${studentId}`, 
-            `centers/${centerId}/studyLogs/${studentId}`
-        ];
-        const filterCols = [
-            `centers/${centerId}/counselingReservations`, 
-            `centers/${centerId}/counselingLogs`, 
-            `centers/${centerId}/attendanceRequests`, 
-            `centers/${centerId}/dailyReports`
-        ];
+        const paths = [`users/${studentId}`, `userCenters/${studentId}`, `centers/${centerId}/members/${studentId}`, `centers/${centerId}/students/${studentId}`, `centers/${centerId}/growthProgress/${studentId}`, `centers/${centerId}/plans/${studentId}`, `centers/${centerId}/studyLogs/${studentId}`];
+        const filterCols = [`centers/${centerId}/counselingReservations`, `centers/${centerId}/counselingLogs`, `centers/${centerId}/attendanceRequests`, `centers/${centerId}/dailyReports` ];
         await Promise.allSettled([
-            ...paths.map(async (p) => { 
-                try { await db.recursiveDelete(db.doc(p)); } catch (e) { } 
-            }),
+            ...paths.map(async (p) => { try { await db.recursiveDelete(db.doc(p)); } catch (e) { } }),
             ...filterCols.map(async (cp) => {
                 try {
                     const q = await db.collection(cp).where('studentId', '==', studentId).get();
@@ -47,25 +29,6 @@ exports.deleteStudentAccount = functions.region(region).runWith({ timeoutSeconds
         ]);
         return { ok: true, message: "정리가 완료되었습니다." };
     } catch (error) { throw new functions.https.HttpsError("internal", error.message); }
-});
-
-exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
-    const db = admin.firestore();
-    const auth = admin.auth();
-    const { email, password, displayName, schoolName, grade, centerId } = data;
-    try {
-        const userRecord = await auth.createUser({ email, password, displayName });
-        const uid = userRecord.uid;
-        const timestamp = admin.firestore.Timestamp.now();
-        await db.runTransaction(async (t) => {
-            t.set(db.doc(`users/${uid}`), { id: uid, email, displayName, schoolName, createdAt: timestamp, updatedAt: timestamp });
-            t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: 'student', status: 'active', joinedAt: timestamp, displayName });
-            t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: 'student', status: 'active', joinedAt: timestamp });
-            t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
-            t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), { seasonLp: 0, penaltyPoints: 0, stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 }, updatedAt: timestamp });
-        });
-        return { ok: true, uid };
-    } catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
 
 exports.updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
@@ -94,6 +57,25 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         if (displayName) batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
         await batch.commit();
         return { ok: true };
+    } catch (e) { throw new functions.https.HttpsError("internal", e.message); }
+});
+
+exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    const auth = admin.auth();
+    const { email, password, displayName, schoolName, grade, centerId } = data;
+    try {
+        const userRecord = await auth.createUser({ email, password, displayName });
+        const uid = userRecord.uid;
+        const timestamp = admin.firestore.Timestamp.now();
+        await db.runTransaction(async (t) => {
+            t.set(db.doc(`users/${uid}`), { id: uid, email, displayName, schoolName, createdAt: timestamp, updatedAt: timestamp });
+            t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: 'student', status: 'active', joinedAt: timestamp, displayName });
+            t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: 'student', status: 'active', joinedAt: timestamp });
+            t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
+            t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), { seasonLp: 0, penaltyPoints: 0, stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 }, updatedAt: timestamp });
+        });
+        return { ok: true, uid };
     } catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
 

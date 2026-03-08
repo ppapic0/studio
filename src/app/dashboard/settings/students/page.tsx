@@ -21,22 +21,17 @@ import {
   UserX,
   Users,
   LayoutGrid,
-  ArrowRightLeft,
   Edit2,
-  Lock,
-  School,
-  ShieldCheck,
-  Check,
+  Save,
   Zap,
-  Activity,
+  Timer,
+  Clock,
+  Building2,
   Target,
   RefreshCw,
   CheckCircle2,
-  Timer,
-  Clock,
-  ChevronRight,
-  Building2,
-  Save
+  ShieldCheck,
+  ChevronRight
 } from 'lucide-react';
 import { StudentProfile, CenterMembership, InviteCode, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -112,7 +107,7 @@ export default function StudentAccountManagementPage() {
   
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isAdmin });
 
-  // 2. 가용 반 리스트 추출을 위한 초대코드/프로필 조회
+  // 2. 가용 반 리스트 추출
   const invitesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(collection(firestore, 'inviteCodes'), where('centerId', '==', centerId));
@@ -123,7 +118,6 @@ export default function StudentAccountManagementPage() {
     if (!firestore || !centerId || !isAdmin) return null;
     return collection(firestore, 'centers', centerId, 'students');
   }, [firestore, centerId, isAdmin]);
-  
   const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isAdmin });
 
   const availableClasses = useMemo(() => {
@@ -185,9 +179,8 @@ export default function StudentAccountManagementPage() {
     
     setIsUpdating(selectedStudentForEdit.id);
     try {
+      // 1. Auth 및 기본 프로필 업데이트 (10분 타임아웃 적용)
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
-      
-      // 1. Auth 및 기본 프로필 업데이트 (Cloud Function)
       const authPayload: any = {
         studentId: selectedStudentForEdit.id,
         centerId,
@@ -207,15 +200,21 @@ export default function StudentAccountManagementPage() {
       const batch = writeBatch(firestore);
       const studentId = selectedStudentForEdit.id;
 
-      // 반 이동 처리
       const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
       const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
       const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
       
-      const classData = { className: editForm.className, updatedAt: serverTimestamp() };
+      const classData = { 
+        className: editForm.className || null, 
+        displayName: editForm.displayName,
+        schoolName: editForm.schoolName,
+        grade: editForm.grade,
+        updatedAt: serverTimestamp() 
+      };
+      
       batch.update(memberRef, classData);
-      batch.update(studentRef, classData);
-      batch.update(userCenterRef, classData);
+      batch.set(studentRef, { ...classData, name: editForm.displayName }, { merge: true });
+      batch.update(userCenterRef, { className: editForm.className || null, updatedAt: serverTimestamp() });
 
       // 성장 지표(LP, Stats) 보정
       const progRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
@@ -225,7 +224,7 @@ export default function StudentAccountManagementPage() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      // 오늘 공부 시간 강제 보정
+      // 오늘 공부 시간 보정
       const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
       batch.set(statRef, { 
         totalStudyMinutes: editForm.todayStudyMinutes,
@@ -243,7 +242,7 @@ export default function StudentAccountManagementPage() {
       }, { merge: true });
 
       await batch.commit();
-      toast({ title: "데이터 마스터 보정 완료" });
+      toast({ title: "데이터 통합 보정 완료" });
       setIsEditModalOpen(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "수정 실패", description: e.message });
@@ -277,10 +276,10 @@ export default function StudentAccountManagementPage() {
   return (
     <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-24 px-4")}>
       <header className="flex flex-col gap-1">
-        <h1 className={cn("font-black tracking-tighter flex items-center gap-2 text-primary text-4xl")}>
+        <h1 className="font-black tracking-tighter flex items-center gap-2 text-primary text-4xl">
           <UserCog className="h-8 w-8" /> 학생 계정 관리 마스터
         </h1>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] ml-1">Lifecycle & Data Control</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] ml-1">Full Lifecycle & Data Control</p>
       </header>
 
       <div className="relative group">
@@ -296,9 +295,9 @@ export default function StudentAccountManagementPage() {
       <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
         <CardHeader className="bg-muted/5 border-b p-8">
           <CardTitle className="text-xl font-black flex items-center gap-2">
-            <Users className="h-5 w-5 opacity-40" /> 관리 대상 학생 리스트
+            <Users className="h-5 w-5 opacity-40" /> 센터 재원생 및 퇴원생 리스트
           </CardTitle>
-          <CardDescription className="font-bold">계정 정보, LP, 스킬 지표 및 공부 시간을 직접 보정하거나 영구 삭제합니다.</CardDescription>
+          <CardDescription className="font-bold text-sm">모든 학생의 계정 정보와 성장 지표를 정밀하게 조작하거나 영구히 삭제할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {membersLoading ? (
@@ -347,7 +346,7 @@ export default function StudentAccountManagementPage() {
                             <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4"><AlertTriangle className="h-10 w-10 text-rose-600" /></div>
                             <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">영구 강제 삭제 (Recursive)</AlertDialogTitle>
                             <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
-                              [{member.displayName}] 학생의 모든 데이터와 하위 기록을 뿌리까지 찾아내어 삭제합니다. 절대 복구할 수 없습니다.
+                              [{member.displayName}] 학생의 모든 데이터와 하위 기록(로그, 계획 등)을 뿌리까지 찾아내어 삭제합니다. 절대 복구할 수 없습니다.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter className="mt-8 flex flex-col gap-2">
@@ -366,18 +365,18 @@ export default function StudentAccountManagementPage() {
       </Card>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-2xl max-h-[95vh]")}>
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-2xl max-h-[95vh]">
           <div className="bg-primary p-8 text-white relative shrink-0">
             <UserCog className="absolute top-0 right-0 p-8 h-24 w-24 opacity-10 rotate-12" />
             <DialogHeader>
-              <DialogTitle className="text-3xl font-black tracking-tighter">학생 데이터 마스터 보정</DialogTitle>
-              <DialogDescription className="text-white/60 font-bold mt-1">계정 정보, 성장 지표, 공부 시간을 직접 제어합니다.</DialogDescription>
+              <DialogTitle className="text-3xl font-black tracking-tighter">학생 데이터 통합 보정</DialogTitle>
+              <DialogDescription className="text-white/60 font-bold mt-1 text-sm">계정, 소속, 성장 지표, 공부 시간을 정밀하게 제어합니다.</DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-8 space-y-10">
             <section className="space-y-5">
-              <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><Users className="h-3.5 w-3.5" /> 계정 및 소속</h4>
+              <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><Users className="h-3.5 w-3.5" /> 기본 정보 및 소속</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">이름</Label><Input value={editForm.displayName} onChange={e => setEditForm({...editForm, displayName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
@@ -386,17 +385,28 @@ export default function StudentAccountManagementPage() {
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학교</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학년</Label>
-                  <Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}><SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl">{['1학년', '2학년', '3학년', 'N수생'].map(g => <SelectItem key={g} value={g} className="font-bold">{g}</SelectItem>)}</SelectContent></Select>
+                  <Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}>
+                    <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      {['1학년', '2학년', '3학년', 'N수생'].map(g => <SelectItem key={g} value={g} className="font-bold">{g}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 반</Label>
-                  <Select value={editForm.className || 'none'} onValueChange={v => setEditForm({...editForm, className: v === 'none' ? '' : v})}><SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="none" className="font-bold">미배정</SelectItem>{availableClasses.map(c => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}</SelectContent></Select>
+                  <Select value={editForm.className || 'none'} onValueChange={v => setEditForm({...editForm, className: v === 'none' ? '' : v})}>
+                    <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="none" className="font-bold">미배정</SelectItem>
+                      {availableClasses.map(c => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </section>
 
             <section className="space-y-6">
-              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-1 flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> 성장 지표 보정 (LP & Stats)</h4>
+              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-1 flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> 성장 지표 보정 (LP & 스킬)</h4>
               <Card className="rounded-[1.5rem] border-2 border-emerald-100 bg-white p-6 space-y-6 shadow-sm">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase text-primary/60">Season Points (LP)</Label><Badge className="bg-emerald-500 text-white font-black">{editForm.seasonLp.toLocaleString()} LP</Badge></div>
@@ -414,14 +424,20 @@ export default function StudentAccountManagementPage() {
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-widest ml-1 flex items-center gap-2"><Timer className="h-3.5 w-3.5" /> 오늘 공부 시간 강제 설정</h4>
+              <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-widest ml-1 flex items-center gap-2"><Timer className="h-3.5 w-3.5" /> 오늘 공부 시간 강제 보정</h4>
               <div className="flex items-center gap-4 p-5 rounded-2xl bg-blue-50/50 border-2 border-blue-100 shadow-sm">
                 <div className="bg-white p-3 rounded-xl shadow-md"><Clock className="h-5 w-5 text-blue-600" /></div>
                 <div className="flex-1 grid gap-1">
-                  <Label className="text-[10px] font-black text-blue-900/60 uppercase">Manual Minutes Override</Label>
-                  <div className="flex items-center gap-2"><Input type="number" value={editForm.todayStudyMinutes} onChange={e => setEditForm({...editForm, todayStudyMinutes: Number(e.target.value)})} className="h-10 rounded-xl border-blue-200 font-black text-xl text-blue-600 text-center" /><span className="text-sm font-black text-blue-900/40">min</span></div>
+                  <Label className="text-[10px] font-black text-blue-900/60 uppercase">Manual Time Override (Minutes)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" value={editForm.todayStudyMinutes} onChange={e => setEditForm({...editForm, todayStudyMinutes: Number(e.target.value)})} className="h-10 rounded-xl border-blue-200 font-black text-xl text-blue-600 text-center" />
+                    <span className="text-sm font-black text-blue-900/40">min</span>
+                  </div>
                 </div>
-                <div className="text-right leading-none"><span className="text-[10px] font-bold text-blue-900/40 block mb-1">Total</span><span className="text-lg font-black text-blue-900/80">{Math.floor(editForm.todayStudyMinutes/60)}h {editForm.todayStudyMinutes%60}m</span></div>
+                <div className="text-right leading-none">
+                  <span className="text-[10px] font-bold text-blue-900/40 block mb-1">Total Display</span>
+                  <span className="text-lg font-black text-blue-900/80">{Math.floor(editForm.todayStudyMinutes/60)}h {editForm.todayStudyMinutes%60}m</span>
+                </div>
               </div>
             </section>
           </div>
