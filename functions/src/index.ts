@@ -10,34 +10,7 @@ if (admin.apps.length === 0) {
 const region = "asia-northeast3";
 
 /**
- * 하위 컬렉션까지 수동으로 재귀 삭제하는 헬퍼 함수
- * 사용자 제안 로직을 바탕으로 Admin SDK에 최적화함
- */
-async function deleteRecursive(ref: admin.firestore.DocumentReference | admin.firestore.CollectionReference) {
-  const db = admin.firestore();
-  
-  if (ref instanceof admin.firestore.DocumentReference) {
-    console.log(`[DeleteRecursive] Processing Document: ${ref.path}`);
-    // 1. 하위 컬렉션 목록 가져오기 (listCollections는 Admin SDK 전용)
-    const subcollections = await ref.listCollections();
-    for (const sub of subcollections) {
-      await deleteRecursive(sub);
-    }
-    // 2. 본인 문서 삭제
-    await ref.delete();
-    console.log(`[DeleteRecursive] Deleted Document: ${ref.path}`);
-  } else {
-    console.log(`[DeleteRecursive] Processing Collection: ${ref.path}`);
-    // 컬렉션인 경우 내부 모든 문서를 가져와서 재귀 삭제
-    const snapshot = await ref.get();
-    const tasks = snapshot.docs.map(doc => deleteRecursive(doc.ref));
-    await Promise.all(tasks);
-    console.log(`[DeleteRecursive] Processed all docs in Collection: ${ref.path}`);
-  }
-}
-
-/**
- * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive 모사)
+ * 학생 계정 및 모든 하위 데이터를 강제로 삭제 (Firebase CLI --recursive와 동일한 공식 로직)
  */
 export const deleteStudentAccount = functions.region(region).runWith({
   timeoutSeconds: 540, // 9분
@@ -66,15 +39,16 @@ export const deleteStudentAccount = functions.region(region).runWith({
       console.warn(`[DeleteProcess] Auth account error (might be already deleted): ${authError.message}`);
     }
 
-    // 2. 삭제할 주요 문서 경로 (직접 참조 가능)
-    const docPaths = [
-      `users/${studentId}`,
-      `userCenters/${studentId}`, 
-      `centers/${centerId}/members/${studentId}`,
-      `centers/${centerId}/students/${studentId}`,
-      `centers/${centerId}/growthProgress/${studentId}`,
-      `centers/${centerId}/plans/${studentId}`,
-      `centers/${centerId}/studyLogs/${studentId}`
+    // 2. 삭제할 주요 문서/컬렉션 참조 리스트
+    // 공식 recursiveDelete를 사용하여 각 경로의 모든 하위 데이터를 뿌리까지 지웁니다.
+    const refsToDelete = [
+      db.doc(`users/${studentId}`),
+      db.doc(`userCenters/${studentId}`), 
+      db.doc(`centers/${centerId}/members/${studentId}`),
+      db.doc(`centers/${centerId}/students/${studentId}`),
+      db.doc(`centers/${centerId}/growthProgress/${studentId}`),
+      db.doc(`centers/${centerId}/plans/${studentId}`),
+      db.doc(`centers/${centerId}/studyLogs/${studentId}`)
     ];
 
     // 3. 필터링이 필요한 데이터 (컬렉션 내에서 studentId로 찾아야 하는 것들)
@@ -86,21 +60,21 @@ export const deleteStudentAccount = functions.region(region).runWith({
 
     // 실행 시작
     await Promise.allSettled([
-      // 문서 경로 재귀 삭제
-      ...docPaths.map(async (path) => {
+      // 문서 경로 재귀 삭제 (가장 강력한 방식)
+      ...refsToDelete.map(async (ref) => {
         try {
-          const docRef = db.doc(path);
-          await deleteRecursive(docRef);
-          console.log(`[DeleteProcess] Successfully deleted: ${path}`);
+          // Firebase Admin SDK의 공식 재귀 삭제 도구 사용
+          await db.recursiveDelete(ref);
+          console.log(`[DeleteProcess] Successfully recursively deleted: ${ref.path}`);
         } catch (e: any) {
-          console.error(`[DeleteProcess] Error deleting path ${path}: ${e.message}`);
+          console.error(`[DeleteProcess] Error recursively deleting path ${ref.path}: ${e.message}`);
         }
       }),
       // 필터링 삭제 (해당 학생의 기록만 골라내서 삭제)
       ...collectionsToFilter.map(async (colPath) => {
         try {
           const q = await db.collection(colPath).where('studentId', '==', studentId).get();
-          const tasks = q.docs.map(doc => deleteRecursive(doc.ref));
+          const tasks = q.docs.map(doc => db.recursiveDelete(doc.ref));
           await Promise.all(tasks);
           console.log(`[DeleteProcess] Filter-deleted from: ${colPath}`);
         } catch (e: any) {
@@ -110,7 +84,7 @@ export const deleteStudentAccount = functions.region(region).runWith({
     ]);
 
     console.log(`[DeleteProcess] Finalized deletion for student: ${studentId}`);
-    return { ok: true, message: "모든 하위 데이터가 수동 재귀 로직에 의해 완전 삭제되었습니다." };
+    return { ok: true, message: "모든 데이터가 성공적으로 정리되었습니다." };
 
   } catch (error: any) {
     console.error("[DeleteStudent Main Error]", error);

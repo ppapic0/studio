@@ -9,25 +9,6 @@ if (admin.apps.length === 0) {
 }
 const region = "asia-northeast3";
 
-async function deleteRecursive(ref) {
-    if (ref instanceof admin.firestore.DocumentReference) {
-        console.log(`[DeleteRecursive] Processing Document: ${ref.path}`);
-        const subcollections = await ref.listCollections();
-        for (const sub of subcollections) {
-            await deleteRecursive(sub);
-        }
-        await ref.delete();
-        console.log(`[DeleteRecursive] Deleted Document: ${ref.path}`);
-    }
-    else {
-        console.log(`[DeleteRecursive] Processing Collection: ${ref.path}`);
-        const snapshot = await ref.get();
-        const tasks = snapshot.docs.map(doc => deleteRecursive(doc.ref));
-        await Promise.all(tasks);
-        console.log(`[DeleteRecursive] Processed all docs in Collection: ${ref.path}`);
-    }
-}
-
 exports.deleteStudentAccount = functions.region(region).runWith({
     timeoutSeconds: 540,
     memory: '1GB'
@@ -44,16 +25,16 @@ exports.deleteStudentAccount = functions.region(region).runWith({
             console.log(`[DeleteProcess] Auth account deleted: ${studentId}`);
         }
         catch (e) {
-            console.warn(`[DeleteProcess] Auth account already gone or error: ${e.message}`);
+            console.warn(`[DeleteProcess] Auth account error: ${e.message}`);
         }
-        const docPaths = [
-            `users/${studentId}`,
-            `userCenters/${studentId}`,
-            `centers/${centerId}/members/${studentId}`,
-            `centers/${centerId}/students/${studentId}`,
-            `centers/${centerId}/growthProgress/${studentId}`,
-            `centers/${centerId}/plans/${studentId}`,
-            `centers/${centerId}/studyLogs/${studentId}`
+        const refsToDelete = [
+            db.doc(`users/${studentId}`),
+            db.doc(`userCenters/${studentId}`),
+            db.doc(`centers/${centerId}/members/${studentId}`),
+            db.doc(`centers/${centerId}/students/${studentId}`),
+            db.doc(`centers/${centerId}/growthProgress/${studentId}`),
+            db.doc(`centers/${centerId}/plans/${studentId}`),
+            db.doc(`centers/${centerId}/studyLogs/${studentId}`)
         ];
         const collectionsToFilter = [
             `centers/${centerId}/counselingReservations`,
@@ -61,29 +42,27 @@ exports.deleteStudentAccount = functions.region(region).runWith({
             `centers/${centerId}/attendanceRequests`
         ];
         await Promise.allSettled([
-            ...docPaths.map(async (path) => {
+            ...refsToDelete.map(async (ref) => {
                 try {
-                    const docRef = db.doc(path);
-                    await deleteRecursive(docRef);
-                    console.log(`[DeleteProcess] Recursively deleted: ${path}`);
+                    await db.recursiveDelete(ref);
+                    console.log(`[DeleteProcess] Deleted: ${ref.path}`);
                 }
                 catch (e) { }
             }),
             ...collectionsToFilter.map(async (colPath) => {
                 try {
                     const q = await db.collection(colPath).where('studentId', '==', studentId).get();
-                    const tasks = q.docs.map(doc => deleteRecursive(doc.ref));
+                    const tasks = q.docs.map(doc => db.recursiveDelete(doc.ref));
                     await Promise.all(tasks);
-                    console.log(`[DeleteProcess] Filter-deleted from: ${colPath}`);
+                    console.log(`[DeleteProcess] Filter-deleted: ${colPath}`);
                 }
                 catch (e) { }
             })
         ]);
         console.log(`[DeleteProcess] Finalized deletion for student: ${studentId}`);
-        return { ok: true, message: "수동 재귀 삭제 완료" };
+        return { ok: true, message: "삭제 완료" };
     }
     catch (e) {
-        console.error("[DeleteStudent Main Error]", e);
         throw new functions.https.HttpsError("internal", e.message);
     }
 });
