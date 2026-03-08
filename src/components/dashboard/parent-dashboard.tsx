@@ -41,7 +41,7 @@ import {
   type ParentNotificationItem,
 } from '@/lib/parent-dashboard-model';
 import {
-  type AttendanceCurrent,
+  type \uCD9C\uC11D\uB960Current,
   type DailyReport,
   type GrowthProgress,
   type StudyLogDay,
@@ -333,10 +333,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
             <TabsContent value="reports" className="mt-4 space-y-3">
               <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
-                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Weekly Study Time</p><p className="mt-1 text-lg font-black tracking-tight">{toHm(weekly.totalStudyMinutes)}</p><p className={cn('mt-1 text-xs font-bold', weekly.studyTimeDeltaRate >= 0 ? 'text-emerald-600' : 'text-rose-600')}>{weekly.studyTimeDeltaRate >= 0 ? '+' : ''}{weekly.studyTimeDeltaRate}%</p></CardContent></Card>
-                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Weekly Plan Rate</p><p className="mt-1 text-lg font-black tracking-tight">{weekly.avgPlanCompletionRate}%</p><p className="mt-1 text-xs font-bold text-slate-500">Done {planDone}/{planTotal || 0}</p></CardContent></Card>
-                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Monthly Attendance</p><p className="mt-1 text-lg font-black tracking-tight">{monthly.attendanceRate}%</p><p className="mt-1 text-xs font-bold text-slate-500">Lates {weekly.lateCount}</p></CardContent></Card>
-                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Life Status</p><p className={cn('mt-1 text-lg font-black tracking-tight', penalty < 10 ? 'text-emerald-700' : penalty < 20 ? 'text-amber-700' : 'text-rose-700')}>{behavior.label}</p><p className="mt-1 text-xs font-bold text-slate-500">Penalty {penalty}pt</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">\uC8FC\uAC04 \uCD1D \uACF5\uBD80</p><p className="mt-1 text-lg font-black tracking-tight">{toHm(weekly.totalStudyMinutes)}</p><p className={cn('mt-1 text-xs font-bold', weekly.studyTimeDeltaRate >= 0 ? 'text-emerald-600' : 'text-rose-600')}>{weekly.studyTimeDeltaRate >= 0 ? '+' : ''}{weekly.studyTimeDeltaRate}%</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">\uC8FC\uAC04 \uACC4\uD68D \uB2EC\uC131</p><p className="mt-1 text-lg font-black tracking-tight">{weekly.avgPlanCompletionRate}%</p><p className="mt-1 text-xs font-bold text-slate-500">\uC644\uB8CC {planDone}/{planTotal || 0}</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">\uC6D4\uAC04 \uCD9C\uC11D\uB960</p><p className="mt-1 text-lg font-black tracking-tight">{monthly.attendanceRate}%</p><p className="mt-1 text-xs font-bold text-slate-500">\uC9C0\uAC01 {weekly.lateCount}\uD68C</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">\uC0DD\uD65C \uC0C1\uD0DC</p><p className={cn('mt-1 text-lg font-black tracking-tight', penalty < 10 ? 'text-emerald-700' : penalty < 20 ? 'text-amber-700' : 'text-rose-700')}>{behavior.label}</p><p className="mt-1 text-xs font-bold text-slate-500">\uBC8C\uC810 {penalty}\uC810</p></CardContent></Card>
               </div>
 
               <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -355,9 +355,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">출석률</p><p className="text-lg font-black tracking-tight">{weekly.attendanceRate}%</p></div>
                     </div>
                     <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Plan Completion</span><span>{weekly.avgPlanCompletionRate}%</span></div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>\uACC4\uD68D \uB2EC\uC131\uB960</span><span>{weekly.avgPlanCompletionRate}%</span></div>
                       <Progress value={weekly.avgPlanCompletionRate} className="h-2" />
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Attendance</span><span>{weekly.attendanceRate}%</span></div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>{"\uCD9C\uC11D\uB960"}</span><span>{weekly.attendanceRate}%</span></div>
                       <Progress value={weekly.attendanceRate} className="h-2" />
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -368,7 +368,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700 leading-relaxed">
                       강점 과목: <span className="font-black">{weekly.topSubject}</span> · 보완 과목: <span className="font-black">{weekly.weakSubject}</span>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Teacher Comment</p><p className="mt-1 text-sm font-semibold text-slate-700 leading-relaxed">{weekly.teacherFeedback}</p></div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">\uC120\uC0DD\uB2D8 \uCF54\uBA58\uD2B8</p><p className="mt-1 text-sm font-semibold text-slate-700 leading-relaxed">{weekly.teacherFeedback}</p></div>
                   </CardContent>
                 </Card>
 
@@ -389,9 +389,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">상담 횟수</p><p className="text-lg font-black tracking-tight">{monthly.counselingCount}회</p></div>
                     </div>
                     <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Avg Plan Completion</span><span>{monthly.avgPlanCompletionRate}%</span></div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>\uD3C9\uADE0 \uACC4\uD68D \uB2EC\uC131</span><span>{monthly.avgPlanCompletionRate}%</span></div>
                       <Progress value={monthly.avgPlanCompletionRate} className="h-2" />
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Monthly Attendance</span><span>{monthly.attendanceRate}%</span></div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>\uC6D4\uAC04 \uCD9C\uC11D\uB960</span><span>{monthly.attendanceRate}%</span></div>
                       <Progress value={monthly.attendanceRate} className="h-2" />
                     </div>
                     <div className="rounded-xl bg-[#f8fbff] border border-[#e8f0ff] p-3 text-sm font-semibold text-slate-700">

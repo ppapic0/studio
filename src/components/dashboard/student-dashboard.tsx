@@ -369,14 +369,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const planViewWeekKey = planViewDate ? format(planViewDate, "yyyy-'W'II") : '';
   const isViewingOtherWeek = planWeekOffset !== 0;
   const planViewLabel = planWeekOffset === 0
-    ? 'This Week'
+    ? '\uC774\uBC88 \uC8FC'
     : planWeekOffset === -1
-      ? 'Last Week'
+      ? '\uC9C0\uB09C \uC8FC'
       : planWeekOffset === 1
-        ? 'Next Week'
+        ? '\uB2E4\uC74C \uC8FC'
         : planWeekOffset < 0
-          ? `${Math.abs(planWeekOffset)}w ago`
-          : `${planWeekOffset}w later`;
+          ? `${Math.abs(planWeekOffset)}\uC8FC \uC804`
+          : `${planWeekOffset}\uC8FC \uD6C4`;
   const planWeekRangeLabel = planViewDate
     ? `${format(startOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')} ~ ${format(endOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')}`
     : '';
@@ -633,7 +633,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !progressRef || !planViewWeekKey || !todayPlans) return;
     if (isViewingOtherWeek) {
-      toast({ title: 'Read-only view', description: 'Past and future week plans can only be viewed.' });
+      toast({ title: '\uC77D\uAE30 \uC804\uC6A9 \uD654\uBA74', description: '\uC9C0\uB09C \uC8FC/\uB2E4\uC74C \uC8FC \uACC4\uD68D\uC740 \uD655\uC778\uB9CC \uAC00\uB2A5\uD569\uB2C8\uB2E4.' });
       return;
     }
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items', item.id);
@@ -815,14 +815,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full text-slate-500" onClick={() => setPlanWeekOffset((prev) => prev - 1)}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <Button type="button" size="sm" variant="ghost" className={cn("h-7 rounded-full px-2 text-[10px] font-black", planWeekOffset === 0 ? "bg-[#eaf2ff] text-[#1b64da]" : "text-slate-500")} onClick={() => setPlanWeekOffset(0)}>This Week</Button>
+                  <Button type="button" size="sm" variant="ghost" className={cn("h-7 rounded-full px-2 text-[10px] font-black", planWeekOffset === 0 ? "bg-[#eaf2ff] text-[#1b64da]" : "text-slate-500")} onClick={() => setPlanWeekOffset(0)}>{'\uC774\uBC88 \uC8FC'}</Button>
                   <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full text-slate-500" onClick={() => setPlanWeekOffset((prev) => prev + 1)}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
                 <Badge variant="outline" className="h-6 rounded-full border-slate-200 bg-white text-[10px] font-black text-slate-600">{planViewLabel}</Badge>
                 <span className="text-[11px] font-bold text-slate-500">{planWeekRangeLabel}</span>
-                {isViewingOtherWeek && <Badge className="h-6 rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black text-amber-700">READ ONLY</Badge>}
+                {isViewingOtherWeek && <Badge className="h-6 rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black text-amber-700">{'\uC77D\uAE30 \uC804\uC6A9'}</Badge>}
               </div>
             </CardHeader>
             <CardContent className={cn("bg-white", isMobile ? "p-5" : "p-8")}>
