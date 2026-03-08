@@ -1,0 +1,121 @@
+
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "type": "object",
+      "description": "사용자의 기본 프로필 정보",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "displayName", "createdAt"]
+    },
+    "Center": {
+      "title": "Center",
+      "type": "object",
+      "description": "학습 센터 정보 및 재무 설정",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "financeSettings": {
+          "type": "object",
+          "properties": {
+            "fixedCosts": { "type": "number", "description": "월 고정비 총액" },
+            "refundPolicy": {
+              "type": "object",
+              "properties": {
+                "penaltyType": { "type": "string", "enum": ["none", "rate", "fixed"] },
+                "penaltyRate": { "type": "number" },
+                "penaltyFixed": { "type": "number" }
+              }
+            },
+            "discountPolicy": {
+              "type": "object",
+              "properties": {
+                "order": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Pricing": {
+      "title": "Pricing",
+      "type": "object",
+      "description": "시즌/학생타입별 28일 기준 기본가",
+      "properties": {
+        "productId": { "type": "string" },
+        "season": { "type": "string", "enum": ["semester", "vacation"] },
+        "studentType": { "type": "string", "enum": ["student", "n_student"] },
+        "basePrice": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "type": "object",
+      "description": "결제 영수증 및 수납 상태",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "cycleStartDate": { "type": "string", "format": "date" },
+        "cycleEndDate": { "type": "string", "format": "date" },
+        "finalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["issued", "paid", "refunded", "void", "overdue"] },
+        "paymentMethod": { "type": "string", "enum": ["card", "transfer", "cash", "none"] },
+        "paidAt": { "type": "string", "format": "date-time" },
+        "transactionId": { "type": "string" }
+      }
+    },
+    "Payment": {
+      "title": "Payment",
+      "type": "object",
+      "description": "실제 결제 트랜잭션 기록",
+      "properties": {
+        "invoiceId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "status": { "type": "string" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "KpiDaily": {
+      "title": "KpiDaily",
+      "type": "object",
+      "description": "일별 재무 지표 집계",
+      "properties": {
+        "totalRevenue": { "type": "number" },
+        "collectedRevenue": { "type": "number", "description": "실제 수납액" },
+        "totalDiscount": { "type": "number" },
+        "totalRefund": { "type": "number" },
+        "activeStudentCount": { "type": "number" },
+        "breakevenStudents": { "type": "number" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/centers/{centerId}/pricing/{pricingId}": {
+      "schema": { "$ref": "#/entities/Pricing" },
+      "description": "가격 매트릭스"
+    },
+    "/centers/{centerId}/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "결제 내역 및 인보이스"
+    },
+    "/centers/{centerId}/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "결제 트랜잭션 로그"
+    },
+    "/centers/{centerId}/kpiDaily/{date}": {
+      "schema": { "$ref": "#/entities/KpiDaily" },
+      "description": "일별 KPI 통계"
+    }
+  }
+}

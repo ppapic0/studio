@@ -1,0 +1,159 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getMemberRole(centerId) {
+      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function getMemberStatus(centerId) {
+      return get(/databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid)).data.status;
+    }
+
+    function isActiveMember(centerId) {
+      return isSignedIn() && getMemberStatus(centerId) == 'active';
+    }
+
+    function isCenterAdmin(centerId) {
+      return isSignedIn() && getMemberRole(centerId) == 'centerAdmin';
+    }
+
+    function isTeacherOrAdmin(centerId) {
+      return isSignedIn() && (getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin');
+    }
+
+    function isStudent(centerId) {
+      return isSignedIn() && getMemberRole(centerId) == 'student';
+    }
+
+    function isParent(centerId) {
+      return isSignedIn() && getMemberRole(centerId) == 'parent';
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /inviteCodes/{code} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /userCenters/{userId}/centers/{centerId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /centers/{centerId} {
+      allow read: if isActiveMember(centerId);
+      allow write: if isCenterAdmin(centerId);
+
+      match /members/{memberId} {
+        allow read: if isTeacherOrAdmin(centerId) || (isSignedIn() && request.auth.uid == memberId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /students/{studentId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId)
+          || isParent(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /growthProgress/{studentId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId)
+          || isParent(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /attendanceCurrent/{seatId} {
+        allow read: if isActiveMember(centerId);
+        allow write: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+      }
+
+      match /studyLogs/{studentId}/days/{dateKey} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId)
+          || isParent(centerId);
+        allow write: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId);
+      }
+
+      match /dailyStudentStats/{dateKey}/students/{studentId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == studentId)
+          || isParent(centerId);
+        allow write: if isTeacherOrAdmin(centerId);
+      }
+
+      match /kpiDaily/{dateKey} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /invoices/{invoiceId} {
+        allow read: if isCenterAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isParent(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /payments/{paymentId} {
+        allow read: if isCenterAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /dailyReports/{reportId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && request.auth.uid == reportId)
+          || isParent(centerId);
+        allow create: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt']));
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /counselingReservations/{resId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
+        allow create: if isActiveMember(centerId);
+        allow update: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /counselingLogs/{logId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isParent(centerId);
+        allow write: if isTeacherOrAdmin(centerId);
+      }
+
+      match /attendanceRequests/{reqId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+        allow create: if isStudent(centerId) && request.resource.data.studentId == request.auth.uid;
+        allow update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /leaderboards/{boardId}/entries/{entryId} {
+        allow read: if isActiveMember(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /{document=**} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+    }
+  }
+}
