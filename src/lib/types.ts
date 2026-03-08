@@ -15,7 +15,7 @@ export interface User {
 
 export interface CenterMembership {
   id: string; 
-  role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
   status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;

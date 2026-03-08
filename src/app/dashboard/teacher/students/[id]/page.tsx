@@ -192,6 +192,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const progressRef = useMemoFirebase(() => (!firestore || !centerId) ? null : doc(firestore, 'centers', centerId, 'growthProgress', studentId), [firestore, centerId, studentId]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef);
 
+  const centerMembersQuery = useMemoFirebase(() => (!firestore || !centerId)
+    ? null
+    : query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student')),
+  [firestore, centerId]);
+  const { data: centerStudents } = useCollection<CenterMembership>(centerMembersQuery, { enabled: !!centerId });
+
+  const availableClasses = useMemo(() => {
+    const classes = new Set<string>();
+    centerStudents?.forEach((member) => {
+      if (member.className) classes.add(member.className);
+    });
+    if (student?.className) classes.add(student.className);
+    return Array.from(classes).sort();
+  }, [centerStudents, student?.className]);
+
   useEffect(() => {
     if (progress) {
       setEditLp(progress.seasonLp || 0);
@@ -213,20 +228,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [student]);
 
   const handleUpdateInfo = async () => {
-    if (!functions || !centerId || !studentId || !firestore) return;
+    if (!functions || !centerId || !studentId) return;
     setIsUpdating(true);
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
-      await updateFn({ studentId, centerId, displayName: editForm.name, schoolName: editForm.schoolName, grade: editForm.grade, password: editForm.password.length >= 6 ? editForm.password : undefined, parentLinkCode: editForm.parentLinkCode.trim() || null });
-      const batch = writeBatch(firestore);
-      const upd = { className: editForm.className, updatedAt: serverTimestamp() };
-      batch.update(doc(firestore, 'centers', centerId, 'members', studentId), upd);
-      batch.update(doc(firestore, 'centers', centerId, 'students', studentId), upd);
-      batch.update(doc(firestore, 'userCenters', studentId, 'centers', centerId), upd);
-      await batch.commit();
-      toast({ title: "정보 수정 완료" });
+      await updateFn({
+        studentId,
+        centerId,
+        displayName: editForm.name,
+        schoolName: editForm.schoolName,
+        grade: editForm.grade,
+        password: editForm.password.length >= 6 ? editForm.password : undefined,
+        parentLinkCode: editForm.parentLinkCode.trim() || null,
+        className: editForm.className || null,
+      });
+      toast({ title: '정보 수정 완료' });
       setIsEditModalOpen(false);
-    } catch (e) { toast({ variant: "destructive", title: "수정 실패" }); } finally { setIsUpdating(false); }
+    } catch (e) {
+      toast({ variant: 'destructive', title: '수정 실패' });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleUpdateGrowthData = async () => {

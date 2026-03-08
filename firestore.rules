@@ -39,11 +39,11 @@ service cloud.firestore {
     }
 
     function isCenterAdmin(centerId) {
-      return getMemberRole(centerId) == 'centerAdmin';
+      return getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner';
     }
 
     function isTeacherOrAdmin(centerId) {
-      return getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin';
+      return getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner';
     }
 
     function isStudent(centerId) {

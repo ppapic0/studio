@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 
 export type CenterMembership = {
   id: string; // centerId
-  role: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
   status: 'active' | 'pending' | 'inactive';
   joinedAt: any;
   displayName?: string;
@@ -69,6 +69,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const activeMembershipRef = useRef<string | null>(null);
 
+  const normalizeRole = (role: CenterMembership['role'] | string | undefined): CenterMembership['role'] => {
+    if (role === 'owner') return 'centerAdmin';
+    if (role === 'student' || role === 'teacher' || role === 'parent' || role === 'centerAdmin') return role;
+    return 'student';
+  };
+
   useEffect(() => {
     if (!user || !firestore) {
       setMemberships([]);
@@ -83,10 +89,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
     
     const unsubscribe = onSnapshot(userCentersRef, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as CenterMembership));
+      const fetched = snapshot.docs.map((docSnap) => {
+        const raw = docSnap.data() as any;
+        return {
+          id: docSnap.id,
+          ...raw,
+          role: normalizeRole(raw.role),
+        } as CenterMembership;
+      });
 
       setMemberships(fetched);
       const active = fetched.find(m => m.status === 'active') || fetched[0] || null;

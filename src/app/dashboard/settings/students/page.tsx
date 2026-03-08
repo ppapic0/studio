@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, serverTimestamp, setDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { 
   Search, 
@@ -92,8 +92,7 @@ export default function StudentAccountManagementPage() {
 
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
-  const isAdmin = activeMembership?.role === 'centerAdmin';
-  const periodKey = format(new Date(), 'yyyy-MM');
+  const isAdmin = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
   // 1. 센터 모든 학생 멤버 조회
@@ -175,77 +174,34 @@ export default function StudentAccountManagementPage() {
   };
 
   const handleUpdateStudent = async () => {
-    if (!functions || !centerId || !selectedStudentForEdit || !firestore) return;
+    if (!functions || !centerId || !selectedStudentForEdit) return;
     
     setIsUpdating(selectedStudentForEdit.id);
     try {
-      // 1. Auth 및 기본 프로필 업데이트 (10분 타임아웃 적용)
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
-      const authPayload: any = {
+      const payload: any = {
         studentId: selectedStudentForEdit.id,
         centerId,
         displayName: editForm.displayName.trim() || undefined,
         schoolName: editForm.schoolName.trim() || undefined,
         grade: editForm.grade || undefined,
-        parentLinkCode: editForm.parentLinkCode.trim() || undefined
+        parentLinkCode: editForm.parentLinkCode.trim() || undefined,
+        className: editForm.className || null,
+        seasonLp: editForm.seasonLp,
+        stats: editForm.stats,
+        todayStudyMinutes: editForm.todayStudyMinutes,
+        dateKey: todayKey,
       };
 
       if (editForm.password.trim().length >= 6) {
-        authPayload.password = editForm.password.trim();
+        payload.password = editForm.password.trim();
       }
 
-      await updateFn(authPayload);
-
-      // 2. Firestore 파편화 데이터 통합 업데이트
-      const batch = writeBatch(firestore);
-      const studentId = selectedStudentForEdit.id;
-
-      const memberRef = doc(firestore, 'centers', centerId, 'members', studentId);
-      const studentRef = doc(firestore, 'centers', centerId, 'students', studentId);
-      const userCenterRef = doc(firestore, 'userCenters', studentId, 'centers', centerId);
-      
-      const classData = { 
-        className: editForm.className || null, 
-        displayName: editForm.displayName,
-        schoolName: editForm.schoolName,
-        grade: editForm.grade,
-        updatedAt: serverTimestamp() 
-      };
-      
-      batch.update(memberRef, classData);
-      batch.set(studentRef, { ...classData, name: editForm.displayName }, { merge: true });
-      batch.update(userCenterRef, { className: editForm.className || null, updatedAt: serverTimestamp() });
-
-      // 성장 지표(LP, Stats) 보정
-      const progRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-      batch.set(progRef, {
-        seasonLp: editForm.seasonLp,
-        stats: editForm.stats,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      // 오늘 공부 시간 보정
-      const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
-      batch.set(statRef, { 
-        totalStudyMinutes: editForm.todayStudyMinutes,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      // 랭킹 스냅샷 업데이트
-      const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
-      batch.set(rankRef, {
-        studentId,
-        displayNameSnapshot: editForm.displayName,
-        classNameSnapshot: editForm.className || null,
-        value: editForm.seasonLp,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await batch.commit();
-      toast({ title: "데이터 통합 보정 완료" });
+      await updateFn(payload);
+      toast({ title: '학생 데이터가 업데이트되었습니다.' });
       setIsEditModalOpen(false);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "수정 실패", description: e.message });
+      toast({ variant: 'destructive', title: '수정 실패', description: e.message });
     } finally {
       setIsUpdating(null);
     }

@@ -1,17 +1,39 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteStudentAccount = void 0;
+exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 const region = "asia-northeast3";
+const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
+const adminRoles = new Set(["centerAdmin", "owner"]);
+function isAdminRole(role) {
+    return typeof role === "string" && adminRoles.has(role);
+}
+function assertInviteUsable(inv, expectedRole) {
+    if (!allowedRoles.includes(inv.intendedRole)) {
+        throw new Error("Invalid role in invite");
+    }
+    if (expectedRole && inv.intendedRole !== expectedRole) {
+        throw new Error("Invite role mismatch");
+    }
+    if (inv.isActive === false) {
+        throw new Error("Inactive code");
+    }
+    if (typeof inv.maxUses === "number" && typeof inv.usedCount === "number" && inv.usedCount >= inv.maxUses) {
+        throw new Error("Code usage exceeded");
+    }
+    if (inv.expiresAt && inv.expiresAt.toMillis && inv.expiresAt.toMillis() < Date.now()) {
+        throw new Error("Code expired");
+    }
+}
 exports.deleteStudentAccount = functions.region(region).runWith({
     timeoutSeconds: 540,
     memory: "1GB",
 }).https.onCall(async (data, context) => {
-    var _a;
+    var _a, _b;
     const db = admin.firestore();
     const auth = admin.auth();
     if (!context.auth)
@@ -20,16 +42,16 @@ exports.deleteStudentAccount = functions.region(region).runWith({
     if (!studentId || !centerId)
         throw new functions.https.HttpsError("invalid-argument", "ID 누락");
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    if (!callerMemberSnap.exists || ((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role) !== "centerAdmin") {
+    if (!callerMemberSnap.exists || !isAdminRole((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role)) {
         throw new functions.https.HttpsError("permission-denied", "센터 관리자만 삭제 가능합니다.");
     }
+    const targetMemberRef = db.doc(`centers/${centerId}/members/${studentId}`);
+    const targetMemberSnap = await targetMemberRef.get();
+    if (!targetMemberSnap.exists || ((_b = targetMemberSnap.data()) === null || _b === void 0 ? void 0 : _b.role) !== "student") {
+        throw new functions.https.HttpsError("failed-precondition", "해당 센터의 학생 계정만 삭제할 수 있습니다.");
+    }
     try {
-        try {
-            await auth.deleteUser(studentId);
-        }
-        catch (_b) {
-            console.log("Auth already gone");
-        }
+        const errors = [];
         const paths = [
             `users/${studentId}`,
             `userCenters/${studentId}`,
@@ -46,26 +68,36 @@ exports.deleteStudentAccount = functions.region(region).runWith({
             `centers/${centerId}/attendanceRequests`,
             `centers/${centerId}/dailyReports`,
         ];
-        await Promise.allSettled([
-            ...paths.map(async (p) => {
+        await Promise.all([
+            ...paths.map(async (path) => {
                 try {
-                    await db.recursiveDelete(db.doc(p));
+                    await db.recursiveDelete(db.doc(path));
                 }
-                catch (_a) {
-                    // best effort delete
+                catch (e) {
+                    errors.push(`${path}: ${(e === null || e === void 0 ? void 0 : e.message) || "delete failed"}`);
                 }
             }),
-            ...filterCols.map(async (cp) => {
+            ...filterCols.map(async (colPath) => {
                 try {
-                    const q = await db.collection(cp).where("studentId", "==", studentId).get();
-                    const tasks = q.docs.map((doc) => db.recursiveDelete(doc.ref));
-                    await Promise.all(tasks);
+                    const q = await db.collection(colPath).where("studentId", "==", studentId).get();
+                    await Promise.all(q.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
                 }
-                catch (_a) {
-                    // best effort delete
+                catch (e) {
+                    errors.push(`${colPath}: ${(e === null || e === void 0 ? void 0 : e.message) || "query delete failed"}`);
                 }
             }),
         ]);
+        if (errors.length > 0) {
+            throw new Error(`학생 데이터 일부 삭제 실패 (${errors.length}건)`);
+        }
+        try {
+            await auth.deleteUser(studentId);
+        }
+        catch (e) {
+            if ((e === null || e === void 0 ? void 0 : e.code) !== "auth/user-not-found") {
+                throw e;
+            }
+        }
         return { ok: true, message: "정리가 완료되었습니다." };
     }
     catch (error) {
@@ -76,51 +108,104 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     var _a;
     const db = admin.firestore();
     const auth = admin.auth();
-    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
+    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     if (!studentId || !centerId)
         throw new functions.https.HttpsError("invalid-argument", "ID 누락");
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    if (!callerMemberSnap.exists || ((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role) !== "centerAdmin") {
+    const callerMemberSnap = await db.doc("centers/" + centerId + "/members/" + context.auth.uid).get();
+    if (!callerMemberSnap.exists || !isAdminRole((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role)) {
         throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수정 가능합니다.");
     }
     try {
         const authUpdates = {};
-        if (password)
-            authUpdates.password = password;
-        if (displayName)
-            authUpdates.displayName = displayName;
+        if (typeof password === "string" && password.trim().length >= 6)
+            authUpdates.password = password.trim();
+        if (typeof displayName === "string" && displayName.trim())
+            authUpdates.displayName = displayName.trim();
         if (Object.keys(authUpdates).length > 0) {
             try {
                 await auth.updateUser(studentId, authUpdates);
             }
             catch (authError) {
-                console.warn(`Auth update skipped for ${studentId}: ${authError.message}`);
+                console.warn("Auth update skipped for " + studentId + ": " + authError.message);
             }
         }
         const timestamp = admin.firestore.Timestamp.now();
         const batch = db.batch();
-        if (displayName || schoolName) {
-            const uUp = { updatedAt: timestamp };
-            if (displayName)
-                uUp.displayName = displayName;
-            if (schoolName)
-                uUp.schoolName = schoolName;
-            batch.set(db.doc(`users/${studentId}`), uUp, { merge: true });
+        const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
+        const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
+        const hasClassName = className !== undefined;
+        const normalizedClassName = hasClassName
+            ? (typeof className === "string" && className.trim() ? className.trim() : null)
+            : undefined;
+        if (trimmedDisplayName || trimmedSchoolName) {
+            const userUpdate = { updatedAt: timestamp };
+            if (trimmedDisplayName)
+                userUpdate.displayName = trimmedDisplayName;
+            if (trimmedSchoolName)
+                userUpdate.schoolName = trimmedSchoolName;
+            batch.set(db.doc("users/" + studentId), userUpdate, { merge: true });
         }
-        const sUp = { updatedAt: timestamp };
-        if (displayName)
-            sUp.name = displayName;
-        if (schoolName)
-            sUp.schoolName = schoolName;
+        const studentUpdate = { updatedAt: timestamp };
+        if (trimmedDisplayName)
+            studentUpdate.name = trimmedDisplayName;
+        if (trimmedSchoolName)
+            studentUpdate.schoolName = trimmedSchoolName;
         if (grade)
-            sUp.grade = grade;
+            studentUpdate.grade = grade;
         if (parentLinkCode !== undefined)
-            sUp.parentLinkCode = parentLinkCode;
-        batch.set(db.doc(`centers/${centerId}/students/${studentId}`), sUp, { merge: true });
-        if (displayName) {
-            batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
+            studentUpdate.parentLinkCode = parentLinkCode;
+        if (hasClassName)
+            studentUpdate.className = normalizedClassName;
+        batch.set(db.doc("centers/" + centerId + "/students/" + studentId), studentUpdate, { merge: true });
+        const memberUpdate = { updatedAt: timestamp };
+        if (trimmedDisplayName)
+            memberUpdate.displayName = trimmedDisplayName;
+        if (hasClassName)
+            memberUpdate.className = normalizedClassName;
+        batch.set(db.doc("centers/" + centerId + "/members/" + studentId), memberUpdate, { merge: true });
+        if (hasClassName) {
+            batch.set(db.doc("userCenters/" + studentId + "/centers/" + centerId), {
+                className: normalizedClassName,
+                updatedAt: timestamp,
+            }, { merge: true });
+        }
+        const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
+        const hasStats = !!stats && typeof stats === "object";
+        if (hasSeasonLp || hasStats) {
+            const progressUpdate = { updatedAt: timestamp };
+            if (hasSeasonLp)
+                progressUpdate.seasonLp = seasonLp;
+            if (hasStats)
+                progressUpdate.stats = stats;
+            batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
+        }
+        const safeDateKey = (typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey))
+            ? dateKey
+            : new Date().toISOString().slice(0, 10);
+        if (typeof todayStudyMinutes === "number" && Number.isFinite(todayStudyMinutes)) {
+            batch.set(db.doc("centers/" + centerId + "/dailyStudentStats/" + safeDateKey + "/students/" + studentId), {
+                totalStudyMinutes: todayStudyMinutes,
+                studentId,
+                centerId,
+                dateKey: safeDateKey,
+                updatedAt: timestamp,
+            }, { merge: true });
+        }
+        if (hasSeasonLp || trimmedDisplayName || hasClassName) {
+            const periodKey = safeDateKey.slice(0, 7);
+            const rankUpdate = {
+                studentId,
+                updatedAt: timestamp,
+            };
+            if (hasSeasonLp)
+                rankUpdate.value = seasonLp;
+            if (trimmedDisplayName)
+                rankUpdate.displayNameSnapshot = trimmedDisplayName;
+            if (hasClassName)
+                rankUpdate.classNameSnapshot = normalizedClassName;
+            batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, { merge: true });
         }
         await batch.commit();
         return { ok: true };
@@ -140,7 +225,7 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
         throw new functions.https.HttpsError("invalid-argument", "필수값 누락");
     }
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    if (!callerMemberSnap.exists || ((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role) !== "centerAdmin") {
+    if (!callerMemberSnap.exists || !isAdminRole((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role)) {
         throw new functions.https.HttpsError("permission-denied", "센터 관리자만 학생 계정을 생성할 수 있습니다.");
     }
     try {
@@ -152,7 +237,12 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
             t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName });
             t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
-            t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), { seasonLp: 0, penaltyPoints: 0, stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 }, updatedAt: timestamp });
+            t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
+                seasonLp: 0,
+                penaltyPoints: 0,
+                stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+                updatedAt: timestamp,
+            });
         });
         return { ok: true, uid };
     }
@@ -171,26 +261,181 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
     const callerDisplayName = context.auth.token.name || null;
     try {
         return await db.runTransaction(async (t) => {
-            const snap = await t.get(db.doc(`inviteCodes/${code}`));
-            if (!snap.exists)
+            const inviteRef = db.doc(`inviteCodes/${code}`);
+            const inviteSnap = await t.get(inviteRef);
+            if (!inviteSnap.exists)
                 throw new Error("Invalid code");
-            const inv = snap.data();
-            if (inv.isActive === false)
-                throw new Error("Inactive code");
-            if (typeof inv.maxUses === "number" && typeof inv.usedCount === "number" && inv.usedCount >= inv.maxUses) {
-                throw new Error("Code usage exceeded");
-            }
-            if (inv.expiresAt && inv.expiresAt.toMillis && inv.expiresAt.toMillis() < Date.now()) {
-                throw new Error("Code expired");
+            const inv = inviteSnap.data();
+            assertInviteUsable(inv);
+            const membershipRef = db.doc(`userCenters/${uid}/centers/${inv.centerId}`);
+            const existingMembership = await t.get(membershipRef);
+            if (existingMembership.exists) {
+                throw new Error("Already joined center");
             }
             const ts = admin.firestore.Timestamp.now();
-            t.set(db.doc(`userCenters/${uid}/centers/${inv.centerId}`), { id: inv.centerId, role: inv.intendedRole, status: "active", joinedAt: ts, className: inv.targetClassName || null });
-            t.set(db.doc(`centers/${inv.centerId}/members/${uid}`), { id: uid, role: inv.intendedRole, status: "active", joinedAt: ts, displayName: callerDisplayName, className: inv.targetClassName || null });
-            t.update(db.doc(`inviteCodes/${code}`), { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
-            return { ok: true };
+            t.set(membershipRef, {
+                id: inv.centerId,
+                role: inv.intendedRole,
+                status: "active",
+                joinedAt: ts,
+                className: inv.targetClassName || null,
+            });
+            t.set(db.doc(`centers/${inv.centerId}/members/${uid}`), {
+                id: uid,
+                role: inv.intendedRole,
+                status: "active",
+                joinedAt: ts,
+                displayName: callerDisplayName,
+                className: inv.targetClassName || null,
+            });
+            t.update(inviteRef, { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
+            return { ok: true, message: "센터 가입이 완료되었습니다." };
         });
     }
     catch (e) {
+        throw new functions.https.HttpsError("internal", e.message);
+    }
+});
+exports.completeSignupWithInvite = functions.region(region).https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth)
+        throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+    const uid = context.auth.uid;
+    const role = data === null || data === void 0 ? void 0 : data.role;
+    const code = String((data === null || data === void 0 ? void 0 : data.code) || "").trim();
+    const schoolName = String((data === null || data === void 0 ? void 0 : data.schoolName) || "").trim();
+    const grade = String((data === null || data === void 0 ? void 0 : data.grade) || "고등학생").trim();
+    const parentLinkCode = String((data === null || data === void 0 ? void 0 : data.parentLinkCode) || "").trim();
+    const studentLinkCode = String((data === null || data === void 0 ? void 0 : data.studentLinkCode) || "").trim();
+    const displayNameInput = String((data === null || data === void 0 ? void 0 : data.displayName) || "").trim();
+    if (!code)
+        throw new functions.https.HttpsError("invalid-argument", "초대코드 누락");
+    if (!allowedRoles.includes(role))
+        throw new functions.https.HttpsError("invalid-argument", "역할 값이 올바르지 않습니다.");
+    const emailFromToken = context.auth.token.email || null;
+    const tokenDisplayName = context.auth.token.name || null;
+    try {
+        return await db.runTransaction(async (t) => {
+            const inviteRef = db.doc(`inviteCodes/${code}`);
+            const inviteSnap = await t.get(inviteRef);
+            if (!inviteSnap.exists) {
+                throw new functions.https.HttpsError("failed-precondition", "유효하지 않은 초대코드입니다.");
+            }
+            const inviteData = inviteSnap.data();
+            assertInviteUsable(inviteData, role);
+            const centerId = inviteData.centerId;
+            const targetClassName = inviteData.targetClassName || null;
+            if (!centerId) {
+                throw new functions.https.HttpsError("failed-precondition", "센터 정보가 없는 초대코드입니다.");
+            }
+            const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
+            const existingMembership = await t.get(userCenterRef);
+            if (existingMembership.exists) {
+                throw new functions.https.HttpsError("already-exists", "이미 가입된 센터입니다.");
+            }
+            const ts = admin.firestore.Timestamp.now();
+            let resolvedDisplayName = displayNameInput || tokenDisplayName || "사용자";
+            let linkedStudentIds = [];
+            if (role === "student") {
+                if (!schoolName) {
+                    throw new functions.https.HttpsError("invalid-argument", "학생 가입에는 학교명이 필요합니다.");
+                }
+                if (!/^\d{6}$/.test(parentLinkCode)) {
+                    throw new functions.https.HttpsError("invalid-argument", "학생 가입에는 6자리 부모 연동 코드가 필요합니다.");
+                }
+            }
+            if (role === "parent") {
+                if (!/^\d{6}$/.test(studentLinkCode)) {
+                    throw new functions.https.HttpsError("invalid-argument", "부모 가입에는 6자리 자녀 연동 코드가 필요합니다.");
+                }
+                const studentQuery = db
+                    .collection(`centers/${centerId}/students`)
+                    .where("parentLinkCode", "==", studentLinkCode)
+                    .limit(1);
+                const studentSnap = await t.get(studentQuery);
+                if (studentSnap.empty) {
+                    throw new functions.https.HttpsError("failed-precondition", "연동 코드를 가진 학생을 찾을 수 없습니다.");
+                }
+                const linkedStudentDoc = studentSnap.docs[0];
+                const linkedStudentData = linkedStudentDoc.data();
+                linkedStudentIds = [linkedStudentDoc.id];
+                if (!displayNameInput) {
+                    resolvedDisplayName = `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
+                }
+                t.set(linkedStudentDoc.ref, {
+                    parentUids: admin.firestore.FieldValue.arrayUnion(uid),
+                    updatedAt: ts,
+                }, { merge: true });
+            }
+            t.set(db.doc(`users/${uid}`), {
+                id: uid,
+                email: emailFromToken,
+                displayName: resolvedDisplayName,
+                schoolName: schoolName || "",
+                updatedAt: ts,
+                createdAt: ts,
+            }, { merge: true });
+            const memberData = {
+                id: uid,
+                centerId,
+                role,
+                status: "active",
+                joinedAt: ts,
+                displayName: resolvedDisplayName,
+                className: targetClassName,
+            };
+            if (linkedStudentIds.length > 0) {
+                memberData.linkedStudentIds = linkedStudentIds;
+            }
+            const userCenterData = {
+                id: centerId,
+                centerId,
+                role,
+                status: "active",
+                joinedAt: ts,
+                className: targetClassName,
+            };
+            if (linkedStudentIds.length > 0) {
+                userCenterData.linkedStudentIds = linkedStudentIds;
+            }
+            t.set(db.doc(`centers/${centerId}/members/${uid}`), memberData, { merge: true });
+            t.set(userCenterRef, userCenterData, { merge: true });
+            if (role === "student") {
+                t.set(db.doc(`centers/${centerId}/students/${uid}`), {
+                    id: uid,
+                    name: resolvedDisplayName,
+                    schoolName,
+                    grade,
+                    className: targetClassName,
+                    seatNo: 0,
+                    targetDailyMinutes: 360,
+                    parentUids: [],
+                    parentLinkCode,
+                    createdAt: ts,
+                    updatedAt: ts,
+                }, { merge: true });
+                t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
+                    level: 1,
+                    currentXp: 0,
+                    nextLevelXp: 1000,
+                    seasonLp: 0,
+                    penaltyPoints: 0,
+                    stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+                    skills: {},
+                    updatedAt: ts,
+                }, { merge: true });
+            }
+            t.update(inviteRef, {
+                usedCount: admin.firestore.FieldValue.increment(1),
+                updatedAt: ts,
+            });
+            return { ok: true, centerId, role };
+        });
+    }
+    catch (e) {
+        if (e instanceof functions.https.HttpsError) {
+            throw e;
+        }
         throw new functions.https.HttpsError("internal", e.message);
     }
 });

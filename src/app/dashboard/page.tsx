@@ -83,7 +83,7 @@ export default function DashboardPage() {
     const userRole = activeMembership.role;
     
     // 센터 관리자는 KPI 대시보드를 홈으로 사용
-    if (userRole === 'centerAdmin') {
+    if (userRole === 'centerAdmin' || userRole === 'owner') {
       return <AdminDashboard isActive={true} />;
     }
 

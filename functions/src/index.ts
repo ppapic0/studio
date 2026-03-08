@@ -7,6 +7,7 @@ if (admin.apps.length === 0) {
 
 const region = "asia-northeast3";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
+const adminRoles = new Set(["centerAdmin", "owner"]);
 type AllowedRole = (typeof allowedRoles)[number];
 
 type InviteDoc = {
@@ -18,6 +19,10 @@ type InviteDoc = {
   usedCount?: number;
   expiresAt?: admin.firestore.Timestamp;
 };
+
+function isAdminRole(role: unknown): boolean {
+  return typeof role === "string" && adminRoles.has(role);
+}
 
 function assertInviteUsable(inv: InviteDoc, expectedRole?: AllowedRole) {
   if (!allowedRoles.includes(inv.intendedRole)) {
@@ -50,7 +55,7 @@ export const deleteStudentAccount = functions.region(region).runWith({
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
   const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== "centerAdmin") {
+  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
     throw new functions.https.HttpsError("permission-denied", "센터 관리자만 삭제 가능합니다.");
   }
 
@@ -120,48 +125,113 @@ export const deleteStudentAccount = functions.region(region).runWith({
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
-  const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
+  const {
+    studentId,
+    centerId,
+    password,
+    displayName,
+    schoolName,
+    grade,
+    parentLinkCode,
+    className,
+    seasonLp,
+    stats,
+    todayStudyMinutes,
+    dateKey,
+  } = data;
 
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== "centerAdmin") {
+  const callerMemberSnap = await db.doc("centers/" + centerId + "/members/" + context.auth.uid).get();
+  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
     throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수정 가능합니다.");
   }
 
   try {
     const authUpdates: any = {};
-    if (password) authUpdates.password = password;
-    if (displayName) authUpdates.displayName = displayName;
+    if (typeof password === "string" && password.trim().length >= 6) authUpdates.password = password.trim();
+    if (typeof displayName === "string" && displayName.trim()) authUpdates.displayName = displayName.trim();
 
     if (Object.keys(authUpdates).length > 0) {
       try {
         await auth.updateUser(studentId, authUpdates);
       } catch (authError: any) {
-        console.warn(`Auth update skipped for ${studentId}: ${authError.message}`);
+        console.warn("Auth update skipped for " + studentId + ": " + authError.message);
       }
     }
 
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
+    const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
+    const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
+    const hasClassName = className !== undefined;
+    const normalizedClassName = hasClassName
+      ? (typeof className === "string" && className.trim() ? className.trim() : null)
+      : undefined;
 
-    if (displayName || schoolName) {
+    if (trimmedDisplayName || trimmedSchoolName) {
       const userUpdate: any = { updatedAt: timestamp };
-      if (displayName) userUpdate.displayName = displayName;
-      if (schoolName) userUpdate.schoolName = schoolName;
-      batch.set(db.doc(`users/${studentId}`), userUpdate, { merge: true });
+      if (trimmedDisplayName) userUpdate.displayName = trimmedDisplayName;
+      if (trimmedSchoolName) userUpdate.schoolName = trimmedSchoolName;
+      batch.set(db.doc("users/" + studentId), userUpdate, { merge: true });
     }
 
     const studentUpdate: any = { updatedAt: timestamp };
-    if (displayName) studentUpdate.name = displayName;
-    if (schoolName) studentUpdate.schoolName = schoolName;
+    if (trimmedDisplayName) studentUpdate.name = trimmedDisplayName;
+    if (trimmedSchoolName) studentUpdate.schoolName = trimmedSchoolName;
     if (grade) studentUpdate.grade = grade;
     if (parentLinkCode !== undefined) studentUpdate.parentLinkCode = parentLinkCode;
-    batch.set(db.doc(`centers/${centerId}/students/${studentId}`), studentUpdate, { merge: true });
+    if (hasClassName) studentUpdate.className = normalizedClassName;
+    batch.set(db.doc("centers/" + centerId + "/students/" + studentId), studentUpdate, { merge: true });
 
-    if (displayName) {
-      batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
+    const memberUpdate: any = { updatedAt: timestamp };
+    if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
+    if (hasClassName) memberUpdate.className = normalizedClassName;
+    batch.set(db.doc("centers/" + centerId + "/members/" + studentId), memberUpdate, { merge: true });
+
+    if (hasClassName) {
+      batch.set(db.doc("userCenters/" + studentId + "/centers/" + centerId), {
+        className: normalizedClassName,
+        updatedAt: timestamp,
+      }, { merge: true });
+    }
+
+    const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
+    const hasStats = !!stats && typeof stats === "object";
+
+    if (hasSeasonLp || hasStats) {
+      const progressUpdate: any = { updatedAt: timestamp };
+      if (hasSeasonLp) progressUpdate.seasonLp = seasonLp;
+      if (hasStats) progressUpdate.stats = stats;
+      batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
+    }
+
+    const safeDateKey = (typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey))
+      ? dateKey
+      : new Date().toISOString().slice(0, 10);
+
+    if (typeof todayStudyMinutes === "number" && Number.isFinite(todayStudyMinutes)) {
+      batch.set(db.doc("centers/" + centerId + "/dailyStudentStats/" + safeDateKey + "/students/" + studentId), {
+        totalStudyMinutes: todayStudyMinutes,
+        studentId,
+        centerId,
+        dateKey: safeDateKey,
+        updatedAt: timestamp,
+      }, { merge: true });
+    }
+
+    if (hasSeasonLp || trimmedDisplayName || hasClassName) {
+      const periodKey = safeDateKey.slice(0, 7);
+      const rankUpdate: any = {
+        studentId,
+        updatedAt: timestamp,
+      };
+      if (hasSeasonLp) rankUpdate.value = seasonLp;
+      if (trimmedDisplayName) rankUpdate.displayNameSnapshot = trimmedDisplayName;
+      if (hasClassName) rankUpdate.classNameSnapshot = normalizedClassName;
+
+      batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, { merge: true });
     }
 
     await batch.commit();
@@ -182,7 +252,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
   }
 
   const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== "centerAdmin") {
+  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
     throw new functions.https.HttpsError("permission-denied", "센터 관리자만 학생 계정을 생성할 수 있습니다.");
   }
 
