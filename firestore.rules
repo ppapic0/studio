@@ -2,7 +2,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 개발 단계 임시 전면 개방: 소유자 권한 충돌 없이 강제 삭제가 가능하도록 설정
+    // 개발 및 데이터 보정 단계: 소유자 권한 충돌 없이 모든 문서의 읽기, 쓰기, 삭제를 허용합니다.
     match /{allPaths=**} {
       allow read, write, delete: if true;
     }
