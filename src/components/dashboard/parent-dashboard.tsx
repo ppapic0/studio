@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -28,6 +28,7 @@ import {
 } from 'recharts';
 import { addDoc, collection, doc, limit, query, serverTimestamp, where } from 'firebase/firestore';
 import { format, subDays } from 'date-fns';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
@@ -100,7 +101,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   useEffect(() => setToday(new Date()), []);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('parentTab') as ParentPortalTab | null;
+    if (requestedTab && tabs.some((item) => item.value === requestedTab)) {
+      setTab(requestedTab);
+    }
+  }, [searchParams]);
 
   const centerId = activeMembership?.id;
   const studentId = activeMembership?.linkedStudentIds?.[0];
@@ -207,6 +219,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [notifications]);
 
   const unreadCount = notifications.filter((item) => !readMap[item.id]).length;
+  const weekly = parentDashboardMockData.weeklyReport;
+  const monthly = parentDashboardMockData.monthlyReport;
+
+  const handleTabChange = (value: string) => {
+    const nextTab = value as ParentPortalTab;
+    setTab(nextTab);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('parentTab', nextTab);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   async function submit(type: 'consultation' | 'request' | 'suggestion') {
     if (!firestore || !centerId || !studentId || !user) return;
@@ -284,7 +307,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           <CardDescription className="font-semibold text-slate-500">복잡한 수치 대신 핵심 상태를 빠르게 확인할 수 있도록 구성했습니다.</CardDescription>
         </CardHeader>
         <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-6 pb-6')}>
-          <Tabs value={tab} onValueChange={(v) => setTab(v as ParentPortalTab)}>
+          <Tabs value={tab} onValueChange={handleTabChange}>
             <TabsList className="w-full h-auto justify-start overflow-x-auto rounded-2xl bg-slate-100 p-1">
               {tabs.map((item) => (
                 <TabsTrigger key={item.value} value={item.value} className="rounded-xl px-3 py-2 text-xs font-black data-[state=active]:bg-white data-[state=active]:shadow-sm">
@@ -309,9 +332,77 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="reports" className="mt-4 space-y-3">
+              <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Weekly Study Time</p><p className="mt-1 text-lg font-black tracking-tight">{toHm(weekly.totalStudyMinutes)}</p><p className={cn('mt-1 text-xs font-bold', weekly.studyTimeDeltaRate >= 0 ? 'text-emerald-600' : 'text-rose-600')}>{weekly.studyTimeDeltaRate >= 0 ? '+' : ''}{weekly.studyTimeDeltaRate}%</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Weekly Plan Rate</p><p className="mt-1 text-lg font-black tracking-tight">{weekly.avgPlanCompletionRate}%</p><p className="mt-1 text-xs font-bold text-slate-500">Done {planDone}/{planTotal || 0}</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Monthly Attendance</p><p className="mt-1 text-lg font-black tracking-tight">{monthly.attendanceRate}%</p><p className="mt-1 text-xs font-bold text-slate-500">Lates {weekly.lateCount}</p></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200"><CardContent className="p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Life Status</p><p className={cn('mt-1 text-lg font-black tracking-tight', penalty < 10 ? 'text-emerald-700' : penalty < 20 ? 'text-amber-700' : 'text-rose-700')}>{behavior.label}</p><p className="mt-1 text-xs font-bold text-slate-500">Penalty {penalty}pt</p></CardContent></Card>
+              </div>
+
               <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
-                <Card className="rounded-2xl border border-slate-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-black">주간 리포트</CardTitle></CardHeader><CardContent className="space-y-1 text-sm font-semibold text-slate-700"><div>총 공부시간: {toHm(parentDashboardMockData.weeklyReport.totalStudyMinutes)}</div><div>일평균: {parentDashboardMockData.weeklyReport.averageDailyMinutes}분</div><div>증감률: +{parentDashboardMockData.weeklyReport.studyTimeDeltaRate}%</div><div>계획 달성률: {parentDashboardMockData.weeklyReport.avgPlanCompletionRate}%</div><div>출석률: {parentDashboardMockData.weeklyReport.attendanceRate}%</div><div>강점 과목: {parentDashboardMockData.weeklyReport.topSubject}</div><div>보완 과목: {parentDashboardMockData.weeklyReport.weakSubject}</div></CardContent></Card>
-                <Card className="rounded-2xl border border-slate-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-black">월간 리포트</CardTitle></CardHeader><CardContent className="space-y-1 text-sm font-semibold text-slate-700"><div>총 공부시간: {toHm(parentDashboardMockData.monthlyReport.totalStudyMinutes)}</div><div>출석률: {parentDashboardMockData.monthlyReport.attendanceRate}%</div><div>평균 달성률: {parentDashboardMockData.monthlyReport.avgPlanCompletionRate}%</div><div>벌점 누적: {penalty}점</div><div>상담 횟수: {parentDashboardMockData.monthlyReport.counselingCount}회</div><div>성장 포인트: {parentDashboardMockData.monthlyReport.growthPoint}</div><div>보완 포인트: {parentDashboardMockData.monthlyReport.improvementPoint}</div></CardContent></Card>
+                <Card className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <CardHeader className="pb-3 bg-[#f8fbff] border-b border-[#e8f0ff]">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm font-black">주간 리포트</CardTitle>
+                      <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-black">+{weekly.studyTimeDeltaRate}%</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">주간 총 공부</p><p className="text-lg font-black tracking-tight">{toHm(weekly.totalStudyMinutes)}</p></div>
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">일평균</p><p className="text-lg font-black tracking-tight">{weekly.averageDailyMinutes}분</p></div>
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">계획 달성률</p><p className="text-lg font-black tracking-tight">{weekly.avgPlanCompletionRate}%</p></div>
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">출석률</p><p className="text-lg font-black tracking-tight">{weekly.attendanceRate}%</p></div>
+                    </div>
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Plan Completion</span><span>{weekly.avgPlanCompletionRate}%</span></div>
+                      <Progress value={weekly.avgPlanCompletionRate} className="h-2" />
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Attendance</span><span>{weekly.attendanceRate}%</span></div>
+                      <Progress value={weekly.attendanceRate} className="h-2" />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="bg-blue-50 text-blue-700 border border-blue-100">지각 {weekly.lateCount}회</Badge>
+                      <Badge className="bg-slate-100 text-slate-700 border border-slate-200">결석 {weekly.absenceCount}회</Badge>
+                      <Badge className="bg-slate-100 text-slate-700 border border-slate-200">조퇴 {weekly.earlyLeaveCount}회</Badge>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700 leading-relaxed">
+                      강점 과목: <span className="font-black">{weekly.topSubject}</span> · 보완 과목: <span className="font-black">{weekly.weakSubject}</span>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Teacher Comment</p><p className="mt-1 text-sm font-semibold text-slate-700 leading-relaxed">{weekly.teacherFeedback}</p></div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <CardHeader className="pb-3 bg-slate-50 border-b">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm font-black">월간 리포트</CardTitle>
+                      <Badge className={cn('border font-black', penalty >= 20 ? 'bg-rose-50 text-rose-700 border-rose-100' : penalty >= 10 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100')}>
+                        벌점 {penalty}점
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">월간 총 공부</p><p className="text-lg font-black tracking-tight">{toHm(monthly.totalStudyMinutes)}</p></div>
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">월간 출석률</p><p className="text-lg font-black tracking-tight">{monthly.attendanceRate}%</p></div>
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">평균 계획 달성</p><p className="text-lg font-black tracking-tight">{monthly.avgPlanCompletionRate}%</p></div>
+                      <div className="rounded-xl border border-slate-200 p-3"><p className="text-[10px] font-black text-slate-500 uppercase">상담 횟수</p><p className="text-lg font-black tracking-tight">{monthly.counselingCount}회</p></div>
+                    </div>
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Avg Plan Completion</span><span>{monthly.avgPlanCompletionRate}%</span></div>
+                      <Progress value={monthly.avgPlanCompletionRate} className="h-2" />
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Monthly Attendance</span><span>{monthly.attendanceRate}%</span></div>
+                      <Progress value={monthly.attendanceRate} className="h-2" />
+                    </div>
+                    <div className="rounded-xl bg-[#f8fbff] border border-[#e8f0ff] p-3 text-sm font-semibold text-slate-700">
+                      성실도: {monthly.diligenceSummary}
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700 leading-relaxed">
+                      성장 포인트: <span className="font-black">{monthly.growthPoint}</span><br />
+                      보완 포인트: <span className="font-black">{monthly.improvementPoint}</span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -324,7 +415,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Card className="rounded-2xl border border-slate-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-black">출결/벌점 변화</CardTitle></CardHeader><CardContent className="h-52"><ResponsiveContainer width="100%" height="100%"><BarChart data={parentDashboardMockData.charts.attendancePenaltyTrend}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="week" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="attendanceRate" fill="#1B64DA" radius={[8,8,0,0]} /><Bar dataKey="penalty" fill="#F97316" radius={[8,8,0,0]} /></BarChart></ResponsiveContainer></CardContent></Card>
               </div>
 
-              <Card className="rounded-2xl border border-[#dbe8ff] bg-[#f8fbff]"><CardHeader className="pb-2"><CardTitle className="text-sm font-black text-[#1b64da]">AI 해석</CardTitle></CardHeader><CardContent className="space-y-1">{parentDashboardMockData.aiInsights.map((m, i) => <div key={i} className="text-sm font-semibold text-slate-700">- {m}</div>)}</CardContent></Card>
+              <Card className="rounded-2xl border border-[#dbe8ff] bg-[#f8fbff]">
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-black text-[#1b64da] flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI 해석 요약</CardTitle></CardHeader>
+                <CardContent className="space-y-1">
+                  {parentDashboardMockData.aiInsights.map((m, i) => <div key={i} className="text-sm font-semibold text-slate-700">- {m}</div>)}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="studyDetail" className="mt-4 space-y-3">

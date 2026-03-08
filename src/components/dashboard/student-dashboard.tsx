@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Trophy,
   Crown,
+  ChevronLeft,
   ChevronRight,
   TrendingUp,
   Settings2,
@@ -54,7 +55,7 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
-import { format, isSameDay } from 'date-fns';
+import { addWeeks, endOfWeek, format, isSameDay, startOfWeek } from 'date-fns';
 import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
@@ -281,7 +282,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
           "border border-slate-200/80 shadow-[0_8px_20px_rgba(15,23,42,0.06)] bg-white rounded-[1.75rem] overflow-hidden group hover:-translate-y-0.5 transition-all duration-300 cursor-pointer",
           isMobile ? "rounded-[1.25rem]" : ""
         )}>
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600" />
+          
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
             <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>오늘의 누적 트랙</CardTitle>
             <div className={cn("bg-blue-50 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md", isMobile ? "p-2" : "p-2.5")}>
@@ -356,12 +357,29 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+  const [planWeekOffset, setPlanWeekOffset] = useState(0);
 
   useEffect(() => { setToday(new Date()); }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
   const periodKey = today ? format(today, 'yyyy-MM') : '';
+  const planViewDate = today ? addWeeks(today, planWeekOffset) : null;
+  const planViewDateKey = planViewDate ? format(planViewDate, 'yyyy-MM-dd') : '';
+  const planViewWeekKey = planViewDate ? format(planViewDate, "yyyy-'W'II") : '';
+  const isViewingOtherWeek = planWeekOffset !== 0;
+  const planViewLabel = planWeekOffset === 0
+    ? 'This Week'
+    : planWeekOffset === -1
+      ? 'Last Week'
+      : planWeekOffset === 1
+        ? 'Next Week'
+        : planWeekOffset < 0
+          ? `${Math.abs(planWeekOffset)}w ago`
+          : `${planWeekOffset}w later`;
+  const planWeekRangeLabel = planViewDate
+    ? `${format(startOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')} ~ ${format(endOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')}`
+    : '';
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -412,9 +430,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const allPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !weekKey || !todayKey) return null;
-    return query(collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'), where('dateKey', '==', todayKey));
-  }, [firestore, activeMembership, user, weekKey, todayKey]);
+    if (!firestore || !activeMembership || !user || !planViewWeekKey || !planViewDateKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items'),
+      where('dateKey', '==', planViewDateKey)
+    );
+  }, [firestore, activeMembership, user, planViewWeekKey, planViewDateKey]);
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
   
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
@@ -610,8 +631,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (!firestore || !user || !activeMembership || !progressRef || !weekKey || !todayPlans) return;
-    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    if (!firestore || !user || !activeMembership || !progressRef || !planViewWeekKey || !todayPlans) return;
+    if (isViewingOtherWeek) {
+      toast({ title: 'Read-only view', description: 'Past and future week plans can only be viewed.' });
+      return;
+    }
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items', item.id);
     const nextState = !item.done;
     
     await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
@@ -785,11 +810,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
                 </Badge>
               </div>
+              <div className={cn("mt-3 flex items-center gap-2", isMobile ? "w-full flex-wrap" : "")}>
+                <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1">
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full text-slate-500" onClick={() => setPlanWeekOffset((prev) => prev - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className={cn("h-7 rounded-full px-2 text-[10px] font-black", planWeekOffset === 0 ? "bg-[#eaf2ff] text-[#1b64da]" : "text-slate-500")} onClick={() => setPlanWeekOffset(0)}>This Week</Button>
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-full text-slate-500" onClick={() => setPlanWeekOffset((prev) => prev + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Badge variant="outline" className="h-6 rounded-full border-slate-200 bg-white text-[10px] font-black text-slate-600">{planViewLabel}</Badge>
+                <span className="text-[11px] font-bold text-slate-500">{planWeekRangeLabel}</span>
+                {isViewingOtherWeek && <Badge className="h-6 rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black text-amber-700">READ ONLY</Badge>}
+              </div>
             </CardHeader>
             <CardContent className={cn("bg-white", isMobile ? "p-5" : "p-8")}>
               <div className="grid gap-3 sm:gap-4">
                 {studyTasks.length === 0 ? (
-                  <div className="py-12 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-xl">오늘의 학습 계획이 없습니다.</div>
+                  <div className="py-12 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-xl">{isViewingOtherWeek ? `${planViewLabel} 계획이 없습니다.` : `오늘의 학습 계획이 없습니다.`}</div>
                 ) : studyTasks.map((task) => (
                   <div key={task.id} className={cn(
                     "flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-500 relative group", 
@@ -799,7 +838,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <Checkbox 
                       id={task.id} 
                       checked={task.done} 
-                      onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                      onCheckedChange={() => !isViewingOtherWeek && handleToggleTask(task as WithId<StudyPlanItem>)} 
+                      disabled={isViewingOtherWeek}
                       className={cn("rounded-md border-2", isMobile ? "h-6 w-6" : "h-8 w-8")} 
                     />
                     <div className="flex-1 grid gap-1">
