@@ -199,18 +199,18 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           "border border-slate-200/80 shadow-[0_8px_20px_rgba(15,23,42,0.06)] bg-white rounded-[1.75rem] overflow-hidden group hover:-translate-y-0.5 transition-all duration-300 cursor-pointer",
           isMobile ? "rounded-[1.25rem]" : ""
         )}>
-          <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-4 pt-4" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>시즌 러닝 포인트 (LP)</CardTitle>
-            <div className={cn("bg-amber-50 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md", isMobile ? "p-1.5" : "p-2.5")}>
+          <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>시즌 러닝 포인트 (LP)</CardTitle>
+            <div className={cn("bg-amber-50 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md", isMobile ? "p-2" : "p-2.5")}>
               <Zap className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
-          <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("font-black tracking-tighter text-amber-600 drop-shadow-sm leading-none", isMobile ? "text-3xl" : "text-6xl sm:text-7xl")}>
-              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>lp</span>
+          <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-6" : "")}>
+            <div className={cn("font-black tracking-tighter text-amber-600 drop-shadow-sm leading-none", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
+              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>lp</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-amber-50 text-amber-700 border border-amber-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>히스토리 분석 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+              <Badge variant="secondary" className={cn("bg-amber-50 text-amber-700 border border-amber-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all", isMobile ? "text-[9px] px-2.5 py-1" : "text-[10px]")}>히스토리 분석 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
             </div>
           </CardContent>
         </Card>
@@ -234,17 +234,17 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                 return (
                   <div key={date} className="bg-white p-4 rounded-xl border-2 border-primary/5 flex items-center justify-between shadow-sm group">
                     <div className="grid gap-0.5">
-                      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">{date}</span>
+                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{date}</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
-                        {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[7px] px-1 py-0">출석</Badge>}
-                        {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[7px] px-1 py-0">계획</Badge>}
-                        {data.routine && <Badge className="bg-amber-500 text-white border-none font-black text-[7px] px-1 py-0">루틴</Badge>}
-                        {studyLp > 0 && <Badge className="bg-blue-600 text-white border-none font-black text-[7px] px-1 py-0">몰입</Badge>}
+                        {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">출석</Badge>}
+                        {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">계획</Badge>}
+                        {data.routine && <Badge className="bg-amber-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">루틴</Badge>}
+                        {studyLp > 0 && <Badge className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">몰입</Badge>}
                       </div>
                     </div>
                     <div className="text-right">
                       <span className="text-sm font-black text-primary tabular-nums">{(data.dailyLpAmount || 0).toLocaleString()}</span>
-                      <span className="text-[8px] ml-0.5 font-bold text-muted-foreground/40">LP</span>
+                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40">LP</span>
                     </div>
                   </div>
                 );
@@ -282,18 +282,18 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
           isMobile ? "rounded-[1.25rem]" : ""
         )}>
           <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600" />
-          <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-4 pt-4" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>오늘의 누적 트랙</CardTitle>
-            <div className={cn("bg-blue-50 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md", isMobile ? "p-1.5" : "p-2.5")}>
+          <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>오늘의 누적 트랙</CardTitle>
+            <div className={cn("bg-blue-50 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md", isMobile ? "p-2" : "p-2.5")}>
               <Clock className={cn("text-blue-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
-          <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("font-black tracking-tighter text-blue-600 drop-shadow-sm leading-none", isMobile ? "text-3xl" : "text-6xl sm:text-7xl")}>
-              {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>m</span>
+          <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-6" : "")}>
+            <div className={cn("font-black tracking-tighter text-blue-600 drop-shadow-sm leading-none", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
+              {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>m</span>
             </div>
             <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-blue-50 text-blue-700 border border-blue-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>세션 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+              <Badge variant="secondary" className={cn("bg-blue-50 text-blue-700 border border-blue-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all", isMobile ? "text-[9px] px-2.5 py-1" : "text-[10px]")}>세션 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
             </div>
           </CardContent>
         </Card>
@@ -321,10 +321,10 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
                     </div>
                     <div className="grid leading-tight">
                       <span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
                     </div>
                   </div>
-                  <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-2">{session.durationMinutes}분</Badge>
+                  <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[10px] px-2.5">{session.durationMinutes}분</Badge>
                 </div>
               ))}
             </div>
@@ -675,7 +675,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <section className={cn(
         "group relative overflow-hidden text-white shadow-xl transition-all duration-500 bg-gradient-to-br ring-1 ring-white/15",
         currentTier.gradient, "shadow-primary/20",
-        isMobile ? "rounded-[1.25rem] p-4" : "rounded-[2.25rem] p-8"
+        isMobile ? "rounded-[1.25rem] p-5" : "rounded-[2.25rem] p-8"
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-[0.08] rotate-12 transition-transform duration-700 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
@@ -683,20 +683,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <div className={cn("relative z-10 flex flex-col gap-3", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
           <div className={isMobile ? "space-y-1.5" : "space-y-4"}>
             <div className="flex flex-col gap-0.5">
-              <Badge className={cn("w-fit bg-white/20 text-white border border-white/20 font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[6px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
-              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-lg" : "text-5xl")}>
+              <Badge className={cn("w-fit bg-white/20 text-white border border-white/20 font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
+              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-xl" : "text-5xl")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
             <div className={cn("flex items-center gap-1.5 bg-white/10 w-fit px-2.5 py-1 rounded-full border border-white/20", isMobile ? "mx-auto" : "md:mx-0")}>
               <span className="relative flex h-1.5 w-1.5"><span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isTimerActive ? "bg-accent" : "bg-white")}></span><span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", isTimerActive ? "bg-accent" : "bg-white")}></span></span>
-              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[7px]" : "text-[11px]")}>Performance Engine</span>
+              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[9px]" : "text-[11px]")}>Performance Engine</span>
             </div>
           </div>
           <div className={cn("flex items-center gap-2.5", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
               <div className={cn("flex flex-col items-center bg-black/25 rounded-2xl border border-white/20 shadow-lg px-4 py-2", isMobile ? "w-full" : "")}>
-                <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
                 <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
                   {formatTimer(localSeconds)}
                 </span>
@@ -707,7 +707,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 disabled={isProcessingAction}
                 className={cn(
                   "w-full rounded-2xl font-black transition-all md:w-auto shadow-lg active:scale-[0.98] border border-white/20 flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
-                  isMobile ? "h-12 text-base px-6" : "h-24 px-16 text-3xl",
+                  isMobile ? "h-14 text-lg px-8" : "h-24 px-16 text-3xl",
                   isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
                 )} 
                 onClick={handleStudyStartStop}
@@ -723,7 +723,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full h-10 rounded-2xl bg-white/15 border-white/25 text-white font-black hover:bg-white hover:text-primary gap-2 shadow-lg">
+                  <Button variant="outline" className="w-full h-11 rounded-2xl bg-white/15 border-white/25 text-white font-black hover:bg-white hover:text-primary gap-2 shadow-lg">
                     <QrCode className="h-4 w-4" /> 나의 출입 QR
                   </Button>
                 </DialogTrigger>
@@ -776,17 +776,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <Card className={cn("border border-slate-200/80 shadow-[0_12px_26px_rgba(15,23,42,0.06)] rounded-[2rem] bg-white overflow-hidden", isMobile ? "rounded-[1.25rem]" : "")}>
         <div className="grid grid-cols-1 lg:grid-cols-3">
           <div className={cn("lg:col-span-2 border-r border-dashed border-muted", isMobile && "border-r-0")}>
-            <CardHeader className={cn("bg-slate-50 border-b", isMobile ? "p-4" : "p-8")}>
+            <CardHeader className={cn("bg-slate-50 border-b", isMobile ? "p-5" : "p-8")}>
               <div className="flex items-center justify-between">
                 <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-slate-900", isMobile ? "text-lg" : "text-3xl")}>
                   <ListTodo className={cn("text-[#1b64da]", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 계획트랙
                 </CardTitle>
-                <Badge variant="secondary" className={cn("bg-[#eaf2ff] text-[#1b64da] border border-[#dbe8ff] font-black h-5 uppercase tracking-widest", isMobile ? "text-[8px] px-1.5" : "text-[10px] px-3")}>
+                <Badge variant="secondary" className={cn("bg-[#eaf2ff] text-[#1b64da] border border-[#dbe8ff] font-black h-5 uppercase tracking-widest", isMobile ? "text-[9px] px-2" : "text-[10px] px-3")}>
                   {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className={cn("bg-white", isMobile ? "p-4" : "p-8")}>
+            <CardContent className={cn("bg-white", isMobile ? "p-5" : "p-8")}>
               <div className="grid gap-3 sm:gap-4">
                 {studyTasks.length === 0 ? (
                   <div className="py-12 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-xl">오늘의 학습 계획이 없습니다.</div>
@@ -805,11 +805,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex-1 grid gap-1">
                       <Label 
                         htmlFor={task.id} 
-                        className={cn("font-black tracking-tight leading-snug break-keep", isMobile ? "text-sm" : "text-lg", task.done ? "line-through text-muted-foreground/40 italic" : "text-slate-800")}
+                        className={cn("font-black tracking-tight leading-snug break-keep", isMobile ? "text-base" : "text-lg", task.done ? "line-through text-muted-foreground/40 italic" : "text-slate-800")}
                       >
                         {task.title}
                       </Label>
-                      {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
+                      {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase flex items-center gap-1", isMobile ? "text-[9px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
                     </div>
                   </div>
                 ))}
@@ -850,18 +850,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </Card>
 
-      <section className={cn("grid gap-2.5", isMobile ? "grid-cols-3" : "grid-cols-3")}>
+      <section className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "grid-cols-3")}>
         <Link href="/dashboard/student-reports">
           <Card className={cn(
             "border border-slate-200/80 shadow-sm bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95 flex flex-col items-center text-center",
-            isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
+            isMobile ? "rounded-[1.25rem] p-4 gap-2 min-h-[116px]" : "rounded-[2rem] p-8 gap-4"
           )}>
-            <div className={cn("rounded-2xl bg-primary/5 flex items-center justify-center", isMobile ? "h-10 w-10" : "h-16 w-16")}>
+            <div className={cn("rounded-2xl bg-primary/5 flex items-center justify-center", isMobile ? "h-12 w-12" : "h-16 w-16")}>
               <FileText className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
             </div>
             <div className="grid">
-              <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>데일리 리포트</span>
-              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Analysis</span>
+              <span className={cn("font-black tracking-tighter", isMobile ? "text-[11px]" : "text-lg")}>데일리 리포트</span>
+              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>Analysis</span>
             </div>
           </Card>
         </Link>
@@ -870,14 +870,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <DialogTrigger asChild>
             <Card className={cn(
               "border border-slate-200/80 shadow-sm bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95 flex flex-col items-center text-center cursor-pointer",
-              isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
+              isMobile ? "rounded-[1.25rem] p-4 gap-2 min-h-[116px]" : "rounded-[2rem] p-8 gap-4"
             )}>
-              <div className={cn("rounded-2xl bg-amber-50 flex items-center justify-center", isMobile ? "h-10 w-10" : "h-16 w-16")}>
+              <div className={cn("rounded-2xl bg-amber-50 flex items-center justify-center", isMobile ? "h-12 w-12" : "h-16 w-16")}>
                 <ClipboardPen className={cn("text-amber-600", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               </div>
               <div className="grid">
-                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>지각/결석 신청</span>
-                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Requests</span>
+                <span className={cn("font-black tracking-tighter", isMobile ? "text-[11px]" : "text-lg")}>지각/결석 신청</span>
+                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>Requests</span>
               </div>
             </Card>
           </DialogTrigger>
@@ -981,14 +981,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <DialogTrigger asChild>
             <Card className={cn(
               "border border-slate-200/80 shadow-sm bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95 flex flex-col items-center text-center cursor-pointer",
-              isMobile ? "rounded-[1.25rem] p-3 gap-1.5" : "rounded-[2rem] p-8 gap-4"
+              isMobile ? "rounded-[1.25rem] p-4 gap-2 min-h-[116px]" : "rounded-[2rem] p-8 gap-4"
             )}>
-              <div className={cn("rounded-2xl bg-rose-50 flex items-center justify-center", isMobile ? "h-10 w-10" : "h-16 w-16")}>
+              <div className={cn("rounded-2xl bg-rose-50 flex items-center justify-center", isMobile ? "h-12 w-12" : "h-16 w-16")}>
                 <AlertOctagon className={cn("text-rose-600", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               </div>
               <div className="grid">
-                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>벌점 현황</span>
-                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Penalties</span>
+                <span className={cn("font-black tracking-tighter", isMobile ? "text-[11px]" : "text-lg")}>벌점 현황</span>
+                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>Penalties</span>
               </div>
             </Card>
           </DialogTrigger>
