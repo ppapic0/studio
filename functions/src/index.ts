@@ -70,38 +70,57 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const db = admin.firestore();
   const auth = admin.auth();
   const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode } = data;
-  
+
+  // ✅ 인증 체크
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+  if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
+
+  // ✅ 권한 체크
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  if (!callerMemberSnap.exists || callerMemberSnap.data()?.role !== 'centerAdmin') {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수정 가능합니다.");
+  }
+
   try {
+    // ✅ auth.updateUser 실패해도 Firestore는 계속 진행
     const authUpdates: any = {};
     if (password) authUpdates.password = password;
     if (displayName) authUpdates.displayName = displayName;
-    if (Object.keys(authUpdates).length > 0) await auth.updateUser(studentId, authUpdates);
-    
+
+    if (Object.keys(authUpdates).length > 0) {
+      try {
+        await auth.updateUser(studentId, authUpdates);
+      } catch (authError: any) {
+        console.warn(`Auth update skipped for ${studentId}: ${authError.message}`);
+      }
+    }
+
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
-    
-    // User 프로필 업데이트
+
     if (displayName || schoolName) {
       const uUp: any = { updatedAt: timestamp };
       if (displayName) uUp.displayName = displayName;
       if (schoolName) uUp.schoolName = schoolName;
       batch.set(db.doc(`users/${studentId}`), uUp, { merge: true });
     }
-    
-    // 학생 상세 프로필 업데이트
+
     const sUp: any = { updatedAt: timestamp };
     if (displayName) sUp.name = displayName;
     if (schoolName) sUp.schoolName = schoolName;
     if (grade) sUp.grade = grade;
     if (parentLinkCode !== undefined) sUp.parentLinkCode = parentLinkCode;
     batch.set(db.doc(`centers/${centerId}/students/${studentId}`), sUp, { merge: true });
-    
-    // 센터 멤버 정보 업데이트
-    if (displayName) batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
-    
+
+    if (displayName) {
+      batch.set(db.doc(`centers/${centerId}/members/${studentId}`), { displayName, updatedAt: timestamp }, { merge: true });
+    }
+
     await batch.commit();
     return { ok: true };
-  } catch (e: any) { throw new functions.https.HttpsError("internal", e.message); }
+  } catch (e: any) {
+    throw new functions.https.HttpsError("internal", e.message);
+  }
 });
 
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
