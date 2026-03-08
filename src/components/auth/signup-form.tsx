@@ -22,9 +22,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import Link from 'next/link';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFunctions } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, writeBatch, collection, query, where, getDocs, getDoc, increment } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
@@ -40,16 +40,16 @@ const formSchema = z.object({
   }),
   schoolName: z.string().optional(),
   inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
-  parentLinkCode: z.string().optional(), 
-  studentLinkCode: z.string().optional(), 
+  parentLinkCode: z.string().optional(),
+  studentLinkCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "비밀번호가 일치하지 않습니다.",
-  path: ["confirmPassword"],
+  message: '비밀번호가 일치하지 않습니다.',
+  path: ['confirmPassword'],
 });
 
 export function SignupForm() {
   const auth = useAuth();
-  const firestore = useFirestore();
+  const functions = useFunctions();
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -57,24 +57,24 @@ export function SignupForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { 
-      displayName: '', 
-      email: '', 
-      password: '', 
+    defaultValues: {
+      displayName: '',
+      email: '',
+      password: '',
       confirmPassword: '',
       role: 'student',
       schoolName: '',
       inviteCode: '',
       parentLinkCode: '',
-      studentLinkCode: ''
+      studentLinkCode: '',
     },
   });
 
   const selectedRole = form.watch('role');
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth || !firestore) return;
-    
+    if (!auth || !functions) return;
+
     if (values.role === 'student') {
       if (!values.displayName || values.displayName.length < 2) {
         form.setError('displayName', { message: '이름을 입력해주세요.' });
@@ -101,164 +101,60 @@ export function SignupForm() {
     }
 
     setIsLoading(true);
-    
+    let createdUser = false;
+
     try {
-      setLoadingStatus('초대 코드를 검증하고 있습니다...');
-      const inviteRef = doc(firestore, 'inviteCodes', values.inviteCode);
-      const inviteSnap = await getDoc(inviteRef);
-
-      if (!inviteSnap.exists()) {
-        setIsLoading(false);
-        setLoadingStatus('');
-        form.setError('inviteCode', { message: '존재하지 않거나 유효하지 않은 초대 코드입니다.' });
-        return;
-      }
-
-      const inviteData = inviteSnap.data();
-      
-      if (inviteData.intendedRole !== values.role) {
-        setIsLoading(false);
-        setLoadingStatus('');
-        const roleNames = { student: '학생', teacher: '선생님', parent: '학부모', centerAdmin: '센터 관리자' };
-        const intendedRoleName = roleNames[inviteData.intendedRole as keyof typeof roleNames] || inviteData.intendedRole;
-        form.setError('inviteCode', { 
-          message: `입력하신 코드는 [${intendedRoleName}] 전용 코드입니다. 선택하신 역할과 일치하지 않습니다.` 
-        });
-        return;
-      }
-
-      if (inviteData.isActive === false) {
-        setIsLoading(false);
-        setLoadingStatus('');
-        form.setError('inviteCode', { message: '현재 비활성화된 초대 코드입니다.' });
-        return;
-      }
-
-      if (inviteData.usedCount >= inviteData.maxUses) {
-        setIsLoading(false);
-        setLoadingStatus('');
-        form.setError('inviteCode', { message: '이미 최대 사용 횟수에 도달한 코드입니다.' });
-        return;
-      }
-
-      const centerId = inviteData.centerId; 
-      const targetClassName = inviteData.targetClassName || null;
-      const timestamp = serverTimestamp();
-      const batch = writeBatch(firestore);
-      let finalDisplayName = values.displayName || '';
-      let linkedStudentId = '';
-
-      if (values.role === 'parent') {
-        setLoadingStatus('자녀 정보를 확인하고 있습니다...');
-        const studentsRef = collection(firestore, 'centers', centerId, 'students');
-        const q = query(studentsRef, where('parentLinkCode', '==', values.studentLinkCode));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const studentDoc = querySnapshot.docs[0];
-          linkedStudentId = studentDoc.id;
-          const studentData = studentDoc.data();
-          finalDisplayName = `${studentData.name} 학부모`;
-        } else {
-          setIsLoading(false);
-          setLoadingStatus('');
-          form.setError('studentLinkCode', { message: '해당 코드를 사용하는 학생을 찾을 수 없습니다.' });
-          return;
-        }
-      }
+      const inviteCode = values.inviteCode.trim();
+      const trimmedEmail = values.email.trim();
+      const fallbackName =
+        values.role === 'parent'
+          ? '학부모'
+          : values.role === 'student'
+            ? '학생'
+            : '사용자';
+      const finalDisplayName = (values.displayName || '').trim() || fallbackName;
 
       setLoadingStatus('계정 생성 중...');
-      const trimmedEmail = values.email.trim();
       const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, values.password);
-      const user = userCredential.user;
-      await updateProfile(user, { displayName: finalDisplayName });
+      createdUser = true;
+      await updateProfile(userCredential.user, { displayName: finalDisplayName });
 
-      batch.set(doc(firestore, 'users', user.uid), {
-        id: user.uid,
-        email: trimmedEmail,
+      setLoadingStatus('센터 가입 처리 중...');
+      const completeSignupFn = httpsCallable(functions, 'completeSignupWithInvite');
+      await completeSignupFn({
+        code: inviteCode,
+        role: values.role,
         displayName: finalDisplayName,
         schoolName: values.schoolName || '',
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        grade: '고등학생',
+        parentLinkCode: values.parentLinkCode || null,
+        studentLinkCode: values.studentLinkCode || null,
       });
-
-      const membershipData: any = {
-        id: user.uid,
-        centerId: centerId,
-        role: values.role,
-        status: "active",
-        className: targetClassName,
-        joinedAt: timestamp,
-        displayName: finalDisplayName,
-      };
-
-      if (values.role === 'student') {
-        batch.set(doc(firestore, 'centers', centerId, 'students', user.uid), {
-          id: user.uid,
-          name: finalDisplayName,
-          schoolName: values.schoolName || '',
-          grade: '고등학생',
-          className: targetClassName,
-          seatNo: 0,
-          targetDailyMinutes: 360,
-          parentUids: [],
-          parentLinkCode: values.parentLinkCode,
-          createdAt: timestamp,
-        });
-
-        batch.set(doc(firestore, 'centers', centerId, 'growthProgress', user.uid), {
-          level: 1,
-          currentXp: 0,
-          nextLevelXp: 1000,
-          stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
-          skills: {},
-          updatedAt: timestamp,
-        });
-      }
-
-      if (values.role === 'parent' && linkedStudentId) {
-        membershipData.linkedStudentIds = [linkedStudentId];
-        batch.update(doc(firestore, 'centers', centerId, 'students', linkedStudentId), {
-          parentUids: [user.uid]
-        });
-      }
-
-      batch.set(doc(firestore, 'centers', centerId, 'members', user.uid), membershipData);
-      batch.set(doc(firestore, 'userCenters', user.uid, 'centers', centerId), {
-        id: centerId,
-        centerId: centerId,
-        role: values.role,
-        status: "active",
-        className: targetClassName,
-        joinedAt: timestamp,
-        ...(membershipData.linkedStudentIds ? { linkedStudentIds: membershipData.linkedStudentIds } : {})
-      });
-
-      batch.update(inviteRef, {
-        usedCount: increment(1),
-        updatedAt: timestamp
-      });
-
-      await batch.commit();
 
       setLoadingStatus('회원가입이 완료되었습니다!');
-      toast({ 
-        title: '회원가입 완료 ✨', 
-        description: `${finalDisplayName}님의 계정이 성공적으로 생성되었습니다. 로그인 창으로 이동합니다.` 
+      toast({
+        title: '회원가입 완료 ✨',
+        description: `${finalDisplayName}님의 계정이 성공적으로 생성되었습니다. 로그인 창으로 이동합니다.`,
       });
-      
-      await signOut(auth);
 
+      await signOut(auth);
       setTimeout(() => {
         router.replace('/login');
       }, 1500);
-
     } catch (error: any) {
+      if (createdUser && auth.currentUser) {
+        try {
+          await auth.currentUser.delete();
+        } catch (cleanupError) {
+          console.error('Signup rollback failed:', cleanupError);
+        }
+      }
+
       console.error('Signup Error:', error);
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description: error.message || '오류가 발생했습니다.',
+        description: error?.message || '오류가 발생했습니다.',
       });
       setIsLoading(false);
       setLoadingStatus('');

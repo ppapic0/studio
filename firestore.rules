@@ -10,16 +10,28 @@ service cloud.firestore {
       return /databases/$(database)/documents/centers/$(centerId)/members/$(request.auth.uid);
     }
 
+    function userCenterPath(centerId) {
+      return /databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId);
+    }
+
     function hasMembership(centerId) {
       return isSignedIn() && exists(memberPath(centerId));
     }
 
+    function hasUserCenter(centerId) {
+      return isSignedIn() && exists(userCenterPath(centerId));
+    }
+
     function getMemberRole(centerId) {
-      return hasMembership(centerId) ? get(memberPath(centerId)).data.role : null;
+      return hasMembership(centerId)
+        ? get(memberPath(centerId)).data.role
+        : (hasUserCenter(centerId) ? get(userCenterPath(centerId)).data.role : null);
     }
 
     function getMemberStatus(centerId) {
-      return hasMembership(centerId) ? get(memberPath(centerId)).data.status : null;
+      return hasMembership(centerId)
+        ? get(memberPath(centerId)).data.status
+        : (hasUserCenter(centerId) ? get(userCenterPath(centerId)).data.status : null);
     }
 
     function isActiveMember(centerId) {
@@ -42,10 +54,21 @@ service cloud.firestore {
       return getMemberRole(centerId) == 'parent';
     }
 
-    function isLinkedParent(centerId, studentId) {
-      return isParent(centerId)
+    function isLinkedParentFromMember(centerId, studentId) {
+      return hasMembership(centerId)
         && get(memberPath(centerId)).data.linkedStudentIds != null
         && get(memberPath(centerId)).data.linkedStudentIds.hasAny([studentId]);
+    }
+
+    function isLinkedParentFromUserCenter(centerId, studentId) {
+      return hasUserCenter(centerId)
+        && get(userCenterPath(centerId)).data.linkedStudentIds != null
+        && get(userCenterPath(centerId)).data.linkedStudentIds.hasAny([studentId]);
+    }
+
+    function isLinkedParent(centerId, studentId) {
+      return isParent(centerId)
+        && (isLinkedParentFromMember(centerId, studentId) || isLinkedParentFromUserCenter(centerId, studentId));
     }
 
     function isLinkedParentFromResource(centerId) {
@@ -65,7 +88,9 @@ service cloud.firestore {
     }
 
     match /inviteCodes/{code} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn()
+        && resource.data.centerId != null
+        && isCenterAdmin(resource.data.centerId);
       allow write: if false;
     }
 
