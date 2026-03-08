@@ -6,6 +6,10 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) { admin.initializeApp(); }
 const region = "asia-northeast3";
+
+/**
+ * 컴파일된 실행 파일도 소스와 동일하게 recursiveDelete 로직으로 강제 업데이트합니다.
+ */
 exports.deleteStudentAccount = functions.region(region).runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
@@ -14,10 +18,25 @@ exports.deleteStudentAccount = functions.region(region).runWith({ timeoutSeconds
     if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
     try {
         try { await auth.deleteUser(studentId); } catch (e) { }
-        const paths = [`users/${studentId}`, `userCenters/${studentId}`, `centers/${centerId}/members/${studentId}`, `centers/${centerId}/students/${studentId}`, `centers/${centerId}/growthProgress/${studentId}`, `centers/${centerId}/plans/${studentId}`, `centers/${centerId}/studyLogs/${studentId}`];
-        const filterCols = [`centers/${centerId}/counselingReservations`, `centers/${centerId}/counselingLogs`, `centers/${centerId}/attendanceRequests`, `centers/${centerId}/dailyReports` ];
+        const paths = [
+            `users/${studentId}`, 
+            `userCenters/${studentId}`, 
+            `centers/${centerId}/members/${studentId}`, 
+            `centers/${centerId}/students/${studentId}`, 
+            `centers/${centerId}/growthProgress/${studentId}`, 
+            `centers/${centerId}/plans/${studentId}`, 
+            `centers/${centerId}/studyLogs/${studentId}`
+        ];
+        const filterCols = [
+            `centers/${centerId}/counselingReservations`, 
+            `centers/${centerId}/counselingLogs`, 
+            `centers/${centerId}/attendanceRequests`, 
+            `centers/${centerId}/dailyReports`
+        ];
         await Promise.allSettled([
-            ...paths.map(async (p) => { try { await db.recursiveDelete(db.doc(p)); } catch (e) { } }),
+            ...paths.map(async (p) => { 
+                try { await db.recursiveDelete(db.doc(p)); } catch (e) { } 
+            }),
             ...filterCols.map(async (cp) => {
                 try {
                     const q = await db.collection(cp).where('studentId', '==', studentId).get();
@@ -26,9 +45,10 @@ exports.deleteStudentAccount = functions.region(region).runWith({ timeoutSeconds
                 } catch (e) { }
             })
         ]);
-        return { ok: true, message: "완벽히 정리되었습니다." };
+        return { ok: true, message: "정리가 완료되었습니다." };
     } catch (error) { throw new functions.https.HttpsError("internal", error.message); }
 });
+
 exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
@@ -47,6 +67,7 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
         return { ok: true, uid };
     } catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
+
 exports.updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const auth = admin.auth();
@@ -75,6 +96,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         return { ok: true };
     } catch (e) { throw new functions.https.HttpsError("internal", e.message); }
 });
+
 exports.redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
     const db = admin.firestore();
     const { code } = data;
