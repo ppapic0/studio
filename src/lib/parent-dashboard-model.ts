@@ -1,4 +1,4 @@
-﻿export type ParentPortalTab = 'home' | 'reports' | 'studyDetail' | 'life' | 'communication' | 'notifications';
+export type ParentPortalTab = 'home' | 'reports' | 'studyDetail' | 'life' | 'communication' | 'notifications';
 
 export type ParentQuickRequestKey =
   | 'math_support'
@@ -174,23 +174,23 @@ export const parentDashboardMockData: ParentDashboardMockData = {
     monthly: '전반적으로 성장 추세이며 영어 독해 루틴을 보완하면 더 좋은 결과가 기대됩니다.',
   },
   quickRequestTemplates: {
-    math_support: '수학 관리 요청',
-    english_support: '영어 관리 요청',
-    habit_coaching: '생활 태도 상담 요청',
-    career_consulting: '진로 상담 요청',
+    math_support: '수학 집중 관리 요청',
+    english_support: '영어 보완 요청',
+    habit_coaching: '학습 습관 코칭 요청',
+    career_consulting: '진로/진학 상담 요청',
   },
   aiInsights: [
     '이번 주는 전반적으로 꾸준한 학습이 유지되었습니다.',
-    '최근 수학 학습 비중은 높지만 영어 학습 시간이 부족합니다.',
-    '생활 태도는 안정적이지만 지각 횟수가 증가하는 추세입니다.',
-    '현재는 상담 없이도 개선 가능하지만, 지각 추세가 이어지면 상담 권장이 필요합니다.',
+    '수학 학습 비중이 높으나 영어 학습 보완이 필요해 보입니다.',
+    '생활 태도는 매우 좋으며 출석 리듬이 일정합니다.',
+    '현재의 성실도를 유지한다면 다음 모의고사 성적 향상이 기대됩니다.',
   ],
   notifications: [
     {
       id: 'n-1',
       type: 'check_in',
-      title: '등원 알림',
-      body: '오늘 16:08에 정상 등원했습니다.',
+      title: '등원 완료',
+      body: '오늘 16:08에 정상적으로 등원 처리되었습니다.',
       createdAtLabel: '방금 전',
       isRead: false,
       isImportant: true,
@@ -198,8 +198,8 @@ export const parentDashboardMockData: ParentDashboardMockData = {
     {
       id: 'n-2',
       type: 'weekly_report',
-      title: '주간 리포트 도착',
-      body: '이번 주 학습 리포트가 도착했습니다. 핵심 요약을 확인해보세요.',
+      title: '주간 리포트 발행',
+      body: '이번 주 자녀의 학습 분석 리포트가 도착했습니다.',
       createdAtLabel: '1시간 전',
       isRead: false,
       isImportant: true,
@@ -207,8 +207,8 @@ export const parentDashboardMockData: ParentDashboardMockData = {
     {
       id: 'n-3',
       type: 'penalty',
-      title: '벌점 누적 알림',
-      body: '최근 2주 벌점 누적이 9점입니다. 생활관리 탭을 확인해 주세요.',
+      title: '벌점 기록 알림',
+      body: '생활 수칙 위반으로 벌점 2점이 부과되었습니다.',
       createdAtLabel: '어제',
       isRead: true,
       isImportant: false,
