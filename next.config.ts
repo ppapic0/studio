@@ -1,4 +1,4 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -29,6 +29,13 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  webpack: (config, { dev }) => {
+    // OneDrive-synced paths can intermittently break webpack persistent cache files.
+    if (dev) {
+      config.cache = false;
+    }
+    return config;
   },
 };
 

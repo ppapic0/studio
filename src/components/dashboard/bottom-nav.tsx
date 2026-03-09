@@ -52,7 +52,7 @@ export function BottomNav() {
       { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
       { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
       { href: '/dashboard?parentTab=life', label: '생활', icon: Armchair },
-      { href: '/dashboard?parentTab=communication', label: '상담', icon: MessageCircle },
+      { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
       { href: '/dashboard?parentTab=notifications', label: '알림', icon: Bell },
     ],
     centerAdmin: [
@@ -69,8 +69,10 @@ export function BottomNav() {
   return (
     <div
       className={cn(
-        'z-50 bg-white/95 backdrop-blur-2xl border-t border-black/[0.06] transition-all duration-300 shadow-[0_-10px_30px_rgba(15,23,42,0.08)]',
-        isParent ? 'h-[5.5rem] rounded-t-[1.5rem] border-x border-slate-200/80 px-1 pb-[calc(env(safe-area-inset-bottom)+0.35rem)]' : 'h-20 pb-6',
+        'z-50 transition-all duration-300',
+        isParent
+          ? 'h-[5.6rem] rounded-t-[1.65rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.38rem)] shadow-[0_-16px_30px_rgba(10,20,52,0.46)]'
+          : 'h-20 border-t border-black/[0.06] bg-white/95 pb-6 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-2xl',
         isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden'
       )}
     >
@@ -89,8 +91,8 @@ export function BottomNav() {
               href={item.href}
               className={cn(
                 'relative flex min-w-0 flex-col items-center justify-center rounded-2xl transition-all active:scale-95',
-                isParent ? 'h-full gap-0.5' : 'h-full gap-1 min-w-[52px] group',
-                isActive ? 'text-primary' : 'text-muted-foreground/40'
+                isParent ? 'h-full gap-0.5' : 'h-full min-w-[52px] gap-1 group',
+                isParent ? (isActive ? 'text-[#FFD7AE]' : 'text-white/65') : (isActive ? 'text-primary' : 'text-muted-foreground/40')
               )}
             >
               <div
@@ -98,8 +100,8 @@ export function BottomNav() {
                   'rounded-xl transition-all',
                   isParent ? 'p-1.5' : 'p-2',
                   isActive
-                    ? (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg` : 'bg-primary text-white shadow-[inset_0_-2px_6px_rgba(0,0,0,0.16)]')
-                    : (isParent ? 'bg-slate-100/70 text-slate-500' : 'group-hover:bg-muted/50')
+                    ? (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg` : isParent ? 'bg-[#FF7A16] text-[#14295F] shadow-[0_6px_14px_rgba(255,122,22,0.4)]' : 'bg-primary text-white shadow-[inset_0_-2px_6px_rgba(0,0,0,0.16)]')
+                    : (isParent ? 'bg-white/10 text-white/85' : 'group-hover:bg-muted/50')
                 )}
               >
                 <item.icon className={cn(isParent ? 'h-4 w-4' : 'h-5 w-5', 'transition-all duration-300', isActive ? 'stroke-[2.4px] scale-110' : 'stroke-[2px]')} />
@@ -109,13 +111,13 @@ export function BottomNav() {
                 {item.label}
               </span>
 
-              {isActive && isParent && <div className="absolute bottom-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
-              {isActive && !isParent && <div className={cn('absolute top-0 w-8 h-1 rounded-full animate-in fade-in slide-in-from-top-1', isStudent ? `bg-gradient-to-r ${currentTier.gradient}` : 'bg-primary')} />}
+              {isActive && isParent && <div className="absolute bottom-0.5 h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
+              {isActive && !isParent && <div className={cn('absolute top-0 h-1 w-8 rounded-full animate-in fade-in slide-in-from-top-1', isStudent ? `bg-gradient-to-r ${currentTier.gradient}` : 'bg-primary')} />}
             </Link>
           );
         })}
       </nav>
-      {isMobileMode && !isParent && <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-black/10 rounded-full" />}
+      {isMobileMode && !isParent && <div className="absolute bottom-1.5 left-1/2 h-1.5 w-32 -translate-x-1/2 rounded-full bg-black/10" />}
     </div>
   );
 }
