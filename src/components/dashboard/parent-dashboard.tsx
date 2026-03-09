@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   CalendarCheck,
@@ -44,7 +44,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-import { addDoc, collection, doc, limit, query, serverTimestamp, where, orderBy } from 'firebase/firestore';
+import { addDoc, collection, doc, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { 
   format, 
   subDays, 
@@ -77,6 +77,7 @@ import {
   type AttendanceRequest,
   type DailyReport,
   type GrowthProgress,
+  type ParentActivityEvent,
   type StudyLogDay,
   type StudyPlanItem,
   type StudentProfile,
@@ -185,6 +186,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [submitting, setSubmitting] = useState(false);
 
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
+  const visitLoggedRef = useRef(false);
+  const reportReadLoggedRef = useRef<Record<string, boolean>>({});
 
   const router = useRouter();
   const pathname = usePathname();
@@ -204,6 +207,32 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+  const logParentActivity = async (
+    eventType: ParentActivityEvent['eventType'],
+    metadata?: Record<string, any>
+  ) => {
+    if (!firestore || !centerId || !studentId || !user) return;
+
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'parentActivityEvents'), {
+        centerId,
+        studentId,
+        parentUid: user.uid,
+        eventType,
+        createdAt: serverTimestamp(),
+        metadata: metadata || {},
+      });
+    } catch (error) {
+      console.warn('[parent-activity] failed to log event', eventType, error);
+    }
+  };
+
+  useEffect(() => {
+    if (!isActive || !centerId || !studentId || !user || visitLoggedRef.current) return;
+
+    visitLoggedRef.current = true;
+    void logParentActivity('app_visit', { source: 'dashboard_open', tab });
+  }, [isActive, centerId, studentId, user, tab]);
 
   const studentRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'students', studentId)), [firestore, centerId, studentId]);
   const { data: student } = useDoc<StudentProfile>(studentRef, { enabled: isActive && !!studentId });
@@ -235,6 +264,28 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
   const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || !studentId || !report?.content) return;
+
+    const reportDocId = report.id || `${yesterdayKey}_${studentId}`;
+    if (reportReadLoggedRef.current[reportDocId]) return;
+    reportReadLoggedRef.current[reportDocId] = true;
+
+    if (!(report as any).viewedAt) {
+      const targetRef = doc(firestore, 'centers', centerId, 'dailyReports', reportDocId);
+      updateDoc(targetRef, {
+        viewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }).catch((error) => {
+        console.warn('[parent-report] viewedAt update failed', error);
+      });
+    }
+
+    void logParentActivity('report_read', {
+      reportId: reportDocId,
+      dateKey: report.dateKey || yesterdayKey,
+    });
+  }, [isActive, firestore, centerId, studentId, report, yesterdayKey]);
 
   const growthRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'growthProgress', studentId)), [firestore, centerId, studentId]);
   const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId });
@@ -488,6 +539,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     const params = new URLSearchParams(searchParams.toString());
     params.set('parentTab', nextTab);
     router.replace(`${pathname}?${params.toString()}`);
+    void logParentActivity('app_visit', { source: 'tab_change', tab: nextTab });
   };
 
   async function submit(type: 'consultation' | 'request' | 'suggestion') {
@@ -515,6 +567,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         type, title, body, channel: type === 'consultation' ? channel : null,
         status: 'requested', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
+
+      const eventType: ParentActivityEvent['eventType'] =
+        type === 'consultation' ? 'consultation_request' : type;
+      await logParentActivity(eventType, {
+        title,
+        channel: type === 'consultation' ? channel : null,
+        quickType: type === 'request' ? quickType : null,
+      });
+
       toast({ title: '전송 완료', description: '선생님께 요청이 정상적으로 전달되었습니다.' });
       setRequestText(''); setSuggestionText('');
     } catch (error) {

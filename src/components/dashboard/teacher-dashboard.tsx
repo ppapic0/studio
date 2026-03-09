@@ -51,7 +51,7 @@ import {
   Eye,
   MapPin
 } from 'lucide-react';
-import { useCollection, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useDoc, useFunctions, useMemoFirebase } from '@/firebase';
 import { useAppContext, TIERS } from '@/contexts/app-context';
 import { 
   collection, 
@@ -95,6 +95,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { sendKakaoNotification } from '@/lib/kakao-service';
+import { httpsCallable } from 'firebase/functions';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -116,6 +117,7 @@ const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
 
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
@@ -149,6 +151,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const centerId = activeMembership?.id;
+  const canTriggerAttendanceSms =
+    activeMembership?.role === 'teacher' ||
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
+
+  const triggerAttendanceSms = async (
+    studentId: string,
+    eventType: 'check_in' | 'check_out'
+  ) => {
+    if (!functions || !centerId || !canTriggerAttendanceSms) return;
+
+    try {
+      const notifyAttendanceSmsFn = httpsCallable(functions, 'notifyAttendanceSms');
+      await notifyAttendanceSmsFn({ centerId, studentId, eventType });
+    } catch (error) {
+      console.warn('[teacher] notifyAttendanceSms failed', error);
+    }
+  };
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const thirtyDaysAgoKey = format(subDays(new Date(), 30), 'yyyy-MM-dd');
 
@@ -504,7 +524,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       batch.update(seatRef, updateData);
       await batch.commit();
-
       // 카카오 알림톡 발송 (선생님 수동 조작)
       const studentName = students?.find(s => s.id === studentId)?.name || '학생';
       const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
@@ -512,6 +531,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         studentName,
         type: kakaoType
       });
+
+      if (nextStatus === 'studying') {
+        void triggerAttendanceSms(studentId, 'check_in');
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        void triggerAttendanceSms(studentId, 'check_out');
+      }
       
       toast({ title: "학생 상태가 업데이트되었습니다." });
       setIsManaging(false);

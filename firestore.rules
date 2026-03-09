@@ -191,7 +191,6 @@ service cloud.firestore {
           || isLinkedParentFromResource(centerId);
         allow write: if isCenterAdmin(centerId);
       }
-
       match /dailyReports/{reportId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
@@ -200,7 +199,9 @@ service cloud.firestore {
         allow update: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId)
               && resource.data.studentId == request.auth.uid
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt']));
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt']))
+          || (isLinkedParentFromResource(centerId)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt', 'updatedAt']));
         allow delete: if isCenterAdmin(centerId);
       }
 
@@ -231,6 +232,36 @@ service cloud.firestore {
         allow create: if isStudent(centerId) && request.resource.data.studentId == request.auth.uid;
         allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /parentNotifications/{notificationId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isParent(centerId) && resource.data.parentUid == request.auth.uid);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /parentCommunications/{commId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isParent(centerId) && resource.data.parentUid == request.auth.uid);
+        allow create: if isLinkedParentFromRequest(centerId)
+          && request.resource.data.parentUid == request.auth.uid;
+        allow update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /parentActivityEvents/{eventId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isParent(centerId) && resource.data.parentUid == request.auth.uid);
+        allow create: if isLinkedParentFromRequest(centerId)
+          && request.resource.data.parentUid == request.auth.uid
+          && request.resource.data.eventType in ['app_visit', 'report_read', 'consultation_request', 'request', 'suggestion'];
+        allow update, delete: if false;
+      }
+
+      match /settings/{settingId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
       }
 
       match /leaderboards/{boardId}/entries/{entryId} {

@@ -49,7 +49,7 @@ import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, collectionGroup, Timestamp, doc } from 'firebase/firestore';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress } from '@/lib/types';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -115,6 +115,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, todayKey]);
   const { data: dailyReports } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
+  const parentActivityQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'parentActivityEvents');
+  }, [firestore, centerId]);
+  const { data: parentActivityEvents } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: isActive });
+
+  const parentCommunicationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'parentCommunications');
+  }, [firestore, centerId]);
+  const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
 
   const availableClasses = useMemo(() => {
     if (!activeMembers) return [];
@@ -170,7 +181,33 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
     const sentReports = filteredReports.filter(r => r.status === 'sent');
-    
+
+    const thirtyDaysAgoMs = now - (30 * 24 * 60 * 60 * 1000);
+    const recentParentEvents = (parentActivityEvents || []).filter((event) => {
+      if (!targetMemberIds.has(event.studentId)) return false;
+      const createdAtMs = (event.createdAt as any)?.toMillis?.() ?? 0;
+      return createdAtMs >= thirtyDaysAgoMs;
+    });
+    const recentParentCommunications = (parentCommunications || []).filter((item: any) => {
+      if (!targetMemberIds.has(item.studentId)) return false;
+      const createdAtMs = item?.createdAt?.toMillis?.() ?? 0;
+      return createdAtMs >= thirtyDaysAgoMs;
+    });
+
+    const parentVisitCount30d = recentParentEvents.filter((event) => event.eventType === 'app_visit').length;
+    const activeParentCount30d = new Set(
+      recentParentEvents
+        .filter((event) => event.eventType === 'app_visit')
+        .map((event) => event.parentUid)
+        .filter((uid): uid is string => typeof uid === 'string' && uid.length > 0)
+    ).size;
+
+    const consultationEventCount30d = recentParentEvents.filter((event) => event.eventType === 'consultation_request').length;
+    const consultationDocCount30d = recentParentCommunications.filter((item: any) => item.type === 'consultation').length;
+    const consultationRequestCount30d = Math.max(consultationEventCount30d, consultationDocCount30d);
+
+    const reportReadCount30d = recentParentEvents.filter((event) => event.eventType === 'report_read').length;
+
     return {
       totalTodayMins,
       checkedInCount,
@@ -180,9 +217,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       riskCount: highRiskCount,
       regularityRate: targetMemberIds.size > 0 ? Math.round((sentReports.length / targetMemberIds.size) * 100) : 0,
       readRate: sentReports.length > 0 ? Math.round((sentReports.filter(r => r.viewedAt).length / sentReports.length) * 100) : 0,
-      commentWriteRate: sentReports.length > 0 ? Math.round((sentReports.filter(r => r.content.length > 200).length / sentReports.length) * 100) : 0
+      commentWriteRate: sentReports.length > 0 ? Math.round((sentReports.filter(r => r.content.length > 200).length / sentReports.length) * 100) : 0,
+      parentVisitCount30d,
+      activeParentCount30d,
+      avgVisitsPerStudent30d: targetMemberIds.size > 0 ? Number((parentVisitCount30d / targetMemberIds.size).toFixed(1)) : 0,
+      consultationRequestCount30d,
+      reportReadCount30d,
     };
-  }, [activeMembers, attendanceList, todayStats, dailyReports, progressList, selectedClass, now, isMounted]);
+  }, [activeMembers, attendanceList, todayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, selectedClass, now, isMounted]);
 
   if (!isActive) return null;
 
@@ -308,41 +350,44 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">TRUST KPI</Badge>
                 </div>
-                
                 <div className="grid gap-10 md:grid-cols-3">
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-blue-500" /> 리포트 발송 정기성</span>
-                        <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.regularityRate}%</div>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-blue-500" /> 최근 30일 앱 방문 수</span>
+                        <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.parentVisitCount30d}</div>
+                        <p className="text-[11px] font-bold text-blue-500/80">활성 학부모 {metrics.activeParentCount30d}명</p>
                       </div>
                     </div>
                     <div className="h-2.5 w-full bg-blue-50 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.regularityRate}%` }} />
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, metrics.avgVisitsPerStudent30d * 8)}%` }} />
                     </div>
+                    <p className="text-[10px] font-bold text-muted-foreground">학생 1인당 평균 방문 {metrics.avgVisitsPerStudent30d}회</p>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><PenTool className="h-3 w-3 text-emerald-500" /> 코멘트 작성 밀도</span>
-                        <div className="text-5xl font-black text-emerald-600 tabular-nums">{metrics.commentWriteRate}%</div>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><MessageSquare className="h-3 w-3 text-emerald-500" /> 최근 30일 상담 신청</span>
+                        <div className="text-5xl font-black text-emerald-600 tabular-nums">{metrics.consultationRequestCount30d}</div>
+                        <p className="text-[11px] font-bold text-emerald-500/80">학부모 요청 누적 건수</p>
                       </div>
                     </div>
                     <div className="h-2.5 w-full bg-emerald-50 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.commentWriteRate}%` }} />
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, metrics.consultationRequestCount30d * 6)}%` }} />
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><Eye className="h-3 w-3 text-amber-500" /> 학부모 리포트 열람률</span>
-                        <div className="text-5xl font-black text-amber-600 tabular-nums">{metrics.readRate}%</div>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><Eye className="h-3 w-3 text-amber-500" /> 최근 30일 리포트 열람</span>
+                        <div className="text-5xl font-black text-amber-600 tabular-nums">{metrics.reportReadCount30d}</div>
+                        <p className="text-[11px] font-bold text-amber-500/80">당일 리포트 열람률 {metrics.readRate}%</p>
                       </div>
                     </div>
                     <div className="h-2.5 w-full bg-amber-50 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.readRate}%` }} />
+                      <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, Math.max(metrics.readRate, metrics.reportReadCount30d * 5))}%` }} />
                     </div>
                   </div>
                 </div>

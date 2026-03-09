@@ -9,6 +9,7 @@ export interface User {
   email: string;
   profileImageUrl?: string;
   schoolName?: string; 
+  phoneNumber?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -20,6 +21,7 @@ export interface CenterMembership {
   joinedAt: Timestamp;
   displayName?: string;
   className?: string;
+  phoneNumber?: string;
   linkedStudentIds?: string[];
   monthlyFee?: number;
   baseFee?: number;
@@ -86,6 +88,7 @@ export interface StudentProfile {
   parentUids: string[];
   createdAt: Timestamp;
   parentLinkCode?: string;
+  expectedArrivalTime?: string;
   monthlyFee?: number;
   currentEnrollment?: {
     productId: string;
@@ -222,4 +225,31 @@ export interface AttendanceRequest {
   status: 'requested' | 'approved' | 'rejected';
   penaltyApplied: boolean;
   createdAt: Timestamp;
+}
+
+export interface NotificationSettings {
+  smsEnabled?: boolean;
+  smsProvider?: "none" | "aligo" | "custom";
+  smsSender?: string;
+  smsApiKey?: string;
+  smsUserId?: string;
+  smsEndpointUrl?: string;
+  smsTemplateCheckIn?: string;
+  smsTemplateCheckOut?: string;
+  smsTemplateLateAlert?: string;
+  lateAlertEnabled?: boolean;
+  lateAlertGraceMinutes?: number;
+  defaultArrivalTime?: string;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export interface ParentActivityEvent {
+  id: string;
+  centerId: string;
+  studentId: string;
+  parentUid: string;
+  eventType: "app_visit" | "report_read" | "consultation_request" | "request" | "suggestion";
+  createdAt: Timestamp;
+  metadata?: Record<string, any>;
 }

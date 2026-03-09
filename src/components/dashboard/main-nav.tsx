@@ -63,6 +63,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
     { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
+    { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
     { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
   ],
 };
