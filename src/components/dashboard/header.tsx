@@ -3,27 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Bell,
-  Home,
-  LineChart,
-  Package2,
-  Users,
   PanelLeft,
-  Search,
   LogOut,
   Smartphone,
   Monitor,
   Settings,
   HelpCircle,
   BookOpen,
-  Zap,
-  CalendarDays,
-  MessageCircle,
-  CheckCircle2,
-  School,
-  GraduationCap,
-  Loader2,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 
 import {
@@ -68,10 +56,12 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
-import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
 import { NotificationBell } from './notification-bell';
+import { TrackLogo } from '../ui/track-logo';
+import { Badge } from '../ui/badge';
 
 export function DashboardHeader() {
   const { user } = useUser();
@@ -149,19 +139,28 @@ export function DashboardHeader() {
       "sticky top-0 z-30 flex items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:static md:border-0 md:bg-transparent md:px-6 transition-all duration-300",
       isMobileView ? "h-12" : "h-14 md:h-auto"
     )}>
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className={cn("rounded-xl border-2 transition-all", isMobileView ? "h-8 w-8" : "h-9 w-9 md:hidden")}>
-            <PanelLeft className={cn(isMobileView ? "h-4 w-4" : "h-5 w-5")} />
-            <span className="sr-only">메뉴 열기</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="sm:max-w-xs">
-          <MainNav isMobile={true} />
-        </SheetContent>
-      </Sheet>
+      <div className="flex items-center gap-2">
+        <Sheet>
+          <SheetTrigger asChild>
+            <button className={cn("p-1 text-primary/60 hover:text-primary transition-all", isMobileView ? "md:hidden" : "md:hidden")}>
+              <PanelLeft className={cn(isMobileView ? "h-5 w-5" : "h-6 w-6")} />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="left" className="sm:max-w-xs">
+            <MainNav isMobile={true} />
+          </SheetContent>
+        </Sheet>
 
-      {/* 앱 모드일 때는 브레드크럼을 숨겨서 상단 공간을 확보합니다. */}
+        {isMobileView && (
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <TrackLogo className="h-5 w-auto" />
+            {activeMembership?.role === 'parent' && (
+              <Badge className="bg-primary text-white border-none font-black text-[8px] h-4 px-1.5 uppercase tracking-tighter shadow-sm">PARENT</Badge>
+            )}
+          </Link>
+        )}
+      </div>
+
       {!isMobileView && (
         <Breadcrumb className="hidden md:flex">
           <BreadcrumbList>
@@ -172,41 +171,40 @@ export function DashboardHeader() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
+              <BreadcrumbPage>메인 화면</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
       )}
 
       <div className="relative ml-auto flex items-center gap-2">
-        {/* 앱 모드 토글 버튼 */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={cn("rounded-full text-muted-foreground hover:bg-primary/5 transition-all", isMobileView ? "h-8 w-8" : "h-10 w-10")}
-          onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
-          title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
-        >
-          {viewMode === 'mobile' ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-5 w-5" />}
-        </Button>
+        {!isMobileView && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-full text-muted-foreground hover:bg-primary/5 transition-all h-9 w-9"
+            onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
+            title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
+          >
+            {viewMode === 'mobile' ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-5 w-5" />}
+          </Button>
+        )}
 
         <NotificationBell />
 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
+            <button
               className={cn(
-                "overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button",
-                isMobileView ? "h-8 w-8" : "h-10 w-10"
+                "overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button transition-all",
+                isMobileView ? "h-7 w-7" : "h-9 w-9"
               )}
             >
               <Avatar className="h-full w-full">
                 {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
-                <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarFallback className="bg-primary/5 text-primary font-black text-[10px]">{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             align="end" 
@@ -246,10 +244,7 @@ export function DashboardHeader() {
           <div className="space-y-6 bg-white p-6 sm:p-8">
             <div className="grid gap-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label>
-              <div className="relative">
-                <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/30" />
-                <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 pl-10 rounded-xl border-2 font-bold" placeholder="학교명을 입력하세요" />
-              </div>
+              <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 rounded-xl border-2 font-bold" placeholder="학교명을 입력하세요" />
             </div>
             {activeMembership?.role === 'student' && (
               <div className="grid gap-2">
@@ -288,31 +283,11 @@ export function DashboardHeader() {
           <div className="flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar p-6 sm:p-8">
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <Zap className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
+                <Sparkles className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
               </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
+              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm">
                 <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  대시보드 상단의 **[트랙 시작]** 버튼을 누르면 실시간 학습 몰입 엔진이 가동됩니다.
-                </p>
-              </div>
-            </section>
-            <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 계획 및 루틴
-              </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  **[나의 학습 계획]** 메뉴에서 매일의 공부 To-do와 생활 루틴을 관리하세요.
-                </p>
-              </div>
-            </section>
-            <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 상담 및 피드백
-              </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  고민이 생기면 언제든 **[상담 신청]**을 통해 도움을 요청하세요.
+                  학생들이 공부를 시작하면 실시간으로 시간이 측정되며, 학부모님은 이 현황을 언제든 확인하실 수 있습니다.
                 </p>
               </div>
             </section>
