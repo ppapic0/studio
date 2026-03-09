@@ -5,48 +5,34 @@ import { cn } from '@/lib/utils';
 export function TrackLogo({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 400 400"
-      className={cn('h-12 w-auto', className)}
+      viewBox="0 0 140 100"
+      className={cn('h-10 w-auto', className)}
       role="img"
-      aria-label="트랙 학습센터 로고"
+      aria-label="트랙 학습센터 심볼"
     >
-      <title>트랙 학습센터 로고</title>
+      <title>트랙 학습센터 심볼</title>
       
-      {/* 트랙 심볼 (상단) */}
-      <g transform="translate(200, 140)">
-        {/* 바깥쪽 오렌지 트랙 */}
+      <g transform="translate(70, 50)">
+        {/* 바깥쪽 오렌지 트랙 (Stadium Shape) */}
         <path
-          d="M 6 -50 H 45 A 50 50 0 0 1 45 50 H -45 A 50 50 0 0 1 -45 -50 H -6"
+          d="M 10 -35 H 35 A 35 35 0 0 1 35 35 H -35 A 35 35 0 0 1 -35 -35 H -10"
           fill="none"
           stroke="#FF7A16"
-          strokeWidth="28"
-          strokeLinecap="butt"
+          strokeWidth="22"
+          strokeLinecap="round"
         />
-        {/* 안쪽 네이비 라인 */}
+        {/* 안쪽 네이비 가이드 라인 */}
         <path
-          d="M 6 -50 H 45 A 50 50 0 0 1 45 50 H -45 A 50 50 0 0 1 -45 -50 H -6"
+          d="M 10 -35 H 35 A 35 35 0 0 1 35 35 H -35 A 35 35 0 0 1 -35 -35 H -10"
           fill="none"
           stroke="#14295F"
-          strokeWidth="6"
-          strokeLinecap="butt"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray="2 4"
         />
+        {/* 중앙 포인트 가이드 */}
+        <circle cx="0" cy="0" r="3" fill="#14295F" opacity="0.5" />
       </g>
-
-      {/* 로고 텍스트 (하단) */}
-      <text
-        x="200"
-        y="320"
-        textAnchor="middle"
-        fill="#14295F"
-        style={{
-          fontWeight: 900,
-          fontSize: '62px',
-          fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
-          letterSpacing: '-3px'
-        }}
-      >
-        트랙 학습센터
-      </text>
     </svg>
   );
 }

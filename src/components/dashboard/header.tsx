@@ -137,7 +137,7 @@ export function DashboardHeader() {
   return (
     <header className={cn(
       "sticky top-0 z-30 flex items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 transition-all duration-300",
-      isMobileView ? "h-12" : "h-14 md:h-16 md:px-6 md:bg-transparent md:border-0"
+      isMobileView ? "h-14" : "h-14 md:h-16 md:px-6 md:bg-transparent md:border-0"
     )}>
       <div className="flex items-center gap-2">
         <Sheet>
@@ -152,10 +152,14 @@ export function DashboardHeader() {
         </Sheet>
 
         {isMobileView && (
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <TrackLogo className="h-5 w-auto" />
+          <Link href="/dashboard" className="flex items-center gap-2 group active:scale-95 transition-all">
+            <TrackLogo className="h-7 w-auto" />
+            <div className="flex flex-col -gap-1">
+              <span className="text-sm font-black tracking-tighter text-primary leading-none uppercase">Track</span>
+              <span className="text-[10px] font-bold text-muted-foreground leading-none">학습센터</span>
+            </div>
             {activeMembership?.role === 'parent' && (
-              <Badge className="bg-primary text-white border-none font-black text-[8px] h-4 px-1.5 uppercase tracking-tighter shadow-sm">PARENT</Badge>
+              <Badge className="bg-primary text-white border-none font-black text-[8px] h-4 px-1.5 uppercase tracking-tighter shadow-sm ml-1">PARENT</Badge>
             )}
           </Link>
         )}

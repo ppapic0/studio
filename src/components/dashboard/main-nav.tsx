@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import {
@@ -95,8 +95,12 @@ export function MainNav({ isMobile = false }: MainNavProps) {
 
   return (
     <nav className={navClass}>
-      <Link href="/dashboard" className="mb-4 px-1 pt-0">
-        <TrackLogo className={cn(isMobile ? 'h-12 w-[140px]' : 'h-14 w-[170px]')} />
+      <Link href="/dashboard" className="mb-8 px-2 pt-6 flex items-center gap-3">
+        <TrackLogo className={cn(isMobile ? 'h-10' : 'h-12', "drop-shadow-sm")} />
+        <div className="flex flex-col">
+          <span className="text-xl font-black tracking-tighter text-primary leading-none uppercase">Track</span>
+          <span className="text-[11px] font-bold text-muted-foreground/60 leading-none mt-0.5">학습센터</span>
+        </div>
       </Link>
       {userNavItems.map((item) => {
         const [itemPath, itemQuery] = item.href.split('?');
