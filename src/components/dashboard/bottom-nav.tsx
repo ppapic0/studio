@@ -49,7 +49,6 @@ export function BottomNav() {
     ],
     parent: [
       { href: '/dashboard?parentTab=home', label: '홈', icon: LayoutDashboard },
-      { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
       { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
       { href: '/dashboard?parentTab=life', label: '생활', icon: Armchair },
       { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
@@ -134,7 +133,7 @@ export function BottomNav() {
 
               <span
                 className={cn(
-                  'font-black tracking-tight transition-all duration-300',
+                  'font-black tracking-tight transition-all duration-300 whitespace-nowrap',
                   isParent ? 'text-[11px] leading-none' : 'text-[10px]',
                   isActive ? 'opacity-100' : 'opacity-45'
                 )}

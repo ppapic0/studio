@@ -120,7 +120,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
             className={cn(linkClass, isActive && (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-xl` : 'bg-primary text-primary-foreground shadow-xl'))}
           >
             <item.icon className={cn('h-5 w-5 transition-transform duration-300 group-hover:scale-110', isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary')} />
-            <span className="font-bold">{item.label}</span>
+            <span className="font-bold whitespace-nowrap truncate">{item.label}</span>
           </Link>
         );
       })}
