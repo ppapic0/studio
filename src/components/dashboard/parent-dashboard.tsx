@@ -55,7 +55,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsContent } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 
 const tabs: { value: ParentPortalTab; label: string }[] = [
@@ -66,6 +66,15 @@ const tabs: { value: ParentPortalTab; label: string }[] = [
   { value: 'communication', label: '상담/소통' },
   { value: 'notifications', label: '알림' },
 ];
+
+const tabMeta: Record<ParentPortalTab, { title: string; description: string }> = {
+  home: { title: 'Today Overview', description: 'Check attendance, study time, and plan progress at a glance.' },
+  reports: { title: 'Weekly & Monthly Report', description: 'See key metrics and trend charts in one place.' },
+  studyDetail: { title: 'Study Details', description: 'Review sessions, subjects, and time-of-day records.' },
+  life: { title: 'Life Management', description: 'Monitor attendance events, behavior, and penalty changes.' },
+  communication: { title: 'Counsel & Communication', description: 'Submit requests and counseling quickly.' },
+  notifications: { title: 'Notifications', description: 'Track important alerts and delivered reports.' },
+};
 
 function toHm(minutes: number) {
   return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
@@ -308,13 +317,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </CardHeader>
         <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-6 pb-6')}>
           <Tabs value={tab} onValueChange={handleTabChange}>
-            <TabsList className="w-full h-auto justify-start overflow-x-auto rounded-2xl bg-slate-100 p-1">
-              {tabs.map((item) => (
-                <TabsTrigger key={item.value} value={item.value} className="rounded-xl px-3 py-2 text-xs font-black data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  {item.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <Card className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 shadow-none">
+              <CardContent className={cn(isMobile ? 'p-4' : 'p-5')}>
+                <p className="text-[11px] font-black uppercase tracking-wider text-[#1b64da]">{tabMeta[tab].title}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{tabMeta[tab].description}</p>
+              </CardContent>
+            </Card>
 
             <TabsContent value="home" className="mt-4 space-y-3">
               <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3')}>
