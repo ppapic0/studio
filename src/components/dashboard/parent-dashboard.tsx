@@ -65,8 +65,9 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tabs, TabsContent } from '../ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
 import {
   Dialog,
   DialogContent,
@@ -254,7 +255,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <CardContent className={cn('p-6 space-y-6')}>
           <div className="flex flex-col gap-1">
             <CardTitle className="text-2xl font-black tracking-tighter text-primary leading-none">
-              {student?.name || '자녀'} 학생 상태
+              {student?.name || '자녀'} 학생 스냅샷
             </CardTitle>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
               {format(new Date(), 'yyyy. MM. dd (EEEE)', {locale: ko})}
@@ -268,25 +269,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">공부 시간</span>
                   <p className="text-xl font-black text-primary leading-tight">{toHm(totalMinutes)}</p>
                 </Card>
-                <Card className="rounded-2xl border-none bg-emerald-50 p-4 text-center space-y-1 shadow-sm border border-emerald-100">
-                  <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">계획 달성</span>
+                <Card className="rounded-2xl border-none bg-[#fff7ed] p-4 text-center space-y-1 shadow-sm border border-orange-100">
+                  <span className="text-[8px] font-black text-orange-600 uppercase tracking-widest">계획 달성</span>
                   <p className="text-xl font-black text-primary leading-tight">{planRate}%</p>
                 </Card>
                 <Card className={cn(
                   "rounded-2xl border-none p-4 text-center space-y-1 shadow-sm border",
-                  inCenter ? "bg-blue-50 border-blue-100" : "bg-slate-100 border-slate-200"
+                  inCenter ? "bg-[#eaf2ff] border-blue-100" : "bg-slate-100 border-slate-200"
                 )}>
                   <span className={cn("text-[8px] font-black uppercase tracking-widest", inCenter ? "text-blue-600" : "text-slate-400")}>재실 상태</span>
                   <p className="text-xl font-black text-primary leading-tight">{inCenter ? '입실 중' : '미재실'}</p>
                 </Card>
               </div>
 
-              <Card className="rounded-[2rem] border-none bg-[#fafafa] p-6 ring-1 ring-slate-100 relative overflow-hidden group">
+              <Card className="rounded-[2rem] border-none bg-slate-50 p-6 ring-1 ring-slate-100 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:rotate-12 transition-transform duration-700">
                   <MessageCircle className="h-20 w-20 text-primary" />
                 </div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="h-4 w-4 text-accent fill-current" />
+                  <Sparkles className="h-4 w-4 text-[#FF7A16] fill-current" />
                   <span className="text-[10px] font-black text-primary uppercase tracking-widest">오늘의 집중 분석 요약</span>
                 </div>
                 <p className="text-sm font-bold text-slate-700 leading-relaxed break-keep relative z-10">
@@ -296,26 +297,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button className="w-full h-14 rounded-2xl bg-primary text-white hover:bg-primary/90 font-black gap-2 text-base shadow-xl shadow-primary/20 active:scale-[0.98] transition-all">
+                  <Button className="w-full h-14 rounded-2xl bg-primary text-white hover:bg-primary/90 font-black gap-2 text-base shadow-xl active:scale-[0.98] transition-all">
                     <TrendingUp className="h-5 w-5" /> 상세 분석 리포트 확인 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
                   <div className="bg-primary p-10 text-white relative">
                     <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
-                    <DialogTitle className="text-3xl font-black tracking-tighter">AI 학습 인사이트</DialogTitle>
-                    <DialogDescription className="text-white/70 font-bold mt-1 text-sm">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black tracking-tighter">AI 학습 인사이트</DialogTitle>
+                    <DialogDescription className="text-white/70 font-bold mt-1 text-xs">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
                   </div>
-                  <div className="p-8 space-y-4 bg-[#f8f9fc]">
+                  <div className="p-6 space-y-3 bg-[#fafafa]">
                     {parentDashboardMockData.aiInsights.map((insight, i) => (
-                      <div key={i} className="flex items-start gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-primary/20">
-                        <div className="h-2 w-2 rounded-full bg-accent mt-2 shrink-0" />
+                      <div key={i} className="flex items-start gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-orange-200">
+                        <div className="h-2 w-2 rounded-full bg-[#FF7A16] mt-2 shrink-0" />
                         <p className="text-sm font-bold text-slate-700 leading-relaxed">{insight}</p>
                       </div>
                     ))}
                   </div>
                   <DialogFooter className="p-6 bg-white border-t">
-                    <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg">확인했습니다</Button></DialogClose>
+                    <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-primary">확인했습니다</Button></DialogClose>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -329,14 +330,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
-                  <p className="text-2xl font-black text-accent">{weekly.avgPlanCompletionRate}%</p>
+                  <p className="text-2xl font-black text-[#FF7A16]">{weekly.avgPlanCompletionRate}%</p>
                 </Card>
               </div>
 
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full h-14 rounded-2xl border-2 border-slate-100 bg-slate-50/30 hover:bg-slate-50 font-black gap-2 text-sm text-primary shadow-sm">
-                    <BarChart3 className="h-5 w-5 text-accent" /> 주간 성과 정밀 분석 보기 <Maximize2 className="h-4 w-4 opacity-30 ml-auto" />
+                    <BarChart3 className="h-5 w-5 text-[#FF7A16]" /> 주간 성과 정밀 분석 보기 <Maximize2 className="h-4 w-4 opacity-30 ml-auto" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
@@ -360,12 +361,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     </div>
                     <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
-                      <p className="text-[10px] font-black text-accent uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
+                      <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
                       <p className="text-base font-bold text-slate-700 leading-relaxed">"{weekly.teacherFeedback}"</p>
                     </div>
                   </div>
                   <DialogFooter className="p-6 bg-white border-t">
-                    <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg">확인 완료</Button></DialogClose>
+                    <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-primary">확인 완료</Button></DialogClose>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -374,7 +375,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="studyDetail" className="mt-0 space-y-4 animate-in fade-in duration-500">
               <Card className="rounded-[2rem] border-none shadow-sm bg-white p-6 ring-1 ring-slate-100">
                 <CardTitle className="text-base font-black tracking-tight mb-6 flex items-center gap-2">
-                  <PieChartIcon className="h-5 w-5 text-accent" /> 과목별 학습 비중
+                  <PieChartIcon className="h-5 w-5 text-[#FF7A16]" /> 과목별 학습 비중
                 </CardTitle>
                 <div className="space-y-5">
                   {subjects.slice(0, 4).map((s, i) => (
@@ -489,7 +490,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   )} onClick={() => setReadMap(prev => ({...prev, [n.id]: true}))}>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
-                      {n.isImportant && <Badge className="bg-orange-100 text-accent border-none font-black text-[8px] h-5 px-2">중요</Badge>}
+                      {n.isImportant && <Badge className="bg-orange-100 text-[#FF7A16] border-none font-black text-[8px] h-5 px-2">중요</Badge>}
                     </div>
                     <p className="text-base font-black text-primary tracking-tight">{n.title}</p>
                     <p className="text-xs font-bold text-slate-500 leading-relaxed">{n.body}</p>
