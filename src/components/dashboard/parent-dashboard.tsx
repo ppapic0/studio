@@ -57,6 +57,7 @@ import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
+import { TrackLogo } from '../ui/track-logo';
 
 const tabs: { value: ParentPortalTab; label: string }[] = [
   { value: 'home', label: '홈' },
@@ -307,13 +308,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", isMobile ? "pb-24" : "")}>
       <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
         <CardHeader className={cn(isMobile ? 'p-4' : 'p-6')}>
-          <CardTitle className={cn('font-black tracking-tight', isMobile ? 'text-xl' : 'text-3xl')}>
-            {student?.name || '자녀'} 학습 안심 리포트
+          <div className="flex items-center justify-between gap-3">
+            <TrackLogo className={cn(isMobile ? 'h-10 w-[124px]' : 'h-12 w-[150px]')} />
+            <Badge className="rounded-full border border-[#dbe8ff] bg-[#f2f7ff] px-3 py-1 text-[10px] font-black text-[#1b64da]">{'\uBD80\uBAA8 \uC804\uC6A9'}</Badge>
+          </div>
+          <CardTitle className={cn('mt-3 font-black tracking-tight', isMobile ? 'text-xl' : 'text-3xl')}>
+            {student?.name || '\uC790\uB140'} {'\uD559\uC2B5 \uC548\uC2EC \uB9AC\uD3EC\uD2B8'}
           </CardTitle>
-          <CardDescription className="font-semibold text-slate-500">복잡한 수치 대신 핵심 상태를 빠르게 확인할 수 있도록 구성했습니다.</CardDescription>
+          <CardDescription className="font-semibold text-slate-500">{'\uBCF5\uC7A1\uD55C \uC218\uCE58 \uB300\uC2E0 \uD575\uC2EC \uC0C1\uD0DC\uB97C \uBE60\uB974\uAC8C \uD655\uC778\uD560 \uC218 \uC788\uB3C4\uB85D \uAD6C\uC131\uD588\uC2B5\uB2C8\uB2E4.'}</CardDescription>
         </CardHeader>
         <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-6 pb-6')}>
           <Tabs value={tab} onValueChange={handleTabChange}>

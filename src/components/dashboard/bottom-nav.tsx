@@ -29,6 +29,7 @@ export function BottomNav() {
 
   const role = activeMembership.role;
   const isStudent = role === 'student';
+  const isParent = role === 'parent';
   const activeParentTab = searchParams.get('parentTab') || 'home';
 
   const navItems: Record<string, { href: string; label: string; icon: any }[]> = {
@@ -68,11 +69,12 @@ export function BottomNav() {
   return (
     <div
       className={cn(
-        'z-50 bg-white/90 backdrop-blur-2xl border-t border-black/[0.05] h-20 transition-all duration-500 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]',
+        'z-50 bg-white/95 backdrop-blur-2xl border-t border-black/[0.06] transition-all duration-300 shadow-[0_-10px_30px_rgba(15,23,42,0.08)]',
+        isParent ? 'h-[5.5rem] rounded-t-[1.5rem] border-x border-slate-200/80 px-1 pb-[calc(env(safe-area-inset-bottom)+0.35rem)]' : 'h-20 pb-6',
         isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden'
       )}
     >
-      <nav className="flex items-center justify-around h-full px-2">
+      <nav className={cn('h-full', isParent ? 'grid grid-cols-6 gap-0.5 px-1.5 pt-1' : 'flex items-center justify-around px-2')}>
         {currentNav.map((item) => {
           const [itemPath, itemQuery] = item.href.split('?');
           const isParentQueryItem = role === 'parent' && !!itemQuery;
@@ -86,25 +88,34 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 min-w-[52px] h-full transition-all active:scale-90 relative group',
-                isActive ? 'text-primary' : 'text-muted-foreground/30'
+                'relative flex min-w-0 flex-col items-center justify-center rounded-2xl transition-all active:scale-95',
+                isParent ? 'h-full gap-0.5' : 'h-full gap-1 min-w-[52px] group',
+                isActive ? 'text-primary' : 'text-muted-foreground/40'
               )}
             >
               <div
                 className={cn(
-                  'p-2 rounded-2xl transition-all duration-500',
-                  isActive ? (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg` : 'bg-primary text-white shadow-inner') : 'group-hover:bg-muted/50'
+                  'rounded-xl transition-all',
+                  isParent ? 'p-1.5' : 'p-2',
+                  isActive
+                    ? (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg` : 'bg-primary text-white shadow-[inset_0_-2px_6px_rgba(0,0,0,0.16)]')
+                    : (isParent ? 'bg-slate-100/70 text-slate-500' : 'group-hover:bg-muted/50')
                 )}
               >
-                <item.icon className={cn('h-5 w-5 transition-all duration-500', isActive ? 'stroke-[2.5px] scale-110' : 'stroke-[2px]')} />
+                <item.icon className={cn(isParent ? 'h-4 w-4' : 'h-5 w-5', 'transition-all duration-300', isActive ? 'stroke-[2.4px] scale-110' : 'stroke-[2px]')} />
               </div>
-              <span className={cn('text-[10px] font-black tracking-tighter transition-all duration-300', isActive ? 'text-primary opacity-100' : 'opacity-40')}>{item.label}</span>
-              {isActive && <div className={cn('absolute top-0 w-8 h-1 rounded-full animate-in fade-in slide-in-from-top-1', isStudent ? `bg-gradient-to-r ${currentTier.gradient}` : 'bg-primary')} />}
+
+              <span className={cn('font-black tracking-tight transition-all duration-300', isParent ? 'text-[9px]' : 'text-[10px]', isActive ? 'opacity-100' : 'opacity-45')}>
+                {item.label}
+              </span>
+
+              {isActive && isParent && <div className="absolute bottom-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
+              {isActive && !isParent && <div className={cn('absolute top-0 w-8 h-1 rounded-full animate-in fade-in slide-in-from-top-1', isStudent ? `bg-gradient-to-r ${currentTier.gradient}` : 'bg-primary')} />}
             </Link>
           );
         })}
       </nav>
-      {isMobileMode && <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-black/10 rounded-full" />}
+      {isMobileMode && !isParent && <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-black/10 rounded-full" />}
     </div>
   );
 }

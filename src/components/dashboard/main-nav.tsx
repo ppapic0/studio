@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {
   Armchair,
   Bell,
-  BookOpen,
   CalendarDays,
   ClipboardCheck,
   DollarSign,
@@ -25,6 +24,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
+import { TrackLogo } from '../ui/track-logo';
 
 type MainNavProps = {
   isMobile?: boolean;
@@ -96,11 +96,8 @@ export function MainNav({ isMobile = false }: MainNavProps) {
 
   return (
     <nav className={navClass}>
-      <Link href="/dashboard" className="flex items-center gap-3 text-2xl font-black text-primary mb-4 px-2 pt-0 tracking-tighter">
-        <div className="bg-primary p-2 rounded-xl">
-          <BookOpen className="h-6 w-6 text-white" />
-        </div>
-        <span>트랙학습센터</span>
+      <Link href="/dashboard" className="mb-4 px-1 pt-0">
+        <TrackLogo className={cn(isMobile ? 'h-12 w-[140px]' : 'h-14 w-[170px]')} />
       </Link>
       {userNavItems.map((item) => {
         const [itemPath, itemQuery] = item.href.split('?');
