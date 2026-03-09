@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
@@ -71,6 +71,46 @@ function toTime(value?: Timestamp): number {
   } catch {
     return 0;
   }
+}
+function resolveCallableErrorMessage(error: any, fallback: string): string {
+  const detailMessage =
+    typeof error?.details === 'string'
+      ? error.details
+      : typeof error?.details?.userMessage === 'string'
+        ? error.details.userMessage
+        : typeof error?.details?.message === 'string'
+          ? error.details.message
+          : '';
+
+  const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
+  const cleanedRaw = rawMessage
+    .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, '')
+    .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, '')
+    .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, '')
+    .replace(/^\d+\s+PERMISSION_DENIED:\s*/i, '')
+    .replace(/^\d+\s+INTERNAL:\s*/i, '')
+    .trim();
+
+  const code = String(error?.code || '').toLowerCase();
+  const isInternal = code.includes('internal') || /\b(functions\/internal|internal)\b/i.test(cleanedRaw);
+
+  if (detailMessage) return detailMessage;
+  if (!isInternal && cleanedRaw) return cleanedRaw;
+
+  if (code.includes('failed-precondition')) {
+    return '사전 조건이 맞지 않습니다. 학생 코드 또는 연동 상태를 확인해 주세요.';
+  }
+  if (code.includes('invalid-argument')) {
+    return '입력값이 올바르지 않습니다. 필수 항목을 확인해 주세요.';
+  }
+  if (code.includes('permission-denied')) {
+    return '수정 권한이 없습니다. 관리자 권한을 확인해 주세요.';
+  }
+  if (code.includes('already-exists')) {
+    return '이미 존재하는 데이터입니다. 값을 확인해 주세요.';
+  }
+
+  return fallback;
 }
 
 const CustomTooltip = ({ active, payload, label, unit = '분' }: any) => {
@@ -428,9 +468,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       });
       toast({ title: '정보 수정 완료' });
       setIsEditModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ variant: 'destructive', title: '수정 실패' });
+      const message = resolveCallableErrorMessage(error, '학생 정보 수정 중 오류가 발생했습니다.');
+      toast({ variant: 'destructive', title: '수정 실패', description: message });
     } finally {
       setIsUpdating(false);
     }
@@ -452,9 +493,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       await batch.commit();
       toast({ title: '성장 지표 보정 완료' });
       setIsEditStats(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ variant: 'destructive', title: '수정 실패' });
+      const message = resolveCallableErrorMessage(error, '학생 정보 수정 중 오류가 발생했습니다.');
+      toast({ variant: 'destructive', title: '수정 실패', description: message });
     } finally {
       setIsUpdating(false);
     }

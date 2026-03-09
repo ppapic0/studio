@@ -66,6 +66,46 @@ import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import { format } from 'date-fns';
 
+function resolveCallableErrorMessage(error: any, fallback: string): string {
+  const detailMessage =
+    typeof error?.details === 'string'
+      ? error.details
+      : typeof error?.details?.userMessage === 'string'
+        ? error.details.userMessage
+        : typeof error?.details?.message === 'string'
+          ? error.details.message
+          : '';
+
+  const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
+  const cleanedRaw = rawMessage
+    .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, '')
+    .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, '')
+    .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, '')
+    .replace(/^\d+\s+PERMISSION_DENIED:\s*/i, '')
+    .replace(/^\d+\s+INTERNAL:\s*/i, '')
+    .trim();
+
+  const code = String(error?.code || '').toLowerCase();
+  const isInternal = code.includes('internal') || /\b(functions\/internal|internal)\b/i.test(cleanedRaw);
+
+  if (detailMessage) return detailMessage;
+  if (!isInternal && cleanedRaw) return cleanedRaw;
+
+  if (code.includes('failed-precondition')) {
+    return '사전 조건이 맞지 않습니다. 학생 코드 중복이나 연동 상태를 확인해 주세요.';
+  }
+  if (code.includes('invalid-argument')) {
+    return '입력값이 올바르지 않습니다. 필수 항목을 확인해 주세요.';
+  }
+  if (code.includes('permission-denied')) {
+    return '수정 권한이 없습니다. 관리자 계정으로 다시 시도해 주세요.';
+  }
+  if (code.includes('already-exists')) {
+    return '이미 등록된 정보입니다. 다른 값으로 시도해 주세요.';
+  }
+
+  return fallback;
+}
 export default function StudentAccountManagementPage() {
   const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
@@ -201,7 +241,8 @@ export default function StudentAccountManagementPage() {
       toast({ title: '학생 데이터가 업데이트되었습니다.' });
       setIsEditModalOpen(false);
     } catch (e: any) {
-      toast({ variant: 'destructive', title: '수정 실패', description: e.message });
+      const message = resolveCallableErrorMessage(e, '학생 정보 수정 중 오류가 발생했습니다.');
+      toast({ variant: 'destructive', title: '수정 실패', description: message });
     } finally {
       setIsUpdating(null);
     }

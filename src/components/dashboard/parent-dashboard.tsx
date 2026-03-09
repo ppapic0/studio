@@ -171,7 +171,7 @@ function formatDateLabel(dateText?: string, fallbackTimestamp?: TimestampLike) {
 export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { memberships, activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
 
   const isMobile = viewMode === 'mobile';
@@ -202,8 +202,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
   }, [searchParams]);
 
-  const centerId = activeMembership?.id;
-  const studentId = activeMembership?.linkedStudentIds?.[0];
+  const activeCenterMembership = useMemo(() => {
+    if (activeMembership) {
+      return memberships.find((membership) => membership.id === activeMembership.id) || activeMembership;
+    }
+    return memberships.find((membership) => membership.status === 'active') || memberships[0] || null;
+  }, [activeMembership, memberships]);
+
+  const centerId = activeCenterMembership?.id;
+  const studentId = activeCenterMembership?.linkedStudentIds?.[0];
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';

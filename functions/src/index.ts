@@ -461,6 +461,12 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     throw new functions.https.HttpsError("permission-denied", "수정 권한이 없습니다.");
   }
 
+  const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
+  const existingStudentSnap = await studentRef.get();
+  const existingStudentData = existingStudentSnap.exists ? (existingStudentSnap.data() as any) : null;
+  const existingParentLinkCode =
+    typeof existingStudentData?.parentLinkCode === "string" ? existingStudentData.parentLinkCode.trim() : "";
+
   const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
   const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
   const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
@@ -488,7 +494,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       });
     }
 
-    if (normalizedParentLinkCode) {
+    if (normalizedParentLinkCode && normalizedParentLinkCode !== existingParentLinkCode) {
       const duplicateSnap = await db
         .collectionGroup("students")
         .where("parentLinkCode", "==", normalizedParentLinkCode)
@@ -558,7 +564,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (trimmedGrade) studentUpdate.grade = trimmedGrade;
     if (parentLinkCodeProvided) studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
     if (isAdminCaller && hasClassName) studentUpdate.className = normalizedClassName;
-    batch.set(db.doc("centers/" + centerId + "/students/" + studentId), studentUpdate, { merge: true });
+    batch.set(studentRef, studentUpdate, { merge: true });
 
     if (isAdminCaller) {
       const memberUpdate: any = { updatedAt: timestamp };
@@ -829,23 +835,32 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       }
 
       const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
-      const existingMembership = await t.get(userCenterRef);
+      const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
+      const [existingMembership, existingCenterMember] = await Promise.all([t.get(userCenterRef), t.get(memberRef)]);
       const existingMembershipData = existingMembership.exists ? (existingMembership.data() as any) : null;
-      const isParentRelink = role === "parent" && existingMembership.exists && existingMembershipData?.role === "parent";
+      const existingCenterMemberData = existingCenterMember.exists ? (existingCenterMember.data() as any) : null;
+      const existingRole = existingMembershipData?.role || existingCenterMemberData?.role || null;
+      const isParentRelink = role === "parent" && existingRole === "parent";
 
-      if (existingMembership.exists && !isParentRelink) {
+      if ((existingMembership.exists || existingCenterMember.exists) && !isParentRelink) {
         throw new functions.https.HttpsError("already-exists", "Already joined this center.", {
           userMessage: "이미 가입된 센터입니다.",
         });
       }
 
+      const extractLinkedIds = (value: unknown): string[] => {
+        if (!Array.isArray(value)) return [];
+        return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+      };
+
       const ts = admin.firestore.Timestamp.now();
       let resolvedDisplayName = displayNameInput || tokenDisplayName || "사용자";
-      const existingLinkedStudentIds = Array.isArray(existingMembershipData?.linkedStudentIds)
-        ? existingMembershipData.linkedStudentIds.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0)
-        : [];
+      const existingLinkedStudentIds = Array.from(new Set([
+        ...extractLinkedIds(existingMembershipData?.linkedStudentIds),
+        ...extractLinkedIds(existingCenterMemberData?.linkedStudentIds),
+      ]));
       let linkedStudentIds: string[] = [];
-      let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber(existingMembershipData?.phoneNumber || "");
+      let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber(existingMembershipData?.phoneNumber || existingCenterMemberData?.phoneNumber || "");
 
       if (role === "student") {
         if (!schoolName) {
@@ -876,7 +891,9 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         linkedStudentIds = Array.from(new Set([...existingLinkedStudentIds, linkedStudentId]));
         if (!displayNameInput) {
           resolvedDisplayName =
-            (existingMembershipData?.displayName as string | undefined) || `${linkedStudentData?.name || "학생"} 학부모`;
+            (existingMembershipData?.displayName as string | undefined) ||
+            (existingCenterMemberData?.displayName as string | undefined) ||
+            `${linkedStudentData?.name || "학생"} 학부모`;
         }
 
         t.set(linkedStudentRef, {
@@ -902,10 +919,10 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         id: uid,
         centerId,
         role,
-        status: existingMembershipData?.status || "active",
-        joinedAt: existingMembershipData?.joinedAt || ts,
+        status: existingMembershipData?.status || existingCenterMemberData?.status || "active",
+        joinedAt: existingMembershipData?.joinedAt || existingCenterMemberData?.joinedAt || ts,
         displayName: resolvedDisplayName,
-        className: targetClassName || existingMembershipData?.className || null,
+        className: targetClassName || existingMembershipData?.className || existingCenterMemberData?.className || null,
       };
       if (role === "parent" && effectiveParentPhone) {
         memberData.phoneNumber = effectiveParentPhone;
@@ -918,9 +935,10 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         id: centerId,
         centerId,
         role,
-        status: existingMembershipData?.status || "active",
-        joinedAt: existingMembershipData?.joinedAt || ts,
-        className: targetClassName || existingMembershipData?.className || null,
+        status: existingMembershipData?.status || existingCenterMemberData?.status || "active",
+        joinedAt: existingMembershipData?.joinedAt || existingCenterMemberData?.joinedAt || ts,
+        displayName: resolvedDisplayName,
+        className: targetClassName || existingMembershipData?.className || existingCenterMemberData?.className || null,
       };
       if (role === "parent" && effectiveParentPhone) {
         userCenterData.phoneNumber = effectiveParentPhone;
@@ -929,7 +947,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         userCenterData.linkedStudentIds = linkedStudentIds;
       }
 
-      t.set(db.doc(`centers/${centerId}/members/${uid}`), memberData, { merge: true });
+      t.set(memberRef, memberData, { merge: true });
       t.set(userCenterRef, userCenterData, { merge: true });
 
       if (role === "student") {

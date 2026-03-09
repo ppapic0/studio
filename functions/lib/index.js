@@ -358,6 +358,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     if (!isAdminCaller && !isSelfStudentCaller) {
         throw new functions.https.HttpsError("permission-denied", "수정 권한이 없습니다.");
     }
+    const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
+    const existingStudentSnap = await studentRef.get();
+    const existingStudentData = existingStudentSnap.exists ? existingStudentSnap.data() : null;
+    const existingParentLinkCode = typeof (existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.parentLinkCode) === "string" ? existingStudentData.parentLinkCode.trim() : "";
     const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
     const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
     const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
@@ -380,7 +384,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
                 userMessage: "학부모 연동 코드는 6자리 숫자여야 합니다.",
             });
         }
-        if (normalizedParentLinkCode) {
+        if (normalizedParentLinkCode && normalizedParentLinkCode !== existingParentLinkCode) {
             const duplicateSnap = await db
                 .collectionGroup("students")
                 .where("parentLinkCode", "==", normalizedParentLinkCode)
@@ -450,7 +454,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
         if (isAdminCaller && hasClassName)
             studentUpdate.className = normalizedClassName;
-        batch.set(db.doc("centers/" + centerId + "/students/" + studentId), studentUpdate, { merge: true });
+        batch.set(studentRef, studentUpdate, { merge: true });
         if (isAdminCaller) {
             const memberUpdate = { updatedAt: timestamp };
             if (trimmedDisplayName)
@@ -692,21 +696,30 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 }
             }
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
-            const existingMembership = await t.get(userCenterRef);
+            const memberRef = db.doc(`centers/${centerId}/members/${uid}`);
+            const [existingMembership, existingCenterMember] = await Promise.all([t.get(userCenterRef), t.get(memberRef)]);
             const existingMembershipData = existingMembership.exists ? existingMembership.data() : null;
-            const isParentRelink = role === "parent" && existingMembership.exists && (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.role) === "parent";
-            if (existingMembership.exists && !isParentRelink) {
+            const existingCenterMemberData = existingCenterMember.exists ? existingCenterMember.data() : null;
+            const existingRole = (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.role) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.role) || null;
+            const isParentRelink = role === "parent" && existingRole === "parent";
+            if ((existingMembership.exists || existingCenterMember.exists) && !isParentRelink) {
                 throw new functions.https.HttpsError("already-exists", "Already joined this center.", {
                     userMessage: "이미 가입된 센터입니다.",
                 });
             }
+            const extractLinkedIds = (value) => {
+                if (!Array.isArray(value))
+                    return [];
+                return value.filter((id) => typeof id === "string" && id.trim().length > 0);
+            };
             const ts = admin.firestore.Timestamp.now();
             let resolvedDisplayName = displayNameInput || tokenDisplayName || "사용자";
-            const existingLinkedStudentIds = Array.isArray(existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.linkedStudentIds)
-                ? existingMembershipData.linkedStudentIds.filter((id) => typeof id === "string" && id.trim().length > 0)
-                : [];
+            const existingLinkedStudentIds = Array.from(new Set([
+                ...extractLinkedIds(existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.linkedStudentIds),
+                ...extractLinkedIds(existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.linkedStudentIds),
+            ]));
             let linkedStudentIds = [];
-            let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber((existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.phoneNumber) || "");
+            let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber((existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.phoneNumber) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.phoneNumber) || "");
             if (role === "student") {
                 if (!schoolName) {
                     throw new functions.https.HttpsError("invalid-argument", "School name is required for student signup.", {
@@ -733,7 +746,9 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 linkedStudentIds = Array.from(new Set([...existingLinkedStudentIds, linkedStudentId]));
                 if (!displayNameInput) {
                     resolvedDisplayName =
-                        (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.displayName) || `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
+                        (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.displayName) ||
+                            (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.displayName) ||
+                            `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
                 }
                 t.set(linkedStudentRef, {
                     parentUids: admin.firestore.FieldValue.arrayUnion(uid),
@@ -756,10 +771,10 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 id: uid,
                 centerId,
                 role,
-                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || "active",
-                joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || ts,
+                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.status) || "active",
+                joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.joinedAt) || ts,
                 displayName: resolvedDisplayName,
-                className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || null,
+                className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.className) || null,
             };
             if (role === "parent" && effectiveParentPhone) {
                 memberData.phoneNumber = effectiveParentPhone;
@@ -771,9 +786,10 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 id: centerId,
                 centerId,
                 role,
-                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || "active",
-                joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || ts,
-                className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || null,
+                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.status) || "active",
+                joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.joinedAt) || ts,
+                displayName: resolvedDisplayName,
+                className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.className) || null,
             };
             if (role === "parent" && effectiveParentPhone) {
                 userCenterData.phoneNumber = effectiveParentPhone;
@@ -781,7 +797,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             if (linkedStudentIds.length > 0) {
                 userCenterData.linkedStudentIds = linkedStudentIds;
             }
-            t.set(db.doc(`centers/${centerId}/members/${uid}`), memberData, { merge: true });
+            t.set(memberRef, memberData, { merge: true });
             t.set(userCenterRef, userCenterData, { merge: true });
             if (role === "student") {
                 t.set(db.doc(`centers/${centerId}/students/${uid}`), {

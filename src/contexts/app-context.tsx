@@ -82,6 +82,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     let userCenterMemberships: CenterMembership[] = [];
     let memberFallbackMemberships: CenterMembership[] = [];
+    const normalizeLinkedStudentIds = (value: unknown): string[] => {
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    };
+    const mergeMembership = (primary: CenterMembership, secondary: CenterMembership): CenterMembership => {
+      const primaryLinkedIds = normalizeLinkedStudentIds(primary.linkedStudentIds);
+      const secondaryLinkedIds = normalizeLinkedStudentIds(secondary.linkedStudentIds);
+      const mergedLinkedIds = Array.from(new Set(primaryLinkedIds.length > 0 ? primaryLinkedIds : secondaryLinkedIds));
+      return {
+        ...secondary,
+        ...primary,
+        role: normalizeRole(primary.role || secondary.role),
+        status: (primary.status || secondary.status || 'active') as CenterMembership['status'],
+        joinedAt: primary.joinedAt || secondary.joinedAt,
+        displayName: primary.displayName || secondary.displayName,
+        className: primary.className ?? secondary.className,
+        linkedStudentIds: mergedLinkedIds.length > 0 ? mergedLinkedIds : undefined,
+      };
+    };
 
     const applyMembershipState = () => {
       const map = new Map<string, CenterMembership>();
@@ -91,16 +113,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       memberFallbackMemberships.forEach((membership) => {
-        if (!map.has(membership.id)) {
+        const existing = map.get(membership.id);
+        if (!existing) {
           map.set(membership.id, membership);
+          return;
         }
+
+        map.set(membership.id, mergeMembership(existing, membership));
       });
 
       const mergedMemberships = Array.from(map.values());
       setMemberships(mergedMemberships);
 
       const active = mergedMemberships.find((m) => m.status === 'active') || mergedMemberships[0] || null;
-      const activeKey = active ? `${active.id}_${active.status}_${active.role}` : 'null';
+      const linkedKey = active?.linkedStudentIds?.join(',') || '';
+      const activeKey = active
+        ? `${active.id}_${active.status}_${active.role}_${active.className || ''}_${active.displayName || ''}_${linkedKey}`
+        : 'null';
 
       if (activeMembershipRef.current !== activeKey) {
         setActiveMembership(active);
@@ -120,8 +149,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const raw = docSnap.data() as any;
           return {
             id: docSnap.id,
-            ...raw,
             role: normalizeRole(raw.role),
+            status: raw.status || 'active',
+            joinedAt: raw.joinedAt,
+            displayName: raw.displayName,
+            linkedStudentIds: raw.linkedStudentIds,
+            className: raw.className,
           } as CenterMembership;
         });
 
