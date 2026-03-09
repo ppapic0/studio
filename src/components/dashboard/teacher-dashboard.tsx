@@ -69,7 +69,7 @@ import {
   increment,
   getDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, KpiDaily, GrowthProgress } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -133,6 +133,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<StudyLogDay[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
+  const [trendLoading, setTrendLoading] = useState(false);
   
   const [selectedClass, setSelectedClass] = useState<string>('all');
 
@@ -196,16 +198,67 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
 
-  const historicalLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'kpiDaily'),
-      where('date', '>=', thirtyDaysAgoKey),
-      orderBy('date', 'asc')
-    );
-  }, [firestore, centerId, thirtyDaysAgoKey]);
-  const { data: kpiHistory } = useCollection<KpiDaily>(historicalLogsQuery, { enabled: isActive });
+  useEffect(() => {
+    let disposed = false;
+    if (!firestore || !centerId || !isActive || !studentMembers) {
+      setHistoricalCenterMinutes({});
+      return;
+    }
 
+    const targetStudents = studentMembers.filter((m) =>
+      m.status === 'active' && (selectedClass === 'all' || m.className === selectedClass)
+    );
+    if (targetStudents.length === 0) {
+      setHistoricalCenterMinutes({});
+      return;
+    }
+
+    const loadHistoricalTrend = async () => {
+      setTrendLoading(true);
+      try {
+        const bucket: Record<string, number> = {};
+        await Promise.all(
+          targetStudents.map(async (student) => {
+            const daysRef = collection(firestore, 'centers', centerId, 'studyLogs', student.id, 'days');
+            const daysSnap = await getDocs(
+              query(
+                daysRef,
+                where('dateKey', '>=', thirtyDaysAgoKey),
+                where('dateKey', '<', todayKey)
+              )
+            );
+
+            daysSnap.forEach((snap) => {
+              const raw = snap.data() as Partial<StudyLogDay>;
+              const dateKey = typeof raw.dateKey === 'string' ? raw.dateKey : snap.id;
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+              const mins = Number(raw.totalMinutes || 0);
+              if (!Number.isFinite(mins) || mins < 0) return;
+              bucket[dateKey] = (bucket[dateKey] || 0) + mins;
+            });
+          })
+        );
+
+        if (!disposed) {
+          setHistoricalCenterMinutes(bucket);
+        }
+      } catch (error) {
+        console.error('Historical trend load failed:', error);
+        if (!disposed) {
+          setHistoricalCenterMinutes({});
+        }
+      } finally {
+        if (!disposed) {
+          setTrendLoading(false);
+        }
+      }
+    };
+
+    loadHistoricalTrend();
+    return () => {
+      disposed = true;
+    };
+  }, [firestore, centerId, isActive, studentMembers, selectedClass, thirtyDaysAgoKey, todayKey]);
   const getStudentStudyTimes = (studentId: string, status: string, lastCheckInAt?: Timestamp) => {
     if (!mounted) return { session: '00:00', total: '0h 0m', isStudying: false, totalMins: 0, sessionSecs: 0 };
     
@@ -287,30 +340,26 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const centerTrendData = useMemo(() => {
     if (!mounted) return [];
-    
-    let data = kpiHistory 
-      ? kpiHistory
-          .filter(k => k.date !== todayKey)
-          .map(k => ({
-            name: k.date.split('-').slice(1).join('/'),
-            hours: Number(((k.totalStudyMinutes || 0) / 60).toFixed(1)), 
-            totalMinutes: k.totalStudyMinutes || 0, 
-            dateKey: k.date
-          }))
-      : [];
 
-    data.push({
-      name: todayKey.split('-').slice(1).join('/'),
-      hours: Number((stats.totalCenterMinutes / 60).toFixed(1)),
-      totalMinutes: stats.totalCenterMinutes,
-      dateKey: todayKey
+    const dateRange = eachDayOfInterval({
+      start: subDays(new Date(), 29),
+      end: new Date(),
     });
 
-    return data
-      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-      .slice(-30);
-  }, [kpiHistory, stats.totalCenterMinutes, todayKey, mounted]);
+    return dateRange.map((day) => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const totalMinutes = dateKey === todayKey
+        ? stats.totalCenterMinutes
+        : historicalCenterMinutes[dateKey] || 0;
 
+      return {
+        name: dateKey.split('-').slice(1).join('/'),
+        hours: Number((totalMinutes / 60).toFixed(1)),
+        totalMinutes,
+        dateKey,
+      };
+    });
+  }, [historicalCenterMinutes, stats.totalCenterMinutes, todayKey, mounted]);
   const recentReportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
@@ -629,7 +678,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </CardTitle>
                 <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Historical Study Trend (Actual Study Minutes Analysis)</CardDescription>
               </div>
-              <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">PAST 30 DAYS</Badge>
+              <div className="flex items-center gap-2">{trendLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/50" />}<Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">{trendLoading ? "UPDATING" : "PAST 30 DAYS"}</Badge></div>
             </div>
           </CardHeader>
           <div className="h-[200px] w-full">

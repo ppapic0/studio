@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,9 @@ import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { DailyStudentStat, CenterMembership, GrowthProgress } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { 
   AlertTriangle, 
@@ -53,6 +53,8 @@ export function RiskIntelligence() {
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
   const [selectedRiskStudent, setSelectedRiskStudent] = useState<any>(null);
+  const [recentStudyByStudent, setRecentStudyByStudent] = useState<Record<string, Record<string, number>>>({});
+  const [studyLogsLoading, setStudyLogsLoading] = useState(false);
 
   // 1. 모든 재원생 조회 (실제 Firestore 쿼리)
   const membersQuery = useMemoFirebase(() => {
@@ -78,67 +80,145 @@ export function RiskIntelligence() {
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(statsQuery);
+  useEffect(() => {
+    let disposed = false;
+    if (!firestore || !centerId || !members || members.length === 0) {
+      setRecentStudyByStudent({});
+      return;
+    }
+
+    const loadRecentStudyLogs = async () => {
+      setStudyLogsLoading(true);
+      try {
+        const fromKey = format(subDays(new Date(), 6), 'yyyy-MM-dd');
+        const studentBuckets: Record<string, Record<string, number>> = {};
+
+        await Promise.all(
+          members.map(async (member) => {
+            const daysRef = collection(firestore, 'centers', centerId, 'studyLogs', member.id, 'days');
+            const daysSnap = await getDocs(query(daysRef, where('dateKey', '>=', fromKey)));
+            const dayMap: Record<string, number> = {};
+
+            daysSnap.forEach((snap) => {
+              const raw = snap.data() as any;
+              const dateKey = typeof raw.dateKey === 'string' ? raw.dateKey : snap.id;
+              const mins = Number(raw.totalMinutes || 0);
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || !Number.isFinite(mins) || mins < 0) return;
+              dayMap[dateKey] = mins;
+            });
+
+            studentBuckets[member.id] = dayMap;
+          })
+        );
+
+        if (!disposed) {
+          setRecentStudyByStudent(studentBuckets);
+        }
+      } catch (error) {
+        console.error('Risk study-log aggregation failed:', error);
+        if (!disposed) {
+          setRecentStudyByStudent({});
+        }
+      } finally {
+        if (!disposed) {
+          setStudyLogsLoading(false);
+        }
+      }
+    };
+
+    loadRecentStudyLogs();
+    return () => {
+      disposed = true;
+    };
+  }, [firestore, centerId, members]);
 
   // 리스크 분석 엔진 (요청하신 가중치 반영)
   const riskAnalysis = useMemo(() => {
     if (!members) return null;
 
-    return members.map(m => {
-      const stats = todayStats?.find(s => s.studentId === m.id);
-      const progress = progressList?.find(p => p.id === m.id);
+    const nowMs = Date.now();
+    const today = new Date();
+
+    return members.map((m) => {
+      const stats = todayStats?.find((s) => s.studentId === m.id);
+      const progress = progressList?.find((p) => p.id === m.id);
+      const recentStudyMap = recentStudyByStudent[m.id] || {};
+      const joinedAtMs = m.joinedAt?.toMillis?.() || nowMs;
+      const observedDays = Math.min(7, Math.max(1, Math.floor((nowMs - joinedAtMs) / 86400000) + 1));
 
       let score = 0;
-      const detailedReasons: { label: string, value: string, score: number, icon: any, color: string }[] = [];
+      const detailedReasons: { label: string; value: string; score: number; icon: any; color: string }[] = [];
 
-      // [기준 1] 학습량 급감 (세분화 단계)
       if (stats) {
         if (stats.studyTimeGrowthRate <= -0.2) {
           const weight = 30;
           score += weight;
           detailedReasons.push({
-            label: '학습량 위험 급감',
-            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% 감소`,
+            label: 'Study time dropped sharply',
+            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% down`,
             score: weight,
             icon: TrendingDown,
-            color: 'text-rose-600'
+            color: 'text-rose-600',
           });
         } else if (stats.studyTimeGrowthRate <= -0.1) {
           const weight = 15;
           score += weight;
           detailedReasons.push({
-            label: '학습량 주의 감소',
-            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% 감소`,
+            label: 'Study time slightly declined',
+            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% down`,
             score: weight,
             icon: History,
-            color: 'text-amber-600'
+            color: 'text-amber-600',
           });
         }
       }
 
-      // [기준 2] 누적 벌점 (벌점 10점 이상 시 +40점)
       const penalty = progress?.penaltyPoints || 0;
       if (penalty >= 10) {
         const weight = 40;
         score += weight;
         detailedReasons.push({
-          label: '규정 위반 (벌점 10점↑)',
-          value: `${penalty}점 누적`,
+          label: 'Penalty points >= 10',
+          value: `${penalty} pts`,
           score: weight,
           icon: ShieldAlert,
-          color: 'text-rose-600'
+          color: 'text-rose-600',
         });
       }
 
-      // [기준 3] 성취도 저조 (완수율 50% 미만 시 +20점)
       if (stats && stats.todayPlanCompletionRate < 50) {
         const weight = 20;
         score += weight;
         detailedReasons.push({
-          label: '계획 성취도 저조',
-          value: `완수율 ${stats.todayPlanCompletionRate}%`,
+          label: 'Plan completion below 50%',
+          value: `Completion ${stats.todayPlanCompletionRate}%`,
           score: weight,
           icon: Target,
-          color: 'text-rose-600'
+          color: 'text-rose-600',
+        });
+      }
+
+      const todayMinutes = Math.max(Number(stats?.totalStudyMinutes || 0), Number(recentStudyMap[todayKey] || 0));
+      let lowStudyStreak = 0;
+      for (let i = 0; i < observedDays; i++) {
+        const dateKey = format(subDays(today, i), 'yyyy-MM-dd');
+        const dailyMinutes = dateKey === todayKey ? todayMinutes : Number(recentStudyMap[dateKey] || 0);
+        if (dailyMinutes < 180) {
+          lowStudyStreak += 1;
+        } else {
+          break;
+        }
+      }
+
+      if (observedDays >= 3 && lowStudyStreak >= 3) {
+        const weight = Math.min(45, 20 + lowStudyStreak * 5);
+        score += weight;
+        detailedReasons.push({
+          label: 'Under 3h study streak',
+          value: `${lowStudyStreak} days in a row (<3h)`,
+          score: weight,
+          icon: Clock,
+          color: 'text-rose-600',
         });
       }
 
@@ -149,21 +229,28 @@ export function RiskIntelligence() {
         score: Math.min(100, score),
         detailedReasons,
         stats,
-        penalty
+        penalty,
+        lowStudyStreak,
+        todayMinutes,
       };
     }).sort((a, b) => b.score - a.score);
-  }, [members, todayStats, progressList]);
+  }, [members, todayStats, progressList, recentStudyByStudent, todayKey]);
 
+  const healthyStudyRate = useMemo(() => {
+    if (!riskAnalysis || riskAnalysis.length === 0) return 0;
+    const safeStudents = riskAnalysis.filter((r) => r.lowStudyStreak < 3).length;
+    return Math.round((safeStudents / riskAnalysis.length) * 100);
+  }, [riskAnalysis]);
   const clusters = useMemo(() => {
     if (!riskAnalysis) return null;
     return {
       highPenalty: riskAnalysis.filter(r => r.penalty >= 10).slice(0, 5),
-      lowStudy: riskAnalysis.filter(r => r.stats && r.stats.totalStudyMinutes < 180).slice(0, 5),
+      lowStudy: riskAnalysis.filter(r => r.lowStudyStreak >= 3).slice(0, 5),
       highRisk: riskAnalysis.filter(r => r.score >= 70)
     };
   }, [riskAnalysis]);
 
-  if (membersLoading) {
+  if (membersLoading || studyLogsLoading) {
     return (
       <div className="py-40 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-rose-500 opacity-20" />
@@ -188,8 +275,8 @@ export function RiskIntelligence() {
 
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group ring-1 ring-black/[0.03]">
           <div className="flex items-center gap-3"><Activity className="h-6 w-6 text-emerald-500" /><h4 className="text-sm font-black uppercase tracking-widest">평균 학습 집중도</h4></div>
-          <div className="text-5xl font-black tracking-tighter text-primary">82.4<span className="text-xl opacity-40 ml-1">%</span></div>
-          <Progress value={82.4} className="h-2 bg-emerald-100" />
+          <div className="text-5xl font-black tracking-tighter text-primary">{healthyStudyRate}<span className="text-xl opacity-40 ml-1">%</span></div>
+          <Progress value={healthyStudyRate} className="h-2 bg-emerald-100" />
           <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic mt-2">"전체 입실 인원 대비 순수 몰입 시간 비율입니다."</p>
         </Card>
 
@@ -303,7 +390,7 @@ export function RiskIntelligence() {
               ) : clusters?.lowStudy.map(s => (
                 <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-blue-50/30 border border-blue-100/50">
                   <span className="font-bold text-sm">{s.name}</span>
-                  <Badge className="bg-blue-600 text-white border-none font-black">{Math.floor((s.stats?.totalStudyMinutes || 0)/60)}h {(s.stats?.totalStudyMinutes || 0)%60}m</Badge>
+                  <Badge className="bg-blue-600 text-white border-none font-black">{s.lowStudyStreak}일 연속 &lt; 3h</Badge>
                 </div>
               ))}
             </div>

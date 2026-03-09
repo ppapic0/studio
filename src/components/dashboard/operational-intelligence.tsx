@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,8 @@ import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { CounselingLog, CenterMembership, AttendanceCurrent } from '@/lib/types';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { CounselingLog, CenterMembership, AttendanceCurrent, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
   MessageCircle, 
@@ -31,6 +31,7 @@ import {
   Tooltip, 
   CartesianGrid
 } from 'recharts';
+import { format, subDays } from 'date-fns';
 import Link from 'next/link';
 
 export function OperationalIntelligence() {
@@ -59,34 +60,109 @@ export function OperationalIntelligence() {
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
+  const [studyMinutesByStudent, setStudyMinutesByStudent] = useState<Record<string, number>>({});
+  const [studyMinutesLoading, setStudyMinutesLoading] = useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+    if (!firestore || !centerId || !allMembers || allMembers.length === 0) {
+      setStudyMinutesByStudent({});
+      return;
+    }
+
+    const targetStudents = allMembers.filter((member) => member.role === 'student' && member.status === 'active');
+    if (targetStudents.length === 0) {
+      setStudyMinutesByStudent({});
+      return;
+    }
+
+    const loadStudyMinutes = async () => {
+      setStudyMinutesLoading(true);
+      try {
+        const fromKey = format(subDays(new Date(), 29), 'yyyy-MM-dd');
+        const bucket: Record<string, number> = {};
+
+        await Promise.all(
+          targetStudents.map(async (student) => {
+            const daysRef = collection(firestore, 'centers', centerId, 'studyLogs', student.id, 'days');
+            const daysSnap = await getDocs(query(daysRef, where('dateKey', '>=', fromKey)));
+            let totalMinutes = 0;
+            daysSnap.forEach((snap) => {
+              const data = snap.data() as Partial<StudyLogDay>;
+              const mins = Number(data.totalMinutes || 0);
+              if (Number.isFinite(mins) && mins > 0) totalMinutes += mins;
+            });
+            bucket[student.id] = totalMinutes;
+          })
+        );
+
+        if (!disposed) {
+          setStudyMinutesByStudent(bucket);
+        }
+      } catch (error) {
+        console.error('Operational study aggregation failed:', error);
+        if (!disposed) {
+          setStudyMinutesByStudent({});
+        }
+      } finally {
+        if (!disposed) {
+          setStudyMinutesLoading(false);
+        }
+      }
+    };
+
+    loadStudyMinutes();
+    return () => {
+      disposed = true;
+    };
+  }, [firestore, centerId, allMembers]);
 
   const opsMetrics = useMemo(() => {
     if (!allMembers || !attendanceList) return null;
 
     const students = allMembers.filter(m => m.role === 'student');
     const teachers = allMembers.filter(m => m.role === 'teacher' || m.role === 'centerAdmin');
-    
-    // 강사당 관리 인원
+
     const studentCount = students.length;
     const teacherCount = Math.max(1, teachers.length);
     const ratio = Number((studentCount / teacherCount).toFixed(1));
 
-    // 실시간 점유율 분석
     const totalSeats = attendanceList.filter(a => a.type !== 'aisle').length || 1;
     const occupiedSeats = attendanceList.filter(a => a.status === 'studying').length;
     const occupancyRate = Math.round((occupiedSeats / totalSeats) * 100);
 
-    // 상담 통계 (실데이터 기반)
     const teacherStats: Record<string, { name: string; count: number; improvedCount: number }> = {};
-    counselLogs?.forEach(log => {
+    const timeSlots = {
+      morning: { name: '?ㅼ쟾 (09-13)', counselCount: 0, improvedCount: 0 },
+      afternoon: { name: '?ㅽ썑 (13-18)', counselCount: 0, improvedCount: 0 },
+      evening: { name: '?쇨컙 (18-24)', counselCount: 0, improvedCount: 0 },
+    };
+
+    counselLogs?.forEach((log) => {
       const tId = log.teacherId;
       if (!teacherStats[tId]) {
-        teacherStats[tId] = { name: log.teacherName || '선생님', count: 0, improvedCount: 0 };
+        teacherStats[tId] = { name: log.teacherName || 'Teacher', count: 0, improvedCount: 0 };
       }
-      teacherStats[tId].count++;
-      if ((log.improvement || '').trim().length > 0) {
-        teacherStats[tId].improvedCount++;
+      teacherStats[tId].count += 1;
+
+      const improved = (log.improvement || '').trim().length > 0;
+      if (improved) {
+        teacherStats[tId].improvedCount += 1;
       }
+
+      const createdAt = (log as any).createdAt?.toDate?.();
+      if (!createdAt) return;
+      const hour = createdAt.getHours();
+      const slot = hour >= 9 && hour < 13
+        ? timeSlots.morning
+        : hour >= 13 && hour < 18
+          ? timeSlots.afternoon
+          : hour >= 18 && hour <= 23
+            ? timeSlots.evening
+            : null;
+      if (!slot) return;
+      slot.counselCount += 1;
+      if (improved) slot.improvedCount += 1;
     });
 
     const teacherChartData = Object.values(teacherStats)
@@ -97,37 +173,24 @@ export function OperationalIntelligence() {
       }))
       .sort((a, b) => b.count - a.count);
 
-    // 시간대 분석 (상담 로그 생성시간 + 실시간 점유율 가중치)
-    const timeSlots = {
-      morning: { name: '오전 (09-13)', counselCount: 0, occupancyBase: Math.round(occupancyRate * 0.55) },
-      afternoon: { name: '오후 (13-18)', counselCount: 0, occupancyBase: occupancyRate },
-      evening: { name: '야간 (18-24)', counselCount: 0, occupancyBase: Math.round(occupancyRate * 0.8) },
-    };
+    const totalCounselCount = counselLogs?.length || 0;
+    const totalImprovedCounsel = Object.values(teacherStats).reduce((sum, item) => sum + item.improvedCount, 0);
+    const counselQualityRate = totalCounselCount > 0 ? Math.round((totalImprovedCounsel / totalCounselCount) * 100) : 0;
 
-    counselLogs?.forEach((log) => {
-      const createdAt = (log as any).createdAt?.toDate?.();
-      if (!createdAt) return;
-      const hour = createdAt.getHours();
-      if (hour >= 9 && hour < 13) {
-        timeSlots.morning.counselCount += 1;
-      } else if (hour >= 13 && hour < 18) {
-        timeSlots.afternoon.counselCount += 1;
-      } else if (hour >= 18 && hour <= 23) {
-        timeSlots.evening.counselCount += 1;
-      }
-    });
-
-    const maxCounselCount = Math.max(1, ...Object.values(timeSlots).map((slot) => slot.counselCount));
+    const totalSlotCounsel = Object.values(timeSlots).reduce((sum, slot) => sum + slot.counselCount, 0);
     const timeSlotData = Object.values(timeSlots).map((slot) => ({
       name: slot.name,
-      occupancy: Math.max(10, Math.min(100, Math.round(slot.occupancyBase * 0.5 + (slot.counselCount / maxCounselCount) * 50))),
-      profit: slot.counselCount * 18000,
+      consultCount: slot.counselCount,
+      share: totalSlotCounsel > 0 ? Math.round((slot.counselCount / totalSlotCounsel) * 100) : 0,
+      improvementRate: slot.counselCount > 0 ? Math.round((slot.improvedCount / slot.counselCount) * 100) : 0,
     }));
 
-    const totalCounselCount = counselLogs?.length || 0;
-    const improvedCounselCount = Object.values(teacherStats).reduce((sum, item) => sum + item.improvedCount, 0);
-    const efficiencyScore = totalCounselCount > 0 ? Math.round((improvedCounselCount / totalCounselCount) * 100) : 0;
-    const lowestOccupancySlot = [...timeSlotData].sort((a, b) => a.occupancy - b.occupancy)[0] || null;
+    const totalStudyMinutes30d = students.reduce((sum, s) => sum + (studyMinutesByStudent[s.id] || 0), 0);
+    const lowStudyStudentCount = students.filter((s) => (studyMinutesByStudent[s.id] || 0) < 540).length;
+    const studyHealthRate = studentCount > 0 ? Math.round(((studentCount - lowStudyStudentCount) / studentCount) * 100) : 0;
+
+    const efficiencyScore = Math.round((studyHealthRate * 0.6) + (counselQualityRate * 0.4));
+    const lowestOccupancySlot = [...timeSlotData].sort((a, b) => a.consultCount - b.consultCount)[0] || null;
 
     return {
       ratio,
@@ -135,12 +198,16 @@ export function OperationalIntelligence() {
       teacherChartData,
       timeSlotData,
       totalCounselCount,
+      counselQualityRate,
+      studyHealthRate,
       efficiencyScore,
       lowestOccupancySlot,
+      lowStudyStudentCount,
+      totalStudyMinutes30d,
     };
-  }, [allMembers, attendanceList, counselLogs]);
+  }, [allMembers, attendanceList, counselLogs, studyMinutesByStudent]);
 
-  const isLoading = membersLoading || logsLoading || attendanceLoading;
+  const isLoading = membersLoading || logsLoading || attendanceLoading || studyMinutesLoading;
 
   if (isLoading) {
     return (
@@ -236,14 +303,14 @@ export function OperationalIntelligence() {
                 <div className="flex justify-between items-end">
                   <div className="grid gap-0.5">
                     <span className="text-xs font-black text-primary">{slot.name}</span>
-                    <span className="text-lg font-black text-amber-600">평균 점유 {slot.occupancy}%</span>
+                    <span className="text-lg font-black text-amber-600">상담 비율 {slot.share}%</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Est. Profit</span>
-                    <p className="text-base font-black text-primary">₩{slot.profit.toLocaleString()}</p>
+                    <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Consult Count</span>
+                    <p className="text-base font-black text-primary">{slot.consultCount}건</p>
                   </div>
                 </div>
-                <Progress value={slot.occupancy} className={cn("h-2 bg-muted", slot.occupancy < 40 ? "text-rose-400" : "text-amber-500")} />
+                <Progress value={slot.share} className={cn("h-2 bg-muted", slot.share < 20 ? "text-rose-400" : "text-amber-500")} />
               </div>
             ))}
             

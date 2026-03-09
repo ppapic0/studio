@@ -84,7 +84,11 @@ export function SignupForm() {
             : '';
 
     const rawMessage = String(error?.message || '').trim();
-    const normalizedRaw = /^(functions\/)?internal$/i.test(rawMessage) ? '' : rawMessage;
+    const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
+    const normalizedRaw =
+      /^(functions\/)?internal$/i.test(strippedRaw) || /\(functions\/internal\)/i.test(strippedRaw)
+        ? ''
+        : strippedRaw;
     const fallbackMessage = detailMessage || normalizedRaw;
 
     switch (code) {

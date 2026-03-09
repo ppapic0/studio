@@ -14,19 +14,19 @@ function isAdminRole(role) {
 }
 function assertInviteUsable(inv, expectedRole) {
     if (!allowedRoles.includes(inv.intendedRole)) {
-        throw new Error("Invalid role in invite");
+        throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.");
     }
     if (expectedRole && inv.intendedRole !== expectedRole) {
-        throw new Error("Invite role mismatch");
+        throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.");
     }
     if (inv.isActive === false) {
-        throw new Error("Inactive code");
+        throw new functions.https.HttpsError("failed-precondition", "Invite code is inactive.");
     }
     if (typeof inv.maxUses === "number" && typeof inv.usedCount === "number" && inv.usedCount >= inv.maxUses) {
-        throw new Error("Code usage exceeded");
+        throw new functions.https.HttpsError("failed-precondition", "Invite code usage limit exceeded.");
     }
     if (inv.expiresAt && inv.expiresAt.toMillis && inv.expiresAt.toMillis() < Date.now()) {
-        throw new Error("Code expired");
+        throw new functions.https.HttpsError("failed-precondition", "Invite code has expired.");
     }
 }
 exports.deleteStudentAccount = functions.region(region).runWith({
@@ -211,7 +211,12 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         return { ok: true };
     }
     catch (e) {
-        throw new functions.https.HttpsError("internal", e.message);
+        if (e instanceof functions.https.HttpsError) {
+            throw e;
+        }
+        throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
+            userMessage: (e === null || e === void 0 ? void 0 : e.message) || "Unknown internal error",
+        });
     }
 });
 exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
@@ -247,7 +252,12 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
         return { ok: true, uid };
     }
     catch (e) {
-        throw new functions.https.HttpsError("internal", e.message);
+        if (e instanceof functions.https.HttpsError) {
+            throw e;
+        }
+        throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
+            userMessage: (e === null || e === void 0 ? void 0 : e.message) || "Unknown internal error",
+        });
     }
 });
 exports.redeemInviteCode = functions.region(region).https.onCall(async (data, context) => {
@@ -264,13 +274,13 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
             const inviteRef = db.doc(`inviteCodes/${code}`);
             const inviteSnap = await t.get(inviteRef);
             if (!inviteSnap.exists)
-                throw new Error("Invalid code");
+                throw new functions.https.HttpsError("failed-precondition", "Invalid invite code.");
             const inv = inviteSnap.data();
             assertInviteUsable(inv);
             const membershipRef = db.doc(`userCenters/${uid}/centers/${inv.centerId}`);
             const existingMembership = await t.get(membershipRef);
             if (existingMembership.exists) {
-                throw new Error("Already joined center");
+                throw new functions.https.HttpsError("already-exists", "Already joined this center.");
             }
             const ts = admin.firestore.Timestamp.now();
             t.set(membershipRef, {
@@ -293,7 +303,12 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
         });
     }
     catch (e) {
-        throw new functions.https.HttpsError("internal", e.message);
+        if (e instanceof functions.https.HttpsError) {
+            throw e;
+        }
+        throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
+            userMessage: (e === null || e === void 0 ? void 0 : e.message) || "Unknown internal error",
+        });
     }
 });
 exports.completeSignupWithInvite = functions.region(region).https.onCall(async (data, context) => {
