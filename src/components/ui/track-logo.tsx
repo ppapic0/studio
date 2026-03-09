@@ -1,42 +1,51 @@
-﻿'use client';
+'use client';
 
 import { cn } from '@/lib/utils';
 
 export function TrackLogo({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 520 220"
+      viewBox="0 0 400 400"
       className={cn('h-12 w-auto', className)}
       role="img"
-      aria-label={'\uD2B8\uB799\uD559\uC2B5\uC13C\uD130 \uB85C\uACE0'}
+      aria-label="트랙 학습센터 로고"
     >
-      <title>{'\uD2B8\uB799\uD559\uC2B5\uC13C\uD130 \uB85C\uACE0'}</title>
-      <rect x="16" y="16" width="488" height="188" rx="94" fill="none" stroke="#FF7A16" strokeWidth="26" />
-      <rect x="28" y="28" width="464" height="164" rx="82" fill="none" stroke="#14295F" strokeWidth="6" />
-      <rect x="196" y="6" width="30" height="44" fill="#FFFFFF" />
+      <title>트랙 학습센터 로고</title>
+      
+      {/* 트랙 심볼 (상단) */}
+      <g transform="translate(200, 140)">
+        {/* 바깥쪽 오렌지 트랙 */}
+        <path
+          d="M 6 -50 H 45 A 50 50 0 0 1 45 50 H -45 A 50 50 0 0 1 -45 -50 H -6"
+          fill="none"
+          stroke="#FF7A16"
+          strokeWidth="28"
+          strokeLinecap="butt"
+        />
+        {/* 안쪽 네이비 라인 */}
+        <path
+          d="M 6 -50 H 45 A 50 50 0 0 1 45 50 H -45 A 50 50 0 0 1 -45 -50 H -6"
+          fill="none"
+          stroke="#14295F"
+          strokeWidth="6"
+          strokeLinecap="butt"
+        />
+      </g>
+
+      {/* 로고 텍스트 (하단) */}
       <text
-        x="260"
-        y="98"
+        x="200"
+        y="320"
         textAnchor="middle"
         fill="#14295F"
-        fontWeight="800"
-        fontSize="64"
-        letterSpacing="-3"
-        fontFamily="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif"
+        style={{
+          fontWeight: 900,
+          fontSize: '62px',
+          fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
+          letterSpacing: '-3px'
+        }}
       >
-        {'\uD2B8\uB799'}
-      </text>
-      <text
-        x="260"
-        y="166"
-        textAnchor="middle"
-        fill="#14295F"
-        fontWeight="800"
-        fontSize="74"
-        letterSpacing="-4"
-        fontFamily="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif"
-      >
-        {'\uD559\uC2B5\uC13C\uD130'}
+        트랙 학습센터
       </text>
     </svg>
   );
