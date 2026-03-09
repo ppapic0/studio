@@ -68,13 +68,13 @@ import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
-  parentDashboardMockData,
   type ParentPortalTab,
   type ParentQuickRequestKey,
   type ParentNotificationItem,
 } from '@/lib/parent-dashboard-model';
 import {
   type AttendanceCurrent,
+  type AttendanceRequest,
   type DailyReport,
   type GrowthProgress,
   type StudyLogDay,
@@ -115,6 +115,58 @@ function formatMinutes(minutes: number) {
   return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
+const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
+  math_support: '수학 집중 관리 요청',
+  english_support: '영어 보완 요청',
+  habit_coaching: '학습 습관 코칭 요청',
+  career_consulting: '진로/진학 상담 요청',
+};
+
+const SUBJECT_COLORS = ['#FF7A16', '#14295F', '#10B981', '#0EA5E9', '#A855F7'];
+
+type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
+
+function toDateSafe(value: TimestampLike): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    const date = value.toDate();
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function toRelativeLabel(value: TimestampLike, now = new Date()) {
+  const date = toDateSafe(value);
+  if (!date) return '최근';
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return '방금 전';
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}일 전`;
+  return format(date, 'MM/dd', { locale: ko });
+}
+
+function formatDateLabel(dateText?: string, fallbackTimestamp?: TimestampLike) {
+  if (dateText && /^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+    const parsed = parse(dateText, 'yyyy-MM-dd', new Date());
+    if (!Number.isNaN(parsed.getTime())) {
+      return format(parsed, 'MM/dd', { locale: ko });
+    }
+  }
+  const fallbackDate = toDateSafe(fallbackTimestamp);
+  if (fallbackDate) {
+    return format(fallbackDate, 'MM/dd', { locale: ko });
+  }
+  return '최근';
+}
 export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -172,6 +224,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, studentId, todayKey, weekKey]);
   const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive && !!studentId });
 
+  const weeklyPlansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !weekKey) return null;
+    return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'));
+  }, [firestore, centerId, studentId, weekKey]);
+  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: isActive && !!studentId });
+
   const attendanceCurrentRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'attendanceCurrent', studentId)), [firestore, centerId, studentId]);
   const { data: attendanceCurrent } = useDoc<AttendanceCurrent>(attendanceCurrentRef, { enabled: isActive && !!studentId });
 
@@ -187,12 +245,126 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, studentId]);
   const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId });
 
+  const attendanceRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(30));
+  }, [firestore, centerId, studentId]);
+  const { data: attendanceRequests } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: isActive && !!studentId });
+
   const studyPlans = (todayPlans || []).filter((item) => item.category === 'study' || !item.category);
   const totalMinutes = todayLog?.totalMinutes || 0;
   
   const planTotal = studyPlans.length;
   const planDone = studyPlans.filter((item) => item.done).length;
   const planRate = planTotal > 0 ? Math.round((planDone / planTotal) * 100) : 0;
+
+  const logMinutesByDateKey = useMemo(() => {
+    const map = new Map<string, number>();
+    (allLogs || []).forEach((log) => {
+      map.set(log.dateKey, log.totalMinutes || 0);
+    });
+    return map;
+  }, [allLogs]);
+
+  const dailyStudyTrend = useMemo(() => {
+    if (!today) return [] as { date: string; minutes: number }[];
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return {
+        date: format(day, 'MM/dd', { locale: ko }),
+        minutes: logMinutesByDateKey.get(dateKey) || 0,
+      };
+    });
+  }, [today, logMinutesByDateKey]);
+
+  const weeklyTotalStudyMinutes = useMemo(
+    () => dailyStudyTrend.reduce((sum, day) => sum + day.minutes, 0),
+    [dailyStudyTrend]
+  );
+
+  const weeklyStudyPlans = (weeklyPlans || []).filter((item) => item.category === 'study' || !item.category);
+  const weeklyPlanTotal = weeklyStudyPlans.length;
+  const weeklyPlanDone = weeklyStudyPlans.filter((item) => item.done).length;
+  const weeklyPlanCompletionRate = weeklyPlanTotal > 0 ? Math.round((weeklyPlanDone / weeklyPlanTotal) * 100) : 0;
+
+  const subjectsData = useMemo(() => {
+    const source = weeklyStudyPlans.length > 0 ? weeklyStudyPlans : studyPlans;
+    const minutesBySubject = new Map<string, number>();
+
+    source.forEach((item) => {
+      const inferredSubject = item.subject?.trim() || (item.title.match(/수학|영어|국어|과학|사회|한국사|논술|코딩/)?.[0] ?? '기타');
+      const weight = item.targetMinutes && item.targetMinutes > 0 ? item.targetMinutes : item.done ? 50 : 30;
+      minutesBySubject.set(inferredSubject, (minutesBySubject.get(inferredSubject) || 0) + weight);
+    });
+
+    if (minutesBySubject.size === 0 && weeklyTotalStudyMinutes > 0) {
+      minutesBySubject.set('전체 학습', weeklyTotalStudyMinutes);
+    }
+
+    return Array.from(minutesBySubject.entries())
+      .map(([subject, minutes], index) => ({
+        subject,
+        minutes,
+        color: SUBJECT_COLORS[index % SUBJECT_COLORS.length],
+      }))
+      .sort((a, b) => b.minutes - a.minutes);
+  }, [studyPlans, weeklyStudyPlans, weeklyTotalStudyMinutes]);
+
+  const subjectTotalMinutes = subjectsData.reduce((sum, subject) => sum + subject.minutes, 0);
+
+  const recentPenaltyReasons = useMemo(() => {
+    const sortedRequests = [...(attendanceRequests || [])].sort((a, b) => {
+      const aDate = toDateSafe((a as any).createdAt)?.getTime() ?? 0;
+      const bDate = toDateSafe((b as any).createdAt)?.getTime() ?? 0;
+      return bDate - aDate;
+    });
+
+    return sortedRequests
+      .filter((request) => request.penaltyApplied)
+      .slice(0, 5)
+      .map((request) => ({
+        id: request.id,
+        reason: request.reason || (request.type === 'late' ? '지각 신청 처리' : '결석 신청 처리'),
+        points: request.type === 'late' ? 3 : 5,
+        dateLabel: formatDateLabel(request.date, (request as any).createdAt),
+      }));
+  }, [attendanceRequests]);
+
+  const aiInsights = useMemo(() => {
+    const insights: string[] = [];
+    const targetWeeklyMinutes = (student?.targetDailyMinutes || 360) * 5;
+
+    if (weeklyTotalStudyMinutes > 0) {
+      const progressRate = Math.round((weeklyTotalStudyMinutes / Math.max(targetWeeklyMinutes, 1)) * 100);
+      if (progressRate >= 100) {
+        insights.push(`이번 주 목표 학습시간을 달성했습니다. (${toHm(weeklyTotalStudyMinutes)})`);
+      } else {
+        insights.push(`이번 주 누적 학습은 ${toHm(weeklyTotalStudyMinutes)}으로 목표 대비 ${progressRate}%입니다.`);
+      }
+    } else {
+      insights.push('학습 로그가 쌓이면 AI 인사이트가 자동으로 정교해집니다.');
+    }
+
+    insights.push(
+      weeklyPlanTotal > 0
+        ? `주간 계획 달성률은 ${weeklyPlanCompletionRate}%입니다. ${weeklyPlanCompletionRate >= 80 ? '아주 안정적입니다.' : '완료율을 조금만 더 끌어올려 보세요.'}`
+        : '이번 주 계획 데이터가 아직 등록되지 않았습니다.'
+    );
+
+    if (subjectsData.length > 0) {
+      const topSubject = subjectsData[0];
+      insights.push(`가장 많이 투자한 과목은 ${topSubject.subject} (${topSubject.minutes}분)입니다.`);
+    }
+
+    if ((growth?.penaltyPoints || 0) > 0) {
+      insights.push(`생활 벌점이 ${growth?.penaltyPoints || 0}점 누적되어 있어 생활 관리가 필요합니다.`);
+    }
+
+    return insights.slice(0, 4);
+  }, [student?.targetDailyMinutes, weeklyTotalStudyMinutes, weeklyPlanTotal, weeklyPlanCompletionRate, subjectsData, growth?.penaltyPoints]);
+
+  const weeklyFeedback = report?.content?.trim() || aiInsights[0] || '선생님 피드백이 등록되면 이 영역에서 확인할 수 있습니다.';
 
   const attendanceStatus = useMemo(() => {
     if (!attendanceCurrent) return { label: '상태 미확인', color: 'bg-slate-100 text-slate-400', icon: Clock };
@@ -258,13 +430,53 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         type: item.type || 'weekly_report',
         title: item.title || '새 알림',
         body: item.body || '',
-        createdAtLabel: item.createdAtLabel || '최근',
+        createdAtLabel: item.createdAtLabel || toRelativeLabel(item.createdAt),
         isRead: !!item.isRead,
         isImportant: !!item.isImportant,
       }));
     }
-    return parentDashboardMockData.notifications;
-  }, [remoteNotifications]);
+
+    const fallback: ParentNotificationItem[] = [];
+
+    if (attendanceCurrent) {
+      fallback.push({
+        id: `attendance-${attendanceCurrent.id || 'current'}`,
+        type: attendanceCurrent.status === 'studying' ? 'check_in' : 'check_out',
+        title: attendanceCurrent.status === 'studying' ? '등원 상태 확인' : '출결 상태 업데이트',
+        body: attendanceStatus.label,
+        createdAtLabel: toRelativeLabel((attendanceCurrent as any).updatedAt),
+        isRead: false,
+        isImportant: attendanceCurrent.status !== 'studying',
+      });
+    }
+
+    if (report?.content) {
+      fallback.push({
+        id: report.id || `${yesterdayKey}-${studentId}`,
+        type: 'weekly_report',
+        title: '학습 리포트 도착',
+        body: report.content,
+        createdAtLabel: toRelativeLabel((report as any).updatedAt || (report as any).createdAt),
+        isRead: !!report.viewedAt,
+        isImportant: true,
+      });
+    }
+
+    if (recentPenaltyReasons.length > 0) {
+      const latest = recentPenaltyReasons[0];
+      fallback.push({
+        id: `penalty-${latest.id}`,
+        type: 'penalty',
+        title: '생활 기록 알림',
+        body: `${latest.reason} (+${latest.points}점)`,
+        createdAtLabel: latest.dateLabel,
+        isRead: false,
+        isImportant: true,
+      });
+    }
+
+    return fallback;
+  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, studentId, yesterdayKey]);
 
   const readNotification = (id: string) => {
     setReadMap(prev => ({...prev, [id]: true}));
@@ -288,7 +500,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       if (!body) { toast({ variant: 'destructive', title: '입력 확인', description: '상담 요청 내용을 입력해주세요.' }); return; }
     }
     if (type === 'request') {
-      title = parentDashboardMockData.quickRequestTemplates[quickType];
+      title = QUICK_REQUEST_TEMPLATES[quickType];
       body = requestText.trim() || title;
     }
     if (type === 'suggestion') {
@@ -311,8 +523,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       setSubmitting(false);
     }
   }
-
-  const subjectsData = parentDashboardMockData.charts.subjectShare;
 
   if (!isActive) return null;
 
@@ -381,7 +591,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <DialogDescription className="text-white/70 font-bold mt-1 text-xs">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
                     </div>
                     <div className="p-6 space-y-3 bg-[#fafafa]">
-                      {parentDashboardMockData.aiInsights.map((insight, i) => (
+                      {aiInsights.map((insight, i) => (
                         <div key={i} className="flex items-start gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-orange-200">
                           <div className="h-2 w-2 rounded-full bg-[#FF7A16] mt-2 shrink-0" />
                           <p className="text-sm font-bold text-slate-700 leading-relaxed">{insight}</p>
@@ -401,11 +611,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">주간 누적 몰입</span>
-                  <p className="text-2xl font-black text-[#14295F]">{toHm(parentDashboardMockData.weeklyReport.totalStudyMinutes)}</p>
+                  <p className="text-2xl font-black text-[#14295F]">{toHm(weeklyTotalStudyMinutes)}</p>
                 </Card>
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
-                  <p className="text-2xl font-black text-[#FF7A16]">{parentDashboardMockData.weeklyReport.avgPlanCompletionRate}%</p>
+                  <p className="text-2xl font-black text-[#FF7A16]">{weeklyPlanCompletionRate}%</p>
                 </Card>
               </div>
 
@@ -481,7 +691,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           <span>{s.subject}</span>
                           <span className="font-black">{s.minutes}분</span>
                         </div>
-                        <Progress value={Math.min(100, Math.round((s.minutes / (totalMinutes || 1)) * 100))} className="h-1 bg-slate-100" />
+                        <Progress value={Math.min(100, Math.round((s.minutes / (subjectTotalMinutes || 1)) * 100))} className="h-1 bg-slate-100" />
                       </div>
                     ))}
                   </div>
@@ -507,7 +717,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">일별 집중 시간 (분)</h4>
                         <div className="h-48 w-full">
                           <ResponsiveContainer width="100%" height="100%">
-                            <RechartsLineChart data={parentDashboardMockData.charts.dailyStudyMinutes}>
+                            <RechartsLineChart data={dailyStudyTrend}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                               <XAxis dataKey="date" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
                               <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={30} />
@@ -519,7 +729,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
                         <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
-                        <p className="text-base font-bold text-slate-700 leading-relaxed">"{parentDashboardMockData.weeklyReport.teacherFeedback}"</p>
+                        <p className="text-base font-bold text-slate-700 leading-relaxed">"{weeklyFeedback}"</p>
                       </div>
                     </div>
                     <DialogFooter className="p-6 bg-white border-t">
@@ -544,11 +754,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <Activity className="h-4 w-4 text-slate-400" />
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">실시간 관리 기록</span>
                 </div>
-                {parentDashboardMockData.life.recentPenaltyReasons.length === 0 ? (
+                {recentPenaltyReasons.length === 0 ? (
                   <div className="py-16 text-center opacity-20 italic font-black text-xs border-2 border-dashed rounded-[2rem]">기록된 특이사항이 없습니다. ✨</div>
                 ) : (
                   <div className="grid gap-2">
-                    {parentDashboardMockData.life.recentPenaltyReasons.map((r) => (
+                    {recentPenaltyReasons.map((r) => (
                       <div key={r.id} className="flex justify-between items-center p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:border-rose-200 transition-all">
                         <div className="grid gap-1">
                           <span className="text-sm font-bold text-slate-800">{r.reason}</span>

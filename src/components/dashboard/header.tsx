@@ -73,7 +73,6 @@ import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
 import { NotificationBell } from './notification-bell';
-import { TrackLogo } from '../ui/track-logo';
 
 export function DashboardHeader() {
   const { user } = useUser();
@@ -166,14 +165,6 @@ export function DashboardHeader() {
             <MainNav isMobile={true} />
           </SheetContent>
         </Sheet>
-        {isMobileView && (
-          <Link
-            href="/dashboard"
-            className="md:hidden inline-flex items-center rounded-full border border-[#ffd8b4] bg-white/90 px-2 py-1 shadow-[0_8px_18px_rgba(20,41,95,0.14)]"
-          >
-            <TrackLogo className="h-7" />
-          </Link>
-        )}
       </div>
 
       <Breadcrumb className="hidden md:flex">

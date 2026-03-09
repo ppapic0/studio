@@ -76,36 +76,67 @@ export function OperationalIntelligence() {
     const occupiedSeats = attendanceList.filter(a => a.status === 'studying').length;
     const occupancyRate = Math.round((occupiedSeats / totalSeats) * 100);
 
-    // 상담 통계
-    const teacherStats: Record<string, { name: string, count: number, impact: number }> = {};
+    // 상담 통계 (실데이터 기반)
+    const teacherStats: Record<string, { name: string; count: number; improvedCount: number }> = {};
     counselLogs?.forEach(log => {
       const tId = log.teacherId;
       if (!teacherStats[tId]) {
-        teacherStats[tId] = { name: log.teacherName || '선생님', count: 0, impact: 70 + Math.floor(Math.random() * 25) };
+        teacherStats[tId] = { name: log.teacherName || '선생님', count: 0, improvedCount: 0 };
       }
       teacherStats[tId].count++;
+      if ((log.improvement || '').trim().length > 0) {
+        teacherStats[tId].improvedCount++;
+      }
     });
 
-    const teacherChartData = Object.values(teacherStats).map(t => ({
-      name: t.name,
-      count: t.count,
-      improvement: t.impact
-    })).sort((a, b) => b.count - a.count);
+    const teacherChartData = Object.values(teacherStats)
+      .map((t) => ({
+        name: t.name,
+        count: t.count,
+        improvement: t.count > 0 ? Math.round((t.improvedCount / t.count) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
 
-    // 시간대 분석 (시뮬레이션 데이터 포함)
-    const timeSlotData = [
-      { name: '오전 (09-13)', occupancy: Math.max(20, Math.floor(occupancyRate * 0.5)), profit: Math.round(studentCount * 5000) },
-      { name: '오후 (13-18)', occupancy: occupancyRate, profit: Math.round(studentCount * 12000) },
-      { name: '야간 (18-24)', occupancy: Math.max(30, Math.floor(occupancyRate * 0.8)), profit: Math.round(studentCount * 8000) },
-    ];
+    // 시간대 분석 (상담 로그 생성시간 + 실시간 점유율 가중치)
+    const timeSlots = {
+      morning: { name: '오전 (09-13)', counselCount: 0, occupancyBase: Math.round(occupancyRate * 0.55) },
+      afternoon: { name: '오후 (13-18)', counselCount: 0, occupancyBase: occupancyRate },
+      evening: { name: '야간 (18-24)', counselCount: 0, occupancyBase: Math.round(occupancyRate * 0.8) },
+    };
+
+    counselLogs?.forEach((log) => {
+      const createdAt = (log as any).createdAt?.toDate?.();
+      if (!createdAt) return;
+      const hour = createdAt.getHours();
+      if (hour >= 9 && hour < 13) {
+        timeSlots.morning.counselCount += 1;
+      } else if (hour >= 13 && hour < 18) {
+        timeSlots.afternoon.counselCount += 1;
+      } else if (hour >= 18 && hour <= 23) {
+        timeSlots.evening.counselCount += 1;
+      }
+    });
+
+    const maxCounselCount = Math.max(1, ...Object.values(timeSlots).map((slot) => slot.counselCount));
+    const timeSlotData = Object.values(timeSlots).map((slot) => ({
+      name: slot.name,
+      occupancy: Math.max(10, Math.min(100, Math.round(slot.occupancyBase * 0.5 + (slot.counselCount / maxCounselCount) * 50))),
+      profit: slot.counselCount * 18000,
+    }));
+
+    const totalCounselCount = counselLogs?.length || 0;
+    const improvedCounselCount = Object.values(teacherStats).reduce((sum, item) => sum + item.improvedCount, 0);
+    const efficiencyScore = totalCounselCount > 0 ? Math.round((improvedCounselCount / totalCounselCount) * 100) : 0;
+    const lowestOccupancySlot = [...timeSlotData].sort((a, b) => a.occupancy - b.occupancy)[0] || null;
 
     return {
       ratio,
       occupancyRate,
       teacherChartData,
       timeSlotData,
-      totalCounselCount: counselLogs?.length || 0,
-      efficiencyScore: 82 // 상담 후 개선 성공률 가상 지표
+      totalCounselCount,
+      efficiencyScore,
+      lowestOccupancySlot,
     };
   }, [allMembers, attendanceList, counselLogs]);
 
@@ -131,7 +162,7 @@ export function OperationalIntelligence() {
             <p className="text-[10px] font-black uppercase tracking-widest opacity-60">상담 효율 지수 (Efficiency)</p>
             <h3 className="text-7xl font-black tracking-tighter">{opsMetrics.efficiencyScore}<span className="text-2xl opacity-40 ml-2">점</span></h3>
             <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10">
-              <p className="text-xs font-bold leading-relaxed">최근 진행된 {opsMetrics.totalCounselCount}건의 상담 중 82%가 학습량 증가로 이어졌습니다.</p>
+              <p className="text-xs font-bold leading-relaxed">최근 진행된 {opsMetrics.totalCounselCount}건의 상담 중 {opsMetrics.efficiencyScore}%가 개선 액션으로 기록되었습니다.</p>
             </div>
           </div>
         </Card>
@@ -219,8 +250,8 @@ export function OperationalIntelligence() {
             <div className="p-6 rounded-[2rem] bg-muted/20 border-2 border-dashed flex flex-col items-center text-center gap-3">
               <Zap className="h-8 w-8 text-primary/20" />
               <p className="text-xs font-bold text-muted-foreground leading-relaxed">
-                현재 **오전 시간대** 점유율이 낮습니다. <br/>
-                조기 등원생을 위한 **'얼리버드 LP 부스트'** 캠페인을 제안합니다.
+                현재 **{opsMetrics.lowestOccupancySlot?.name || '해당 시간대'}** 효율이 가장 낮습니다. <br/>
+                해당 시간대 집중 캠페인으로 출석/상담 전환율을 높여보세요.
               </p>
               <Button asChild variant="outline" className="rounded-xl h-9 px-4 text-[10px] font-black mt-2 bg-white">
                 <Link href="/dashboard/settings/invites">프로모션 코드 생성 <ArrowRight className="ml-2 h-3 w-3" /></Link>

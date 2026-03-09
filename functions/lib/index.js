@@ -462,7 +462,9 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
         if (e instanceof functions.https.HttpsError) {
             throw e;
         }
-        throw new functions.https.HttpsError("internal", e.message);
+        throw new functions.https.HttpsError("internal", "회원가입 처리 중 내부 오류가 발생했습니다.", {
+            userMessage: (e === null || e === void 0 ? void 0 : e.message) || "알 수 없는 내부 오류",
+        });
     }
 });
 //# sourceMappingURL=index.js.map

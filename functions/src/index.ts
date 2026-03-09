@@ -516,7 +516,9 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
     if (e instanceof functions.https.HttpsError) {
       throw e;
     }
-    throw new functions.https.HttpsError("internal", e.message);
+    throw new functions.https.HttpsError("internal", "회원가입 처리 중 내부 오류가 발생했습니다.", {
+      userMessage: e?.message || "알 수 없는 내부 오류",
+    });
   }
 });
 

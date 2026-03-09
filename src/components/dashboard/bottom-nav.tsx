@@ -79,7 +79,7 @@ export function BottomNav() {
         className={cn(
           'h-full',
           isParent
-            ? 'grid grid-cols-5 gap-1 px-2 pt-1'
+            ? 'grid grid-cols-5 gap-0.5 px-1.5 pt-1'
             : useBrandNav
               ? 'grid grid-cols-5 gap-1 px-2 pt-1.5'
               : 'flex items-center justify-around px-2'
@@ -134,7 +134,7 @@ export function BottomNav() {
               <span
                 className={cn(
                   'font-black tracking-tight transition-all duration-300 whitespace-nowrap',
-                  isParent ? 'text-[11px] leading-none' : 'text-[10px]',
+                  isParent ? 'text-[12px] leading-tight px-0.5 text-center' : 'text-[10px]',
                   isActive ? 'opacity-100' : 'opacity-45'
                 )}
               >

@@ -72,6 +72,45 @@ export function SignupForm() {
 
   const selectedRole = form.watch('role');
 
+  const resolveSignupErrorMessage = (error: any) => {
+    const code = String(error?.code || '');
+    const detailMessage =
+      typeof error?.details === 'string'
+        ? error.details
+        : typeof error?.details?.userMessage === 'string'
+          ? error.details.userMessage
+          : typeof error?.details?.message === 'string'
+            ? error.details.message
+            : '';
+
+    const rawMessage = String(error?.message || '').trim();
+    const normalizedRaw = /^(functions\/)?internal$/i.test(rawMessage) ? '' : rawMessage;
+    const fallbackMessage = detailMessage || normalizedRaw;
+
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return '이미 사용 중인 이메일입니다.';
+      case 'auth/invalid-email':
+        return '이메일 형식이 올바르지 않습니다.';
+      case 'auth/weak-password':
+        return '비밀번호가 너무 약합니다. 8자 이상으로 설정해 주세요.';
+      case 'auth/network-request-failed':
+        return '네트워크 연결을 확인한 뒤 다시 시도해 주세요.';
+      case 'functions/invalid-argument':
+        return fallbackMessage || '입력값이 올바르지 않습니다. 입력 항목을 확인해 주세요.';
+      case 'functions/failed-precondition':
+        return fallbackMessage || '가입 조건을 만족하지 않습니다. 초대코드/연동코드를 확인해 주세요.';
+      case 'functions/already-exists':
+        return fallbackMessage || '이미 가입된 센터입니다.';
+      case 'functions/unauthenticated':
+        return '인증이 만료되었습니다. 다시 로그인 후 시도해 주세요.';
+      case 'functions/internal':
+        return fallbackMessage || '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+      default:
+        return fallbackMessage || '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+    }
+  };
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !functions) return;
 
@@ -84,13 +123,13 @@ export function SignupForm() {
         form.setError('schoolName', { message: '학교명을 입력해주세요.' });
         return;
       }
-      if (!values.parentLinkCode || values.parentLinkCode.length !== 6) {
+      if (!values.parentLinkCode || !/^\d{6}$/.test(values.parentLinkCode)) {
         form.setError('parentLinkCode', { message: '부모님 연동을 위한 6자리 숫자를 입력해주세요.' });
         return;
       }
     }
 
-    if (values.role === 'parent' && (!values.studentLinkCode || values.studentLinkCode.length !== 6)) {
+    if (values.role === 'parent' && (!values.studentLinkCode || !/^\d{6}$/.test(values.studentLinkCode))) {
       form.setError('studentLinkCode', { message: '자녀의 6자리 연동 코드를 입력해주세요.' });
       return;
     }
@@ -156,10 +195,25 @@ export function SignupForm() {
       }
 
       console.error('Signup Error:', error);
+
+      const signupErrorMessage = resolveSignupErrorMessage(error);
+      if (/초대\s*코드|초대코드/.test(signupErrorMessage)) {
+        form.setError('inviteCode', { message: signupErrorMessage });
+      }
+      if (/자녀\s*연동\s*코드|연동 코드를 가진 학생|동일한 자녀 연동 코드/.test(signupErrorMessage)) {
+        form.setError('studentLinkCode', { message: signupErrorMessage });
+      }
+      if (/부모\s*연동\s*코드/.test(signupErrorMessage)) {
+        form.setError('parentLinkCode', { message: signupErrorMessage });
+      }
+      if (/학교명/.test(signupErrorMessage)) {
+        form.setError('schoolName', { message: signupErrorMessage });
+      }
+
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description: error?.message || '오류가 발생했습니다.',
+        description: signupErrorMessage,
       });
       setIsLoading(false);
       setLoadingStatus('');
