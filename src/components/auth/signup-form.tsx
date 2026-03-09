@@ -95,7 +95,7 @@ export function SignupForm() {
 
   const resolveSignupErrorMessage = (error: any): string => {
     const code = String(error?.code || '').toLowerCase();
-    const detailMessage =
+    const detailMessageRaw =
       typeof error?.details === 'string'
         ? error.details
         : typeof error?.details?.userMessage === 'string'
@@ -105,13 +105,19 @@ export function SignupForm() {
             : typeof error?.details?.error === 'string'
               ? error.details.error
               : '';
+    const detailMessage = String(detailMessageRaw || '')
+      .replace(/^\d+\s+FAILED_PRECONDITION:?\s*/i, '')
+      .replace(/^\d+\s+ALREADY_EXISTS:?\s*/i, '')
+      .replace(/^\d+\s+INVALID_ARGUMENT:?\s*/i, '')
+      .replace(/^\d+\s+INTERNAL:?\s*/i, '')
+      .trim();
 
     const rawMessage = String(error?.message || '').trim();
     const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
     const cleanedRaw = strippedRaw
-      .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, '')
-      .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, '')
-      .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, '')
+      .replace(/^\d+\s+FAILED_PRECONDITION:?\s*/i, '')
+      .replace(/^\d+\s+ALREADY_EXISTS:?\s*/i, '')
+      .replace(/^\d+\s+INVALID_ARGUMENT:?\s*/i, '')
       .trim();
 
     const normalizedRaw =

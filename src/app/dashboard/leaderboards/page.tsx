@@ -53,6 +53,13 @@ function isEnrolledMemberStatus(status: unknown): boolean {
   return normalized === 'active';
 }
 
+function isSyntheticStudentId(studentId: unknown): boolean {
+  if (typeof studentId !== 'string') return true;
+  const normalized = studentId.trim().toLowerCase();
+  if (!normalized) return true;
+  return normalized.startsWith('test-') || normalized.startsWith('seed-') || normalized.startsWith('mock-') || normalized.includes('dummy');
+}
+
 type LeaderboardTabProps = {
   title: string;
   description: string;
@@ -220,29 +227,30 @@ export default function LeaderboardsPage() {
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
   const userRole = activeMembership?.role;
-  const canReadStudentRoster =
+  const canReadMemberRoster =
     userRole === 'student' || userRole === 'teacher' || userRole === 'centerAdmin' || userRole === 'owner';
+  const canReadStudentProfiles = userRole === 'teacher' || userRole === 'centerAdmin' || userRole === 'owner';
   
   const targetDate = useMemo(() => seasonOffset === 0 ? new Date() : subMonths(new Date(), 1), [seasonOffset]);
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
-  // 1. 현재 재원생(active) 목록만 조회
+  // 1. 현재 재원(active) 학생 멤버 목록
   const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !canReadStudentRoster) return null;
+    if (!firestore || !activeMembership || !canReadMemberRoster) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'members'),
       where('role', '==', 'student'),
       where('status', '==', 'active')
     );
-  }, [firestore, activeMembership, canReadStudentRoster]);
+  }, [firestore, activeMembership, canReadMemberRoster]);
   const {
     data: studentMembers,
     isLoading: membersLoading,
     error: membersError,
-  } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadStudentRoster });
+  } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadMemberRoster });
 
   const activeStudentIds = useMemo(() => {
-    if (!canReadStudentRoster || membersLoading) return null;
+    if (!canReadMemberRoster || membersLoading) return null;
     if (!studentMembers) return null;
 
     return new Set(
@@ -250,7 +258,7 @@ export default function LeaderboardsPage() {
         .filter((member) => isEnrolledMemberStatus((member as any).status))
         .map((member) => member.id)
     );
-  }, [canReadStudentRoster, membersLoading, studentMembers]);
+  }, [canReadMemberRoster, membersLoading, studentMembers]);
 
   // 2. 실제 좌석 배정 학생 목록
   const attendanceCurrentQuery = useMemoFirebase(() => {
@@ -267,19 +275,25 @@ export default function LeaderboardsPage() {
     if (!attendanceCurrent) return null;
     const ids = attendanceCurrent
       .map((seat) => (typeof seat.studentId === 'string' ? seat.studentId.trim() : ''))
-      .filter((id) => id.length > 0);
+      .filter((id) => id.length > 0 && !isSyntheticStudentId(id));
     return new Set(ids);
   }, [attendanceCurrent]);
 
   const studentsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
+    if (!firestore || !activeMembership || !canReadStudentProfiles) return null;
     return collection(firestore, 'centers', activeMembership.id, 'students');
-  }, [firestore, activeMembership]);
-  const { data: studentProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isMember && canReadStudentRoster });
+  }, [firestore, activeMembership, canReadStudentProfiles]);
+  const {
+    data: studentProfiles,
+    isLoading: profilesLoading,
+    error: profilesError,
+  } = useCollection<StudentProfile>(studentsQuery, { enabled: isMember && canReadStudentProfiles });
 
   const studentsMap = useMemo(() => {
     const map: Record<string, StudentProfile> = {};
-    studentProfiles?.forEach(p => { map[p.id] = p; });
+    studentProfiles?.forEach((profile) => {
+      map[profile.id] = profile;
+    });
     return map;
   }, [studentProfiles]);
 
@@ -291,6 +305,7 @@ export default function LeaderboardsPage() {
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
+
   const visibleLpEntries = useMemo(() => {
     if (!allLpEntries) return null;
 
@@ -298,22 +313,41 @@ export default function LeaderboardsPage() {
     if (assignedStudentIds === null) return [];
     if (assignedStudentIds.size === 0) return [];
 
-    let filtered = allLpEntries.filter((entry) => assignedStudentIds.has(entry.studentId));
+    let filtered = allLpEntries.filter(
+      (entry) => !isSyntheticStudentId(entry.studentId) && assignedStudentIds.has(entry.studentId)
+    );
 
-    if (canReadStudentRoster) {
+    if (canReadMemberRoster) {
       if (membersError) return [];
       if (activeStudentIds === null) return [];
       filtered = filtered.filter((entry) => activeStudentIds.has(entry.studentId));
     }
 
-    if (canReadStudentRoster && studentProfiles) {
+    if (canReadStudentProfiles) {
+      if (profilesError) return [];
+      if (profilesLoading) return [];
       filtered = filtered.filter((entry) => !!studentsMap[entry.studentId]);
     }
 
     return filtered;
-  }, [allLpEntries, attendanceError, assignedStudentIds, canReadStudentRoster, membersError, activeStudentIds, studentProfiles, studentsMap]);
+  }, [
+    allLpEntries,
+    attendanceError,
+    assignedStudentIds,
+    canReadMemberRoster,
+    membersError,
+    activeStudentIds,
+    canReadStudentProfiles,
+    profilesError,
+    profilesLoading,
+    studentsMap,
+  ]);
 
-  const boardLoading = lpLoading || attendanceLoading || (canReadStudentRoster && membersLoading);
+  const boardLoading =
+    lpLoading ||
+    attendanceLoading ||
+    (canReadMemberRoster && membersLoading) ||
+    (canReadStudentProfiles && profilesLoading);
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();

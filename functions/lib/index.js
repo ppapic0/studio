@@ -766,7 +766,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 }
                 if (studentDocMap.size === 0) {
                     throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
-                        userMessage: "입력한 학생 코드와 일치하는 학생이 없습니다. 학생 코드를 다시 확인해주세요.",
+                        userMessage: "No student matched this code. Please check the 6-digit student code and try again.",
                     });
                 }
                 let candidates = [];
@@ -775,15 +775,14 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     if (!centerRef)
                         continue;
                     const candidateMemberRef = db.doc(`centers/${centerRef.id}/members/${studentDoc.id}`);
-                    const candidateMemberSnap = await t.get(candidateMemberRef);
-                    if (!candidateMemberSnap.exists)
-                        continue;
-                    const candidateMemberData = candidateMemberSnap.data();
-                    const isActiveStudentCandidate = (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
-                    if (!isActiveStudentCandidate)
-                        continue;
                     const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${centerRef.id}`);
-                    const candidateUserCenterSnap = await t.get(candidateUserCenterRef);
+                    const [candidateMemberSnap, candidateUserCenterSnap] = await Promise.all([
+                        t.get(candidateMemberRef),
+                        t.get(candidateUserCenterRef),
+                    ]);
+                    const candidateMemberData = candidateMemberSnap.exists ? candidateMemberSnap.data() : null;
+                    const hasActiveMember = candidateMemberSnap.exists &&
+                        (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
                     const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
                     const hasActiveUserCenter = candidateUserCenterSnap.exists &&
                         (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
@@ -794,12 +793,17 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         .limit(1);
                     const seatSnap = await t.get(seatQuery);
                     const hasSeatAssignment = !seatSnap.empty;
+                    if (!hasActiveMember && !hasActiveUserCenter && !hasSeatAssignment)
+                        continue;
                     const studentData = studentDoc.data();
                     candidates.push({
                         centerId: centerRef.id,
                         studentDoc,
                         studentData,
-                        className: (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.className) || null,
+                        className: (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.className) ||
+                            (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.className) ||
+                            null,
+                        hasActiveMember,
                         hasActiveUserCenter,
                         hasSeatAssignment,
                         updatedAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.updatedAt),
@@ -808,8 +812,12 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 }
                 if (candidates.length === 0) {
                     throw new functions.https.HttpsError("failed-precondition", "No active student found for this link code.", {
-                        userMessage: "현재 재원 중인 학생 정보를 찾지 못했습니다. 학생 코드를 다시 확인해주세요.",
+                        userMessage: "No active student was found for this code. Ask the center admin to verify enrollment and seat assignment.",
                     });
+                }
+                const activeMemberCandidates = candidates.filter((candidate) => candidate.hasActiveMember);
+                if (activeMemberCandidates.length > 0) {
+                    candidates = activeMemberCandidates;
                 }
                 const userCenterActiveCandidates = candidates.filter((candidate) => candidate.hasActiveUserCenter);
                 if (userCenterActiveCandidates.length > 0) {
@@ -823,19 +831,26 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 }
                 if (candidates.length > 1) {
                     const sortedCandidates = [...candidates].sort((a, b) => {
+                        const aMemberScore = (a.hasActiveMember ? 2 : 0) + (a.hasActiveUserCenter ? 1 : 0);
+                        const bMemberScore = (b.hasActiveMember ? 2 : 0) + (b.hasActiveUserCenter ? 1 : 0);
+                        if (aMemberScore !== bMemberScore)
+                            return bMemberScore - aMemberScore;
+                        const aSeatScore = a.hasSeatAssignment ? 1 : 0;
+                        const bSeatScore = b.hasSeatAssignment ? 1 : 0;
+                        if (aSeatScore !== bSeatScore)
+                            return bSeatScore - aSeatScore;
                         const aScore = Math.max(a.updatedAtMs, a.createdAtMs);
                         const bScore = Math.max(b.updatedAtMs, b.createdAtMs);
-                        return bScore - aScore;
+                        if (aScore !== bScore)
+                            return bScore - aScore;
+                        return a.studentDoc.id.localeCompare(b.studentDoc.id);
                     });
-                    const topScore = Math.max(sortedCandidates[0].updatedAtMs, sortedCandidates[0].createdAtMs);
-                    const secondScore = Math.max(sortedCandidates[1].updatedAtMs, sortedCandidates[1].createdAtMs);
-                    if (topScore > secondScore) {
-                        candidates = [sortedCandidates[0]];
-                    }
-                }
-                if (candidates.length > 1) {
-                    throw new functions.https.HttpsError("failed-precondition", "Student link code is duplicated.", {
-                        userMessage: "해당 학생 코드가 중복되어 있습니다. 센터 관리자에게 코드 재설정을 요청해주세요.",
+                    candidates = [sortedCandidates[0]];
+                    console.warn("[completeSignupWithInvite] duplicate student link code candidates resolved automatically", {
+                        studentLinkCode,
+                        candidateCount: sortedCandidates.length,
+                        selectedStudentId: sortedCandidates[0].studentDoc.id,
+                        selectedCenterId: sortedCandidates[0].centerId,
                     });
                 }
                 const selected = candidates[0];
@@ -1006,8 +1021,35 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
         if (e instanceof functions.https.HttpsError) {
             throw e;
         }
-        throw new functions.https.HttpsError("internal", "회원가입 처리 중 오류가 발생했습니다.", {
-            userMessage: (e === null || e === void 0 ? void 0 : e.message) || "알 수 없는 내부 오류",
+        const errorCode = String((e === null || e === void 0 ? void 0 : e.code) || "").toLowerCase();
+        const errorMessage = String((e === null || e === void 0 ? void 0 : e.message) || "").trim();
+        const strippedErrorMessage = errorMessage.replace(/^FirebaseError:\s*/i, "").trim();
+        const hasFailedPrecondition = errorCode.includes("failed-precondition") ||
+            errorCode === "9" ||
+            /failed[_ -]?precondition/i.test(strippedErrorMessage);
+        const hasInvalidArgument = errorCode.includes("invalid-argument") ||
+            errorCode === "3" ||
+            /invalid[_ -]?argument/i.test(strippedErrorMessage);
+        const hasAlreadyExists = errorCode.includes("already-exists") ||
+            errorCode === "6" ||
+            /already[_ -]?exists/i.test(strippedErrorMessage);
+        if (hasFailedPrecondition) {
+            throw new functions.https.HttpsError("failed-precondition", "Signup precondition failed.", {
+                userMessage: "Please verify the student code and link status. The code may be duplicated or the student may not be active.",
+            });
+        }
+        if (hasInvalidArgument) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid signup input.", {
+                userMessage: "Please check required fields: student code, phone number, and other inputs.",
+            });
+        }
+        if (hasAlreadyExists) {
+            throw new functions.https.HttpsError("already-exists", "Signup target already exists.", {
+                userMessage: "This account is already linked. Please sign in and check your dashboard.",
+            });
+        }
+        throw new functions.https.HttpsError("internal", "Signup processing failed due to an internal error.", {
+            userMessage: (e === null || e === void 0 ? void 0 : e.message) || "Unknown internal error",
         });
     }
 });

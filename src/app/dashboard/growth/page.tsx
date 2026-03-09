@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
-import { GrowthProgress, LeaderboardEntry } from '@/lib/types';
+import { AttendanceCurrent, CenterMembership, GrowthProgress, LeaderboardEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +80,26 @@ const STAT_CONFIG = {
     guide: '6시간 이상 달성 시 상승 (일일 +0.5)'
   },
 };
+
+
+function isActiveStudentStatus(status: unknown): boolean {
+  if (typeof status !== 'string') return true;
+  const normalized = status.trim().toLowerCase();
+  if (!normalized) return true;
+  return normalized === 'active';
+}
+
+function isSyntheticStudentId(studentId: unknown): boolean {
+  if (typeof studentId !== 'string') return true;
+  const normalized = studentId.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized.startsWith('test-') ||
+    normalized.startsWith('seed-') ||
+    normalized.startsWith('mock-') ||
+    normalized.includes('dummy')
+  );
+}
 
 function SystemGuideDialog() {
   return (
@@ -161,28 +181,87 @@ export default function GrowthPage() {
     );
   }, [firestore, activeMembership, user, periodKey]);
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
-  const currentRank = rankEntries?.[0]?.rank || 0;
 
-  // 전체 학생 수 조회 (백분위 계산용)
+  // ??? ??? ????? (??????????
   const totalEntriesQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
   }, [firestore, activeMembership, periodKey]);
   const { data: totalRankEntries } = useCollection<LeaderboardEntry>(totalEntriesQuery);
-  const totalCount = totalRankEntries?.length || 0;
+
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership]);
+  const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<CenterMembership>(membersQuery);
+
+  const activeStudentIds = useMemo(() => {
+    if (!activeStudentMembers) return null;
+    return new Set(
+      activeStudentMembers
+        .filter((member) => isActiveStudentStatus(member.status))
+        .map((member) => member.id)
+    );
+  }, [activeStudentMembers]);
+
+  const attendanceCurrentQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
+  }, [firestore, activeMembership]);
+  const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery);
+
+  const assignedStudentIds = useMemo(() => {
+    if (!attendanceCurrent) return null;
+    return new Set(
+      attendanceCurrent
+        .map((seat) => (typeof seat.studentId === 'string' ? seat.studentId.trim() : ''))
+        .filter((studentId) => studentId.length > 0 && !isSyntheticStudentId(studentId))
+    );
+  }, [attendanceCurrent]);
+
+  const validRankEntries = useMemo(() => {
+    if (!totalRankEntries) return [];
+    let filtered = totalRankEntries.filter((entry) => !isSyntheticStudentId(entry.studentId));
+
+    if (assignedStudentIds) {
+      filtered = filtered.filter((entry) => assignedStudentIds.has(entry.studentId));
+    }
+    if (activeStudentIds) {
+      filtered = filtered.filter((entry) => activeStudentIds.has(entry.studentId));
+    }
+
+    return filtered;
+  }, [totalRankEntries, assignedStudentIds, activeStudentIds]);
+
+  const totalCount = validRankEntries.length;
+  const isRankContextLoading = activeMembersLoading || attendanceLoading;
+
+  const currentRank = useMemo(() => {
+    const snapshotRank = rankEntries?.[0]?.rank || 0;
+    if (!user || validRankEntries.length === 0) return snapshotRank;
+
+    const sorted = [...validRankEntries].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
+    if (ownIndex >= 0) return ownIndex + 1;
+    return snapshotRank;
+  }, [rankEntries, validRankEntries, user?.uid]);
 
   const rankDisplay = useMemo(() => {
-    // 999는 시딩된 초기값이거나 아직 순위가 매겨지지 않은 상태입니다.
-    if (currentRank === 0 || currentRank >= 999) return '산정 중';
-    if (currentRank <= 3) return `${currentRank}위`;
-    
-    // 전체 인원수가 로딩되지 않았거나 너무 적을 때는 백분율이 어색할 수 있습니다.
-    if (totalCount <= 0) return `${currentRank}위`;
-    if (totalCount < 10) return `${currentRank}위 / ${totalCount}명`;
-    
+    if (isRankContextLoading) return 'Calculating';
+    if (currentRank === 0 || currentRank >= 999) return 'Pending';
+    if (currentRank <= 3) return `#${currentRank}`;
+
+    if (totalCount <= 0) return `#${currentRank}`;
+    if (totalCount < 10) return `#${currentRank} / ${totalCount}`;
+
     const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
-    return `상위 ${percent}%`;
-  }, [currentRank, totalCount]);
+    return `Top ${percent}%`;
+
+  }, [isRankContextLoading, currentRank, totalCount]);
 
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
