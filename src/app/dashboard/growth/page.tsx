@@ -5,8 +5,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
-import { GrowthProgress, LeaderboardEntry, CenterMembership } from '@/lib/types';
+import { doc, collection, query, where } from 'firebase/firestore';
+import { GrowthProgress, LeaderboardEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -164,16 +164,12 @@ export default function GrowthPage() {
   const currentRank = rankEntries?.[0]?.rank || 0;
 
   // 전체 학생 수 조회 (백분위 계산용)
-  const totalStudentsQuery = useMemoFirebase(() => {
+  const totalEntriesQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
-    );
-  }, [firestore, activeMembership]);
-  const { data: activeStudents } = useCollection<CenterMembership>(totalStudentsQuery);
-  const totalCount = activeStudents?.length || 0;
+    return collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
+  }, [firestore, activeMembership, periodKey]);
+  const { data: totalRankEntries } = useCollection<LeaderboardEntry>(totalEntriesQuery);
+  const totalCount = totalRankEntries?.length || 0;
 
   const rankDisplay = useMemo(() => {
     // 999는 시딩된 초기값이거나 아직 순위가 매겨지지 않은 상태입니다.
@@ -181,6 +177,7 @@ export default function GrowthPage() {
     if (currentRank <= 3) return `${currentRank}위`;
     
     // 전체 인원수가 로딩되지 않았거나 너무 적을 때는 백분율이 어색할 수 있습니다.
+    if (totalCount <= 0) return `${currentRank}위`;
     if (totalCount < 10) return `${currentRank}위 / ${totalCount}명`;
     
     const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));

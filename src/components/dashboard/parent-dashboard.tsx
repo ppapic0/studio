@@ -291,10 +291,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId });
 
   const remoteNotificationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'parentNotifications'), where('studentId', '==', studentId), limit(20));
-  }, [firestore, centerId, studentId]);
-  const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId });
+    if (!firestore || !centerId || !studentId || !user) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'parentNotifications'),
+      where('parentUid', '==', user.uid),
+      where('studentId', '==', studentId),
+      limit(20)
+    );
+  }, [firestore, centerId, studentId, user?.uid]);
+  const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user });
 
   const attendanceRequestsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;

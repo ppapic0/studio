@@ -63,7 +63,10 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
     if (!entries) return [];
     
     // 1. 퇴원생 및 비활성 학생 제외
-    let list = entries.filter(entry => activeStudentIds.has(entry.studentId));
+    let list = entries;
+    if (activeStudentIds.size > 0) {
+      list = list.filter((entry) => activeStudentIds.has(entry.studentId));
+    }
     
     // 2. 반 필터링
     if (classNameFilter) {
@@ -214,31 +217,35 @@ export default function LeaderboardsPage() {
   
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
+  const userRole = activeMembership?.role;
+  const canReadStudentRoster = userRole === 'teacher' || userRole === 'centerAdmin' || userRole === 'owner';
   
   const targetDate = useMemo(() => seasonOffset === 0 ? new Date() : subMonths(new Date(), 1), [seasonOffset]);
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
 
   // 1. 현재 재원생(active) 목록만 조회
   const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
+    if (!firestore || !activeMembership || !canReadStudentRoster) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'members'),
       where('role', '==', 'student'),
       where('status', '==', 'active')
     );
-  }, [firestore, activeMembership, periodKey]);
-  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember });
+  }, [firestore, activeMembership, canReadStudentRoster]);
+  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadStudentRoster });
 
   const activeStudentIds = useMemo(() => {
-    if (!studentMembers) return new Set<string>();
-    return new Set(studentMembers.map(m => m.id));
+    if (studentMembers && studentMembers.length > 0) {
+      return new Set(studentMembers.map((m) => m.id));
+    }
+    return new Set<string>();
   }, [studentMembers]);
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'students');
   }, [firestore, activeMembership]);
-  const { data: studentProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isMember });
+  const { data: studentProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isMember && canReadStudentRoster });
 
   const studentsMap = useMemo(() => {
     const map: Record<string, StudentProfile> = {};
@@ -257,9 +264,17 @@ export default function LeaderboardsPage() {
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
-    studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
-    return Array.from(classes).sort();
-  }, [studentMembers]);
+    if (studentMembers && studentMembers.length > 0) {
+      studentMembers.forEach((m) => {
+        if (m.className) classes.add(m.className);
+      });
+    } else {
+      allLpEntries?.forEach((entry) => {
+        if (entry.classNameSnapshot) classes.add(entry.classNameSnapshot);
+      });
+    }
+    return ['all', ...Array.from(classes).sort()];
+  }, [studentMembers, allLpEntries]);
 
   if (!isMember) return null;
 
@@ -293,7 +308,7 @@ export default function LeaderboardsPage() {
               <Filter className="h-4 w-4 text-primary opacity-40 ml-2" />
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger className="h-10 w-[220px] border-none bg-transparent font-black text-sm focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl border-none shadow-2xl">{availableClasses.map(c => <SelectItem key={c} value={c} className="font-black">{c}</SelectItem>)}</SelectContent>
+                <SelectContent className="rounded-xl border-none shadow-2xl">{availableClasses.map(c => <SelectItem key={c} value={c} className="font-black">{c === 'all' ? 'All classes' : c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           )}

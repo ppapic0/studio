@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -8,7 +7,7 @@ import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { Loader2, RefreshCw, Compass, Sparkles } from 'lucide-react';
+import { Loader2, RefreshCw, Compass, Sparkles, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -30,7 +29,11 @@ import { httpsCallable } from 'firebase/functions';
 import { cn } from '@/lib/utils';
 
 const inviteFormSchema = z.object({
-  inviteCode: z.string().min(1, '코드를 입력해주세요.'),
+  inviteCode: z.string().trim().min(1, '초대 코드를 입력해 주세요.'),
+});
+
+const parentLinkFormSchema = z.object({
+  studentLinkCode: z.string().trim().regex(/^\d{6}$/, '학생 코드(6자리 숫자)를 입력해 주세요.'),
 });
 
 export default function DashboardPage() {
@@ -38,42 +41,79 @@ export default function DashboardPage() {
   const functions = useFunctions();
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInviteSubmitting, setIsInviteSubmitting] = useState(false);
+  const [isParentLinkSubmitting, setIsParentLinkSubmitting] = useState(false);
   const isMobile = viewMode === 'mobile';
 
-  const form = useForm<z.infer<typeof inviteFormSchema>>({
+  const inviteForm = useForm<z.infer<typeof inviteFormSchema>>({
     resolver: zodResolver(inviteFormSchema),
     defaultValues: { inviteCode: '' },
   });
 
+  const parentLinkForm = useForm<z.infer<typeof parentLinkFormSchema>>({
+    resolver: zodResolver(parentLinkFormSchema),
+    defaultValues: { studentLinkCode: '' },
+  });
+
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
     if (!user || !functions) return;
-    setIsSubmitting(true);
+
+    setIsInviteSubmitting(true);
     try {
       const redeemFn = httpsCallable(functions, 'redeemInviteCode');
-      const result: any = await redeemFn({ code: values.inviteCode });
-      
-      if (result.data.ok) {
-        toast({ title: '가입 성공', description: result.data.message });
-        window.location.reload();
+      const result: any = await redeemFn({ code: values.inviteCode.trim() });
+
+      if (result.data?.ok) {
+        toast({ title: '가입 완료', description: result.data.message || '센터 가입이 완료되었습니다.' });
+        setTimeout(() => window.location.reload(), 250);
       }
     } catch (error: any) {
-      toast({ variant: 'destructive', title: '가입 실패', description: error.message });
+      toast({
+        variant: 'destructive',
+        title: '가입 실패',
+        description: error?.message || '초대 코드 가입 중 오류가 발생했습니다.',
+      });
     } finally {
-      setIsSubmitting(false);
+      setIsInviteSubmitting(false);
+    }
+  }
+
+  async function onParentLinkSubmit(values: z.infer<typeof parentLinkFormSchema>) {
+    if (!user || !functions) return;
+
+    setIsParentLinkSubmitting(true);
+    try {
+      const completeSignupFn = httpsCallable(functions, 'completeSignupWithInvite');
+      const result: any = await completeSignupFn({
+        role: 'parent',
+        studentLinkCode: values.studentLinkCode.trim(),
+      });
+
+      if (result.data?.ok) {
+        toast({ title: '연동 완료', description: '학부모 계정이 학생과 연결되었습니다.' });
+        setTimeout(() => window.location.reload(), 250);
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '연동 실패',
+        description: error?.message || '학생 코드 연동 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsParentLinkSubmitting(false);
     }
   }
 
   if (membershipsLoading) {
     return (
-      <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-6">
+      <div className="flex h-[70vh] w-full flex-col items-center justify-center gap-6">
         <div className="relative">
-          <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-          <Compass className="h-12 w-12 text-primary absolute inset-0 animate-pulse" />
+          <Loader2 className="absolute inset-0 h-12 w-12 animate-spin text-primary opacity-20" />
+          <Compass className="h-12 w-12 animate-pulse text-primary" />
         </div>
-        <div className="text-center space-y-2">
-          <p className="text-xl font-black text-primary tracking-tighter">정보를 동기화하고 있습니다</p>
-          <p className="text-sm font-bold text-muted-foreground italic">데이터베이스 연결을 확인 중입니다...</p>
+        <div className="space-y-2 text-center">
+          <p className="text-xl font-black tracking-tighter text-primary">센터 정보를 확인하고 있습니다</p>
+          <p className="text-sm font-bold italic text-muted-foreground">가입 직후에는 연동이 몇 초 정도 지연될 수 있습니다.</p>
         </div>
       </div>
     );
@@ -81,29 +121,33 @@ export default function DashboardPage() {
 
   if (activeMembership) {
     const userRole = activeMembership.role;
-    
-    // 센터 관리자는 KPI 대시보드를 홈으로 사용
+
     if (userRole === 'centerAdmin' || userRole === 'owner') {
       return <AdminDashboard isActive={true} />;
     }
 
-    // 선생님은 실시간 관제 화면을 홈으로 사용
     if (userRole === 'teacher') {
       return <TeacherDashboard isActive={true} />;
     }
 
     return (
-      <div className={cn("flex flex-col", isMobile ? "gap-1" : "gap-2")}>
-        <div className={cn("flex items-center gap-2 mb-2 flex-wrap px-1", isMobile ? "mt-0" : "mb-4")}>
-          <h1 className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-4xl")}>
+      <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
+        <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
+          <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-xl' : 'text-4xl')}>
             {userRole === 'parent' ? `${user?.displayName} 학부모님` : `${user?.displayName}님, 반가워요!`}
           </h1>
-          <Badge variant="secondary" className={cn("rounded-full font-black bg-primary text-white border-none uppercase whitespace-nowrap shrink-0", isMobile ? "h-5 px-2 text-[9px]" : "h-7 px-3 text-[11px]")}>
+          <Badge
+            variant="secondary"
+            className={cn(
+              'shrink-0 whitespace-nowrap rounded-full border-none bg-primary font-black uppercase text-white',
+              isMobile ? 'h-5 px-2 text-[9px]' : 'h-7 px-3 text-[11px]',
+            )}
+          >
             {userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
         </div>
-        
-        <div className={cn("flex flex-col", isMobile ? "gap-4" : "gap-8")}>
+
+        <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
           <StudentDashboard isActive={userRole === 'student'} />
           <ParentDashboard isActive={userRole === 'parent'} />
         </div>
@@ -112,39 +156,115 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-10 text-center px-4">
+    <div className="flex min-h-[70vh] flex-col items-center justify-center space-y-10 px-4 text-center">
       <div className="space-y-4">
-        <div className="bg-primary/10 p-6 rounded-[2.5rem] w-fit mx-auto shadow-inner">
-          <Sparkles className="h-12 w-12 text-primary animate-bounce" />
+        <div className="mx-auto w-fit rounded-[2.5rem] bg-primary/10 p-6 shadow-inner">
+          <Sparkles className="h-12 w-12 animate-bounce text-primary" />
         </div>
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tighter">아직 소속된 센터가 없습니다</h1>
-          <p className="text-muted-foreground font-bold max-w-sm mx-auto leading-relaxed">
-            가입 과정에서 정보 전송이 느려질 수 있습니다.<br/>
-            '다시 확인'을 누르거나 코드를 다시 입력해 보세요.
+          <p className="mx-auto max-w-sm font-bold leading-relaxed text-muted-foreground">
+            가입 직후에는 정보 동기화가 늦어질 수 있습니다.
+            <br />
+            다시 확인을 누르거나 코드를 다시 입력해 주세요.
           </p>
         </div>
       </div>
-      
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <Button variant="outline" size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black border-2 shadow-sm" onClick={() => window.location.reload()}><RefreshCw className="mr-2 h-5 w-5" /> 다시 확인</Button>
+
+      <div className="grid w-full max-w-xl gap-3 sm:grid-cols-3">
+        <Button
+          variant="outline"
+          size="lg"
+          className="h-14 rounded-2xl border-2 text-base font-black shadow-sm"
+          onClick={() => window.location.reload()}
+        >
+          <RefreshCw className="mr-2 h-5 w-5" /> 다시 확인
+        </Button>
+
         <Dialog>
-          <DialogTrigger asChild><Button size="lg" className="flex-1 h-16 rounded-2xl text-lg font-black shadow-xl">초대 코드로 가입</Button></DialogTrigger>
-          <DialogContent className="rounded-[2.5rem] p-8 border-none shadow-2xl">
+          <DialogTrigger asChild>
+            <Button size="lg" className="h-14 rounded-2xl text-base font-black shadow-xl">
+              초대 코드로 가입
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-[2.5rem] border-none p-8 shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-3xl font-black tracking-tighter">초대 코드 입력</DialogTitle>
-              <DialogDescription className="font-bold pt-2">센터에서 제공받은 코드를 입력하여 가입을 완료하세요.</DialogDescription>
+              <DialogDescription className="pt-2 font-bold">
+                센터에서 받은 초대 코드로 가입을 완료합니다.
+              </DialogDescription>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onInviteSubmit)} className="space-y-6 pt-4">
-                <FormField name="inviteCode" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-black text-xs uppercase tracking-widest text-primary/70">코드를 입력하세요</FormLabel>
-                    <FormControl><Input placeholder="예: 0313" {...field} className="h-14 rounded-xl border-2 text-xl font-black tracking-widest" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <DialogFooter><Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg">{isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '멤버십 생성하기'}</Button></DialogFooter>
+            <Form {...inviteForm}>
+              <form onSubmit={inviteForm.handleSubmit(onInviteSubmit)} className="space-y-6 pt-4">
+                <FormField
+                  control={inviteForm.control}
+                  name="inviteCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
+                        초대 코드
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="예: 0313"
+                          {...field}
+                          className="h-14 rounded-xl border-2 text-xl font-black tracking-widest"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="submit" disabled={isInviteSubmitting} className="h-14 w-full rounded-2xl text-lg font-black shadow-lg">
+                    {isInviteSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '센터 가입 완료'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="lg" variant="secondary" className="h-14 rounded-2xl text-base font-black shadow-xl">
+              <Link2 className="mr-2 h-5 w-5" /> 학부모 코드 연동
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-[2.5rem] border-none p-8 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-black tracking-tighter">학부모 자녀코드 연동</DialogTitle>
+              <DialogDescription className="pt-2 font-bold">
+                학생이 설정한 6자리 코드를 입력하면 학부모 계정이 즉시 연결됩니다.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...parentLinkForm}>
+              <form onSubmit={parentLinkForm.handleSubmit(onParentLinkSubmit)} className="space-y-6 pt-4">
+                <FormField
+                  control={parentLinkForm.control}
+                  name="studentLinkCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
+                        학생 코드(6자리)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="123456"
+                          maxLength={6}
+                          {...field}
+                          className="h-14 rounded-xl border-2 text-center text-xl font-black tracking-[0.4em]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="submit" disabled={isParentLinkSubmitting} className="h-14 w-full rounded-2xl text-lg font-black shadow-lg">
+                    {isParentLinkSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '학생과 연동하기'}
+                  </Button>
+                </DialogFooter>
               </form>
             </Form>
           </DialogContent>

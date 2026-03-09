@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,7 +135,7 @@ export default function NotificationSettingsPage() {
             <PlugZap className="h-5 w-5" /> SMS API 연결
           </CardTitle>
           <CardDescription className="font-bold text-sm">
-            API는 나중에 연결해도 됩니다. 지금은 키/엔드포인트를 저장해두고, 큐(`centers/{{centerId}}/smsQueue`)를 통해 연동할 수 있습니다.
+            API는 나중에 연결해도 됩니다. 지금은 키/엔드포인트를 저장해두고, 큐(centers/{"{centerId}"}/smsQueue)를 통해 연동할 수 있습니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 p-6">
