@@ -49,7 +49,6 @@ export function BottomNav() {
     ],
     parent: [
       { href: '/dashboard?parentTab=home', label: '홈', icon: LayoutDashboard },
-      { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
       { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
       { href: '/dashboard?parentTab=life', label: '생활', icon: Armchair },
       { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
@@ -76,7 +75,7 @@ export function BottomNav() {
         isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden'
       )}
     >
-      <nav className={cn('h-full', isParent ? 'grid grid-cols-6 gap-0.5 px-1.5 pt-1' : 'flex items-center justify-around px-2')}>
+      <nav className={cn('h-full', isParent ? 'grid grid-cols-5 gap-0.5 px-1.5 pt-1' : 'flex items-center justify-around px-2')}>
         {currentNav.map((item) => {
           const [itemPath, itemQuery] = item.href.split('?');
           const isParentQueryItem = role === 'parent' && !!itemQuery;

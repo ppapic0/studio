@@ -49,7 +49,6 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   ],
   parent: [
     { href: '/dashboard?parentTab=home', label: '홈', icon: LayoutDashboard },
-    { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
     { href: '/dashboard?parentTab=studyDetail', label: '학습상세', icon: History },
     { href: '/dashboard?parentTab=life', label: '생활관리', icon: Armchair },
     { href: '/dashboard?parentTab=communication', label: '상담/소통', icon: MessageCircle },

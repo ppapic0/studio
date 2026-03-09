@@ -312,7 +312,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
   }
 
-  const weeklyData = parentDashboardMockData.weeklyReport;
   const subjectsData = parentDashboardMockData.charts.subjectShare;
 
   if (!isActive) return null;
@@ -397,7 +396,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </TabsContent>
 
-            <TabsContent value="reports" className="mt-0 space-y-4 animate-in fade-in duration-500">
+            <TabsContent value="studyDetail" className="mt-0 space-y-6 animate-in fade-in duration-500">
+              {/* 주간 성과 요약 (기존 리포트 내용 통합) */}
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">주간 누적 몰입</span>
@@ -409,45 +409,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full h-14 rounded-2xl border-2 border-slate-100 bg-slate-50/30 hover:bg-slate-50 font-black gap-2 text-sm text-[#14295F] shadow-sm">
-                    <BarChart3 className="h-5 w-5 text-[#FF7A16]" /> 주간 성과 상세 분석 <Maximize2 className="h-4 w-4 opacity-30 ml-auto" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
-                  <div className="bg-[#14295F] p-10 text-white relative">
-                    <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
-                    <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
-                  </div>
-                  <div className="p-8 space-y-10 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
-                    <div className="space-y-4">
-                      <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">일별 집중 시간 (분)</h4>
-                      <div className="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsLineChart data={parentDashboardMockData.charts.dailyStudyMinutes}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="date" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
-                            <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={30} />
-                            <Tooltip contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
-                            <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={4} dot={{ r: 4, fill: '#fff', stroke: '#FF7A16', strokeWidth: 2 }} />
-                          </RechartsLineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                    <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
-                      <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
-                      <p className="text-base font-bold text-slate-700 leading-relaxed">"{parentDashboardMockData.weeklyReport.teacherFeedback}"</p>
-                    </div>
-                  </div>
-                  <DialogFooter className="p-6 bg-white border-t">
-                    <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">확인 완료</Button></DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </TabsContent>
-
-            <TabsContent value="studyDetail" className="mt-0 space-y-6 animate-in fade-in duration-500">
               <div className="flex items-center justify-between px-1">
                 <div className="flex flex-col">
                   <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
@@ -531,29 +492,39 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <Card className="rounded-[1.5rem] border-none shadow-sm bg-[#14295F] p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
                       <BarChart3 className="h-6 w-6 text-white/40" />
                       <div className="grid gap-0.5 text-white">
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Focus Time</span>
-                        <span className="text-xs font-black">시간대 분석</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Weekly Detail</span>
+                        <span className="text-xs font-black">성과 상세 분석</span>
                       </div>
                     </Card>
                   </DialogTrigger>
-                  <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle className="text-xl font-black mb-2 text-[#14295F]">시간대별 집중 분포</DialogTitle>
-                      <DialogDescription className="text-xs font-bold text-muted-foreground leading-relaxed">
-                        자녀가 하루 중 가장 고도의 몰입을 보이는 시간대입니다.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="h-56 w-full mt-8">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={parentDashboardMockData.charts.hourlyFocus}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                          <XAxis dataKey="hour" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
-                          <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={25} />
-                          <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} contentStyle={{borderRadius: '1rem', border: 'none'}} />
-                          <Bar dataKey="minutes" name="집중(분)" fill="#14295F" radius={[6,6,0,0]} barSize={20} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
+                    <div className="bg-[#14295F] p-10 text-white relative">
+                      <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
+                      <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
                     </div>
+                    <div className="p-8 space-y-10 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">일별 집중 시간 (분)</h4>
+                        <div className="h-48 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RechartsLineChart data={parentDashboardMockData.charts.dailyStudyMinutes}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                              <XAxis dataKey="date" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
+                              <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={30} />
+                              <Tooltip contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
+                              <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={4} dot={{ r: 4, fill: '#fff', stroke: '#FF7A16', strokeWidth: 2 }} />
+                            </RechartsLineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
+                        <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
+                        <p className="text-base font-bold text-slate-700 leading-relaxed">"{parentDashboardMockData.weeklyReport.teacherFeedback}"</p>
+                      </div>
+                    </div>
+                    <DialogFooter className="p-6 bg-white border-t">
+                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">확인 완료</Button></DialogClose>
+                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
               </div>
