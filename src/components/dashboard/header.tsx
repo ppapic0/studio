@@ -136,17 +136,17 @@ export function DashboardHeader() {
 
   return (
     <header className={cn(
-      "sticky top-0 z-30 flex items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:static md:border-0 md:bg-transparent md:px-6 transition-all duration-300",
-      isMobileView ? "h-12" : "h-14 md:h-auto"
+      "sticky top-0 z-30 flex items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 transition-all duration-300",
+      isMobileView ? "h-12" : "h-14 md:h-16 md:px-6 md:bg-transparent md:border-0"
     )}>
       <div className="flex items-center gap-2">
         <Sheet>
           <SheetTrigger asChild>
-            <button className={cn("p-1 text-primary/60 hover:text-primary transition-all", isMobileView ? "md:hidden" : "md:hidden")}>
+            <button className={cn("p-1 text-primary/60 hover:text-primary transition-all md:hidden")}>
               <PanelLeft className={cn(isMobileView ? "h-5 w-5" : "h-6 w-6")} />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="sm:max-w-xs">
+          <SheetContent side="left" className="sm:max-w-xs p-0">
             <MainNav isMobile={true} />
           </SheetContent>
         </Sheet>
@@ -177,18 +177,17 @@ export function DashboardHeader() {
         </Breadcrumb>
       )}
 
-      <div className="relative ml-auto flex items-center gap-2">
-        {!isMobileView && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="rounded-full text-muted-foreground hover:bg-primary/5 transition-all h-9 w-9"
-            onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
-            title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
-          >
-            {viewMode === 'mobile' ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-5 w-5" />}
-          </Button>
-        )}
+      <div className="relative ml-auto flex items-center gap-2 sm:gap-4">
+        {/* 웹 모드 전환 버튼 복구 */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="rounded-full text-muted-foreground hover:bg-primary/5 transition-all h-9 w-9"
+          onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
+          title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
+        >
+          {viewMode === 'mobile' ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-5 w-5" />}
+        </Button>
 
         <NotificationBell />
 

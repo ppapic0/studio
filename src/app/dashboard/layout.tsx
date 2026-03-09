@@ -1,4 +1,3 @@
-
 'use client';
 
 import { MainNav } from '@/components/dashboard/main-nav';
@@ -19,18 +18,20 @@ export default function DashboardLayout({
 
   return (
     <div className={cn(
-      "min-h-screen w-full bg-[#f0f0f0] transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center",
-      !isMobileView && "md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-background"
+      "min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center",
+      isMobileView ? "bg-[#f0f0f0]" : "bg-background"
     )}>
-      {/* Premium Background Decoration */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:40px_40px] opacity-[0.04]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]" />
-      </div>
-
-      {/* Sidebar - Desktop/Tablet Mode */}
+      {/* Premium Background Decoration - Only shown in Desktop mode */}
       {!isMobileView && (
-        <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20">
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:40px_40px] opacity-[0.04]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]" />
+        </div>
+      )}
+
+      {/* Sidebar - Desktop Mode */}
+      {!isMobileView && (
+        <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20 w-[240px] lg:w-[280px]">
           <div className="flex h-full flex-col justify-start">
             <MainNav />
           </div>
@@ -42,7 +43,7 @@ export default function DashboardLayout({
         "flex flex-col transition-all duration-700 relative z-10",
         isMobileView 
           ? "w-full max-w-[430px] aspect-[9/19.5] h-[92vh] max-h-[932px] bg-white rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[12px] border-black overflow-hidden ring-[4px] ring-gray-800 relative mt-8" 
-          : "w-full min-h-screen"
+          : "flex-1 min-h-screen"
       )}>
         {/* Header */}
         <DashboardHeader />
@@ -59,9 +60,9 @@ export default function DashboardLayout({
         <AppointmentNotifier />
         <ReportNotifier />
 
-        {/* Bottom Nav - Shown in Mobile View Mode or on actual small screens */}
+        {/* Bottom Nav - Only in mobile view frame or on actual small devices */}
         {(isMobileView || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
-          <div className={isMobileView ? "absolute bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-black/5" : ""}>
+          <div className={isMobileView ? "absolute bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-black/5" : "fixed bottom-0 left-0 right-0 z-50 md:hidden"}>
             <BottomNav />
           </div>
         )}
