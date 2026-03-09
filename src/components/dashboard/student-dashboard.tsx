@@ -380,6 +380,49 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     ? `${format(startOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')} ~ ${format(endOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')}`
     : '';
 
+  // CRITICAL: hooks declaration order matters to prevent initialization error
+  const progressRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
+
+  const studyLogRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !todayKey) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
+  }, [firestore, activeMembership, user, todayKey]);
+  const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
+
+  const allPlansRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !planViewWeekKey || !planViewDateKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items'),
+      where('dateKey', '==', planViewDateKey)
+    );
+  }, [firestore, activeMembership, user, planViewWeekKey, planViewDateKey]);
+  const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
+
+  const stats = useMemo(() => {
+    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+    return {
+      focus: Math.min(100, raw.focus),
+      consistency: Math.min(100, raw.consistency),
+      achievement: Math.min(100, raw.achievement),
+      resilience: Math.min(100, raw.resilience),
+    };
+  }, [progress?.stats]);
+
+  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+  const penaltyPoints = progress?.penaltyPoints || 0;
+  const penaltyRate = useMemo(() => {
+    if (penaltyPoints >= 30) return 0.15; 
+    if (penaltyPoints >= 20) return 0.10; 
+    if (penaltyPoints >= 10) return 0.06; 
+    if (penaltyPoints >= 5) return 0.03;  
+    return 0; 
+  }, [penaltyPoints]);
+  const finalMultiplier = totalBoost * (1 - penaltyRate);
+
   const handleStudyStartStop = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
     
@@ -437,7 +480,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
           batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
           
-          batch.update(progressRef!, updateData);
+          batch.update(progressRef, updateData);
 
           const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
           batch.set(rankRef, {
@@ -462,7 +505,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const nowTs = Date.now();
         const batch = writeBatch(firestore);
         if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-          batch.update(progressRef!, { 'stats.consistency': increment(0.5), [`dailyLpStatus.${todayKey}.checkedIn`]: true, updatedAt: serverTimestamp() });
+          batch.update(progressRef, { 'stats.consistency': increment(0.5), [`dailyLpStatus.${todayKey}.checkedIn`]: true, updatedAt: serverTimestamp() });
           toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
         }
         if (seatDoc) {
@@ -478,7 +521,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     } finally {
       setIsProcessingAction(false);
     }
-  }, [firestore, user, activeMembership, isTimerActive, startTime, progress, todayStudyLog, todayKey, periodKey, setIsTimerActive, setStartTime, toast, finalMultiplier]);
+  }, [firestore, user, activeMembership, progressRef, isTimerActive, startTime, progress, todayStudyLog, todayKey, periodKey, setIsTimerActive, setStartTime, toast, finalMultiplier]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -495,48 +538,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
-  const progressRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-  }, [firestore, activeMembership?.id, user?.uid]);
-  const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
-
-  const stats = useMemo(() => {
-    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-    return {
-      focus: Math.min(100, raw.focus),
-      consistency: Math.min(100, raw.consistency),
-      achievement: Math.min(100, raw.achievement),
-      resilience: Math.min(100, raw.resilience),
-    };
-  }, [progress?.stats]);
-
-  const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
-  const penaltyPoints = progress?.penaltyPoints || 0;
-  const penaltyRate = useMemo(() => {
-    if (penaltyPoints >= 30) return 0.15; 
-    if (penaltyPoints >= 20) return 0.10; 
-    if (penaltyPoints >= 10) return 0.06; 
-    if (penaltyPoints >= 5) return 0.03;  
-    return 0; 
-  }, [penaltyPoints]);
-  const finalMultiplier = totalBoost * (1 - penaltyRate);
-
-  const studyLogRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !todayKey) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
-  }, [firestore, activeMembership, user, todayKey]);
-  const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
-
-  const allPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !planViewWeekKey || !planViewDateKey) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items'),
-      where('dateKey', '==', planViewDateKey)
-    );
-  }, [firestore, activeMembership, user, planViewWeekKey, planViewDateKey]);
-  const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
-  
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
@@ -555,6 +556,53 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
       .slice(0, 5);
   }, [rawRequests]);
+
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
+    if (requestReason.trim().length < 10) {
+      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
+      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
+      
+      const requestData: any = {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: requestReason.trim(),
+        status: 'requested',
+        penaltyApplied: isTodayRequest,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
+
+      if (isTodayRequest) {
+        const pointsToAdd = requestType === 'late' ? 3 : 5;
+        batch.update(progressRef!, {
+          penaltyPoints: increment(pointsToAdd),
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
+      }
+
+      await batch.commit();
+      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      setRequestReason('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (!firestore || !user || !activeMembership || !progressRef || !planViewWeekKey || !todayPlans) return;
