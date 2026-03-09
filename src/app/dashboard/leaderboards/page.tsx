@@ -46,6 +46,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+function isEnrolledMemberStatus(status: unknown): boolean {
+  if (typeof status !== 'string') return true;
+  const normalized = status.trim().toLowerCase();
+  if (!normalized) return true;
+  return normalized === 'active';
+}
+
 type LeaderboardTabProps = {
   title: string;
   description: string;
@@ -224,18 +231,25 @@ export default function LeaderboardsPage() {
     if (!firestore || !activeMembership || !canReadStudentRoster) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
+      where('role', '==', 'student')
     );
   }, [firestore, activeMembership, canReadStudentRoster]);
-  const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadStudentRoster });
+  const {
+    data: studentMembers,
+    isLoading: membersLoading,
+    error: membersError,
+  } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadStudentRoster });
 
   const activeStudentIds = useMemo(() => {
-    if (studentMembers && studentMembers.length > 0) {
-      return new Set(studentMembers.map((m) => m.id));
-    }
-    return new Set<string>();
-  }, [studentMembers]);
+    if (!canReadStudentRoster || membersLoading) return null;
+    if (!studentMembers) return null;
+
+    const ids = studentMembers
+      .filter((member) => isEnrolledMemberStatus((member as any).status))
+      .map((member) => member.id);
+
+    return new Set(ids);
+  }, [canReadStudentRoster, membersLoading, studentMembers]);
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -260,18 +274,22 @@ export default function LeaderboardsPage() {
   const visibleLpEntries = useMemo(() => {
     if (!allLpEntries) return null;
     if (!canReadStudentRoster) return allLpEntries;
+    if (membersError) return allLpEntries;
+    if (activeStudentIds === null) return allLpEntries;
     if (activeStudentIds.size === 0) return [];
     return allLpEntries.filter((entry) => activeStudentIds.has(entry.studentId));
-  }, [allLpEntries, canReadStudentRoster, activeStudentIds]);
+  }, [allLpEntries, canReadStudentRoster, membersError, activeStudentIds]);
 
   const boardLoading = lpLoading || (canReadStudentRoster && membersLoading);
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
     if (studentMembers && studentMembers.length > 0) {
-      studentMembers.forEach((m) => {
-        if (m.className) classes.add(m.className);
-      });
+      studentMembers
+        .filter((member) => isEnrolledMemberStatus((member as any).status))
+        .forEach((member) => {
+          if (member.className) classes.add(member.className);
+        });
     } else {
       allLpEntries?.forEach((entry) => {
         if (entry.classNameSnapshot) classes.add(entry.classNameSnapshot);
