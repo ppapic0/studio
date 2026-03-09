@@ -55,18 +55,13 @@ type LeaderboardTabProps = {
   isMobile: boolean;
   studentsMap: Record<string, StudentProfile>;
   classNameFilter?: string | null;
-  activeStudentIds: Set<string>;
 };
 
-function LeaderboardTab({ title, description, entries, isLoading, isMobile, studentsMap, classNameFilter, activeStudentIds }: LeaderboardTabProps) {
+function LeaderboardTab({ title, description, entries, isLoading, isMobile, studentsMap, classNameFilter }: LeaderboardTabProps) {
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
-    
-    // 1. 퇴원생 및 비활성 학생 제외
+    // 1. 랭킹 항목 기준 목록
     let list = entries;
-    if (activeStudentIds.size > 0) {
-      list = list.filter((entry) => activeStudentIds.has(entry.studentId));
-    }
     
     // 2. 반 필터링
     if (classNameFilter) {
@@ -75,7 +70,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
     
     // 3. 값 기준 정렬
     return list.sort((a, b) => b.value - a.value);
-  }, [entries, classNameFilter, activeStudentIds]);
+  }, [entries, classNameFilter]);
 
   const topThree = useMemo(() => filteredEntries.slice(0, 3), [filteredEntries]);
   const others = useMemo(() => filteredEntries.slice(3), [filteredEntries]);
@@ -218,7 +213,8 @@ export default function LeaderboardsPage() {
   const isMember = !!activeMembership;
   const isMobile = viewMode === 'mobile';
   const userRole = activeMembership?.role;
-  const canReadStudentRoster = userRole === 'teacher' || userRole === 'centerAdmin' || userRole === 'owner';
+  const canReadStudentRoster =
+    userRole === 'student' || userRole === 'teacher' || userRole === 'centerAdmin' || userRole === 'owner';
   
   const targetDate = useMemo(() => seasonOffset === 0 ? new Date() : subMonths(new Date(), 1), [seasonOffset]);
   const periodKey = useMemo(() => format(targetDate, 'yyyy-MM'), [targetDate]);
@@ -232,7 +228,7 @@ export default function LeaderboardsPage() {
       where('status', '==', 'active')
     );
   }, [firestore, activeMembership, canReadStudentRoster]);
-  const { data: studentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadStudentRoster });
+  const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isMember && canReadStudentRoster });
 
   const activeStudentIds = useMemo(() => {
     if (studentMembers && studentMembers.length > 0) {
@@ -261,6 +257,14 @@ export default function LeaderboardsPage() {
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
+  const visibleLpEntries = useMemo(() => {
+    if (!allLpEntries) return null;
+    if (!canReadStudentRoster) return allLpEntries;
+    if (activeStudentIds.size === 0) return [];
+    return allLpEntries.filter((entry) => activeStudentIds.has(entry.studentId));
+  }, [allLpEntries, canReadStudentRoster, activeStudentIds]);
+
+  const boardLoading = lpLoading || (canReadStudentRoster && membersLoading);
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -314,10 +318,10 @@ export default function LeaderboardsPage() {
           )}
         </div>
         <TabsContent value="class" className="mt-0 animate-in fade-in duration-500">
-          <LeaderboardTab title={selectedClass !== 'all' ? `${selectedClass} 랭킹` : '반별 랭킹'} description={`${selectedClass} 학생들의 성적입니다.`} entries={allLpEntries} isLoading={lpLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} classNameFilter={selectedClass === 'all' ? null : selectedClass} activeStudentIds={activeStudentIds} />
+          <LeaderboardTab title={selectedClass !== 'all' ? `${selectedClass} 랭킹` : '반별 랭킹'} description={`${selectedClass} 학생들의 성적입니다.`} entries={visibleLpEntries} isLoading={boardLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} classNameFilter={selectedClass === 'all' ? null : selectedClass} />
         </TabsContent>
         <TabsContent value="total" className="mt-0 animate-in fade-in duration-500">
-          <LeaderboardTab title="전체 랭킹" description="센터 전체 학생 중 이번 시즌 가장 앞서가는 러너들입니다." entries={allLpEntries} isLoading={lpLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} activeStudentIds={activeStudentIds} />
+          <LeaderboardTab title="전체 랭킹" description="센터 전체 학생 중 이번 시즌 가장 앞서가는 러너들입니다." entries={visibleLpEntries} isLoading={boardLoading} metricType="lp" isMobile={isMobile} studentsMap={studentsMap} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,16 +1,9 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bell,
-  Home,
-  LineChart,
-  Package2,
-  Users,
   PanelLeft,
-  Search,
   LogOut,
   Smartphone,
   Monitor,
@@ -20,11 +13,9 @@ import {
   Zap,
   CalendarDays,
   MessageCircle,
-  CheckCircle2,
   School,
-  GraduationCap,
   Loader2,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
 
 import {
@@ -48,10 +39,9 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
-  DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -63,21 +53,41 @@ import {
 } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 import { MainNav } from './main-nav';
-import { useUser, useAuth, useFirestore, useDoc } from '@/firebase';
+import { NotificationBell } from './notification-bell';
+import { useAppContext } from '@/contexts/app-context';
+import { useAuth, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
-import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
-import { NotificationBell } from './notification-bell';
+
+function resolveCallableErrorMessage(error: any): string {
+  const detailMessage =
+    typeof error?.details === 'string'
+      ? error.details
+      : typeof error?.details?.userMessage === 'string'
+        ? error.details.userMessage
+        : typeof error?.details?.message === 'string'
+          ? error.details.message
+          : '';
+
+  const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
+  if (detailMessage) return detailMessage;
+  if (rawMessage && !/(functions\/internal|internal)$/i.test(rawMessage)) return rawMessage;
+
+  return '서버 통신 중 오류가 발생했습니다.';
+}
 
 export function DashboardHeader() {
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const router = useRouter();
   const { toast } = useToast();
   const { activeMembership, viewMode, setViewMode } = useAppContext();
@@ -87,24 +97,28 @@ export function DashboardHeader() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // 설정 폼 상태
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
+  const [parentLinkCode, setParentLinkCode] = useState('');
 
-  const userRef = (firestore && user) ? doc(firestore, 'users', user.uid) : null;
+  const userRef = firestore && user ? doc(firestore, 'users', user.uid) : null;
   const { data: userProfile } = useDoc<UserType>(userRef as any);
 
-  const studentRef = (firestore && activeMembership && user) 
-    ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
-    : null;
+  const studentRef =
+    firestore && activeMembership && user
+      ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
+      : null;
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
 
   useEffect(() => {
     if (studentProfile) {
       setSchoolName(studentProfile.schoolName || '');
       setGrade(studentProfile.grade || '');
+      setParentLinkCode(studentProfile.parentLinkCode || '');
     } else if (userProfile) {
       setSchoolName(userProfile.schoolName || '');
+      setGrade('');
+      setParentLinkCode('');
     }
   }, [studentProfile, userProfile]);
 
@@ -116,29 +130,57 @@ export function DashboardHeader() {
 
   const handleUpdateSettings = async () => {
     if (!firestore || !user || !activeMembership) return;
+
+    const normalizedSchoolName = schoolName.trim();
+    const normalizedGrade = grade.trim();
+    const normalizedParentLinkCode = parentLinkCode.trim();
+
+    if (activeMembership.role === 'student' && !/^\d{6}$/.test(normalizedParentLinkCode)) {
+      toast({
+        variant: 'destructive',
+        title: '입력 확인',
+        description: '학부모 연동 코드는 6자리 숫자로 입력해 주세요.',
+      });
+      return;
+    }
+
     setIsUpdating(true);
     try {
-      const batch = writeBatch(firestore);
-      const commonUpdate = {
-        schoolName: schoolName.trim(),
-        updatedAt: serverTimestamp()
-      };
-      const uRef = doc(firestore, 'users', user.uid);
-      batch.set(uRef, commonUpdate, { merge: true });
       if (activeMembership.role === 'student') {
-        const sRef = doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-        batch.set(sRef, {
-          ...commonUpdate,
-          grade: grade,
-          name: user.displayName || '학생'
-        }, { merge: true });
+        if (!functions) {
+          throw new Error('함수 연결이 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+        }
+
+        const updateFn = httpsCallable(functions, 'updateStudentAccount');
+        await updateFn({
+          studentId: user.uid,
+          centerId: activeMembership.id,
+          schoolName: normalizedSchoolName,
+          grade: normalizedGrade,
+          parentLinkCode: normalizedParentLinkCode,
+        });
+      } else {
+        const batch = writeBatch(firestore);
+        batch.set(
+          doc(firestore, 'users', user.uid),
+          {
+            schoolName: normalizedSchoolName,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+        await batch.commit();
       }
-      await batch.commit();
-      toast({ title: "정보가 성공적으로 업데이트되었습니다." });
+
+      toast({ title: '정보가 성공적으로 업데이트되었습니다.' });
       setIsSettingsOpen(false);
-    } catch (e: any) {
-      console.error("Settings Update Error:", e);
-      toast({ variant: "destructive", title: "업데이트 실패", description: e.message || "서버 통신 중 오류가 발생했습니다." });
+    } catch (error: any) {
+      console.error('Settings Update Error:', error);
+      toast({
+        variant: 'destructive',
+        title: '업데이트 실패',
+        description: resolveCallableErrorMessage(error),
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -182,11 +224,14 @@ export function DashboardHeader() {
       </Breadcrumb>
 
       <div className="relative ml-auto flex items-center gap-2">
-        {/* 앱 모드 토글 버튼 ( Smartphone / Monitor ) */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={cn('rounded-full text-muted-foreground hover:bg-primary/5 transition-all', isMobileView && 'bg-[#14295F] text-white shadow-[0_8px_18px_rgba(20,41,95,0.28)] hover:bg-[#10214a] hover:text-white')}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            'rounded-full text-muted-foreground hover:bg-primary/5 transition-all',
+            isMobileView &&
+              'bg-[#14295F] text-white shadow-[0_8px_18px_rgba(20,41,95,0.28)] hover:bg-[#10214a] hover:text-white'
+          )}
           onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
           title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
         >
@@ -200,30 +245,43 @@ export function DashboardHeader() {
             <Button
               variant="outline"
               size="icon"
-              className={cn('overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button', isMobileView && 'border-[#14295F]/20 bg-white')}
+              className={cn(
+                'overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button',
+                isMobileView && 'border-[#14295F]/20 bg-white'
+              )}
             >
               <Avatar className="h-full w-full">
                 {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
-                <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">
+                  {user?.displayName?.charAt(0) || 'U'}
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            align="end" 
+          <DropdownMenuContent
+            align="end"
             className="rounded-2xl border-none shadow-2xl min-w-[200px] p-2 animate-in fade-in zoom-in duration-200"
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
-            <DropdownMenuLabel className="font-black px-3 py-2 text-xs uppercase tracking-widest opacity-60">내 계정 관리</DropdownMenuLabel>
+            <DropdownMenuLabel className="font-black px-3 py-2 text-xs uppercase tracking-widest opacity-60">
+              내 계정 관리
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="font-bold rounded-xl cursor-pointer py-2.5" 
-              onSelect={(e) => { e.preventDefault(); setIsSettingsOpen(true); }}
+            <DropdownMenuItem
+              className="font-bold rounded-xl cursor-pointer py-2.5"
+              onSelect={(e) => {
+                e.preventDefault();
+                setIsSettingsOpen(true);
+              }}
             >
               <Settings className="mr-2 h-4 w-4 opacity-40" /> 설정
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="font-bold rounded-xl cursor-pointer py-2.5" 
-              onSelect={(e) => { e.preventDefault(); setIsSupportOpen(true); }}
+            <DropdownMenuItem
+              className="font-bold rounded-xl cursor-pointer py-2.5"
+              onSelect={(e) => {
+                e.preventDefault();
+                setIsSupportOpen(true);
+              }}
             >
               <HelpCircle className="mr-2 h-4 w-4 opacity-40" /> 지원 및 메뉴얼
             </DropdownMenuItem>
@@ -243,33 +301,58 @@ export function DashboardHeader() {
             <DialogTitle className="font-black tracking-tighter text-xl sm:text-2xl">프로필 설정</DialogTitle>
             <DialogDescription className="text-white/60 font-bold mt-1 text-xs">정보를 수정할 수 있습니다.</DialogDescription>
           </div>
+
           <div className="space-y-6 bg-white p-6 sm:p-8">
             <div className="grid gap-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label>
               <div className="relative">
                 <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/30" />
-                <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 pl-10 rounded-xl border-2 font-bold" placeholder="학교명을 입력하세요" />
+                <Input
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  className="h-12 pl-10 rounded-xl border-2 font-bold"
+                  placeholder="학교명을 입력하세요"
+                />
               </div>
             </div>
+
             {activeMembership?.role === 'student' && (
-              <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">현재 학년</Label>
-                <Select value={grade} onValueChange={setGrade}>
-                  <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
-                    <SelectValue placeholder="학년 선택" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-none shadow-2xl">
-                    <SelectItem value="1학년">1학년</SelectItem>
-                    <SelectItem value="2학년">2학년</SelectItem>
-                    <SelectItem value="3학년">3학년</SelectItem>
-                    <SelectItem value="N수생">N수생</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <>
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">현재 학년</Label>
+                  <Select value={grade} onValueChange={setGrade}>
+                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                      <SelectValue placeholder="학년 선택" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      <SelectItem value="1학년">1학년</SelectItem>
+                      <SelectItem value="2학년">2학년</SelectItem>
+                      <SelectItem value="3학년">3학년</SelectItem>
+                      <SelectItem value="N수생">N수생</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학부모 연동 코드 (6자리)</Label>
+                  <Input
+                    value={parentLinkCode}
+                    onChange={(e) => setParentLinkCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                    className="h-12 rounded-xl border-2 font-black tracking-[0.25em] text-center"
+                    placeholder="123456"
+                    maxLength={6}
+                  />
+                </div>
+              </>
             )}
           </div>
+
           <DialogFooter className="bg-muted/20 border-t p-6 sm:p-8">
-            <Button onClick={handleUpdateSettings} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">
+            <Button
+              onClick={handleUpdateSettings}
+              disabled={isUpdating}
+              className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all"
+            >
               {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '저장'}
             </Button>
           </DialogFooter>
@@ -285,6 +368,7 @@ export function DashboardHeader() {
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">앱 사용 메뉴얼입니다.</DialogDescription>
           </div>
+
           <div className="flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar p-6 sm:p-8">
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
@@ -296,6 +380,7 @@ export function DashboardHeader() {
                 </p>
               </div>
             </section>
+
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
                 <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 계획 및 루틴
@@ -306,6 +391,7 @@ export function DashboardHeader() {
                 </p>
               </div>
             </section>
+
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
                 <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 상담 및 피드백
@@ -317,8 +403,11 @@ export function DashboardHeader() {
               </div>
             </section>
           </div>
+
           <div className="bg-white border-t shrink-0 flex justify-end p-4 sm:p-6">
-            <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">닫기</Button>
+            <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">
+              닫기
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

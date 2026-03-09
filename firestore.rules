@@ -106,7 +106,8 @@ service cloud.firestore {
       match /members/{memberId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == memberId)
-          || (isActiveMember(centerId) && resource.data.role in ['teacher', 'centerAdmin', 'owner']);
+          || (isActiveMember(centerId) && resource.data.role in ['teacher', 'centerAdmin', 'owner'])
+          || (isStudent(centerId) && resource.data.role == 'student' && resource.data.status == 'active');
         allow write: if isCenterAdmin(centerId);
       }
 

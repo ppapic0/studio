@@ -7,7 +7,7 @@ import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { useUser, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { Loader2, RefreshCw, Compass, Sparkles, Link2 } from 'lucide-react';
+import { Loader2, RefreshCw, Compass, Sparkles, Link2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -34,7 +34,54 @@ const inviteFormSchema = z.object({
 
 const parentLinkFormSchema = z.object({
   studentLinkCode: z.string().trim().regex(/^\d{6}$/, '학생 코드(6자리 숫자)를 입력해 주세요.'),
+  parentPhoneNumber: z.string().trim().optional(),
 });
+
+function normalizePhone(raw: string): string {
+  return raw.replace(/\D/g, '');
+}
+
+function isValidKoreanMobilePhone(raw: string): boolean {
+  return /^01\d{8,9}$/.test(raw);
+}
+
+function resolveCallableErrorMessage(error: any, fallback: string): string {
+  const detailMessage =
+    typeof error?.details === 'string'
+      ? error.details
+      : typeof error?.details?.userMessage === 'string'
+        ? error.details.userMessage
+        : typeof error?.details?.message === 'string'
+          ? error.details.message
+          : '';
+
+  const rawMessage = String(error?.message || '').trim();
+  const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
+  const normalizedRaw = strippedRaw
+    .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, '')
+    .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, '')
+    .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, '')
+    .replace(/^\d+\s+INTERNAL:\s*/i, '')
+    .trim();
+
+  const code = String(error?.code || '').toLowerCase();
+  const isInternal = code.includes('internal') || /\b(functions\/internal|internal)\b/i.test(normalizedRaw);
+
+  if (detailMessage) return detailMessage;
+  if (!isInternal && normalizedRaw) return normalizedRaw;
+
+  if (code.includes('failed-precondition')) {
+    return '가입 조건을 만족하지 못했습니다. 입력한 코드를 다시 확인해 주세요.';
+  }
+  if (code.includes('invalid-argument')) {
+    return '입력값이 올바르지 않습니다. 필수 항목을 다시 확인해 주세요.';
+  }
+  if (code.includes('already-exists')) {
+    return '이미 연결된 계정입니다. 잠시 후 다시 확인해 주세요.';
+  }
+
+  return fallback;
+}
 
 export default function DashboardPage() {
   const { user } = useUser();
@@ -52,7 +99,7 @@ export default function DashboardPage() {
 
   const parentLinkForm = useForm<z.infer<typeof parentLinkFormSchema>>({
     resolver: zodResolver(parentLinkFormSchema),
-    defaultValues: { studentLinkCode: '' },
+    defaultValues: { studentLinkCode: '', parentPhoneNumber: '' },
   });
 
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
@@ -68,10 +115,11 @@ export default function DashboardPage() {
         setTimeout(() => window.location.reload(), 250);
       }
     } catch (error: any) {
+      const message = resolveCallableErrorMessage(error, '초대 코드 가입 중 오류가 발생했습니다.');
       toast({
         variant: 'destructive',
         title: '가입 실패',
-        description: error?.message || '초대 코드 가입 중 오류가 발생했습니다.',
+        description: message,
       });
     } finally {
       setIsInviteSubmitting(false);
@@ -81,12 +129,21 @@ export default function DashboardPage() {
   async function onParentLinkSubmit(values: z.infer<typeof parentLinkFormSchema>) {
     if (!user || !functions) return;
 
+    const normalizedPhone = normalizePhone(values.parentPhoneNumber || '');
+    if (normalizedPhone && !isValidKoreanMobilePhone(normalizedPhone)) {
+      parentLinkForm.setError('parentPhoneNumber', {
+        message: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
+      });
+      return;
+    }
+
     setIsParentLinkSubmitting(true);
     try {
       const completeSignupFn = httpsCallable(functions, 'completeSignupWithInvite');
       const result: any = await completeSignupFn({
         role: 'parent',
         studentLinkCode: values.studentLinkCode.trim(),
+        parentPhoneNumber: normalizedPhone || null,
       });
 
       if (result.data?.ok) {
@@ -94,10 +151,12 @@ export default function DashboardPage() {
         setTimeout(() => window.location.reload(), 250);
       }
     } catch (error: any) {
+      const message = resolveCallableErrorMessage(error, '학생 코드 연동 중 오류가 발생했습니다.');
+      parentLinkForm.setError('studentLinkCode', { message });
       toast({
         variant: 'destructive',
         title: '연동 실패',
-        description: error?.message || '학생 코드 연동 중 오류가 발생했습니다.',
+        description: message,
       });
     } finally {
       setIsParentLinkSubmitting(false);
@@ -260,6 +319,34 @@ export default function DashboardPage() {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={parentLinkForm.control}
+                  name="parentPhoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
+                        학부모 전화번호 (선택)
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/40" />
+                          <Input
+                            placeholder="01012345678"
+                            maxLength={11}
+                            {...field}
+                            className="h-14 rounded-xl border-2 pl-11 text-base font-black"
+                          />
+                        </div>
+                      </FormControl>
+                      <p className="text-[10px] font-bold text-muted-foreground">
+                        최초 연동 계정이면 필수이며, 기존 연동 계정은 비워도 됩니다.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <DialogFooter>
                   <Button type="submit" disabled={isParentLinkSubmitting} className="h-14 w-full rounded-2xl text-lg font-black shadow-lg">
                     {isParentLinkSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '학생과 연동하기'}

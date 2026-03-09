@@ -350,32 +350,87 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     if (!studentId || !centerId)
         throw new functions.https.HttpsError("invalid-argument", "ID 누락");
-    const callerMemberSnap = await db.doc("centers/" + centerId + "/members/" + context.auth.uid).get();
-    if (!callerMemberSnap.exists || !isAdminRole((_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role)) {
-        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수정 가능합니다.");
+    const callerUid = context.auth.uid;
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerUid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    const isAdminCaller = isAdminRole(callerRole);
+    const isSelfStudentCaller = callerRole === "student" && callerUid === studentId;
+    if (!isAdminCaller && !isSelfStudentCaller) {
+        throw new functions.https.HttpsError("permission-denied", "수정 권한이 없습니다.");
+    }
+    const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
+    const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
+    const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
+    const hasClassName = className !== undefined;
+    const normalizedClassName = hasClassName
+        ? (typeof className === "string" && className.trim() ? className.trim() : null)
+        : undefined;
+    const parentLinkCodeProvided = parentLinkCode !== undefined;
+    const normalizedParentLinkCode = typeof parentLinkCode === "string"
+        ? parentLinkCode.trim()
+        : parentLinkCode === null
+            ? ""
+            : undefined;
+    if (parentLinkCodeProvided) {
+        if (typeof normalizedParentLinkCode !== "string") {
+            throw new functions.https.HttpsError("invalid-argument", "Parent link code type is invalid.");
+        }
+        if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
+            throw new functions.https.HttpsError("invalid-argument", "Parent link code must be 6 digits.", {
+                userMessage: "학부모 연동 코드는 6자리 숫자여야 합니다.",
+            });
+        }
+        if (normalizedParentLinkCode) {
+            const duplicateSnap = await db
+                .collectionGroup("students")
+                .where("parentLinkCode", "==", normalizedParentLinkCode)
+                .limit(2)
+                .get();
+            const hasConflict = duplicateSnap.docs.some((docSnap) => docSnap.id !== studentId);
+            if (hasConflict) {
+                throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
+                    userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
+                });
+            }
+        }
+    }
+    if (isSelfStudentCaller) {
+        const hasForbiddenUpdate = (typeof password === "string" && password.trim().length > 0) ||
+            trimmedDisplayName.length > 0 ||
+            hasClassName ||
+            seasonLp !== undefined ||
+            stats !== undefined ||
+            todayStudyMinutes !== undefined ||
+            dateKey !== undefined;
+        if (hasForbiddenUpdate) {
+            throw new functions.https.HttpsError("permission-denied", "학생 계정은 일부 항목만 수정할 수 있습니다.", {
+                userMessage: "학생은 학교/학년/학부모 연동 코드만 수정할 수 있습니다.",
+            });
+        }
+        if (!trimmedSchoolName && !trimmedGrade && !parentLinkCodeProvided) {
+            throw new functions.https.HttpsError("invalid-argument", "No editable field provided.", {
+                userMessage: "수정할 항목을 입력해 주세요.",
+            });
+        }
     }
     try {
-        const authUpdates = {};
-        if (typeof password === "string" && password.trim().length >= 6)
-            authUpdates.password = password.trim();
-        if (typeof displayName === "string" && displayName.trim())
-            authUpdates.displayName = displayName.trim();
-        if (Object.keys(authUpdates).length > 0) {
-            try {
-                await auth.updateUser(studentId, authUpdates);
-            }
-            catch (authError) {
-                console.warn("Auth update skipped for " + studentId + ": " + authError.message);
+        if (isAdminCaller) {
+            const authUpdates = {};
+            if (typeof password === "string" && password.trim().length >= 6)
+                authUpdates.password = password.trim();
+            if (trimmedDisplayName)
+                authUpdates.displayName = trimmedDisplayName;
+            if (Object.keys(authUpdates).length > 0) {
+                try {
+                    await auth.updateUser(studentId, authUpdates);
+                }
+                catch (authError) {
+                    console.warn("Auth update skipped for " + studentId + ": " + authError.message);
+                }
             }
         }
         const timestamp = admin.firestore.Timestamp.now();
         const batch = db.batch();
-        const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
-        const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
-        const hasClassName = className !== undefined;
-        const normalizedClassName = hasClassName
-            ? (typeof className === "string" && className.trim() ? className.trim() : null)
-            : undefined;
         if (trimmedDisplayName || trimmedSchoolName) {
             const userUpdate = { updatedAt: timestamp };
             if (trimmedDisplayName)
@@ -389,63 +444,67 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             studentUpdate.name = trimmedDisplayName;
         if (trimmedSchoolName)
             studentUpdate.schoolName = trimmedSchoolName;
-        if (grade)
-            studentUpdate.grade = grade;
-        if (parentLinkCode !== undefined)
-            studentUpdate.parentLinkCode = parentLinkCode;
-        if (hasClassName)
+        if (trimmedGrade)
+            studentUpdate.grade = trimmedGrade;
+        if (parentLinkCodeProvided)
+            studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
+        if (isAdminCaller && hasClassName)
             studentUpdate.className = normalizedClassName;
         batch.set(db.doc("centers/" + centerId + "/students/" + studentId), studentUpdate, { merge: true });
-        const memberUpdate = { updatedAt: timestamp };
-        if (trimmedDisplayName)
-            memberUpdate.displayName = trimmedDisplayName;
-        if (hasClassName)
-            memberUpdate.className = normalizedClassName;
-        batch.set(db.doc("centers/" + centerId + "/members/" + studentId), memberUpdate, { merge: true });
-        if (hasClassName) {
-            batch.set(db.doc("userCenters/" + studentId + "/centers/" + centerId), {
-                className: normalizedClassName,
-                updatedAt: timestamp,
-            }, { merge: true });
-        }
-        const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
-        const hasStats = !!stats && typeof stats === "object";
-        if (hasSeasonLp || hasStats) {
-            const progressUpdate = { updatedAt: timestamp };
-            if (hasSeasonLp)
-                progressUpdate.seasonLp = seasonLp;
-            if (hasStats)
-                progressUpdate.stats = stats;
-            batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
-        }
-        const safeDateKey = (typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey))
-            ? dateKey
-            : new Date().toISOString().slice(0, 10);
-        if (typeof todayStudyMinutes === "number" && Number.isFinite(todayStudyMinutes)) {
-            batch.set(db.doc("centers/" + centerId + "/dailyStudentStats/" + safeDateKey + "/students/" + studentId), {
-                totalStudyMinutes: todayStudyMinutes,
-                studentId,
-                centerId,
-                dateKey: safeDateKey,
-                updatedAt: timestamp,
-            }, { merge: true });
-        }
-        if (hasSeasonLp || trimmedDisplayName || hasClassName) {
-            const periodKey = safeDateKey.slice(0, 7);
-            const rankUpdate = {
-                studentId,
-                updatedAt: timestamp,
-            };
-            if (hasSeasonLp)
-                rankUpdate.value = seasonLp;
+        if (isAdminCaller) {
+            const memberUpdate = { updatedAt: timestamp };
             if (trimmedDisplayName)
-                rankUpdate.displayNameSnapshot = trimmedDisplayName;
+                memberUpdate.displayName = trimmedDisplayName;
             if (hasClassName)
-                rankUpdate.classNameSnapshot = normalizedClassName;
-            batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, { merge: true });
+                memberUpdate.className = normalizedClassName;
+            batch.set(db.doc("centers/" + centerId + "/members/" + studentId), memberUpdate, { merge: true });
+            if (hasClassName) {
+                batch.set(db.doc("userCenters/" + studentId + "/centers/" + centerId), {
+                    className: normalizedClassName,
+                    updatedAt: timestamp,
+                }, { merge: true });
+            }
+            const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
+            const hasStats = !!stats && typeof stats === "object";
+            if (hasSeasonLp || hasStats) {
+                const progressUpdate = { updatedAt: timestamp };
+                if (hasSeasonLp)
+                    progressUpdate.seasonLp = seasonLp;
+                if (hasStats)
+                    progressUpdate.stats = stats;
+                batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
+            }
+            const safeDateKey = typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+                ? dateKey
+                : new Date().toISOString().slice(0, 10);
+            if (typeof todayStudyMinutes === "number" && Number.isFinite(todayStudyMinutes)) {
+                batch.set(db.doc("centers/" + centerId + "/dailyStudentStats/" + safeDateKey + "/students/" + studentId), {
+                    totalStudyMinutes: todayStudyMinutes,
+                    studentId,
+                    centerId,
+                    dateKey: safeDateKey,
+                    updatedAt: timestamp,
+                }, { merge: true });
+            }
+            if (hasSeasonLp || trimmedDisplayName || hasClassName) {
+                const periodKey = safeDateKey.slice(0, 7);
+                const rankUpdate = {
+                    studentId,
+                    updatedAt: timestamp,
+                };
+                if (hasSeasonLp)
+                    rankUpdate.value = seasonLp;
+                if (trimmedDisplayName)
+                    rankUpdate.displayNameSnapshot = trimmedDisplayName;
+                if (hasClassName)
+                    rankUpdate.classNameSnapshot = normalizedClassName;
+                batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, {
+                    merge: true,
+                });
+            }
         }
         await batch.commit();
-        return { ok: true };
+        return { ok: true, updatedBy: isSelfStudentCaller ? "student" : "admin" };
     }
     catch (e) {
         if (e instanceof functions.https.HttpsError) {
@@ -634,14 +693,20 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             }
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
             const existingMembership = await t.get(userCenterRef);
-            if (existingMembership.exists) {
+            const existingMembershipData = existingMembership.exists ? existingMembership.data() : null;
+            const isParentRelink = role === "parent" && existingMembership.exists && (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.role) === "parent";
+            if (existingMembership.exists && !isParentRelink) {
                 throw new functions.https.HttpsError("already-exists", "Already joined this center.", {
                     userMessage: "이미 가입된 센터입니다.",
                 });
             }
             const ts = admin.firestore.Timestamp.now();
             let resolvedDisplayName = displayNameInput || tokenDisplayName || "사용자";
+            const existingLinkedStudentIds = Array.isArray(existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.linkedStudentIds)
+                ? existingMembershipData.linkedStudentIds.filter((id) => typeof id === "string" && id.trim().length > 0)
+                : [];
             let linkedStudentIds = [];
+            let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber((existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.phoneNumber) || "");
             if (role === "student") {
                 if (!schoolName) {
                     throw new functions.https.HttpsError("invalid-argument", "School name is required for student signup.", {
@@ -660,14 +725,15 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         userMessage: "연동할 학생 정보를 찾지 못했습니다. 다시 시도해주세요.",
                     });
                 }
-                if (!parentPhoneNumber) {
+                if (!effectiveParentPhone) {
                     throw new functions.https.HttpsError("invalid-argument", "Parent phone number is required.", {
-                        userMessage: "학부모 가입 시 휴대폰 번호를 입력해주세요.",
+                        userMessage: "학부모 가입/연동 시 휴대폰 번호를 입력해주세요.",
                     });
                 }
-                linkedStudentIds = [linkedStudentId];
+                linkedStudentIds = Array.from(new Set([...existingLinkedStudentIds, linkedStudentId]));
                 if (!displayNameInput) {
-                    resolvedDisplayName = `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
+                    resolvedDisplayName =
+                        (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.displayName) || `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
                 }
                 t.set(linkedStudentRef, {
                     parentUids: admin.firestore.FieldValue.arrayUnion(uid),
@@ -682,21 +748,21 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 updatedAt: ts,
                 createdAt: ts,
             };
-            if (role === "parent" && parentPhoneNumber) {
-                userDocData.phoneNumber = parentPhoneNumber;
+            if (role === "parent" && effectiveParentPhone) {
+                userDocData.phoneNumber = effectiveParentPhone;
             }
             t.set(db.doc(`users/${uid}`), userDocData, { merge: true });
             const memberData = {
                 id: uid,
                 centerId,
                 role,
-                status: "active",
-                joinedAt: ts,
+                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || "active",
+                joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || ts,
                 displayName: resolvedDisplayName,
-                className: targetClassName,
+                className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || null,
             };
-            if (role === "parent" && parentPhoneNumber) {
-                memberData.phoneNumber = parentPhoneNumber;
+            if (role === "parent" && effectiveParentPhone) {
+                memberData.phoneNumber = effectiveParentPhone;
             }
             if (linkedStudentIds.length > 0) {
                 memberData.linkedStudentIds = linkedStudentIds;
@@ -705,12 +771,12 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 id: centerId,
                 centerId,
                 role,
-                status: "active",
-                joinedAt: ts,
-                className: targetClassName,
+                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || "active",
+                joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || ts,
+                className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || null,
             };
-            if (role === "parent" && parentPhoneNumber) {
-                userCenterData.phoneNumber = parentPhoneNumber;
+            if (role === "parent" && effectiveParentPhone) {
+                userCenterData.phoneNumber = effectiveParentPhone;
             }
             if (linkedStudentIds.length > 0) {
                 userCenterData.linkedStudentIds = linkedStudentIds;

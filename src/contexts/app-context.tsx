@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -30,8 +30,7 @@ interface AppContextType {
   memberships: CenterMembership[];
   activeMembership: CenterMembership | null;
   membershipsLoading: boolean;
-  
-  // Timer Global State
+
   isTimerActive: boolean;
   setIsTimerActive: (active: boolean) => void;
   startTime: number | null;
@@ -39,11 +38,9 @@ interface AppContextType {
   lastActiveCheckTime: number | null;
   setLastActiveCheckTime: (time: number | null) => void;
 
-  // View Mode (App Mode Toggle)
   viewMode: 'mobile' | 'desktop';
   setViewMode: (mode: 'mobile' | 'desktop') => void;
 
-  // Global Tier State
   currentTier: typeof TIERS[0];
 }
 
@@ -55,16 +52,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
-  
-  // Timer States
+
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastActiveCheckTime, setLastActiveCheckTime] = useState<number | null>(null);
 
-  // View Mode State
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('desktop');
-
-  // Tier State (Default to Bronze)
   const [currentTier, setCurrentTier] = useState(TIERS[0]);
 
   const activeMembershipRef = useRef<string | null>(null);
@@ -86,37 +79,95 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     setMembershipsLoading(true);
-    const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    
-    const unsubscribe = onSnapshot(userCentersRef, (snapshot) => {
-      const fetched = snapshot.docs.map((docSnap) => {
-        const raw = docSnap.data() as any;
-        return {
-          id: docSnap.id,
-          ...raw,
-          role: normalizeRole(raw.role),
-        } as CenterMembership;
+
+    let userCenterMemberships: CenterMembership[] = [];
+    let memberFallbackMemberships: CenterMembership[] = [];
+
+    const applyMembershipState = () => {
+      const map = new Map<string, CenterMembership>();
+
+      userCenterMemberships.forEach((membership) => {
+        map.set(membership.id, membership);
       });
 
-      setMemberships(fetched);
-      const active = fetched.find(m => m.status === 'active') || fetched[0] || null;
-      
+      memberFallbackMemberships.forEach((membership) => {
+        if (!map.has(membership.id)) {
+          map.set(membership.id, membership);
+        }
+      });
+
+      const mergedMemberships = Array.from(map.values());
+      setMemberships(mergedMemberships);
+
+      const active = mergedMemberships.find((m) => m.status === 'active') || mergedMemberships[0] || null;
       const activeKey = active ? `${active.id}_${active.status}_${active.role}` : 'null';
+
       if (activeMembershipRef.current !== activeKey) {
         setActiveMembership(active);
         activeMembershipRef.current = activeKey;
       }
-      
-      setMembershipsLoading(false);
-    }, (error) => {
-      console.error("Membership sync error:", error);
-      setMembershipsLoading(false);
-    });
 
-    return () => unsubscribe();
+      setMembershipsLoading(false);
+    };
+
+    const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
+    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+
+    const unsubscribeUserCenters = onSnapshot(
+      userCentersRef,
+      (snapshot) => {
+        userCenterMemberships = snapshot.docs.map((docSnap) => {
+          const raw = docSnap.data() as any;
+          return {
+            id: docSnap.id,
+            ...raw,
+            role: normalizeRole(raw.role),
+          } as CenterMembership;
+        });
+
+        applyMembershipState();
+      },
+      (error) => {
+        console.error('Membership sync error:', error);
+        setMembershipsLoading(false);
+      }
+    );
+
+    const unsubscribeFallback = onSnapshot(
+      fallbackMembersQuery,
+      (snapshot) => {
+        memberFallbackMemberships = snapshot.docs
+          .map((docSnap) => {
+            const raw = docSnap.data() as any;
+            const centerId = docSnap.ref.parent.parent?.id;
+            if (!centerId) return null;
+
+            return {
+              id: centerId,
+              role: normalizeRole(raw.role),
+              status: raw.status || 'active',
+              joinedAt: raw.joinedAt,
+              displayName: raw.displayName,
+              linkedStudentIds: raw.linkedStudentIds,
+              className: raw.className,
+            } as CenterMembership;
+          })
+          .filter((membership): membership is CenterMembership => !!membership);
+
+        applyMembershipState();
+      },
+      (error) => {
+        console.warn('Membership fallback sync warning:', error);
+        setMembershipsLoading(false);
+      }
+    );
+
+    return () => {
+      unsubscribeUserCenters();
+      unsubscribeFallback();
+    };
   }, [user, firestore]);
 
-  // 실시간 타이머 세션 동기화 (학생인 경우에만)
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
       setIsTimerActive(false);
@@ -130,7 +181,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       where('studentId', '==', user.uid)
     );
 
-    // 실시간 좌석 상태를 감시하여 타이머 동기화
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
         setIsTimerActive(false);
@@ -151,7 +201,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [user, firestore, activeMembership]);
 
-  // 실시간 티어 동기화 (학생인 경우에만)
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
       setCurrentTier(TIERS[0]);
@@ -168,13 +217,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const updateTierState = () => {
       if (latestLp >= 25000) {
-        if (latestRank === 1) setCurrentTier(TIERS.find(t => t.name === '챌린저')!);
-        else if (latestRank === 2 || latestRank === 3) setCurrentTier(TIERS.find(t => t.name === '그랜드마스터')!);
-        else setCurrentTier(TIERS.find(t => t.name === '마스터')!);
+        if (latestRank === 1) setCurrentTier(TIERS.find((t) => t.name === '챌린저')!);
+        else if (latestRank === 2 || latestRank === 3) setCurrentTier(TIERS.find((t) => t.name === '그랜드마스터')!);
+        else setCurrentTier(TIERS.find((t) => t.name === '마스터')!);
       } else {
-        // 하위 티어 판정 (순서대로 뒤집어서 찾기)
         const lowerTiers = TIERS.slice(0, 5);
-        const found = [...lowerTiers].reverse().find(t => latestLp >= t.min) || TIERS[0];
+        const found = [...lowerTiers].reverse().find((t) => latestLp >= t.min) || TIERS[0];
         setCurrentTier(found);
       }
     };
@@ -199,35 +247,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [user, firestore, activeMembership]);
 
-  const contextValue = useMemo(() => ({
-    memberships,
-    activeMembership,
-    membershipsLoading,
-    isTimerActive,
-    setIsTimerActive,
-    startTime,
-    setStartTime,
-    lastActiveCheckTime,
-    setLastActiveCheckTime,
-    viewMode,
-    setViewMode,
-    currentTier
-  }), [
-    memberships, 
-    activeMembership, 
-    membershipsLoading, 
-    isTimerActive, 
-    startTime, 
-    lastActiveCheckTime,
-    viewMode,
-    currentTier
-  ]);
-
-  return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      memberships,
+      activeMembership,
+      membershipsLoading,
+      isTimerActive,
+      setIsTimerActive,
+      startTime,
+      setStartTime,
+      lastActiveCheckTime,
+      setLastActiveCheckTime,
+      viewMode,
+      setViewMode,
+      currentTier,
+    }),
+    [
+      memberships,
+      activeMembership,
+      membershipsLoading,
+      isTimerActive,
+      startTime,
+      lastActiveCheckTime,
+      viewMode,
+      currentTier,
+    ]
   );
+
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }
 
 export function useAppContext() {
