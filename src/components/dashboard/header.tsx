@@ -1,17 +1,30 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
+  Bell,
+  Home,
+  LineChart,
+  Package2,
+  Users,
   PanelLeft,
+  Search,
   LogOut,
   Smartphone,
   Monitor,
   Settings,
   HelpCircle,
   BookOpen,
-  Sparkles,
-  Loader2
+  Zap,
+  CalendarDays,
+  MessageCircle,
+  CheckCircle2,
+  School,
+  GraduationCap,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 import {
@@ -56,12 +69,11 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
-import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
 import { NotificationBell } from './notification-bell';
 import { TrackLogo } from '../ui/track-logo';
-import { Badge } from '../ui/badge';
 
 export function DashboardHeader() {
   const { user } = useUser();
@@ -70,12 +82,11 @@ export function DashboardHeader() {
   const router = useRouter();
   const { toast } = useToast();
   const { activeMembership, viewMode, setViewMode } = useAppContext();
+  const isMobileView = viewMode === 'mobile';
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-
-  const isMobileView = viewMode === 'mobile';
 
   // 설정 폼 상태
   const [schoolName, setSchoolName] = useState('');
@@ -135,79 +146,76 @@ export function DashboardHeader() {
   };
 
   return (
-    <header className={cn(
-      "sticky top-0 z-30 flex items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 transition-all duration-300",
-      isMobileView ? "h-14" : "h-14 md:h-16 md:px-6 md:bg-transparent md:border-0"
-    )}>
+    <header
+      className={cn(
+        'sticky top-0 z-30 flex h-14 items-center gap-4 px-4 md:static md:h-auto md:px-6',
+        isMobileView
+          ? 'border-b border-[#ffd9b7] bg-[linear-gradient(180deg,#fff2e6_0%,#ffffff_82%)] shadow-[0_8px_22px_rgba(20,41,95,0.14)] backdrop-blur-sm'
+          : 'border-b bg-background/80 backdrop-blur-sm md:border-0 md:bg-transparent'
+      )}
+    >
       <div className="flex items-center gap-2">
         <Sheet>
           <SheetTrigger asChild>
-            <button className={cn("p-1 text-primary/60 hover:text-primary transition-all md:hidden")}>
-              <PanelLeft className={cn(isMobileView ? "h-5 w-5" : "h-6 w-6")} />
-            </button>
+            <Button size="icon" variant="outline" className="md:hidden rounded-full border-[#1a336d]/20 bg-white/80 shadow-sm">
+              <PanelLeft className="h-5 w-5" />
+              <span className="sr-only">메뉴 열기</span>
+            </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="sm:max-w-xs p-0">
+          <SheetContent side="left" className="sm:max-w-xs">
             <MainNav isMobile={true} />
           </SheetContent>
         </Sheet>
-
         {isMobileView && (
-          <Link href="/dashboard" className="flex items-center gap-2 group active:scale-95 transition-all">
-            <TrackLogo className="h-7 w-auto" />
-            <div className="flex flex-col -gap-1">
-              <span className="text-sm font-black tracking-tighter text-primary leading-none uppercase">Track</span>
-              <span className="text-[10px] font-bold text-muted-foreground leading-none">학습센터</span>
-            </div>
-            {activeMembership?.role === 'parent' && (
-              <Badge className="bg-primary text-white border-none font-black text-[8px] h-4 px-1.5 uppercase tracking-tighter shadow-sm ml-1">PARENT</Badge>
-            )}
+          <Link
+            href="/dashboard"
+            className="md:hidden inline-flex items-center rounded-full border border-[#ffd8b4] bg-white/90 px-2 py-1 shadow-[0_8px_18px_rgba(20,41,95,0.14)]"
+          >
+            <TrackLogo className="h-7" />
           </Link>
         )}
       </div>
 
-      {!isMobileView && (
-        <Breadcrumb className="hidden md:flex">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">대시보드</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>메인 화면</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      )}
+      <Breadcrumb className="hidden md:flex">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">대시보드</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-      <div className="relative ml-auto flex items-center gap-2 sm:gap-4">
-        {/* 웹 모드 전환 버튼 복구 */}
+      <div className="relative ml-auto flex items-center gap-2">
+        {/* 앱 모드 토글 버튼 ( Smartphone / Monitor ) */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="rounded-full text-muted-foreground hover:bg-primary/5 transition-all h-9 w-9"
+          className={cn('rounded-full text-muted-foreground hover:bg-primary/5 transition-all', isMobileView && 'bg-[#14295F] text-white shadow-[0_8px_18px_rgba(20,41,95,0.28)] hover:bg-[#10214a] hover:text-white')}
           onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
           title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
         >
-          {viewMode === 'mobile' ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-5 w-5" />}
+          {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
         </Button>
 
         <NotificationBell />
 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <button
-              className={cn(
-                "overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button transition-all",
-                isMobileView ? "h-7 w-7" : "h-9 w-9"
-              )}
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn('overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button', isMobileView && 'border-[#14295F]/20 bg-white')}
             >
               <Avatar className="h-full w-full">
                 {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
-                <AvatarFallback className="bg-primary/5 text-primary font-black text-[10px]">{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             align="end" 
@@ -247,7 +255,10 @@ export function DashboardHeader() {
           <div className="space-y-6 bg-white p-6 sm:p-8">
             <div className="grid gap-2">
               <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 학교</Label>
-              <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 rounded-xl border-2 font-bold" placeholder="학교명을 입력하세요" />
+              <div className="relative">
+                <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/30" />
+                <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="h-12 pl-10 rounded-xl border-2 font-bold" placeholder="학교명을 입력하세요" />
+              </div>
             </div>
             {activeMembership?.role === 'student' && (
               <div className="grid gap-2">
@@ -276,7 +287,7 @@ export function DashboardHeader() {
 
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
         <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500 w-[95vw] max-w-[370px] sm:w-auto h-[80vh] sm:h-auto max-h-[85vh]">
-          <div className="bg-primary text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
+          <div className="bg-accent text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
             <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
             <DialogTitle className="font-black tracking-tighter flex items-center gap-3 text-xl sm:text-3xl">
               <BookOpen className="h-6 w-6" /> 가이드
@@ -286,11 +297,31 @@ export function DashboardHeader() {
           <div className="flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar p-6 sm:p-8">
             <section className="space-y-4">
               <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <Sparkles className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
+                <Zap className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
               </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm">
+              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
                 <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  학생들이 공부를 시작하면 실시간으로 시간이 측정되며, 학부모님은 이 현황을 언제든 확인하실 수 있습니다.
+                  대시보드 상단의 **[트랙 시작]** 버튼을 누르면 실시간 학습 몰입 엔진이 가동됩니다.
+                </p>
+              </div>
+            </section>
+            <section className="space-y-4">
+              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
+                <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 계획 및 루틴
+              </h4>
+              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  **[나의 학습 계획]** 메뉴에서 매일의 공부 To-do와 생활 루틴을 관리하세요.
+                </p>
+              </div>
+            </section>
+            <section className="space-y-4">
+              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
+                <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 상담 및 피드백
+              </h4>
+              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  고민이 생기면 언제든 **[상담 신청]**을 통해 도움을 요청하세요.
                 </p>
               </div>
             </section>

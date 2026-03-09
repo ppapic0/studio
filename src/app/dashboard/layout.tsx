@@ -17,52 +17,69 @@ export default function DashboardLayout({
   const isMobileView = viewMode === 'mobile';
 
   return (
-    <div className={cn(
-      "min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center",
-      isMobileView ? "bg-[#f0f0f0]" : "bg-background"
-    )}>
-      {/* Premium Background Decoration - Only shown in Desktop mode */}
-      {!isMobileView && (
-        <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:40px_40px] opacity-[0.04]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]" />
-        </div>
+    <div
+      className={cn(
+        'min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
+        isMobileView
+          ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-3 pb-6'
+          : 'bg-[#f0f0f0] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-background'
       )}
+    >
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div
+          className={cn(
+            'absolute inset-0',
+            isMobileView
+              ? 'bg-[radial-gradient(#14295F_1px,transparent_1px)] [background-size:30px_30px] opacity-[0.05]'
+              : 'bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:40px_40px] opacity-[0.04]'
+          )}
+        />
+        <div
+          className={cn(
+            'absolute inset-0',
+            isMobileView
+              ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(255,122,22,0.35),transparent_42%),radial-gradient(circle_at_85%_90%,rgba(20,41,95,0.26),transparent_45%)]'
+              : 'bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]'
+          )}
+        />
+      </div>
 
-      {/* Sidebar - Desktop Mode */}
       {!isMobileView && (
-        <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20 w-[240px] lg:w-[280px]">
+        <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20">
           <div className="flex h-full flex-col justify-start">
             <MainNav />
           </div>
         </div>
       )}
 
-      {/* Main Content Area */}
-      <div className={cn(
-        "flex flex-col transition-all duration-700 relative z-10",
-        isMobileView 
-          ? "w-full max-w-[430px] aspect-[9/19.5] h-[92vh] max-h-[932px] bg-white rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[12px] border-black overflow-hidden ring-[4px] ring-gray-800 relative mt-8" 
-          : "flex-1 min-h-screen"
-      )}>
-        {/* Header */}
+      <div
+        className={cn(
+          'flex flex-col transition-all duration-700 relative z-10',
+          isMobileView
+            ? 'w-full max-w-[430px] h-[94vh] max-h-[932px] overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-4'
+            : 'w-full min-h-screen'
+        )}
+      >
+        {isMobileView && (
+          <div className="pointer-events-none absolute left-1/2 top-0 z-30 h-6 w-32 -translate-x-1/2 rounded-b-[1.2rem] bg-[#0f224f] shadow-[0_5px_14px_rgba(0,0,0,0.32)]" />
+        )}
+
         <DashboardHeader />
-        
-        {/* Scrollable Content */}
-        <main className={cn(
-          "flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10",
-          isMobileView ? "p-4 px-5 pb-24" : "p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12"
-        )}>
+
+        <main
+          className={cn(
+            'flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10',
+            isMobileView ? 'p-4 px-4 pb-24 pt-5' : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
+          )}
+        >
           {children}
         </main>
 
-        {/* Global Notifiers */}
         <AppointmentNotifier />
         <ReportNotifier />
 
-        {/* Bottom Nav - Only in mobile view frame or on actual small devices */}
         {(isMobileView || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
-          <div className={isMobileView ? "absolute bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-black/5" : "fixed bottom-0 left-0 right-0 z-50 md:hidden"}>
+          <div className={isMobileView ? 'absolute bottom-0 left-0 right-0 z-50' : ''}>
             <BottomNav />
           </div>
         )}

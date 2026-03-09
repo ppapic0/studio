@@ -39,7 +39,7 @@ const formSchema = z.object({
     required_error: '역할을 선택해주세요.',
   }),
   schoolName: z.string().optional(),
-  inviteCode: z.string().min(1, '초대 코드를 입력해주세요.'),
+  inviteCode: z.string().optional(),
   parentLinkCode: z.string().optional(),
   studentLinkCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -100,11 +100,16 @@ export function SignupForm() {
       return;
     }
 
+    if (values.role !== 'parent' && !values.inviteCode?.trim()) {
+      form.setError('inviteCode', { message: '초대 코드를 입력해주세요.' });
+      return;
+    }
+
     setIsLoading(true);
     let createdUser = false;
 
     try {
-      const inviteCode = values.inviteCode.trim();
+      const inviteCode = (values.inviteCode || '').trim();
       const trimmedEmail = values.email.trim();
       const fallbackName =
         values.role === 'parent'
@@ -279,21 +284,26 @@ export function SignupForm() {
           />
         )}
 
-        <FormField
-          control={form.control}
-          name="inviteCode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="font-bold">센터 가입 코드</FormLabel>
-              <FormControl><Input placeholder="센터에서 제공받은 코드" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
-              <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
-                💡 반드시 선택하신 가입 역할에 맞는 코드를 입력해야 합니다.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
+        {selectedRole !== 'parent' ? (
+          <FormField
+            control={form.control}
+            name="inviteCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-bold">센터 가입 코드</FormLabel>
+                <FormControl><Input placeholder="센터에서 제공받은 코드" {...field} className="h-12 rounded-xl border-2" disabled={isLoading} /></FormControl>
+                <FormDescription className="text-[10px] font-black text-primary bg-primary/5 p-2 rounded-lg">
+                  💡 반드시 선택하신 가입 역할에 맞는 코드를 입력해야 합니다.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ) : (
+          <div className="rounded-xl border border-[#ffd9b7] bg-[#fff7ef] px-3 py-2 text-[11px] font-bold text-[#8b3e00]">
+            학부모는 센터 초대코드 없이 자녀 연동 코드로 가입할 수 있습니다.
+          </div>
+        )}
         <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg mt-2 shadow-xl" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
           {isLoading ? (loadingStatus || '처리 중...') : '가입 완료'}

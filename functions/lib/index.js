@@ -308,25 +308,59 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
     const parentLinkCode = String((data === null || data === void 0 ? void 0 : data.parentLinkCode) || "").trim();
     const studentLinkCode = String((data === null || data === void 0 ? void 0 : data.studentLinkCode) || "").trim();
     const displayNameInput = String((data === null || data === void 0 ? void 0 : data.displayName) || "").trim();
-    if (!code)
-        throw new functions.https.HttpsError("invalid-argument", "초대코드 누락");
     if (!allowedRoles.includes(role))
         throw new functions.https.HttpsError("invalid-argument", "역할 값이 올바르지 않습니다.");
+    if (role !== "parent" && !code)
+        throw new functions.https.HttpsError("invalid-argument", "초대코드 누락");
     const emailFromToken = context.auth.token.email || null;
     const tokenDisplayName = context.auth.token.name || null;
     try {
         return await db.runTransaction(async (t) => {
-            const inviteRef = db.doc(`inviteCodes/${code}`);
-            const inviteSnap = await t.get(inviteRef);
-            if (!inviteSnap.exists) {
-                throw new functions.https.HttpsError("failed-precondition", "유효하지 않은 초대코드입니다.");
+            let centerId = "";
+            let targetClassName = null;
+            let inviteRef = null;
+            let linkedStudentRef = null;
+            let linkedStudentData = null;
+            let linkedStudentId = "";
+            if (role === "parent") {
+                if (!/^\d{6}$/.test(studentLinkCode)) {
+                    throw new functions.https.HttpsError("invalid-argument", "부모 가입에는 6자리 자녀 연동 코드가 필요합니다.");
+                }
+                const studentQuery = db
+                    .collectionGroup("students")
+                    .where("parentLinkCode", "==", studentLinkCode)
+                    .limit(2);
+                const studentSnap = await t.get(studentQuery);
+                if (studentSnap.empty) {
+                    throw new functions.https.HttpsError("failed-precondition", "연동 코드를 가진 학생을 찾을 수 없습니다.");
+                }
+                if (studentSnap.size > 1) {
+                    throw new functions.https.HttpsError("failed-precondition", "동일한 자녀 연동 코드가 여러 명에게 설정되어 있어 가입할 수 없습니다. 센터에 문의해주세요.");
+                }
+                const studentDoc = studentSnap.docs[0];
+                const centerRef = studentDoc.ref.parent.parent;
+                if (!centerRef) {
+                    throw new functions.https.HttpsError("failed-precondition", "학생 센터 정보를 확인할 수 없습니다.");
+                }
+                centerId = centerRef.id;
+                linkedStudentRef = studentDoc.ref;
+                linkedStudentData = studentDoc.data();
+                linkedStudentId = studentDoc.id;
+                targetClassName = (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
             }
-            const inviteData = inviteSnap.data();
-            assertInviteUsable(inviteData, role);
-            const centerId = inviteData.centerId;
-            const targetClassName = inviteData.targetClassName || null;
-            if (!centerId) {
-                throw new functions.https.HttpsError("failed-precondition", "센터 정보가 없는 초대코드입니다.");
+            else {
+                inviteRef = db.doc(`inviteCodes/${code}`);
+                const inviteSnap = await t.get(inviteRef);
+                if (!inviteSnap.exists) {
+                    throw new functions.https.HttpsError("failed-precondition", "유효하지 않은 초대코드입니다.");
+                }
+                const inviteData = inviteSnap.data();
+                assertInviteUsable(inviteData, role);
+                centerId = inviteData.centerId;
+                targetClassName = inviteData.targetClassName || null;
+                if (!centerId) {
+                    throw new functions.https.HttpsError("failed-precondition", "센터 정보가 없는 초대코드입니다.");
+                }
             }
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
             const existingMembership = await t.get(userCenterRef);
@@ -345,24 +379,14 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 }
             }
             if (role === "parent") {
-                if (!/^\d{6}$/.test(studentLinkCode)) {
-                    throw new functions.https.HttpsError("invalid-argument", "부모 가입에는 6자리 자녀 연동 코드가 필요합니다.");
+                if (!linkedStudentRef || !linkedStudentData || !linkedStudentId) {
+                    throw new functions.https.HttpsError("failed-precondition", "연동할 학생 정보를 찾을 수 없습니다.");
                 }
-                const studentQuery = db
-                    .collection(`centers/${centerId}/students`)
-                    .where("parentLinkCode", "==", studentLinkCode)
-                    .limit(1);
-                const studentSnap = await t.get(studentQuery);
-                if (studentSnap.empty) {
-                    throw new functions.https.HttpsError("failed-precondition", "연동 코드를 가진 학생을 찾을 수 없습니다.");
-                }
-                const linkedStudentDoc = studentSnap.docs[0];
-                const linkedStudentData = linkedStudentDoc.data();
-                linkedStudentIds = [linkedStudentDoc.id];
+                linkedStudentIds = [linkedStudentId];
                 if (!displayNameInput) {
                     resolvedDisplayName = `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
                 }
-                t.set(linkedStudentDoc.ref, {
+                t.set(linkedStudentRef, {
                     parentUids: admin.firestore.FieldValue.arrayUnion(uid),
                     updatedAt: ts,
                 }, { merge: true });
@@ -425,10 +449,12 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     updatedAt: ts,
                 }, { merge: true });
             }
-            t.update(inviteRef, {
-                usedCount: admin.firestore.FieldValue.increment(1),
-                updatedAt: ts,
-            });
+            if (inviteRef) {
+                t.update(inviteRef, {
+                    usedCount: admin.firestore.FieldValue.increment(1),
+                    updatedAt: ts,
+                });
+            }
             return { ok: true, centerId, role };
         });
     }

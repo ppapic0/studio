@@ -49,6 +49,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   ],
   parent: [
     { href: '/dashboard?parentTab=home', label: '홈', icon: LayoutDashboard },
+    { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
     { href: '/dashboard?parentTab=studyDetail', label: '학습상세', icon: History },
     { href: '/dashboard?parentTab=life', label: '생활관리', icon: Armchair },
     { href: '/dashboard?parentTab=communication', label: '상담/소통', icon: MessageCircle },
@@ -95,12 +96,14 @@ export function MainNav({ isMobile = false }: MainNavProps) {
 
   return (
     <nav className={navClass}>
-      <Link href="/dashboard" className="mb-8 px-2 pt-6 flex items-center gap-3">
-        <TrackLogo className={cn(isMobile ? 'h-10' : 'h-12', "drop-shadow-sm")} />
-        <div className="flex flex-col">
-          <span className="text-xl font-black tracking-tighter text-primary leading-none uppercase">Track</span>
-          <span className="text-[11px] font-bold text-muted-foreground/60 leading-none mt-0.5">학습센터</span>
-        </div>
+      <Link
+        href="/dashboard"
+        className={cn(
+          'mb-4 inline-flex items-center rounded-2xl border border-[#ffd9b9] bg-white/90 p-2 shadow-[0_10px_24px_rgba(20,41,95,0.12)]',
+          isMobile ? 'mx-1' : ''
+        )}
+      >
+        <TrackLogo className={cn(isMobile ? 'h-9' : 'h-10')} />
       </Link>
       {userNavItems.map((item) => {
         const [itemPath, itemQuery] = item.href.split('?');
