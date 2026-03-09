@@ -73,7 +73,7 @@ export function SignupForm() {
   const selectedRole = form.watch('role');
 
   const resolveSignupErrorMessage = (error: any) => {
-    const code = String(error?.code || '');
+    const code = String(error?.code || '').toLowerCase();
     const detailMessage =
       typeof error?.details === 'string'
         ? error.details
@@ -85,36 +85,58 @@ export function SignupForm() {
 
     const rawMessage = String(error?.message || '').trim();
     const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
+    const cleanedRaw = strippedRaw
+      .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, '')
+      .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, '')
+      .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, '')
+      .trim();
+
     const normalizedRaw =
-      /^(functions\/)?internal$/i.test(strippedRaw) || /\(functions\/internal\)/i.test(strippedRaw)
+      /^(functions\/)?internal$/i.test(cleanedRaw) || /\(functions\/internal\)/i.test(cleanedRaw)
         ? ''
-        : strippedRaw;
+        : cleanedRaw;
+
+    const hasFailedPrecondition = code.includes('failed-precondition') || /failed[_ -]?precondition/i.test(strippedRaw);
+    const hasInvalidArgument = code.includes('invalid-argument') || /invalid[_ -]?argument/i.test(strippedRaw);
+    const hasAlreadyExists = code.includes('already-exists') || /already[_ -]?exists/i.test(strippedRaw);
+
+    if (!detailMessage && !normalizedRaw) {
+      if (hasFailedPrecondition) {
+        return '가입 조건을 확인해주세요. 자녀 연동 코드 또는 초대 코드를 다시 확인해 주세요.';
+      }
+      if (hasInvalidArgument) {
+        return '입력값이 올바르지 않습니다. 코드와 필수 항목을 확인해 주세요.';
+      }
+      if (hasAlreadyExists) {
+        return '이미 가입된 센터입니다.';
+      }
+    }
+
     const fallbackMessage = detailMessage || normalizedRaw;
 
     switch (code) {
       case 'auth/email-already-in-use':
-        return '이미 사용 중인 이메일입니다.';
+        return '?대? ?ъ슜 以묒씤 ?대찓?쇱엯?덈떎.';
       case 'auth/invalid-email':
-        return '이메일 형식이 올바르지 않습니다.';
+        return '?대찓???뺤떇???щ컮瑜댁? ?딆뒿?덈떎.';
       case 'auth/weak-password':
-        return '비밀번호가 너무 약합니다. 8자 이상으로 설정해 주세요.';
+        return '鍮꾨?踰덊샇媛 ?덈Т ?쏀빀?덈떎. 8???댁긽?쇰줈 ?ㅼ젙??二쇱꽭??';
       case 'auth/network-request-failed':
-        return '네트워크 연결을 확인한 뒤 다시 시도해 주세요.';
+        return '?ㅽ듃?뚰겕 ?곌껐???뺤씤?????ㅼ떆 ?쒕룄??二쇱꽭??';
       case 'functions/invalid-argument':
-        return fallbackMessage || '입력값이 올바르지 않습니다. 입력 항목을 확인해 주세요.';
+        return fallbackMessage || '?낅젰媛믪씠 ?щ컮瑜댁? ?딆뒿?덈떎. ?낅젰 ??ぉ???뺤씤??二쇱꽭??';
       case 'functions/failed-precondition':
-        return fallbackMessage || '가입 조건을 만족하지 않습니다. 초대코드/연동코드를 확인해 주세요.';
+        return fallbackMessage || '媛??議곌굔??留뚯”?섏? ?딆뒿?덈떎. 珥덈?肄붾뱶/?곕룞肄붾뱶瑜??뺤씤??二쇱꽭??';
       case 'functions/already-exists':
-        return fallbackMessage || '이미 가입된 센터입니다.';
+        return fallbackMessage || '?대? 媛?낅맂 ?쇳꽣?낅땲??';
       case 'functions/unauthenticated':
-        return '인증이 만료되었습니다. 다시 로그인 후 시도해 주세요.';
+        return '?몄쬆??留뚮즺?섏뿀?듬땲?? ?ㅼ떆 濡쒓렇?????쒕룄??二쇱꽭??';
       case 'functions/internal':
-        return fallbackMessage || '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+        return fallbackMessage || '?쒕쾭 ?대? ?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??';
       default:
-        return fallbackMessage || '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+        return fallbackMessage || '?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??';
     }
   };
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth || !functions) return;
 
@@ -201,19 +223,20 @@ export function SignupForm() {
       console.error('Signup Error:', error);
 
       const signupErrorMessage = resolveSignupErrorMessage(error);
-      if (/초대\s*코드|초대코드/.test(signupErrorMessage)) {
+      const msgLower = signupErrorMessage.toLowerCase();
+
+      if (values.role === 'parent') {
+        form.setError('studentLinkCode', { message: signupErrorMessage });
+      } else if (/invite|초대|invite code/.test(msgLower)) {
         form.setError('inviteCode', { message: signupErrorMessage });
       }
-      if (/자녀\s*연동\s*코드|연동 코드를 가진 학생|동일한 자녀 연동 코드/.test(signupErrorMessage)) {
-        form.setError('studentLinkCode', { message: signupErrorMessage });
-      }
-      if (/부모\s*연동\s*코드/.test(signupErrorMessage)) {
+
+      if (/parent|부모|연동 코드/.test(msgLower)) {
         form.setError('parentLinkCode', { message: signupErrorMessage });
       }
-      if (/학교명/.test(signupErrorMessage)) {
+      if (/school|학교/.test(msgLower)) {
         form.setError('schoolName', { message: signupErrorMessage });
       }
-
       toast({
         variant: 'destructive',
         title: '가입 실패',
