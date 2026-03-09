@@ -118,7 +118,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     const requestedTab = searchParams.get('parentTab') as ParentPortalTab | null;
-    if (requestedTab && tabs.some((item) => item.value === requestedTab)) {
+    if (requestedTab) {
       setTab(requestedTab);
     }
   }, [searchParams]);
@@ -147,6 +147,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
   const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
 
+  const growthRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'growthProgress', studentId)), [firestore, centerId, studentId]);
+  const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId });
+
   const remoteNotificationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(collection(firestore, 'centers', centerId, 'parentNotifications'), where('studentId', '==', studentId), limit(20));
@@ -160,7 +163,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const planDone = studyPlans.filter((item) => item.done).length;
   const planRate = planTotal > 0 ? Math.round((planDone / planTotal) * 100) : 0;
 
-  // --- 실시간 출결 판정 로직 ---
   const attendanceStatus = useMemo(() => {
     if (!attendanceCurrent) return { label: '상태 미확인', color: 'bg-slate-100 text-slate-400', icon: Clock };
 
@@ -168,17 +170,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     const isStudying = ['studying', 'away', 'break'].includes(status);
     const hasRecord = (todayLog?.totalMinutes || 0) > 0;
 
-    // 1. 등원 (현재 학습 중)
     if (isStudying) {
-      return { label: '등원 (학습 중)', color: 'bg-[#eaf2ff] text-[#1b64da] border-blue-100', icon: UserCheck };
+      return { label: '등원 (학습 중)', color: 'bg-[#eaf2ff] text-[#14295F] border-blue-100', icon: UserCheck };
     }
 
-    // 2. 하원 (공부 기록은 있는데 지금은 퇴실함)
     if (!isStudying && hasRecord) {
       return { label: '하원 (귀가 완료)', color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Home };
     }
 
-    // 3. 루틴 기반 판정 (지각/결석/입실전)
     const routineItems = todayPlans?.filter(p => p.category === 'schedule') || [];
     const isAbsentDay = routineItems.some(p => p.title.includes('등원하지 않습니다'));
     
@@ -188,14 +187,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
     const inTimePlan = routineItems.find(p => p.title.includes('등원 예정'));
     if (inTimePlan) {
-      const timeStr = inTimePlan.title.split(': ')[1]; // "09:00"
+      const timeStr = inTimePlan.title.split(': ')[1];
       if (timeStr) {
-        const now = new Date();
-        const scheduledTime = parse(timeStr, 'HH:mm', now);
-        
-        if (isAfter(now, scheduledTime)) {
-          return { label: '지각 주의', color: 'bg-orange-50 text-[#FF7A16] border-orange-100', icon: AlertCircle };
-        }
+        try {
+          const now = new Date();
+          const scheduledTime = parse(timeStr, 'HH:mm', now);
+          if (isAfter(now, scheduledTime)) {
+            return { label: '지각 주의', color: 'bg-orange-50 text-[#FF7A16] border-orange-100', icon: AlertCircle };
+          }
+        } catch (e) {}
       }
     }
 
@@ -263,6 +263,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
   }
 
+  const weeklyData = parentDashboardMockData.weeklyReport;
+  const subjectsData = parentDashboardMockData.charts.subjectShare;
+
   if (!isActive) return null;
 
   return (
@@ -274,7 +277,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               {student?.name || '자녀'} 학생 현황
             </CardTitle>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              {format(new Date(), 'yyyy. MM. dd (EEEE)', {locale: ko})}
+              {today && format(today, 'yyyy. MM. dd (EEEE)', {locale: ko})}
               <span className="opacity-20">|</span>
               <span className="text-[#FF7A16]">실시간 업데이트 중</span>
             </p>
@@ -346,11 +349,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">주간 누적 몰입</span>
-                  <p className="text-2xl font-black text-[#14295F]">{toHm(weekly.totalStudyMinutes)}</p>
+                  <p className="text-2xl font-black text-[#14295F]">{toHm(weeklyData.totalStudyMinutes)}</p>
                 </Card>
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
-                  <p className="text-2xl font-black text-[#FF7A16]">{weekly.avgPlanCompletionRate}%</p>
+                  <p className="text-2xl font-black text-[#FF7A16]">{weeklyData.avgPlanCompletionRate}%</p>
                 </Card>
               </div>
 
@@ -372,8 +375,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <ResponsiveContainer width="100%" height="100%">
                           <RechartsLineChart data={parentDashboardMockData.charts.dailyStudyMinutes}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="date" fontSize={10} fontWeights="800" axisLine={false} tickLine={false} />
-                            <YAxis fontSize={10} fontWeights="800" axisLine={false} tickLine={false} width={30} />
+                            <XAxis dataKey="date" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
+                            <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={30} />
                             <Tooltip contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
                             <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={4} dot={{ r: 4, fill: '#fff', stroke: '#FF7A16', strokeWidth: 2 }} />
                           </RechartsLineChart>
@@ -382,7 +385,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
                       <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
-                      <p className="text-base font-bold text-slate-700 leading-relaxed">"{weekly.teacherFeedback}"</p>
+                      <p className="text-base font-bold text-slate-700 leading-relaxed">"{weeklyData.teacherFeedback}"</p>
                     </div>
                   </div>
                   <DialogFooter className="p-6 bg-white border-t">
@@ -398,7 +401,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <PieChartIcon className="h-5 w-5 text-[#FF7A16]" /> 과목별 학습 비중
                 </CardTitle>
                 <div className="space-y-5">
-                  {subjects.slice(0, 4).map((s, i) => (
+                  {subjectsData.slice(0, 4).map((s, i) => (
                     <div key={s.subject} className="flex flex-col gap-2">
                       <div className="flex justify-between items-center text-xs font-bold text-slate-700">
                         <span className="flex items-center gap-2">
@@ -430,8 +433,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={parentDashboardMockData.charts.hourlyFocus}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="hour" fontSize={10} fontWeights="800" axisLine={false} tickLine={false} />
-                        <YAxis fontSize={10} fontWeights="800" axisLine={false} tickLine={false} width={25} />
+                        <XAxis dataKey="hour" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
+                        <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={25} />
                         <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} contentStyle={{borderRadius: '1rem', border: 'none'}} />
                         <Bar dataKey="minutes" name="집중(분)" fill="#14295F" radius={[6,6,0,0]} barSize={20} />
                       </BarChart>
