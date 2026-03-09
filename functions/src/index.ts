@@ -84,6 +84,38 @@ function parseHourMinute(value: unknown): { hour: number; minute: number } | nul
   return { hour, minute };
 }
 
+function normalizeMembershipStatus(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().toLowerCase();
+}
+
+function isActiveMembershipStatus(value: unknown): boolean {
+  const normalized = normalizeMembershipStatus(value);
+  return !normalized || normalized === "active";
+}
+
+function toMillisSafe(value: unknown): number {
+  if (!value) return 0;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.getTime() : 0;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === "object" && value !== null) {
+    const maybeTs = value as { toMillis?: () => number };
+    if (typeof maybeTs.toMillis === "function") {
+      const millis = maybeTs.toMillis();
+      return Number.isFinite(millis) ? millis : 0;
+    }
+  }
+  return 0;
+}
+
 function applyTemplate(template: string, values: Record<string, string>): string {
   return Object.entries(values).reduce((acc, [key, value]) => {
     return acc.replace(new RegExp(`\\{${key}\\}`, "g"), value);
@@ -384,7 +416,6 @@ export const deleteStudentAccount = functions.region(region).runWith({
       `centers/${centerId}/growthProgress/${studentId}`,
       `centers/${centerId}/plans/${studentId}`,
       `centers/${centerId}/studyLogs/${studentId}`,
-      `centers/${centerId}/dailyStudentStats/today/students/${studentId}`,
     ];
 
     const filterCols = [
@@ -410,6 +441,53 @@ export const deleteStudentAccount = functions.region(region).runWith({
           errors.push(`${colPath}: ${e?.message || "query delete failed"}`);
         }
       }),
+      (async () => {
+        try {
+          const statsSnap = await db.collectionGroup("students").where("studentId", "==", studentId).get();
+          const statDocs = statsSnap.docs.filter((docSnap) =>
+            docSnap.ref.path.startsWith(`centers/${centerId}/dailyStudentStats/`)
+          );
+          await Promise.all(statDocs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+        } catch (e: any) {
+          errors.push(`dailyStudentStats: ${e?.message || "stats cleanup failed"}`);
+        }
+      })(),
+      (async () => {
+        try {
+          const leaderboardsSnap = await db.collection(`centers/${centerId}/leaderboards`).get();
+          await Promise.all(
+            leaderboardsSnap.docs.map(async (boardDoc) => {
+              const directEntryRef = boardDoc.ref.collection("entries").doc(studentId);
+              await db.recursiveDelete(directEntryRef);
+
+              const byStudentQuery = await boardDoc.ref.collection("entries").where("studentId", "==", studentId).get();
+              await Promise.all(byStudentQuery.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+            })
+          );
+        } catch (e: any) {
+          errors.push(`leaderboards: ${e?.message || "leaderboard cleanup failed"}`);
+        }
+      })(),
+      (async () => {
+        try {
+          const seatsSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).get();
+          await Promise.all(
+            seatsSnap.docs.map((seatDoc) =>
+              seatDoc.ref.set(
+                {
+                  studentId: null,
+                  status: "absent",
+                  updatedAt: admin.firestore.Timestamp.now(),
+                  lastCheckInAt: admin.firestore.FieldValue.delete(),
+                },
+                { merge: true }
+              )
+            )
+          );
+        } catch (e: any) {
+          errors.push(`attendanceCurrent: ${e?.message || "seat cleanup failed"}`);
+        }
+      })(),
     ]);
 
     if (errors.length > 0) {
@@ -498,16 +576,54 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       const duplicateSnap = await db
         .collectionGroup("students")
         .where("parentLinkCode", "==", normalizedParentLinkCode)
-        .limit(2)
+        .limit(20)
         .get();
 
-      const hasConflict = duplicateSnap.docs.some((docSnap) => docSnap.id !== studentId);
+      let hasConflict = false;
+      for (const docSnap of duplicateSnap.docs) {
+        if (docSnap.id === studentId) continue;
+
+        const candidateCenterRef = docSnap.ref.parent.parent;
+        if (!candidateCenterRef) continue;
+
+        const candidateMemberSnap = await db.doc(`centers/${candidateCenterRef.id}/members/${docSnap.id}`).get();
+        if (!candidateMemberSnap.exists) continue;
+
+        const candidateMemberData = candidateMemberSnap.data() as any;
+        const isActiveStudentCandidate =
+          candidateMemberData?.role === "student" && isActiveMembershipStatus(candidateMemberData?.status);
+        if (!isActiveStudentCandidate) continue;
+
+        const candidateUserCenterSnap = await db.doc(`userCenters/${docSnap.id}/centers/${candidateCenterRef.id}`).get();
+        const candidateUserCenterData = candidateUserCenterSnap.exists ? (candidateUserCenterSnap.data() as any) : null;
+        const hasActiveUserCenter =
+          candidateUserCenterSnap.exists &&
+          candidateUserCenterData?.role === "student" &&
+          isActiveMembershipStatus(candidateUserCenterData?.status);
+
+        let hasSeatAssignment = false;
+        if (!hasActiveUserCenter) {
+          const seatSnap = await db
+            .collection(`centers/${candidateCenterRef.id}/attendanceCurrent`)
+            .where("studentId", "==", docSnap.id)
+            .limit(1)
+            .get();
+          hasSeatAssignment = !seatSnap.empty;
+        }
+
+        if (hasActiveUserCenter || hasSeatAssignment) {
+          hasConflict = true;
+          break;
+        }
+      }
+
       if (hasConflict) {
         throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
           userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
         });
       }
     }
+
   }
 
   if (isSelfStudentCaller) {
@@ -783,36 +899,130 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           });
         }
 
-        const studentQuery = db
-          .collectionGroup("students")
-          .where("parentLinkCode", "==", studentLinkCode)
-          .limit(2);
-        const studentSnap = await t.get(studentQuery);
+        const codeAsNumber = Number(studentLinkCode);
+        const candidateQueries = [
+          db.collectionGroup("students").where("parentLinkCode", "==", studentLinkCode).limit(20),
+          db.collectionGroup("students").where("studentLinkCode", "==", studentLinkCode).limit(20),
+        ];
+        if (Number.isFinite(codeAsNumber)) {
+          candidateQueries.push(
+            db.collectionGroup("students").where("parentLinkCode", "==", codeAsNumber).limit(20),
+            db.collectionGroup("students").where("studentLinkCode", "==", codeAsNumber).limit(20)
+          );
+        }
 
-        if (studentSnap.empty) {
+        const studentSnaps = await Promise.all(candidateQueries.map((candidateQuery) => t.get(candidateQuery)));
+        const studentDocMap = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+        for (const snap of studentSnaps) {
+          for (const studentDoc of snap.docs) {
+            studentDocMap.set(studentDoc.ref.path, studentDoc);
+          }
+        }
+
+        if (studentDocMap.size === 0) {
           throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
             userMessage: "입력한 학생 코드와 일치하는 학생이 없습니다. 학생 코드를 다시 확인해주세요.",
           });
         }
-        if (studentSnap.size > 1) {
+
+        type ParentLinkCandidate = {
+          centerId: string;
+          studentDoc: admin.firestore.QueryDocumentSnapshot;
+          studentData: admin.firestore.DocumentData;
+          className: string | null;
+          hasActiveUserCenter: boolean;
+          hasSeatAssignment: boolean;
+          updatedAtMs: number;
+          createdAtMs: number;
+        };
+
+        let candidates: ParentLinkCandidate[] = [];
+
+        for (const studentDoc of studentDocMap.values()) {
+          const centerRef = studentDoc.ref.parent.parent;
+          if (!centerRef) continue;
+
+          const candidateMemberRef = db.doc(`centers/${centerRef.id}/members/${studentDoc.id}`);
+          const candidateMemberSnap = await t.get(candidateMemberRef);
+          if (!candidateMemberSnap.exists) continue;
+
+          const candidateMemberData = candidateMemberSnap.data() as any;
+          const isActiveStudentCandidate =
+            candidateMemberData?.role === "student" && isActiveMembershipStatus(candidateMemberData?.status);
+          if (!isActiveStudentCandidate) continue;
+
+          const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${centerRef.id}`);
+          const candidateUserCenterSnap = await t.get(candidateUserCenterRef);
+          const candidateUserCenterData = candidateUserCenterSnap.exists ? (candidateUserCenterSnap.data() as any) : null;
+          const hasActiveUserCenter =
+            candidateUserCenterSnap.exists &&
+            candidateUserCenterData?.role === "student" &&
+            isActiveMembershipStatus(candidateUserCenterData?.status);
+
+          const seatQuery = db
+            .collection(`centers/${centerRef.id}/attendanceCurrent`)
+            .where("studentId", "==", studentDoc.id)
+            .limit(1);
+          const seatSnap = await t.get(seatQuery);
+          const hasSeatAssignment = !seatSnap.empty;
+
+          const studentData = studentDoc.data();
+          candidates.push({
+            centerId: centerRef.id,
+            studentDoc,
+            studentData,
+            className: (candidateMemberData?.className as string | null) || null,
+            hasActiveUserCenter,
+            hasSeatAssignment,
+            updatedAtMs: toMillisSafe(studentData?.updatedAt),
+            createdAtMs: toMillisSafe(studentData?.createdAt),
+          });
+        }
+
+        if (candidates.length === 0) {
+          throw new functions.https.HttpsError("failed-precondition", "No active student found for this link code.", {
+            userMessage: "현재 재원 중인 학생 정보를 찾지 못했습니다. 학생 코드를 다시 확인해주세요.",
+          });
+        }
+
+        const userCenterActiveCandidates = candidates.filter((candidate) => candidate.hasActiveUserCenter);
+        if (userCenterActiveCandidates.length > 0) {
+          candidates = userCenterActiveCandidates;
+        }
+
+        if (candidates.length > 1) {
+          const seatAssignedCandidates = candidates.filter((candidate) => candidate.hasSeatAssignment);
+          if (seatAssignedCandidates.length > 0) {
+            candidates = seatAssignedCandidates;
+          }
+        }
+
+        if (candidates.length > 1) {
+          const sortedCandidates = [...candidates].sort((a, b) => {
+            const aScore = Math.max(a.updatedAtMs, a.createdAtMs);
+            const bScore = Math.max(b.updatedAtMs, b.createdAtMs);
+            return bScore - aScore;
+          });
+
+          const topScore = Math.max(sortedCandidates[0].updatedAtMs, sortedCandidates[0].createdAtMs);
+          const secondScore = Math.max(sortedCandidates[1].updatedAtMs, sortedCandidates[1].createdAtMs);
+          if (topScore > secondScore) {
+            candidates = [sortedCandidates[0]];
+          }
+        }
+
+        if (candidates.length > 1) {
           throw new functions.https.HttpsError("failed-precondition", "Student link code is duplicated.", {
             userMessage: "해당 학생 코드가 중복되어 있습니다. 센터 관리자에게 코드 재설정을 요청해주세요.",
           });
         }
 
-        const studentDoc = studentSnap.docs[0];
-        const centerRef = studentDoc.ref.parent.parent;
-        if (!centerRef) {
-          throw new functions.https.HttpsError("failed-precondition", "Student center information is missing.", {
-            userMessage: "학생 센터 정보를 확인할 수 없습니다. 관리자에게 문의해주세요.",
-          });
-        }
-
-        centerId = centerRef.id;
-        linkedStudentRef = studentDoc.ref;
-        linkedStudentData = studentDoc.data();
-        linkedStudentId = studentDoc.id;
-        targetClassName = (linkedStudentData?.className as string | null) || null;
+        const selected = candidates[0];
+        centerId = selected.centerId;
+        linkedStudentRef = selected.studentDoc.ref;
+        linkedStudentData = selected.studentData;
+        linkedStudentId = selected.studentDoc.id;
+        targetClassName = selected.className || (linkedStudentData?.className as string | null) || null;
       } else {
         inviteRef = db.doc(`inviteCodes/${code}`);
         const inviteSnap = await t.get(inviteRef);
@@ -861,6 +1071,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       ]));
       let linkedStudentIds: string[] = [];
       let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber(existingMembershipData?.phoneNumber || existingCenterMemberData?.phoneNumber || "");
+      const resolvedStatus = "active";
 
       if (role === "student") {
         if (!schoolName) {
@@ -919,7 +1130,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         id: uid,
         centerId,
         role,
-        status: existingMembershipData?.status || existingCenterMemberData?.status || "active",
+        status: resolvedStatus,
         joinedAt: existingMembershipData?.joinedAt || existingCenterMemberData?.joinedAt || ts,
         displayName: resolvedDisplayName,
         className: targetClassName || existingMembershipData?.className || existingCenterMemberData?.className || null,
@@ -935,7 +1146,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         id: centerId,
         centerId,
         role,
-        status: existingMembershipData?.status || existingCenterMemberData?.status || "active",
+        status: resolvedStatus,
         joinedAt: existingMembershipData?.joinedAt || existingCenterMemberData?.joinedAt || ts,
         displayName: resolvedDisplayName,
         className: targetClassName || existingMembershipData?.className || existingCenterMemberData?.className || null,

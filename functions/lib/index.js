@@ -48,6 +48,37 @@ function parseHourMinute(value) {
     const [hour, minute] = normalized.split(":").map((part) => Number(part));
     return { hour, minute };
 }
+function normalizeMembershipStatus(value) {
+    if (typeof value !== "string")
+        return "";
+    return value.trim().toLowerCase();
+}
+function isActiveMembershipStatus(value) {
+    const normalized = normalizeMembershipStatus(value);
+    return !normalized || normalized === "active";
+}
+function toMillisSafe(value) {
+    if (!value)
+        return 0;
+    if (value instanceof Date) {
+        return Number.isFinite(value.getTime()) ? value.getTime() : 0;
+    }
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === "string") {
+        const parsed = Date.parse(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    if (typeof value === "object" && value !== null) {
+        const maybeTs = value;
+        if (typeof maybeTs.toMillis === "function") {
+            const millis = maybeTs.toMillis();
+            return Number.isFinite(millis) ? millis : 0;
+        }
+    }
+    return 0;
+}
 function applyTemplate(template, values) {
     return Object.entries(values).reduce((acc, [key, value]) => {
         return acc.replace(new RegExp(`\\{${key}\\}`, "g"), value);
@@ -297,7 +328,6 @@ exports.deleteStudentAccount = functions.region(region).runWith({
             `centers/${centerId}/growthProgress/${studentId}`,
             `centers/${centerId}/plans/${studentId}`,
             `centers/${centerId}/studyLogs/${studentId}`,
-            `centers/${centerId}/dailyStudentStats/today/students/${studentId}`,
         ];
         const filterCols = [
             `centers/${centerId}/counselingReservations`,
@@ -323,6 +353,44 @@ exports.deleteStudentAccount = functions.region(region).runWith({
                     errors.push(`${colPath}: ${(e === null || e === void 0 ? void 0 : e.message) || "query delete failed"}`);
                 }
             }),
+            (async () => {
+                try {
+                    const statsSnap = await db.collectionGroup("students").where("studentId", "==", studentId).get();
+                    const statDocs = statsSnap.docs.filter((docSnap) => docSnap.ref.path.startsWith(`centers/${centerId}/dailyStudentStats/`));
+                    await Promise.all(statDocs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+                }
+                catch (e) {
+                    errors.push(`dailyStudentStats: ${(e === null || e === void 0 ? void 0 : e.message) || "stats cleanup failed"}`);
+                }
+            })(),
+            (async () => {
+                try {
+                    const leaderboardsSnap = await db.collection(`centers/${centerId}/leaderboards`).get();
+                    await Promise.all(leaderboardsSnap.docs.map(async (boardDoc) => {
+                        const directEntryRef = boardDoc.ref.collection("entries").doc(studentId);
+                        await db.recursiveDelete(directEntryRef);
+                        const byStudentQuery = await boardDoc.ref.collection("entries").where("studentId", "==", studentId).get();
+                        await Promise.all(byStudentQuery.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+                    }));
+                }
+                catch (e) {
+                    errors.push(`leaderboards: ${(e === null || e === void 0 ? void 0 : e.message) || "leaderboard cleanup failed"}`);
+                }
+            })(),
+            (async () => {
+                try {
+                    const seatsSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).get();
+                    await Promise.all(seatsSnap.docs.map((seatDoc) => seatDoc.ref.set({
+                        studentId: null,
+                        status: "absent",
+                        updatedAt: admin.firestore.Timestamp.now(),
+                        lastCheckInAt: admin.firestore.FieldValue.delete(),
+                    }, { merge: true })));
+                }
+                catch (e) {
+                    errors.push(`attendanceCurrent: ${(e === null || e === void 0 ? void 0 : e.message) || "seat cleanup failed"}`);
+                }
+            })(),
         ]);
         if (errors.length > 0) {
             throw new Error(`학생 데이터 일부 삭제 실패 (${errors.length}건)`);
@@ -388,9 +456,41 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             const duplicateSnap = await db
                 .collectionGroup("students")
                 .where("parentLinkCode", "==", normalizedParentLinkCode)
-                .limit(2)
+                .limit(20)
                 .get();
-            const hasConflict = duplicateSnap.docs.some((docSnap) => docSnap.id !== studentId);
+            let hasConflict = false;
+            for (const docSnap of duplicateSnap.docs) {
+                if (docSnap.id === studentId)
+                    continue;
+                const candidateCenterRef = docSnap.ref.parent.parent;
+                if (!candidateCenterRef)
+                    continue;
+                const candidateMemberSnap = await db.doc(`centers/${candidateCenterRef.id}/members/${docSnap.id}`).get();
+                if (!candidateMemberSnap.exists)
+                    continue;
+                const candidateMemberData = candidateMemberSnap.data();
+                const isActiveStudentCandidate = (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
+                if (!isActiveStudentCandidate)
+                    continue;
+                const candidateUserCenterSnap = await db.doc(`userCenters/${docSnap.id}/centers/${candidateCenterRef.id}`).get();
+                const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
+                const hasActiveUserCenter = candidateUserCenterSnap.exists &&
+                    (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
+                    isActiveMembershipStatus(candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.status);
+                let hasSeatAssignment = false;
+                if (!hasActiveUserCenter) {
+                    const seatSnap = await db
+                        .collection(`centers/${candidateCenterRef.id}/attendanceCurrent`)
+                        .where("studentId", "==", docSnap.id)
+                        .limit(1)
+                        .get();
+                    hasSeatAssignment = !seatSnap.empty;
+                }
+                if (hasActiveUserCenter || hasSeatAssignment) {
+                    hasConflict = true;
+                    break;
+                }
+            }
             if (hasConflict) {
                 throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
                     userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
@@ -649,33 +749,101 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         userMessage: "학생 코드는 6자리 숫자로 입력해주세요.",
                     });
                 }
-                const studentQuery = db
-                    .collectionGroup("students")
-                    .where("parentLinkCode", "==", studentLinkCode)
-                    .limit(2);
-                const studentSnap = await t.get(studentQuery);
-                if (studentSnap.empty) {
+                const codeAsNumber = Number(studentLinkCode);
+                const candidateQueries = [
+                    db.collectionGroup("students").where("parentLinkCode", "==", studentLinkCode).limit(20),
+                    db.collectionGroup("students").where("studentLinkCode", "==", studentLinkCode).limit(20),
+                ];
+                if (Number.isFinite(codeAsNumber)) {
+                    candidateQueries.push(db.collectionGroup("students").where("parentLinkCode", "==", codeAsNumber).limit(20), db.collectionGroup("students").where("studentLinkCode", "==", codeAsNumber).limit(20));
+                }
+                const studentSnaps = await Promise.all(candidateQueries.map((candidateQuery) => t.get(candidateQuery)));
+                const studentDocMap = new Map();
+                for (const snap of studentSnaps) {
+                    for (const studentDoc of snap.docs) {
+                        studentDocMap.set(studentDoc.ref.path, studentDoc);
+                    }
+                }
+                if (studentDocMap.size === 0) {
                     throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
                         userMessage: "입력한 학생 코드와 일치하는 학생이 없습니다. 학생 코드를 다시 확인해주세요.",
                     });
                 }
-                if (studentSnap.size > 1) {
+                let candidates = [];
+                for (const studentDoc of studentDocMap.values()) {
+                    const centerRef = studentDoc.ref.parent.parent;
+                    if (!centerRef)
+                        continue;
+                    const candidateMemberRef = db.doc(`centers/${centerRef.id}/members/${studentDoc.id}`);
+                    const candidateMemberSnap = await t.get(candidateMemberRef);
+                    if (!candidateMemberSnap.exists)
+                        continue;
+                    const candidateMemberData = candidateMemberSnap.data();
+                    const isActiveStudentCandidate = (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
+                    if (!isActiveStudentCandidate)
+                        continue;
+                    const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${centerRef.id}`);
+                    const candidateUserCenterSnap = await t.get(candidateUserCenterRef);
+                    const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
+                    const hasActiveUserCenter = candidateUserCenterSnap.exists &&
+                        (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
+                        isActiveMembershipStatus(candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.status);
+                    const seatQuery = db
+                        .collection(`centers/${centerRef.id}/attendanceCurrent`)
+                        .where("studentId", "==", studentDoc.id)
+                        .limit(1);
+                    const seatSnap = await t.get(seatQuery);
+                    const hasSeatAssignment = !seatSnap.empty;
+                    const studentData = studentDoc.data();
+                    candidates.push({
+                        centerId: centerRef.id,
+                        studentDoc,
+                        studentData,
+                        className: (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.className) || null,
+                        hasActiveUserCenter,
+                        hasSeatAssignment,
+                        updatedAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.updatedAt),
+                        createdAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.createdAt),
+                    });
+                }
+                if (candidates.length === 0) {
+                    throw new functions.https.HttpsError("failed-precondition", "No active student found for this link code.", {
+                        userMessage: "현재 재원 중인 학생 정보를 찾지 못했습니다. 학생 코드를 다시 확인해주세요.",
+                    });
+                }
+                const userCenterActiveCandidates = candidates.filter((candidate) => candidate.hasActiveUserCenter);
+                if (userCenterActiveCandidates.length > 0) {
+                    candidates = userCenterActiveCandidates;
+                }
+                if (candidates.length > 1) {
+                    const seatAssignedCandidates = candidates.filter((candidate) => candidate.hasSeatAssignment);
+                    if (seatAssignedCandidates.length > 0) {
+                        candidates = seatAssignedCandidates;
+                    }
+                }
+                if (candidates.length > 1) {
+                    const sortedCandidates = [...candidates].sort((a, b) => {
+                        const aScore = Math.max(a.updatedAtMs, a.createdAtMs);
+                        const bScore = Math.max(b.updatedAtMs, b.createdAtMs);
+                        return bScore - aScore;
+                    });
+                    const topScore = Math.max(sortedCandidates[0].updatedAtMs, sortedCandidates[0].createdAtMs);
+                    const secondScore = Math.max(sortedCandidates[1].updatedAtMs, sortedCandidates[1].createdAtMs);
+                    if (topScore > secondScore) {
+                        candidates = [sortedCandidates[0]];
+                    }
+                }
+                if (candidates.length > 1) {
                     throw new functions.https.HttpsError("failed-precondition", "Student link code is duplicated.", {
                         userMessage: "해당 학생 코드가 중복되어 있습니다. 센터 관리자에게 코드 재설정을 요청해주세요.",
                     });
                 }
-                const studentDoc = studentSnap.docs[0];
-                const centerRef = studentDoc.ref.parent.parent;
-                if (!centerRef) {
-                    throw new functions.https.HttpsError("failed-precondition", "Student center information is missing.", {
-                        userMessage: "학생 센터 정보를 확인할 수 없습니다. 관리자에게 문의해주세요.",
-                    });
-                }
-                centerId = centerRef.id;
-                linkedStudentRef = studentDoc.ref;
-                linkedStudentData = studentDoc.data();
-                linkedStudentId = studentDoc.id;
-                targetClassName = (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
+                const selected = candidates[0];
+                centerId = selected.centerId;
+                linkedStudentRef = selected.studentDoc.ref;
+                linkedStudentData = selected.studentData;
+                linkedStudentId = selected.studentDoc.id;
+                targetClassName = selected.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
             }
             else {
                 inviteRef = db.doc(`inviteCodes/${code}`);
@@ -720,6 +888,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             ]));
             let linkedStudentIds = [];
             let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber((existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.phoneNumber) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.phoneNumber) || "");
+            const resolvedStatus = "active";
             if (role === "student") {
                 if (!schoolName) {
                     throw new functions.https.HttpsError("invalid-argument", "School name is required for student signup.", {
@@ -771,7 +940,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 id: uid,
                 centerId,
                 role,
-                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.status) || "active",
+                status: resolvedStatus,
                 joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.joinedAt) || ts,
                 displayName: resolvedDisplayName,
                 className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.className) || null,
@@ -786,7 +955,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 id: centerId,
                 centerId,
                 role,
-                status: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.status) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.status) || "active",
+                status: resolvedStatus,
                 joinedAt: (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.joinedAt) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.joinedAt) || ts,
                 displayName: resolvedDisplayName,
                 className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.className) || null,

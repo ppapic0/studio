@@ -53,7 +53,9 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
         ? error.details.userMessage
         : typeof error?.details?.message === 'string'
           ? error.details.message
-          : '';
+          : typeof error?.details?.error === 'string'
+            ? error.details.error
+            : '';
 
   const rawMessage = String(error?.message || '').trim();
   const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
@@ -65,18 +67,21 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
     .trim();
 
   const code = String(error?.code || '').toLowerCase();
+  const hasFailedPrecondition = code.includes('failed-precondition') || /failed[_ -]?precondition/i.test(strippedRaw);
+  const hasInvalidArgument = code.includes('invalid-argument') || /invalid[_ -]?argument/i.test(strippedRaw);
+  const hasAlreadyExists = code.includes('already-exists') || /already[_ -]?exists/i.test(strippedRaw);
   const isInternal = code.includes('internal') || /\b(functions\/internal|internal)\b/i.test(normalizedRaw);
 
   if (detailMessage) return detailMessage;
   if (!isInternal && normalizedRaw) return normalizedRaw;
 
-  if (code.includes('failed-precondition')) {
-    return '가입 조건을 만족하지 못했습니다. 입력한 코드를 다시 확인해 주세요.';
+  if (hasFailedPrecondition) {
+    return '가입 조건을 만족하지 못했습니다. 입력한 학생 코드 또는 초대 코드를 다시 확인해 주세요.';
   }
-  if (code.includes('invalid-argument')) {
+  if (hasInvalidArgument) {
     return '입력값이 올바르지 않습니다. 필수 항목을 다시 확인해 주세요.';
   }
-  if (code.includes('already-exists')) {
+  if (hasAlreadyExists) {
     return '이미 연결된 계정입니다. 잠시 후 다시 확인해 주세요.';
   }
 
@@ -152,7 +157,12 @@ export default function DashboardPage() {
       }
     } catch (error: any) {
       const message = resolveCallableErrorMessage(error, '학생 코드 연동 중 오류가 발생했습니다.');
-      parentLinkForm.setError('studentLinkCode', { message });
+      const lowered = message.toLowerCase();
+      if (/phone|전화|휴대폰/.test(lowered)) {
+        parentLinkForm.setError('parentPhoneNumber', { message });
+      } else {
+        parentLinkForm.setError('studentLinkCode', { message });
+      }
       toast({
         variant: 'destructive',
         title: '연동 실패',

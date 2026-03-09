@@ -109,6 +109,7 @@ export function LoginForm() {
       console.error('Password reset failed:', error);
 
       const code = String(error?.code || '').toLowerCase();
+      const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
       let message = '재설정 메일 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
 
       if (code === 'auth/invalid-email') {
@@ -119,6 +120,10 @@ export function LoginForm() {
         message = '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
       } else if (code === 'auth/user-not-found') {
         message = '가입된 이메일이라면 재설정 링크가 전송됩니다. 메일함을 확인해 주세요.';
+      } else if (code === 'auth/operation-not-allowed') {
+        message = '현재 프로젝트에서 이메일 비밀번호 재설정 기능이 비활성화되어 있습니다. 관리자 설정을 확인해 주세요.';
+      } else if (rawMessage && !/\binternal\b/i.test(rawMessage)) {
+        message = rawMessage;
       }
 
       toast({

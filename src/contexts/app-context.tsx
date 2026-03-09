@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, collectionGroup, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, onSnapshot, doc, query, where, documentId } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -105,6 +105,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
     };
 
+    const getNormalizedStatus = (value: unknown) =>
+      typeof value === 'string' ? value.trim().toLowerCase() : '';
+
+    const hasLinkedStudents = (membership: CenterMembership) =>
+      Array.isArray(membership.linkedStudentIds) &&
+      membership.linkedStudentIds.some((id) => typeof id === 'string' && id.trim().length > 0);
+
+    const pickActiveMembership = (items: CenterMembership[]): CenterMembership | null => {
+      if (items.length === 0) return null;
+
+      const activeItems = items.filter((membership) => {
+        const normalized = getNormalizedStatus(membership.status);
+        return !normalized || normalized === 'active';
+      });
+      const source = activeItems.length > 0 ? activeItems : items;
+
+      const parentWithLinkedStudent = source.find(
+        (membership) => normalizeRole(membership.role) === 'parent' && hasLinkedStudents(membership)
+      );
+      if (parentWithLinkedStudent) return parentWithLinkedStudent;
+
+      return source[0] || null;
+    };
+
     const applyMembershipState = () => {
       const map = new Map<string, CenterMembership>();
 
@@ -125,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const mergedMemberships = Array.from(map.values());
       setMemberships(mergedMemberships);
 
-      const active = mergedMemberships.find((m) => m.status === 'active') || mergedMemberships[0] || null;
+      const active = pickActiveMembership(mergedMemberships);
       const linkedKey = active?.linkedStudentIds?.join(',') || '';
       const activeKey = active
         ? `${active.id}_${active.status}_${active.role}_${active.className || ''}_${active.displayName || ''}_${linkedKey}`
@@ -140,7 +164,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where(documentId(), '==', user.uid));
 
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,

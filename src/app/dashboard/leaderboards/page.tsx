@@ -22,7 +22,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, where } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
-import { LeaderboardEntry, WithId, StudentProfile, CenterMembership } from '@/lib/types';
+import { LeaderboardEntry, WithId, StudentProfile, CenterMembership, AttendanceCurrent } from '@/lib/types';
 import { 
   Loader2, 
   Trophy, 
@@ -231,7 +231,8 @@ export default function LeaderboardsPage() {
     if (!firestore || !activeMembership || !canReadStudentRoster) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student')
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
     );
   }, [firestore, activeMembership, canReadStudentRoster]);
   const {
@@ -244,12 +245,31 @@ export default function LeaderboardsPage() {
     if (!canReadStudentRoster || membersLoading) return null;
     if (!studentMembers) return null;
 
-    const ids = studentMembers
-      .filter((member) => isEnrolledMemberStatus((member as any).status))
-      .map((member) => member.id);
-
-    return new Set(ids);
+    return new Set(
+      studentMembers
+        .filter((member) => isEnrolledMemberStatus((member as any).status))
+        .map((member) => member.id)
+    );
   }, [canReadStudentRoster, membersLoading, studentMembers]);
+
+  // 2. 실제 좌석 배정 학생 목록
+  const attendanceCurrentQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
+  }, [firestore, activeMembership]);
+  const {
+    data: attendanceCurrent,
+    isLoading: attendanceLoading,
+    error: attendanceError,
+  } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isMember });
+
+  const assignedStudentIds = useMemo(() => {
+    if (!attendanceCurrent) return null;
+    const ids = attendanceCurrent
+      .map((seat) => (typeof seat.studentId === 'string' ? seat.studentId.trim() : ''))
+      .filter((id) => id.length > 0);
+    return new Set(ids);
+  }, [attendanceCurrent]);
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -273,18 +293,36 @@ export default function LeaderboardsPage() {
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });
   const visibleLpEntries = useMemo(() => {
     if (!allLpEntries) return null;
-    if (!canReadStudentRoster) return allLpEntries;
-    if (membersError) return allLpEntries;
-    if (activeStudentIds === null) return allLpEntries;
-    if (activeStudentIds.size === 0) return [];
-    return allLpEntries.filter((entry) => activeStudentIds.has(entry.studentId));
-  }, [allLpEntries, canReadStudentRoster, membersError, activeStudentIds]);
 
-  const boardLoading = lpLoading || (canReadStudentRoster && membersLoading);
+    if (attendanceError) return [];
+    if (assignedStudentIds === null) return [];
+    if (assignedStudentIds.size === 0) return [];
+
+    let filtered = allLpEntries.filter((entry) => assignedStudentIds.has(entry.studentId));
+
+    if (canReadStudentRoster) {
+      if (membersError) return [];
+      if (activeStudentIds === null) return [];
+      filtered = filtered.filter((entry) => activeStudentIds.has(entry.studentId));
+    }
+
+    if (canReadStudentRoster && studentProfiles) {
+      filtered = filtered.filter((entry) => !!studentsMap[entry.studentId]);
+    }
+
+    return filtered;
+  }, [allLpEntries, attendanceError, assignedStudentIds, canReadStudentRoster, membersError, activeStudentIds, studentProfiles, studentsMap]);
+
+  const boardLoading = lpLoading || attendanceLoading || (canReadStudentRoster && membersLoading);
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
-    if (studentMembers && studentMembers.length > 0) {
+
+    if (visibleLpEntries && visibleLpEntries.length > 0) {
+      visibleLpEntries.forEach((entry) => {
+        if (entry.classNameSnapshot) classes.add(entry.classNameSnapshot);
+      });
+    } else if (studentMembers && studentMembers.length > 0) {
       studentMembers
         .filter((member) => isEnrolledMemberStatus((member as any).status))
         .forEach((member) => {
@@ -295,8 +333,9 @@ export default function LeaderboardsPage() {
         if (entry.classNameSnapshot) classes.add(entry.classNameSnapshot);
       });
     }
+
     return ['all', ...Array.from(classes).sort()];
-  }, [studentMembers, allLpEntries]);
+  }, [visibleLpEntries, studentMembers, allLpEntries]);
 
   if (!isMember) return null;
 

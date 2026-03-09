@@ -102,7 +102,9 @@ export function SignupForm() {
           ? error.details.userMessage
           : typeof error?.details?.message === 'string'
             ? error.details.message
-            : '';
+            : typeof error?.details?.error === 'string'
+              ? error.details.error
+              : '';
 
     const rawMessage = String(error?.message || '').trim();
     const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
