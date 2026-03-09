@@ -78,6 +78,7 @@ import { TrackLogo } from '../ui/track-logo';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -279,9 +280,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <CardContent className={cn('p-5 space-y-5')}>
           <div className="flex flex-col gap-1">
             <CardTitle className="text-xl font-black tracking-tighter text-slate-900 leading-none">
-              {student?.name || '자녀'} 학생 현황
+              {student?.name || '자녀'} 학생 스냅샷
             </CardTitle>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
               {format(new Date(), 'yyyy. MM. dd (EEEE)', {locale: ko})}
             </p>
           </div>
@@ -307,7 +308,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="absolute top-0 right-0 p-3 opacity-5 rotate-12"><MessageCircle className="h-12 w-12" /></div>
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Teacher's Daily Note</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">교사 데일리 코멘트</span>
                 </div>
                 <p className="text-xs font-bold text-slate-700 leading-relaxed break-keep relative z-10">
                   "{report?.content || '오늘의 학습 피드백이 준비 중입니다.'}"
@@ -344,11 +345,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="reports" className="mt-0 space-y-3 animate-in fade-in duration-500">
               <div className="grid grid-cols-2 gap-2">
                 <Card className="rounded-2xl border-none bg-white p-4 ring-1 ring-slate-100 text-center">
-                  <span className="text-[8px] font-black text-slate-400 block mb-1 uppercase">Weekly Study</span>
+                  <span className="text-[8px] font-black text-slate-400 block mb-1 uppercase">주간 누적 시간</span>
                   <p className="text-lg font-black text-blue-600">{toHm(weekly.totalStudyMinutes)}</p>
                 </Card>
                 <Card className="rounded-2xl border-none bg-white p-4 ring-1 ring-slate-100 text-center">
-                  <span className="text-[8px] font-black text-slate-400 block mb-1 uppercase">Completion Rate</span>
+                  <span className="text-[8px] font-black text-slate-400 block mb-1 uppercase">평균 완수율</span>
                   <p className="text-lg font-black text-emerald-600">{weekly.avgPlanCompletionRate}%</p>
                 </Card>
               </div>
@@ -362,6 +363,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
                   <div className="bg-blue-600 p-8 text-white relative">
                     <DialogTitle className="text-2xl font-black tracking-tighter text-left">주간 성과 분석</DialogTitle>
+                    <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 7일간의 학습 지표 변화입니다.</DialogDescription>
                   </div>
                   <div className="p-6 space-y-6 bg-white">
                     <div className="space-y-3">
@@ -379,7 +381,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     </div>
                     <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
-                      <p className="text-[9px] font-black text-blue-600 uppercase mb-1.5 tracking-widest">Teacher's Feedback</p>
+                      <p className="text-[9px] font-black text-blue-600 uppercase mb-1.5 tracking-widest">선생님 종합 의견</p>
                       <p className="text-sm font-bold text-slate-700 leading-relaxed">"{weekly.teacherFeedback}"</p>
                     </div>
                   </div>
@@ -416,8 +418,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="rounded-[2rem] border-none shadow-2xl p-6 sm:max-w-md">
-                  <DialogHeader><DialogTitle className="text-lg font-black mb-4">시간대별 집중 분포</DialogTitle></DialogHeader>
-                  <div className="h-48 w-full">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg font-black mb-1">시간대별 집중 분포</DialogTitle>
+                    <DialogDescription className="text-[10px] font-bold text-muted-foreground">자녀가 가장 활발하게 몰입하는 시간대입니다.</DialogDescription>
+                  </DialogHeader>
+                  <div className="h-48 w-full mt-4">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={parentDashboardMockData.charts.hourlyFocus}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
