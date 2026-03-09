@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -86,6 +85,8 @@ export function DashboardHeader() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const isMobileView = viewMode === 'mobile';
+
   // 설정 폼 상태
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
@@ -144,11 +145,14 @@ export function DashboardHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:static md:h-auto md:border-0 md:bg-transparent md:px-6">
+    <header className={cn(
+      "sticky top-0 z-30 flex items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:static md:border-0 md:bg-transparent md:px-6 transition-all duration-300",
+      isMobileView ? "h-12" : "h-14 md:h-auto"
+    )}>
       <Sheet>
         <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="md:hidden">
-            <PanelLeft className="h-5 w-5" />
+          <Button size="icon" variant="outline" className={cn("rounded-xl border-2 transition-all", isMobileView ? "h-8 w-8" : "h-9 w-9 md:hidden")}>
+            <PanelLeft className={cn(isMobileView ? "h-4 w-4" : "h-5 w-5")} />
             <span className="sr-only">메뉴 열기</span>
           </Button>
         </SheetTrigger>
@@ -157,30 +161,33 @@ export function DashboardHeader() {
         </SheetContent>
       </Sheet>
 
-      <Breadcrumb className="hidden md:flex">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard">대시보드</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      {/* 앱 모드일 때는 브레드크럼을 숨겨서 상단 공간을 확보합니다. */}
+      {!isMobileView && (
+        <Breadcrumb className="hidden md:flex">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard">대시보드</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
 
       <div className="relative ml-auto flex items-center gap-2">
-        {/* 앱 모드 토글 버튼 ( Smartphone / Monitor ) */}
+        {/* 앱 모드 토글 버튼 */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="rounded-full text-muted-foreground hover:bg-primary/5 transition-all"
+          className={cn("rounded-full text-muted-foreground hover:bg-primary/5 transition-all", isMobileView ? "h-8 w-8" : "h-10 w-10")}
           onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
           title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
         >
-          {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+          {viewMode === 'mobile' ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-5 w-5" />}
         </Button>
 
         <NotificationBell />
@@ -190,7 +197,10 @@ export function DashboardHeader() {
             <Button
               variant="outline"
               size="icon"
-              className="overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button"
+              className={cn(
+                "overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button",
+                isMobileView ? "h-8 w-8" : "h-10 w-10"
+              )}
             >
               <Avatar className="h-full w-full">
                 {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
@@ -268,7 +278,7 @@ export function DashboardHeader() {
 
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
         <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500 w-[95vw] max-w-[370px] sm:w-auto h-[80vh] sm:h-auto max-h-[85vh]">
-          <div className="bg-accent text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
+          <div className="bg-primary text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
             <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
             <DialogTitle className="font-black tracking-tighter flex items-center gap-3 text-xl sm:text-3xl">
               <BookOpen className="h-6 w-6" /> 가이드
