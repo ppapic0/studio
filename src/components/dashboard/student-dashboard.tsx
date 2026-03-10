@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -54,7 +55,8 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
-import { addWeeks, endOfWeek, format, isSameDay, startOfWeek } from 'date-fns';
+import { addDays, subDays, format, isSameDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
@@ -356,31 +358,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
-  const [planWeekOffset, setPlanWeekOffset] = useState(0);
 
   useEffect(() => { setToday(new Date()); }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
+  const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+  const tomorrowKey = today ? format(addDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
   const periodKey = today ? format(today, 'yyyy-MM') : '';
-  const planViewDate = today ? addWeeks(today, planWeekOffset) : null;
-  const planViewDateKey = planViewDate ? format(planViewDate, 'yyyy-MM-dd') : '';
-  const planViewWeekKey = planViewDate ? format(planViewDate, "yyyy-'W'II") : '';
-  const isViewingOtherWeek = planWeekOffset !== 0;
-  const planViewLabel = planWeekOffset === 0
-    ? '\uC774\uBC88 \uC8FC'
-    : planWeekOffset === -1
-      ? '\uC9C0\uB09C \uC8FC'
-      : planWeekOffset === 1
-        ? '\uB2E4\uC74C \uC8FC'
-        : planWeekOffset < 0
-          ? `${Math.abs(planWeekOffset)}\uC8FC \uC804`
-          : `${planWeekOffset}\uC8FC \uD6C4`;
-  const planWeekRangeLabel = planViewDate
-    ? `${format(startOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')} ~ ${format(endOfWeek(planViewDate, { weekStartsOn: 1 }), 'M/d')}`
-    : '';
 
-  // CRITICAL: hooks declaration order matters to prevent initialization error
+  // 성장 및 통계 데이터 (선언 순서 주의: progressRef가 먼저 선언되어야 함)
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
@@ -392,15 +379,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
   }, [firestore, activeMembership, user, todayKey]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
-
-  const allPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !planViewWeekKey || !planViewDateKey) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items'),
-      where('dateKey', '==', planViewDateKey)
-    );
-  }, [firestore, activeMembership, user, planViewWeekKey, planViewDateKey]);
-  const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
 
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
@@ -423,9 +401,32 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [penaltyPoints]);
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
-  const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !progressRef || !todayKey || !periodKey || isProcessingAction) return;
+  // 멀티 데이 쿼리 (어제, 오늘, 내일 통합 조회)
+  const targetDays = useMemo(() => isMobile ? [todayKey] : [yesterdayKey, todayKey, tomorrowKey], [isMobile, yesterdayKey, todayKey, tomorrowKey]);
+  
+  const allPlansRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !weekKey) return null;
+    // 주간 하위 모든 아이템 중 타겟 날짜들만 필터링
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
+      where('dateKey', 'in', targetDays)
+    );
+  }, [firestore, activeMembership, user, weekKey, targetDays]);
+  
+  const { data: fetchedPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
 
+  const plansByDay = useMemo(() => {
+    const map: Record<string, StudyPlanItem[]> = {};
+    fetchedPlans?.forEach(p => {
+      if (!map[p.dateKey]) map[p.dateKey] = [];
+      map[p.dateKey].push(p);
+    });
+    return map;
+  }, [fetchedPlans]);
+
+  const handleStudyStartStop = useCallback(async () => {
+    if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
+    
     setIsProcessingAction(true);
     try {
       const centerId = activeMembership.id;
@@ -441,154 +442,104 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       if (isTimerActive) {
         const nowTs = Date.now();
-        const safeStartTs = startTime || nowTs;
-        const sessionSeconds = Math.max(0, Math.floor((nowTs - safeStartTs) / 1000));
+        const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
-
+        
         const batch = writeBatch(firestore);
         const updateData: any = { updatedAt: serverTimestamp() };
         let finalNewLp = progress?.seasonLp || 0;
-        let wroteSomething = false;
-
+        
         if (sessionSeconds > 0) {
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
-          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1);
+          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
           const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
           const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
-
+          
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
-            updateData['dailyLpStatus.' + todayKey + '.attendance'] = true;
-            toast({ title: '3?? ??! ?? ??? LP ??' });
+            updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
+            toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
             updateData['stats.resilience'] = increment(0.5);
-            updateData['dailyLpStatus.' + todayKey + '.bonus6h'] = true;
-            toast({ title: '6?? ?? ??! ??? ?? ??' });
+            updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
+            toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
           }
 
           finalNewLp += studyLpEarned;
           updateData.seasonLp = increment(studyLpEarned);
-          updateData['dailyLpStatus.' + todayKey + '.dailyLpAmount'] = increment(studyLpEarned);
-
-          if (studyLogRef) {
-            batch.set(studyLogRef, {
-              totalMinutes: increment(sessionMinutes),
-              studentId: user.uid,
-              centerId: activeMembership.id,
-              dateKey: todayKey,
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-            wroteSomething = true;
-          }
-
+          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
+          
+          batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+          
           const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
-          batch.set(statRef, {
-            totalStudyMinutes: increment(sessionMinutes),
-            studentId: user.uid,
-            centerId,
-            dateKey: todayKey,
-            updatedAt: serverTimestamp(),
+          batch.set(statRef, { 
+            totalStudyMinutes: increment(sessionMinutes), 
+            studentId: user.uid, 
+            centerId, 
+            dateKey: todayKey, 
+            updatedAt: serverTimestamp() 
           }, { merge: true });
-          wroteSomething = true;
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, {
-            startTime: Timestamp.fromMillis(safeStartTs),
-            endTime: Timestamp.fromMillis(nowTs),
-            durationMinutes: sessionMinutes,
-            createdAt: serverTimestamp(),
-          });
-          wroteSomething = true;
+          batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          
+          batch.update(progressRef, updateData);
 
-          batch.set(progressRef, updateData, { merge: true });
-          wroteSomething = true;
-
-          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', periodKey + '_lp', 'entries', user.uid);
+          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
           batch.set(rankRef, {
             studentId: user.uid,
-            displayNameSnapshot: user.displayName || '??',
+            displayNameSnapshot: user.displayName || '학생',
             classNameSnapshot: activeMembership.className || null,
             value: finalNewLp,
-            updatedAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
           }, { merge: true });
-          wroteSomething = true;
         }
 
         if (seatDoc) {
           batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
-          wroteSomething = true;
         }
-
-        if (!wroteSomething) {
-          batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
-        }
-
+        
         await batch.commit();
-        sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '??', type: 'exit' });
-        setIsTimerActive(false);
-        setStartTime(null);
-        toast({ title: '?? ???' });
+        sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '학생', type: 'exit' });
+        setIsTimerActive(false); 
+        setStartTime(null); 
+        toast({ title: "트랙 종료됨" });
       } else {
         const nowTs = Date.now();
         const batch = writeBatch(firestore);
-        let wroteSomething = false;
 
         if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-          batch.set(progressRef, {
+          batch.update(progressRef, {
             'stats.consistency': increment(0.5),
-            ['dailyLpStatus.' + todayKey + '.checkedIn']: true,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          toast({ title: '?? ??! ??? ?? +0.5 ??' });
-          wroteSomething = true;
+            [`dailyLpStatus.${todayKey}.checkedIn`]: true,
+            updatedAt: serverTimestamp()
+          });
+          toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
         }
 
         if (seatDoc) {
-          batch.update(seatDoc.ref, {
-            status: 'studying',
+          batch.update(seatDoc.ref, { 
+            status: 'studying', 
             lastCheckInAt: Timestamp.fromMillis(nowTs),
-            updatedAt: serverTimestamp(),
+            updatedAt: serverTimestamp() 
           });
-          wroteSomething = true;
-        }
-
-        if (!wroteSomething) {
-          batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
         }
 
         await batch.commit();
-        sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '??', type: 'entry' });
-        setStartTime(nowTs);
+        sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '학생', type: 'entry' });
+        setStartTime(nowTs); 
         setIsTimerActive(true);
       }
     } catch (e: any) {
-      const detail = typeof e?.message === 'string' ? e.message : '?? ? ?? ??? ???.';
-      console.error('[student-track] start/stop failed', e);
-      toast({ variant: 'destructive', title: '?? ? ?? ??', description: detail });
+      console.error("Action error:", e);
+      toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
     } finally {
       setIsProcessingAction(false);
     }
-  }, [
-    firestore,
-    user,
-    activeMembership,
-    progressRef,
-    isTimerActive,
-    startTime,
-    progress,
-    todayStudyLog,
-    todayKey,
-    periodKey,
-    studyLogRef,
-    setIsTimerActive,
-    setStartTime,
-    toast,
-    finalMultiplier,
-    isProcessingAction,
-  ]);
+  }, [firestore, user, activeMembership, progressRef, isTimerActive, startTime, progress, todayStudyLog, todayKey, periodKey, setIsTimerActive, setStartTime, toast, finalMultiplier, isProcessingAction]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -605,8 +556,105 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
-  const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
-  const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
+  const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
+    if (!firestore || !user || !activeMembership || !progressRef || !weekKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    const nextState = !item.done;
+    
+    await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
+    
+    if (nextState) {
+      const batch = writeBatch(firestore);
+      const achievementCount = progress?.dailyLpStatus?.[item.dateKey]?.achievementCount || 0;
+      if (achievementCount < 5) {
+        batch.update(progressRef, { 
+          'stats.achievement': increment(0.1),
+          [`dailyLpStatus.${item.dateKey}.achievementCount`]: increment(1)
+        });
+      }
+
+      const dailyItems = plansByDay[item.dateKey] || [];
+      const studyTasks = dailyItems.filter(p => p.category === 'study' || !p.category);
+      const doneCount = studyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
+      
+      let finalNewLp = progress?.seasonLp || 0;
+
+      if (studyTasks.length >= 3 && doneCount === studyTasks.length && !progress?.dailyLpStatus?.[item.dateKey]?.plan) {
+        const planLp = Math.round(100 * finalMultiplier);
+        finalNewLp += planLp;
+        batch.update(progressRef, {
+          seasonLp: increment(planLp),
+          [`dailyLpStatus.${item.dateKey}.plan`]: true,
+          [`dailyLpStatus.${item.dateKey}.dailyLpAmount`]: increment(planLp),
+        });
+        toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+
+        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+        batch.set(rankRef, {
+          studentId: user.uid,
+          displayNameSnapshot: user.displayName || '학생',
+          classNameSnapshot: activeMembership.className || null,
+          value: finalNewLp,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      }
+      await batch.commit();
+    }
+  };
+
+  const PlanColumn = ({ dateKey, label }: { dateKey: string, label: string }) => {
+    const items = plansByDay[dateKey] || [];
+    const studyTasks = items.filter(p => p.category === 'study' || !p.category);
+    const routineItems = items.filter(p => p.category === 'schedule');
+    const isTodayCol = dateKey === todayKey;
+
+    return (
+      <div className={cn("flex flex-col gap-4 h-full", !isTodayCol && "opacity-60")}>
+        <div className="flex items-center justify-between px-2">
+          <div className="grid">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</span>
+            <span className="text-xs font-black text-[#14295F]">{dateKey}</span>
+          </div>
+          <Badge variant="outline" className="h-5 px-2 font-black text-[9px] border-primary/20">{studyTasks.filter(t => t.done).length}/{studyTasks.length} DONE</Badge>
+        </div>
+        
+        <div className="flex-1 space-y-2.5">
+          {studyTasks.length === 0 ? (
+            <div className="py-10 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-slate-200 rounded-3xl">계획 없음</div>
+          ) : studyTasks.map(task => (
+            <div key={task.id} className={cn(
+              "flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all shadow-sm group",
+              task.done ? "bg-[#f8faff] border-primary/5" : "bg-white border-slate-100"
+            )}>
+              <Checkbox 
+                checked={task.done} 
+                onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
+                className="h-5 w-5 rounded-md border-2" 
+              />
+              <Label className={cn(
+                "flex-1 text-sm font-black tracking-tight leading-tight truncate break-all",
+                task.done ? "line-through text-slate-400 italic" : "text-slate-800"
+              )}>
+                {task.title}
+              </Label>
+            </div>
+          ))}
+        </div>
+
+        {routineItems.length > 0 && (
+          <div className="pt-4 border-t border-dashed">
+            <div className="flex flex-wrap gap-1.5">
+              {routineItems.map(item => (
+                <Badge key={item.id} variant="secondary" className="bg-slate-50 text-slate-500 border-none font-black text-[8px] h-5 px-2">
+                  <Timer className="h-2.5 w-2.5 mr-1" /> {item.title.split(': ')[0]}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const myRequestsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -624,129 +672,43 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .slice(0, 5);
   }, [rawRequests]);
 
-  const handleRequestSubmit = async () => {
-    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
-    if (requestReason.trim().length < 10) {
-      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
-      return;
-    }
-
-    setIsRequestSubmitting(true);
-    try {
-      const requestData: any = {
-        studentId: user.uid,
-        studentName: user.displayName || '학생',
-        centerId: activeMembership.id,
-        type: requestType,
-        date: requestDate,
-        reason: requestReason.trim(),
-        status: 'requested',
-        penaltyApplied: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'), requestData);
-      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
-      setRequestReason('');
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "제출 실패", description: e.message });
-    } finally {
-      setIsRequestSubmitting(false);
-    }
-  };
-
-  const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (!firestore || !user || !activeMembership || !progressRef || !planViewWeekKey || !todayPlans) return;
-    if (isViewingOtherWeek) {
-      toast({ title: '\uC77D\uAE30 \uC804\uC6A9 \uD654\uBA74', description: '\uC9C0\uB09C \uC8FC/\uB2E4\uC74C \uC8FC \uACC4\uD68D\uC740 \uD655\uC778\uB9CC \uAC00\uB2A5\uD569\uB2C8\uB2E4.' });
-      return;
-    }
-    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', planViewWeekKey, 'items', item.id);
-    const nextState = !item.done;
-    
-    await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
-    
-    if (nextState) {
-      const batch = writeBatch(firestore);
-      const achievementCount = progress?.dailyLpStatus?.[todayKey]?.achievementCount || 0;
-      if (achievementCount < 5) {
-        batch.update(progressRef, { 
-          'stats.achievement': increment(0.1),
-          [`dailyLpStatus.${todayKey}.achievementCount`]: increment(1)
-        });
-      }
-
-      const currentStudyTasks = todayPlans.filter(p => p.category === 'study' || !p.category);
-      const willBeDoneCount = currentStudyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
-      
-      let finalNewLp = progress?.seasonLp || 0;
-
-      if (currentStudyTasks.length >= 3 && willBeDoneCount === currentStudyTasks.length && !progress?.dailyLpStatus?.[todayKey]?.plan) {
-        const planLp = Math.round(100 * finalMultiplier);
-        finalNewLp += planLp;
-        batch.update(progressRef, {
-          seasonLp: increment(planLp),
-          [`dailyLpStatus.${todayKey}.plan`]: true,
-          [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
-        });
-        toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
-
-        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
-        batch.set(rankRef, {
-          studentId: user.uid,
-          displayNameSnapshot: user.displayName || '학생',
-          classNameSnapshot: activeMembership.className || null,
-          value: finalNewLp,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      }
-      await batch.commit();
-    }
-  };
+  const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
   if (!isActive) return null;
-  const totalMinutes = (todayStudyLog?.totalMinutes || 0) + Math.ceil(localSeconds / 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
+  const totalMinutesCount = (todayStudyLog?.totalMinutes || 0) + Math.ceil(localSeconds / 60);
+  const hDisplay = Math.floor(totalMinutesCount / 60);
+  const mDisplay = totalMinutesCount % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
-
-  const formatTimer = (totalSecs: number) => {
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
+      {/* 최상단: 라이브 트랙 세션 */}
       <section className={cn(
         "group relative overflow-hidden text-white shadow-xl transition-all duration-500 bg-gradient-to-br ring-1 ring-white/15",
         currentTier.gradient, "shadow-primary/20",
-        isMobile ? "rounded-[1.25rem] p-5" : "rounded-[2.25rem] p-8"
+        isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-10"
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-[0.08] rotate-12 transition-transform duration-700 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
-        <div className={cn("relative z-10 flex flex-col gap-3", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
-          <div className={isMobile ? "space-y-1.5" : "space-y-4"}>
-            <div className="flex flex-col gap-0.5">
+        <div className={cn("relative z-10 flex flex-col gap-4", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
+          <div className={isMobile ? "space-y-2" : "space-y-4"}>
+            <div className="flex flex-col gap-1">
               <Badge className={cn("w-fit bg-white/20 text-white border border-white/20 font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
-              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-xl" : "text-5xl")}>
+              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-2xl" : "text-6xl")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
-            <div className={cn("flex items-center gap-1.5 bg-white/10 w-fit px-2.5 py-1 rounded-full border border-white/20", isMobile ? "mx-auto" : "md:mx-0")}>
+            <div className={cn("flex items-center gap-1.5 bg-white/10 w-fit px-3 py-1 rounded-full border border-white/20", isMobile ? "mx-auto" : "md:mx-0")}>
               <span className="relative flex h-1.5 w-1.5"><span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isTimerActive ? "bg-accent" : "bg-white")}></span><span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", isTimerActive ? "bg-accent" : "bg-white")}></span></span>
-              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[7px]" : "text-[11px]")}>Performance Engine</span>
+              <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>Performance Engine Active</span>
             </div>
           </div>
-          <div className={cn("flex items-center gap-2.5", isMobile ? "flex-col w-full" : "flex-row")}>
+          <div className={cn("flex items-center gap-3", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
-              <div className={cn("flex flex-col items-center bg-black/25 rounded-2xl border border-white/20 shadow-lg px-4 py-2", isMobile ? "w-full" : "")}>
-                <span className="text-[8px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
-                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
+              <div className={cn("flex flex-col items-center bg-black/25 rounded-2xl border border-white/20 shadow-lg px-6 py-3", isMobile ? "w-full" : "")}>
+                <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">Live Session</span>
+                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-3xl" : "text-7xl")}>
                   {formatTimer(localSeconds)}
                 </span>
               </div>
@@ -756,31 +718,31 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 disabled={isProcessingAction}
                 className={cn(
                   "w-full rounded-2xl font-black transition-all md:w-auto shadow-lg active:scale-[0.98] border border-white/20 flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
-                  isMobile ? "h-14 text-lg px-8" : "h-24 px-16 text-3xl",
+                  isMobile ? "h-16 text-xl px-10" : "h-24 px-16 text-3xl",
                   isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
                 )} 
                 onClick={handleStudyStartStop}
               >
                 {isProcessingAction ? (
-                  <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
+                  <Loader2 className={cn("animate-spin", isMobile ? "h-6 w-6" : "h-10 w-10")} />
                 ) : isTimerActive ? (
-                  <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                  <>트랙 종료 <Square className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} fill="currentColor" /></>
                 ) : (
-                  <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                  <>트랙 시작 <Play className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} fill="currentColor" /></>
                 )}
               </button>
               
               <Dialog>
                 <DialogTrigger asChild>
-                  <button className="w-full h-11 rounded-2xl bg-white/15 border border-white/25 text-white font-black hover:bg-white hover:text-primary gap-2 shadow-lg flex items-center justify-center transition-all active:scale-95">
+                  <button className="w-full h-12 rounded-2xl bg-white/15 border border-white/25 text-white font-black hover:bg-white hover:text-primary gap-2 shadow-lg flex items-center justify-center transition-all active:scale-95">
                     <QrCode className="h-4 w-4" /> 나의 출입 QR
                   </button>
                 </DialogTrigger>
                 <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-sm">
                   <div className="bg-primary p-8 text-white text-center">
                     <DialogHeader>
-                      <DialogTitle className="text-2xl font-black tracking-tighter">나의 출입 QR</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
+                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">나의 출입 QR</DialogTitle>
+                      <DialogDescription className="text-white/70 font-bold mt-1">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
                     </DialogHeader>
                   </div>
                   <div className="p-10 bg-white flex flex-col items-center gap-6">
@@ -803,85 +765,58 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "sm:grid-cols-2")}>
-        <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={h} m={m} isMobile={isMobile} />
+        <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={hDisplay} m={mDisplay} isMobile={isMobile} />
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
       </div>
 
-      <Card className={cn("border border-slate-200/80 shadow-[0_12px_26px_rgba(15,23,42,0.06)] rounded-[2.25rem] bg-white overflow-hidden", isMobile ? "rounded-[1.25rem]" : "")}>
-        <CardHeader className={cn("bg-slate-50 border-b flex flex-col items-center gap-4", isMobile ? "p-5" : "p-8")}>
-          <div className="flex items-center justify-between w-full max-w-2xl">
-            <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-slate-900", isMobile ? "text-lg" : "text-3xl")}>
-              <ListTodo className={cn("text-primary")} /> 계획트랙
-            </CardTitle>
-            <Badge variant="secondary" className={cn("bg-[#eaf2ff] text-primary border border-[#dbe8ff] font-black h-6 uppercase tracking-widest px-3")}>
-              {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
-            </Badge>
+      {/* 핵심: 계획트랙 섹션 (앱 모드 vs 웹 모드 차등화) */}
+      <Card className={cn("border border-slate-200/80 shadow-[0_12px_26px_rgba(15,23,42,0.06)] rounded-[2.25rem] bg-white overflow-hidden transition-all duration-500", isMobile ? "rounded-[1.5rem]" : "")}>
+        <CardHeader className={cn("bg-slate-50/50 border-b flex flex-row items-center justify-between", isMobile ? "p-5" : "p-8")}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/5 text-primary shadow-inner">
+              <ListTodo className="h-6 w-6" />
+            </div>
+            <div className="grid">
+              <CardTitle className="font-black text-2xl tracking-tighter text-slate-900 leading-none">계획트랙</CardTitle>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Study Matrix Logic</p>
+            </div>
           </div>
-          
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-full border shadow-sm">
-            <button className="text-slate-400 hover:text-primary transition-all" onClick={() => setPlanWeekOffset(prev => prev - 1)}><ChevronLeft className="h-5 w-5" /></button>
-            <span className="text-[11px] font-black min-w-[100px] text-center">{planViewLabel} ({planWeekRangeLabel})</span>
-            <button className="text-slate-400 hover:text-primary transition-all" onClick={() => setPlanWeekOffset(prev => prev + 1)}><ChevronRight className="h-5 w-5" /></button>
-          </div>
+          {isMobile ? (
+            <Badge variant="secondary" className="bg-[#eaf2ff] text-primary border border-[#dbe8ff] font-black h-6 px-3">{fetchedPlans?.filter(p => p.dateKey === todayKey && p.done).length || 0} DONE</Badge>
+          ) : (
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border shadow-sm">
+              <span className="text-[11px] font-black text-primary uppercase tracking-widest">3-Day Archive View</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+          )}
         </CardHeader>
         
-        <CardContent className={cn("p-6 flex flex-col items-center gap-8", isMobile ? "p-5" : "p-10")}>
-          <div className="w-full max-w-2xl space-y-4">
-            {studyTasks.length === 0 ? (
-              <div className="py-16 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-slate-200 rounded-3xl w-full">계획이 없습니다.</div>
-            ) : (
-              studyTasks.map((task) => (
-                <div key={task.id} className={cn(
-                  "flex items-center gap-4 p-5 rounded-2xl border-2 transition-all duration-300 group shadow-sm", 
-                  task.done ? "bg-[#f8faff] border-primary/10 opacity-60" : "bg-white border-slate-100 hover:border-primary/20 hover:shadow-md"
-                )}>
-                  <Checkbox 
-                    id={task.id} 
-                    checked={task.done} 
-                    onCheckedChange={() => !isViewingOtherWeek && handleToggleTask(task as WithId<StudyPlanItem>)} 
-                    disabled={isViewingOtherWeek}
-                    className="h-7 w-7 rounded-lg border-2" 
-                  />
-                  <div className="flex-1 min-w-0">
-                    <Label 
-                      htmlFor={task.id} 
-                      className={cn("font-black tracking-tight leading-snug break-keep cursor-pointer block", isMobile ? "text-base" : "text-xl", task.done ? "line-through text-slate-400 italic" : "text-slate-800")}
-                    >
-                      {task.title}
-                    </Label>
-                    {task.targetMinutes && <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 inline-flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="w-full max-w-2xl pt-8 border-t border-dashed">
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <Timer className="h-5 w-5 text-primary" />
-              <h3 className="font-black text-slate-900 text-lg sm:text-xl">생활 루틴</h3>
+        <CardContent className={cn(isMobile ? "p-5" : "p-10")}>
+          {isMobile ? (
+            // 앱 모드: 오늘 계획만 중앙 정렬
+            <div className="max-w-xl mx-auto">
+              <PlanColumn dateKey={todayKey} label="오늘의 목표" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {scheduleItems.length === 0 ? (
-                <div className="col-span-full py-8 text-center opacity-30 italic font-black text-[10px] border border-dashed border-slate-200 rounded-2xl">루틴이 없습니다.</div>
-              ) : (
-                scheduleItems.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100 shadow-sm transition-all hover:bg-white hover:border-primary/20">
-                    <div className="p-2 rounded-lg bg-white shadow-sm text-primary"><Timer className="h-4 w-4" /></div>
-                    <div className="grid leading-tight">
-                      <span className="font-black text-xs text-slate-800 truncate">{item.title.split(': ')[0]}</span>
-                      <span className="text-[10px] font-mono font-black text-primary/60">{item.title.split(': ')[1] || '--:--'}</span>
-                    </div>
-                  </div>
-                ))
-              )}
+          ) : (
+            // 웹 모드: 어제 | 오늘 | 내일 3일치 매트릭스
+            <div className="grid grid-cols-3 gap-10">
+              <div className="relative">
+                <PlanColumn dateKey={yesterdayKey} label="어제의 복기" />
+                <div className="absolute top-0 -right-5 h-full w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent" />
+              </div>
+              <div className="relative">
+                <PlanColumn dateKey={todayKey} label="오늘의 집중" />
+                <div className="absolute top-0 -right-5 h-full w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent" />
+              </div>
+              <PlanColumn dateKey={tomorrowKey} label="내일의 준비" />
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* 하단 액션 카드 (한 줄로 정렬) */}
       <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-        <Link href="/dashboard/student-reports" className="group">
+        <Link href="/dashboard/student-reports" className="group h-full">
           <Card className={cn(
             "h-full border border-slate-200/80 shadow-sm bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-row items-center gap-4",
             isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
@@ -889,8 +824,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className={cn("rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 transition-all group-hover:bg-primary group-hover:text-white", isMobile ? "h-12 w-12" : "h-16 w-16")}>
               <FileText className={cn(isMobile ? "h-6 w-6" : "h-8 w-8")} />
             </div>
-            <div className="grid text-left">
-              <span className={cn("font-black tracking-tighter", isMobile ? "text-sm" : "text-xl")}>데일리 리포트</span>
+            <div className="grid text-left min-w-0">
+              <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-xl")}>데일리 리포트</span>
               <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>Analysis Archive</span>
             </div>
             <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
@@ -899,7 +834,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         <Dialog>
           <DialogTrigger asChild>
-            <button className="group text-left">
+            <button className="group text-left h-full w-full">
               <Card className={cn(
                 "h-full border border-slate-200/80 shadow-sm bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-row items-center gap-4",
                 isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
@@ -907,15 +842,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <div className={cn("rounded-2xl bg-amber-50 flex items-center justify-center shrink-0 transition-all group-hover:bg-amber-500 group-hover:text-white", isMobile ? "h-12 w-12" : "h-16 w-16")}>
                   <ClipboardPen className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
-                <div className="grid">
-                  <span className={cn("font-black tracking-tighter", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
+                <div className="grid min-w-0">
+                  <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
                   <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>Quick Requests</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
               </Card>
             </button>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+          <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
             <div className="bg-amber-500 p-8 text-white relative shrink-0">
               <BellRing className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
@@ -952,7 +887,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   {requestDate === format(new Date(), 'yyyy-MM-dd') && (
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3"><AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" /><p className="text-[11px] font-bold text-rose-900">당일 신청도 먼저 접수되며, 담당 선생님 승인 후 센터 규정에 따라 반영됩니다.</p></div>
                   )}
-                  <Button onClick={handleRequestSubmit} disabled={isRequestSubmitting || requestReason.length < 10} className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200">
+                  <Button onClick={handleRequestSubmit} disabled={isRequestSubmitting || requestReason.length < 10} className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 transition-all active:scale-[0.98]">
                     {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
                   </Button>
                 </div>
@@ -972,7 +907,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         <Dialog>
           <DialogTrigger asChild>
-            <button className="group text-left">
+            <button className="group text-left h-full w-full">
               <Card className={cn(
                 "h-full border border-slate-200/80 shadow-sm bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-row items-center gap-4",
                 isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
@@ -980,8 +915,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <div className={cn("rounded-2xl bg-rose-50 flex items-center justify-center shrink-0 transition-all group-hover:bg-rose-600 group-hover:text-white", isMobile ? "h-12 w-12" : "h-16 w-16")}>
                   <AlertOctagon className={cn("text-rose-600 group-hover:text-white", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
-                <div className="grid">
-                  <span className={cn("font-black tracking-tighter", isMobile ? "text-sm" : "text-xl")}>벌점 현황</span>
+                <div className="grid min-w-0">
+                  <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-xl")}>벌점 현황</span>
                   <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>Growth Guard</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
@@ -1014,4 +949,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
     </div>
   );
+}
+
+function formatTimer(totalSecs: number) {
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
