@@ -573,14 +573,46 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     }
 
     if (normalizedParentLinkCode && normalizedParentLinkCode !== existingParentLinkCode) {
-      const duplicateSnap = await db
-        .collectionGroup("students")
-        .where("parentLinkCode", "==", normalizedParentLinkCode)
-        .limit(20)
-        .get();
+      let duplicateCandidates: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+      try {
+        const duplicateSnap = await db
+          .collectionGroup("students")
+          .where("parentLinkCode", "==", normalizedParentLinkCode)
+          .limit(20)
+          .get();
+        duplicateCandidates = duplicateSnap.docs;
+      } catch (lookupError: any) {
+        console.warn("[updateStudentAccount] collectionGroup duplicate lookup failed, fallback to center scoped lookup", {
+          centerId,
+          studentId,
+          code: normalizedParentLinkCode,
+          message: lookupError?.message || lookupError,
+        });
+
+        const localStudentsRef = db.collection(`centers/${centerId}/students`);
+        const localStringSnap = await localStudentsRef
+          .where("parentLinkCode", "==", normalizedParentLinkCode)
+          .limit(20)
+          .get();
+        duplicateCandidates = [...localStringSnap.docs];
+
+        const asNumber = Number(normalizedParentLinkCode);
+        if (Number.isFinite(asNumber)) {
+          const localNumberSnap = await localStudentsRef
+            .where("parentLinkCode", "==", asNumber)
+            .limit(20)
+            .get();
+
+          for (const docSnap of localNumberSnap.docs) {
+            if (!duplicateCandidates.find((d) => d.ref.path === docSnap.ref.path)) {
+              duplicateCandidates.push(docSnap);
+            }
+          }
+        }
+      }
 
       let hasConflict = false;
-      for (const docSnap of duplicateSnap.docs) {
+      for (const docSnap of duplicateCandidates) {
         if (docSnap.id === studentId) continue;
 
         const candidateCenterRef = docSnap.ref.parent.parent;
