@@ -445,8 +445,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
-    
+    if (!firestore || !user || !activeMembership || !progressRef || !todayKey || !periodKey || isProcessingAction) return;
+
     setIsProcessingAction(true);
     try {
       const centerId = activeMembership.id;
@@ -462,104 +462,244 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       if (isTimerActive) {
         const nowTs = Date.now();
-        const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
+        const safeStartTs = startTime || nowTs;
+        const safeSeatStart = seatDoc?.data?.()?.lastCheckInAt || Timestamp.fromMillis(safeStartTs);
+        const sessionSeconds = Math.max(0, Math.floor((nowTs - safeStartTs) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
-        
+
         const batch = writeBatch(firestore);
         const updateData: any = { updatedAt: serverTimestamp() };
         let finalNewLp = progress?.seasonLp || 0;
-        
+        let wroteSomething = false;
+
         if (sessionSeconds > 0) {
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
-          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
+          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1);
 
           const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
           const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
-          
+
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
-            updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
-            toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+            updateData['dailyLpStatus.' + todayKey + '.attendance'] = true;
+            toast({ title: '3?? ??! ?? ??? LP ??' });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
             updateData['stats.resilience'] = increment(0.5);
-            updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
-            toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
+            updateData['dailyLpStatus.' + todayKey + '.bonus6h'] = true;
+            toast({ title: '6?? ?? ??! ??? ?? ??' });
           }
 
           finalNewLp += studyLpEarned;
           updateData.seasonLp = increment(studyLpEarned);
-          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
-          
-          batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
-          
+          updateData['dailyLpStatus.' + todayKey + '.dailyLpAmount'] = increment(studyLpEarned);
+
+          if (studyLogRef) {
+            batch.set(studyLogRef, {
+              totalMinutes: increment(sessionMinutes),
+              studentId: user.uid,
+              centerId: activeMembership.id,
+              dateKey: todayKey,
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+            wroteSomething = true;
+          }
+
           const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
-          batch.set(statRef, { 
-            totalStudyMinutes: increment(sessionMinutes), 
-            studentId: user.uid, 
-            centerId, 
-            dateKey: todayKey, 
-            updatedAt: serverTimestamp() 
+          batch.set(statRef, {
+            totalStudyMinutes: increment(sessionMinutes),
+            studentId: user.uid,
+            centerId,
+            dateKey: todayKey,
+            updatedAt: serverTimestamp(),
           }, { merge: true });
+          wroteSomething = true;
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, { startTime: seatDoc?.data()?.lastCheckInAt || Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
-          
-          batch.update(progressRef, updateData);
+          batch.set(sessionRef, {
+            startTime: safeSeatStart,
+            endTime: Timestamp.fromMillis(nowTs),
+            durationMinutes: sessionMinutes,
+            createdAt: serverTimestamp(),
+          });
+          wroteSomething = true;
 
-          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+          batch.set(progressRef, updateData, { merge: true });
+          wroteSomething = true;
+
+          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', periodKey + '_lp', 'entries', user.uid);
           batch.set(rankRef, {
             studentId: user.uid,
-            displayNameSnapshot: user.displayName || '학생',
+            displayNameSnapshot: user.displayName || '??',
             classNameSnapshot: activeMembership.className || null,
             value: finalNewLp,
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
           }, { merge: true });
+          wroteSomething = true;
         }
 
         if (seatDoc) {
           batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
+          wroteSomething = true;
         }
-        
-        await batch.commit();
-        sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '학생', type: 'exit' });
-        setIsTimerActive(false); 
-        setStartTime(null); 
-        toast({ title: "트랙 종료됨" });
+
+        if (!wroteSomething) {
+          batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
+        }
+
+        let stopCommitError: any = null;
+        let usedStopFallback = false;
+        try {
+          await batch.commit();
+        } catch (commitError: any) {
+          stopCommitError = commitError;
+          console.error('[student-track] stop commit failed', commitError);
+        }
+
+        if (stopCommitError && sessionSeconds > 0 && studyLogRef) {
+          try {
+            await setDoc(studyLogRef, {
+              totalMinutes: increment(sessionMinutes),
+              studentId: user.uid,
+              centerId: activeMembership.id,
+              dateKey: todayKey,
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+            const fallbackSessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
+            await setDoc(fallbackSessionRef, {
+              startTime: safeSeatStart,
+              endTime: Timestamp.fromMillis(nowTs),
+              durationMinutes: sessionMinutes,
+              createdAt: serverTimestamp(),
+            });
+            usedStopFallback = true;
+            stopCommitError = null;
+            console.warn('[student-track] stop fallback saved session while optional writes were skipped');
+          } catch (fallbackError: any) {
+            console.error('[student-track] stop fallback failed', fallbackError);
+          }
+        }
+
+        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '??', type: 'exit' })
+          .catch((notifyError: any) => {
+            console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
+          });
+
+        setIsTimerActive(false);
+        setStartTime(null);
+        if (stopCommitError) {
+          toast({
+            variant: 'destructive',
+            title: 'Track stop failed',
+            description: 'Please check Firestore write permissions for student data.',
+          });
+        } else if (usedStopFallback) {
+          toast({
+            title: 'Track stopped',
+            description: 'Session log was saved. Some optional metrics sync was skipped.',
+          });
+        } else {
+          toast({ title: 'Track stopped' });
+        }
       } else {
         const nowTs = Date.now();
         const batch = writeBatch(firestore);
+        let wroteSomething = false;
 
         if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-          batch.update(progressRef, {
+          batch.set(progressRef, {
             'stats.consistency': increment(0.5),
-            [`dailyLpStatus.${todayKey}.checkedIn`]: true,
-            updatedAt: serverTimestamp()
-          });
-          toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
+            ['dailyLpStatus.' + todayKey + '.checkedIn']: true,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+          toast({ title: '?? ??! ??? ?? +0.5 ??' });
+          wroteSomething = true;
         }
 
         if (seatDoc) {
-          batch.update(seatDoc.ref, { 
-            status: 'studying', 
+          batch.update(seatDoc.ref, {
+            status: 'studying',
             lastCheckInAt: Timestamp.fromMillis(nowTs),
-            updatedAt: serverTimestamp() 
+            updatedAt: serverTimestamp(),
           });
+          wroteSomething = true;
         }
 
-        await batch.commit();
-        sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '학생', type: 'entry' });
-        setStartTime(nowTs); 
+        if (!wroteSomething) {
+          batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
+        }
+
+        let startCommitError: any = null;
+        let usedStartFallback = false;
+        try {
+          await batch.commit();
+        } catch (commitError: any) {
+          startCommitError = commitError;
+          console.error('[student-track] start commit failed', commitError);
+        }
+
+        if (startCommitError && studyLogRef) {
+          try {
+            await setDoc(studyLogRef, {
+              studentId: user.uid,
+              centerId: activeMembership.id,
+              dateKey: todayKey,
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+            usedStartFallback = true;
+            startCommitError = null;
+            console.warn('[student-track] start fallback kept study-day doc in sync');
+          } catch (fallbackError: any) {
+            console.error('[student-track] start fallback failed', fallbackError);
+          }
+        }
+
+        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '??', type: 'entry' })
+          .catch((notifyError: any) => {
+            console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
+          });
+
+        setStartTime(nowTs);
         setIsTimerActive(true);
+        if (startCommitError) {
+          toast({
+            variant: 'destructive',
+            title: 'Track start failed',
+            description: 'Please check Firestore write permissions for student data.',
+          });
+        } else if (usedStartFallback) {
+          toast({
+            title: 'Track started',
+            description: 'Core study-day sync succeeded. Optional attendance sync was skipped.',
+          });
+        }
       }
     } catch (e: any) {
-      console.error("Action error:", e);
-      toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
+      const detail = typeof e?.message === 'string' ? e.message : '?? ? ?? ??? ???.';
+      console.error('[student-track] start/stop failed', e);
+      toast({ variant: 'destructive', title: '?? ? ?? ??', description: detail });
     } finally {
       setIsProcessingAction(false);
     }
-  }, [firestore, user, activeMembership, progressRef, isTimerActive, startTime, progress, todayStudyLog, todayKey, periodKey, setIsTimerActive, setStartTime, toast, finalMultiplier, isProcessingAction]);
+  }, [
+    firestore,
+    user,
+    activeMembership,
+    progressRef,
+    isTimerActive,
+    startTime,
+    progress,
+    todayStudyLog,
+    todayKey,
+    periodKey,
+    studyLogRef,
+    setIsTimerActive,
+    setStartTime,
+    toast,
+    finalMultiplier,
+    isProcessingAction,
+  ]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
