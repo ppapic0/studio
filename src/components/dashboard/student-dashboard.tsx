@@ -372,7 +372,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
   const periodKey = today ? format(today, 'yyyy-MM') : '';
 
-  // 1. 성장 및 통계 데이터 선언 (ReferenceError 방지를 위해 최상단 선언)
+  // 1. 성장 및 통계 데이터 조회
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
@@ -385,6 +385,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership, user, todayKey]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
+  // 2. 계획 데이터 조회 (어제, 오늘, 내일)
+  const targetDays = useMemo(() => isMobile ? [todayKey] : [yesterdayKey, todayKey, tomorrowKey], [isMobile, yesterdayKey, todayKey, tomorrowKey]);
+  const allPlansRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !weekKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
+      where('dateKey', 'in', targetDays)
+    );
+  }, [firestore, activeMembership, user, weekKey, targetDays]);
+  const { data: fetchedPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
+
+  const plansByDay = useMemo(() => {
+    const map: Record<string, StudyPlanItem[]> = {};
+    fetchedPlans?.forEach(p => {
+      if (!map[p.dateKey]) map[p.dateKey] = [];
+      map[p.dateKey].push(p);
+    });
+    return map;
+  }, [fetchedPlans]);
+
+  // 3. 나의 신청 내역 조회
+  const myRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: myRequestsRaw } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+
+  const myRequests = useMemo(() => {
+    if (!myRequestsRaw) return [];
+    return [...myRequestsRaw]
+      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+      .slice(0, 5);
+  }, [myRequestsRaw]);
+
+  // 4. 스탯 계산
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
     return {
@@ -405,61 +443,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return 0; 
   }, [penaltyPoints]);
   const finalMultiplier = totalBoost * (1 - penaltyRate);
-
-  // 2. 계획 데이터 쿼리
-  const targetDays = useMemo(() => isMobile ? [todayKey] : [yesterdayKey, todayKey, tomorrowKey], [isMobile, yesterdayKey, todayKey, tomorrowKey]);
-  
-  const allPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !weekKey) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
-      where('dateKey', 'in', targetDays)
-    );
-  }, [firestore, activeMembership, user, weekKey, targetDays]);
-  
-  const { data: fetchedPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
-
-  const plansByDay = useMemo(() => {
-    const map: Record<string, StudyPlanItem[]> = {};
-    fetchedPlans?.forEach(p => {
-      if (!map[p.dateKey]) map[p.dateKey] = [];
-      map[p.dateKey].push(p);
-    });
-    return map;
-  }, [fetchedPlans]);
-
-  // 3. 신청서 제출 함수 (RefernceError 해결)
-  const handleRequestSubmit = async () => {
-    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
-    if (requestReason.trim().length < 10) {
-      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
-      return;
-    }
-
-    setIsRequestSubmitting(true);
-    try {
-      const requestData: any = {
-        studentId: user.uid,
-        studentName: user.displayName || '학생',
-        centerId: activeMembership.id,
-        type: requestType,
-        date: requestDate,
-        reason: requestReason.trim(),
-        status: 'requested',
-        penaltyApplied: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'), requestData);
-      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
-      setRequestReason('');
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "제출 실패", description: e.message });
-    } finally {
-      setIsRequestSubmitting(false);
-    }
-  };
 
   const handleStudyStartStop = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
@@ -521,7 +504,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }, { merge: true });
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          batch.set(sessionRef, { startTime: seatDoc?.data()?.lastCheckInAt || Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
           
           batch.update(progressRef, updateData);
 
@@ -639,6 +622,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleRequestSubmitInternal = async () => {
+    await handleRequestSubmit();
+  };
+
   const PlanColumn = ({ dateKey, label }: { dateKey: string, label: string }) => {
     const items = plansByDay[dateKey] || [];
     const studyTasks = items.filter(p => p.category === 'study' || !p.category);
@@ -703,7 +690,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
-      {/* 최상단: 라이브 트랙 세션 */}
       <section className={cn(
         "group relative overflow-hidden text-white shadow-xl transition-all duration-500 bg-gradient-to-br ring-1 ring-white/15",
         currentTier.gradient, "shadow-primary/20",
@@ -790,7 +776,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
       </div>
 
-      {/* 계획트랙 섹션: 앱 모드(오늘만) vs 웹 모드(3일치) */}
       <Card className={cn("border border-slate-200/80 shadow-[0_12px_26px_rgba(15,23,42,0.06)] rounded-[2.25rem] bg-white overflow-hidden transition-all duration-500", isMobile ? "rounded-[1.5rem]" : "")}>
         <CardHeader className={cn("bg-slate-50/50 border-b flex flex-row items-center justify-between", isMobile ? "p-5" : "p-8")}>
           <div className="flex items-center gap-3">
@@ -833,7 +818,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
-      {/* 하단 액션 카드 (한 줄로 정렬) */}
       <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
         <Link href="/dashboard/student-reports" className="group h-full">
           <Card className={cn(
@@ -906,14 +890,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   {requestDate === format(new Date(), 'yyyy-MM-dd') && (
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3"><AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" /><p className="text-[11px] font-bold text-rose-900">당일 신청도 먼저 접수되며, 담당 선생님 승인 후 센터 규정에 따라 반영됩니다.</p></div>
                   )}
-                  <Button onClick={handleRequestSubmit} disabled={isRequestSubmitting || requestReason.length < 10} className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 transition-all active:scale-[0.98]">
+                  <Button onClick={handleRequestSubmitInternal} disabled={isRequestSubmitting || requestReason.length < 10} className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 transition-all active:scale-[0.98]">
                     {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
                   </Button>
                 </div>
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><History className="h-3.5 w-3.5" /> 최근 신청 내역</h4>
                   <div className="grid gap-2">
-                    {myRequests?.length === 0 ? <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px]">내역이 없습니다.</div> : myRequests?.map(req => (
+                    {myRequests.length === 0 ? <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px]">내역이 없습니다.</div> : myRequests.map(req => (
                       <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between"><div className="flex items-center gap-3"><div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>{req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}</div><div className="grid leading-tight"><span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span><span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span></div></div><Badge className={cn("font-black text-[9px] border-none px-2", req.status === 'requested' ? "bg-muted text-muted-foreground" : req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white")}>{req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}</Badge></div>
                     ))}
                   </div>
