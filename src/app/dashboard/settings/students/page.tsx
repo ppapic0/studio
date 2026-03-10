@@ -215,7 +215,17 @@ export default function StudentAccountManagementPage() {
 
   const handleUpdateStudent = async () => {
     if (!functions || !centerId || !selectedStudentForEdit) return;
-    
+
+    const normalizedParentLinkCode = editForm.parentLinkCode.trim();
+    if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
+      toast({
+        variant: 'destructive',
+        title: '\uBD80\uBAA8 \uC5F0\uB3D9\uCF54\uB4DC \uD615\uC2DD \uC624\uB958',
+        description: '\uBD80\uBAA8 \uC5F0\uB3D9\uCF54\uB4DC\uB294 6\uC790\uB9AC \uC22B\uC790\uB85C \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
+      });
+      return;
+    }
+
     setIsUpdating(selectedStudentForEdit.id);
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
@@ -225,7 +235,7 @@ export default function StudentAccountManagementPage() {
         displayName: editForm.displayName.trim() || undefined,
         schoolName: editForm.schoolName.trim() || undefined,
         grade: editForm.grade || undefined,
-        parentLinkCode: editForm.parentLinkCode.trim() || undefined,
+        parentLinkCode: normalizedParentLinkCode || undefined,
         className: editForm.className || null,
         seasonLp: editForm.seasonLp,
         stats: editForm.stats,
@@ -373,31 +383,49 @@ export default function StudentAccountManagementPage() {
 
           <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-8 space-y-10">
             <section className="space-y-5">
-              <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><Users className="h-3.5 w-3.5" /> 기본 정보 및 소속</h4>
+              <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><Users className="h-3.5 w-3.5" /> {'\uAE30\uBCF8 \uC815\uBCF4 \uBC0F \uC18C\uC18D'}</h4>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">이름</Label><Input value={editForm.displayName} onChange={e => setEditForm({...editForm, displayName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
-                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uC774\uB984'}</Label><Input value={editForm.displayName} onChange={e => setEditForm({...editForm, displayName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uBE44\uBC00\uBC88\uD638 (\uBCC0\uACBD \uC2DC\uC5D0\uB9CC)'}</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학교</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uD559\uAD50'}</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학년</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uD559\uB144'}</Label>
                   <Select value={editForm.grade} onValueChange={v => setEditForm({...editForm, grade: v})}>
                     <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-xl">
-                      {['1학년', '2학년', '3학년', 'N수생'].map(g => <SelectItem key={g} value={g} className="font-bold">{g}</SelectItem>)}
+                      {['1\uD559\uB144', '2\uD559\uB144', '3\uD559\uB144', 'N\uC218\uC0DD'].map(g => <SelectItem key={g} value={g} className="font-bold">{g}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">소속 반</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uC18C\uC18D \uBC18'}</Label>
                   <Select value={editForm.className || 'none'} onValueChange={v => setEditForm({...editForm, className: v === 'none' ? '' : v})}>
                     <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-xl">
-                      <SelectItem value="none" className="font-bold">미배정</SelectItem>
+                      <SelectItem value="none" className="font-bold">{'\uBBF8\uBC30\uC815'}</SelectItem>
                       {availableClasses.map(c => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uBD80\uBAA8 \uC5F0\uB3D9\uCF54\uB4DC (6\uC790\uB9AC)'}</Label>
+                  <Input
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="e.g. 123456"
+                    value={editForm.parentLinkCode}
+                    onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value.replace(/\D/g, '').slice(0, 6)})}
+                    className="h-11 rounded-xl border-2 font-bold tracking-[0.2em]"
+                  />
+                </div>
+                <div className="flex items-end pb-2">
+                  <p className="text-[10px] font-bold text-muted-foreground leading-relaxed">
+                    {'\uD559\uC0DD-\uD559\uBD80\uBAA8 \uC5F0\uB3D9\uC5D0 \uC0AC\uC6A9\uD558\uB294 \uCF54\uB4DC\uC785\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uC911\uBCF5/\uD615\uC2DD \uAC80\uC99D\uC774 \uC790\uB3D9\uC73C\uB85C \uC801\uC6A9\uB429\uB2C8\uB2E4.'}
+                  </p>
                 </div>
               </div>
             </section>
