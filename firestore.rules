@@ -54,6 +54,10 @@ service cloud.firestore {
       return getMemberRole(centerId) == 'parent';
     }
 
+    function isSelfStudent(studentId) {
+      return isSignedIn() && request.auth.uid == studentId;
+    }
+
     function isLinkedParentFromMember(centerId, studentId) {
       return hasMembership(centerId)
         && get(memberPath(centerId)).data.linkedStudentIds != null
@@ -120,9 +124,10 @@ service cloud.firestore {
 
       match /growthProgress/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isSignedIn() && request.auth.uid == studentId)
+          || isSelfStudent(studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isCenterAdmin(centerId);
+        allow write: if isCenterAdmin(centerId)
+          || (isStudent(centerId) && isSelfStudent(studentId));
       }
 
       match /attendanceCurrent/{seatId} {
@@ -171,9 +176,13 @@ service cloud.firestore {
 
       match /dailyStudentStats/{dateKey}/students/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isSignedIn() && request.auth.uid == studentId)
+          || isSelfStudent(studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId);
+        allow write: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId)
+              && isSelfStudent(studentId)
+              && request.resource.data.studentId == request.auth.uid
+              && request.resource.data.centerId == centerId);
       }
 
       match /kpiDaily/{dateKey} {
@@ -269,7 +278,10 @@ service cloud.firestore {
 
       match /leaderboards/{boardId}/entries/{entryId} {
         allow read: if isActiveMember(centerId);
-        allow write: if isCenterAdmin(centerId);
+        allow write: if isCenterAdmin(centerId)
+          || (isStudent(centerId)
+              && isSelfStudent(entryId)
+              && request.resource.data.studentId == request.auth.uid);
       }
 
       match /{document=**} {
