@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, collectionGroup, onSnapshot, doc, query, where, documentId } from 'firebase/firestore';
+import { collection, collectionGroup, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -164,7 +164,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where(documentId(), '==', user.uid));
+    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
 
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
