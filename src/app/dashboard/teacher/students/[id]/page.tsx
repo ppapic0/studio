@@ -72,6 +72,16 @@ function toTime(value?: Timestamp): number {
     return 0;
   }
 }
+function normalizeParentLinkCode(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.replace(/\D/g, '').slice(0, 6);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(Math.trunc(value)).replace(/\D/g, '').slice(0, 6);
+  }
+  return '';
+}
+
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
     typeof error?.details === 'string'
@@ -153,8 +163,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const todayKey = format(today, 'yyyy-MM-dd');
   const periodKey = format(today, 'yyyy-MM');
 
-  const canEditStudent = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
-  const canWriteCounseling = canEditStudent || activeMembership?.role === 'teacher';
+  const isAdmin = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
+  const canEditStudentInfo = isAdmin || activeMembership?.role === 'teacher';
+  const canEditGrowthData = isAdmin;
+  const canWriteCounseling = canEditStudentInfo;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'counseling' | 'plans'>('overview');
   const [focusedChartView, setFocusedChartView] = useState<ChartRangeKey>('weekly');
@@ -224,7 +236,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (student && !hasInitializedForm.current) {
-      setEditForm({ name: student.name, schoolName: student.schoolName, grade: student.grade, password: '', parentLinkCode: student.parentLinkCode || '', className: student.className || '' });
+      setEditForm({
+        name: student.name,
+        schoolName: student.schoolName,
+        grade: student.grade,
+        password: '',
+        parentLinkCode: normalizeParentLinkCode(student.parentLinkCode),
+        className: student.className || '',
+      });
       hasInitializedForm.current = true;
     }
   }, [student]);
@@ -452,20 +471,40 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [focusedChartView, avgStudyMinutes, avgCompletionRate, rhythmScore]);
 
   const handleUpdateInfo = async () => {
-    if (!functions || !centerId || !studentId) return;
+    if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
+
+    const normalizedParentLinkCode = normalizeParentLinkCode(editForm.parentLinkCode);
+    const existingParentLinkCode = normalizeParentLinkCode(student?.parentLinkCode);
+    if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
+      toast({
+        variant: 'destructive',
+        title: '입력값 확인 필요',
+        description: '부모 연동코드는 6자리 숫자로 입력해 주세요.',
+      });
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
-      await updateFn({
+      const payload: any = {
         studentId,
         centerId,
-        displayName: editForm.name,
-        schoolName: editForm.schoolName,
-        grade: editForm.grade,
-        password: editForm.password.length >= 6 ? editForm.password : undefined,
-        parentLinkCode: editForm.parentLinkCode.trim() || null,
+        displayName: editForm.name.trim(),
+        schoolName: editForm.schoolName.trim(),
+        grade: editForm.grade.trim(),
         className: editForm.className || null,
-      });
+      };
+
+      if (normalizedParentLinkCode !== existingParentLinkCode) {
+        payload.parentLinkCode = normalizedParentLinkCode || null;
+      }
+
+      if (isAdmin && editForm.password.length >= 6) {
+        payload.password = editForm.password;
+      }
+
+      await updateFn(payload);
       toast({ title: '정보 수정 완료' });
       setIsEditModalOpen(false);
     } catch (error: any) {
@@ -478,7 +517,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const handleUpdateGrowthData = async () => {
-    if (!firestore || !centerId || !studentId) return;
+    if (!firestore || !centerId || !studentId || !canEditGrowthData) return;
     setIsUpdating(true);
     try {
       const batch = writeBatch(firestore);
@@ -608,8 +647,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-wrap gap-2">
           {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
           {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
-          {canEditStudent && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
-          {canEditStudent && <Button variant="destructive" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
+          {canEditStudentInfo && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
+          {isAdmin && <Button variant="destructive" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
         </div>
       </div>
 
@@ -814,7 +853,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <DialogHeader>
               <div className="flex justify-between items-center">
                 <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest">Growth Management</Badge>
-                {!isEditStats && canEditStudent && <Button variant="ghost" size="sm" onClick={() => setIsEditStats(true)} className="text-white hover:bg-white/10 gap-2 h-8 rounded-lg font-black text-xs"><Settings2 className="h-3.5 w-3.5" /> 수동 보정</Button>}
+                {!isEditStats && canEditGrowthData && <Button variant="ghost" size="sm" onClick={() => setIsEditStats(true)} className="text-white hover:bg-white/10 gap-2 h-8 rounded-lg font-black text-xs"><Settings2 className="h-3.5 w-3.5" /> 수동 보정</Button>}
               </div>
               <DialogTitle className="text-3xl font-black tracking-tighter">성장 및 스킬 마스터 관리</DialogTitle>
             </DialogHeader>
@@ -824,7 +863,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <section className="space-y-4">
               <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2"><Zap className="h-4 w-4" /> 시즌 보유 LP</h4>
               <Card className="rounded-[1.5rem] border-2 border-primary/5 bg-muted/5 p-6 flex flex-col items-center text-center gap-4">
-                {isEditStats && canEditStudent ? (
+                {isEditStats && canEditGrowthData ? (
                   <div className="w-full space-y-4">
                     <Slider value={[editLp]} max={50000} step={100} onValueChange={([value]) => setEditLp(value)} />
                     <Input type="number" value={editLp} onChange={(event) => setEditLp(Number(event.target.value))} className="h-12 rounded-xl text-center font-black text-xl border-2" />
@@ -835,7 +874,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </Card>
             </section>
 
-            {isEditStats && canEditStudent && (
+            {isEditStats && canEditGrowthData && (
               <section className="space-y-4">
                 <h4 className="text-xs font-black uppercase text-blue-600 flex items-center gap-2"><Timer className="h-4 w-4" /> 오늘 공부시간 보정 (분)</h4>
                 <Input type="number" value={editTodayMinutes} onChange={(event) => setEditTodayMinutes(Number(event.target.value))} className="h-14 rounded-2xl border-blue-200 font-black text-2xl text-center text-blue-600" />
@@ -847,7 +886,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <div className="grid gap-8">
                 {Object.entries(STAT_CONFIG).map(([key, config]) => {
                   const statKey = key as keyof typeof editStats;
-                  const value = isEditStats && canEditStudent ? (editStats[statKey] || 0) : (progress?.stats?.[statKey] || 0);
+                  const value = isEditStats && canEditGrowthData ? (editStats[statKey] || 0) : (progress?.stats?.[statKey] || 0);
                   const Icon = config.icon;
                   return (
                     <div key={key} className="space-y-3">
@@ -855,7 +894,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         <div className="flex items-center gap-3"><div className={cn('p-2 rounded-xl', config.accent)}><Icon className={cn('h-5 w-5', config.color)} /></div><div><p className="text-sm font-black tracking-tight">{config.label}</p><p className="text-[10px] font-bold text-muted-foreground uppercase">{config.sub}</p></div></div>
                         <div className="text-right flex items-baseline gap-1"><span className="text-2xl font-black tabular-nums">{value.toFixed(1)}</span><span className="text-[10px] font-bold text-muted-foreground/40">/ 100</span></div>
                       </div>
-                      {isEditStats && canEditStudent ? <Slider value={[value]} max={100} step={0.5} onValueChange={([next]) => setEditStats({ ...editStats, [statKey]: next })} /> : <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${value}%` }} /></div>}
+                      {isEditStats && canEditGrowthData ? <Slider value={[value]} max={100} step={0.5} onValueChange={([next]) => setEditStats({ ...editStats, [statKey]: next })} /> : <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${value}%` }} /></div>}
                       <p className="text-[11px] font-semibold text-muted-foreground">{config.guide}</p>
                     </div>
                   );
@@ -865,7 +904,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <DialogFooter className="p-8 bg-muted/20 border-t shrink-0">
-            {isEditStats && canEditStudent ? (
+            {isEditStats && canEditGrowthData ? (
               <div className="flex gap-3 w-full">
                 <Button variant="outline" onClick={() => setIsEditStats(false)} className="flex-1 h-14 rounded-2xl font-black border-2">취소</Button>
                 <Button onClick={handleUpdateGrowthData} disabled={isUpdating} className="h-14 px-10 rounded-2xl font-black text-lg shadow-xl gap-2">{isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />} 저장</Button>
@@ -885,6 +924,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">소속 반</Label><Select value={editForm.className || 'none'} onValueChange={(value) => setEditForm({ ...editForm, className: value === 'none' ? '' : value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="none" className="font-bold">미배정</SelectItem>{availableClasses.map((className) => <SelectItem key={className} value={className} className="font-bold">{className}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학교</Label><Input value={editForm.schoolName} onChange={(event) => setEditForm({ ...editForm, schoolName: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학년</Label><Select value={editForm.grade} onValueChange={(value) => setEditForm({ ...editForm, grade: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">부모 연동코드 (6자리)</Label><Input value={editForm.parentLinkCode} onChange={(event) => setEditForm({ ...editForm, parentLinkCode: event.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" maxLength={6} className="rounded-xl h-12 border-2 font-bold tracking-[0.2em]" placeholder="123456" /></div>
+            {isAdmin && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={(event) => setEditForm({ ...editForm, password: event.target.value })} className="rounded-xl h-12 border-2 font-bold" placeholder="6자 이상 입력 시 변경" /></div>}
           </div>
           <DialogFooter className="p-8 bg-muted/20 border-t"><Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">{isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : '정보 저장'}</Button></DialogFooter>
         </DialogContent>
@@ -928,3 +969,4 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     </div>
   );
 }
+

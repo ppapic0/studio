@@ -94,6 +94,65 @@ function isActiveMembershipStatus(value: unknown): boolean {
   return !normalized || normalized === "active";
 }
 
+type CenterMembershipLookup = {
+  role: string | null;
+  status: unknown;
+};
+
+async function resolveCenterMembershipRole(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  uid: string
+): Promise<CenterMembershipLookup> {
+  const [memberSnap, userCenterSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${uid}`).get(),
+    db.doc(`userCenters/${uid}/centers/${centerId}`).get(),
+  ]);
+
+  const memberData = memberSnap.exists ? (memberSnap.data() as any) : null;
+  const memberRole = typeof memberData?.role === "string" ? memberData.role.trim() : "";
+  if (memberRole && isActiveMembershipStatus(memberData?.status)) {
+    return {
+      role: memberRole,
+      status: memberData?.status,
+    };
+  }
+
+  const userCenterData = userCenterSnap.exists ? (userCenterSnap.data() as any) : null;
+  const userCenterRole = typeof userCenterData?.role === "string" ? userCenterData.role.trim() : "";
+  if (userCenterRole && isActiveMembershipStatus(userCenterData?.status)) {
+    return {
+      role: userCenterRole,
+      status: userCenterData?.status,
+    };
+  }
+
+  if (memberRole) {
+    return {
+      role: memberRole,
+      status: memberData?.status,
+    };
+  }
+
+  if (userCenterRole) {
+    return {
+      role: userCenterRole,
+      status: userCenterData?.status,
+    };
+  }
+
+  return { role: null, status: null };
+}
+
+function normalizeParentLinkCodeValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(Math.trunc(value)).trim();
+  }
+  return "";
+}
 function toMillisSafe(value: unknown): number {
   if (!value) return 0;
   if (value instanceof Date) {
@@ -530,20 +589,30 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
   const callerUid = context.auth.uid;
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerUid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  const callerMembership = await resolveCenterMembershipRole(db, centerId, callerUid);
+  const callerRole = callerMembership.role;
+  const callerStatus = callerMembership.status;
   const isAdminCaller = isAdminRole(callerRole);
+  const isTeacherCaller = callerRole === "teacher";
+  const canEditOtherStudent = isAdminCaller || isTeacherCaller;
   const isSelfStudentCaller = callerRole === "student" && callerUid === studentId;
 
-  if (!isAdminCaller && !isSelfStudentCaller) {
-    throw new functions.https.HttpsError("permission-denied", "수정 권한이 없습니다.");
+  if (!canEditOtherStudent && !isSelfStudentCaller) {
+    throw new functions.https.HttpsError("permission-denied", "?? ??? ????.", {
+      userMessage: "?? ?? ?? ???/?? ???? ??? ? ????.",
+    });
+  }
+
+  if (!isActiveMembershipStatus(callerStatus)) {
+    throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+      userMessage: "??? ??? ??? ?? ??? ??? ? ????.",
+    });
   }
 
   const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
   const existingStudentSnap = await studentRef.get();
   const existingStudentData = existingStudentSnap.exists ? (existingStudentSnap.data() as any) : null;
-  const existingParentLinkCode =
-    typeof existingStudentData?.parentLinkCode === "string" ? existingStudentData.parentLinkCode.trim() : "";
+  const existingParentLinkCode = normalizeParentLinkCodeValue(existingStudentData?.parentLinkCode);
 
   const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
   const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
@@ -554,15 +623,10 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     : undefined;
 
   const parentLinkCodeProvided = parentLinkCode !== undefined;
-  const normalizedParentLinkCode =
-    typeof parentLinkCode === "string"
-      ? parentLinkCode.trim()
-      : parentLinkCode === null
-        ? ""
-        : undefined;
+  const normalizedParentLinkCode = parentLinkCode === null ? "" : normalizeParentLinkCodeValue(parentLinkCode);
 
   if (parentLinkCodeProvided) {
-    if (typeof normalizedParentLinkCode !== "string") {
+    if (parentLinkCode !== null && typeof parentLinkCode !== "string" && typeof parentLinkCode !== "number") {
       throw new functions.https.HttpsError("invalid-argument", "Parent link code type is invalid.");
     }
 
@@ -674,7 +738,10 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       });
     }
 
-    if (!trimmedSchoolName && !trimmedGrade && !parentLinkCodeProvided) {
+    const hasSelfEditableFieldInPayload =
+      typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided;
+
+    if (!hasSelfEditableFieldInPayload) {
       throw new functions.https.HttpsError("invalid-argument", "No editable field provided.", {
         userMessage: "수정할 항목을 입력해 주세요.",
       });
@@ -711,10 +778,10 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (trimmedSchoolName) studentUpdate.schoolName = trimmedSchoolName;
     if (trimmedGrade) studentUpdate.grade = trimmedGrade;
     if (parentLinkCodeProvided) studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
-    if (isAdminCaller && hasClassName) studentUpdate.className = normalizedClassName;
+    if (canEditOtherStudent && hasClassName) studentUpdate.className = normalizedClassName;
     batch.set(studentRef, studentUpdate, { merge: true });
 
-    if (isAdminCaller) {
+    if (canEditOtherStudent) {
       const memberUpdate: any = { updatedAt: timestamp };
       if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
       if (hasClassName) memberUpdate.className = normalizedClassName;
@@ -730,7 +797,9 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
           { merge: true }
         );
       }
+    }
 
+    if (isAdminCaller) {
       const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
       const hasStats = !!stats && typeof stats === "object";
 
@@ -777,7 +846,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     }
 
     await batch.commit();
-    return { ok: true, updatedBy: isSelfStudentCaller ? "student" : "admin" };
+    return { ok: true, updatedBy: isSelfStudentCaller ? "student" : isTeacherCaller ? "teacher" : "admin" };
   } catch (e: any) {
     if (e instanceof functions.https.HttpsError) {
       throw e;

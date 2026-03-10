@@ -106,6 +106,16 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
 
   return fallback;
 }
+function normalizeParentLinkCode(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.replace(/\D/g, '').slice(0, 6);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(Math.trunc(value)).replace(/\D/g, '').slice(0, 6);
+  }
+  return '';
+}
+
 export default function StudentAccountManagementPage() {
   const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
@@ -199,7 +209,7 @@ export default function StudentAccountManagementPage() {
       password: '',
       schoolName: profile?.schoolName || '',
       grade: profile?.grade || '1학년',
-      parentLinkCode: profile?.parentLinkCode || '',
+      parentLinkCode: normalizeParentLinkCode(profile?.parentLinkCode),
       className: member.className || '',
       seasonLp: progress?.seasonLp || 0,
       stats: {
@@ -216,7 +226,8 @@ export default function StudentAccountManagementPage() {
   const handleUpdateStudent = async () => {
     if (!functions || !centerId || !selectedStudentForEdit) return;
 
-    const normalizedParentLinkCode = editForm.parentLinkCode.trim();
+    const normalizedParentLinkCode = normalizeParentLinkCode(editForm.parentLinkCode);
+    const currentParentLinkCode = normalizeParentLinkCode(studentsProfiles?.find((profile) => profile.id === selectedStudentForEdit.id)?.parentLinkCode);
     if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
       toast({
         variant: 'destructive',
@@ -235,7 +246,7 @@ export default function StudentAccountManagementPage() {
         displayName: editForm.displayName.trim() || undefined,
         schoolName: editForm.schoolName.trim() || undefined,
         grade: editForm.grade || undefined,
-        parentLinkCode: normalizedParentLinkCode || undefined,
+        parentLinkCode: normalizedParentLinkCode !== currentParentLinkCode ? (normalizedParentLinkCode || null) : undefined,
         className: editForm.className || null,
         seasonLp: editForm.seasonLp,
         stats: editForm.stats,

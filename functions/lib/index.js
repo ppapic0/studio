@@ -57,6 +57,50 @@ function isActiveMembershipStatus(value) {
     const normalized = normalizeMembershipStatus(value);
     return !normalized || normalized === "active";
 }
+async function resolveCenterMembershipRole(db, centerId, uid) {
+    const [memberSnap, userCenterSnap] = await Promise.all([
+        db.doc(`centers/${centerId}/members/${uid}`).get(),
+        db.doc(`userCenters/${uid}/centers/${centerId}`).get(),
+    ]);
+    const memberData = memberSnap.exists ? memberSnap.data() : null;
+    const memberRole = typeof (memberData === null || memberData === void 0 ? void 0 : memberData.role) === "string" ? memberData.role.trim() : "";
+    if (memberRole && isActiveMembershipStatus(memberData === null || memberData === void 0 ? void 0 : memberData.status)) {
+        return {
+            role: memberRole,
+            status: memberData === null || memberData === void 0 ? void 0 : memberData.status,
+        };
+    }
+    const userCenterData = userCenterSnap.exists ? userCenterSnap.data() : null;
+    const userCenterRole = typeof (userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.role) === "string" ? userCenterData.role.trim() : "";
+    if (userCenterRole && isActiveMembershipStatus(userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.status)) {
+        return {
+            role: userCenterRole,
+            status: userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.status,
+        };
+    }
+    if (memberRole) {
+        return {
+            role: memberRole,
+            status: memberData === null || memberData === void 0 ? void 0 : memberData.status,
+        };
+    }
+    if (userCenterRole) {
+        return {
+            role: userCenterRole,
+            status: userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.status,
+        };
+    }
+    return { role: null, status: null };
+}
+function normalizeParentLinkCodeValue(value) {
+    if (typeof value === "string") {
+        return value.trim();
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(Math.trunc(value)).trim();
+    }
+    return "";
+}
 function toMillisSafe(value) {
     if (!value)
         return 0;
@@ -410,7 +454,6 @@ exports.deleteStudentAccount = functions.region(region).runWith({
     }
 });
 exports.updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
-    var _a;
     const db = admin.firestore();
     const auth = admin.auth();
     const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
@@ -419,17 +462,27 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     if (!studentId || !centerId)
         throw new functions.https.HttpsError("invalid-argument", "ID 누락");
     const callerUid = context.auth.uid;
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${callerUid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    const callerMembership = await resolveCenterMembershipRole(db, centerId, callerUid);
+    const callerRole = callerMembership.role;
+    const callerStatus = callerMembership.status;
     const isAdminCaller = isAdminRole(callerRole);
+    const isTeacherCaller = callerRole === "teacher";
+    const canEditOtherStudent = isAdminCaller || isTeacherCaller;
     const isSelfStudentCaller = callerRole === "student" && callerUid === studentId;
-    if (!isAdminCaller && !isSelfStudentCaller) {
-        throw new functions.https.HttpsError("permission-denied", "수정 권한이 없습니다.");
+    if (!canEditOtherStudent && !isSelfStudentCaller) {
+        throw new functions.https.HttpsError("permission-denied", "?? ??? ????.", {
+            userMessage: "?? ?? ?? ???/?? ???? ??? ? ????.",
+        });
+    }
+    if (!isActiveMembershipStatus(callerStatus)) {
+        throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+            userMessage: "??? ??? ??? ?? ??? ??? ? ????.",
+        });
     }
     const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
     const existingStudentSnap = await studentRef.get();
     const existingStudentData = existingStudentSnap.exists ? existingStudentSnap.data() : null;
-    const existingParentLinkCode = typeof (existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.parentLinkCode) === "string" ? existingStudentData.parentLinkCode.trim() : "";
+    const existingParentLinkCode = normalizeParentLinkCodeValue(existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.parentLinkCode);
     const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
     const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
     const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
@@ -438,13 +491,9 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         ? (typeof className === "string" && className.trim() ? className.trim() : null)
         : undefined;
     const parentLinkCodeProvided = parentLinkCode !== undefined;
-    const normalizedParentLinkCode = typeof parentLinkCode === "string"
-        ? parentLinkCode.trim()
-        : parentLinkCode === null
-            ? ""
-            : undefined;
+    const normalizedParentLinkCode = parentLinkCode === null ? "" : normalizeParentLinkCodeValue(parentLinkCode);
     if (parentLinkCodeProvided) {
-        if (typeof normalizedParentLinkCode !== "string") {
+        if (parentLinkCode !== null && typeof parentLinkCode !== "string" && typeof parentLinkCode !== "number") {
             throw new functions.https.HttpsError("invalid-argument", "Parent link code type is invalid.");
         }
         if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
@@ -541,7 +590,8 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
                 userMessage: "학생은 학교/학년/학부모 연동 코드만 수정할 수 있습니다.",
             });
         }
-        if (!trimmedSchoolName && !trimmedGrade && !parentLinkCodeProvided) {
+        const hasSelfEditableFieldInPayload = typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided;
+        if (!hasSelfEditableFieldInPayload) {
             throw new functions.https.HttpsError("invalid-argument", "No editable field provided.", {
                 userMessage: "수정할 항목을 입력해 주세요.",
             });
@@ -582,10 +632,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             studentUpdate.grade = trimmedGrade;
         if (parentLinkCodeProvided)
             studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
-        if (isAdminCaller && hasClassName)
+        if (canEditOtherStudent && hasClassName)
             studentUpdate.className = normalizedClassName;
         batch.set(studentRef, studentUpdate, { merge: true });
-        if (isAdminCaller) {
+        if (canEditOtherStudent) {
             const memberUpdate = { updatedAt: timestamp };
             if (trimmedDisplayName)
                 memberUpdate.displayName = trimmedDisplayName;
@@ -598,6 +648,8 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
                     updatedAt: timestamp,
                 }, { merge: true });
             }
+        }
+        if (isAdminCaller) {
             const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
             const hasStats = !!stats && typeof stats === "object";
             if (hasSeasonLp || hasStats) {
@@ -638,7 +690,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             }
         }
         await batch.commit();
-        return { ok: true, updatedBy: isSelfStudentCaller ? "student" : "admin" };
+        return { ok: true, updatedBy: isSelfStudentCaller ? "student" : isTeacherCaller ? "teacher" : "admin" };
     }
     catch (e) {
         if (e instanceof functions.https.HttpsError) {

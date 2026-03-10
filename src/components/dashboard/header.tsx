@@ -83,6 +83,16 @@ function resolveCallableErrorMessage(error: any): string {
   return '서버 통신 중 오류가 발생했습니다.';
 }
 
+function normalizeParentLinkCode(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.replace(/\D/g, '').slice(0, 6);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(Math.trunc(value)).replace(/\D/g, '').slice(0, 6);
+  }
+  return '';
+}
+
 export function DashboardHeader() {
   const { user } = useUser();
   const auth = useAuth();
@@ -114,7 +124,7 @@ export function DashboardHeader() {
     if (studentProfile) {
       setSchoolName(studentProfile.schoolName || '');
       setGrade(studentProfile.grade || '');
-      setParentLinkCode(studentProfile.parentLinkCode || '');
+      setParentLinkCode(normalizeParentLinkCode(studentProfile.parentLinkCode));
     } else if (userProfile) {
       setSchoolName(userProfile.schoolName || '');
       setGrade('');
@@ -133,9 +143,10 @@ export function DashboardHeader() {
 
     const normalizedSchoolName = schoolName.trim();
     const normalizedGrade = grade.trim();
-    const normalizedParentLinkCode = parentLinkCode.trim();
+    const normalizedParentLinkCode = normalizeParentLinkCode(parentLinkCode);
+    const currentParentLinkCode = normalizeParentLinkCode(studentProfile?.parentLinkCode);
 
-    if (activeMembership.role === 'student' && !/^\d{6}$/.test(normalizedParentLinkCode)) {
+    if (activeMembership.role === 'student' && normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
       toast({
         variant: 'destructive',
         title: '입력 확인',
@@ -152,13 +163,16 @@ export function DashboardHeader() {
         }
 
         const updateFn = httpsCallable(functions, 'updateStudentAccount');
-        await updateFn({
+        const payload: any = {
           studentId: user.uid,
           centerId: activeMembership.id,
           schoolName: normalizedSchoolName,
           grade: normalizedGrade,
-          parentLinkCode: normalizedParentLinkCode,
-        });
+        };
+        if (normalizedParentLinkCode !== currentParentLinkCode) {
+          payload.parentLinkCode = normalizedParentLinkCode || null;
+        }
+        await updateFn(payload);
       } else {
         const batch = writeBatch(firestore);
         batch.set(
