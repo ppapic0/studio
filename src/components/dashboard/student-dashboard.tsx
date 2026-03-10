@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -55,7 +54,7 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
-import { addDays, subDays, format, isSameDay } from 'date-fns';
+import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -89,6 +88,12 @@ const TIER_PRESETS = [
   { label: '그마', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
   { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
+
+function formatTimer(totalSecs: number) {
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
 
 function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string }) {
   const [stats, setStats] = useState(currentStats);
@@ -367,7 +372,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
   const periodKey = today ? format(today, 'yyyy-MM') : '';
 
-  // 성장 및 통계 데이터 (선언 순서 주의: progressRef가 먼저 선언되어야 함)
+  // 1. 성장 및 통계 데이터 선언 (ReferenceError 방지를 위해 최상단 선언)
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
@@ -401,12 +406,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [penaltyPoints]);
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
-  // 멀티 데이 쿼리 (어제, 오늘, 내일 통합 조회)
+  // 2. 계획 데이터 쿼리
   const targetDays = useMemo(() => isMobile ? [todayKey] : [yesterdayKey, todayKey, tomorrowKey], [isMobile, yesterdayKey, todayKey, tomorrowKey]);
   
   const allPlansRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !weekKey) return null;
-    // 주간 하위 모든 아이템 중 타겟 날짜들만 필터링
     return query(
       collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
       where('dateKey', 'in', targetDays)
@@ -423,6 +427,39 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     });
     return map;
   }, [fetchedPlans]);
+
+  // 3. 신청서 제출 함수 (RefernceError 해결)
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
+    if (requestReason.trim().length < 10) {
+      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const requestData: any = {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: requestReason.trim(),
+        status: 'requested',
+        penaltyApplied: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'), requestData);
+      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      setRequestReason('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
 
   const handleStudyStartStop = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
@@ -484,7 +521,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }, { merge: true });
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
           
           batch.update(progressRef, updateData);
 
@@ -656,22 +693,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
   };
 
-  const myRequestsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
-      where('studentId', '==', user.uid)
-    );
-  }, [firestore, activeMembership, user]);
-  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
-
-  const myRequests = useMemo(() => {
-    if (!rawRequests) return [];
-    return [...rawRequests]
-      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-      .slice(0, 5);
-  }, [rawRequests]);
-
   const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
   if (!isActive) return null;
@@ -769,7 +790,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
       </div>
 
-      {/* 핵심: 계획트랙 섹션 (앱 모드 vs 웹 모드 차등화) */}
+      {/* 계획트랙 섹션: 앱 모드(오늘만) vs 웹 모드(3일치) */}
       <Card className={cn("border border-slate-200/80 shadow-[0_12px_26px_rgba(15,23,42,0.06)] rounded-[2.25rem] bg-white overflow-hidden transition-all duration-500", isMobile ? "rounded-[1.5rem]" : "")}>
         <CardHeader className={cn("bg-slate-50/50 border-b flex flex-row items-center justify-between", isMobile ? "p-5" : "p-8")}>
           <div className="flex items-center gap-3">
@@ -793,12 +814,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         
         <CardContent className={cn(isMobile ? "p-5" : "p-10")}>
           {isMobile ? (
-            // 앱 모드: 오늘 계획만 중앙 정렬
             <div className="max-w-xl mx-auto">
               <PlanColumn dateKey={todayKey} label="오늘의 목표" />
             </div>
           ) : (
-            // 웹 모드: 어제 | 오늘 | 내일 3일치 매트릭스
             <div className="grid grid-cols-3 gap-10">
               <div className="relative">
                 <PlanColumn dateKey={yesterdayKey} label="어제의 복기" />
@@ -949,10 +968,4 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
     </div>
   );
-}
-
-function formatTimer(totalSecs: number) {
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
