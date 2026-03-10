@@ -1,4 +1,18 @@
 {
+  "apphosting": [
+    {
+      "backendId": "studio",
+      "rootDir": ".",
+      "ignore": [
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "functions",
+        "node_modules",
+        ".next"
+      ]
+    }
+  ],
   "functions": [
     {
       "source": "functions",
