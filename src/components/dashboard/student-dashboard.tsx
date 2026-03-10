@@ -451,11 +451,37 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     try {
       const centerId = activeMembership.id;
       let seatDoc: any = null;
+      let fallbackSeatRef: any = null;
+      let fallbackSeatNo: number | null = null;
+      let fallbackSeatZone: string | null = null;
       try {
+        const studentRef = doc(firestore, 'centers', centerId, 'students', user.uid);
+        const studentSnap = await getDoc(studentRef);
+        if (studentSnap.exists()) {
+          const studentData = studentSnap.data() as Partial<StudentProfile>;
+          const rawSeatNo = studentData?.seatNo;
+          const parsedSeatNo = typeof rawSeatNo === 'number'
+            ? rawSeatNo
+            : Number.parseInt(String(rawSeatNo ?? ''), 10);
+          if (Number.isFinite(parsedSeatNo) && parsedSeatNo > 0) {
+            fallbackSeatNo = parsedSeatNo;
+            fallbackSeatZone = studentData?.seatZone || null;
+            const seatId = `seat_${parsedSeatNo.toString().padStart(3, '0')}`;
+            fallbackSeatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId);
+          }
+        }
+
         const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
         const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
         const seatSnap = await getDocs(seatQuery);
         seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
+
+        if (!seatDoc && fallbackSeatRef) {
+          const fallbackSeatSnap = await getDoc(fallbackSeatRef);
+          if (fallbackSeatSnap.exists()) {
+            seatDoc = fallbackSeatSnap;
+          }
+        }
       } catch (seatError: any) {
         console.warn('[student-track] seat lookup skipped', seatError?.message || seatError);
       }
@@ -538,9 +564,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }, { merge: true });
           wroteSomething = true;
         }
-
-        if (seatDoc) {
-          batch.update(seatDoc.ref, { status: 'absent', updatedAt: serverTimestamp() });
+        const stopSeatRef = seatDoc?.ref || fallbackSeatRef;
+        if (stopSeatRef) {
+          const stopSeatPayload: Record<string, any> = {
+            studentId: user.uid,
+            status: 'absent',
+            updatedAt: serverTimestamp(),
+          };
+          if (fallbackSeatNo) {
+            stopSeatPayload.seatNo = fallbackSeatNo;
+            stopSeatPayload.type = 'seat';
+          }
+          if (fallbackSeatZone) {
+            stopSeatPayload.seatZone = fallbackSeatZone;
+          }
+          batch.set(stopSeatRef, stopSeatPayload, { merge: true });
           wroteSomething = true;
         }
 
@@ -620,13 +658,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           toast({ title: '?? ??! ??? ?? +0.5 ??' });
           wroteSomething = true;
         }
-
-        if (seatDoc) {
-          batch.update(seatDoc.ref, {
+        const startSeatRef = seatDoc?.ref || fallbackSeatRef;
+        if (startSeatRef) {
+          const startSeatPayload: Record<string, any> = {
+            studentId: user.uid,
             status: 'studying',
             lastCheckInAt: Timestamp.fromMillis(nowTs),
             updatedAt: serverTimestamp(),
-          });
+          };
+          if (fallbackSeatNo) {
+            startSeatPayload.seatNo = fallbackSeatNo;
+            startSeatPayload.type = 'seat';
+          }
+          if (fallbackSeatZone) {
+            startSeatPayload.seatZone = fallbackSeatZone;
+          }
+          batch.set(startSeatRef, startSeatPayload, { merge: true });
           wroteSomething = true;
         }
 
@@ -671,6 +718,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             variant: 'destructive',
             title: 'Track start failed',
             description: 'Please check Firestore write permissions for student data.',
+          });
+        } else if (!seatDoc && !fallbackSeatRef) {
+          toast({
+            variant: 'destructive',
+            title: 'Track started (seat sync pending)',
+            description: 'Seat is not assigned yet. Ask your teacher/admin to assign a seat.',
           });
         } else if (usedStartFallback) {
           toast({
