@@ -796,9 +796,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
                       const student = students?.find(s => s.id === seat?.studentId);
                       const studentMember = studentMembers?.find(m => m.id === seat?.studentId);
+                      const occupantId = typeof seat?.studentId === 'string' ? seat.studentId : '';
+                      const occupantName = student?.name || studentMember?.displayName || (occupantId ? 'Assigned' : '');
                       const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
                       
-                      const timeInfo = student ? getStudentStudyTimes(student.id, seat.status, seat.lastCheckInAt) : null;
+                      const timeInfo = occupantId ? getStudentStudyTimes(occupantId, seat.status, seat.lastCheckInAt) : null;
                       const isAisle = seat?.type === 'aisle';
                       const isStudying = timeInfo?.isStudying;
                       const isAway = !isEditMode && (seat?.status === 'away' || seat?.status === 'break');
@@ -810,16 +812,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           isAisle ? "bg-transparent border-transparent text-transparent hover:bg-muted/10" : 
                           isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" : 
                           isAway ? "bg-amber-50 border-amber-600 text-white" : 
-                          student ? "bg-white border-primary/30 text-primary" : "bg-white border-primary/40 text-primary/5 hover:border-primary/60",
+                          occupantId ? "bg-white border-primary/30 text-primary" : "bg-white border-primary/40 text-primary/5 hover:border-primary/60",
                           isEditMode && isAisle && "border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20"
                         )}>
                           {!isAisle && <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAway ? "opacity-60" : "opacity-40")}>{seatNo}</span>}
                           {seat?.seatZone && !isAisle && (
                             <Badge variant="outline" className={cn("absolute top-1 right-1 h-3.5 px-1 border-none font-black text-[6px]", isStudying || isAway ? "bg-white/20 text-white" : "bg-primary/5 text-primary/40")}>{seat.seatZone.charAt(0)}</Badge>
                           )}
-                          {isAisle ? (isEditMode && <MapIcon className="h-3 w-3 opacity-40" />) : student ? (
+                          {isAisle ? (isEditMode && <MapIcon className="h-3 w-3 opacity-40" />) : occupantId ? (
                             <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
-                              <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{student.name}</span>
+                              <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{occupantName}</span>
                               <div className="flex flex-col items-center leading-[1.1]">
                                 <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white" : "text-primary")}>{`L: ${timeInfo?.session}`}</span>
                                 <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white/90" : "text-primary/80")}>{`T: ${timeInfo?.total}`}</span>
