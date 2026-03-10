@@ -508,13 +508,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
             updateData['dailyLpStatus.' + todayKey + '.attendance'] = true;
-            toast({ title: '3?? ??! ?? ??? LP ??' });
+            toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 LP \uD68D\uB4DD' });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
             updateData['stats.resilience'] = increment(0.5);
             updateData['dailyLpStatus.' + todayKey + '.bonus6h'] = true;
-            toast({ title: '6?? ?? ??! ??? ?? ??' });
+            toast({ title: '\u0036\uC2DC\uAC04 \uC5F0\uC18D \uD559\uC2B5! \uD68C\uBCF5\uB825 \uC2A4\uD0EF \uC0C1\uC2B9' });
           }
 
           finalNewLp += studyLpEarned;
@@ -557,7 +557,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', periodKey + '_lp', 'entries', user.uid);
           batch.set(rankRef, {
             studentId: user.uid,
-            displayNameSnapshot: user.displayName || '??',
+            displayNameSnapshot: user.displayName || '\uD559\uC0DD',
             classNameSnapshot: activeMembership.className || null,
             value: finalNewLp,
             updatedAt: serverTimestamp(),
@@ -628,7 +628,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
 
-        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '??', type: 'exit' })
+        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'exit' })
           .catch((notifyError: any) => {
             console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
           });
@@ -655,7 +655,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             ['dailyLpStatus.' + todayKey + '.checkedIn']: true,
             updatedAt: serverTimestamp(),
           }, { merge: true });
-          toast({ title: '?? ??! ??? ?? +0.5 ??' });
+          toast({ title: '\uC785\uC2E4 \uD655\uC778! \uAFB8\uC900\uD568 \uC2A4\uD0EF +0.5 \uC0C1\uC2B9' });
           wroteSomething = true;
         }
         const startSeatRef = seatDoc?.ref || fallbackSeatRef;
@@ -706,7 +706,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
 
-        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '??', type: 'entry' })
+        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'entry' })
           .catch((notifyError: any) => {
             console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
           });
@@ -733,9 +733,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
       }
     } catch (e: any) {
-      const detail = typeof e?.message === 'string' ? e.message : '?? ? ?? ??? ???.';
+      const detail = typeof e?.message === 'string' ? e.message : '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
       console.error('[student-track] start/stop failed', e);
-      toast({ variant: 'destructive', title: '?? ? ?? ??', description: detail });
+      toast({ variant: 'destructive', title: '\uACF5\uBD80 \uC0C1\uD0DC \uBCC0\uACBD \uC2E4\uD328', description: detail });
     } finally {
       setIsProcessingAction(false);
     }
