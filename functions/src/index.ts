@@ -153,6 +153,39 @@ function normalizeParentLinkCodeValue(value: unknown): string {
   }
   return "";
 }
+
+function parseFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function normalizeStatsPayload(value: unknown): Record<string, number> | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+  const keys = ["focus", "consistency", "achievement", "resilience"] as const;
+  const result: Record<string, number> = {};
+  let hasAny = false;
+
+  for (const key of keys) {
+    const parsed = parseFiniteNumber(source[key]);
+    if (parsed === null) continue;
+    result[key] = Math.max(0, Math.min(100, parsed));
+    hasAny = true;
+  }
+
+  return hasAny ? result : null;
+}
 function toMillisSafe(value: unknown): number {
   if (!value) return 0;
   if (value instanceof Date) {
@@ -598,14 +631,14 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const isSelfStudentCaller = callerRole === "student" && callerUid === studentId;
 
   if (!canEditOtherStudent && !isSelfStudentCaller) {
-    throw new functions.https.HttpsError("permission-denied", "?? ??? ????.", {
-      userMessage: "?? ?? ?? ???/?? ???? ??? ? ????.",
+    throw new functions.https.HttpsError("permission-denied", "No permission to update this student.", {
+      userMessage: "센터 관리자/선생님 또는 본인만 수정할 수 있습니다.",
     });
   }
 
   if (!isActiveMembershipStatus(callerStatus)) {
     throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
-      userMessage: "??? ??? ??? ?? ??? ??? ? ????.",
+      userMessage: "현재 계정 상태로는 학생 정보를 수정할 수 없습니다.",
     });
   }
 
@@ -624,6 +657,9 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
   const parentLinkCodeProvided = parentLinkCode !== undefined;
   const normalizedParentLinkCode = parentLinkCode === null ? "" : normalizeParentLinkCodeValue(parentLinkCode);
+  const normalizedSeasonLp = parseFiniteNumber(seasonLp);
+  const normalizedTodayStudyMinutes = parseFiniteNumber(todayStudyMinutes);
+  const normalizedStats = normalizeStatsPayload(stats);
 
   if (parentLinkCodeProvided) {
     if (parentLinkCode !== null && typeof parentLinkCode !== "string" && typeof parentLinkCode !== "number") {
@@ -719,7 +755,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
         });
       }
     }
-
   }
 
   if (isSelfStudentCaller) {
@@ -766,11 +801,13 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
 
-    if (trimmedDisplayName || trimmedSchoolName) {
-      const userUpdate: any = { updatedAt: timestamp };
-      if (trimmedDisplayName) userUpdate.displayName = trimmedDisplayName;
-      if (trimmedSchoolName) userUpdate.schoolName = trimmedSchoolName;
-      batch.set(db.doc("users/" + studentId), userUpdate, { merge: true });
+    const userRef = db.doc("users/" + studentId);
+    const userUpdate: any = { updatedAt: timestamp };
+    if (trimmedDisplayName) userUpdate.displayName = trimmedDisplayName;
+    if (trimmedSchoolName) userUpdate.schoolName = trimmedSchoolName;
+    const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0;
+    if (hasUserWrite) {
+      batch.set(userRef, userUpdate, { merge: true });
     }
 
     const studentUpdate: any = { updatedAt: timestamp };
@@ -781,32 +818,31 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (canEditOtherStudent && hasClassName) studentUpdate.className = normalizedClassName;
     batch.set(studentRef, studentUpdate, { merge: true });
 
+    const memberRef = db.doc("centers/" + centerId + "/members/" + studentId);
+    const memberUpdate: any = { updatedAt: timestamp };
+    if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
+    if (hasClassName) memberUpdate.className = normalizedClassName;
     if (canEditOtherStudent) {
-      const memberUpdate: any = { updatedAt: timestamp };
-      if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
-      if (hasClassName) memberUpdate.className = normalizedClassName;
-      batch.set(db.doc("centers/" + centerId + "/members/" + studentId), memberUpdate, { merge: true });
+      batch.set(memberRef, memberUpdate, { merge: true });
+    }
 
-      if (hasClassName) {
-        batch.set(
-          db.doc("userCenters/" + studentId + "/centers/" + centerId),
-          {
-            className: normalizedClassName,
-            updatedAt: timestamp,
-          },
-          { merge: true }
-        );
-      }
+    const userCenterRef = db.doc("userCenters/" + studentId + "/centers/" + centerId);
+    const userCenterUpdate = {
+      className: normalizedClassName,
+      updatedAt: timestamp,
+    };
+    if (canEditOtherStudent && hasClassName) {
+      batch.set(userCenterRef, userCenterUpdate, { merge: true });
     }
 
     if (isAdminCaller) {
-      const hasSeasonLp = typeof seasonLp === "number" && Number.isFinite(seasonLp);
-      const hasStats = !!stats && typeof stats === "object";
+      const hasSeasonLp = normalizedSeasonLp !== null;
+      const hasStats = normalizedStats !== null;
 
       if (hasSeasonLp || hasStats) {
         const progressUpdate: any = { updatedAt: timestamp };
-        if (hasSeasonLp) progressUpdate.seasonLp = seasonLp;
-        if (hasStats) progressUpdate.stats = stats;
+        if (hasSeasonLp) progressUpdate.seasonLp = normalizedSeasonLp;
+        if (hasStats) progressUpdate.stats = normalizedStats;
         batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
       }
 
@@ -815,11 +851,11 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
           ? dateKey
           : new Date().toISOString().slice(0, 10);
 
-      if (typeof todayStudyMinutes === "number" && Number.isFinite(todayStudyMinutes)) {
+      if (normalizedTodayStudyMinutes !== null) {
         batch.set(
           db.doc("centers/" + centerId + "/dailyStudentStats/" + safeDateKey + "/students/" + studentId),
           {
-            totalStudyMinutes: todayStudyMinutes,
+            totalStudyMinutes: Math.max(0, Math.round(normalizedTodayStudyMinutes)),
             studentId,
             centerId,
             dateKey: safeDateKey,
@@ -835,7 +871,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
           studentId,
           updatedAt: timestamp,
         };
-        if (hasSeasonLp) rankUpdate.value = seasonLp;
+        if (hasSeasonLp) rankUpdate.value = normalizedSeasonLp;
         if (trimmedDisplayName) rankUpdate.displayNameSnapshot = trimmedDisplayName;
         if (hasClassName) rankUpdate.classNameSnapshot = normalizedClassName;
 
@@ -845,18 +881,68 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       }
     }
 
-    await batch.commit();
+    let batchError: any = null;
+    try {
+      await batch.commit();
+    } catch (commitError: any) {
+      batchError = commitError;
+      console.error("[updateStudentAccount] batch commit failed", {
+        centerId,
+        studentId,
+        callerUid,
+        message: commitError?.message || commitError,
+      });
+    }
+
+    if (batchError) {
+      const coreWrites: Promise<FirebaseFirestore.WriteResult>[] = [];
+      coreWrites.push(studentRef.set(studentUpdate, { merge: true }));
+      if (hasUserWrite) {
+        coreWrites.push(userRef.set(userUpdate, { merge: true }));
+      }
+      if (canEditOtherStudent) {
+        coreWrites.push(memberRef.set(memberUpdate, { merge: true }));
+      }
+      if (canEditOtherStudent && hasClassName) {
+        coreWrites.push(userCenterRef.set(userCenterUpdate, { merge: true }));
+      }
+
+      const coreResults = await Promise.allSettled(coreWrites);
+      const hasCoreFailure = coreResults.some((result) => result.status === "rejected");
+
+      if (!hasCoreFailure) {
+        console.warn("[updateStudentAccount] core fallback write succeeded after batch failure", {
+          centerId,
+          studentId,
+        });
+        return {
+          ok: true,
+          partial: true,
+          warning: "core_profile_saved_optional_sync_skipped",
+          updatedBy: isSelfStudentCaller ? "student" : isTeacherCaller ? "teacher" : "admin",
+        };
+      }
+
+      throw batchError;
+    }
+
     return { ok: true, updatedBy: isSelfStudentCaller ? "student" : isTeacherCaller ? "teacher" : "admin" };
   } catch (e: any) {
     if (e instanceof functions.https.HttpsError) {
       throw e;
     }
+    console.error("[updateStudentAccount] failed", {
+      centerId,
+      studentId,
+      callerUid,
+      message: e?.message || e,
+      stack: e?.stack || null,
+    });
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
       userMessage: e?.message || "Unknown internal error",
     });
   }
 });
-
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
