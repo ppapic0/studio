@@ -30,12 +30,25 @@ import { format } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, doc, serverTimestamp, setDoc, query, where, updateDoc, orderBy } from 'firebase/firestore';
-import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck } from 'lucide-react';
-import { AttendanceRecord, CenterMembership, AttendanceRequest } from '@/lib/types';
+import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck } from 'lucide-react';
+import { CenterMembership, AttendanceRequest } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+type AttendanceRecordStatus = 'requested' | 'confirmed_present' | 'confirmed_late' | 'confirmed_absent' | 'excused_absent';
+type AttendanceRecord = {
+  id: string;
+  status: AttendanceRecordStatus;
+  updatedAt?: any;
+  confirmedByUserId?: string;
+  centerId?: string;
+  studentId?: string;
+  dateKey?: string;
+  studentName?: string;
+};
 
 export default function AttendancePage() {
   const { user } = useUser();

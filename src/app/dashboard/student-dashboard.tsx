@@ -588,10 +588,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     setIsRequestSubmitting(true);
     try {
-      const batch = writeBatch(firestore);
-      const requestId = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests')).id;
-      const isTodayRequest = requestDate === format(new Date(), 'yyyy-MM-dd');
-      
       const requestData: any = {
         studentId: user.uid,
         studentName: user.displayName || '학생',
@@ -600,23 +596,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         date: requestDate,
         reason: requestReason.trim(),
         status: 'requested',
-        penaltyApplied: isTodayRequest,
+        penaltyApplied: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
-      batch.set(doc(firestore, 'centers', activeMembership.id, 'attendanceRequests', requestId), requestData);
-
-      if (isTodayRequest) {
-        const pointsToAdd = requestType === 'late' ? 3 : 5;
-        batch.update(progressRef!, {
-          penaltyPoints: increment(pointsToAdd),
-          updatedAt: serverTimestamp()
-        });
-        toast({ title: `당일 신청으로 벌점 ${pointsToAdd}점이 부과되었습니다.` });
-      }
-
-      await batch.commit();
+      await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'), requestData);
       toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
       setRequestReason('');
     } catch (e: any) {
@@ -942,7 +927,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3">
                       <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
                       <p className="text-[11px] font-bold text-rose-900 leading-relaxed">
-                        **당일 신청 알림**: 당일 신청 시 규정에 따라 **벌점(지각 +3, 결석 +5)**이 즉시 부과됩니다.
+                        당일 신청도 먼저 접수되며, 담당 선생님 승인 후 센터 규정에 따라 반영됩니다.
                       </p>
                     </div>
                   )}
