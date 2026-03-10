@@ -106,6 +106,7 @@ export function DashboardHeader() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSettingsFormInitialized, setIsSettingsFormInitialized] = useState(false);
 
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
@@ -121,16 +122,28 @@ export function DashboardHeader() {
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
 
   useEffect(() => {
+    if (!isSettingsOpen) {
+      setIsSettingsFormInitialized(false);
+      return;
+    }
+
+    if (isSettingsFormInitialized) return;
+
     if (studentProfile) {
       setSchoolName(studentProfile.schoolName || '');
       setGrade(studentProfile.grade || '');
       setParentLinkCode(normalizeParentLinkCode(studentProfile.parentLinkCode));
-    } else if (userProfile) {
+      setIsSettingsFormInitialized(true);
+      return;
+    }
+
+    if (userProfile) {
       setSchoolName(userProfile.schoolName || '');
       setGrade('');
       setParentLinkCode('');
+      setIsSettingsFormInitialized(true);
     }
-  }, [studentProfile, userProfile]);
+  }, [isSettingsOpen, isSettingsFormInitialized, studentProfile, userProfile]);
 
   const handleSignOut = async () => {
     if (!auth) return;

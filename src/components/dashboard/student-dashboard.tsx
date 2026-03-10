@@ -557,25 +557,34 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           console.error('[student-track] stop commit failed', commitError);
         }
 
-        if (stopCommitError && sessionSeconds > 0 && studyLogRef) {
+        if (stopCommitError && studyLogRef) {
           try {
-            await setDoc(studyLogRef, {
-              totalMinutes: increment(sessionMinutes),
+            const fallbackStudyLogData: any = {
               studentId: user.uid,
               centerId: activeMembership.id,
               dateKey: todayKey,
               updatedAt: serverTimestamp(),
-            }, { merge: true });
-            const fallbackSessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-            await setDoc(fallbackSessionRef, {
-              startTime: safeSeatStart,
-              endTime: Timestamp.fromMillis(nowTs),
-              durationMinutes: sessionMinutes,
-              createdAt: serverTimestamp(),
-            });
+            };
+
+            if (sessionSeconds > 0) {
+              fallbackStudyLogData.totalMinutes = increment(sessionMinutes);
+            }
+
+            await setDoc(studyLogRef, fallbackStudyLogData, { merge: true });
+
+            if (sessionSeconds > 0) {
+              const fallbackSessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
+              await setDoc(fallbackSessionRef, {
+                startTime: safeSeatStart,
+                endTime: Timestamp.fromMillis(nowTs),
+                durationMinutes: sessionMinutes,
+                createdAt: serverTimestamp(),
+              });
+            }
+
             usedStopFallback = true;
             stopCommitError = null;
-            console.warn('[student-track] stop fallback saved session while optional writes were skipped');
+            console.warn('[student-track] stop fallback saved core study logs while optional writes were skipped');
           } catch (fallbackError: any) {
             console.error('[student-track] stop fallback failed', fallbackError);
           }
@@ -591,16 +600,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         if (stopCommitError) {
           toast({
             variant: 'destructive',
-            title: 'Track stop failed',
-            description: 'Please check Firestore write permissions for student data.',
-          });
-        } else if (usedStopFallback) {
-          toast({
-            title: 'Track stopped',
-            description: 'Session log was saved. Some optional metrics sync was skipped.',
+            title: '공부 종료 저장 실패',
+            description: '기록 저장 중 일부 권한 오류가 발생했습니다. 관리자에게 문의해 주세요.',
           });
         } else {
-          toast({ title: 'Track stopped' });
+          toast({ title: '공부 종료됨' });
         }
       } else {
         const nowTs = Date.now();
@@ -1093,3 +1097,4 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     </div>
   );
 }
+
