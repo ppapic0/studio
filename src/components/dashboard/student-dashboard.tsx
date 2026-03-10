@@ -429,10 +429,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setIsProcessingAction(true);
     try {
       const centerId = activeMembership.id;
-      const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
-      const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
-      const seatSnap = await getDocs(seatQuery);
-      const seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
+      let seatDoc: any = null;
+      try {
+        const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
+        const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
+        const seatSnap = await getDocs(seatQuery);
+        seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
+      } catch (seatError: any) {
+        console.warn('[student-track] seat lookup skipped', seatError?.message || seatError);
+      }
 
       if (isTimerActive) {
         const nowTs = Date.now();
