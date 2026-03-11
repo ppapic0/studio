@@ -5,8 +5,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
-import { AttendanceCurrent, CenterMembership, GrowthProgress, LeaderboardEntry } from '@/lib/types';
+import { doc, collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { AttendanceCurrent, CenterMembership, GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -79,6 +79,21 @@ const STAT_CONFIG = {
     accent: 'bg-rose-50',
     guide: '6시간 이상 달성 시 상승 (일일 +0.5)'
   },
+};
+
+type StatKey = keyof typeof STAT_CONFIG;
+type SkillTrackHistoryItem = {
+  dateKey: string;
+  reason: string;
+  detail: string;
+  gained: number;
+};
+
+const SKILL_LABEL: Record<StatKey, string> = {
+  focus: '집중력',
+  consistency: '꾸준함',
+  achievement: '목표달성',
+  resilience: '회복력',
 };
 
 
@@ -172,6 +187,16 @@ export default function GrowthPage() {
   }, [firestore, activeMembership?.id, user?.uid]);
 
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
+
+  const seasonStudyLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days'),
+      orderBy('dateKey', 'desc'),
+      limit(62)
+    );
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: seasonStudyLogs } = useCollection<StudyLogDay>(seasonStudyLogsQuery);
 
   const rankQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -273,6 +298,68 @@ export default function GrowthPage() {
     };
   }, [progress?.stats]);
 
+  const skillTrackHistory = useMemo<Record<StatKey, SkillTrackHistoryItem[]>>(() => {
+    const result: Record<StatKey, SkillTrackHistoryItem[]> = {
+      focus: [],
+      consistency: [],
+      achievement: [],
+      resilience: [],
+    };
+
+    const isCurrentSeason = (dateKey: string) => dateKey.startsWith(periodKey);
+
+    Object.entries(progress?.dailyLpStatus || {}).forEach(([dateKey, rawStatus]) => {
+      if (!isCurrentSeason(dateKey)) return;
+      const dayStatus = (rawStatus || {}) as Record<string, any>;
+
+      if (dayStatus.checkedIn) {
+        result.consistency.push({
+          dateKey,
+          reason: '입실 체크인',
+          detail: '하루 첫 입실 시 +0.5',
+          gained: 0.5,
+        });
+      }
+
+      const achievementCount = Number(dayStatus.achievementCount || 0);
+      if (achievementCount > 0) {
+        result.achievement.push({
+          dateKey,
+          reason: '학습 To-do 완료',
+          detail: `완료 ${achievementCount}회`,
+          gained: Number((achievementCount * 0.1).toFixed(1)),
+        });
+      }
+
+      if (dayStatus.bonus6h) {
+        result.resilience.push({
+          dateKey,
+          reason: '6시간 학습 달성',
+          detail: '장시간 집중 학습 보너스',
+          gained: 0.5,
+        });
+      }
+    });
+
+    (seasonStudyLogs || []).forEach((log) => {
+      if (!log?.dateKey || !isCurrentSeason(log.dateKey)) return;
+      const totalMinutes = Math.max(0, Number(log.totalMinutes || 0));
+      if (totalMinutes <= 0) return;
+      result.focus.push({
+        dateKey: log.dateKey,
+        reason: '학습 시간 누적',
+        detail: `실공부 ${totalMinutes}분`,
+        gained: Number(((totalMinutes / 60) * 0.1).toFixed(2)),
+      });
+    });
+
+    (Object.keys(result) as StatKey[]).forEach((key) => {
+      result[key].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+    });
+
+    return result;
+  }, [progress?.dailyLpStatus, seasonStudyLogs, periodKey]);
+
   const avgStat = useMemo(() => {
     const values = Object.values(stats);
     return values.reduce((a, b) => a + b, 0) / values.length;
@@ -356,26 +443,65 @@ export default function GrowthPage() {
 
         <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
           {Object.entries(STAT_CONFIG).map(([key, config]) => {
-            const val = stats[key as keyof typeof stats] || 0;
+            const statKey = key as StatKey;
+            const val = stats[statKey] || 0;
+            const history = skillTrackHistory[statKey] || [];
+            const gainedTotal = history.reduce((sum, item) => sum + item.gained, 0);
             const Icon = config.icon;
             return (
-              <Card key={key} className={cn("border-none bg-white shadow-lg overflow-hidden group ring-1 ring-black/[0.03]", isMobile ? "rounded-[1rem] p-4" : "rounded-[2.5rem] p-8")}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className={cn("rounded-lg", config.accent, isMobile ? "p-1.5" : "p-3")}>
-                    <Icon className={cn(config.color, isMobile ? "h-4 w-4" : "h-6 w-6")} />
+              <Dialog key={key}>
+                <DialogTrigger asChild>
+                  <button type="button" className="text-left">
+                    <Card className={cn("border-none bg-white shadow-lg overflow-hidden group ring-1 ring-black/[0.03] hover:-translate-y-0.5 transition-all cursor-pointer", isMobile ? "rounded-[1rem] p-4" : "rounded-[2.5rem] p-8")}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={cn("rounded-lg", config.accent, isMobile ? "p-1.5" : "p-3")}>
+                          <Icon className={cn(config.color, isMobile ? "h-4 w-4" : "h-6 w-6")} />
+                        </div>
+                        <span className={cn("font-black uppercase tracking-widest opacity-40", isMobile ? "text-[7px]" : "text-[9px]")}>{config.sub}</span>
+                      </div>
+                      <h3 className={cn("font-black tracking-tight mb-0.5", isMobile ? "text-xs" : "text-xl")}>{config.label}</h3>
+                      <div className="flex items-baseline gap-1 mb-3">
+                        <span className={cn("font-black tabular-nums", isMobile ? "text-xl" : "text-3xl")}>{val.toFixed(1)}</span>
+                        <span className={cn("font-bold text-muted-foreground opacity-40", isMobile ? "text-[8px]" : "text-xs")}>/ 100</span>
+                      </div>
+                      <div className="relative h-1.5 w-full bg-muted rounded-full overflow-hidden shadow-inner mb-2">
+                        <div className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out", config.bg)} style={{ width: `${val}%` }} />
+                      </div>
+                      {!isMobile && <p className="text-[10px] font-bold text-muted-foreground leading-tight mt-3 pt-3 border-t border-dashed">{config.guide}</p>}
+                    </Card>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "max-w-[92vw] rounded-[1.5rem]" : "sm:max-w-lg rounded-[2rem]")}>
+                  <div className={cn("text-white", config.bg, isMobile ? "p-5" : "p-7")}>
+                    <DialogHeader>
+                      <DialogTitle className={cn("font-black tracking-tight", isMobile ? "text-xl" : "text-2xl")}>{SKILL_LABEL[statKey]} 점수 획득 이력</DialogTitle>
+                      <DialogDescription className="text-white/80 font-semibold text-xs">
+                        이번 시즌 누적 획득 +{gainedTotal.toFixed(2)}점
+                      </DialogDescription>
+                    </DialogHeader>
                   </div>
-                  <span className={cn("font-black uppercase tracking-widest opacity-40", isMobile ? "text-[7px]" : "text-[9px]")}>{config.sub}</span>
-                </div>
-                <h3 className={cn("font-black tracking-tight mb-0.5", isMobile ? "text-xs" : "text-xl")}>{config.label}</h3>
-                <div className="flex items-baseline gap-1 mb-3">
-                  <span className={cn("font-black tabular-nums", isMobile ? "text-xl" : "text-3xl")}>{val.toFixed(1)}</span>
-                  <span className={cn("font-bold text-muted-foreground opacity-40", isMobile ? "text-[8px]" : "text-xs")}>/ 100</span>
-                </div>
-                <div className="relative h-1.5 w-full bg-muted rounded-full overflow-hidden shadow-inner mb-2">
-                  <div className={cn("absolute inset-y-0 left-0 transition-all duration-1000 ease-out", config.bg)} style={{ width: `${val}%` }} />
-                </div>
-                {!isMobile && <p className="text-[10px] font-bold text-muted-foreground leading-tight mt-3 pt-3 border-t border-dashed">{config.guide}</p>}
-              </Card>
+                  <div className={cn("bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[52vh] p-4" : "max-h-[60vh] p-6")}>
+                    {history.length === 0 ? (
+                      <div className="py-10 text-center text-sm font-bold text-muted-foreground">이번 시즌 획득 기록이 없습니다.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {history.slice(0, 60).map((item, index) => (
+                          <div key={`${item.dateKey}-${index}`} className="rounded-xl border bg-slate-50/70 px-3 py-2.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-black text-slate-500">{item.dateKey}</p>
+                                <p className="text-sm font-black text-slate-900">{item.reason}</p>
+                                <p className="text-xs font-semibold text-slate-600">{item.detail}</p>
+                              </div>
+                              <p className="shrink-0 text-sm font-black text-emerald-600">+{item.gained.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
             );
           })}
         </div>

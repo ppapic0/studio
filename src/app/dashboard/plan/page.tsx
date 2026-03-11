@@ -483,10 +483,12 @@ export default function StudyPlanPage() {
     if (nextState) {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[selectedDateKey]?.achievementCount || 0;
+      const existingDayStatus = (progress?.dailyLpStatus?.[selectedDateKey] || {}) as Record<string, any>;
       const progressUpdate: Record<string, any> = {
         seasonLp: increment(10),
         dailyLpStatus: {
           [selectedDateKey]: {
+            ...existingDayStatus,
             dailyLpAmount: increment(10),
           },
         },

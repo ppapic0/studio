@@ -106,6 +106,19 @@ function formatTimer(totalSecs: number) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
+function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: string): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const storageKey = `track:checkin-toast:${centerId}:${userId}`;
+    const lastShownDate = window.localStorage.getItem(storageKey);
+    if (lastShownDate === dateKey) return false;
+    window.localStorage.setItem(storageKey, dateKey);
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string }) {
   const [stats, setStats] = useState(currentStats);
   const [lp, setLp] = useState(currentLp);
@@ -523,7 +536,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         const batch = writeBatch(firestore);
         const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
-        const dailyStatusUpdate: Record<string, any> = {};
+        const existingTodayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
+        const dailyStatusUpdate: Record<string, any> = { ...existingTodayStatus };
         const statsUpdate: Record<string, any> = {};
         let finalNewLp = progress?.seasonLp || 0;
         let earnedLpThisSession = false;
@@ -706,7 +720,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         if (needsCheckInSync) {
           batch.set(progressRef, checkInProgressUpdate, { merge: true });
-          toast({ title: '\uC785\uC2E4 \uD655\uC778! \uAFB8\uC900\uD568 \uC2A4\uD0EF +0.5 \uC0C1\uC2B9' });
+          if (shouldShowDailyCheckInToast(centerId, user.uid, todayKey)) {
+            toast({ title: '\uC785\uC2E4 \uD655\uC778! \uAFB8\uC900\uD568 \uC2A4\uD0EF +0.5 \uC0C1\uC2B9' });
+          }
           wroteSomething = true;
         }
         const startSeatRef = seatDoc?.ref || fallbackSeatRef;
@@ -838,7 +854,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[item.dateKey]?.achievementCount || 0;
       const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
-      const dayStatusUpdate: Record<string, any> = {};
+      const existingDayStatus = (progress?.dailyLpStatus?.[item.dateKey] || {}) as Record<string, any>;
+      const dayStatusUpdate: Record<string, any> = { ...existingDayStatus };
       const statsUpdate: Record<string, any> = {};
       let shouldCommitProgress = false;
       let shouldSyncRank = false;
