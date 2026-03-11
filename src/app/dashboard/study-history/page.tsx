@@ -322,13 +322,15 @@ export default function StudyHistoryPage() {
   };
 
   const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-white/40';
-    if (minutes < 60) return 'bg-emerald-50 text-emerald-700 ring-inset ring-1 ring-emerald-100';
-    if (minutes < 180) return 'bg-emerald-100 text-emerald-800 ring-inset ring-1 ring-emerald-200';
-    if (minutes < 300) return 'bg-emerald-200 text-emerald-900 ring-inset ring-1 ring-emerald-300';
-    if (minutes < 480) return 'bg-emerald-400 text-white shadow-sm';
-    return 'bg-emerald-600 text-white shadow-md';
+    if (minutes === 0) return 'bg-gradient-to-br from-slate-50 to-white text-slate-500 ring-inset ring-1 ring-slate-100';
+    if (minutes < 60) return 'bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-800 ring-inset ring-1 ring-emerald-100';
+    if (minutes < 180) return 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-900 ring-inset ring-1 ring-emerald-200';
+    if (minutes < 300) return 'bg-gradient-to-br from-emerald-200 to-emerald-100 text-emerald-950 ring-inset ring-1 ring-emerald-300';
+    if (minutes < 480) return 'bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm';
+    return 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md';
   };
+
+  const getFocusProgress = (minutes: number) => Math.min(100, Math.round((minutes / 480) * 100));
 
   const monthTotalMinutes = useMemo(() => {
     if (!logs || !currentDate) return 0;
@@ -497,12 +499,21 @@ export default function StudyHistoryPage() {
 
       <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full border-2 border-primary/5 ring-1 ring-black/[0.03]">
         <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b-2 border-primary/10 bg-muted/20">
-            {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
-              <div key={day} className={cn("py-6 text-center text-[11px] font-black uppercase tracking-widest", i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60")}>{day}</div>
+          <div className={cn("grid grid-cols-7 border-b-2 border-primary/10", isMobile ? "bg-slate-50" : "bg-gradient-to-r from-slate-50 via-white to-slate-50")}>
+            {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, i) => (
+              <div
+                key={day}
+                className={cn(
+                  isMobile ? "py-3 text-[9px]" : "py-5 text-[11px]",
+                  "text-center font-black uppercase tracking-widest",
+                  i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
+                )}
+              >
+                {day}
+              </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 auto-rows-fr">
+          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr" : "auto-rows-fr")}>
             {logsLoading ? (
               <div className="col-span-7 h-[400px] flex items-center justify-center">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -513,47 +524,84 @@ export default function StudyHistoryPage() {
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
-              
+              const progressPercent = getFocusProgress(minutes);
+              const hour = Math.floor(minutes / 60);
+              const minuteRemainder = minutes % 60;
+
               return (
-                <div 
-                  key={dateKey} 
-                  onClick={() => setSelectedDateForPlan(day)} 
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
-                    "p-2 sm:p-4 border-r-2 border-b-2 border-primary/5 relative transition-all cursor-pointer bg-white group overflow-hidden", 
-                    isMobile ? "aspect-square" : "min-h-[160px]", 
-                    !isCurrentMonth ? "opacity-[0.05] grayscale" : getHeatmapColor(minutes), 
+                    "relative text-left border-r-2 border-b-2 border-primary/5 transition-all cursor-pointer group overflow-hidden",
+                    isMobile ? "aspect-square p-1.5" : "min-h-[170px] p-4",
+                    !isCurrentMonth ? "opacity-[0.14] grayscale bg-slate-100" : getHeatmapColor(minutes),
                     isTodayCalendar && "ring-4 ring-inset ring-primary/30 z-10 shadow-2xl scale-[1.02] rounded-xl"
                   )}
                 >
-                  <div className="flex justify-between items-start mb-1 sm:mb-3">
-                    <span className={cn(
-                      "text-[10px] sm:text-xs font-black tracking-tighter tabular-nums", 
-                      idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-rose-600" : "text-primary/40",
-                      isTodayCalendar && "text-primary scale-110 sm:scale-125"
-                    )}>
+                  {!isMobile && isCurrentMonth && minutes > 0 && (
+                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/30 to-transparent pointer-events-none" />
+                  )}
+
+                  <div className={cn("flex justify-between items-start", isMobile ? "mb-1" : "mb-3")}>
+                    <span
+                      className={cn(
+                        "font-black tracking-tighter tabular-nums rounded-full",
+                        isMobile ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1",
+                        idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/80" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/80" : "text-primary/60 bg-white/70",
+                        isTodayCalendar && "text-primary scale-110"
+                      )}
+                    >
                       {format(day, 'd')}
                     </span>
                     <div className="flex flex-col items-end gap-1">
-                      {minutes >= 180 && <Zap className="h-3 w-3 sm:h-4 w-4 text-amber-500 fill-amber-500 drop-shadow-sm animate-pulse" />}
-                      {hasPlans && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary/30" />}
+                      {minutes >= 180 && <Zap className={cn("text-amber-500 fill-amber-500 drop-shadow-sm", isMobile ? "h-2.5 w-2.5" : "h-4 w-4")} />}
+                      {hasPlans && <div className={cn("rounded-full bg-primary/35", isMobile ? "w-1.5 h-1.5" : "w-2 h-2")} />}
                     </div>
                   </div>
-                  {minutes > 0 && (
-                    <div className="mt-auto flex flex-col items-center gap-0.5 group-hover:scale-110 transition-transform duration-500">
-                      <span className={cn("font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none", isMobile ? "text-[10px]" : "text-3xl")}>
-                        {formatMinutes(minutes)}
-                      </span>
-                      {!isMobile && minutes >= 360 && (
-                        <Badge className="bg-white/30 text-primary border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">FOCUS MAX</Badge>
+
+                  {isMobile ? (
+                    <div className="absolute inset-x-1 bottom-1.5">
+                      <div
+                        className={cn(
+                          "rounded-md text-center font-mono font-black tabular-nums py-1 leading-none border",
+                          minutes > 0 ? "text-primary bg-white/85 border-white/80 shadow-sm" : "text-slate-400 bg-white/55 border-white/65"
+                        )}
+                      >
+                        {isCurrentMonth ? formatMinutes(minutes) : '--:--'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 flex flex-col gap-2">
+                      {isCurrentMonth && minutes > 0 ? (
+                        <>
+                          <span className="font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none text-3xl">
+                            {formatMinutes(minutes)}
+                          </span>
+                          <div className="h-1.5 w-full rounded-full bg-white/55 overflow-hidden">
+                            <div className="h-full rounded-full bg-primary/80" style={{ width: `${progressPercent}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-black opacity-75">
+                            <span>{progressPercent}% FOCUS</span>
+                            <span>{hour}h {minuteRemainder.toString().padStart(2, '0')}m</span>
+                          </div>
+                          {minutes >= 360 && (
+                            <Badge className="w-fit bg-white/40 text-primary border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">FOCUS MAX</Badge>
+                          )}
+                        </>
+                      ) : (
+                        <span className="mt-auto text-[11px] font-bold text-slate-400">No record</span>
                       )}
                     </div>
                   )}
+
                   {isTodayCalendar && (
                     <div className="absolute bottom-1 right-1">
                       <div className="bg-primary text-white p-0.5 rounded-full shadow-lg"><Activity className="h-1.5 w-1.5" /></div>
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
