@@ -82,6 +82,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [teacherSearch, setTeacherSearch] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
+  const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
+  const [parentTrustSearch, setParentTrustSearch] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
@@ -114,6 +116,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'teacher'));
   }, [firestore, centerId]);
   const { data: teacherMembers } = useCollection<CenterMembership>(teacherMembersQuery, { enabled: isActive });
+
+  const parentMembersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'parent'));
+  }, [firestore, centerId]);
+  const { data: parentMembers } = useCollection<CenterMembership>(parentMembersQuery, { enabled: isActive });
 
   // 2. 벌점 데이터 소스
   const progressQuery = useMemoFirebase(() => {
@@ -171,6 +179,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const classes = new Set<string>();
     activeMembers.forEach(m => { if (m.className) classes.add(m.className); });
     return Array.from(classes).sort();
+  }, [activeMembers]);
+
+  const filteredStudentMembers = useMemo(() => {
+    if (!activeMembers) return [];
+    return activeMembers.filter((member) => selectedClass === 'all' || member.className === selectedClass);
+  }, [activeMembers, selectedClass]);
+
+  const targetMemberIds = useMemo(
+    () => new Set(filteredStudentMembers.map((member) => member.id)),
+    [filteredStudentMembers]
+  );
+
+  const studentNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    (activeMembers || []).forEach((member) => {
+      map.set(member.id, member.displayName || member.id);
+    });
+    return map;
   }, [activeMembers]);
 
   const teacherRows = useMemo(() => {
@@ -260,18 +286,213 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const parentTrustRows = useMemo(() => {
+    if (!isMounted) return [];
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const thirtyDaysAgoMs = now - (30 * dayMs);
+    const parentMemberMap = new Map<string, CenterMembership>(
+      (parentMembers || []).map((member) => [member.id, member])
+    );
+
+    const buckets = new Map<string, {
+      parentUid: string;
+      parentName: string;
+      parentPhone: string;
+      studentIds: Set<string>;
+      visitCount: number;
+      reportReadCount: number;
+      consultationEventCount: number;
+      consultationDocCount: number;
+      requestCount: number;
+      suggestionCount: number;
+      latestVisitMs: number;
+      latestInteractionMs: number;
+    }>();
+
+    const ensureBucket = (parentUid: string) => {
+      let bucket = buckets.get(parentUid);
+      if (bucket) return bucket;
+      const parentMember = parentMemberMap.get(parentUid);
+      bucket = {
+        parentUid,
+        parentName: parentMember?.displayName || '',
+        parentPhone: parentMember?.phoneNumber || '',
+        studentIds: new Set(parentMember?.linkedStudentIds || []),
+        visitCount: 0,
+        reportReadCount: 0,
+        consultationEventCount: 0,
+        consultationDocCount: 0,
+        requestCount: 0,
+        suggestionCount: 0,
+        latestVisitMs: 0,
+        latestInteractionMs: 0,
+      };
+      buckets.set(parentUid, bucket);
+      return bucket;
+    };
+
+    (parentMembers || []).forEach((member) => {
+      const linkedIds = member.linkedStudentIds || [];
+      if (linkedIds.length > 0 && !linkedIds.some((id) => targetMemberIds.has(id))) return;
+      ensureBucket(member.id);
+    });
+
+    (parentActivityEvents || []).forEach((event) => {
+      const createdAtMs = (event.createdAt as any)?.toMillis?.() ?? 0;
+      if (createdAtMs < thirtyDaysAgoMs) return;
+      if (!targetMemberIds.has(event.studentId)) return;
+      if (!event.parentUid) return;
+
+      const bucket = ensureBucket(event.parentUid);
+      bucket.studentIds.add(event.studentId);
+      bucket.latestInteractionMs = Math.max(bucket.latestInteractionMs, createdAtMs);
+
+      if (event.eventType === 'app_visit') {
+        bucket.visitCount += 1;
+        bucket.latestVisitMs = Math.max(bucket.latestVisitMs, createdAtMs);
+      } else if (event.eventType === 'report_read') {
+        bucket.reportReadCount += 1;
+      } else if (event.eventType === 'consultation_request') {
+        bucket.consultationEventCount += 1;
+      }
+
+      const metaName = event.metadata?.parentName;
+      const metaPhone = event.metadata?.parentPhone;
+      if (!bucket.parentName && typeof metaName === 'string' && metaName.trim()) {
+        bucket.parentName = metaName.trim();
+      }
+      if (!bucket.parentPhone && typeof metaPhone === 'string' && metaPhone.trim()) {
+        bucket.parentPhone = metaPhone.trim();
+      }
+    });
+
+    (parentCommunications || []).forEach((item: any) => {
+      const createdAtMs = item?.createdAt?.toMillis?.() ?? item?.updatedAt?.toMillis?.() ?? 0;
+      if (createdAtMs < thirtyDaysAgoMs) return;
+      if (!targetMemberIds.has(item.studentId)) return;
+      if (!item.parentUid) return;
+
+      const bucket = ensureBucket(item.parentUid);
+      bucket.studentIds.add(item.studentId);
+      bucket.latestInteractionMs = Math.max(bucket.latestInteractionMs, createdAtMs);
+
+      if (item.type === 'consultation') bucket.consultationDocCount += 1;
+      if (item.type === 'request') bucket.requestCount += 1;
+      if (item.type === 'suggestion') bucket.suggestionCount += 1;
+
+      if (!bucket.parentName && typeof item.parentName === 'string' && item.parentName.trim()) {
+        bucket.parentName = item.parentName.trim();
+      }
+    });
+
+    const rows = Array.from(buckets.values()).map((bucket) => {
+      const consultationRequestCount = Math.max(bucket.consultationEventCount, bucket.consultationDocCount);
+      const daysSinceVisit = bucket.latestVisitMs > 0 ? Math.floor((now - bucket.latestVisitMs) / dayMs) : 999;
+
+      const trustScoreRaw =
+        72
+        + Math.min(22, bucket.visitCount * 2)
+        + Math.min(16, bucket.reportReadCount * 2)
+        - (consultationRequestCount * 14)
+        - (bucket.requestCount * 6)
+        - (bucket.suggestionCount * 4)
+        - (bucket.reportReadCount === 0 ? 8 : 0);
+      const trustScore = Math.max(0, Math.min(100, Math.round(trustScoreRaw)));
+
+      const inactivityRisk = bucket.latestVisitMs > 0
+        ? Math.min(28, Math.max(0, daysSinceVisit - 3) * 2)
+        : 28;
+      const riskScore = Math.max(
+        0,
+        Math.min(
+          100,
+          (consultationRequestCount * 30)
+          + (bucket.requestCount * 12)
+          + (bucket.suggestionCount * 8)
+          + inactivityRisk
+          + (bucket.reportReadCount === 0 ? 12 : 0)
+        )
+      );
+
+      const priority = consultationRequestCount >= 2 || riskScore >= 70
+        ? '긴급'
+        : consultationRequestCount >= 1 || riskScore >= 45
+          ? '우선'
+          : riskScore >= 25
+            ? '관찰'
+            : '안정';
+
+      const recommendedAction =
+        priority === '긴급'
+          ? '24시간 내 전화 상담 권장'
+          : priority === '우선'
+            ? '48시간 내 상담 일정 제안'
+            : priority === '관찰'
+              ? '리포트 확인/안부 메시지 발송'
+              : '정기 모니터링 유지';
+
+      const linkedStudentNames = Array.from(bucket.studentIds)
+        .filter((id) => targetMemberIds.has(id))
+        .map((id) => studentNameById.get(id) || id)
+        .sort((a, b) => a.localeCompare(b, 'ko'));
+
+      const parentName = bucket.parentName || `학부모-${bucket.parentUid.slice(0, 6)}`;
+
+      return {
+        parentUid: bucket.parentUid,
+        parentName,
+        parentPhone: bucket.parentPhone || '-',
+        linkedStudentNames,
+        visitCount: bucket.visitCount,
+        reportReadCount: bucket.reportReadCount,
+        consultationRequestCount,
+        requestCount: bucket.requestCount,
+        suggestionCount: bucket.suggestionCount,
+        trustScore,
+        riskScore,
+        priority,
+        recommendedAction,
+        lastVisitLabel: bucket.latestVisitMs > 0 ? format(new Date(bucket.latestVisitMs), 'MM.dd HH:mm') : '방문 기록 없음',
+        lastInteractionLabel: bucket.latestInteractionMs > 0 ? format(new Date(bucket.latestInteractionMs), 'MM.dd HH:mm') : '요청 기록 없음',
+      };
+    });
+
+    return rows.sort((a, b) => {
+      if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+      if (a.trustScore !== b.trustScore) return a.trustScore - b.trustScore;
+      return a.parentName.localeCompare(b.parentName, 'ko');
+    });
+  }, [isMounted, now, parentMembers, parentActivityEvents, parentCommunications, studentNameById, targetMemberIds]);
+
+  const filteredParentTrustRows = useMemo(() => {
+    const keyword = parentTrustSearch.trim().toLowerCase();
+    if (!keyword) return parentTrustRows;
+    return parentTrustRows.filter((row) => {
+      const studentsText = row.linkedStudentNames.join(' ').toLowerCase();
+      return (
+        row.parentName.toLowerCase().includes(keyword)
+        || row.parentPhone.toLowerCase().includes(keyword)
+        || studentsText.includes(keyword)
+        || row.parentUid.toLowerCase().includes(keyword)
+      );
+    });
+  }, [parentTrustRows, parentTrustSearch]);
+
+  const parentContactRecommendations = useMemo(
+    () => parentTrustRows.filter((row) => row.priority !== '안정').slice(0, 5),
+    [parentTrustRows]
+  );
+
   // --- 실시간 KPI 엔진 ---
   const metrics = useMemo(() => {
     if (!activeMembers || !attendanceList || !isMounted || !progressList) return null;
-
-    const filteredMembers = activeMembers.filter(m => selectedClass === 'all' || m.className === selectedClass);
-    const targetMemberIds = new Set(filteredMembers.map(m => m.id));
 
     let totalTodayMins = 0;
     const studentLiveMinutes: number[] = [];
     let highRiskCount = 0;
 
-    filteredMembers.forEach(member => {
+    filteredStudentMembers.forEach(member => {
       const studentStat = todayStats?.find(s => s.studentId === member.id);
       const studentProgress = progressList.find(p => p.id === member.id);
       let cumulative = studentStat?.totalStudyMinutes || 0;
@@ -348,9 +569,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       activeParentCount30d,
       avgVisitsPerStudent30d: targetMemberIds.size > 0 ? Number((parentVisitCount30d / targetMemberIds.size).toFixed(1)) : 0,
       consultationRequestCount30d,
+      consultationRiskIndex30d: activeParentCount30d > 0
+        ? Math.min(100, Math.round((consultationRequestCount30d / activeParentCount30d) * 100))
+        : 0,
       reportReadCount30d,
     };
-  }, [activeMembers, attendanceList, todayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, selectedClass, now, isMounted]);
+  }, [activeMembers, attendanceList, todayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted]);
 
   if (!isActive) return null;
 
@@ -464,7 +688,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           </section>
 
           <section className="pb-10 px-1">
-            <Card className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03]">
+            <Card
+              className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03] cursor-pointer"
+              role="button"
+              onClick={() => setIsParentTrustDialogOpen(true)}
+            >
               <div className="absolute -right-10 -bottom-10 opacity-5 rotate-12 transition-transform duration-1000 group-hover:scale-110">
                 <HeartHandshake className="h-64 w-64" />
               </div>
@@ -474,7 +702,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <CardTitle className="text-2xl font-black tracking-tighter">부모님 신뢰 및 관리 지표</CardTitle>
                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Parental Trust & Service Quality Index</p>
                   </div>
-                  <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">TRUST KPI</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">TRUST KPI</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-xl font-black text-xs"
+                      onClick={() => setIsParentTrustDialogOpen(true)}
+                    >
+                      부모님별 상세
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid gap-10 md:grid-cols-3">
                   <div className="space-y-4">
@@ -494,14 +732,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><MessageSquare className="h-3 w-3 text-emerald-500" /> 최근 30일 상담 신청</span>
-                        <div className="text-5xl font-black text-emerald-600 tabular-nums">{metrics.consultationRequestCount30d}</div>
-                        <p className="text-[11px] font-bold text-emerald-500/80">학부모 요청 누적 건수</p>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><MessageSquare className="h-3 w-3 text-rose-500" /> 최근 30일 상담 신청 (주의)</span>
+                        <div className="text-5xl font-black text-rose-600 tabular-nums">{metrics.consultationRequestCount30d}</div>
+                        <p className="text-[11px] font-bold text-rose-500/80">신뢰 하락 리스크 이벤트</p>
                       </div>
                     </div>
-                    <div className="h-2.5 w-full bg-emerald-50 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, metrics.consultationRequestCount30d * 6)}%` }} />
+                    <div className="h-2.5 w-full bg-rose-50 rounded-full overflow-hidden shadow-inner">
+                      <div className="h-full bg-rose-500 rounded-full transition-all duration-1000" style={{ width: `${metrics.consultationRiskIndex30d}%` }} />
                     </div>
+                    <p className="text-[10px] font-bold text-muted-foreground">상담 신청 리스크 지수 {metrics.consultationRiskIndex30d}%</p>
                   </div>
 
                   <div className="space-y-4">
@@ -515,6 +754,46 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="h-2.5 w-full bg-amber-50 rounded-full overflow-hidden shadow-inner">
                       <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, Math.max(metrics.readRate, metrics.reportReadCount30d * 5))}%` }} />
                     </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-700">우선 연락 추천</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-lg px-2 text-[10px] font-black text-rose-700 hover:bg-rose-100"
+                      onClick={() => setIsParentTrustDialogOpen(true)}
+                    >
+                      전체 보기
+                    </Button>
+                  </div>
+                  <div className="mt-2 grid gap-2">
+                    {parentContactRecommendations.length === 0 ? (
+                      <p className="text-xs font-bold text-slate-500">현재 즉시 연락이 필요한 학부모가 없습니다.</p>
+                    ) : (
+                      parentContactRecommendations.slice(0, 3).map((row) => (
+                        <div key={row.parentUid} className="rounded-xl border border-rose-100 bg-white px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-black text-slate-900 truncate">{row.parentName}</p>
+                            <Badge className={cn(
+                              'h-5 border-none px-2 text-[10px] font-black',
+                              row.priority === '긴급'
+                                ? 'bg-rose-100 text-rose-700'
+                                : row.priority === '우선'
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-amber-100 text-amber-700'
+                            )}>
+                              {row.priority}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] font-bold text-slate-600">
+                            상담 {row.consultationRequestCount}건 · 방문 {row.visitCount}회 · 조치: {row.recommendedAction}
+                          </p>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -600,6 +879,104 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <p className="font-black text-xl tracking-tighter">분석 데이터를 집계하고 있습니다...</p>
         </div>
       )}
+
+      <Dialog open={isParentTrustDialogOpen} onOpenChange={setIsParentTrustDialogOpen}>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-4xl">
+          <div className="bg-primary p-6 text-primary-foreground">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight">부모님별 신뢰 KPI 상세</DialogTitle>
+              <DialogDescription className="text-primary-foreground/80 font-bold">
+                방문/리포트 열람/상담 신청을 합산해 우선 연락 대상을 추천합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[72vh] overflow-y-auto bg-white p-6 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">대상 학부모</p>
+                <p className="text-2xl font-black text-blue-800">{parentTrustRows.length}명</p>
+              </div>
+              <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">우선 연락(긴급+우선)</p>
+                <p className="text-2xl font-black text-rose-800">{parentTrustRows.filter((row) => row.priority === '긴급' || row.priority === '우선').length}명</p>
+              </div>
+              <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">상담 신청 총합</p>
+                <p className="text-2xl font-black text-amber-800">
+                  {parentTrustRows.reduce((sum, row) => sum + row.consultationRequestCount, 0)}건
+                </p>
+              </div>
+            </div>
+
+            <Input
+              value={parentTrustSearch}
+              onChange={(event) => setParentTrustSearch(event.target.value)}
+              placeholder="학부모 이름/연락처/학생 이름으로 검색"
+              className="h-11 rounded-xl border-2 font-bold"
+            />
+
+            {filteredParentTrustRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed py-12 text-center text-sm font-bold text-muted-foreground">
+                조회된 학부모 데이터가 없습니다.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {filteredParentTrustRows.map((row) => (
+                  <div key={row.parentUid} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-black text-slate-900 truncate">{row.parentName}</p>
+                          <Badge className={cn(
+                            'h-6 border-none px-2.5 text-[10px] font-black',
+                            row.priority === '긴급'
+                              ? 'bg-rose-100 text-rose-700'
+                              : row.priority === '우선'
+                                ? 'bg-orange-100 text-orange-700'
+                                : row.priority === '관찰'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                          )}>
+                            {row.priority}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-500">
+                          {row.parentPhone} · 학생: {row.linkedStudentNames.length > 0 ? row.linkedStudentNames.join(', ') : '-'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">신뢰 점수</p>
+                        <p className="text-2xl font-black text-primary">{row.trustScore}점</p>
+                        <p className="text-[10px] font-bold text-rose-500">리스크 {row.riskScore}점</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">앱 방문 {row.visitCount}회</div>
+                      <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">리포트 열람 {row.reportReadCount}회</div>
+                      <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-700">상담 신청 {row.consultationRequestCount}건</div>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <p className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-600">최근 방문: {row.lastVisitLabel}</p>
+                      <p className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-600">최근 상호작용: {row.lastInteractionLabel}</p>
+                    </div>
+                    <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50/60 px-3 py-2 text-xs font-black text-rose-700">
+                      연락 추천: {row.recommendedAction}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t bg-white p-4">
+            <DialogClose asChild>
+              <Button className="h-11 rounded-xl px-6 font-black">닫기</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedTeacher} onOpenChange={(open) => !open && setSelectedTeacherId(null)}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
