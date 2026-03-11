@@ -43,11 +43,13 @@ service cloud.firestore {
     }
 
     function isCenterAdmin(centerId) {
-      return getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner';
+      return isActiveMember(centerId)
+        && (getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner');
     }
 
     function isTeacherOrAdmin(centerId) {
-      return getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner';
+      return isActiveMember(centerId)
+        && (getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner');
     }
 
     function isStudent(centerId) {
@@ -180,7 +182,7 @@ service cloud.firestore {
 
       match /parentAiCache/{studentId}/days/{dateKey} {
         allow read: if isTeacherOrAdmin(centerId) || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId) || isLinkedParent(centerId, studentId);
+        allow write: if isTeacherOrAdmin(centerId);
       }
 
       match /dailyStudentStats/{dateKey}/students/{studentId} {
@@ -304,10 +306,8 @@ service cloud.firestore {
               && request.resource.data.studentId == request.auth.uid);
       }
 
-      match /{document=**} {
-        allow read: if isTeacherOrAdmin(centerId);
-        allow write: if isCenterAdmin(centerId);
-      }
+      // 와일드카드 규칙 제거됨 - 개별 컬렉션 규칙으로 제어
+      // 새 하위 컬렉션 추가 시 명시적으로 규칙을 정의해야 합니다.
     }
   }
 }
