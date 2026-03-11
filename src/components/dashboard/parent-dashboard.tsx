@@ -108,9 +108,9 @@ import {
 function toHm(minutes: number) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${m}분`;
-  if (m === 0) return `${h}시간`;
-  return `${h}시간 ${m}분`;
+  if (h === 0) return `${m}遺?;
+  if (m === 0) return `${h}?쒓컙`;
+  return `${h}?쒓컙 ${m}遺?;
 }
 
 function formatMinutes(minutes: number) {
@@ -121,14 +121,14 @@ function formatMinutes(minutes: number) {
 
 function formatWon(value: number) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
-  return `₩${safe.toLocaleString()}`;
+  return `??{safe.toLocaleString()}`;
 }
 
 const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
-  math_support: '수학 집중 관리 요청',
-  english_support: '영어 보완 요청',
-  habit_coaching: '학습 습관 코칭 요청',
-  career_consulting: '진로/진학 상담 요청',
+  math_support: '?섑븰 吏묒쨷 愿由??붿껌',
+  english_support: '?곸뼱 蹂댁셿 ?붿껌',
+  habit_coaching: '?숈뒿 ?듦? 肄붿묶 ?붿껌',
+  career_consulting: '吏꾨줈/吏꾪븰 ?곷떞 ?붿껌',
 };
 
 const SUBJECT_COLORS = ['#FF7A16', '#14295F', '#10B981', '#0EA5E9', '#A855F7'];
@@ -151,15 +151,15 @@ function toDateSafe(value: TimestampLike): Date | null {
 
 function toRelativeLabel(value: TimestampLike, now = new Date()) {
   const date = toDateSafe(value);
-  if (!date) return '최근';
+  if (!date) return '理쒓렐';
   const diffMs = now.getTime() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
-  if (diffMinutes < 1) return '방금 전';
-  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  if (diffMinutes < 1) return '諛⑷툑 ??;
+  if (diffMinutes < 60) return `${diffMinutes}遺???;
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}시간 전`;
+  if (diffHours < 24) return `${diffHours}?쒓컙 ??;
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}일 전`;
+  if (diffDays < 7) return `${diffDays}????;
   return format(date, 'MM/dd', { locale: ko });
 }
 
@@ -174,7 +174,7 @@ function formatDateLabel(dateText?: string, fallbackTimestamp?: TimestampLike) {
   if (fallbackDate) {
     return format(fallbackDate, 'MM/dd', { locale: ko });
   }
-  return '최근';
+  return '理쒓렐';
 }
 export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
@@ -268,7 +268,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
   const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
 
-  // 캘린더용 모든 로그 조회
+  // 罹섎┛?붿슜 紐⑤뱺 濡쒓렇 議고쉶
   const allLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'), orderBy('dateKey', 'desc'));
@@ -409,18 +409,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (!latestInvoice) return null;
     if (latestInvoice.status === 'paid') {
       return {
-        label: '수납 완료',
+        label: '?섎궔 ?꾨즺',
         className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
       };
     }
     if (latestInvoice.status === 'overdue') {
       return {
-        label: '미납',
+        label: '誘몃궔',
         className: 'bg-rose-100 text-rose-700 border-rose-200',
       };
     }
     return {
-      label: '청구',
+      label: '泥?뎄',
       className: 'bg-amber-100 text-amber-700 border-amber-200',
     };
   }, [latestInvoice]);
@@ -429,12 +429,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (!latestInvoice) return null;
     if (latestInvoice.status === 'paid') {
       return {
-        label: '완납',
+        label: '?꾨궔',
         className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
       };
     }
     return {
-      label: '미납',
+      label: '誘몃궔',
       className: 'bg-rose-100 text-rose-700 border-rose-200',
     };
   }, [latestInvoice]);
@@ -481,13 +481,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     const minutesBySubject = new Map<string, number>();
 
     source.forEach((item) => {
-      const inferredSubject = item.subject?.trim() || (item.title.match(/수학|영어|국어|과학|사회|한국사|논술|코딩/)?.[0] ?? '기타');
+      const inferredSubject = item.subject?.trim() || (item.title.match(/?섑븰|?곸뼱|援?뼱|怨쇳븰|?ы쉶|?쒓뎅???쇱닠|肄붾뵫/)?.[0] ?? '湲고?');
       const weight = item.targetMinutes && item.targetMinutes > 0 ? item.targetMinutes : item.done ? 50 : 30;
       minutesBySubject.set(inferredSubject, (minutesBySubject.get(inferredSubject) || 0) + weight);
     });
 
     if (minutesBySubject.size === 0 && weeklyTotalStudyMinutes > 0) {
-      minutesBySubject.set('전체 학습', weeklyTotalStudyMinutes);
+      minutesBySubject.set('?꾩껜 ?숈뒿', weeklyTotalStudyMinutes);
     }
 
     return Array.from(minutesBySubject.entries())
@@ -513,7 +513,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       .slice(0, 5)
       .map((request) => ({
         id: request.id,
-        reason: request.reason || (request.type === 'late' ? '지각 신청 처리' : '결석 신청 처리'),
+        reason: request.reason || (request.type === 'late' ? '吏媛??좎껌 泥섎━' : '寃곗꽍 ?좎껌 泥섎━'),
         points: request.type === 'late' ? 3 : 5,
         dateLabel: formatDateLabel(request.date, (request as any).createdAt),
       }));
@@ -526,57 +526,57 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (weeklyTotalStudyMinutes > 0) {
       const progressRate = Math.round((weeklyTotalStudyMinutes / Math.max(targetWeeklyMinutes, 1)) * 100);
       if (progressRate >= 100) {
-        insights.push(`이번 주 목표 학습시간을 달성했습니다. (${toHm(weeklyTotalStudyMinutes)})`);
+        insights.push(`?대쾲 二?紐⑺몴 ?숈뒿?쒓컙???ъ꽦?덉뒿?덈떎. (${toHm(weeklyTotalStudyMinutes)})`);
       } else {
-        insights.push(`이번 주 누적 학습은 ${toHm(weeklyTotalStudyMinutes)}으로 목표 대비 ${progressRate}%입니다.`);
+        insights.push(`?대쾲 二??꾩쟻 ?숈뒿? ${toHm(weeklyTotalStudyMinutes)}?쇰줈 紐⑺몴 ?鍮?${progressRate}%?낅땲??`);
       }
     } else {
-      insights.push('학습 로그가 쌓이면 AI 인사이트가 자동으로 정교해집니다.');
+      insights.push('?숈뒿 濡쒓렇媛 ?볦씠硫?AI ?몄궗?댄듃媛 ?먮룞?쇰줈 ?뺢탳?댁쭛?덈떎.');
     }
 
     insights.push(
       weeklyPlanTotal > 0
-        ? `주간 계획 달성률은 ${weeklyPlanCompletionRate}%입니다. ${weeklyPlanCompletionRate >= 80 ? '아주 안정적입니다.' : '완료율을 조금만 더 끌어올려 보세요.'}`
-        : '이번 주 계획 데이터가 아직 등록되지 않았습니다.'
+        ? `二쇨컙 怨꾪쉷 ?ъ꽦瑜좎? ${weeklyPlanCompletionRate}%?낅땲?? ${weeklyPlanCompletionRate >= 80 ? '?꾩＜ ?덉젙?곸엯?덈떎.' : '?꾨즺?⑥쓣 議곌툑留????뚯뼱?щ젮 蹂댁꽭??'}`
+        : '?대쾲 二?怨꾪쉷 ?곗씠?곌? ?꾩쭅 ?깅줉?섏? ?딆븯?듬땲??'
     );
 
     if (subjectsData.length > 0) {
       const topSubject = subjectsData[0];
-      insights.push(`가장 많이 투자한 과목은 ${topSubject.subject} (${topSubject.minutes}분)입니다.`);
+      insights.push(`媛??留롮씠 ?ъ옄??怨쇰ぉ? ${topSubject.subject} (${topSubject.minutes}遺??낅땲??`);
     }
 
     if ((growth?.penaltyPoints || 0) > 0) {
-      insights.push(`생활 벌점이 ${growth?.penaltyPoints || 0}점 누적되어 있어 생활 관리가 필요합니다.`);
+      insights.push(`?앺솢 踰뚯젏??${growth?.penaltyPoints || 0}???꾩쟻?섏뼱 ?덉뼱 ?앺솢 愿由ш? ?꾩슂?⑸땲??`);
     }
 
     return insights.slice(0, 4);
   }, [student?.targetDailyMinutes, weeklyTotalStudyMinutes, weeklyPlanTotal, weeklyPlanCompletionRate, subjectsData, growth?.penaltyPoints]);
 
-  const weeklyFeedback = report?.content?.trim() || aiInsights[0] || '선생님 피드백이 등록되면 이 영역에서 확인할 수 있습니다.';
+  const weeklyFeedback = report?.content?.trim() || aiInsights[0] || '?좎깮???쇰뱶諛깆씠 ?깅줉?섎㈃ ???곸뿭?먯꽌 ?뺤씤?????덉뒿?덈떎.';
 
   const attendanceStatus = useMemo(() => {
-    if (!attendanceCurrent) return { label: '상태 미확인', color: 'bg-slate-100 text-slate-400', icon: Clock };
+    if (!attendanceCurrent) return { label: '?곹깭 誘명솗??, color: 'bg-slate-100 text-slate-400', icon: Clock };
 
     const status = attendanceCurrent.status;
     const isStudying = ['studying', 'away', 'break'].includes(status);
     const hasRecord = (todayLog?.totalMinutes || 0) > 0;
 
     if (isStudying) {
-      return { label: '등원 (학습 중)', color: 'bg-[#eaf2ff] text-[#14295F] border-blue-100', icon: UserCheck };
+      return { label: '?깆썝 (?숈뒿 以?', color: 'bg-[#eaf2ff] text-[#14295F] border-blue-100', icon: UserCheck };
     }
 
     if (!isStudying && hasRecord) {
-      return { label: '하원 (귀가 완료)', color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Home };
+      return { label: '?섏썝 (洹媛 ?꾨즺)', color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Home };
     }
 
     const routineItems = todayPlans?.filter(p => p.category === 'schedule') || [];
-    const isAbsentDay = routineItems.some(p => p.title.includes('등원하지 않습니다'));
+    const isAbsentDay = routineItems.some(p => p.title.includes('?깆썝?섏? ?딆뒿?덈떎'));
     
     if (isAbsentDay) {
-      return { label: '결석 (휴무)', color: 'bg-rose-50 text-rose-600 border-rose-100', icon: CalendarX };
+      return { label: '寃곗꽍 (?대Т)', color: 'bg-rose-50 text-rose-600 border-rose-100', icon: CalendarX };
     }
 
-    const inTimePlan = routineItems.find(p => p.title.includes('등원 예정'));
+    const inTimePlan = routineItems.find(p => p.title.includes('?깆썝 ?덉젙'));
     if (inTimePlan) {
       const timeStr = inTimePlan.title.split(': ')[1];
       if (timeStr) {
@@ -584,16 +584,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           const now = new Date();
           const scheduledTime = parse(timeStr, 'HH:mm', now);
           if (isAfter(now, scheduledTime)) {
-            return { label: '지각 주의', color: 'bg-orange-50 text-[#FF7A16] border-orange-100', icon: AlertCircle };
+            return { label: '吏媛?二쇱쓽', color: 'bg-orange-50 text-[#FF7A16] border-orange-100', icon: AlertCircle };
           }
         } catch (e) {}
       }
     }
 
-    return { label: '미입실 (입실 전)', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
+    return { label: '誘몄엯??(?낆떎 ??', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
   }, [attendanceCurrent, todayLog, todayPlans]);
 
-  // 캘린더 데이터 생성
+  // 罹섎┛???곗씠???앹꽦
   const calendarData = useMemo(() => {
     const start = startOfMonth(currentCalendarDate);
     const end = endOfMonth(currentCalendarDate);
@@ -616,7 +616,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       return remoteNotifications.map((item: any) => ({
         id: item.id,
         type: item.type || 'weekly_report',
-        title: item.title || '새 알림',
+        title: item.title || '???뚮┝',
         body: item.body || '',
         createdAtLabel: item.createdAtLabel || toRelativeLabel(item.createdAt),
         createdAtMs: toDateSafe(item.createdAt)?.getTime() || 0,
@@ -631,7 +631,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       fallback.push({
         id: `attendance-${attendanceCurrent.id || 'current'}`,
         type: attendanceCurrent.status === 'studying' ? 'check_in' : 'check_out',
-        title: attendanceCurrent.status === 'studying' ? '등원 상태 확인' : '출결 상태 업데이트',
+        title: attendanceCurrent.status === 'studying' ? '?깆썝 ?곹깭 ?뺤씤' : '異쒓껐 ?곹깭 ?낅뜲?댄듃',
         body: attendanceStatus.label,
         createdAtLabel: toRelativeLabel((attendanceCurrent as any).updatedAt),
         createdAtMs: toDateSafe((attendanceCurrent as any).updatedAt)?.getTime() || 0,
@@ -644,7 +644,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       fallback.push({
         id: report.id || `${yesterdayKey}-${studentId}`,
         type: 'weekly_report',
-        title: '학습 리포트 도착',
+        title: '?숈뒿 由ы룷???꾩갑',
         body: report.content,
         createdAtLabel: toRelativeLabel((report as any).updatedAt || (report as any).createdAt),
         createdAtMs: toDateSafe((report as any).updatedAt || (report as any).createdAt)?.getTime() || 0,
@@ -658,8 +658,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       fallback.push({
         id: `penalty-${latest.id}`,
         type: 'penalty',
-        title: '생활 기록 알림',
-        body: `${latest.reason} (+${latest.points}점)`,
+        title: '?앺솢 湲곕줉 ?뚮┝',
+        body: `${latest.reason} (+${latest.points}??`,
         createdAtLabel: latest.dateLabel,
         createdAtMs: 0,
         isRead: false,
@@ -678,9 +678,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const penaltyMeta = useMemo(() => {
     const points = growth?.penaltyPoints || 0;
-    if (points >= 15) return { label: '주의', badge: 'bg-rose-100 text-rose-700 border-rose-200' };
-    if (points >= 5) return { label: '관심', badge: 'bg-amber-100 text-amber-700 border-amber-200' };
-    return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    if (points >= 15) return { label: '二쇱쓽', badge: 'bg-rose-100 text-rose-700 border-rose-200' };
+    if (points >= 5) return { label: '愿??, badge: 'bg-amber-100 text-amber-700 border-amber-200' };
+    return { label: '?뺤긽', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   }, [growth?.penaltyPoints]);
 
   const selectedDateLog = useMemo(() => {
@@ -725,23 +725,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     let title = '';
     let body = '';
     if (type === 'consultation') {
-      title = `상담 신청 (${channel === 'visit' ? '방문' : channel === 'phone' ? '전화' : '온라인'})`;
+      title = `?곷떞 ?좎껌 (${channel === 'visit' ? '諛⑸Ц' : channel === 'phone' ? '?꾪솕' : '?⑤씪??})`;
       body = requestText.trim();
-      if (!body) { toast({ variant: 'destructive', title: '입력 확인', description: '상담 요청 내용을 입력해주세요.' }); return; }
+      if (!body) { toast({ variant: 'destructive', title: '?낅젰 ?뺤씤', description: '?곷떞 ?붿껌 ?댁슜???낅젰?댁＜?몄슂.' }); return; }
     }
     if (type === 'request') {
       title = QUICK_REQUEST_TEMPLATES[quickType];
       body = requestText.trim() || title;
     }
     if (type === 'suggestion') {
-      title = '건의사항';
+      title = '嫄댁쓽?ы빆';
       body = suggestionText.trim();
-      if (!body) { toast({ variant: 'destructive', title: '입력 확인', description: '건의사항을 입력해주세요.' }); return; }
+      if (!body) { toast({ variant: 'destructive', title: '?낅젰 ?뺤씤', description: '嫄댁쓽?ы빆???낅젰?댁＜?몄슂.' }); return; }
     }
     setSubmitting(true);
     try {
       await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
-        studentId, parentUid: user.uid, parentName: user.displayName || '학부모',
+        studentId, parentUid: user.uid, parentName: user.displayName || '?숇?紐?,
         type, title, body, channel: type === 'consultation' ? channel : null,
         status: 'requested', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
@@ -754,10 +754,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         quickType: type === 'request' ? quickType : null,
       });
 
-      toast({ title: '전송 완료', description: '선생님께 요청이 정상적으로 전달되었습니다.' });
+      toast({ title: '?꾩넚 ?꾨즺', description: '?좎깮?섍퍡 ?붿껌???뺤긽?곸쑝濡??꾨떖?섏뿀?듬땲??' });
       setRequestText(''); setSuggestionText('');
     } catch (error) {
-      toast({ variant: 'destructive', title: '전송 실패', description: '통신 오류가 발생했습니다.' });
+      toast({ variant: 'destructive', title: '?꾩넚 ?ㅽ뙣', description: '?듭떊 ?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.' });
     } finally {
       setSubmitting(false);
     }
@@ -771,12 +771,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <CardContent className={cn('p-6 space-y-6')}>
           <div className="flex flex-col gap-1 px-1">
             <CardTitle className="text-2xl font-black tracking-tighter text-[#14295F] leading-none">
-              {student?.name || '자녀'} 학생 현황
+              {student?.name || '?먮?'} ?숈깮 ?꾪솴
             </CardTitle>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
               {today && format(today, 'yyyy. MM. dd (EEEE)', {locale: ko})}
               <span className="opacity-20">|</span>
-              <span className="text-[#FF7A16]">실시간 업데이트 중</span>
+              <span className="text-[#FF7A16]">?ㅼ떆媛??낅뜲?댄듃 以?/span>
             </p>
           </div>
 
@@ -784,25 +784,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-2xl border-none bg-slate-50 p-4 text-center space-y-1 shadow-sm group hover:bg-white hover:ring-1 hover:ring-slate-200 transition-all">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">오늘 공부</span>
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">?ㅻ뒛 怨듬?</span>
                   <p className="text-xl font-black text-[#14295F] leading-tight">{toHm(totalMinutes)}</p>
                 </Card>
                 <Card className="rounded-2xl border-none bg-[#fff7ed] p-4 text-center space-y-1 shadow-sm border border-orange-100 group hover:bg-white hover:ring-1 hover:ring-orange-200 transition-all">
-                  <span className="text-[8px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
+                  <span className="text-[8px] font-black text-[#FF7A16] uppercase tracking-widest">怨꾪쉷 ?ъ꽦</span>
                   <p className="text-xl font-black text-[#14295F] leading-tight">{planRate}%</p>
                 </Card>
                 <Card className={cn(
                   "rounded-2xl border-none p-4 text-center space-y-1 shadow-sm border transition-all",
                   attendanceStatus.color
                 )}>
-                  <span className="text-[8px] font-black uppercase tracking-widest opacity-60">출결 상태</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest opacity-60">異쒓껐 ?곹깭</span>
                   <p className="text-lg font-black leading-tight truncate">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
                 <Card className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-center space-y-1 shadow-sm transition-all hover:bg-white hover:ring-1 hover:ring-rose-200">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-rose-600">踰뚯젏 吏??/span>
                   <div className="flex items-center justify-center gap-1">
                     <p className="text-xl font-black text-rose-700 leading-tight">{growth?.penaltyPoints || 0}</p>
-                    <span className="text-xs font-black text-rose-500/70">점</span>
+                    <span className="text-xs font-black text-rose-500/70">??/span>
                   </div>
                   <Badge className={cn('h-5 border px-2 text-[9px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
                 </Card>
@@ -815,12 +815,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-[#FF7A16] fill-current" />
-                    <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">어제의 분석 결과</span>
+                    <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">?댁젣??遺꾩꽍 寃곌낵</span>
                   </div>
-                  {report?.viewedAt && <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[8px] h-4 px-1.5">읽음</Badge>}
+                  {report?.viewedAt && <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[8px] h-4 px-1.5">?쎌쓬</Badge>}
                 </div>
                 <p className="text-sm font-bold text-slate-700 leading-relaxed break-keep relative z-10 line-clamp-2">
-                  {report?.content || '선생님과 AI가 어제의 학습 데이터를 분석 중입니다.'}
+                  {report?.content || '?좎깮?섍낵 AI媛 ?댁젣???숈뒿 ?곗씠?곕? 遺꾩꽍 以묒엯?덈떎.'}
                 </p>
               </Card>
 
@@ -828,15 +828,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-[#14295F]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 알림 3개</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">理쒓렐 ?뚮┝ 3媛?/span>
                   </div>
                   <Badge className="h-5 border border-slate-200 bg-slate-50 px-2 text-[9px] font-black text-slate-500">
-                    {recentNotifications.length}건
+                    {recentNotifications.length}嫄?
                   </Badge>
                 </div>
                 {recentNotifications.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
-                    최근 알림이 없습니다.
+                    理쒓렐 ?뚮┝???놁뒿?덈떎.
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -856,13 +856,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <p className="truncate text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
                             {notification.isImportant && (
                               <Badge className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">
-                                중요
+                                以묒슂
                               </Badge>
                             )}
                           </div>
                           <p className="line-clamp-1 text-[12px] font-bold text-slate-600">{notification.body}</p>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
+                            {notification.createdAtLabel} 쨌 {isRead ? '?쎌쓬' : '誘명솗??}
                           </p>
                         </button>
                       );
@@ -875,14 +875,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button className="w-full h-14 rounded-2xl bg-[#14295F] text-white hover:bg-[#14295F]/90 font-black gap-2 text-base shadow-xl active:scale-[0.98] transition-all">
-                      <TrendingUp className="h-5 w-5" /> AI 학습 인사이트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
+                      <TrendingUp className="h-5 w-5" /> AI ?숈뒿 ?몄궗?댄듃 蹂닿린 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
                     <div className="bg-[#14295F] p-10 text-white relative">
                       <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
-                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">AI 학습 인사이트</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1 text-xs">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
+                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">AI ?숈뒿 ?몄궗?댄듃</DialogTitle>
+                      <DialogDescription className="text-white/70 font-bold mt-1 text-xs">?먮????숈뒿 ?⑦꽩???멸났吏?μ씠 ?뺣? 遺꾩꽍?덉뒿?덈떎.</DialogDescription>
                     </div>
                     <div className="p-6 space-y-3 bg-[#fafafa]">
                       {aiInsights.map((insight, i) => (
@@ -893,7 +893,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       ))}
                     </div>
                     <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">확인했습니다</Button></DialogClose>
+                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">?뺤씤?덉뒿?덈떎</Button></DialogClose>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -901,33 +901,33 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="studyDetail" className="mt-0 space-y-6 animate-in fade-in duration-500">
-              {/* 주간 성과 요약 (기존 리포트 내용 통합) */}
+              {/* 二쇨컙 ?깃낵 ?붿빟 (湲곗〈 由ы룷???댁슜 ?듯빀) */}
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
-                  <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">주간 누적 몰입</span>
+                  <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">二쇨컙 ?꾩쟻 紐곗엯</span>
                   <p className="text-2xl font-black text-[#14295F]">{toHm(weeklyTotalStudyMinutes)}</p>
                 </Card>
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
-                  <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
+                  <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">?됯퇏 紐⑺몴 ?ъ꽦</span>
                   <p className="text-2xl font-black text-[#FF7A16]">{weeklyPlanCompletionRate}%</p>
                 </Card>
               </div>
 
               <div className="flex items-center justify-between px-1">
                 <div className="flex flex-col">
-                  <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
+                  <h3 className="text-xl font-black tracking-tighter text-[#14295F]">湲곕줉?몃옓</h3>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Study Consistency Map</p>
                 </div>
                 <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-                  <span className="text-[11px] font-black min-w-[80px] text-center">{format(currentCalendarDate, 'yyyy년 M월')}</span>
+                  <span className="text-[11px] font-black min-w-[80px] text-center">{format(currentCalendarDate, 'yyyy??M??)}</span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
               </div>
 
               <Card className="rounded-[2rem] border-none bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
                 <div className="grid grid-cols-7 border-b bg-gradient-to-r from-slate-50 via-white to-slate-50">
-                  {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
+                  {['??, '??, '??, '紐?, '湲?, '??, '??].map((day, i) => (
                     <div key={day} className={cn(
                       "py-3 text-center text-[10px] font-black uppercase tracking-widest",
                       i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-slate-400"
@@ -978,14 +978,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
                   <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-400 uppercase">
-                    <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
+                    <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 怨쇰ぉ蹂??숈뒿 鍮꾩쨷
                   </CardTitle>
                   <div className="space-y-4">
                     {subjectsData.slice(0, 3).map((s, i) => (
                       <div key={s.subject} className="space-y-1.5">
                         <div className="flex justify-between items-center text-[10px] font-bold text-slate-700">
                           <span>{s.subject}</span>
-                          <span className="font-black">{s.minutes}분</span>
+                          <span className="font-black">{s.minutes}遺?/span>
                         </div>
                         <Progress value={Math.min(100, Math.round((s.minutes / (subjectTotalMinutes || 1)) * 100))} className="h-1 bg-slate-100" />
                       </div>
@@ -999,18 +999,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <BarChart3 className="h-6 w-6 text-white/40" />
                       <div className="grid gap-0.5 text-white">
                         <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Weekly Detail</span>
-                        <span className="text-xs font-black">성과 상세 분석</span>
+                        <span className="text-xs font-black">?깃낵 ?곸꽭 遺꾩꽍</span>
                       </div>
                     </Card>
                   </DialogTrigger>
                   <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
                     <div className="bg-[#14295F] p-10 text-white relative">
-                      <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
+                      <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">二쇨컙 ?깃낵 ?곗씠??/DialogTitle>
+                      <DialogDescription className="text-white/70 font-bold mt-1 text-sm">理쒓렐 7?쇨컙???숈뒿 吏??諛??쇰뱶諛깆엯?덈떎.</DialogDescription>
                     </div>
                     <div className="p-8 space-y-10 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
                       <div className="space-y-4">
-                        <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">일별 집중 시간 (분)</h4>
+                        <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">?쇰퀎 吏묒쨷 ?쒓컙 (遺?</h4>
                         <div className="h-48 w-full">
                           <ResponsiveContainer width="100%" height="100%">
                             <RechartsLineChart data={dailyStudyTrend}>
@@ -1024,12 +1024,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         </div>
                       </div>
                       <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
-                        <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
+                        <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">?좎깮??醫낇빀 ?쇰뱶諛?/p>
                         <p className="text-base font-bold text-slate-700 leading-relaxed">"{weeklyFeedback}"</p>
                       </div>
                     </div>
                     <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">확인 완료</Button></DialogClose>
+                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">?뺤씤 ?꾨즺</Button></DialogClose>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -1040,10 +1040,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <Card className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="grid gap-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">누적 벌점 지수</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">?꾩쟻 踰뚯젏 吏??/span>
                     <h3 className="text-4xl font-black tracking-tighter text-rose-900">
                       {growth?.penaltyPoints || 0}
-                      <span className="ml-1 text-lg opacity-40">점</span>
+                      <span className="ml-1 text-lg opacity-40">??/span>
                     </h3>
                   </div>
                   <Badge className={cn('h-8 rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
@@ -1056,7 +1056,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
                   <CardTitle className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <TrendingUp className="h-4 w-4 text-[#FF7A16]" />
-                    최근 7일 공부시간
+                    理쒓렐 7??怨듬??쒓컙
                   </CardTitle>
                   <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1074,7 +1074,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
                   <CardTitle className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <BarChart3 className="h-4 w-4 text-[#14295F]" />
-                    과목별 학습시간
+                    怨쇰ぉ蹂??숈뒿?쒓컙
                   </CardTitle>
                   <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1093,11 +1093,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="space-y-3 px-1">
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-slate-400" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">최근 생활/출결 이슈</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">理쒓렐 ?앺솢/異쒓껐 ?댁뒋</span>
                 </div>
                 {recentPenaltyReasons.length === 0 ? (
                   <div className="rounded-[2rem] border-2 border-dashed py-16 text-center text-xs font-black italic opacity-20">
-                    기록된 특이사항이 없습니다.
+                    湲곕줉???뱀씠?ы빆???놁뒿?덈떎.
                   </div>
                 ) : (
                   <div className="grid gap-2">
@@ -1105,10 +1105,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <div key={r.id} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-rose-200">
                         <div className="grid gap-1">
                           <span className="text-sm font-bold text-slate-800">{r.reason}</span>
-                          <span className="text-[10px] font-black text-slate-400">{r.dateLabel} · 규정 준수 안내</span>
+                          <span className="text-[10px] font-black text-slate-400">{r.dateLabel} 쨌 洹쒖젙 以???덈궡</span>
                         </div>
                         <Badge variant="destructive" className="border-none bg-rose-100 px-3 py-1 text-xs font-black text-rose-700">
-                          +{r.points}점
+                          +{r.points}??
                         </Badge>
                       </div>
                     ))}
@@ -1119,24 +1119,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
             <TabsContent value="communication" className="mt-0 space-y-4 animate-in fade-in duration-500">
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100">
-                <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
+                <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> ?곷떞 諛?吏???붿껌</CardTitle>
                 <div className="space-y-4">
                   <div className="grid gap-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 채널</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">?곷떞 梨꾨꼸</Label>
                     <Select value={channel} onValueChange={(v) => setChannel(v as any)}>
-                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold text-sm shadow-sm"><SelectValue placeholder="상담 채널 선택" /></SelectTrigger>
+                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold text-sm shadow-sm"><SelectValue placeholder="?곷떞 梨꾨꼸 ?좏깮" /></SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-2xl">
-                        <SelectItem value="visit" className="font-bold py-3 text-sm">🏫 센터 방문 상담</SelectItem>
-                        <SelectItem value="phone" className="font-bold py-3 text-sm">📞 전화 상담</SelectItem>
-                        <SelectItem value="online" className="font-bold py-3 text-sm">💻 온라인 상담</SelectItem>
+                        <SelectItem value="visit" className="font-bold py-3 text-sm">?룶 ?쇳꽣 諛⑸Ц ?곷떞</SelectItem>
+                        <SelectItem value="phone" className="font-bold py-3 text-sm">?뱸 ?꾪솕 ?곷떞</SelectItem>
+                        <SelectItem value="online" className="font-bold py-3 text-sm">?뮲 ?⑤씪???곷떞</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 내용</Label>
-                    <Textarea className="min-h-[120px] rounded-[1.5rem] border-2 font-bold p-4 text-sm shadow-inner" value={requestText} onChange={(e) => setRequestText(e.target.value)} placeholder="자녀의 학습이나 생활에 대해 궁금하신 점을 자유롭게 입력해 주세요." />
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">?곷떞 ?댁슜</Label>
+                    <Textarea className="min-h-[120px] rounded-[1.5rem] border-2 font-bold p-4 text-sm shadow-inner" value={requestText} onChange={(e) => setRequestText(e.target.value)} placeholder="?먮????숈뒿?대굹 ?앺솢?????沅곴툑?섏떊 ?먯쓣 ?먯쑀濡?쾶 ?낅젰??二쇱꽭??" />
                   </div>
-                  <Button className="w-full h-16 rounded-[1.5rem] bg-[#14295F] text-white font-black text-lg shadow-xl shadow-[#14295F]/20 active:scale-[0.98] transition-all" onClick={() => submit('consultation')} disabled={submitting}>요청 보내기</Button>
+                  <Button className="w-full h-16 rounded-[1.5rem] bg-[#14295F] text-white font-black text-lg shadow-xl shadow-[#14295F]/20 active:scale-[0.98] transition-all" onClick={() => submit('consultation')} disabled={submitting}>?붿껌 蹂대궡湲?/Button>
                 </div>
               </Card>
             </TabsContent>
@@ -1146,18 +1146,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="space-y-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
-                      <h3 className="text-4xl font-black tracking-tight text-[#14295F] leading-none">수납</h3>
+                      <h3 className="text-4xl font-black tracking-tight text-[#14295F] leading-none">?섎궔</h3>
                       <p className="text-[15px] font-bold text-slate-700 leading-snug">
-                        센터수납요청건을 비대면으로 결제할 수 있어요 !
+                        <span className="block">센터수납요청건을 비대면으로</span>
+                        <span className="block">결제할 수 있어요</span>
                       </p>
                     </div>
-                    <span className="shrink-0 text-[14px] font-black text-[#14295F]">실시간 연동</span>
+                    <span className="shrink-0 text-[14px] font-black text-[#14295F]">?ㅼ떆媛??곕룞</span>
                   </div>
 
                   {isMobile ? (
                     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[12px] font-black text-[#14295F]">청구금액</p>
+                        <p className="text-[12px] font-black text-[#14295F]">泥?뎄湲덉븸</p>
                         {mobileBillingStatusMeta && (
                           <Badge className={cn('h-6 border px-2 text-[11px] font-black', mobileBillingStatusMeta.className)}>
                             {mobileBillingStatusMeta.label}
@@ -1171,19 +1172,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   ) : (
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3.5 text-center shadow-sm">
-                        <p className="text-[12px] font-black text-[#14295F]">청구</p>
+                        <p className="text-[12px] font-black text-[#14295F]">泥?뎄</p>
                         <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-[#14295F] whitespace-nowrap">
                           {formatWon(billingSummary.billed)}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 px-3 py-3.5 text-center shadow-sm">
-                        <p className="text-[12px] font-black text-emerald-700">수납</p>
+                        <p className="text-[12px] font-black text-emerald-700">?섎궔</p>
                         <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-emerald-700 whitespace-nowrap">
                           {formatWon(billingSummary.paid)}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 px-3 py-3.5 text-center shadow-sm">
-                        <p className="text-[12px] font-black text-rose-700">미납</p>
+                        <p className="text-[12px] font-black text-rose-700">誘몃궔</p>
                         <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-rose-700 whitespace-nowrap">
                           {formatWon(billingSummary.overdue)}
                         </p>
@@ -1199,16 +1200,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="space-y-2 min-w-0 flex-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <p className={cn("font-black tracking-tight text-[#14295F] min-w-0 truncate whitespace-nowrap", isMobile ? "text-[1.45rem] leading-none" : "text-[20px]")}>
-                          {latestInvoice.studentName || student?.name || '학생'}
+                          {latestInvoice.studentName || student?.name || '?숈깮'}
                         </p>
                         {latestInvoiceStatusMeta && (
                           <Badge className={cn('h-6 border px-2 text-[10px] font-black shrink-0', latestInvoiceStatusMeta.className)}>
-                            {isMobile ? (latestInvoice.status === 'paid' ? '완납' : '미납') : latestInvoiceStatusMeta.label}
+                            {isMobile ? (latestInvoice.status === 'paid' ? '?꾨궔' : '誘몃궔') : latestInvoiceStatusMeta.label}
                           </Badge>
                         )}
                       </div>
                       <p className="text-[15px] font-bold text-slate-600">
-                        결제 마감일 {latestInvoiceDueDate ? format(latestInvoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
+                        寃곗젣 留덇컧??{latestInvoiceDueDate ? format(latestInvoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
                       </p>
                     </div>
                     <p className={cn("font-black tracking-tight leading-none text-[#14295F] tabular-nums whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
@@ -1222,25 +1223,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#14295F] text-[15px] font-black text-white shadow-sm transition-colors hover:bg-[#10224f]"
                     >
                       <CreditCard className="h-4 w-4" />
-                      결제하기
+                      寃곗젣?섍린
                     </Link>
                   )}
                 </Card>
               ) : (
                 <Card className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
-                  <p className="text-[14px] font-bold text-slate-500">현재 발행된 인보이스가 없습니다.</p>
+                  <p className="text-[14px] font-bold text-slate-500">?꾩옱 諛쒗뻾???몃낫?댁뒪媛 ?놁뒿?덈떎.</p>
                 </Card>
               )}
 
               <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50/50 px-4 py-3">
-                <p className="text-[15px] font-black text-emerald-700">감사합니다! 최선을 다해 관리하겠습니다!</p>
+                <p className="text-[15px] font-black text-emerald-700">媛먯궗?⑸땲?? 理쒖꽑???ㅽ빐 愿由ы븯寃좎뒿?덈떎!</p>
               </div>
             </TabsContent>
 
             <TabsContent value="notifications" className="mt-0 space-y-3 animate-in fade-in duration-500">
               {notifications.length === 0 ? (
                 <div className="py-32 text-center opacity-20 italic font-black text-slate-400 flex flex-col items-center gap-4">
-                  <Bell className="h-16 w-16" /> <span className="text-sm uppercase tracking-widest">새로운 알림이 없습니다.</span>
+                  <Bell className="h-16 w-16" /> <span className="text-sm uppercase tracking-widest">?덈줈???뚮┝???놁뒿?덈떎.</span>
                 </div>
               ) : (
                 notifications.map((n) => (
@@ -1255,7 +1256,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
-                      {n.isImportant && <Badge className="bg-orange-100 text-[#FF7A16] border-none font-black text-[8px] h-5 px-2">중요</Badge>}
+                      {n.isImportant && <Badge className="bg-orange-100 text-[#FF7A16] border-none font-black text-[8px] h-5 px-2">以묒슂</Badge>}
                     </div>
                     <p className="text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
                     <p className="text-xs font-bold text-slate-500 leading-relaxed">{n.body}</p>
@@ -1270,9 +1271,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       <Dialog open={!!selectedNotification} onOpenChange={(open) => { if (!open) setSelectedNotification(null); }}>
         <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-md">
           <div className="bg-[#14295F] p-6 text-white">
-            <DialogTitle className="text-xl font-black tracking-tight">알림 상세</DialogTitle>
+            <DialogTitle className="text-xl font-black tracking-tight">?뚮┝ ?곸꽭</DialogTitle>
             <DialogDescription className="mt-1 text-xs font-bold text-white/70">
-              {selectedNotification?.createdAtLabel || '최근'} · 읽음 확인 가능
+              {selectedNotification?.createdAtLabel || '理쒓렐'} 쨌 ?쎌쓬 ?뺤씤 媛??
             </DialogDescription>
           </div>
           <div className="space-y-4 bg-white p-6">
@@ -1280,20 +1281,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-base font-black tracking-tight text-[#14295F]">{selectedNotification?.title}</p>
                 {selectedNotification?.isImportant && (
-                  <Badge className="h-5 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">중요</Badge>
+                  <Badge className="h-5 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">以묒슂</Badge>
                 )}
               </div>
               <p className="whitespace-pre-line text-sm font-bold leading-relaxed text-slate-700">{selectedNotification?.body}</p>
             </div>
             {selectedNotification && (
               <p className="text-[11px] font-black uppercase tracking-widest text-emerald-600">
-                {(selectedNotification.isRead || readMap[selectedNotification.id]) ? '읽음 확인됨' : '미확인 알림'}
+                {(selectedNotification.isRead || readMap[selectedNotification.id]) ? '?쎌쓬 ?뺤씤?? : '誘명솗???뚮┝'}
               </p>
             )}
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">닫기</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">?リ린</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -1303,35 +1304,35 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
           <div className="bg-gradient-to-r from-[#14295F] to-[#1f3e87] p-6 text-white">
             <DialogTitle className="text-xl font-black tracking-tight">
-              {selectedCalendarDate ? format(selectedCalendarDate, 'yyyy.MM.dd (EEE)', { locale: ko }) : '날짜 상세'}
+              {selectedCalendarDate ? format(selectedCalendarDate, 'yyyy.MM.dd (EEE)', { locale: ko }) : '?좎쭨 ?곸꽭'}
             </DialogTitle>
-            <DialogDescription className="mt-1 text-xs font-bold text-white/70">해당 날짜의 학습 데이터 요약</DialogDescription>
+            <DialogDescription className="mt-1 text-xs font-bold text-white/70">?대떦 ?좎쭨???숈뒿 ?곗씠???붿빟</DialogDescription>
           </div>
           <div className="space-y-4 bg-white p-6">
             <div className="grid grid-cols-2 gap-2">
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">공부 시간</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">怨듬? ?쒓컙</p>
                 <p className="mt-1 text-xl font-black text-[#14295F]">{toHm(selectedDateLog?.totalMinutes || 0)}</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">계획 달성</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">怨꾪쉷 ?ъ꽦</p>
                 <p className="mt-1 text-xl font-black text-[#FF7A16]">{selectedDatePlanRate}%</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">획득 LP</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">?띾뱷 LP</p>
                 <p className="mt-1 text-xl font-black text-emerald-600">{selectedDateLp.toLocaleString()} LP</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">출결 요청</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">異쒓껐 ?붿껌</p>
                 <p className="mt-1 text-sm font-black text-[#14295F]">
-                  {selectedDateRequest ? (selectedDateRequest.type === 'late' ? '지각 신청' : '결석 신청') : '기록 없음'}
+                  {selectedDateRequest ? (selectedDateRequest.type === 'late' ? '吏媛??좎껌' : '寃곗꽍 ?좎껌') : '湲곕줉 ?놁쓬'}
                 </p>
               </Card>
             </div>
 
             <Card className="rounded-xl border border-slate-100 p-4 shadow-none">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">학습 계획 내역</p>
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">?숈뒿 怨꾪쉷 ?댁뿭</p>
                 <Badge className="h-5 border border-slate-200 bg-slate-50 px-2 text-[9px] font-black text-slate-500">
                   {selectedDatePlanDone}/{selectedDatePlanTotal}
                 </Badge>
@@ -1339,14 +1340,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               {isSelectedDatePlansLoading ? (
                 <div className="py-6 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-300" /></div>
               ) : selectedDateStudyPlans.length === 0 ? (
-                <p className="py-6 text-center text-xs font-bold text-slate-400">등록된 학습 계획이 없습니다.</p>
+                <p className="py-6 text-center text-xs font-bold text-slate-400">?깅줉???숈뒿 怨꾪쉷???놁뒿?덈떎.</p>
               ) : (
                 <div className="space-y-1.5">
                   {selectedDateStudyPlans.slice(0, 6).map((plan) => (
                     <div key={plan.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                       <p className="line-clamp-1 text-xs font-bold text-slate-700">{plan.title}</p>
                       <Badge className={cn('h-5 border-none px-2 text-[9px] font-black', plan.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600')}>
-                        {plan.done ? '완료' : '진행중'}
+                        {plan.done ? '?꾨즺' : '吏꾪뻾以?}
                       </Badge>
                     </div>
                   ))}
@@ -1356,7 +1357,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">확인</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">?뺤씤</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -1365,7 +1366,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       <div className="rounded-[1.5rem] border border-blue-100 bg-blue-50/50 px-6 py-4 flex items-start gap-3 mx-1">
         <Info className="h-4 w-4 text-[#14295F] mt-0.5 shrink-0" />
         <p className="text-[10px] font-bold text-[#14295F]/70 leading-relaxed break-keep">
-          학부모 모드는 실시간 조회 전용입니다. 정보 수정이나 상세 설정 변경은 센터 관리자 또는 자녀 계정을 통해 가능합니다.
+          ?숇?紐?紐⑤뱶???ㅼ떆媛?議고쉶 ?꾩슜?낅땲?? ?뺣낫 ?섏젙?대굹 ?곸꽭 ?ㅼ젙 蹂寃쎌? ?쇳꽣 愿由ъ옄 ?먮뒗 ?먮? 怨꾩젙???듯빐 媛?ν빀?덈떎.
         </p>
       </div>
     </div>
