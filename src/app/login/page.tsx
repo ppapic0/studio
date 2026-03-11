@@ -7,7 +7,7 @@ export default function LoginPage() {
     <AuthFormWrapper
       title={
         <div className="flex flex-col items-center gap-4">
-          <TrackLogo variant="mark" className="h-24 w-auto animate-in fade-in slide-in-from-top-4 duration-700" />
+          <TrackLogo className="h-24 w-auto object-contain animate-in fade-in slide-in-from-top-4 duration-700" />
           <span className="text-lg font-black tracking-tight text-[#14295F]">오늘의 몰입을 시작해보세요</span>
         </div>
       }

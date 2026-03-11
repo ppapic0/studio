@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { cn } from '@/lib/utils';
 
@@ -12,9 +12,12 @@ export function TrackLogo({ className, variant = 'full' }: TrackLogoProps) {
 
   return (
     <img
-      src={isMark ? '/track-logo-mark.svg' : '/track-logo-full.svg'}
+      src={isMark ? '/track-logo-mark.png' : '/track-logo-full.png'}
       alt={isMark ? '트랙 심볼 로고' : '트랙 로고'}
-      className={cn('h-11 w-auto', className)}
+      className={cn(
+        isMark ? 'h-11 w-auto object-contain' : 'h-11 w-auto max-w-[8.75rem] object-contain',
+        className
+      )}
       loading="eager"
       decoding="async"
     />

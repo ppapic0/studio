@@ -1,4 +1,4 @@
-
+﻿
 'use client';
 
 import {
@@ -78,14 +78,14 @@ import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 
 const TIER_PRESETS = [
-  { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
-  { label: '실버', lp: 5000, stats: 45, rank: 50, color: 'bg-slate-300' },
-  { label: '골드', lp: 10000, stats: 65, rank: 20, color: 'bg-yellow-500' },
-  { label: '플래티넘', lp: 15000, stats: 80, rank: 10, color: 'bg-emerald-400' },
-  { label: '다이아', lp: 20000, stats: 90, rank: 5, color: 'bg-blue-400' },
-  { label: '마스터', lp: 26000, stats: 95, rank: 4, color: 'bg-purple-500' },
-  { label: '그마', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
-  { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
+  { label: '釉뚮줎利?, lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
+  { label: '?ㅻ쾭', lp: 5000, stats: 45, rank: 50, color: 'bg-slate-300' },
+  { label: '怨⑤뱶', lp: 10000, stats: 65, rank: 20, color: 'bg-yellow-500' },
+  { label: '?뚮옒?곕꽆', lp: 15000, stats: 80, rank: 10, color: 'bg-emerald-400' },
+  { label: '?ㅼ씠??, lp: 20000, stats: 90, rank: 5, color: 'bg-blue-400' },
+  { label: '留덉뒪??, lp: 26000, stats: 95, rank: 4, color: 'bg-purple-500' },
+  { label: '洹몃쭏', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
+  { label: '梨뚮┛?', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
 function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string }) {
@@ -117,9 +117,9 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         updatedAt: serverTimestamp() 
       }, { merge: true });
       await batch.commit();
-      toast({ title: "테스트 데이터 반영 완료" });
+      toast({ title: "?뚯뒪???곗씠??諛섏쁺 ?꾨즺" });
     } catch (e) {
-      toast({ variant: "destructive", title: "보정 실패" });
+      toast({ variant: "destructive", title: "蹂댁젙 ?ㅽ뙣" });
     } finally {
       setIsUpdating(false);
     }
@@ -150,14 +150,14 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         <div className="flex-1 space-y-8">
           <div className="space-y-4">
             <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 LP</span>
+              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> ?쒖쫵 ?꾩쟻 LP</span>
               <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
             </div>
             <Slider value={[lp]} max={45000} step={500} onValueChange={([val]) => setLp(val)} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-            {Object.entries({ focus: '집중력', consistency: '꾸준함', achievement: '목표달성', resilience: '회복력' }).map(([key, label]) => (
+            {Object.entries({ focus: '吏묒쨷??, consistency: '袁몄???, achievement: '紐⑺몴?ъ꽦', resilience: '?뚮났?? }).map(([key, label]) => (
               <div key={key} className="space-y-3">
                 <div className="flex justify-between items-center px-1">
                   <span className="text-[9px] font-black uppercase text-muted-foreground">{label}</span>
@@ -178,7 +178,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
             ))}
           </div>
           <Button onClick={handleUpdate} disabled={isUpdating} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 gap-3 active:scale-95 transition-all">
-            {isUpdating ? <Loader2 className="animate-spin h-6 w-6" /> : <Wand2 className="h-6 w-6" />}시스템 상태 즉시 반영
+            {isUpdating ? <Loader2 className="animate-spin h-6 w-6" /> : <Wand2 className="h-6 w-6" />}?쒖뒪???곹깭 利됱떆 諛섏쁺
           </Button>
         </div>
       </CardContent>
@@ -200,7 +200,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           isMobile ? "rounded-[1.5rem]" : ""
         )}>
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-10 pt-10", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>시즌 러닝 포인트 (LP)</CardTitle>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>?쒖쫵 ?щ떇 ?ъ씤??(LP)</CardTitle>
             <div className={cn("bg-amber-50 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md", isMobile ? "p-1.5" : "p-2.5")}>
               <Zap className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
@@ -210,7 +210,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
               {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>lp</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-amber-50 text-amber-700 border border-amber-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>히스토리 분석 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+              <Badge variant="secondary" className={cn("bg-amber-50 text-amber-700 border border-amber-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>?덉뒪?좊━ 遺꾩꽍 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
             </div>
           </CardContent>
         </Card>
@@ -219,12 +219,12 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
           <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>LP 획득 히스토리</DialogTitle>
-            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 러닝 포인트 내역입니다.</DialogDescription>
+            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>LP ?띾뱷 ?덉뒪?좊━</DialogTitle>
+            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">理쒓렐 30?쇨컙???щ떇 ?ъ씤???댁뿭?낅땲??</DialogDescription>
           </DialogHeader>
         </div>
         <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "p-4" : "")}>
-          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
+          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">湲곕줉??LP媛 ?놁뒿?덈떎.</div>) : (
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
                 const discreteLp = (data.attendance ? 100 : 0) + (data.plan ? 100 : 0) + (data.routine ? 100 : 0);
@@ -236,10 +236,10 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                     <div className="grid gap-0.5">
                       <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">{date}</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
-                        {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[7px] px-1 py-0">출석</Badge>}
-                        {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[7px] px-1 py-0">계획</Badge>}
-                        {data.routine && <Badge className="bg-amber-500 text-white border-none font-black text-[7px] px-1 py-0">루틴</Badge>}
-                        {studyLp > 0 && <Badge className="bg-blue-600 text-white border-none font-black text-[7px] px-1 py-0">몰입</Badge>}
+                        {data.attendance && <Badge className="bg-blue-500 text-white border-none font-black text-[7px] px-1 py-0">異쒖꽍</Badge>}
+                        {data.plan && <Badge className="bg-emerald-500 text-white border-none font-black text-[7px] px-1 py-0">怨꾪쉷</Badge>}
+                        {data.routine && <Badge className="bg-amber-500 text-white border-none font-black text-[7px] px-1 py-0">猷⑦떞</Badge>}
+                        {studyLp > 0 && <Badge className="bg-blue-600 text-white border-none font-black text-[7px] px-1 py-0">紐곗엯</Badge>}
                       </div>
                     </div>
                     <div className="text-right">
@@ -254,7 +254,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
         </div>
         <DialogFooter className={cn("bg-white border-t justify-center", isMobile ? "p-4" : "p-6")}>
           <DialogClose asChild>
-            <Button variant="ghost" className="font-bold text-muted-foreground h-10">닫기</Button>
+            <Button variant="ghost" className="font-bold text-muted-foreground h-10">?リ린</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -283,7 +283,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
         )}>
           <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600" />
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-10 pt-10", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>오늘의 누적 트랙</CardTitle>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>?ㅻ뒛???꾩쟻 ?몃옓</CardTitle>
             <div className={cn("bg-blue-50 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md", isMobile ? "p-1.5" : "p-2.5")}>
               <Clock className={cn("text-blue-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
@@ -293,7 +293,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>m</span>
             </div>
             <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-blue-50 text-blue-700 border border-blue-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>세션 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+              <Badge variant="secondary" className={cn("bg-blue-50 text-blue-700 border border-blue-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>?몄뀡 蹂닿린 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
             </div>
           </CardContent>
         </Card>
@@ -302,15 +302,15 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
         <div className={cn("bg-blue-600 text-white relative", isMobile ? "p-6" : "p-10")}>
           <Activity className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>몰입 히스토리</DialogTitle>
-            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">오늘 완료된 몰입 세션입니다.</DialogDescription>
+            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>紐곗엯 ?덉뒪?좊━</DialogTitle>
+            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">?ㅻ뒛 ?꾨즺??紐곗엯 ?몄뀡?낅땲??</DialogDescription>
           </DialogHeader>
         </div>
         <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "p-4" : "")}>
           {isLoading ? (
             <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
           ) : !sessions || sessions.length === 0 ? (
-            <div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 세션이 없습니다.</div>
+            <div className="py-20 text-center opacity-20 italic font-black text-sm">湲곕줉???몄뀡???놁뒿?덈떎.</div>
           ) : (
             <div className="space-y-2">
               {sessions.map((session) => (
@@ -324,7 +324,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
                       <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
                     </div>
                   </div>
-                  <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-2">{session.durationMinutes}분</Badge>
+                  <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-2">{session.durationMinutes}遺?/Badge>
                 </div>
               ))}
             </div>
@@ -332,7 +332,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
         </div>
         <DialogFooter className={cn("bg-white border-t justify-center", isMobile ? "p-4" : "p-6")}>
           <DialogClose asChild>
-            <Button variant="ghost" className="font-bold text-muted-foreground h-10">닫기</Button>
+            <Button variant="ghost" className="font-bold text-muted-foreground h-10">?リ린</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -351,7 +351,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const isMobile = viewMode === 'mobile';
   
-  // 지각/결석 신청서 상태
+  // 吏媛?寃곗꽍 ?좎껌???곹깭
   const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
   const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [requestReason, setRequestReason] = useState('');
@@ -422,13 +422,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
             updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
-            toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+            toast({ title: "3?쒓컙 ?ъ꽦! 異쒖꽍 蹂대꼫??LP ?띾뱷 ?럦" });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
             updateData['stats.resilience'] = increment(0.5);
             updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
-            toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
+            toast({ title: "6?쒓컙 紐곗엯 ?ъ꽦! ?뚮났???ㅽ꺈 ?곸듅 ?럦" });
           }
 
           finalNewLp += studyLpEarned;
@@ -451,11 +451,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           
           batch.update(progressRef, updateData);
 
-          // 랭킹 보드 스냅샷 업데이트
+          // ??궧 蹂대뱶 ?ㅻ깄???낅뜲?댄듃
           const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
           batch.set(rankRef, {
             studentId: user.uid,
-            displayNameSnapshot: user.displayName || '학생',
+            displayNameSnapshot: user.displayName || '?숈깮',
             classNameSnapshot: activeMembership.className || null,
             value: finalNewLp,
             updatedAt: serverTimestamp()
@@ -468,15 +468,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         
         await batch.commit();
 
-        // 카카오 알림톡 발송 (퇴실)
+        // 移댁뭅???뚮┝??諛쒖넚 (?댁떎)
         sendKakaoNotification(firestore, centerId, {
-          studentName: user.displayName || '학생',
+          studentName: user.displayName || '?숈깮',
           type: 'exit'
         });
 
         setIsTimerActive(false); 
         setStartTime(null); 
-        toast({ title: "트랙 종료됨" });
+        toast({ title: "?몃옓 醫낅즺?? });
       } else {
         const nowTs = Date.now();
         const batch = writeBatch(firestore);
@@ -487,7 +487,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             [`dailyLpStatus.${todayKey}.checkedIn`]: true,
             updatedAt: serverTimestamp()
           });
-          toast({ title: "입실 확인! 꾸준함 스탯 +0.5 상승 🎉" });
+          toast({ title: "?낆떎 ?뺤씤! 袁몄????ㅽ꺈 +0.5 ?곸듅 ?럦" });
         }
 
         if (seatDoc) {
@@ -500,9 +500,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         await batch.commit();
 
-        // 카카오 알림톡 발송 (입실)
+        // 移댁뭅???뚮┝??諛쒖넚 (?낆떎)
         sendKakaoNotification(firestore, centerId, {
-          studentName: user.displayName || '학생',
+          studentName: user.displayName || '?숈깮',
           type: 'entry'
         });
 
@@ -511,7 +511,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       }
     } catch (e: any) {
       console.error("Action error:", e);
-      toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
+      toast({ variant: "destructive", title: "泥섎━ 以??ㅻ쪟 諛쒖깮", description: "?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??" });
     } finally {
       setIsProcessingAction(false);
     }
@@ -523,13 +523,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const updateSeconds = () => {
         const diff = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
         
-        // 4시간 (14400초) 초과 시 자동 종료
+        // 4?쒓컙 (14400珥? 珥덇낵 ???먮룞 醫낅즺
         if (diff >= 14400) {
           handleStudyStartStop();
           toast({ 
             variant: "destructive", 
-            title: "학습 세션 자동 종료", 
-            description: "집중 보호를 위해 4시간이 경과하여 세션이 자동으로 종료되었습니다." 
+            title: "?숈뒿 ?몄뀡 ?먮룞 醫낅즺", 
+            description: "吏묒쨷 蹂댄샇瑜??꾪빐 4?쒓컙??寃쎄낵?섏뿬 ?몄뀡???먮룞?쇰줈 醫낅즺?섏뿀?듬땲??" 
           });
           return;
         }
@@ -587,7 +587,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const handleRequestSubmit = async () => {
     if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
     if (requestReason.trim().length < 10) {
-      toast({ variant: "destructive", title: "사유 부족", description: "사유를 10자 이상 구체적으로 적어주세요." });
+      toast({ variant: "destructive", title: "?ъ쑀 遺議?, description: "?ъ쑀瑜?10???댁긽 援ъ껜?곸쑝濡??곸뼱二쇱꽭??" });
       return;
     }
 
@@ -595,7 +595,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     try {
       const requestData: any = {
         studentId: user.uid,
-        studentName: user.displayName || '학생',
+        studentName: user.displayName || '?숈깮',
         centerId: activeMembership.id,
         type: requestType,
         date: requestDate,
@@ -607,10 +607,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       };
 
       await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'), requestData);
-      toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
+      toast({ title: "?좎껌?쒓? ?쒖텧?섏뿀?듬땲?? ?좎깮?섏쓽 ?뱀씤??湲곕떎?ㅼ＜?몄슂." });
       setRequestReason('');
     } catch (e: any) {
-      toast({ variant: "destructive", title: "제출 실패", description: e.message });
+      toast({ variant: "destructive", title: "?쒖텧 ?ㅽ뙣", description: e.message });
     } finally {
       setIsRequestSubmitting(false);
     }
@@ -646,13 +646,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           [`dailyLpStatus.${todayKey}.plan`]: true,
           [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
         });
-        toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+        toast({ title: "紐⑤뱺 怨꾪쉷 ?꾨즺! 怨꾪쉷 蹂대꼫??LP ?띾뱷 ?럦" });
 
-        // 랭킹 보드 스냅샷 업데이트
+        // ??궧 蹂대뱶 ?ㅻ깄???낅뜲?댄듃
         const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
         batch.set(rankRef, {
           studentId: user.uid,
-          displayNameSnapshot: user.displayName || '학생',
+          displayNameSnapshot: user.displayName || '?숈깮',
           classNameSnapshot: activeMembership.className || null,
           value: finalNewLp,
           updatedAt: serverTimestamp()
@@ -684,14 +684,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         isMobile ? "rounded-[1.25rem] p-4" : "rounded-[3rem] p-12"
       )}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
-          {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
+          {currentTier.name === '梨뚮┛?' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 flex flex-col gap-3", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
           <div className={isMobile ? "space-y-1.5" : "space-y-4"}>
             <div className="flex flex-col gap-0.5">
               <Badge className={cn("w-fit bg-white/20 text-white border-none font-black tracking-[0.2em] uppercase px-2 py-0.5", isMobile ? "mx-auto text-[6px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
               <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-lg" : "text-6xl")}>
-                {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
+                {isTimerActive ? "?몃옓???뺤젏??n?꾨떖?섏뀲?ㅼ슂 !" : "?ㅻ뒛???깆옣???꾪빐\n?몃옓???쒖옉?섏꽭??}
               </h2>
             </div>
             <div className={cn("flex items-center gap-1.5 bg-white/10 backdrop-blur-xl w-fit px-2.5 py-1 rounded-full border border-white/20 shadow-2xl", isMobile ? "mx-auto" : "md:mx-0")}>
@@ -721,23 +721,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 {isProcessingAction ? (
                   <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
                 ) : isTimerActive ? (
-                  <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                  <>?몃옓 醫낅즺 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
                 ) : (
-                  <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                  <>?몃옓 ?쒖옉 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
                 )}
               </button>
               
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full h-10 rounded-xl bg-white/10 border-white/20 text-white font-black hover:bg-white hover:text-primary gap-2 backdrop-blur-sm shadow-xl">
-                    <QrCode className="h-4 w-4" /> 나의 출입 QR
+                    <QrCode className="h-4 w-4" /> ?섏쓽 異쒖엯 QR
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-sm">
                   <div className="bg-primary p-8 text-white text-center">
                     <DialogHeader>
-                      <DialogTitle className="text-2xl font-black tracking-tighter">나의 출입 QR</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
+                      <DialogTitle className="text-2xl font-black tracking-tighter">?섏쓽 異쒖엯 QR</DialogTitle>
+                      <DialogDescription className="text-white/70 font-bold">?쇳꽣 ?낃뎄 移대찓?쇱뿉 ?ㅼ틪??二쇱꽭??</DialogDescription>
                     </DialogHeader>
                   </div>
                   <div className="p-10 bg-white flex flex-col items-center gap-6">
@@ -748,7 +748,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         level="H"
                         includeMargin={false}
                         imageSettings={{
-                          src: "/track-logo-mark.svg",
+                          src: "/track-logo-mark.png",
                           x: undefined,
                           y: undefined,
                           height: 40,
@@ -764,7 +764,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <DialogFooter className="p-6 bg-muted/30">
                     <DialogClose asChild>
-                      <Button className="w-full h-12 rounded-xl font-black">닫기</Button>
+                      <Button className="w-full h-12 rounded-xl font-black">?リ린</Button>
                     </DialogClose>
                   </DialogFooter>
                 </DialogContent>
@@ -785,7 +785,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-4" : "p-10")}>
               <div className="flex items-center justify-between">
                 <CardTitle className={cn("font-black flex items-center gap-2.5 tracking-tighter text-primary", isMobile ? "text-lg" : "text-3xl")}>
-                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 계획트랙
+                  <ListTodo className={cn("text-emerald-600", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 怨꾪쉷?몃옓
                 </CardTitle>
                 <Badge variant="secondary" className={cn("bg-emerald-500 text-white border-none font-black h-5 uppercase tracking-widest", isMobile ? "text-[8px] px-1.5" : "text-[10px] px-3")}>
                   {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
@@ -795,7 +795,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <CardContent className={cn("bg-emerald-50/5", isMobile ? "p-4" : "p-10")}>
               <div className="grid gap-3 sm:gap-4">
                 {studyTasks.length === 0 ? (
-                  <div className="py-12 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-xl">오늘의 학습 계획이 없습니다.</div>
+                  <div className="py-12 text-center opacity-20 italic font-black text-xs border-2 border-dashed border-emerald-200 rounded-xl">?ㅻ뒛???숈뒿 怨꾪쉷???놁뒿?덈떎.</div>
                 ) : studyTasks.map((task) => (
                   <div key={task.id} className={cn(
                     "flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-500 relative group", 
@@ -827,12 +827,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="lg:col-span-1 bg-amber-50/20">
               <CardHeader className="p-10 bg-amber-100/30 border-b">
                 <CardTitle className="font-black flex items-center gap-2.5 tracking-tighter text-amber-700 text-2xl sm:text-3xl">
-                  <Timer className="h-8 w-8 text-amber-600" /> 루틴
+                  <Timer className="h-8 w-8 text-amber-600" /> 猷⑦떞
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-10 flex flex-col gap-4">
                 {scheduleItems.length === 0 ? (
-                  <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-amber-200 rounded-xl">루틴이 없습니다.</div>
+                  <div className="py-8 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-amber-200 rounded-xl">猷⑦떞???놁뒿?덈떎.</div>
                 ) : (
                   <div className="flex flex-col gap-4">
                     {scheduleItems.map((item) => (
@@ -866,7 +866,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <FileText className={cn("text-primary", isMobile ? "h-5 w-5" : "h-8 w-8")} />
             </div>
             <div className="grid">
-              <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>데일리 리포트</span>
+              <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>?곗씪由?由ы룷??/span>
               <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Analysis</span>
             </div>
           </Card>
@@ -882,7 +882,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <ClipboardPen className={cn("text-amber-600", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               </div>
               <div className="grid">
-                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>지각/결석 신청</span>
+                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>吏媛?寃곗꽍 ?좎껌</span>
                 <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Requests</span>
               </div>
             </Card>
@@ -891,8 +891,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="bg-amber-500 p-8 text-white relative shrink-0">
               <BellRing className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
-                <DialogDescription className="text-white/70 font-bold">지각 또는 결석 사유를 입력하여 제출하세요.</DialogDescription>
+                <DialogTitle className="text-2xl font-black">?좎껌???묒꽦</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold">吏媛??먮뒗 寃곗꽍 ?ъ쑀瑜??낅젰?섏뿬 ?쒖텧?섏꽭??</DialogDescription>
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
@@ -900,28 +900,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="grid gap-6 bg-white p-6 rounded-[2rem] border shadow-sm">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">신청 종류</Label>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">?좎껌 醫낅쪟</Label>
                       <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
                         <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="late">지각 (Late)</SelectItem>
-                          <SelectItem value="absence">결석 (Absence)</SelectItem>
+                          <SelectItem value="late">吏媛?(Late)</SelectItem>
+                          <SelectItem value="absence">寃곗꽍 (Absence)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">?좎쭨</Label>
                       <Input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className="rounded-xl border-2 h-12 font-bold" />
                     </div>
                   </div>
                   
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center ml-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">사유 (최소 10자)</Label>
-                      <span className={cn("text-[9px] font-bold", requestReason.length < 10 ? "text-rose-500" : "text-emerald-500")}>{requestReason.length}/10자</span>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">?ъ쑀 (理쒖냼 10??</Label>
+                      <span className={cn("text-[9px] font-bold", requestReason.length < 10 ? "text-rose-500" : "text-emerald-500")}>{requestReason.length}/10??/span>
                     </div>
                     <Textarea 
-                      placeholder="사유를 상세히 입력해 주세요. (예: 병원 진료, 학교 행사 참여 등)" 
+                      placeholder="?ъ쑀瑜??곸꽭???낅젰??二쇱꽭?? (?? 蹂묒썝 吏꾨즺, ?숆탳 ?됱궗 李몄뿬 ??" 
                       value={requestReason}
                       onChange={e => setRequestReason(e.target.value)}
                       className="rounded-2xl border-2 min-h-[100px] font-bold text-sm resize-none"
@@ -932,7 +932,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3">
                       <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
                       <p className="text-[11px] font-bold text-rose-900 leading-relaxed">
-                        당일 신청도 먼저 접수되며, 담당 선생님 승인 후 센터 규정에 따라 반영됩니다.
+                        ?뱀씪 ?좎껌??癒쇱? ?묒닔?섎ŉ, ?대떦 ?좎깮???뱀씤 ???쇳꽣 洹쒖젙???곕씪 諛섏쁺?⑸땲??
                       </p>
                     </div>
                   )}
@@ -942,17 +942,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     disabled={isRequestSubmitting || requestReason.length < 10} 
                     className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-200 active:scale-95 transition-all"
                   >
-                    {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
+                    {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '?좎껌???쒖텧?섍린'}
                   </Button>
                 </div>
 
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2">
-                    <History className="h-3.5 w-3.5" /> 최근 신청 내역 (최근 5건)
+                    <History className="h-3.5 w-3.5" /> 理쒓렐 ?좎껌 ?댁뿭 (理쒓렐 5嫄?
                   </h4>
                   <div className="grid gap-2">
                     {myRequests?.length === 0 ? (
-                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">신청 내역이 없습니다.</div>
+                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">?좎껌 ?댁뿭???놁뒿?덈떎.</div>
                     ) : (
                       myRequests?.map(req => (
                         <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
@@ -961,7 +961,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                               {req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}
                             </div>
                             <div className="grid leading-tight">
-                              <span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span>
+                              <span className="font-black text-xs">{req.date} {req.type === 'late' ? '吏媛? : '寃곗꽍'}</span>
                               <span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span>
                             </div>
                           </div>
@@ -970,7 +970,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                             req.status === 'requested' ? "bg-muted text-muted-foreground" : 
                             req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
                           )}>
-                            {req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}
+                            {req.status === 'requested' ? '?뱀씤?湲? : req.status === 'approved' ? '?뱀씤?꾨즺' : '諛섎젮'}
                           </Badge>
                         </div>
                       ))
@@ -979,7 +979,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </div>
             </div>
-            <DialogFooter className="p-6 border-t shrink-0 bg-white"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+            <DialogFooter className="p-6 border-t shrink-0 bg-white"><DialogClose asChild><Button variant="ghost" className="w-full font-black">?リ린</Button></DialogClose></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -993,7 +993,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <AlertOctagon className={cn("text-rose-600", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               </div>
               <div className="grid">
-                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>벌점 현황</span>
+                <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>踰뚯젏 ?꾪솴</span>
                 <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Penalties</span>
               </div>
             </Card>
@@ -1005,8 +1005,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex items-center gap-2 mb-2">
                   <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-widest">Growth Guard</Badge>
                 </div>
-                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
-                <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
+                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>踰뚯젏 諛?洹쒖젙 媛?대뱶</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold mt-1 text-sm">踰뚯젏? ?볦씠吏 ?딄쾶, ?깆옣? ?딄린吏 ?딄쾶 愿由ы븯?몄슂.</DialogDescription>
               </DialogHeader>
             </div>
 
@@ -1015,22 +1015,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <Activity className="h-4 w-4 text-rose-600" />
-                    <h4 className="text-xs font-black uppercase text-rose-600 tracking-widest">현재 나의 규정 점수</h4>
+                    <h4 className="text-xs font-black uppercase text-rose-600 tracking-widest">?꾩옱 ?섏쓽 洹쒖젙 ?먯닔</h4>
                   </div>
                   <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 flex flex-col items-center text-center gap-4 ring-1 ring-black/5">
                     <div className={cn(
                       "text-7xl font-black tracking-tighter leading-none",
                       penaltyPoints < 10 ? "text-emerald-500" : penaltyPoints < 20 ? "text-amber-500" : "text-rose-600"
                     )}>
-                      {penaltyPoints}<span className="text-lg opacity-40 ml-1">점</span>
+                      {penaltyPoints}<span className="text-lg opacity-40 ml-1">??/span>
                     </div>
                     <div className="grid gap-1">
                       <p className="font-black text-lg text-primary tracking-tight">
-                        {penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : penaltyPoints < 30 ? "주의 및 강등 위험 상태입니다. ⚠️" : "강등 및 즉시 면담 대상입니다. 🔥"}
+                        {penaltyPoints < 10 ? "?덉젙?곸씤 ?숈뒿 ?곹깭?낅땲?? ?? : penaltyPoints < 30 ? "二쇱쓽 諛?媛뺣벑 ?꾪뿕 ?곹깭?낅땲?? ?좑툘" : "媛뺣벑 諛?利됱떆 硫대떞 ??곸엯?덈떎. ?뵦"}
                       </p>
                       {penaltyRate > 0 && (
                         <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
-                          LP 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
+                          LP ?띾뱷??-{(penaltyRate * 100).toFixed(0)}% ?⑤꼸???곸슜 以?
                         </Badge>
                       )}
                     </div>
@@ -1041,7 +1041,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
             <DialogFooter className={cn("p-6 bg-white border-t shrink-0 flex justify-center", isMobile ? "p-4" : "p-6")}>
               <DialogClose asChild>
-                <Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">규정을 준수하겠습니다</Button>
+                <Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">洹쒖젙??以?섑븯寃좎뒿?덈떎</Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>
