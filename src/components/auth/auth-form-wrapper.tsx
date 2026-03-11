@@ -25,6 +25,11 @@ export function AuthFormWrapper({
 
       <div className="hidden lg:block relative overflow-hidden bg-[#14295F]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-5%,#26437F_0%,#1A2F66_38%,#12244F_65%,#0B1737_100%)]" />
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-75"
+          style={{ backgroundImage: "url('/login-fireworks.png')" }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(10,26,68,0.88)_0%,rgba(10,26,68,0.6)_38%,rgba(11,23,55,0.72)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_28%,rgba(255,154,31,0.42),transparent_20%),radial-gradient(circle_at_76%_31%,rgba(255,122,22,0.24),transparent_26%),radial-gradient(circle_at_20%_20%,rgba(255,184,77,0.14),transparent_18%),radial-gradient(circle_at_16%_72%,rgba(255,184,77,0.12),transparent_16%),radial-gradient(circle_at_88%_72%,rgba(255,184,77,0.1),transparent_14%)]" />
 
         <div className="absolute inset-0">
