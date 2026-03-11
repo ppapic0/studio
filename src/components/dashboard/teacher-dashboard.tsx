@@ -155,6 +155,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [selectedStudentPenaltyPoints, setSelectedStudentPenaltyPoints] = useState(0);
   const [selectedStudentPenaltyLogs, setSelectedStudentPenaltyLogs] = useState<PenaltyLog[]>([]);
   const [selectedReportPreview, setSelectedReportPreview] = useState<DailyReport | null>(null);
+  const [selectedRecentReport, setSelectedRecentReport] = useState<DailyReport | null>(null);
   const [manualPenaltyPoints, setManualPenaltyPoints] = useState('1');
   const [manualPenaltyReason, setManualPenaltyReason] = useState('');
   const [isPenaltySaving, setIsPenaltySaving] = useState(false);
@@ -789,24 +790,27 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
           const progressSnap = await getDoc(progressRef);
-          
-          if (progressSnap.exists()) {
-            const p = progressSnap.data() as GrowthProgress;
-            const stats = p.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-            const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
-            const penaltyPoints = p.penaltyPoints || 0;
-            const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
-            const finalMultiplier = totalBoost * (1 - penaltyRate);
-            
-            let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
-            const updateData: any = { 
-              seasonLp: increment(studyLpEarned), 
-              'stats.focus': increment((sessionMinutes / 60) * 0.1),
-              [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(studyLpEarned),
-              updatedAt: serverTimestamp() 
-            };
-            batch.update(progressRef, updateData);
-          }
+          const p = progressSnap.exists() ? (progressSnap.data() as GrowthProgress) : null;
+          const stats = p?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+          const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+          const penaltyPoints = p?.penaltyPoints || 0;
+          const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
+          const finalMultiplier = totalBoost * (1 - penaltyRate);
+
+          const studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
+          const progressUpdate: Record<string, any> = {
+            seasonLp: increment(studyLpEarned),
+            stats: {
+              focus: increment((sessionMinutes / 60) * 0.1),
+            },
+            dailyLpStatus: {
+              [todayKey]: {
+                dailyLpAmount: increment(studyLpEarned),
+              },
+            },
+            updatedAt: serverTimestamp(),
+          };
+          batch.set(progressRef, progressUpdate, { merge: true });
         }
       }
 
@@ -1182,7 +1186,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             {!recentReportsFeed || recentReportsFeed.length === 0 ? (
               <div className="py-16 text-center bg-white/50 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10"><p className="font-black text-muted-foreground/30 text-sm italic">최근 발송된 리포트가 없습니다.</p></div>
             ) : recentReportsFeed.map((report) => (
-              <Card key={report.id} className="rounded-[2rem] border-none shadow-sm bg-white p-5 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]">
+              <button
+                key={report.id}
+                type="button"
+                onClick={() => setSelectedRecentReport(report)}
+                className="w-full text-left"
+              >
+                <Card className="rounded-[2rem] border-none shadow-sm bg-white p-5 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98] border border-transparent hover:border-emerald-200">
                 <div className="flex items-center gap-4">
                   <div className="h-11 w-11 rounded-2xl bg-emerald-50 flex flex-col items-center justify-center shrink-0">
                     <span className="text-[10px] font-black text-emerald-600 leading-none">{report.dateKey.split('-')[2]}</span>
@@ -1196,11 +1206,47 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <div className={cn("h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-sm", report.viewedAt ? "text-emerald-600" : "text-emerald-300")}>
                   {report.viewedAt ? <CheckCircle2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </div>
-              </Card>
+                </Card>
+              </button>
             ))}
           </div>
         </div>
       </div>
+
+      <Dialog open={!!selectedRecentReport} onOpenChange={(open) => !open && setSelectedRecentReport(null)}>
+        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+          {selectedRecentReport && (
+            <>
+              <div className="bg-emerald-600 text-white p-8 relative shrink-0">
+                <DialogHeader className="relative z-10">
+                  <DialogTitle className="text-2xl font-black tracking-tighter">최근 발송 리포트 상세</DialogTitle>
+                  <DialogDescription className="text-white/80 font-bold">
+                    {selectedRecentReport.dateKey} · {selectedRecentReport.studentName || '학생'}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white space-y-3">
+                <div className="flex items-center justify-between">
+                  <Badge className="border-none bg-emerald-50 text-emerald-700 font-black">{selectedRecentReport.dateKey}</Badge>
+                  <Badge className={cn("border-none font-black", selectedRecentReport.viewedAt ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                    {selectedRecentReport.viewedAt ? '열람 완료' : '미열람'}
+                  </Badge>
+                </div>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/20 p-5">
+                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
+                    {selectedRecentReport.content?.trim() || '리포트 내용이 없습니다.'}
+                  </p>
+                </div>
+              </div>
+              <DialogFooter className="p-6 bg-white border-t">
+                <Button variant="ghost" onClick={() => setSelectedRecentReport(null)} className="w-full font-black">
+                  닫기
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>

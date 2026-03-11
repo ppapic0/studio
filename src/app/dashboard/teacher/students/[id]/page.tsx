@@ -64,6 +64,41 @@ function calculateRhythmScore(minutes: number[]): number {
   return Math.max(0, Math.min(100, Math.round(100 - (std / avg) * 100)));
 }
 
+function calculateDayCompareScore(minutes: number[]): { score: number; dayDiffPercent: number } {
+  if (minutes.length <= 1) return { score: minutes.length ? 100 : 0, dayDiffPercent: 0 };
+
+  const dailyChangeRates: number[] = [];
+  for (let idx = 1; idx < minutes.length; idx += 1) {
+    const prev = Math.max(0, minutes[idx - 1] || 0);
+    const curr = Math.max(0, minutes[idx] || 0);
+    if (prev === 0 && curr === 0) continue;
+    const base = Math.max(prev, 60);
+    dailyChangeRates.push(Math.abs(curr - prev) / base);
+  }
+
+  if (!dailyChangeRates.length) return { score: 0, dayDiffPercent: 0 };
+
+  const averageRate = dailyChangeRates.reduce((acc, value) => acc + value, 0) / dailyChangeRates.length;
+  const dayDiffPercent = averageRate * 100;
+  return {
+    score: Math.max(0, Math.min(100, Math.round(100 - dayDiffPercent))),
+    dayDiffPercent: Math.round(dayDiffPercent),
+  };
+}
+
+function normalizeRhythmMinutes(series: Array<{ studyMinutes: number; hasActualStudyLog: boolean }>): number[] {
+  let previousKnownMinutes = 0;
+  return series.map((item, index) => {
+    const roundedMinutes = Math.max(0, Math.round(item.studyMinutes || 0));
+    if (item.hasActualStudyLog || roundedMinutes > 0) {
+      previousKnownMinutes = roundedMinutes;
+      return roundedMinutes;
+    }
+    if (index === 0) return roundedMinutes;
+    return previousKnownMinutes;
+  });
+}
+
 function toTime(value?: Timestamp): number {
   if (!value) return 0;
   try {
@@ -443,18 +478,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Math.round(values.reduce((acc, value) => acc + value, 0) / values.length);
   }, [displaySeries]);
 
-  const rhythmScore = useMemo(() => calculateRhythmScore(displaySeries.map((item) => item.studyMinutes)), [displaySeries]);
-
   const rhythmGuideMeta = useMemo(() => {
-    const minutes = displaySeries.map((item) => item.studyMinutes);
+    const minutes = normalizeRhythmMinutes(displaySeries.map((item) => ({ studyMinutes: item.studyMinutes, hasActualStudyLog: item.hasActualStudyLog })));
     const sampleCount = minutes.length;
     if (!sampleCount) {
       return {
+        score: 0,
+        mode: 'std' as const,
         sampleCount: 0,
         averageMinutes: 0,
         stdDevMinutes: 0,
         variationPercent: 0,
         actualLogCount: 0,
+        dayDiffPercent: 0,
+        formulaExpression: '0 = 0점',
       };
     }
 
@@ -463,15 +500,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const stdDevMinutes = Math.sqrt(variance);
     const variationPercent = averageMinutes > 0 ? (stdDevMinutes / averageMinutes) * 100 : 0;
     const actualLogCount = displaySeries.filter((item) => item.hasActualStudyLog).length;
+    const stdScore = calculateRhythmScore(minutes);
+    const dayCompare = calculateDayCompareScore(minutes);
+    const needDayCompareFallback = actualLogCount < Math.min(14, sampleCount);
+    const score = needDayCompareFallback ? dayCompare.score : stdScore;
 
     return {
+      score,
+      mode: needDayCompareFallback ? ('dayCompare' as const) : ('std' as const),
       sampleCount,
       averageMinutes: Math.round(averageMinutes),
       stdDevMinutes: Math.round(stdDevMinutes),
       variationPercent: Math.round(variationPercent),
       actualLogCount,
+      dayDiffPercent: dayCompare.dayDiffPercent,
+      formulaExpression: needDayCompareFallback
+        ? `100 - ${dayCompare.dayDiffPercent}% = ${score}점`
+        : `100 - (${Math.round(stdDevMinutes)} / ${Math.round(averageMinutes)}) × 100 = ${score}점`,
     };
   }, [displaySeries]);
+
+  const rhythmScore = rhythmGuideMeta.score;
 
   const averageGrowthRate = useMemo(() => {
     const values = Object.values(dailyStatsMap).map((stat) => stat.studyTimeGrowthRate).filter((value): value is number => typeof value === 'number');
@@ -958,29 +1007,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">평균 공부 리듬 산정 방식</DialogTitle>
               <DialogDescription className="text-white/80 font-semibold">
-                최근 {RANGE_MAP[focusedChartView]}일 실제 공부시간 데이터를 기준으로 계산합니다.
+                최근 {RANGE_MAP[focusedChartView]}일 리듬 점수 계산식입니다.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="px-6 py-5 space-y-4 bg-white">
-            <div className="rounded-2xl border bg-slate-50/70 p-4">
-              <p className="font-black text-[11px] uppercase tracking-widest text-slate-500">데이터 기준</p>
-              <div className="mt-2 space-y-1.5 text-sm font-semibold text-slate-700 leading-relaxed">
-                <p>- 실제 공부시간: `studyLogs / {studentId} / days / totalMinutes`</p>
-                <p>- 오늘 진행 중인 학습은 실시간 좌석 상태(`studying`)의 경과 시간까지 반영</p>
-              </div>
-              <p className="mt-3 text-xs font-black text-slate-500">
-                실제 로그 반영 일수: {rhythmGuideMeta.actualLogCount} / {rhythmGuideMeta.sampleCount}일
-              </p>
-            </div>
-
             <div className="rounded-2xl border bg-white p-4">
               <p className="font-black text-[11px] uppercase tracking-widest text-slate-500">계산식</p>
-              <div className="mt-2 rounded-xl bg-slate-900 text-slate-50 px-3 py-2.5 font-mono text-xs leading-relaxed">
-                리듬 점수 = 100 - (표준편차 / 평균 공부시간) * 100
-                <br />
-                최종 점수는 0점 ~ 100점 범위로 제한
+              <div className="mt-2 rounded-xl bg-slate-900 text-slate-50 px-3.5 py-3">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-300">
+                  {rhythmGuideMeta.mode === 'dayCompare' ? '전일 비교 보정식' : '표준편차 기반 수식'}
+                </p>
+                <p className="mt-1 font-mono text-sm font-semibold">{rhythmGuideMeta.formulaExpression}</p>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -996,7 +1035,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <p className="font-black text-slate-500">변동계수</p>
                   <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.variationPercent}%</p>
                 </div>
-                <div className="rounded-xl bg-emerald-50 px-3 py-2.5 border border-emerald-100">
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+                  <p className="font-black text-slate-500">전일 변동률</p>
+                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.dayDiffPercent}%</p>
+                </div>
+                <div className="col-span-2 rounded-xl bg-emerald-50 px-3 py-2.5 border border-emerald-100">
                   <p className="font-black text-emerald-700">최종 리듬 점수</p>
                   <p className="font-black text-emerald-700 text-base">{rhythmScore}점</p>
                 </div>

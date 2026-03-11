@@ -65,6 +65,7 @@ import { format } from 'date-fns';
 import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -82,13 +83,26 @@ type ParentCommunicationRecord = {
   handledByUid?: string;
 };
 
-export default function AppointmentsPage() {
+type AppointmentTab = 'reservations' | 'logs' | 'parent';
+
+type AppointmentsPageContentProps = {
+  forceTab?: AppointmentTab;
+  showAll?: boolean;
+};
+
+const PREVIEW_LIMIT = 5;
+
+export function AppointmentsPageContent({
+  forceTab = 'reservations',
+  showAll = false,
+}: AppointmentsPageContentProps) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
 
   const isMobile = viewMode === 'mobile';
+  const [activeTab, setActiveTab] = useState<AppointmentTab>(forceTab);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedResForLog, setSelectedResForLog] = useState<CounselingReservation | null>(null);
@@ -106,6 +120,10 @@ export default function AppointmentsPage() {
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
   const [parentTypeFilter, setParentTypeFilter] = useState<'all' | 'consultation' | 'request' | 'suggestion'>('all');
   const [parentStatusFilter, setParentStatusFilter] = useState<'all' | 'requested' | 'in_progress' | 'in_review' | 'done'>('all');
+
+  useEffect(() => {
+    setActiveTab(forceTab);
+  }, [forceTab]);
 
   useEffect(() => {
     setAptDate(format(new Date(), 'yyyy-MM-dd'));
@@ -243,6 +261,19 @@ export default function AppointmentsPage() {
     
     return list.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
   }, [rawLogs, selectedSeason]);
+
+  const visibleReservations = useMemo(
+    () => (showAll ? reservations : reservations.slice(0, PREVIEW_LIMIT)),
+    [showAll, reservations]
+  );
+  const visibleLogs = useMemo(
+    () => (showAll ? filteredLogs : filteredLogs.slice(0, PREVIEW_LIMIT)),
+    [showAll, filteredLogs]
+  );
+  const visibleParentCommunications = useMemo(
+    () => (showAll ? filteredParentCommunications : filteredParentCommunications.slice(0, PREVIEW_LIMIT)),
+    [showAll, filteredParentCommunications]
+  );
 
   const handleRequestAppointment = async () => {
     if (!firestore || !centerId || !user) return;
@@ -399,11 +430,21 @@ export default function AppointmentsPage() {
       <header className={cn("flex justify-between items-center w-full", isMobile ? "flex-col gap-4 items-center text-center" : "flex-row")}>
         <div className="space-y-1">
           <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
-            {isAdmin ? 'All Center Appointments' : 'Appointment & Feedback Center'}
-          </p>
+          {showAll ? (
+            <p className="text-[11px] font-black text-primary/70 ml-1">전체 내역 보기</p>
+          ) : (
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
+              {isAdmin ? 'All Center Appointments' : 'Appointment & Feedback Center'}
+            </p>
+          )}
         </div>
-        {isStudent && (
+        {showAll ? (
+          <Button asChild variant="outline" className="rounded-xl font-black">
+            <Link href="/dashboard/appointments">
+              목록으로 돌아가기 <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        ) : isStudent && (
           <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
             <DialogTrigger asChild>
               <Button size="lg" className={cn("rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-[340px] h-14" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
@@ -469,20 +510,22 @@ export default function AppointmentsPage() {
         )}
       </header>
 
-      <Tabs defaultValue="reservations" className="w-full flex flex-col items-center">
-        <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
-          <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
-            <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
-            <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
-          </TabsTrigger>
-          {isStaff && (
-            <TabsTrigger value="parent" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
-              <ClipboardCheck className="h-4 w-4" /> <span className="text-xs sm:text-sm">학부모 요청</span>
+      <Tabs value={activeTab} onValueChange={(value) => !showAll && setActiveTab(value as AppointmentTab)} className="w-full flex flex-col items-center">
+        {!showAll && (
+          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
+            <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+              <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
             </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="logs" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+              <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
+            </TabsTrigger>
+            {isStaff && (
+              <TabsTrigger value="parent" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+                <ClipboardCheck className="h-4 w-4" /> <span className="text-xs sm:text-sm">학부모 요청</span>
+              </TabsTrigger>
+            )}
+          </TabsList>
+        )}
 
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
           <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
@@ -501,7 +544,7 @@ export default function AppointmentsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-muted/10">
-                  {reservations.map((res) => (
+                  {visibleReservations.map((res) => (
                     <div key={res.id} className={cn("flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4", isMobile ? "p-5" : "p-6 sm:p-8")}>
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
                         <div className={cn("rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
@@ -554,6 +597,15 @@ export default function AppointmentsPage() {
                   ))}
                 </div>
               )}
+              {!showAll && reservations.length > PREVIEW_LIMIT && (
+                <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
+                  <Button asChild variant="outline" className="rounded-xl font-black">
+                    <Link href="/dashboard/appointments/reservations">
+                      상담예약 더보기 <ArrowRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -594,7 +646,7 @@ export default function AppointmentsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-muted/10">
-                  {filteredLogs.map((log) => (
+                  {visibleLogs.map((log) => (
                     <div key={log.id} className={cn("hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -635,6 +687,15 @@ export default function AppointmentsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {!showAll && filteredLogs.length > PREVIEW_LIMIT && (
+                <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
+                  <Button asChild variant="outline" className="rounded-xl font-black">
+                    <Link href="/dashboard/appointments/logs">
+                      상담일지 더보기 <ArrowRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -687,7 +748,7 @@ export default function AppointmentsPage() {
                   </div>
                 ) : (
                   <div className="divide-y divide-muted/10">
-                    {filteredParentCommunications.map((item) => {
+                    {visibleParentCommunications.map((item) => {
                       const createdAtDate = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
                       const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy.MM.dd HH:mm') : '-';
                       const studentName = studentNameById.get(item.studentId) || item.studentId;
@@ -727,6 +788,15 @@ export default function AppointmentsPage() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                {!showAll && filteredParentCommunications.length > PREVIEW_LIMIT && (
+                  <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
+                    <Button asChild variant="outline" className="rounded-xl font-black">
+                      <Link href="/dashboard/appointments/parent-requests">
+                        학부모 요청 더보기 <ArrowRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -773,4 +843,8 @@ export default function AppointmentsPage() {
       </Dialog>
     </div>
   );
+}
+
+export default function AppointmentsPage() {
+  return <AppointmentsPageContent />;
 }

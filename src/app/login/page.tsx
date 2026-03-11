@@ -6,12 +6,12 @@ export default function LoginPage() {
   return (
     <AuthFormWrapper
       title={
-        <div className="flex flex-col items-center gap-4">
-          <TrackLogo className="h-24 w-auto object-contain animate-in fade-in slide-in-from-top-4 duration-700" />
-          <span className="text-lg font-black tracking-tight text-[#14295F]">오늘의 몰입을 시작해보세요</span>
+        <div className="flex flex-col items-center gap-5">
+          <TrackLogo variant="mark" className="h-28 w-auto object-contain animate-in fade-in slide-in-from-top-4 duration-700" />
+          <span className="text-lg font-black tracking-tight text-[#14295F]">트랙 학습센터에 와주셔서 감사합니다.</span>
         </div>
       }
-      subtitle="집중과 성장이 이어지는 학습 운영 플랫폼"
+      subtitle=""
     >
       <LoginForm />
     </AuthFormWrapper>

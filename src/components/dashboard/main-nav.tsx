@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import {
-  Armchair,
   Bell,
   CalendarDays,
   ClipboardCheck,
@@ -52,7 +51,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   parent: [
     { href: '/dashboard?parentTab=home', label: '홈', icon: LayoutDashboard },
     { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
-    { href: '/dashboard?parentTab=life', label: '생활', icon: Armchair },
+    { href: '/dashboard?parentTab=data', label: '데이터', icon: FileText },
     { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
     { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
     { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
