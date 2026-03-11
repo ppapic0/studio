@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
@@ -12,7 +12,7 @@ import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, A
 import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -174,6 +174,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [focusedChartView, setFocusedChartView] = useState<ChartRangeKey>('weekly');
 
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
+  const [isRhythmGuideModalOpen, setIsRhythmGuideModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -213,6 +214,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const studyLogsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'), orderBy('dateKey', 'desc'), limit(45))), [firestore, centerId, studentId]);
   const { data: studyLogs, isLoading: studyLogLoading } = useCollection<StudyLogDay>(studyLogsQuery, { enabled: !!centerId });
+
+  const attendanceCurrentQuery = useMemoFirebase(
+    () =>
+      !firestore || !centerId
+        ? null
+        : query(
+            collection(firestore, 'centers', centerId, 'attendanceCurrent'),
+            where('studentId', '==', studentId),
+            limit(1)
+          ),
+    [firestore, centerId, studentId]
+  );
+  const { data: attendanceCurrentRows } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: !!centerId });
 
   const counselingLogsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'counselingLogs'), orderBy('createdAt', 'desc'), limit(200))), [firestore, centerId]);
   const { data: counselingLogsRaw, isLoading: counselingLoading } = useCollection<CounselingLog>(counselingLogsQuery, { enabled: !!centerId });
@@ -361,6 +375,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return map;
   }, [studyLogs]);
 
+  const attendanceCurrent = attendanceCurrentRows?.[0];
+
+  const activeSessionMinutes = useMemo(() => {
+    if (!attendanceCurrent || attendanceCurrent.status !== 'studying' || !attendanceCurrent.lastCheckInAt) return 0;
+    const startAt = attendanceCurrent.lastCheckInAt.toDate().getTime();
+    const elapsedMs = Date.now() - startAt;
+    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
+    return Math.ceil(elapsedMs / 60000);
+  }, [attendanceCurrent]);
+
   const planByDate = useMemo(() => {
     const map: Record<string, PlanBucket> = {};
     planItems.forEach((item) => {
@@ -386,8 +410,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const stat = dailyStatsMap[dateKey];
       const log = studyLogMap[dateKey];
       const plan = planByDate[dateKey];
-
-      const studyMinutes = typeof stat?.totalStudyMinutes === 'number' ? stat.totalStudyMinutes : Number(log?.totalMinutes || 0);
+      const hasActualStudyLog = Boolean(log);
+      const loggedMinutes = Number(log?.totalMinutes || 0);
+      const fallbackMinutes = Number(stat?.totalStudyMinutes || 0);
+      const inProgressMinutes = dateKey === todayKey ? activeSessionMinutes : 0;
+      const baseMinutes = hasActualStudyLog ? loggedMinutes : fallbackMinutes;
+      const studyMinutes = Math.max(0, baseMinutes + inProgressMinutes);
       const completionFromPlans = plan && plan.studyTotal > 0 ? Math.round((plan.studyDone / plan.studyTotal) * 100) : undefined;
       const completionRate = typeof stat?.todayPlanCompletionRate === 'number' ? Math.round(stat.todayPlanCompletionRate) : completionFromPlans;
 
@@ -395,11 +423,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         dateKey,
         dateLabel: format(date, 'M/d', { locale: ko }),
         studyMinutes,
+        hasActualStudyLog,
         completionRate: completionRate ?? 0,
         hasCompletion: completionRate !== undefined,
       };
     });
-  }, [todayKey, dailyStatsMap, planByDate, studyLogMap]);
+  }, [todayKey, activeSessionMinutes, dailyStatsMap, planByDate, studyLogMap]);
 
   const displaySeries = useMemo(() => fullSeries.slice(-RANGE_MAP[focusedChartView]), [focusedChartView, fullSeries]);
 
@@ -416,6 +445,34 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const rhythmScore = useMemo(() => calculateRhythmScore(displaySeries.map((item) => item.studyMinutes)), [displaySeries]);
 
+  const rhythmGuideMeta = useMemo(() => {
+    const minutes = displaySeries.map((item) => item.studyMinutes);
+    const sampleCount = minutes.length;
+    if (!sampleCount) {
+      return {
+        sampleCount: 0,
+        averageMinutes: 0,
+        stdDevMinutes: 0,
+        variationPercent: 0,
+        actualLogCount: 0,
+      };
+    }
+
+    const averageMinutes = minutes.reduce((acc, value) => acc + value, 0) / sampleCount;
+    const variance = minutes.reduce((acc, value) => acc + (value - averageMinutes) ** 2, 0) / sampleCount;
+    const stdDevMinutes = Math.sqrt(variance);
+    const variationPercent = averageMinutes > 0 ? (stdDevMinutes / averageMinutes) * 100 : 0;
+    const actualLogCount = displaySeries.filter((item) => item.hasActualStudyLog).length;
+
+    return {
+      sampleCount,
+      averageMinutes: Math.round(averageMinutes),
+      stdDevMinutes: Math.round(stdDevMinutes),
+      variationPercent: Math.round(variationPercent),
+      actualLogCount,
+    };
+  }, [displaySeries]);
+
   const averageGrowthRate = useMemo(() => {
     const values = Object.values(dailyStatsMap).map((stat) => stat.studyTimeGrowthRate).filter((value): value is number => typeof value === 'number');
     if (!values.length) return 0;
@@ -423,17 +480,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [dailyStatsMap]);
 
   const studyStreakDays = useMemo(() => {
+    const seriesMinutesMap = Object.fromEntries(fullSeries.map((item) => [item.dateKey, item.studyMinutes]));
     let streak = 0;
     for (let idx = 0; idx < 28; idx += 1) {
       const dateKey = format(subDays(today, idx), 'yyyy-MM-dd');
-      const statMinutes = dailyStatsMap[dateKey]?.totalStudyMinutes;
-      const logMinutes = studyLogMap[dateKey]?.totalMinutes;
-      const minutes = typeof statMinutes === 'number' ? statMinutes : Number(logMinutes || 0);
+      const minutes = Number(seriesMinutesMap[dateKey] || 0);
       if (minutes >= 60) streak += 1;
       else break;
     }
     return streak;
-  }, [dailyStatsMap, studyLogMap, todayKey]);
+  }, [fullSeries, todayKey]);
 
   const todayPlanSummary = planByDate[todayKey] || { studyTotal: 0, studyDone: 0, routineCount: 0, personalCount: 0 };
 
@@ -674,10 +730,39 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <section className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatAnalysisCard title="평균 공부시간" value={minutesToLabel(avgStudyMinutes)} subValue={`최근 ${RANGE_MAP[focusedChartView]}일 기준`} icon={Clock3} colorClass="text-blue-500" isMobile={isMobile} />
-        <StatAnalysisCard title="평균 공부 리듬" value={`${rhythmScore}점`} subValue="시간 분산 기반 안정성" icon={TrendingUp} colorClass="text-emerald-500" isMobile={isMobile} />
-        <StatAnalysisCard title="계획 완수율" value={`${avgCompletionRate}%`} subValue="학습 To-do 완료율" icon={CheckCircle2} colorClass="text-amber-500" isMobile={isMobile} />
-        <StatAnalysisCard title="상담 진행도" value={`${studentReservations.filter((item) => item.status === 'done').length}/${studentReservations.length}`} subValue="완료 상담 / 전체 상담" icon={MessageSquare} colorClass="text-rose-500" isMobile={isMobile} />
+        <StatAnalysisCard
+          title="평균 공부시간"
+          value={minutesToLabel(avgStudyMinutes)}
+          subValue={`최근 ${RANGE_MAP[focusedChartView]}일 기준`}
+          icon={Clock3}
+          colorClass="text-blue-500"
+          isMobile={isMobile}
+        />
+        <StatAnalysisCard
+          title="평균 공부 리듬"
+          value={`${rhythmScore}점`}
+          subValue="실제 공부시간 분산 기반 안정성"
+          icon={TrendingUp}
+          colorClass="text-emerald-500"
+          isMobile={isMobile}
+          onClick={() => setIsRhythmGuideModalOpen(true)}
+        />
+        <StatAnalysisCard
+          title="계획 완수율"
+          value={`${avgCompletionRate}%`}
+          subValue="학습 To-do 완료율"
+          icon={CheckCircle2}
+          colorClass="text-amber-500"
+          isMobile={isMobile}
+        />
+        <StatAnalysisCard
+          title="상담 진행도"
+          value={`${studentReservations.filter((item) => item.status === 'done').length}/${studentReservations.length}`}
+          subValue="완료 상담 / 전체 상담"
+          icon={MessageSquare}
+          colorClass="text-rose-500"
+          isMobile={isMobile}
+        />
       </section>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6">
@@ -866,6 +951,60 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black tracking-tight">평균 공부 리듬 산정 방식</DialogTitle>
+            <DialogDescription className="font-semibold">
+              카드 점수는 최근 {RANGE_MAP[focusedChartView]}일의 실제 공부시간 기록을 기준으로 계산됩니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="rounded-xl border bg-muted/20 p-3">
+              <p className="font-black text-[11px] uppercase tracking-wider text-muted-foreground">데이터 기준</p>
+              <p className="mt-1 font-semibold text-slate-700 leading-relaxed">
+                `studyLogs/{studentId}/days.totalMinutes`를 우선 사용하고, 오늘 진행 중 학습은 실시간 좌석 상태에서 경과 시간을 추가 반영합니다.
+              </p>
+              <p className="mt-2 text-xs font-bold text-muted-foreground">
+                실제 로그 반영 일수: {rhythmGuideMeta.actualLogCount} / {rhythmGuideMeta.sampleCount}일
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-white p-3">
+              <p className="font-black text-[11px] uppercase tracking-wider text-muted-foreground">계산식</p>
+              <p className="mt-1 font-mono text-xs text-slate-700">
+                리듬점수 = clamp(100 - (표준편차 / 평균) x 100, 0, 100)
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                  <p className="font-black text-slate-500">평균 공부시간</p>
+                  <p className="font-black text-slate-800">{rhythmGuideMeta.averageMinutes}분</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                  <p className="font-black text-slate-500">표준편차</p>
+                  <p className="font-black text-slate-800">{rhythmGuideMeta.stdDevMinutes}분</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                  <p className="font-black text-slate-500">변동계수</p>
+                  <p className="font-black text-slate-800">{rhythmGuideMeta.variationPercent}%</p>
+                </div>
+                <div className="rounded-lg bg-emerald-50 px-2.5 py-2">
+                  <p className="font-black text-emerald-600">최종 리듬 점수</p>
+                  <p className="font-black text-emerald-700">{rhythmScore}점</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button className="rounded-xl font-black">확인</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isMasteryModalOpen} onOpenChange={setIsMasteryModalOpen}>
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
