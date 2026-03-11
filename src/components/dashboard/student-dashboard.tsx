@@ -483,6 +483,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (penaltyPoints >= 5) return 0.03;  
     return 0; 
   }, [penaltyPoints]);
+  const penaltyMultiplierPercent = Math.round((1 - penaltyRate) * 100);
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const handleStudyStartStop = useCallback(async () => {
@@ -1409,13 +1410,38 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-              <div className={cn("p-10 text-center space-y-6")}>
+              <div className={cn("p-10 text-center space-y-6", isMobile ? "p-5" : "")}>
                 <div className="inline-flex flex-col items-center gap-1">
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Penalty Score</span>
                   <h3 className={cn("text-8xl font-black tracking-tighter leading-none", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
                 </div>
                 <Progress value={penaltyPoints * 3.3} className="h-3 bg-muted" />
                 <p className="text-sm font-bold text-slate-600">{penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : "주의가 필요한 단계입니다. ⚠️"}</p>
+
+                <div className={cn("grid gap-3 text-left mx-auto", isMobile ? "max-w-full" : "max-w-2xl")}>
+                  <div className="rounded-2xl border border-rose-100 bg-white p-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점이 발생하는 경우</p>
+                    <ul className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700 leading-relaxed">
+                      <li>지각 신청 접수 시 `+1점`이 반영됩니다.</li>
+                      <li>결석 신청 접수 시 `+2점`이 반영됩니다.</li>
+                      <li>센터 관리자/선생님이 생활 기록 벌점을 부여하면 누적 점수에 추가됩니다.</li>
+                    </ul>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">누적 시 적용되는 규정</p>
+                    <div className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700">
+                      <div className="flex items-center justify-between"><span>0~4점</span><span>LP 감점 없음 (100%)</span></div>
+                      <div className="flex items-center justify-between"><span>5~9점</span><span>LP 3% 감소 (97%)</span></div>
+                      <div className="flex items-center justify-between"><span>10~19점</span><span>LP 6% 감소 (94%)</span></div>
+                      <div className="flex items-center justify-between"><span>20~29점</span><span>LP 10% 감소 (90%)</span></div>
+                      <div className="flex items-center justify-between"><span>30점 이상</span><span>LP 15% 감소 (85%)</span></div>
+                    </div>
+                    <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
+                      현재 {penaltyPoints}점 → 이번 LP 배율 {penaltyMultiplierPercent}% 적용
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <DialogFooter className="p-6 bg-white border-t shrink-0 flex justify-center"><DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">확인했습니다</Button></DialogClose></DialogFooter>
