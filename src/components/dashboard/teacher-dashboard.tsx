@@ -159,6 +159,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [manualPenaltyPoints, setManualPenaltyPoints] = useState('1');
   const [manualPenaltyReason, setManualPenaltyReason] = useState('');
   const [isPenaltySaving, setIsPenaltySaving] = useState(false);
+  const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
@@ -505,6 +506,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const matched = students?.find((student) => student.id === selectedSeat.studentId);
     return matched?.name || '학생';
   }, [students, selectedSeat?.studentId]);
+
+  const selectedPenaltyRecovery = useMemo(() => {
+    const basePoints = Math.max(0, Math.round(Number(selectedStudentPenaltyPoints || 0)));
+    const latestPositiveLog = [...(selectedStudentPenaltyLogs || [])]
+      .filter((log) => Number(log.pointsDelta || 0) > 0)
+      .sort((a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0))[0];
+
+    const latestPositiveMs = latestPositiveLog ? ((latestPositiveLog.createdAt as any)?.toMillis?.() || 0) : 0;
+    const daysSinceLatest = latestPositiveMs > 0 ? Math.max(0, Math.floor((Date.now() - latestPositiveMs) / (24 * 60 * 60 * 1000))) : 0;
+    const recoveredPoints = latestPositiveMs > 0 ? Math.min(basePoints, Math.floor(daysSinceLatest / 7)) : 0;
+    const effectivePoints = Math.max(0, basePoints - recoveredPoints);
+
+    return {
+      basePoints,
+      recoveredPoints,
+      effectivePoints,
+      latestPositiveLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd HH:mm') : '-',
+    };
+  }, [selectedStudentPenaltyPoints, selectedStudentPenaltyLogs]);
 
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;
@@ -1399,16 +1419,32 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </TabsContent>
 
                           <TabsContent value="penalty" className="mt-0 space-y-6">
-                            <div className="flex items-center gap-2 px-1">
-                              <ShieldAlert className="h-4 w-4 text-rose-600" />
-                              <h4 className="text-[10px] font-black uppercase text-rose-600 tracking-widest">벌점 현황</h4>
+                            <div className="flex items-center justify-between gap-2 px-1">
+                              <div className="flex items-center gap-2">
+                                <ShieldAlert className="h-4 w-4 text-rose-600" />
+                                <h4 className="text-[10px] font-black uppercase text-rose-600 tracking-widest">벌점 현황</h4>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 rounded-lg px-2 text-[10px] font-black text-rose-600 hover:bg-rose-50"
+                                onClick={() => setIsPenaltyGuideOpen(true)}
+                              >
+                                규칙 보기
+                              </Button>
                             </div>
 
                             <div className="rounded-3xl border border-rose-100 bg-white p-5 shadow-sm space-y-4">
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">현재 누적 벌점</p>
-                                  <p className="text-3xl font-black tracking-tighter text-rose-600 tabular-nums">{selectedStudentPenaltyPoints}점</p>
+                                  <p className="text-3xl font-black tracking-tighter text-rose-600 tabular-nums">{selectedPenaltyRecovery.effectivePoints}점</p>
+                                  {selectedPenaltyRecovery.recoveredPoints > 0 && (
+                                    <p className="text-[10px] font-bold text-rose-500/80">
+                                      원점수 {selectedPenaltyRecovery.basePoints}점 · 회복 {selectedPenaltyRecovery.recoveredPoints}점
+                                    </p>
+                                  )}
                                 </div>
                                 <Badge className="border-none bg-rose-50 text-rose-700 font-black">
                                   학생: {selectedStudentName}
@@ -1532,6 +1568,41 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </TabsContent>
                         </div>
                       </Tabs>
+
+                      <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
+                        <DialogContent className={cn("rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[420px]" : "sm:max-w-lg")}>
+                          <div className="bg-gradient-to-r from-rose-600 to-rose-500 p-6 text-white">
+                            <DialogHeader>
+                              <DialogTitle className="text-xl font-black tracking-tight">벌점 규정 안내</DialogTitle>
+                              <DialogDescription className="text-white/80 font-bold">
+                                부여 기준, 누적 단계, 자동 회복 규칙
+                              </DialogDescription>
+                            </DialogHeader>
+                          </div>
+                          <div className="space-y-3 bg-white p-5">
+                            <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
+                              <p>지각 출석: +1점</p>
+                              <p>결석: +2점</p>
+                              <p>센터 수동 부여: 입력 점수만큼 반영</p>
+                            </div>
+                            <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
+                              <p>7점 이상: 선생님과 상담</p>
+                              <p>12점 이상: 학부모 상담</p>
+                              <p>20점 이상: 퇴원</p>
+                            </div>
+                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
+                              <p>신규 벌점 없이 7일 경과 시 1점 자동 회복</p>
+                              <p>원점수 {selectedPenaltyRecovery.basePoints}점 · 회복 {selectedPenaltyRecovery.recoveredPoints}점 · 적용 {selectedPenaltyRecovery.effectivePoints}점</p>
+                              <p>최근 벌점 반영일: {selectedPenaltyRecovery.latestPositiveLabel}</p>
+                            </div>
+                          </div>
+                          <DialogFooter className="border-t bg-white p-4">
+                            <Button className="w-full h-11 rounded-xl font-black" onClick={() => setIsPenaltyGuideOpen(false)}>
+                              확인
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
 
                       <Dialog open={!!selectedReportPreview} onOpenChange={(open) => !open && setSelectedReportPreview(null)}>
                         <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
