@@ -31,7 +31,8 @@ import {
   CalendarX,
   MapPin,
   CalendarDays,
-  Loader2
+  Loader2,
+  CreditCard,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -62,6 +63,7 @@ import {
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
@@ -77,6 +79,7 @@ import {
   type AttendanceRequest,
   type DailyReport,
   type GrowthProgress,
+  type Invoice,
   type ParentActivityEvent,
   type StudyLogDay,
   type StudyPlanItem,
@@ -114,6 +117,11 @@ function formatMinutes(minutes: number) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return `${h}:${m.toString().padStart(2, '0')}`;
+}
+
+function formatWon(value: number) {
+  const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  return `₩${safe.toLocaleString()}`;
 }
 
 const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
@@ -321,6 +329,74 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(30));
   }, [firestore, centerId, studentId]);
   const { data: attendanceRequests } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: isActive && !!studentId });
+
+  const invoicesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'invoices'),
+      where('studentId', '==', studentId),
+      limit(120)
+    );
+  }, [firestore, centerId, studentId]);
+  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: isActive && !!studentId });
+
+  const sortedInvoices = useMemo(() => {
+    return [...(studentInvoices || [])].sort((a, b) => {
+      const aDate =
+        toDateSafe((a as any).cycleEndDate)?.getTime() ??
+        toDateSafe((a as any).createdAt)?.getTime() ??
+        0;
+      const bDate =
+        toDateSafe((b as any).cycleEndDate)?.getTime() ??
+        toDateSafe((b as any).createdAt)?.getTime() ??
+        0;
+      return bDate - aDate;
+    });
+  }, [studentInvoices]);
+
+  const latestInvoice = sortedInvoices[0];
+  const latestInvoiceDueDate = toDateSafe((latestInvoice as any)?.cycleEndDate);
+
+  const billingSummary = useMemo(() => {
+    return sortedInvoices.reduce(
+      (acc, invoice) => {
+        const amount = Number(invoice.finalPrice || 0);
+        if (!Number.isFinite(amount) || amount <= 0) return acc;
+
+        if (invoice.status !== 'void' && invoice.status !== 'refunded') {
+          acc.billed += amount;
+        }
+        if (invoice.status === 'paid') {
+          acc.paid += amount;
+        }
+        if (invoice.status === 'overdue') {
+          acc.overdue += amount;
+        }
+        return acc;
+      },
+      { billed: 0, paid: 0, overdue: 0 }
+    );
+  }, [sortedInvoices]);
+
+  const latestInvoiceStatusMeta = useMemo(() => {
+    if (!latestInvoice) return null;
+    if (latestInvoice.status === 'paid') {
+      return {
+        label: '수납 완료',
+        className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      };
+    }
+    if (latestInvoice.status === 'overdue') {
+      return {
+        label: '미납',
+        className: 'bg-rose-100 text-rose-700 border-rose-200',
+      };
+    }
+    return {
+      label: '청구',
+      className: 'bg-amber-100 text-amber-700 border-amber-200',
+    };
+  }, [latestInvoice]);
 
   const studyPlans = (todayPlans || []).filter((item) => item.category === 'study' || !item.category);
   const totalMinutes = todayLog?.totalMinutes || 0;
@@ -875,6 +951,86 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <Button className="w-full h-16 rounded-[1.5rem] bg-[#14295F] text-white font-black text-lg shadow-xl shadow-[#14295F]/20 active:scale-[0.98] transition-all" onClick={() => submit('consultation')} disabled={submitting}>요청 보내기</Button>
                 </div>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="billing" className="mt-0 space-y-4 animate-in fade-in duration-500">
+              <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <h3 className="text-4xl font-black tracking-tight text-[#14295F] leading-none">수납</h3>
+                      <p className="text-[15px] font-bold text-slate-700 leading-snug">
+                        센터수납요청건을 비대면으로 결제할 수 있어요 !
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[14px] font-black text-[#14295F]">실시간 연동</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3.5 text-center shadow-sm">
+                      <p className="text-[12px] font-black text-[#14295F]">청구</p>
+                      <p className="mt-1 text-[1.55rem] font-black tracking-tight leading-none tabular-nums text-[#14295F] whitespace-nowrap">
+                        {formatWon(billingSummary.billed)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 px-3 py-3.5 text-center shadow-sm">
+                      <p className="text-[12px] font-black text-emerald-700">수납</p>
+                      <p className="mt-1 text-[1.55rem] font-black tracking-tight leading-none tabular-nums text-emerald-700 whitespace-nowrap">
+                        {formatWon(billingSummary.paid)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50/40 px-3 py-3.5 text-center shadow-sm">
+                      <p className="text-[12px] font-black text-rose-700">미납</p>
+                      <p className="mt-1 text-[1.55rem] font-black tracking-tight leading-none tabular-nums text-rose-700 whitespace-nowrap">
+                        {formatWon(billingSummary.overdue)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {latestInvoice ? (
+                <Card className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[20px] font-black tracking-tight text-[#14295F]">
+                          {latestInvoice.studentName || student?.name || '학생'}
+                        </p>
+                        {latestInvoiceStatusMeta && (
+                          <Badge className={cn('h-6 border text-[11px] font-black', latestInvoiceStatusMeta.className)}>
+                            {latestInvoiceStatusMeta.label}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[15px] font-bold text-slate-600">
+                        결제 마감일 {latestInvoiceDueDate ? format(latestInvoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
+                      </p>
+                    </div>
+                    <p className="text-[2.05rem] font-black tracking-tight leading-none text-[#14295F] tabular-nums whitespace-nowrap">
+                      {formatWon(Number(latestInvoice.finalPrice || 0))}
+                    </p>
+                  </div>
+
+                  {(latestInvoice.status === 'issued' || latestInvoice.status === 'overdue') && (
+                    <Link
+                      href={`/payment/checkout/${latestInvoice.id}`}
+                      className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#14295F] text-[15px] font-black text-white shadow-sm transition-colors hover:bg-[#10224f]"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      결제하기
+                    </Link>
+                  )}
+                </Card>
+              ) : (
+                <Card className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+                  <p className="text-[14px] font-bold text-slate-500">현재 발행된 인보이스가 없습니다.</p>
+                </Card>
+              )}
+
+              <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50/50 px-4 py-3">
+                <p className="text-[15px] font-black text-emerald-700">감사합니다! 최선을 다해 관리하겠습니다!</p>
+              </div>
             </TabsContent>
 
             <TabsContent value="notifications" className="mt-0 space-y-3 animate-in fade-in duration-500">
