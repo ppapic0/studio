@@ -1,21 +1,22 @@
-'use client';
-
 import { Firestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { format, differenceInDays } from 'date-fns';
 
 /**
  * 알리고(Aligo) SMS API 서비스 연동
- * 
+ *
  * [운영 가이드]
  * 1. 알리고(https://aligo.in) 가입 및 포인트 충전
  * 2. API Key, User ID 발급
  * 3. 발신번호 등록 및 인증
- * 4. .env.local 파일에 아래 키값을 등록하거나 직접 수정하세요.
+ * 4. .env.local 파일에 아래 키값을 등록하세요. (NEXT_PUBLIC_ 접두사 사용 금지 - 서버 전용)
+ *    - ALIGO_API_KEY=...
+ *    - ALIGO_USER_ID=...
+ *    - ALIGO_SENDER=...
  */
 
-const ALIGO_API_KEY = process.env.NEXT_PUBLIC_ALIGO_API_KEY || 'YOUR_API_KEY';
-const ALIGO_USER_ID = process.env.NEXT_PUBLIC_ALIGO_USER_ID || 'YOUR_USER_ID';
-const SENDER_NUMBER = process.env.NEXT_PUBLIC_ALIGO_SENDER || '01012345678';
+const ALIGO_API_KEY = process.env.ALIGO_API_KEY || 'YOUR_API_KEY';
+const ALIGO_USER_ID = process.env.ALIGO_USER_ID || 'YOUR_USER_ID';
+const SENDER_NUMBER = process.env.ALIGO_SENDER || '01012345678';
 
 type KakaoMessageType = 'entry' | 'exit' | 'away' | 'report' | 'payment_reminder';
 

@@ -507,15 +507,26 @@ export const deleteStudentAccount = functions.region(region).runWith({
   try {
     const errors: string[] = [];
 
+    // 다중 센터 소속 확인: 이 센터 외에 다른 센터에도 소속되어 있는지 체크
+    const userCentersSnap = await db.collection(`userCenters/${studentId}/centers`).get();
+    const otherCenterCount = userCentersSnap.docs.filter((doc) => doc.id !== centerId).length;
+    const isMultiCenter = otherCenterCount > 0;
+
+    // 이 센터 데이터만 삭제 (다른 센터에 소속된 경우 전역 데이터는 보존)
     const paths = [
-      `users/${studentId}`,
-      `userCenters/${studentId}`,
       `centers/${centerId}/members/${studentId}`,
       `centers/${centerId}/students/${studentId}`,
       `centers/${centerId}/growthProgress/${studentId}`,
       `centers/${centerId}/plans/${studentId}`,
       `centers/${centerId}/studyLogs/${studentId}`,
+      `userCenters/${studentId}/centers/${centerId}`,
     ];
+
+    // 다른 센터에 소속이 없을 때만 전역 데이터 삭제
+    if (!isMultiCenter) {
+      paths.push(`users/${studentId}`);
+      paths.push(`userCenters/${studentId}`);
+    }
 
     const filterCols = [
       `centers/${centerId}/counselingReservations`,
@@ -593,15 +604,18 @@ export const deleteStudentAccount = functions.region(region).runWith({
       throw new Error(`학생 데이터 일부 삭제 실패 (${errors.length}건)`);
     }
 
-    try {
-      await auth.deleteUser(studentId);
-    } catch (e: any) {
-      if (e?.code !== "auth/user-not-found") {
-        throw e;
+    // 다른 센터에 소속이 없을 때만 Auth 계정 삭제
+    if (!isMultiCenter) {
+      try {
+        await auth.deleteUser(studentId);
+      } catch (e: any) {
+        if (e?.code !== "auth/user-not-found") {
+          throw e;
+        }
       }
     }
 
-    return { ok: true, message: "정리가 완료되었습니다." };
+    return { ok: true, message: isMultiCenter ? "이 센터에서의 학생 데이터가 정리되었습니다." : "정리가 완료되었습니다." };
   } catch (error: any) {
     throw new functions.https.HttpsError("internal", error.message);
   }
@@ -976,7 +990,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       stack: e?.stack || null,
     });
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     });
   }
 });
@@ -995,9 +1009,11 @@ export const registerStudent = functions.region(region).https.onCall(async (data
     throw new functions.https.HttpsError("permission-denied", "센터 관리자만 학생 계정을 생성할 수 있습니다.");
   }
 
+  let createdUid: string | null = null;
   try {
     const userRecord = await auth.createUser({ email, password, displayName });
-    const uid = userRecord.uid;
+    createdUid = userRecord.uid;
+    const uid = createdUid;
     const timestamp = admin.firestore.Timestamp.now();
 
     await db.runTransaction(async (t) => {
@@ -1015,11 +1031,20 @@ export const registerStudent = functions.region(region).https.onCall(async (data
 
     return { ok: true, uid };
   } catch (e: any) {
+    // Firestore 트랜잭션 실패 시 이미 생성된 Auth 계정을 롤백(삭제)하여 고아 계정 방지
+    if (createdUid) {
+      try {
+        await auth.deleteUser(createdUid);
+        console.warn(`[registerStudent] Rolled back Auth user ${createdUid} after transaction failure`);
+      } catch (rollbackErr: any) {
+        console.error(`[registerStudent] Failed to rollback Auth user ${createdUid}:`, rollbackErr?.message);
+      }
+    }
     if (e instanceof functions.https.HttpsError) {
       throw e;
     }
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: "학생 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     });
   }
 });
@@ -1073,7 +1098,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       throw e;
     }
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: "초대 코드 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     });
   }
 });
@@ -1558,7 +1583,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
     }
 
     throw new functions.https.HttpsError("internal", "Signup processing failed due to an internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: "회원가입 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     });
   }
 });
