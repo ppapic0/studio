@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import {
@@ -12,6 +12,7 @@ import {
   History,
   LayoutDashboard,
   Loader2,
+  Megaphone,
   MessageCircle,
   Monitor,
   MonitorSmartphone,
@@ -44,6 +45,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
+    { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
     { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
@@ -58,10 +60,11 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   ],
   centerAdmin: [
     { href: '/dashboard', label: '운영실', icon: LayoutDashboard },
-    { href: '/dashboard/teacher', label: '실시간 현황', icon: Monitor },
+    { href: '/dashboard/teacher', label: '실시간 교실', icon: Monitor },
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
+    { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
     { href: '/dashboard/settings/students', label: '학생 계정 관리', icon: UserCog },
     { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },

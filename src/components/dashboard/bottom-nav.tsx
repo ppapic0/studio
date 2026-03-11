@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -10,6 +10,7 @@ import {
   GraduationCap,
   History,
   LayoutDashboard,
+  Megaphone,
   MessageCircle,
   Monitor,
   MonitorSmartphone,
@@ -32,7 +33,7 @@ export function BottomNav() {
   const activeParentTab = searchParams.get('parentTab') || 'home';
   const useBrandNav = isParent || isMobileMode;
 
-  const navItems: Record<string, { href: string; label: string; icon: any }[]> = {
+  const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
     student: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard/growth', label: '성장', icon: Zap },
@@ -41,9 +42,10 @@ export function BottomNav() {
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
     teacher: [
-      { href: '/dashboard/teacher', label: '현황', icon: Monitor },
+      { href: '/dashboard/teacher', label: '교실', icon: Monitor },
       { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
+      { href: '/dashboard/leads', label: '리드DB', icon: Megaphone },
       { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
@@ -56,8 +58,9 @@ export function BottomNav() {
     ],
     centerAdmin: [
       { href: '/dashboard', label: '운영', icon: LayoutDashboard },
-      { href: '/dashboard/teacher', label: '현황', icon: Monitor },
+      { href: '/dashboard/teacher', label: '교실', icon: Monitor },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
+      { href: '/dashboard/leads', label: '리드DB', icon: Megaphone },
       { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
@@ -81,9 +84,10 @@ export function BottomNav() {
           isParent
             ? 'grid grid-cols-5 gap-0.5 px-1.5 pt-1'
             : useBrandNav
-              ? 'grid grid-cols-5 gap-1 px-2 pt-1.5'
+              ? 'grid gap-1 px-2 pt-1.5'
               : 'flex items-center justify-around px-2'
         )}
+        style={!isParent && useBrandNav ? { gridTemplateColumns: `repeat(${Math.max(currentNav.length, 1)}, minmax(0, 1fr))` } : undefined}
       >
         {currentNav.map((item) => {
           const [itemPath, itemQuery] = item.href.split('?');

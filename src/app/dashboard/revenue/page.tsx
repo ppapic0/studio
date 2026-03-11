@@ -81,7 +81,6 @@ import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { RiskIntelligence } from '@/components/dashboard/risk-intelligence';
 import { OperationalIntelligence } from '@/components/dashboard/operational-intelligence';
-import { MarketingConsultingCRM } from '@/components/dashboard/marketing-consulting-crm';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -1008,7 +1007,6 @@ export default function RevenuePage() {
           </section>
 
           <RevenueAnalysis />
-          <MarketingConsultingCRM centerId={centerId} isMobile={isMobile} />
         </TabsContent>
 
         <TabsContent value="risk" className="animate-in fade-in duration-500">

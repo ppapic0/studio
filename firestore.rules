@@ -288,6 +288,10 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      match /consultingLeads/{leadId} {
+        allow read, write: if isTeacherOrAdmin(centerId);
+      }
+
       match /settings/{settingId} {
         allow read: if isTeacherOrAdmin(centerId);
         allow write: if isCenterAdmin(centerId);
