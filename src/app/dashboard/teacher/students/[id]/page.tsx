@@ -210,6 +210,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
   const [isRhythmGuideModalOpen, setIsRhythmGuideModalOpen] = useState(false);
+  const [isAvgStudyModalOpen, setIsAvgStudyModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -227,8 +228,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const [isEditStats, setIsEditStats] = useState(false);
   const [editLp, setEditLp] = useState(0);
+  const [editPenaltyPoints, setEditPenaltyPoints] = useState(0);
   const [editStats, setEditStats] = useState({ focus: 0, consistency: 0, achievement: 0, resilience: 0 });
   const [editTodayMinutes, setEditTodayMinutes] = useState(0);
+  const [sessionAdjustments, setSessionAdjustments] = useState<Record<string, number>>({});
+  const [isSessionSaving, setIsSessionSaving] = useState(false);
 
   const hasInitializedForm = useRef(false);
   const [editForm, setEditForm] = useState({ name: '', schoolName: '', grade: '', password: '', parentLinkCode: '', className: '' });
@@ -281,6 +285,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (progress) {
       setEditLp(progress.seasonLp || 0);
+      setEditPenaltyPoints(progress.penaltyPoints || 0);
       setEditStats({ focus: progress.stats?.focus || 0, consistency: progress.stats?.consistency || 0, achievement: progress.stats?.achievement || 0, resilience: progress.stats?.resilience || 0 });
     }
   }, [progress]);
@@ -542,19 +547,48 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const todayPlanSummary = planByDate[todayKey] || { studyTotal: 0, studyDone: 0, routineCount: 0, personalCount: 0 };
 
-  const upcomingPlanGroups = useMemo(() => {
-    const endDateKey = format(addDays(today, 7), 'yyyy-MM-dd');
+  const pastPlanGroups = useMemo(() => {
+    const startDateKey = format(subDays(today, 6), 'yyyy-MM-dd');
     const groups: Record<string, { dateKey: string; routines: WithId<StudyPlanItem>[]; studies: WithId<StudyPlanItem>[]; personals: WithId<StudyPlanItem>[]; }> = {};
 
-    planItems.filter((item) => item.dateKey >= todayKey && item.dateKey <= endDateKey).forEach((item) => {
+    planItems.filter((item) => item.dateKey >= startDateKey && item.dateKey <= todayKey).forEach((item) => {
       if (!groups[item.dateKey]) groups[item.dateKey] = { dateKey: item.dateKey, routines: [], studies: [], personals: [] };
       if (item.category === 'schedule') groups[item.dateKey].routines.push(item);
       else if (item.category === 'personal') groups[item.dateKey].personals.push(item);
       else groups[item.dateKey].studies.push(item);
     });
 
-    return Object.values(groups).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+    return Object.values(groups).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [planItems, todayKey]);
+
+  const recentStudySessions = useMemo(() => {
+    return fullSeries
+      .slice(-7)
+      .map((item) => ({
+        dateKey: item.dateKey,
+        dateLabel: format(new Date(`${item.dateKey}T00:00:00`), 'M월 d일 (EEE)', { locale: ko }),
+        minutes: Math.max(0, Math.round(item.studyMinutes)),
+        hasActualStudyLog: item.hasActualStudyLog,
+      }))
+      .reverse();
+  }, [fullSeries]);
+
+  const hasSessionAdjustmentChanges = useMemo(() => {
+    return recentStudySessions.some((session) => {
+      const adjusted = sessionAdjustments[session.dateKey];
+      if (typeof adjusted !== 'number' || Number.isNaN(adjusted)) return false;
+      return Math.max(0, Math.round(adjusted)) !== session.minutes;
+    });
+  }, [recentStudySessions, sessionAdjustments]);
+
+  useEffect(() => {
+    if (!isAvgStudyModalOpen) return;
+    const next: Record<string, number> = {};
+    recentStudySessions.forEach((session) => {
+      next[session.dateKey] = session.minutes;
+    });
+    setSessionAdjustments(next);
+  }, [isAvgStudyModalOpen, recentStudySessions]);
 
   const riskSignals = useMemo(() => {
     const chips: string[] = [];
@@ -627,24 +661,131 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId || !studentId || !canEditGrowthData) return;
     setIsUpdating(true);
     try {
+      const normalizedLp = Math.max(0, Math.round(Number(editLp) || 0));
+      const normalizedPenaltyPoints = Math.max(0, Math.round(Number(editPenaltyPoints) || 0));
+      const normalizedTodayMinutes = Math.max(0, Math.round(Number(editTodayMinutes) || 0));
+      const normalizedStats = {
+        focus: Math.max(0, Math.min(100, Number(editStats.focus) || 0)),
+        consistency: Math.max(0, Math.min(100, Number(editStats.consistency) || 0)),
+        achievement: Math.max(0, Math.min(100, Number(editStats.achievement) || 0)),
+        resilience: Math.max(0, Math.min(100, Number(editStats.resilience) || 0)),
+      };
+
+      const previousPenaltyPoints = Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)));
+      const penaltyDelta = normalizedPenaltyPoints - previousPenaltyPoints;
+
       const batch = writeBatch(firestore);
       const pRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
       const rRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
       const sRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
 
-      batch.set(pRef, { seasonLp: editLp, stats: editStats, updatedAt: serverTimestamp() }, { merge: true });
-      batch.set(sRef, { totalStudyMinutes: editTodayMinutes, updatedAt: serverTimestamp() }, { merge: true });
-      batch.set(rRef, { studentId, displayNameSnapshot: student?.name || '학생', value: editLp, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(
+        pRef,
+        {
+          seasonLp: normalizedLp,
+          penaltyPoints: normalizedPenaltyPoints,
+          stats: normalizedStats,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      batch.set(sRef, { totalStudyMinutes: normalizedTodayMinutes, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(rRef, { studentId, displayNameSnapshot: student?.name || '학생', value: normalizedLp, updatedAt: serverTimestamp() }, { merge: true });
+
+      if (penaltyDelta !== 0) {
+        const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
+        batch.set(penaltyLogRef, {
+          centerId,
+          studentId,
+          studentName: student?.name || '학생',
+          pointsDelta: penaltyDelta,
+          reason: `상세 페이지 수동 보정 (${previousPenaltyPoints} → ${normalizedPenaltyPoints})`,
+          source: 'manual',
+          createdByUserId: currentUser?.uid || '',
+          createdByName: currentUser?.displayName || '센터 관리자',
+          createdAt: serverTimestamp(),
+        });
+      }
 
       await batch.commit();
       toast({ title: '성장 지표 보정 완료' });
       setIsEditStats(false);
     } catch (error: any) {
       console.error(error);
-      const message = resolveCallableErrorMessage(error, '학생 정보 수정 중 오류가 발생했습니다.');
+      const message = resolveCallableErrorMessage(error, '성장/세션 보정 중 오류가 발생했습니다.');
       toast({ variant: 'destructive', title: '수정 실패', description: message });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleSaveSessionAdjustments = async () => {
+    if (!firestore || !centerId || !studentId || !canEditGrowthData) return;
+
+    const changedSessions = recentStudySessions
+      .map((session) => {
+        const nextValue = sessionAdjustments[session.dateKey];
+        if (typeof nextValue !== 'number' || Number.isNaN(nextValue)) return null;
+        const normalizedNext = Math.max(0, Math.round(nextValue));
+        if (normalizedNext === session.minutes) return null;
+        return { dateKey: session.dateKey, minutes: normalizedNext };
+      })
+      .filter((item): item is { dateKey: string; minutes: number } => Boolean(item));
+
+    if (changedSessions.length === 0) {
+      toast({ title: '변경된 세션이 없습니다.' });
+      return;
+    }
+
+    setIsSessionSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+
+      changedSessions.forEach(({ dateKey, minutes }) => {
+        const dailyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey);
+        const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
+
+        batch.set(
+          dailyLogRef,
+          {
+            dateKey,
+            totalMinutes: minutes,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        batch.set(
+          dailyStatRef,
+          {
+            totalStudyMinutes: minutes,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+
+      await batch.commit();
+
+      setDailyStatsMap((prev) => {
+        const next = { ...prev };
+        changedSessions.forEach(({ dateKey, minutes }) => {
+          next[dateKey] = {
+            ...(next[dateKey] || { totalStudyMinutes: 0 }),
+            totalStudyMinutes: minutes,
+          };
+        });
+        return next;
+      });
+
+      toast({ title: '공부시간 세션 보정 완료' });
+      setIsAvgStudyModalOpen(false);
+    } catch (error: any) {
+      console.error(error);
+      const message = resolveCallableErrorMessage(error, '공부시간 세션 보정 중 오류가 발생했습니다.');
+      toast({ variant: 'destructive', title: '보정 실패', description: message });
+    } finally {
+      setIsSessionSaving(false);
     }
   };
 
@@ -774,6 +915,18 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
           {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
           {canEditStudentInfo && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
+          {canEditGrowthData && (
+            <Button
+              variant="outline"
+              className="rounded-2xl font-black h-11 px-5 text-xs gap-2"
+              onClick={() => {
+                setIsMasteryModalOpen(true);
+                setIsEditStats(true);
+              }}
+            >
+              <Sparkles className="h-4 w-4" /> 지표/세션 보정
+            </Button>
+          )}
           {isAdmin && <Button variant="destructive" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
         </div>
       </div>
@@ -786,6 +939,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           icon={Clock3}
           colorClass="text-blue-500"
           isMobile={isMobile}
+          onClick={() => setIsAvgStudyModalOpen(true)}
         />
         <StatAnalysisCard
           title="평균 공부 리듬"
@@ -976,14 +1130,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-            <CardHeader><CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><BookOpen className="h-5 w-5 text-emerald-500" /> 향후 7일 계획/루틴</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><BookOpen className="h-5 w-5 text-emerald-500" /> 과거 7일 계획/루틴</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {isDataLoading ? (
                 <div className="flex items-center justify-center h-36 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
-              ) : upcomingPlanGroups.length === 0 ? (
-                <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">향후 7일 계획 데이터가 없습니다.</div>
+              ) : pastPlanGroups.length === 0 ? (
+                <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">과거 7일 계획 데이터가 없습니다.</div>
               ) : (
-                upcomingPlanGroups.map((group) => {
+                pastPlanGroups.map((group) => {
                   const date = new Date(`${group.dateKey}T00:00:00`);
                   return (
                     <div key={group.dateKey} className="rounded-xl border border-border/60 p-3.5 bg-muted/10">
@@ -1000,6 +1154,95 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isAvgStudyModalOpen} onOpenChange={setIsAvgStudyModalOpen}>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight">과거 7일 학습세션</DialogTitle>
+              <DialogDescription className="text-white/80 font-semibold">
+                날짜별 공부시간 세션을 확인하고 필요 시 수동 보정할 수 있습니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 py-5 space-y-4 bg-white">
+            {recentStudySessions.length === 0 ? (
+              <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">
+                표시할 학습세션이 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                {recentStudySessions.map((session) => {
+                  const adjustedMinutes = sessionAdjustments[session.dateKey] ?? session.minutes;
+                  const isChanged = Math.max(0, Math.round(adjustedMinutes)) !== session.minutes;
+                  return (
+                    <div key={session.dateKey} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-slate-800">{session.dateLabel}</p>
+                          <p className="text-[11px] font-bold text-slate-500">
+                            {session.hasActualStudyLog ? '실제 학습 로그 반영' : '통계 데이터 기반'}
+                          </p>
+                        </div>
+                        {canEditGrowthData ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={5}
+                              value={adjustedMinutes}
+                              onChange={(event) => {
+                                const parsed = Number.parseInt(event.target.value, 10);
+                                setSessionAdjustments((prev) => ({
+                                  ...prev,
+                                  [session.dateKey]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
+                                }));
+                              }}
+                              className="h-9 w-24 rounded-lg border-2 text-right font-black"
+                            />
+                            <span className="text-xs font-black text-slate-500">분</span>
+                          </div>
+                        ) : (
+                          <Badge className="border-none bg-blue-50 text-blue-700 font-black">
+                            {minutesToLabel(session.minutes)}
+                          </Badge>
+                        )}
+                      </div>
+                      {isChanged && (
+                        <p className="mt-2 text-[11px] font-black text-indigo-600">
+                          변경 예정: {minutesToLabel(session.minutes)} → {minutesToLabel(adjustedMinutes)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <DialogFooter>
+              {canEditGrowthData ? (
+                <div className="flex w-full gap-2">
+                  <Button variant="outline" className="flex-1 rounded-xl font-black" onClick={() => setIsAvgStudyModalOpen(false)}>
+                    닫기
+                  </Button>
+                  <Button
+                    className="flex-1 rounded-xl font-black"
+                    onClick={handleSaveSessionAdjustments}
+                    disabled={isSessionSaving || !hasSessionAdjustmentChanges}
+                  >
+                    {isSessionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : '세션 보정 저장'}
+                  </Button>
+                </div>
+              ) : (
+                <DialogClose asChild>
+                  <Button className="rounded-xl font-black">확인</Button>
+                </DialogClose>
+              )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
@@ -1055,7 +1298,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isMasteryModalOpen} onOpenChange={setIsMasteryModalOpen}>
+      <Dialog
+        open={isMasteryModalOpen}
+        onOpenChange={(open) => {
+          setIsMasteryModalOpen(open);
+          if (!open) setIsEditStats(false);
+        }}
+      >
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
           <div className="bg-purple-600 p-10 text-white relative shrink-0">
             <Zap className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
@@ -1083,10 +1332,47 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </Card>
             </section>
 
+            <section className="space-y-4">
+              <h4 className="text-xs font-black uppercase text-rose-600 flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> 누적 벌점 지수</h4>
+              <Card className="rounded-[1.5rem] border-2 border-rose-100 bg-rose-50/30 p-6">
+                {isEditStats && canEditGrowthData ? (
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editPenaltyPoints}
+                    onChange={(event) => setEditPenaltyPoints(Number(event.target.value))}
+                    className="h-14 rounded-2xl border-rose-200 font-black text-2xl text-center text-rose-600"
+                  />
+                ) : (
+                  <div className="text-center">
+                    <p className="text-4xl font-black text-rose-600 tabular-nums">
+                      {Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)))}점
+                    </p>
+                    <p className="mt-2 text-xs font-semibold text-rose-700/80">생활/출결 벌점 누적값</p>
+                  </div>
+                )}
+              </Card>
+            </section>
+
             {isEditStats && canEditGrowthData && (
               <section className="space-y-4">
                 <h4 className="text-xs font-black uppercase text-blue-600 flex items-center gap-2"><Timer className="h-4 w-4" /> 오늘 공부시간 보정 (분)</h4>
                 <Input type="number" value={editTodayMinutes} onChange={(event) => setEditTodayMinutes(Number(event.target.value))} className="h-14 rounded-2xl border-blue-200 font-black text-2xl text-center text-blue-600" />
+              </section>
+            )}
+
+            {isEditStats && canEditGrowthData && (
+              <section className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                <p className="text-xs font-black text-blue-700">공부시간 세션 날짜별 보정</p>
+                <p className="text-xs font-semibold text-blue-700/80">최근 7일 날짜별 학습세션은 아래 버튼에서 직접 수정할 수 있습니다.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl font-black border-blue-200 text-blue-700 hover:bg-blue-100"
+                  onClick={() => setIsAvgStudyModalOpen(true)}
+                >
+                  최근 7일 세션 보정 열기
+                </Button>
               </section>
             )}
 

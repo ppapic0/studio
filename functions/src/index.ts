@@ -607,6 +607,70 @@ export const deleteStudentAccount = functions.region(region).runWith({
   }
 });
 
+export const deleteTeacherAccount = functions.region(region).runWith({
+  timeoutSeconds: 540,
+  memory: "1GB",
+}).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+  const auth = admin.auth();
+
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+
+  const { teacherId, centerId } = data || {};
+  if (!teacherId || !centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "teacherId / centerId 가 필요합니다.");
+  }
+  if (teacherId === context.auth.uid) {
+    throw new functions.https.HttpsError("failed-precondition", "본인 계정은 직접 삭제할 수 없습니다.");
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 선생님 계정을 삭제할 수 있습니다.");
+  }
+
+  const targetMemberRef = db.doc(`centers/${centerId}/members/${teacherId}`);
+  const targetMemberSnap = await targetMemberRef.get();
+  if (!targetMemberSnap.exists || targetMemberSnap.data()?.role !== "teacher") {
+    throw new functions.https.HttpsError("failed-precondition", "해당 센터의 선생님 계정만 삭제할 수 있습니다.");
+  }
+
+  try {
+    const userCentersSnap = await db.collection(`userCenters/${teacherId}/centers`).get();
+    const otherCenterCount = userCentersSnap.docs.filter((docSnap) => docSnap.id !== centerId).length;
+    const isMultiCenter = otherCenterCount > 0;
+
+    const batch = db.batch();
+    batch.delete(targetMemberRef);
+    batch.delete(db.doc(`userCenters/${teacherId}/centers/${centerId}`));
+    await batch.commit();
+
+    if (!isMultiCenter) {
+      await Promise.allSettled([
+        db.doc(`users/${teacherId}`).delete(),
+        db.recursiveDelete(db.doc(`userCenters/${teacherId}`)),
+      ]);
+
+      try {
+        await auth.deleteUser(teacherId);
+      } catch (e: any) {
+        if (e?.code !== "auth/user-not-found") {
+          throw e;
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      message: isMultiCenter
+        ? "해당 센터 기준 선생님 계정을 삭제했습니다."
+        : "선생님 계정과 인증 정보를 삭제했습니다.",
+    };
+  } catch (error: any) {
+    throw new functions.https.HttpsError("internal", error?.message || "선생님 계정 삭제 중 오류가 발생했습니다.");
+  }
+});
+
 export const updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();

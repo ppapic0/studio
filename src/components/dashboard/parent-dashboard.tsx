@@ -80,6 +80,7 @@ import {
   type DailyReport,
   type GrowthProgress,
   type Invoice,
+  type PenaltyLog,
   type ParentActivityEvent,
   type StudyLogDay,
   type StudyPlanItem,
@@ -132,6 +133,8 @@ const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
 };
 
 const SUBJECT_COLORS = ['#FF7A16', '#14295F', '#10B981', '#0EA5E9', '#A855F7'];
+const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = { late: 1, absence: 2 };
+const PENALTY_RECOVERY_INTERVAL_DAYS = 7;
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 
@@ -196,6 +199,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+  const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const visitLoggedRef = useRef(false);
   const reportReadLoggedRef = useRef<Record<string, boolean>>({});
 
@@ -357,6 +361,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, studentId]);
   const { data: attendanceRequests } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: isActive && !!studentId });
 
+  const penaltyLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120));
+  }, [firestore, centerId, studentId]);
+  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: isActive && !!studentId });
+
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(
@@ -514,10 +524,35 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       .map((request) => ({
         id: request.id,
         reason: request.reason || (request.type === 'late' ? '지각 신청 처리' : '결석 신청 처리'),
-        points: request.type === 'late' ? 3 : 5,
+        points: request.type === 'absence' ? REQUEST_PENALTY_POINTS.absence : REQUEST_PENALTY_POINTS.late,
         dateLabel: formatDateLabel(request.date, (request as any).createdAt),
       }));
   }, [attendanceRequests]);
+
+  const penaltyRecovery = useMemo(() => {
+    const basePoints = Math.max(0, Math.round(Number(growth?.penaltyPoints || 0)));
+    const nowMs = Date.now();
+    const latestPositiveLog = [...(penaltyLogs || [])]
+      .filter((log) => Number(log.pointsDelta || 0) > 0)
+      .sort((a, b) => {
+        const aMs = toDateSafe((a as any).createdAt)?.getTime() || 0;
+        const bMs = toDateSafe((b as any).createdAt)?.getTime() || 0;
+        return bMs - aMs;
+      })[0];
+
+    const latestPositiveMs = latestPositiveLog ? toDateSafe((latestPositiveLog as any).createdAt)?.getTime() || 0 : 0;
+    const daysSinceLatestPositive = latestPositiveMs > 0 ? Math.max(0, Math.floor((nowMs - latestPositiveMs) / (24 * 60 * 60 * 1000))) : 0;
+    const recoveredPoints = latestPositiveMs > 0 ? Math.min(basePoints, Math.floor(daysSinceLatestPositive / PENALTY_RECOVERY_INTERVAL_DAYS)) : 0;
+    const effectivePoints = Math.max(0, basePoints - recoveredPoints);
+
+    return {
+      basePoints,
+      recoveredPoints,
+      effectivePoints,
+      daysSinceLatestPositive,
+      latestPositiveDateLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd', { locale: ko }) : '-',
+    };
+  }, [growth?.penaltyPoints, penaltyLogs]);
 
   const aiInsights = useMemo(() => {
     const insights: string[] = [];
@@ -545,12 +580,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       insights.push(`가장 많이 투자한 과목은 ${topSubject.subject} (${topSubject.minutes}분)입니다.`);
     }
 
-    if ((growth?.penaltyPoints || 0) > 0) {
-      insights.push(`생활 벌점이 ${growth?.penaltyPoints || 0}점 누적되어 있어 생활 관리가 필요합니다.`);
+    if (penaltyRecovery.effectivePoints > 0) {
+      insights.push(`생활 벌점이 ${penaltyRecovery.effectivePoints}점(회복 반영) 누적되어 있어 생활 관리가 필요합니다.`);
     }
 
     return insights.slice(0, 4);
-  }, [student?.targetDailyMinutes, weeklyTotalStudyMinutes, weeklyPlanTotal, weeklyPlanCompletionRate, subjectsData, growth?.penaltyPoints]);
+  }, [student?.targetDailyMinutes, weeklyTotalStudyMinutes, weeklyPlanTotal, weeklyPlanCompletionRate, subjectsData, penaltyRecovery.effectivePoints]);
 
   const weeklyFeedback = report?.content?.trim() || aiInsights[0] || '선생님 피드백이 등록되면 이 영역에서 확인할 수 있습니다.';
 
@@ -677,11 +712,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const recentNotifications = useMemo(() => sortedNotifications.slice(0, 3), [sortedNotifications]);
 
   const penaltyMeta = useMemo(() => {
-    const points = growth?.penaltyPoints || 0;
-    if (points >= 15) return { label: '주의', badge: 'bg-rose-100 text-rose-700 border-rose-200' };
-    if (points >= 5) return { label: '관심', badge: 'bg-amber-100 text-amber-700 border-amber-200' };
+    const points = penaltyRecovery.effectivePoints;
+    if (points >= 20) return { label: '퇴원', badge: 'bg-rose-200 text-rose-800 border-rose-300' };
+    if (points >= 12) return { label: '학부모 상담', badge: 'bg-amber-100 text-amber-800 border-amber-300' };
+    if (points >= 7) return { label: '선생님과 상담', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
     return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
-  }, [growth?.penaltyPoints]);
+  }, [penaltyRecovery.effectivePoints]);
 
   const selectedDateLog = useMemo(() => {
     if (!selectedDateKey) return null;
@@ -798,13 +834,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <span className="text-[8px] font-black uppercase tracking-widest opacity-60">출결 상태</span>
                   <p className="text-lg font-black leading-tight truncate">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
-                <Card className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-center space-y-1 shadow-sm transition-all hover:bg-white hover:ring-1 hover:ring-rose-200">
+                <Card
+                  className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-center space-y-1 shadow-sm transition-all hover:bg-white hover:ring-1 hover:ring-rose-200 cursor-pointer"
+                  role="button"
+                  onClick={() => setIsPenaltyGuideOpen(true)}
+                >
                   <span className="text-[8px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
                   <div className="flex items-center justify-center gap-1">
-                    <p className="text-xl font-black text-rose-700 leading-tight">{growth?.penaltyPoints || 0}</p>
+                    <p className="text-xl font-black text-rose-700 leading-tight">{penaltyRecovery.effectivePoints}</p>
                     <span className="text-xs font-black text-rose-500/70">점</span>
                   </div>
                   <Badge className={cn('h-5 border px-2 text-[9px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
+                  {penaltyRecovery.recoveredPoints > 0 && (
+                    <p className="text-[9px] font-bold text-rose-500/80">자동 회복 -{penaltyRecovery.recoveredPoints}점 반영</p>
+                  )}
                 </Card>
               </div>
 
@@ -1037,14 +1080,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="data" className="mt-0 space-y-4 animate-in fade-in duration-500">
-              <Card className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm">
+              <Card
+                className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm cursor-pointer"
+                role="button"
+                onClick={() => setIsPenaltyGuideOpen(true)}
+              >
                 <div className="flex items-center justify-between">
                   <div className="grid gap-1">
                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">누적 벌점 지수</span>
                     <h3 className="text-4xl font-black tracking-tighter text-rose-900">
-                      {growth?.penaltyPoints || 0}
+                      {penaltyRecovery.effectivePoints}
                       <span className="ml-1 text-lg opacity-40">점</span>
                     </h3>
+                    <p className="text-[11px] font-bold text-rose-700/80">
+                      원점수 {penaltyRecovery.basePoints}점 · 회복 {penaltyRecovery.recoveredPoints}점
+                    </p>
                   </div>
                   <Badge className={cn('h-8 rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
                     {penaltyMeta.label}
@@ -1266,6 +1316,57 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
+        <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
+          <div className="bg-gradient-to-r from-rose-600 to-rose-500 p-6 text-white">
+            <DialogTitle className="text-xl font-black tracking-tight">벌점 현황 안내</DialogTitle>
+            <DialogDescription className="mt-1 text-xs font-bold text-white/80">
+              벌점 부여 기준, 누적 단계, 자동 회복 규칙
+            </DialogDescription>
+          </div>
+
+          <div className="space-y-3 bg-white p-6">
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점 부여 기준</p>
+              <div className="mt-2 space-y-1.5 text-sm font-bold text-slate-700">
+                <p>지각 출석: +{REQUEST_PENALTY_POINTS.late}점</p>
+                <p>결석: +{REQUEST_PENALTY_POINTS.absence}점</p>
+                <p>센터 수동 부여: 관리자가 설정한 점수</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-amber-700">누적 단계 기준</p>
+              <div className="mt-2 space-y-1.5 text-sm font-bold text-slate-700">
+                <p>7점 이상: 선생님과 상담</p>
+                <p>12점 이상: 학부모 상담</p>
+                <p>20점 이상: 퇴원</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-emerald-700">자동 회복 규칙</p>
+              <div className="mt-2 space-y-1.5 text-sm font-bold text-slate-700">
+                <p>최근 벌점 이후 {PENALTY_RECOVERY_INTERVAL_DAYS}일 동안 신규 벌점이 없으면 1점 회복</p>
+                <p>현재 원점수 {penaltyRecovery.basePoints}점 · 회복 {penaltyRecovery.recoveredPoints}점 · 적용 {penaltyRecovery.effectivePoints}점</p>
+                <p>최근 벌점 반영일: {penaltyRecovery.latestPositiveDateLabel}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">현재 조치 단계</p>
+              <Badge className={cn('mt-2 h-7 rounded-full border px-3 text-xs font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t bg-white p-4">
+            <DialogClose asChild>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">확인</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedNotification} onOpenChange={(open) => { if (!open) setSelectedNotification(null); }}>
         <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-md">

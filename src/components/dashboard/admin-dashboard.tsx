@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
   Select,
   SelectContent,
@@ -19,6 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   Users, 
   TrendingUp, 
@@ -43,24 +53,35 @@ import {
   History,
   CheckCircle2,
   Eye,
-  PenTool
+  PenTool,
+  UserCog,
+  UserX,
+  Mail,
+  Phone
 } from 'lucide-react';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, collectionGroup, Timestamp, doc } from 'firebase/firestore';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent } from '@/lib/types';
+import { collection, query, where, collectionGroup, Timestamp, doc, limit } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { activeMembership, viewMode } = useAppContext();
+  const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState<Date | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [now, setNow] = useState<number>(Date.now());
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -87,6 +108,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId]);
   const { data: activeMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+
+  const teacherMembersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'teacher'));
+  }, [firestore, centerId]);
+  const { data: teacherMembers } = useCollection<CenterMembership>(teacherMembersQuery, { enabled: isActive });
 
   // 2. 벌점 데이터 소스
   const progressQuery = useMemoFirebase(() => {
@@ -115,6 +142,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, todayKey]);
   const { data: dailyReports } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
+
+  const allReportsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'dailyReports'), limit(600));
+  }, [firestore, centerId]);
+  const { data: allReports } = useCollection<DailyReport>(allReportsQuery, { enabled: isActive });
+
+  const counselingLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'counselingLogs'), limit(600));
+  }, [firestore, centerId]);
+  const { data: counselingLogs } = useCollection<CounselingLog>(counselingLogsQuery, { enabled: isActive });
   const parentActivityQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'parentActivityEvents');
@@ -133,6 +172,93 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     activeMembers.forEach(m => { if (m.className) classes.add(m.className); });
     return Array.from(classes).sort();
   }, [activeMembers]);
+
+  const teacherRows = useMemo(() => {
+    const reportByTeacher = new Map<string, DailyReport[]>();
+    (allReports || []).forEach((report) => {
+      const teacherId = report.teacherId;
+      if (!teacherId) return;
+      const bucket = reportByTeacher.get(teacherId) || [];
+      bucket.push(report);
+      reportByTeacher.set(teacherId, bucket);
+    });
+
+    const counselingByTeacher = new Map<string, CounselingLog[]>();
+    (counselingLogs || []).forEach((log) => {
+      const teacherId = log.teacherId;
+      if (!teacherId) return;
+      const bucket = counselingByTeacher.get(teacherId) || [];
+      bucket.push(log);
+      counselingByTeacher.set(teacherId, bucket);
+    });
+
+    return (teacherMembers || [])
+      .map((teacher) => {
+        const reports = [...(reportByTeacher.get(teacher.id) || [])].sort(
+          (a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0)
+        );
+        const logs = [...(counselingByTeacher.get(teacher.id) || [])].sort(
+          (a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0)
+        );
+
+        return {
+          ...teacher,
+          teacherName: teacher.displayName || `선생님-${teacher.id.slice(0, 6)}`,
+          reports,
+          sentReports: reports.filter((report) => report.status === 'sent'),
+          logs,
+        };
+      })
+      .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ko'));
+  }, [teacherMembers, allReports, counselingLogs]);
+
+  const filteredTeacherRows = useMemo(() => {
+    const keyword = teacherSearch.trim().toLowerCase();
+    if (!keyword) return teacherRows;
+    return teacherRows.filter((teacher) => {
+      const name = teacher.teacherName.toLowerCase();
+      const phone = (teacher.phoneNumber || '').toLowerCase();
+      const id = teacher.id.toLowerCase();
+      return name.includes(keyword) || phone.includes(keyword) || id.includes(keyword);
+    });
+  }, [teacherRows, teacherSearch]);
+
+  const selectedTeacher = useMemo(
+    () => teacherRows.find((teacher) => teacher.id === selectedTeacherId) || null,
+    [teacherRows, selectedTeacherId]
+  );
+
+  const handleDeleteTeacher = async (teacher: { id: string; teacherName: string }) => {
+    if (!functions || !centerId) return;
+
+    const confirmed = window.confirm(`${teacher.teacherName} 계정을 삭제할까요?\n삭제 후에는 이 센터에 다시 초대해야 접근할 수 있습니다.`);
+    if (!confirmed) return;
+
+    setDeletingTeacherId(teacher.id);
+    try {
+      const removeTeacher = httpsCallable(functions, 'deleteTeacherAccount', { timeout: 600000 });
+      await removeTeacher({ teacherId: teacher.id, centerId });
+
+      toast({
+        title: '선생님 계정 삭제 완료',
+        description: `${teacher.teacherName} 계정을 센터에서 삭제했습니다.`,
+      });
+
+      if (selectedTeacherId === teacher.id) {
+        setSelectedTeacherId(null);
+      }
+    } catch (error: any) {
+      console.error(error);
+      const message = String(error?.message || '').replace(/^FirebaseError:\s*/, '') || '선생님 계정 삭제 중 오류가 발생했습니다.';
+      toast({
+        variant: 'destructive',
+        title: '삭제 실패',
+        description: message,
+      });
+    } finally {
+      setDeletingTeacherId(null);
+    }
+  };
 
   // --- 실시간 KPI 엔진 ---
   const metrics = useMemo(() => {
@@ -394,6 +520,79 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </Card>
           </section>
+
+          <section className="pb-10 px-1 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <UserCog className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-black tracking-tighter">선생님 계정 관리</h2>
+              </div>
+              <Badge className="bg-slate-900 text-white border-none font-black text-[10px] px-3 py-1">
+                {teacherRows.length}명
+              </Badge>
+            </div>
+
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white ring-1 ring-black/[0.03]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-black tracking-tight">선생님 활동 요약</CardTitle>
+                <CardDescription className="font-bold text-xs">
+                  상담일지 작성 건수와 발송 리포트를 함께 확인하고 계정을 관리할 수 있습니다.
+                </CardDescription>
+                <div className="pt-2">
+                  <Input
+                    value={teacherSearch}
+                    onChange={(event) => setTeacherSearch(event.target.value)}
+                    placeholder="선생님 이름/전화번호/UID 검색"
+                    className="h-11 rounded-xl border-2 font-bold"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {filteredTeacherRows.length === 0 ? (
+                  <div className="rounded-xl border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">
+                    조회된 선생님 계정이 없습니다.
+                  </div>
+                ) : (
+                  filteredTeacherRows.map((teacher) => (
+                    <div key={teacher.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-slate-900 truncate">{teacher.teacherName}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                            <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {teacher.phoneNumber || '전화번호 미등록'}</span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> 상담일지 {teacher.logs.length}건</span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" /> 발송 리포트 {teacher.sentReports.length}건</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-xl font-black text-xs"
+                            onClick={() => setSelectedTeacherId(teacher.id)}
+                          >
+                            상세 보기
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-9 rounded-xl font-black text-xs gap-1.5"
+                            onClick={() => void handleDeleteTeacher({ id: teacher.id, teacherName: teacher.teacherName })}
+                            disabled={deletingTeacherId === teacher.id}
+                          >
+                            {deletingTeacherId === teacher.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+                            삭제
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </section>
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-40 gap-4 opacity-20">
@@ -401,6 +600,85 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <p className="font-black text-xl tracking-tighter">분석 데이터를 집계하고 있습니다...</p>
         </div>
       )}
+
+      <Dialog open={!!selectedTeacher} onOpenChange={(open) => !open && setSelectedTeacherId(null)}>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
+          {selectedTeacher && (
+            <>
+              <div className="bg-primary p-6 text-primary-foreground">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tight">{selectedTeacher.teacherName}</DialogTitle>
+                  <DialogDescription className="text-primary-foreground/80 font-bold">
+                    상담일지 {selectedTeacher.logs.length}건 · 발송 리포트 {selectedTeacher.sentReports.length}건
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="max-h-[70vh] overflow-y-auto bg-white p-6 space-y-5">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">계정 정보</p>
+                  <div className="mt-2 grid gap-1 text-sm font-bold text-slate-700">
+                    <p>UID: {selectedTeacher.id}</p>
+                    <p>전화번호: {selectedTeacher.phoneNumber || '미등록'}</p>
+                    <p>상태: {selectedTeacher.status}</p>
+                  </div>
+                </div>
+
+                <section className="space-y-2">
+                  <h4 className="text-sm font-black tracking-tight text-slate-900">작성 상담일지</h4>
+                  {selectedTeacher.logs.length === 0 ? (
+                    <div className="rounded-xl border border-dashed py-8 text-center text-xs font-bold text-slate-400">
+                      작성된 상담일지가 없습니다.
+                    </div>
+                  ) : (
+                    selectedTeacher.logs.slice(0, 12).map((log) => (
+                      <div key={log.id} className="rounded-xl border border-slate-100 bg-white p-3">
+                        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px] font-black text-slate-500">
+                          <Badge className="h-5 border-none bg-emerald-100 px-2 text-[10px] font-black text-emerald-700">
+                            {log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}
+                          </Badge>
+                          <span>{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm') : '-'}</span>
+                          <span>·</span>
+                          <span>{log.studentName || log.studentId}</span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-700 leading-relaxed">{log.content}</p>
+                        {log.improvement && <p className="mt-1 text-xs font-semibold text-emerald-700">개선 포인트: {log.improvement}</p>}
+                      </div>
+                    ))
+                  )}
+                </section>
+
+                <section className="space-y-2">
+                  <h4 className="text-sm font-black tracking-tight text-slate-900">발송 리포트 내역</h4>
+                  {selectedTeacher.sentReports.length === 0 ? (
+                    <div className="rounded-xl border border-dashed py-8 text-center text-xs font-bold text-slate-400">
+                      발송된 리포트가 없습니다.
+                    </div>
+                  ) : (
+                    selectedTeacher.sentReports.slice(0, 12).map((report) => (
+                      <div key={report.id} className="rounded-xl border border-slate-100 bg-white p-3">
+                        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px] font-black text-slate-500">
+                          <Badge className="h-5 border-none bg-blue-100 px-2 text-[10px] font-black text-blue-700">{report.dateKey}</Badge>
+                          <span>{report.studentName || report.studentId}</span>
+                          <span>·</span>
+                          <span>{report.createdAt ? format(report.createdAt.toDate(), 'yyyy.MM.dd HH:mm') : '-'}</span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-700 line-clamp-2">{report.content || '리포트 내용 없음'}</p>
+                      </div>
+                    ))
+                  )}
+                </section>
+              </div>
+
+              <DialogFooter className="border-t bg-white p-4">
+                <DialogClose asChild>
+                  <Button className="h-11 rounded-xl px-6 font-black">닫기</Button>
+                </DialogClose>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
