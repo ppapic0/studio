@@ -969,19 +969,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3.5 text-center shadow-sm">
                       <p className="text-[12px] font-black text-[#14295F]">청구</p>
-                      <p className="mt-1 text-[1.55rem] font-black tracking-tight leading-none tabular-nums text-[#14295F] whitespace-nowrap">
+                      <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-[#14295F] whitespace-nowrap">
                         {formatWon(billingSummary.billed)}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 px-3 py-3.5 text-center shadow-sm">
                       <p className="text-[12px] font-black text-emerald-700">수납</p>
-                      <p className="mt-1 text-[1.55rem] font-black tracking-tight leading-none tabular-nums text-emerald-700 whitespace-nowrap">
+                      <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-emerald-700 whitespace-nowrap">
                         {formatWon(billingSummary.paid)}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-rose-200 bg-rose-50/40 px-3 py-3.5 text-center shadow-sm">
                       <p className="text-[12px] font-black text-rose-700">미납</p>
-                      <p className="mt-1 text-[1.55rem] font-black tracking-tight leading-none tabular-nums text-rose-700 whitespace-nowrap">
+                      <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-rose-700 whitespace-nowrap">
                         {formatWon(billingSummary.overdue)}
                       </p>
                     </div>
