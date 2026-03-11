@@ -953,56 +953,62 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Tabs>
 
       <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black tracking-tight">평균 공부 리듬 산정 방식</DialogTitle>
-            <DialogDescription className="font-semibold">
-              카드 점수는 최근 {RANGE_MAP[focusedChartView]}일의 실제 공부시간 기록을 기준으로 계산됩니다.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+          <div className="bg-gradient-to-r from-[#0f2359] to-[#1d3f8c] px-6 py-5 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight">평균 공부 리듬 산정 방식</DialogTitle>
+              <DialogDescription className="text-white/80 font-semibold">
+                최근 {RANGE_MAP[focusedChartView]}일 실제 공부시간 데이터를 기준으로 계산합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-3 text-sm">
-            <div className="rounded-xl border bg-muted/20 p-3">
-              <p className="font-black text-[11px] uppercase tracking-wider text-muted-foreground">데이터 기준</p>
-              <p className="mt-1 font-semibold text-slate-700 leading-relaxed">
-                `studyLogs/{studentId}/days.totalMinutes`를 우선 사용하고, 오늘 진행 중 학습은 실시간 좌석 상태에서 경과 시간을 추가 반영합니다.
-              </p>
-              <p className="mt-2 text-xs font-bold text-muted-foreground">
+          <div className="px-6 py-5 space-y-4 bg-white">
+            <div className="rounded-2xl border bg-slate-50/70 p-4">
+              <p className="font-black text-[11px] uppercase tracking-widest text-slate-500">데이터 기준</p>
+              <div className="mt-2 space-y-1.5 text-sm font-semibold text-slate-700 leading-relaxed">
+                <p>- 실제 공부시간: `studyLogs / {studentId} / days / totalMinutes`</p>
+                <p>- 오늘 진행 중인 학습은 실시간 좌석 상태(`studying`)의 경과 시간까지 반영</p>
+              </div>
+              <p className="mt-3 text-xs font-black text-slate-500">
                 실제 로그 반영 일수: {rhythmGuideMeta.actualLogCount} / {rhythmGuideMeta.sampleCount}일
               </p>
             </div>
 
-            <div className="rounded-xl border bg-white p-3">
-              <p className="font-black text-[11px] uppercase tracking-wider text-muted-foreground">계산식</p>
-              <p className="mt-1 font-mono text-xs text-slate-700">
-                리듬점수 = clamp(100 - (표준편차 / 평균) x 100, 0, 100)
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+            <div className="rounded-2xl border bg-white p-4">
+              <p className="font-black text-[11px] uppercase tracking-widest text-slate-500">계산식</p>
+              <div className="mt-2 rounded-xl bg-slate-900 text-slate-50 px-3 py-2.5 font-mono text-xs leading-relaxed">
+                리듬 점수 = 100 - (표준편차 / 평균 공부시간) * 100
+                <br />
+                최종 점수는 0점 ~ 100점 범위로 제한
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
                   <p className="font-black text-slate-500">평균 공부시간</p>
-                  <p className="font-black text-slate-800">{rhythmGuideMeta.averageMinutes}분</p>
+                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.averageMinutes}분</p>
                 </div>
-                <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
                   <p className="font-black text-slate-500">표준편차</p>
-                  <p className="font-black text-slate-800">{rhythmGuideMeta.stdDevMinutes}분</p>
+                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.stdDevMinutes}분</p>
                 </div>
-                <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
                   <p className="font-black text-slate-500">변동계수</p>
-                  <p className="font-black text-slate-800">{rhythmGuideMeta.variationPercent}%</p>
+                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.variationPercent}%</p>
                 </div>
-                <div className="rounded-lg bg-emerald-50 px-2.5 py-2">
-                  <p className="font-black text-emerald-600">최종 리듬 점수</p>
-                  <p className="font-black text-emerald-700">{rhythmScore}점</p>
+                <div className="rounded-xl bg-emerald-50 px-3 py-2.5 border border-emerald-100">
+                  <p className="font-black text-emerald-700">최종 리듬 점수</p>
+                  <p className="font-black text-emerald-700 text-base">{rhythmScore}점</p>
                 </div>
               </div>
             </div>
-          </div>
 
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button className="rounded-xl font-black">확인</Button>
-            </DialogClose>
-          </DialogFooter>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button className="rounded-xl font-black">확인</Button>
+              </DialogClose>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
