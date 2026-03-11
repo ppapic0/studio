@@ -29,9 +29,9 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, doc, serverTimestamp, setDoc, query, where, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy } from 'firebase/firestore';
 import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck } from 'lucide-react';
-import { CenterMembership, AttendanceRequest } from '@/lib/types';
+import { CenterMembership, AttendanceRequest, AttendanceCurrent } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,47 @@ type AttendanceRecord = {
   studentName?: string;
 };
 
+type AttendanceRoutineInfo = {
+  hasRoutine: boolean;
+  isNoAttendanceDay: boolean;
+  expectedArrivalTime: string | null;
+};
+
+type DisplayAttendanceStatus = AttendanceRecordStatus | 'missing_routine';
+
+const extractTimeFromRoutineTitle = (title: string): string | null => {
+  const match = title.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+};
+
+const combineDateWithTime = (date: Date, hhmm: string): Date | null => {
+  const [hourText, minuteText] = hhmm.split(':');
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  const parsed = new Date(date);
+  parsed.setHours(hour, minute, 0, 0);
+  return parsed;
+};
+
+const toDateSafe = (value: any): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
+  return null;
+};
+
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -58,12 +99,15 @@ export default function AttendancePage() {
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [attendanceRoutineMap, setAttendanceRoutineMap] = useState<Record<string, AttendanceRoutineInfo>>({});
+  const [routineLoading, setRoutineLoading] = useState(false);
 
   useEffect(() => {
     setSelectedDate(new Date());
   }, []);
 
   const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const centerId = activeMembership?.id;
   const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
 
@@ -84,6 +128,12 @@ export default function AttendancePage() {
   }, [firestore, centerId, dateKey]);
   const { data: attendanceRecords, isLoading: attendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
+  const attendanceCurrentQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'attendanceCurrent');
+  }, [firestore, centerId]);
+  const { data: attendanceCurrentDocs, isLoading: attendanceCurrentLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isTeacherOrAdmin });
+
   // 3. 지각/결석 신청 내역 조회
   const requestsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -93,6 +143,61 @@ export default function AttendancePage() {
     );
   }, [firestore, centerId]);
   const { data: requests, isLoading: requestsLoading } = useCollection<AttendanceRequest>(requestsQuery, { enabled: isTeacherOrAdmin });
+
+  useEffect(() => {
+    if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !weekKey || !students) {
+      setAttendanceRoutineMap({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadRoutineMap = async () => {
+      setRoutineLoading(true);
+      try {
+        const entries = await Promise.all(
+          students.map(async (student) => {
+            const routineQuery = query(
+              collection(firestore, 'centers', centerId, 'plans', student.id, 'weeks', weekKey, 'items'),
+              where('dateKey', '==', dateKey),
+              where('category', '==', 'schedule'),
+              limit(5)
+            );
+            const snap = await getDocs(routineQuery);
+            const scheduleTitles = snap.docs.map((docSnap) => String(docSnap.data()?.title || ''));
+            const hasRoutine = scheduleTitles.some(
+              (title) => title.includes('등원 예정') || title.includes('하원 예정') || title.includes('등원하지 않습니다')
+            );
+            const isNoAttendanceDay = scheduleTitles.some((title) => title.includes('등원하지 않습니다'));
+            const arrivalTitle = scheduleTitles.find((title) => title.includes('등원 예정'));
+            const expectedArrivalTime = arrivalTitle ? extractTimeFromRoutineTitle(arrivalTitle) : null;
+
+            return [
+              student.id,
+              {
+                hasRoutine,
+                isNoAttendanceDay,
+                expectedArrivalTime,
+              },
+            ] as const;
+          })
+        );
+
+        if (!cancelled) {
+          setAttendanceRoutineMap(Object.fromEntries(entries));
+        }
+      } catch (error) {
+        console.error('[attendance] routine map load failed', error);
+        if (!cancelled) setAttendanceRoutineMap({});
+      } finally {
+        if (!cancelled) setRoutineLoading(false);
+      }
+    };
+
+    void loadRoutineMap();
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, students]);
 
   const getBadgeVariant = (status: string) => {
     switch (status) {
@@ -139,8 +244,77 @@ export default function AttendancePage() {
     }
   };
 
-  const isLoading = !selectedDate || membersLoading || attendanceLoading;
+  const isLoading = !selectedDate || membersLoading || attendanceLoading || attendanceCurrentLoading;
   const attendanceMap = useMemo(() => new Map(attendanceRecords?.map(r => [r.id, r])), [attendanceRecords]);
+  const attendanceCurrentMap = useMemo(() => {
+    const mapped = new Map<string, AttendanceCurrent>();
+    (attendanceCurrentDocs || []).forEach((seat) => {
+      if (seat.studentId) {
+        mapped.set(seat.studentId, seat);
+      }
+    });
+    return mapped;
+  }, [attendanceCurrentDocs]);
+
+  const attendanceDisplayMap = useMemo(() => {
+    const mapped = new Map<string, { status: DisplayAttendanceStatus; checkedAt: Date | null }>();
+    if (!selectedDate) return mapped;
+
+    const todayDateKey = format(new Date(), 'yyyy-MM-dd');
+    const isTodaySelected = dateKey === todayDateKey;
+    const nowMs = Date.now();
+
+    (students || []).forEach((student) => {
+      const record = attendanceMap.get(student.id);
+      const routine = attendanceRoutineMap[student.id];
+      const liveAttendance = attendanceCurrentMap.get(student.id);
+
+      let status: DisplayAttendanceStatus = record?.status || 'requested';
+      const checkedAtFromRecord = toDateSafe(record?.updatedAt);
+      const checkedAtFromSeat = isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null;
+      const checkedAt = checkedAtFromRecord || checkedAtFromSeat;
+
+      if (!record?.status || record.status === 'requested') {
+        if (!routineLoading && routine && !routine.hasRoutine) {
+          status = 'missing_routine';
+        } else if (routine?.isNoAttendanceDay) {
+          status = 'excused_absent';
+        } else if (routine?.expectedArrivalTime) {
+          const expectedArrivalAt = combineDateWithTime(selectedDate, routine.expectedArrivalTime);
+          const checkInAt = checkedAtFromSeat || checkedAtFromRecord;
+
+          if (checkInAt) {
+            status = expectedArrivalAt && checkInAt.getTime() > expectedArrivalAt.getTime()
+              ? 'confirmed_late'
+              : 'confirmed_present';
+          } else if (expectedArrivalAt) {
+            const isPastDate = dateKey < todayDateKey;
+            const hasTimedOutToday = isTodaySelected && nowMs > expectedArrivalAt.getTime();
+            if (isPastDate || hasTimedOutToday) {
+              status = 'confirmed_absent';
+            }
+          }
+        }
+      }
+
+      mapped.set(student.id, { status, checkedAt });
+    });
+
+    return mapped;
+  }, [
+    attendanceMap,
+    attendanceCurrentMap,
+    attendanceRoutineMap,
+    dateKey,
+    routineLoading,
+    selectedDate,
+    students,
+  ]);
+
+  const missingRoutineStudents = useMemo(
+    () => (students || []).filter((student) => attendanceRoutineMap[student.id]?.hasRoutine === false),
+    [students, attendanceRoutineMap]
+  );
 
   if (!isTeacherOrAdmin) {
     return (
@@ -179,7 +353,25 @@ export default function AttendancePage() {
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? <div className='flex justify-center py-20'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
-              <Table>
+              <div>
+                {!routineLoading && missingRoutineStudents.length > 0 && (
+                  <div className="px-8 pt-6">
+                    <Alert className="rounded-2xl border-amber-200 bg-amber-50/60">
+                      <AlertTitle className="font-black text-amber-700">미작성 학생 {missingRoutineStudents.length}명</AlertTitle>
+                      <AlertDescription className="font-bold text-amber-700/90 text-xs leading-relaxed">
+                        선택한 날짜({dateKey})에 출결 루틴(등원/하원/휴무)이 없는 학생입니다. 먼저 학습계획에서 루틴을 작성해 주세요.
+                      </AlertDescription>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {missingRoutineStudents.map((student) => (
+                          <Badge key={student.id} variant="outline" className="border-amber-300 bg-white text-amber-700 font-black">
+                            {student.displayName}
+                          </Badge>
+                        ))}
+                      </div>
+                    </Alert>
+                  </div>
+                )}
+                <Table>
                 <TableHeader className="bg-muted/10">
                   <TableRow className="border-none hover:bg-transparent h-12">
                     <TableHead className="font-black text-[10px] pl-8">STUDENT</TableHead>
@@ -193,7 +385,10 @@ export default function AttendancePage() {
                     <TableRow><TableCell colSpan={4} className="h-40 text-center font-bold opacity-30 italic">학생 정보가 없습니다.</TableCell></TableRow>
                   ) : students?.map((student) => {
                     const record = attendanceMap.get(student.id);
-                    const status = record?.status || 'requested';
+                    const status = attendanceDisplayMap.get(student.id)?.status || 'requested';
+                    const hasAttendanceRoutine = attendanceRoutineMap[student.id]?.hasRoutine !== false;
+                    const checkedAt = attendanceDisplayMap.get(student.id)?.checkedAt;
+                    const manualStatus = record?.status && record.status !== 'requested' ? record.status : undefined;
                     return (
                     <TableRow key={student.id} className="h-20 hover:bg-muted/5 transition-colors border-muted/10">
                       <TableCell className="pl-8">
@@ -201,25 +396,49 @@ export default function AttendancePage() {
                           <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50">
                             <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{student.displayName?.charAt(0)}</AvatarFallback>
                           </Avatar>
-                          <div className="font-black text-sm">{student.displayName}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="font-black text-sm">{student.displayName}</div>
+                            {routineLoading && !attendanceRoutineMap[student.id] && (
+                              <Badge variant="outline" className="font-black text-[10px]">루틴 확인중</Badge>
+                            )}
+                            {!routineLoading && !hasAttendanceRoutine && (
+                              <Badge className="font-black text-[10px] border-none bg-amber-100 text-amber-700">미작성</Badge>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getBadgeVariant(status) as any} className="font-black text-[10px] rounded-md shadow-sm border-none">
-                          {status === 'confirmed_present' ? '출석' : status === 'confirmed_late' ? '지각' : status === 'confirmed_absent' ? '결석' : status === 'excused_absent' ? '사유결석' : '미확인'}
+                        <Badge
+                          variant={getBadgeVariant(status) as any}
+                          className={cn(
+                            "font-black text-[10px] rounded-md shadow-sm border-none",
+                            status === 'missing_routine' && "bg-amber-100 text-amber-700"
+                          )}
+                        >
+                          {status === 'confirmed_present'
+                            ? '출석'
+                            : status === 'confirmed_late'
+                              ? '지각출석'
+                              : status === 'confirmed_absent'
+                                ? '결석'
+                                : status === 'excused_absent'
+                                  ? '사유결석'
+                                  : status === 'missing_routine'
+                                    ? '미작성'
+                                    : '미확인'}
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-xs font-bold text-muted-foreground">
-                        {record?.updatedAt ? format((record.updatedAt as any).toDate(), 'p') : 'N/A'}
+                        {checkedAt ? format(checkedAt, 'p') : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right pr-8">
-                        <Select value={status} onValueChange={(newStatus) => handleStatusChange(student.id, newStatus as any)}>
+                        <Select value={manualStatus} onValueChange={(newStatus) => handleStatusChange(student.id, newStatus as any)}>
                           <SelectTrigger className="w-[120px] h-10 rounded-xl font-bold border-2 ml-auto">
                             <SelectValue placeholder="상태 설정" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl shadow-2xl border-none">
                             <SelectItem value="confirmed_present" className="font-bold">출석</SelectItem>
-                            <SelectItem value="confirmed_late" className="font-bold">지각</SelectItem>
+                            <SelectItem value="confirmed_late" className="font-bold">지각출석</SelectItem>
                             <SelectItem value="confirmed_absent" className="font-bold text-rose-600">무단결석</SelectItem>
                             <SelectItem value="excused_absent" className="font-bold text-blue-600">사유결석</SelectItem>
                           </SelectContent>
@@ -229,6 +448,7 @@ export default function AttendancePage() {
                   )})}
                 </TableBody>
               </Table>
+              </div>
               }
             </CardContent>
           </Card>
