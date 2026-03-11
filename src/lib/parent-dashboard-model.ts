@@ -1,4 +1,4 @@
-export type ParentPortalTab = 'home' | 'studyDetail' | 'life' | 'communication' | 'notifications';
+export type ParentPortalTab = 'home' | 'studyDetail' | 'life' | 'communication' | 'reports' | 'billing';
 
 export type ParentQuickRequestKey =
   | 'math_support'
@@ -23,6 +23,7 @@ export interface ParentNotificationItem {
   title: string;
   body: string;
   createdAtLabel: string;
+  createdAtMs?: number;
   isRead: boolean;
   isImportant: boolean;
 }

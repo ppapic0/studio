@@ -134,7 +134,7 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfStudent(studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isCenterAdmin(centerId)
+        allow write: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId);
       }
 
@@ -252,6 +252,15 @@ service cloud.firestore {
         allow create: if isStudent(centerId) && request.resource.data.studentId == request.auth.uid;
         allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /penaltyLogs/{logId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
+        allow create: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && request.resource.data.studentId == request.auth.uid);
+        allow update, delete: if isTeacherOrAdmin(centerId);
       }
 
       match /parentNotifications/{notificationId} {

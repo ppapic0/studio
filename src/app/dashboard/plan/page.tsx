@@ -51,6 +51,7 @@ import {
   PlusCircle,
   CheckCircle2,
   CalendarCheck,
+  ChevronLeft,
   ChevronRight,
   CircleDot,
   BarChart3,
@@ -287,6 +288,22 @@ export default function StudyPlanPage() {
     const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
     return [...Array(7)].map((_, i) => addDays(start, i));
   }, [selectedDate]);
+
+  const weekRangeLabel = useMemo(() => {
+    if (weekDays.length !== 7) return '';
+    const start = weekDays[0];
+    const end = weekDays[6];
+    const sameMonth = format(start, 'yyyy-MM') === format(end, 'yyyy-MM');
+    if (sameMonth) {
+      return `${format(start, 'yyyy.MM.dd')} - ${format(end, 'dd')}`;
+    }
+    return `${format(start, 'yyyy.MM.dd')} - ${format(end, 'yyyy.MM.dd')}`;
+  }, [weekDays]);
+
+  const moveWeek = (direction: -1 | 1) => {
+    if (!selectedDate) return;
+    setSelectedDate(addDays(selectedDate, direction * 7));
+  };
 
   const planItemsQuery = useMemoFirebase(() => {
     if (!firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return null;
@@ -584,28 +601,65 @@ export default function StudyPlanPage() {
         </div>
       </header>
 
-      <div className={cn("grid grid-cols-7 gap-1 sm:gap-4", isMobile ? "px-0" : "px-0")}>
-        {weekDays.map((day) => {
-          const isSelected = isSameDay(day, selectedDate);
-          const isTodayBtn = isSameDay(day, new Date());
-          return (
-            <button
-              key={day.toISOString()}
-              className={cn(
-                "flex flex-col items-center justify-center transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-2.5 sm:py-5 shrink-0",
-                isMobile ? "px-0" : "px-4",
-                isSelected 
-                  ? cn("border-transparent shadow-xl scale-105 z-10 text-white bg-gradient-to-br", currentTier.gradient) 
-                  : "bg-white border-transparent hover:border-primary/20",
-                isTodayBtn && !isSelected && "border-primary/30"
-              )}
-              onClick={() => setSelectedDate(day)}
-            >
-              <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[7px] mb-1" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-base" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
-            </button>
-          );
-        })}
+      <div className={cn("flex items-center justify-between", isMobile ? "px-0 gap-1" : "gap-3")}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => moveWeek(-1)}
+          className={cn(
+            "shrink-0 rounded-xl border-2 bg-white text-primary hover:bg-primary hover:text-white",
+            isMobile ? "h-9 w-9" : "h-11 w-11"
+          )}
+          aria-label="지난 주 보기"
+        >
+          <ChevronLeft className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+        </Button>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex items-center justify-center">
+            <span className={cn("font-black text-primary/60", isMobile ? "text-[10px]" : "text-xs")}>
+              {weekRangeLabel}
+            </span>
+          </div>
+          <div className={cn("grid grid-cols-7 gap-1 sm:gap-4", isMobile ? "px-0" : "px-0")}>
+            {weekDays.map((day) => {
+              const isSelected = isSameDay(day, selectedDate);
+              const isTodayBtn = isSameDay(day, new Date());
+              return (
+                <button
+                  key={day.toISOString()}
+                  className={cn(
+                    "flex flex-col items-center justify-center transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-2.5 sm:py-5 shrink-0",
+                    isMobile ? "px-0" : "px-4",
+                    isSelected
+                      ? cn("border-transparent shadow-xl scale-105 z-10 text-white bg-gradient-to-br", currentTier.gradient)
+                      : "bg-white border-transparent hover:border-primary/20",
+                    isTodayBtn && !isSelected && "border-primary/30"
+                  )}
+                  onClick={() => setSelectedDate(day)}
+                >
+                  <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[7px] mb-1" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
+                  <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-base" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => moveWeek(1)}
+          className={cn(
+            "shrink-0 rounded-xl border-2 bg-white text-primary hover:bg-primary hover:text-white",
+            isMobile ? "h-9 w-9" : "h-11 w-11"
+          )}
+          aria-label="다음 주 보기"
+        >
+          <ChevronRight className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+        </Button>
       </div>
 
       {!isPast && (

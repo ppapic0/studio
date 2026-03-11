@@ -33,6 +33,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
   student: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { href: '/dashboard/growth', label: '성장트랙', icon: Zap },
+    { href: '/dashboard/analysis', label: '분석트랙', icon: FileText },
     { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
     { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
@@ -43,7 +44,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
-    { href: '/dashboard/attendance', label: '출결/요청 승인', icon: ClipboardCheck },
+    { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
@@ -52,7 +53,8 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
     { href: '/dashboard?parentTab=life', label: '생활', icon: Armchair },
     { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
-    { href: '/dashboard?parentTab=notifications', label: '알림', icon: Bell },
+    { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
+    { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
   ],
   centerAdmin: [
     { href: '/dashboard', label: '운영실', icon: LayoutDashboard },
@@ -61,7 +63,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
     { href: '/dashboard/settings/students', label: '학생 계정 관리', icon: UserCog },
-    { href: '/dashboard/attendance', label: '출결/요청 승인', icon: ClipboardCheck },
+    { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
     { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
@@ -71,7 +73,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
 };
 
 export function MainNav({ isMobile = false }: MainNavProps) {
-  const { activeMembership, currentTier } = useAppContext();
+  const { activeMembership, currentTier, viewMode } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -84,12 +86,17 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   }
 
   const userRole = activeMembership.role;
-  const userNavItems = navItems[userRole] || [];
+  const userNavItems = (navItems[userRole] || []).filter((item) => {
+    if (userRole === 'student' && viewMode === 'mobile' && item.href === '/dashboard/analysis') {
+      return false;
+    }
+    return true;
+  });
+
   const isStudent = userRole === 'student';
   const activeParentTab = searchParams.get('parentTab') || 'home';
 
   const navClass = cn('flex-1 items-start px-4 text-sm font-medium pt-0', isMobile ? 'grid gap-6 text-lg' : 'flex flex-col gap-2');
-
   const linkClass = cn(
     'flex items-center gap-4 rounded-2xl px-4 py-3 text-muted-foreground transition-all duration-300 hover:text-primary hover:bg-primary/5 active:scale-95 group',
     isMobile ? 'text-lg' : ''

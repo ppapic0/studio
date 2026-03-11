@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   Armchair,
-  Bell,
   CalendarDays,
+  DollarSign,
   FileText,
   GraduationCap,
   History,
@@ -52,7 +52,7 @@ export function BottomNav() {
       { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
       { href: '/dashboard?parentTab=life', label: '생활', icon: Armchair },
       { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
-      { href: '/dashboard?parentTab=notifications', label: '알림', icon: Bell },
+      { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
     ],
     centerAdmin: [
       { href: '/dashboard', label: '운영', icon: LayoutDashboard },

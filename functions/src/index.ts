@@ -167,6 +167,13 @@ function parseFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item.length > 0);
+}
+
 function normalizeStatsPayload(value: unknown): Record<string, number> | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -622,13 +629,46 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
   const callerUid = context.auth.uid;
-  const callerMembership = await resolveCenterMembershipRole(db, centerId, callerUid);
-  const callerRole = callerMembership.role;
-  const callerStatus = callerMembership.status;
+  const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
+  const existingStudentSnap = await studentRef.get();
+  const existingStudentData = existingStudentSnap.exists ? (existingStudentSnap.data() as any) : null;
+
+  if (!existingStudentSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+      userMessage: "학생 프로필을 찾을 수 없습니다. 센터 관리자에게 학생 등록 상태를 확인해 주세요.",
+    });
+  }
+
+  const callerMemberRef = db.doc(`centers/${centerId}/members/${callerUid}`);
+  const callerUserCenterRef = db.doc(`userCenters/${callerUid}/centers/${centerId}`);
+  const [callerMembership, callerMemberSnap, callerUserCenterSnap] = await Promise.all([
+    resolveCenterMembershipRole(db, centerId, callerUid),
+    callerMemberRef.get(),
+    callerUserCenterRef.get(),
+  ]);
+  const callerMemberData = callerMemberSnap.exists ? (callerMemberSnap.data() as any) : null;
+  const callerUserCenterData = callerUserCenterSnap.exists ? (callerUserCenterSnap.data() as any) : null;
+  const callerMemberRole = typeof callerMemberData?.role === "string" ? callerMemberData.role.trim() : "";
+  const callerUserCenterRole = typeof callerUserCenterData?.role === "string" ? callerUserCenterData.role.trim() : "";
+  const callerRole = callerMembership.role || callerMemberRole || callerUserCenterRole || null;
+  const callerStatus = callerMembership.status ?? callerMemberData?.status ?? callerUserCenterData?.status;
   const isAdminCaller = isAdminRole(callerRole);
   const isTeacherCaller = callerRole === "teacher";
   const canEditOtherStudent = isAdminCaller || isTeacherCaller;
-  const isSelfStudentCaller = callerRole === "student" && callerUid === studentId;
+  const isSelfStudentCaller = callerUid === studentId;
+
+  console.info("[updateStudentAccount] caller resolved", {
+    centerId,
+    studentId,
+    callerUid,
+    callerRole,
+    callerStatus,
+    callerMemberRole,
+    callerUserCenterRole,
+    isSelfStudentCaller,
+    isAdminCaller,
+    isTeacherCaller,
+  });
 
   if (!canEditOtherStudent && !isSelfStudentCaller) {
     throw new functions.https.HttpsError("permission-denied", "No permission to update this student.", {
@@ -636,15 +676,12 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     });
   }
 
-  if (!isActiveMembershipStatus(callerStatus)) {
+  if (!isSelfStudentCaller && !isActiveMembershipStatus(callerStatus)) {
     throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
       userMessage: "현재 계정 상태로는 학생 정보를 수정할 수 없습니다.",
     });
   }
 
-  const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
-  const existingStudentSnap = await studentRef.get();
-  const existingStudentData = existingStudentSnap.exists ? (existingStudentSnap.data() as any) : null;
   const existingParentLinkCode = normalizeParentLinkCodeValue(existingStudentData?.parentLinkCode);
 
   const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
@@ -1054,7 +1091,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   const schoolName = String(data?.schoolName || "").trim();
   const grade = String(data?.grade || "고등학생").trim();
   const parentLinkCode = String(data?.parentLinkCode || "").trim();
-  const studentLinkCode = String(data?.studentLinkCode || "").trim();
+  const studentLinkCodeInput = data?.studentLinkCode ?? data?.parentLinkCode ?? "";
+  const studentLinkCode = String(studentLinkCodeInput).trim();
   const displayNameInput = String(data?.displayName || "").trim();
   const parentPhoneNumber = normalizePhoneNumber(data?.parentPhoneNumber || data?.phoneNumber || "");
 
@@ -1098,11 +1136,42 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           );
         }
 
-        const studentSnaps = await Promise.all(candidateQueries.map((candidateQuery) => t.get(candidateQuery)));
         const studentDocMap = new Map<string, admin.firestore.QueryDocumentSnapshot>();
-        for (const snap of studentSnaps) {
-          for (const studentDoc of snap.docs) {
-            studentDocMap.set(studentDoc.ref.path, studentDoc);
+        try {
+          const studentSnaps = await Promise.all(candidateQueries.map((candidateQuery) => candidateQuery.get()));
+          for (const snap of studentSnaps) {
+            for (const studentDoc of snap.docs) {
+              studentDocMap.set(studentDoc.ref.path, studentDoc);
+            }
+          }
+        } catch (lookupError: any) {
+          const lookupCode = String(lookupError?.code || "");
+          const lookupMessage = String(lookupError?.message || "");
+          const isPreconditionLookupError =
+            lookupCode === "9" ||
+            /failed[_ -]?precondition/i.test(lookupCode) ||
+            /failed[_ -]?precondition/i.test(lookupMessage);
+          if (!isPreconditionLookupError) {
+            throw lookupError;
+          }
+
+          console.warn("[completeSignupWithInvite] collectionGroup lookup failed, fallback to center scan", {
+            studentLinkCode,
+            lookupCode,
+            lookupMessage,
+          });
+
+          const centerSnap = await db.collection("centers").limit(100).get();
+          for (const centerDoc of centerSnap.docs) {
+            const studentCollectionSnap = await db.collection(`centers/${centerDoc.id}/students`).limit(1000).get();
+            for (const studentDoc of studentCollectionSnap.docs) {
+              const studentData = studentDoc.data() as any;
+              const parentCode = normalizeParentLinkCodeValue(studentData?.parentLinkCode);
+              const studentCode = normalizeParentLinkCodeValue(studentData?.studentLinkCode);
+              if (parentCode === studentLinkCode || studentCode === studentLinkCode) {
+                studentDocMap.set(studentDoc.ref.path, studentDoc);
+              }
+            }
           }
         }
 
@@ -1125,13 +1194,24 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         };
 
         let candidates: ParentLinkCandidate[] = [];
+        const candidateStudentDocs = Array.from(studentDocMap.values()).filter((studentDoc) => {
+          const pathSegments = studentDoc.ref.path.split("/");
+          return pathSegments.length === 4 && pathSegments[0] === "centers" && pathSegments[2] === "students";
+        });
 
-        for (const studentDoc of studentDocMap.values()) {
-          const centerRef = studentDoc.ref.parent.parent;
-          if (!centerRef) continue;
+        console.info("[completeSignupWithInvite] parent code lookup", {
+          studentLinkCode,
+          rawMatchedDocCount: studentDocMap.size,
+          centerStudentDocCount: candidateStudentDocs.length,
+        });
 
-          const candidateMemberRef = db.doc(`centers/${centerRef.id}/members/${studentDoc.id}`);
-          const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${centerRef.id}`);
+        for (const studentDoc of candidateStudentDocs) {
+          const pathSegments = studentDoc.ref.path.split("/");
+          const resolvedCenterId = pathSegments[1];
+          if (!resolvedCenterId) continue;
+
+          const candidateMemberRef = db.doc(`centers/${resolvedCenterId}/members/${studentDoc.id}`);
+          const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${resolvedCenterId}`);
           const [candidateMemberSnap, candidateUserCenterSnap] = await Promise.all([
             t.get(candidateMemberRef),
             t.get(candidateUserCenterRef),
@@ -1148,17 +1228,15 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
 
 
           const seatQuery = db
-            .collection(`centers/${centerRef.id}/attendanceCurrent`)
+            .collection(`centers/${resolvedCenterId}/attendanceCurrent`)
             .where("studentId", "==", studentDoc.id)
             .limit(1);
           const seatSnap = await t.get(seatQuery);
           const hasSeatAssignment = !seatSnap.empty;
 
-          if (!hasActiveMember && !hasActiveUserCenter && !hasSeatAssignment) continue;
-
           const studentData = studentDoc.data();
           candidates.push({
-            centerId: centerRef.id,
+            centerId: resolvedCenterId,
             studentDoc,
             studentData,
             className:
@@ -1174,9 +1252,14 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         }
 
         if (candidates.length === 0) {
-          throw new functions.https.HttpsError("failed-precondition", "No active student found for this link code.", {
+          console.warn("[completeSignupWithInvite] no resolvable student candidate", {
+            studentLinkCode,
+            rawMatchedDocCount: studentDocMap.size,
+            centerStudentDocCount: candidateStudentDocs.length,
+          });
+          throw new functions.https.HttpsError("failed-precondition", "No student profile could be resolved for this link code.", {
             userMessage:
-              "No active student was found for this code. Ask the center admin to verify enrollment and seat assignment.",
+              "A student was found for this code, but profile linkage failed. Please ask the center admin to verify student data.",
           });
         }
 
@@ -1411,6 +1494,15 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
     const errorCode = String(e?.code || "").toLowerCase();
     const errorMessage = String(e?.message || "").trim();
     const strippedErrorMessage = errorMessage.replace(/^FirebaseError:\s*/i, "").trim();
+    const normalizedFailedPreconditionMessage = strippedErrorMessage
+      .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, "")
+      .trim();
+    const normalizedInvalidArgumentMessage = strippedErrorMessage
+      .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, "")
+      .trim();
+    const normalizedAlreadyExistsMessage = strippedErrorMessage
+      .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, "")
+      .trim();
     const hasFailedPrecondition =
       errorCode.includes("failed-precondition") ||
       errorCode === "9" ||
@@ -1424,22 +1516,44 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       errorCode === "6" ||
       /already[_ -]?exists/i.test(strippedErrorMessage);
 
+    console.error("[completeSignupWithInvite] failed", {
+      uid,
+      role,
+      studentLinkCode,
+      code,
+      errorCode,
+      strippedErrorMessage,
+    });
+
     if (hasFailedPrecondition) {
+      const lower = normalizedFailedPreconditionMessage.toLowerCase();
+      let userMessage =
+        "학생코드 확인에 실패했습니다. 코드가 올바른지, 해당 학생이 센터에 정상 등록되어 있는지 확인해 주세요.";
+
+      if (lower.includes("no student found for this link code")) {
+        userMessage = "해당 학생코드를 찾을 수 없습니다. 6자리 학생코드를 다시 확인해 주세요.";
+      } else if (lower.includes("no student profile could be resolved for this link code")) {
+        userMessage = "학생코드는 확인됐지만 프로필 연결에 실패했습니다. 센터 관리자에게 학생 등록 상태를 확인해 주세요.";
+      } else if (lower.includes("invite code has no center information")) {
+        userMessage = "학생코드에 연결된 센터 정보가 올바르지 않습니다. 센터 관리자에게 문의해 주세요.";
+      } else if (normalizedFailedPreconditionMessage) {
+        userMessage = normalizedFailedPreconditionMessage;
+      }
+
       throw new functions.https.HttpsError("failed-precondition", "Signup precondition failed.", {
-        userMessage:
-          "Please verify the student code and link status. The code may be duplicated or the student may not be active.",
+        userMessage,
       });
     }
 
     if (hasInvalidArgument) {
       throw new functions.https.HttpsError("invalid-argument", "Invalid signup input.", {
-        userMessage: "Please check required fields: student code, phone number, and other inputs.",
+        userMessage: normalizedInvalidArgumentMessage || "입력값을 다시 확인해 주세요. 학생코드, 전화번호 등 필수값이 누락되었을 수 있습니다.",
       });
     }
 
     if (hasAlreadyExists) {
       throw new functions.https.HttpsError("already-exists", "Signup target already exists.", {
-        userMessage: "This account is already linked. Please sign in and check your dashboard.",
+        userMessage: normalizedAlreadyExistsMessage || "이미 연결된 계정입니다. 로그인 후 대시보드에서 확인해 주세요.",
       });
     }
 
@@ -1447,6 +1561,157 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       userMessage: e?.message || "Unknown internal error",
     });
   }
+});
+
+export const confirmInvoicePayment = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = String(data?.centerId || "").trim();
+  const invoiceId = String(data?.invoiceId || "").trim();
+  if (!centerId || !invoiceId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId and invoiceId are required.");
+  }
+
+  const paymentMethodRaw = String(data?.paymentMethod || "card").trim();
+  const paymentMethod = (["card", "transfer", "cash"] as const).includes(paymentMethodRaw as any)
+    ? (paymentMethodRaw as "card" | "transfer" | "cash")
+    : "card";
+  const paymentKey = typeof data?.paymentKey === "string" ? data.paymentKey.trim() : "";
+  const orderId = typeof data?.orderId === "string" ? data.orderId.trim() : "";
+
+  const callerUid = context.auth.uid;
+  const invoiceRef = db.doc(`centers/${centerId}/invoices/${invoiceId}`);
+  const callerMemberRef = db.doc(`centers/${centerId}/members/${callerUid}`);
+  const callerUserCenterRef = db.doc(`userCenters/${callerUid}/centers/${centerId}`);
+
+  const [invoiceSnap, callerMembership, callerMemberSnap, callerUserCenterSnap] = await Promise.all([
+    invoiceRef.get(),
+    resolveCenterMembershipRole(db, centerId, callerUid),
+    callerMemberRef.get(),
+    callerUserCenterRef.get(),
+  ]);
+
+  if (!invoiceSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Invoice not found.", {
+      userMessage: "수납 요청 정보를 찾을 수 없습니다.",
+    });
+  }
+
+  const invoiceData = invoiceSnap.data() as any;
+  const invoiceStudentId = String(invoiceData?.studentId || "").trim();
+  if (!invoiceStudentId) {
+    throw new functions.https.HttpsError("failed-precondition", "Invoice has invalid student info.");
+  }
+
+  const callerMemberData = callerMemberSnap.exists ? (callerMemberSnap.data() as any) : null;
+  const callerUserCenterData = callerUserCenterSnap.exists ? (callerUserCenterSnap.data() as any) : null;
+  const callerMemberRole = typeof callerMemberData?.role === "string" ? callerMemberData.role.trim() : "";
+  const callerUserCenterRole = typeof callerUserCenterData?.role === "string" ? callerUserCenterData.role.trim() : "";
+  const callerRole = callerMembership.role || callerMemberRole || callerUserCenterRole || null;
+
+  const linkedStudentIds = new Set<string>([
+    ...normalizeStringArray(callerMemberData?.linkedStudentIds),
+    ...normalizeStringArray(callerUserCenterData?.linkedStudentIds),
+  ]);
+
+  const isAdminOrTeacher = isAdminRole(callerRole) || callerRole === "teacher";
+  const isOwnerStudent = callerUid === invoiceStudentId;
+  let isLinkedParent = callerRole === "parent" && linkedStudentIds.has(invoiceStudentId);
+
+  if (!isLinkedParent && callerRole === "parent") {
+    const studentSnap = await db.doc(`centers/${centerId}/students/${invoiceStudentId}`).get();
+    const parentUids = normalizeStringArray(studentSnap.data()?.parentUids);
+    isLinkedParent = parentUids.includes(callerUid);
+  }
+
+  if (!isAdminOrTeacher && !isOwnerStudent && !isLinkedParent) {
+    throw new functions.https.HttpsError("permission-denied", "No permission to process this invoice payment.", {
+      userMessage: "해당 수납 건을 결제할 권한이 없습니다.",
+    });
+  }
+
+  let alreadyProcessed = false;
+  let processedAmount = parseFiniteNumber(invoiceData?.finalPrice) || 0;
+  let processedStatus = String(invoiceData?.status || "issued");
+
+  await db.runTransaction(async (tx) => {
+    const latestInvoiceSnap = await tx.get(invoiceRef);
+    if (!latestInvoiceSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "Invoice not found during transaction.");
+    }
+
+    const latestInvoice = latestInvoiceSnap.data() as any;
+    const latestStatus = String(latestInvoice?.status || "issued");
+    const latestAmount = parseFiniteNumber(latestInvoice?.finalPrice) || 0;
+    processedAmount = parseFiniteNumber(data?.amount) ?? latestAmount;
+    processedStatus = latestStatus;
+
+    if (latestStatus === "paid") {
+      alreadyProcessed = true;
+      processedStatus = "paid";
+      return;
+    }
+
+    if (latestStatus === "void" || latestStatus === "refunded") {
+      throw new functions.https.HttpsError("failed-precondition", "Invoice is not payable.", {
+        userMessage: "무효 또는 환불 처리된 청구건은 결제할 수 없습니다.",
+      });
+    }
+
+    const nowTs = admin.firestore.Timestamp.now();
+    tx.set(invoiceRef, {
+      status: "paid",
+      paymentMethod,
+      paidAt: nowTs,
+      updatedAt: nowTs,
+      ...(paymentKey ? { paymentKey } : {}),
+      ...(orderId ? { orderId } : {}),
+    }, { merge: true });
+
+    const paymentRef = db.collection(`centers/${centerId}/payments`).doc();
+    tx.set(paymentRef, {
+      invoiceId,
+      centerId,
+      studentId: invoiceStudentId,
+      studentName: latestInvoice?.studentName || "학생",
+      amount: processedAmount,
+      method: paymentMethod,
+      status: "success",
+      processedAt: nowTs,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+      paidByUid: callerUid,
+      paidByRole: callerRole || null,
+      paymentKey: paymentKey || null,
+      orderId: orderId || null,
+    });
+
+    const todayKst = toKstDate();
+    const todayKey = toDateKey(todayKst);
+    const kpiRef = db.doc(`centers/${centerId}/kpiDaily/${todayKey}`);
+    const kpiSnap = await tx.get(kpiRef);
+    const prevCollectedRevenue = parseFiniteNumber(kpiSnap.data()?.collectedRevenue) || 0;
+    tx.set(kpiRef, {
+      date: todayKey,
+      collectedRevenue: prevCollectedRevenue + processedAmount,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    processedStatus = "paid";
+  });
+
+  return {
+    ok: true,
+    centerId,
+    invoiceId,
+    status: processedStatus,
+    amount: processedAmount,
+    alreadyProcessed,
+  };
 });
 
 export const notifyAttendanceSms = functions.region(region).https.onCall(async (data, context) => {

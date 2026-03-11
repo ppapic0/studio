@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -49,9 +49,11 @@ import {
   ChevronLeft,
   CheckCircle2,
   Eye,
-  MapPin
+  MapPin,
+  ShieldAlert,
+  RotateCcw
 } from 'lucide-react';
-import { useCollection, useFirestore, useDoc, useFunctions, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useDoc, useFunctions, useMemoFirebase, useUser } from '@/firebase';
 import { useAppContext, TIERS } from '@/contexts/app-context';
 import { 
   collection, 
@@ -69,7 +71,7 @@ import {
   increment,
   getDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -92,6 +94,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { sendKakaoNotification } from '@/lib/kakao-service';
@@ -115,7 +118,22 @@ const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   return null;
 };
 
+const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
+  late: 1,
+  absence: 2,
+};
+
+function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
+  const explicitDelta = Number((req as any).penaltyPointsDelta);
+  if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
+    return explicitDelta;
+  }
+  if (req.type === 'absence') return REQUEST_PENALTY_POINTS.absence;
+  return REQUEST_PENALTY_POINTS.late;
+}
+
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
+  const { user } = useUser();
   const firestore = useFirestore();
   const functions = useFunctions();
   const { activeMembership, viewMode } = useAppContext();
@@ -134,9 +152,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
   const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<StudyLogDay[]>([]);
+  const [selectedStudentPenaltyPoints, setSelectedStudentPenaltyPoints] = useState(0);
+  const [selectedStudentPenaltyLogs, setSelectedStudentPenaltyLogs] = useState<PenaltyLog[]>([]);
+  const [selectedReportPreview, setSelectedReportPreview] = useState<DailyReport | null>(null);
+  const [manualPenaltyPoints, setManualPenaltyPoints] = useState('1');
+  const [manualPenaltyReason, setManualPenaltyReason] = useState('');
+  const [isPenaltySaving, setIsPenaltySaving] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
+  const staleSeatCleanupInFlightRef = useRef(false);
   
   const [selectedClass, setSelectedClass] = useState<string>('all');
 
@@ -151,6 +176,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const centerId = activeMembership?.id;
+  const canAdjustPenalty =
+    activeMembership?.role === 'teacher' ||
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
+  const canResetPenalty =
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
   const canTriggerAttendanceSms =
     activeMembership?.role === 'teacher' ||
     activeMembership?.role === 'centerAdmin' ||
@@ -211,6 +243,56 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
+
+  useEffect(() => {
+    if (!firestore || !centerId || !isActive) return;
+    if (!attendanceList || !students || !studentMembers) return;
+    if (staleSeatCleanupInFlightRef.current) return;
+
+    const knownStudentIds = new Set<string>();
+    students.forEach((student) => {
+      if (typeof student.id === 'string' && student.id.trim()) {
+        knownStudentIds.add(student.id.trim());
+      }
+    });
+    studentMembers.forEach((member) => {
+      if (typeof member.id === 'string' && member.id.trim()) {
+        knownStudentIds.add(member.id.trim());
+      }
+    });
+
+    const staleSeats = attendanceList.filter((seat) => {
+      const seatStudentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
+      if (!seatStudentId) return false;
+      return !knownStudentIds.has(seatStudentId);
+    });
+
+    if (staleSeats.length === 0) return;
+
+    staleSeatCleanupInFlightRef.current = true;
+    (async () => {
+      try {
+        const batch = writeBatch(firestore);
+        staleSeats.forEach((seat) => {
+          batch.set(
+            doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id),
+            {
+              studentId: null,
+              status: 'absent',
+              lastCheckInAt: null,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        });
+        await batch.commit();
+      } catch (cleanupError) {
+        console.warn('[teacher-dashboard] stale seat cleanup failed', cleanupError);
+      } finally {
+        staleSeatCleanupInFlightRef.current = false;
+      }
+    })();
+  }, [firestore, centerId, isActive, attendanceList, students, studentMembers]);
 
   const todayStatsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
@@ -417,6 +499,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [students, studentMembers, searchTerm]);
 
+  const selectedStudentName = useMemo(() => {
+    if (!selectedSeat?.studentId) return '학생';
+    const matched = students?.find((student) => student.id === selectedSeat.studentId);
+    return matched?.name || '학생';
+  }, [students, selectedSeat?.studentId]);
+
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
@@ -440,9 +528,51 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         } as StudyLogDay;
       });
 
+      const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+      const progressSnap = await getDoc(progressRef);
+      const progressData = progressSnap.exists() ? (progressSnap.data() as GrowthProgress) : null;
+      const penaltyPoints = Number(progressData?.penaltyPoints || 0);
+
+      const penaltyLogsRef = collection(firestore, 'centers', centerId, 'penaltyLogs');
+      const penaltyLogsSnap = await getDocs(query(penaltyLogsRef, where('studentId', '==', studentId), limit(30)));
+      const penaltyLogs = penaltyLogsSnap.docs.map((snap) => ({
+        id: snap.id,
+        ...(snap.data() as Omit<PenaltyLog, 'id'>),
+      } as PenaltyLog));
+      const loggedAttendanceRequestIds = new Set(
+        penaltyLogs
+          .filter((log) => log.source === 'attendance_request' && typeof log.requestId === 'string')
+          .map((log) => log.requestId as string)
+      );
+
+      const requestRef = collection(firestore, 'centers', centerId, 'attendanceRequests');
+      const requestSnap = await getDocs(query(requestRef, where('studentId', '==', studentId), limit(30)));
+      const requestLogs: PenaltyLog[] = requestSnap.docs
+        .map((snap) => ({ id: snap.id, ...(snap.data() as Omit<AttendanceRequest, 'id'>) } as AttendanceRequest))
+        .filter((req) => req.penaltyApplied && !loggedAttendanceRequestIds.has(req.id))
+        .map((req) => ({
+          id: `attendance_request_${req.id}`,
+          centerId,
+          studentId,
+          studentName: req.studentName,
+          pointsDelta: resolveRequestPenalty(req),
+          reason: req.reason || '지각/결석 신청',
+          source: 'attendance_request' as const,
+          requestId: req.id,
+          requestType: req.type,
+          createdAt: req.createdAt || Timestamp.now(),
+        } as PenaltyLog));
+
+      const mergedPenaltyLogs = [...penaltyLogs, ...requestLogs]
+        .sort((a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0))
+        .slice(0, 30);
+
       setSelectedStudentSessions(sessions.sort((a, b) => b.startTime.toMillis() - a.startTime.toMillis()));
       setSelectedStudentReports(reports.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 5));
       setSelectedStudentHistory(history.sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 14));
+      setSelectedStudentPenaltyPoints(penaltyPoints);
+      setSelectedStudentPenaltyLogs(mergedPenaltyLogs);
+      setSelectedReportPreview(null);
 
     } catch (e) {
       console.error("Student Details Fetch Error:", e);
@@ -455,7 +585,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const handleSeatClick = (seat: AttendanceCurrent) => {
     setSelectedSeat(seat);
     if (isEditMode) {
-      if (seat.studentId) setIsManaging(true);
+      if (seat.studentId) {
+        setIsManaging(true);
+        fetchStudentDetails(seat.studentId);
+      }
       else setIsAssigning(true);
     } else {
       if (seat.studentId && seat.type !== 'aisle') {
@@ -464,6 +597,167 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     }
   };
+
+  const appendPenaltyLogLocally = (log: PenaltyLog) => {
+    setSelectedStudentPenaltyLogs((prev) =>
+      [log, ...prev]
+        .sort((a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0))
+        .slice(0, 30)
+    );
+  };
+
+  const handleAddPenalty = async () => {
+    if (!firestore || !centerId || !selectedSeat?.studentId || !canAdjustPenalty || !user) return;
+
+    const parsedPoints = Number.parseInt(manualPenaltyPoints, 10);
+    if (!Number.isFinite(parsedPoints) || parsedPoints <= 0) {
+      toast({
+        variant: 'destructive',
+        title: '벌점 점수를 확인해 주세요.',
+        description: '1 이상 숫자만 입력할 수 있습니다.',
+      });
+      return;
+    }
+
+    const trimmedReason = manualPenaltyReason.trim();
+    if (trimmedReason.length < 2) {
+      toast({
+        variant: 'destructive',
+        title: '벌점 사유를 입력해 주세요.',
+      });
+      return;
+    }
+
+    setIsPenaltySaving(true);
+    try {
+      const studentId = selectedSeat.studentId;
+      const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+      const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
+      const batch = writeBatch(firestore);
+
+      batch.set(progressRef, {
+        penaltyPoints: increment(parsedPoints),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      batch.set(penaltyLogRef, {
+        centerId,
+        studentId,
+        studentName: selectedStudentName,
+        pointsDelta: parsedPoints,
+        reason: trimmedReason,
+        source: 'manual',
+        createdByUserId: user.uid,
+        createdByName: user.displayName || '운영자',
+        createdAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      setSelectedStudentPenaltyPoints((prev) => prev + parsedPoints);
+      appendPenaltyLogLocally({
+        id: penaltyLogRef.id,
+        centerId,
+        studentId,
+        studentName: selectedStudentName,
+        pointsDelta: parsedPoints,
+        reason: trimmedReason,
+        source: 'manual',
+        createdByUserId: user.uid,
+        createdByName: user.displayName || '운영자',
+        createdAt: Timestamp.now(),
+      });
+      setManualPenaltyReason('');
+      setManualPenaltyPoints('1');
+
+      toast({
+        title: '벌점이 부여되었습니다.',
+        description: `${selectedStudentName} 학생에게 ${parsedPoints}점을 부여했습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '벌점 부여 실패',
+        description: error?.message || '서버 갱신 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsPenaltySaving(false);
+    }
+  };
+
+  const handleResetPenalty = async () => {
+    if (!firestore || !centerId || !selectedSeat?.studentId || !canResetPenalty || !user) return;
+
+    const currentPoints = Math.max(0, Number(selectedStudentPenaltyPoints || 0));
+    if (currentPoints <= 0) {
+      toast({
+        title: '초기화할 벌점이 없습니다.',
+      });
+      return;
+    }
+
+    setIsPenaltySaving(true);
+    try {
+      const studentId = selectedSeat.studentId;
+      const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+      const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
+      const batch = writeBatch(firestore);
+
+      batch.set(progressRef, {
+        penaltyPoints: 0,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      batch.set(penaltyLogRef, {
+        centerId,
+        studentId,
+        studentName: selectedStudentName,
+        pointsDelta: -currentPoints,
+        reason: '센터관리자 벌점 초기화',
+        source: 'reset',
+        createdByUserId: user.uid,
+        createdByName: user.displayName || '센터관리자',
+        createdAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      setSelectedStudentPenaltyPoints(0);
+      appendPenaltyLogLocally({
+        id: penaltyLogRef.id,
+        centerId,
+        studentId,
+        studentName: selectedStudentName,
+        pointsDelta: -currentPoints,
+        reason: '센터관리자 벌점 초기화',
+        source: 'reset',
+        createdByUserId: user.uid,
+        createdByName: user.displayName || '센터관리자',
+        createdAt: Timestamp.now(),
+      });
+
+      toast({
+        title: '벌점이 초기화되었습니다.',
+        description: `${selectedStudentName} 학생의 벌점을 0점으로 변경했습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '벌점 초기화 실패',
+        description: error?.message || '서버 갱신 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsPenaltySaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isManaging) {
+      setSelectedReportPreview(null);
+      setManualPenaltyReason('');
+      setManualPenaltyPoints('1');
+    }
+  }, [isManaging]);
 
   const handleStatusUpdate = async (nextStatus: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !selectedSeat) return;
@@ -935,6 +1229,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <TabsList className="w-full rounded-none h-14 bg-muted/20 border-b p-0">
                           <TabsTrigger value="status" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-primary transition-all">실시간 상태</TabsTrigger>
                           <TabsTrigger value="history" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-emerald-500 transition-all">학습 히스토리</TabsTrigger>
+                          <TabsTrigger value="penalty" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-rose-500 transition-all">벌점 관리</TabsTrigger>
                           <TabsTrigger value="reports" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-amber-500 transition-all">리포트 내역</TabsTrigger>
                         </TabsList>
 
@@ -1057,6 +1352,110 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
+                          <TabsContent value="penalty" className="mt-0 space-y-6">
+                            <div className="flex items-center gap-2 px-1">
+                              <ShieldAlert className="h-4 w-4 text-rose-600" />
+                              <h4 className="text-[10px] font-black uppercase text-rose-600 tracking-widest">벌점 현황</h4>
+                            </div>
+
+                            <div className="rounded-3xl border border-rose-100 bg-white p-5 shadow-sm space-y-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">현재 누적 벌점</p>
+                                  <p className="text-3xl font-black tracking-tighter text-rose-600 tabular-nums">{selectedStudentPenaltyPoints}점</p>
+                                </div>
+                                <Badge className="border-none bg-rose-50 text-rose-700 font-black">
+                                  학생: {selectedStudentName}
+                                </Badge>
+                              </div>
+
+                              {canAdjustPenalty && (
+                                <div className="grid gap-3 rounded-2xl border border-rose-100 bg-rose-50/40 p-4">
+                                  <div className="grid gap-1">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 부여 사유</Label>
+                                    <Textarea
+                                      value={manualPenaltyReason}
+                                      onChange={(event) => setManualPenaltyReason(event.target.value)}
+                                      placeholder="벌점 부여 사유를 입력해 주세요."
+                                      className="min-h-[88px] rounded-xl border-2 font-bold resize-none"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr]">
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      step={1}
+                                      value={manualPenaltyPoints}
+                                      onChange={(event) => setManualPenaltyPoints(event.target.value)}
+                                      className="h-11 rounded-xl border-2 font-black text-center"
+                                    />
+                                    <Button
+                                      onClick={handleAddPenalty}
+                                      disabled={isPenaltySaving}
+                                      className="h-11 rounded-xl font-black bg-rose-600 hover:bg-rose-700"
+                                    >
+                                      {isPenaltySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : '벌점 부여'}
+                                    </Button>
+                                  </div>
+                                  {canResetPenalty && (
+                                    <Button
+                                      variant="outline"
+                                      onClick={handleResetPenalty}
+                                      disabled={isPenaltySaving}
+                                      className="h-11 rounded-xl font-black border-2 border-rose-200 text-rose-700 hover:bg-rose-50 gap-2"
+                                    >
+                                      <RotateCcw className="h-4 w-4" />
+                                      벌점 초기화
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 px-1">
+                                <History className="h-4 w-4 text-rose-500" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 기록</h4>
+                              </div>
+                              {sessionsLoading ? (
+                                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                              ) : selectedStudentPenaltyLogs.length === 0 ? (
+                                <div className="py-20 text-center opacity-30 italic font-black text-sm border-2 border-dashed rounded-3xl">벌점 기록이 없습니다.</div>
+                              ) : (
+                                <div className="grid gap-2">
+                                  {selectedStudentPenaltyLogs.map((log) => {
+                                    const rawPoints = Number(log.pointsDelta || 0);
+                                    const createdAtDate = (log.createdAt as any)?.toDate?.();
+                                    const createdAtLabel = createdAtDate ? format(createdAtDate, 'MM/dd HH:mm') : '-';
+                                    const sourceLabel =
+                                      log.source === 'reset'
+                                        ? '초기화'
+                                        : log.source === 'manual'
+                                          ? '수동 부여'
+                                          : '지각/결석 신청';
+                                    return (
+                                      <div key={log.id} className="p-4 rounded-2xl bg-white border border-rose-100 shadow-sm flex items-start justify-between gap-3">
+                                        <div className="grid gap-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <Badge className="border-none bg-rose-50 text-rose-700 font-black text-[10px] h-5 px-2">{sourceLabel}</Badge>
+                                            <span className="text-[10px] font-bold text-muted-foreground">{createdAtLabel}</span>
+                                          </div>
+                                          <p className="text-sm font-bold text-foreground/80 break-keep">{log.reason || '사유 없음'}</p>
+                                        </div>
+                                        <Badge className={cn(
+                                          "border-none font-black text-xs h-6 px-2.5",
+                                          rawPoints >= 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                                        )}>
+                                          {rawPoints >= 0 ? `+${rawPoints}` : rawPoints}점
+                                        </Badge>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </TabsContent>
+
                           <TabsContent value="reports" className="mt-0 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <FileText className="h-4 w-4 text-amber-600" />
@@ -1069,19 +1468,57 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">발송된 리포트가 없습니다.</div>
                               ) : (
                                 selectedStudentReports.map((report) => (
-                                  <div key={report.id} className="p-5 rounded-2xl bg-white border border-amber-100 shadow-sm space-y-2 relative group hover:shadow-md transition-all">
+                                  <button
+                                    key={report.id}
+                                    type="button"
+                                    onClick={() => setSelectedReportPreview(report)}
+                                    className="w-full text-left p-5 rounded-2xl bg-white border border-amber-100 shadow-sm space-y-2 relative group hover:shadow-md transition-all"
+                                  >
                                     <div className="flex justify-between items-center">
                                       <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter">{report.dateKey}</span>
-                                      {report.viewedAt && <Badge className="bg-emerald-50 text-white border-none font-black text-[7px] px-1.5 h-4">열람함</Badge>}
+                                      {report.viewedAt && <Badge className="bg-emerald-50 text-emerald-700 border-none font-black text-[10px] px-1.5 h-5">열람함</Badge>}
                                     </div>
                                     <p className="text-xs font-bold text-foreground/70 line-clamp-2 leading-relaxed">{report.content.substring(0, 100)}...</p>
-                                  </div>
+                                  </button>
                                 ))
                               )}
                             </div>
                           </TabsContent>
                         </div>
                       </Tabs>
+
+                      <Dialog open={!!selectedReportPreview} onOpenChange={(open) => !open && setSelectedReportPreview(null)}>
+                        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+                          {selectedReportPreview && (
+                            <>
+                              <div className="bg-amber-500 text-white p-8 relative shrink-0">
+                                <DialogHeader className="relative z-10">
+                                  <DialogTitle className="text-2xl font-black tracking-tighter">발송 리포트 상세</DialogTitle>
+                                  <DialogDescription className="text-white/80 font-bold">
+                                    {selectedReportPreview.dateKey} · {selectedStudentName} 학생
+                                  </DialogDescription>
+                                </DialogHeader>
+                              </div>
+                              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Badge className="border-none bg-amber-50 text-amber-700 font-black">{selectedReportPreview.dateKey}</Badge>
+                                  {selectedReportPreview.viewedAt && <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">열람 완료</Badge>}
+                                </div>
+                                <div className="rounded-2xl border border-amber-100 bg-amber-50/30 p-5">
+                                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
+                                    {selectedReportPreview.content?.trim() || '리포트 내용이 없습니다.'}
+                                  </p>
+                                </div>
+                              </div>
+                              <DialogFooter className="p-6 bg-white border-t">
+                                <Button variant="ghost" onClick={() => setSelectedReportPreview(null)} className="w-full font-black">
+                                  닫기
+                                </Button>
+                              </DialogFooter>
+                            </>
+                          )}
+                        </DialogContent>
+                      </Dialog>
 
                       <div className="p-6 sm:p-8 pt-0 border-t border-dashed mt-4">
                         <Button variant="secondary" className="w-full h-14 sm:h-16 rounded-2xl font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/5" asChild>

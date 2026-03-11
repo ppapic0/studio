@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 220" role="img" aria-label="트랙 심볼 로고">
+  <title>트랙 심볼 로고</title>
+
+  <!-- Open book base -->
+  <path d="M20 56C72 34 125 37 178 66V176C130 158 78 157 20 176V56Z" fill="#14295F"/>
+  <path d="M182 66C235 37 288 34 340 56V176C282 157 230 158 182 176V66Z" fill="#1E3566"/>
+
+  <!-- Book inner split -->
+  <path d="M180 66V140" stroke="#F2F4F8" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Main trajectory ribbons -->
+  <path d="M20 150C120 132 229 106 286 34" fill="none" stroke="#F2F4F8" stroke-width="17" stroke-linecap="round"/>
+  <path d="M12 172C108 146 230 107 300 44" fill="none" stroke="#F98A00" stroke-width="20" stroke-linecap="round"/>
+  <path d="M38 182C138 152 247 112 309 49" fill="none" stroke="#F2F4F8" stroke-width="17" stroke-linecap="round"/>
+
+  <!-- Star -->
+  <path d="M274 12L282 29L301 31L287 44L291 63L274 54L257 63L261 44L247 31L266 29Z" fill="#F98A00"/>
+
+  <!-- Top ornaments -->
+  <path d="M20 83C31 79 40 79 48 84C57 89 65 89 73 84C81 79 90 79 99 84C108 89 116 89 125 84" fill="none" stroke="#F7BD5B" stroke-width="4" stroke-linecap="round"/>
+  <path d="M23 92C33 88 41 88 48 92C56 96 63 96 71 92C79 88 87 88 96 92" fill="none" stroke="#F7BD5B" stroke-width="4" stroke-linecap="round"/>
+  <path d="M303 94C311 89 319 89 327 94C335 99 343 99 351 94" fill="none" stroke="#F7BD5B" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Bottom floral border -->
+  <path d="M20 182C76 163 130 165 180 191C230 165 284 163 340 182" fill="none" stroke="#1A2D58" stroke-width="13" stroke-linecap="round"/>
+  <path d="M20 181C76 164 130 166 180 190C230 166 284 164 340 181" fill="none" stroke="#F7BD5B" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>
+
+  <circle cx="46" cy="177" r="2.1" fill="#E53935"/>
+  <circle cx="60" cy="176" r="1.9" fill="#A8C94A"/>
+  <circle cx="74" cy="175" r="2.2" fill="#F98A00"/>
+  <circle cx="286" cy="176" r="2.2" fill="#E53935"/>
+  <circle cx="300" cy="175" r="1.9" fill="#A8C94A"/>
+  <circle cx="314" cy="177" r="2.1" fill="#F98A00"/>
+
+  <path d="M171 196L176 201L171 206L166 201Z" fill="#F98A00"/>
+  <path d="M184 196L189 201L184 206L179 201Z" fill="#F98A00"/>
+</svg>

@@ -1,476 +1,386 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { 
-  DollarSign, 
-  Users, 
-  TrendingUp, 
-  CalendarDays, 
-  PieChart,
-  ChevronRight,
-  Edit2,
-  Save,
-  X,
-  History,
-  Search,
-  Loader2,
-  RefreshCw,
-  Gift,
-  Users2,
-  AlertTriangle,
-  Clock,
-  ArrowRight,
-  BarChart3,
-  UserWarning,
-  ShieldAlert,
-  UserCheck,
-  Activity,
-  ArrowUpRight,
-  Zap,
-  LayoutGrid,
-  Map,
-  Scale,
-  Percent
-} from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
+  Area,
+  AreaChart,
   CartesianGrid,
-  Cell,
-  PieChart as RechartsPieChart,
-  Pie
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { useFirestore, useCollection } from '@/firebase';
+import { CalendarRange, Loader2, TrendingUp, Wallet } from 'lucide-react';
+import { collection, limit, orderBy, query, where } from 'firebase/firestore';
+import { format, subMonths } from 'date-fns';
+
 import { useAppContext } from '@/contexts/app-context';
+import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { CenterMembership, StudentProfile, AttendanceCurrent } from '@/lib/types';
-import { format, eachMonthOfInterval, subMonths, differenceInDays } from 'date-fns';
+import {
+  buildMonthlyTrackBuckets,
+  getInvoiceMonth,
+  INVOICE_TRACK_META,
+  resolveInvoiceTrackCategory,
+  type InvoiceTrackCategory,
+  type MonthlyTrackBucket,
+} from '@/lib/invoice-analytics';
+import type { CenterMembership, Invoice } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { syncDailyKpi } from '@/lib/finance-actions';
-import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+function toNumber(value: unknown): number {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function formatWon(value: number): string {
+  return `₩${Math.round(value).toLocaleString()}`;
+}
+
+function toDateLabel(invoice: Invoice): string {
+  const raw = invoice.cycleEndDate as any;
+  if (raw && typeof raw.toDate === 'function') {
+    const date = raw.toDate();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return format(date, 'yyyy.MM.dd');
+    }
+  }
+  return '-';
+}
+
+function getStatusBadgeClass(status: Invoice['status']) {
+  if (status === 'paid') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (status === 'overdue') return 'bg-rose-100 text-rose-700 border-rose-200';
+  if (status === 'issued') return 'bg-amber-100 text-amber-700 border-amber-200';
+  if (status === 'refunded') return 'bg-slate-100 text-slate-700 border-slate-200';
+  return 'bg-slate-100 text-slate-600 border-slate-200';
+}
+
+function getStatusLabel(status: Invoice['status']) {
+  if (status === 'paid') return '수납완료';
+  if (status === 'issued') return '청구됨';
+  if (status === 'overdue') return '미납/연체';
+  if (status === 'refunded') return '환불';
+  if (status === 'void') return '무효';
+  return status;
+}
+
+function emptyBucket(month: string): MonthlyTrackBucket {
+  return {
+    month,
+    byTrack: {
+      studyRoom: {
+        billed: 0,
+        collected: 0,
+        arrears: 0,
+        invoiceCount: 0,
+        paidInvoiceCount: 0,
+        overdueInvoiceCount: 0,
+      },
+      academy: {
+        billed: 0,
+        collected: 0,
+        arrears: 0,
+        invoiceCount: 0,
+        paidInvoiceCount: 0,
+        overdueInvoiceCount: 0,
+      },
+    },
+    total: {
+      billed: 0,
+      collected: 0,
+      arrears: 0,
+      invoiceCount: 0,
+      paidInvoiceCount: 0,
+      overdueInvoiceCount: 0,
+    },
+  };
+}
 
 export function RevenueAnalysis() {
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
-  const { toast } = useToast();
-  const isMobile = viewMode === 'mobile';
+
   const centerId = activeMembership?.id;
+  const isMobile = viewMode === 'mobile';
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [activeDrillDown, setActiveDrillDown] = useState<'revenue' | 'active' | 'churn' | 'zones' | 'elasticity' | null>(null);
-  const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
-  const [tempFeeValue, setTempFeeValue] = useState<string>('');
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // 1. 멤버십 정보 조회
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'members'), 
-      where('role', '==', 'student')
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'), where('status', '==', 'active'));
+  }, [firestore, centerId]);
+  const { data: activeStudents } = useCollection<CenterMembership>(membersQuery);
+
+  const invoicesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'invoices'), orderBy('cycleEndDate', 'desc'), limit(1000));
+  }, [firestore, centerId]);
+  const { data: invoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery);
+
+  const monthlyBuckets = useMemo(() => buildMonthlyTrackBuckets(invoices || []), [invoices]);
+
+  const monthOptions = useMemo(() => {
+    const recent = Array.from({ length: 18 }, (_, idx) => format(subMonths(new Date(), idx), 'yyyy-MM'));
+    const fromInvoices = monthlyBuckets.map((bucket) => bucket.month);
+    return Array.from(new Set([selectedMonth, ...recent, ...fromInvoices])).sort((a, b) => b.localeCompare(a));
+  }, [monthlyBuckets, selectedMonth]);
+
+  const selectedBucket = useMemo(
+    () => monthlyBuckets.find((bucket) => bucket.month === selectedMonth) || emptyBucket(selectedMonth),
+    [monthlyBuckets, selectedMonth]
+  );
+
+  const selectedTimeline = useMemo(
+    () => (invoices || []).filter((invoice) => getInvoiceMonth(invoice) === selectedMonth).slice(0, 30),
+    [invoices, selectedMonth]
+  );
+
+  const chartData = useMemo(
+    () =>
+      monthlyBuckets
+        .slice(-12)
+        .map((bucket) => ({
+          month: bucket.month,
+          billed: bucket.total.billed,
+          collected: bucket.total.collected,
+          arrears: bucket.total.arrears,
+          studyRoomCollected: bucket.byTrack.studyRoom.collected,
+          academyCollected: bucket.byTrack.academy.collected,
+        })),
+    [monthlyBuckets]
+  );
+
+  const summary = selectedBucket.total;
+  const collectionRate = summary.billed > 0 ? (summary.collected / summary.billed) * 100 : 0;
+  const arrearsRate = summary.billed > 0 ? (summary.arrears / summary.billed) * 100 : 0;
+
+  const activeStudentCount = (activeStudents || []).length;
+
+  const byTrackCards: Array<{ key: InvoiceTrackCategory; title: string }> = [
+    { key: 'studyRoom', title: '독서실' },
+    { key: 'academy', title: '학원' },
+  ];
+
+  if (invoicesLoading) {
+    return (
+      <div className="flex h-[36vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
-  }, [firestore, centerId]);
-  const { data: rawMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery);
-
-  // 2. 학생 프로필 정보 조회
-  const studentsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return collection(firestore, 'centers', centerId, 'students');
-  }, [firestore, centerId]);
-  const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery);
-
-  // 3. 실시간 좌석 구역 정보 조회
-  const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId]);
-  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
-
-  const businessMetrics = useMemo(() => {
-    if (!rawMembers || !attendanceList) return null;
-
-    const members = [...rawMembers].sort((a, b) => {
-      const timeA = a.joinedAt?.toMillis() || 0;
-      const timeB = b.joinedAt?.toMillis() || 0;
-      return timeB - timeA;
-    });
-
-    const activeMembers = members.filter(m => m.status === 'active');
-    const withdrawnMembers = members.filter(m => m.status === 'withdrawn');
-    
-    let totalActualRevenue = 0;
-    let totalPotentialRevenue = 0;
-    let tutoringDiscountTotal = 0;
-    let siblingDiscountTotal = 0;
-
-    activeMembers.forEach(m => {
-      const profile = studentsProfiles?.find(p => p.id === m.id);
-      const baseFee = profile?.grade?.includes('N수생') ? 540000 : 390000;
-      const actualFee = m.monthlyFee ?? baseFee;
-      
-      totalActualRevenue += actualFee;
-      totalPotentialRevenue += baseFee;
-      
-      if (m.tutoringDiscount) tutoringDiscountTotal += 50000;
-      if (m.siblingDiscount) siblingDiscountTotal += Math.floor(baseFee * 0.05);
-    });
-
-    const totalDiscountAmount = totalPotentialRevenue - totalActualRevenue;
-    const discountDependencyRate = totalPotentialRevenue > 0 ? (totalDiscountAmount / totalPotentialRevenue) * 100 : 0;
-
-    // --- 동적 좌석 구역별 분석 ---
-    const zoneData: Record<string, { count: number, revenue: number, potential: number }> = {};
-
-    // 1. 모든 좌석 정보를 순회하며 구역 초기화
-    attendanceList.forEach(seat => {
-      if (seat.type === 'aisle') return;
-      const zoneName = seat.seatZone || '자유석 (Flex)';
-      if (!zoneData[zoneName]) {
-        zoneData[zoneName] = { count: 0, revenue: 0, potential: 0 };
-      }
-    });
-
-    // 2. 현재 재원생의 좌석 정보를 바탕으로 수익 합산
-    activeMembers.forEach(m => {
-      const profile = studentsProfiles?.find(p => p.id === m.id);
-      const baseFee = profile?.grade?.includes('N수생') ? 540000 : 390000;
-      const actualFee = m.monthlyFee ?? baseFee;
-      
-      // 해당 학생이 배정된 좌석의 실시간 구역 정보를 가져옴
-      const seat = attendanceList.find(a => a.studentId === m.id);
-      const zoneName = seat?.seatZone || '자유석 (Flex)';
-
-      if (!zoneData[zoneName]) {
-        zoneData[zoneName] = { count: 0, revenue: 0, potential: 0 };
-      }
-      
-      zoneData[zoneName].count++;
-      zoneData[zoneName].revenue += actualFee;
-      zoneData[zoneName].potential += baseFee;
-    });
-
-    const zoneChartData = Object.entries(zoneData)
-      .map(([name, data]) => ({
-        name,
-        revenue: data.revenue,
-        count: data.count,
-        arpu: data.count > 0 ? Math.round(data.revenue / data.count) : 0,
-        discountRate: data.potential > 0 ? Math.round(((data.potential - data.revenue) / data.potential) * 100) : 0
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
-
-    // --- 가격 탄력성 가설 분석 ---
-    const discountGroup = activeMembers.filter(m => m.tutoringDiscount || m.siblingDiscount);
-    const regularGroup = activeMembers.filter(m => !m.tutoringDiscount && !m.siblingDiscount);
-    
-    const churnDiscountGroup = withdrawnMembers.filter(m => m.tutoringDiscount || m.siblingDiscount);
-    const churnRegularGroup = withdrawnMembers.filter(m => !m.tutoringDiscount && !m.siblingDiscount);
-
-    const elasticityData = [
-      { name: '할인 적용군', active: discountGroup.length, churn: churnDiscountGroup.length, churnRate: (discountGroup.length + churnDiscountGroup.length) > 0 ? Math.round((churnDiscountGroup.length / (discountGroup.length + churnDiscountGroup.length)) * 100) : 0 },
-      { name: '정가 수납군', active: regularGroup.length, churn: churnRegularGroup.length, churnRate: (regularGroup.length + churnRegularGroup.length) > 0 ? Math.round((churnRegularGroup.length / (regularGroup.length + churnRegularGroup.length)) * 100) : 0 },
-    ];
-
-    return {
-      activeCount: activeMembers.length,
-      estimatedMonthlyRevenue: totalActualRevenue,
-      totalPotentialRevenue,
-      totalDiscountAmount,
-      discountDependencyRate,
-      tutoringDiscountTotal,
-      siblingDiscountTotal,
-      zoneChartData,
-      elasticityData,
-      allMembers: members,
-      registrationTrend: registrationTrend(members)
-    };
-  }, [rawMembers, studentsProfiles, attendanceList]);
-
-  function registrationTrend(members: CenterMembership[]) {
-    const now = new Date();
-    const months = eachMonthOfInterval({ start: subMonths(now, 11), end: now });
-    return months.map(month => {
-      const monthStr = format(month, 'yyyy-MM');
-      const count = members.filter(m => m.joinedAt && format(m.joinedAt.toDate(), 'yyyy-MM') === monthStr).length;
-      return { name: format(month, 'M월'), monthKey: monthStr, count };
-    });
   }
 
-  const filteredTimelineMembers = useMemo(() => {
-    if (!businessMetrics) return [];
-    let list = businessMetrics.allMembers;
-    if (selectedMonth) list = list.filter(m => m.joinedAt && format(m.joinedAt.toDate(), 'yyyy-MM') === selectedMonth);
-    if (searchTerm) list = list.filter(m => m.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
-    if (activeDrillDown === 'active') list = list.filter(m => m.status === 'active');
-    else if (activeDrillDown === 'churn') list = list.filter(m => m.status === 'withdrawn');
-    return list;
-  }, [businessMetrics, selectedMonth, searchTerm, activeDrillDown]);
-
-  const handleUpdateFee = async (studentId: string, customFee?: number) => {
-    if (!firestore || !centerId) return;
-    let fee = customFee ?? parseInt(tempFeeValue.replace(/[^0-9]/g, ''));
-    if (isNaN(fee)) { toast({ variant: "destructive", title: "금액 오류" }); return; }
-    setIsUpdating(true);
-    try {
-      const updateData = { monthlyFee: fee, updatedAt: serverTimestamp() };
-      await Promise.all([
-        setDoc(doc(firestore, 'centers', centerId, 'members', studentId), updateData, { merge: true }),
-        setDoc(doc(firestore, 'userCenters', studentId, 'centers', centerId), updateData, { merge: true })
-      ]);
-      await syncDailyKpi(firestore, centerId, format(new Date(), 'yyyy-MM-dd'));
-      toast({ title: "수강료 업데이트 완료" });
-      setEditingFeeId(null);
-    } catch (e: any) { toast({ variant: "destructive", title: "업데이트 실패", description: e.message }); } finally { setIsUpdating(false); }
-  };
-
-  const handleToggleDiscount = async (studentId: string, type: 'tutoring' | 'sibling') => {
-    if (!firestore || !centerId || !rawMembers) return;
-    const member = rawMembers.find(m => m.id === studentId);
-    if (!member) return;
-    const profile = studentsProfiles?.find(p => p.id === studentId);
-    const base = profile?.grade?.includes('N수생') ? 540000 : 390000;
-    const isTutoring = type === 'tutoring' ? !member.tutoringDiscount : !!member.tutoringDiscount;
-    const isSibling = type === 'sibling' ? !member.siblingDiscount : !!member.siblingDiscount;
-    let nextFee = base;
-    if (isSibling) nextFee = Math.floor(nextFee * 0.95);
-    if (isTutoring) nextFee -= 50000;
-    setIsUpdating(true);
-    try {
-      const updateData = { monthlyFee: Math.max(0, nextFee), tutoringDiscount: isTutoring, siblingDiscount: isSibling, updatedAt: serverTimestamp() };
-      await Promise.all([
-        setDoc(doc(firestore, 'centers', centerId, 'members', studentId), updateData, { merge: true }),
-        setDoc(doc(firestore, 'userCenters', studentId, 'centers', centerId), updateData, { merge: true })
-      ]);
-      await syncDailyKpi(firestore, centerId, format(new Date(), 'yyyy-MM-dd'));
-      toast({ title: "할인 정책 적용 완료" });
-    } catch (e) { toast({ variant: "destructive", title: "정책 적용 실패" }); } finally { setIsUpdating(false); }
-  };
-
-  if (isMembersLoading || !businessMetrics) return null;
-
   return (
-    <div className="space-y-8 pb-32 animate-in fade-in duration-1000">
-      <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-        <Card onClick={() => setActiveDrillDown(activeDrillDown === 'revenue' ? null : 'revenue')} className={cn("rounded-[2.5rem] border-none shadow-xl cursor-pointer relative overflow-hidden group transition-all", activeDrillDown === 'revenue' ? "ring-4 ring-primary ring-offset-4 bg-primary text-white" : "bg-white hover:bg-muted/5")}>
-          <div className="absolute top-0 left-0 w-2 h-full bg-primary" />
-          <CardHeader className="p-8 pb-2"><p className={cn("text-[10px] font-black uppercase tracking-widest", activeDrillDown === 'revenue' ? "text-white/60" : "text-muted-foreground")}>예상 월 매출 (ARPU 합산)</p></CardHeader>
-          <CardContent className="p-8 pt-0"><h3 className="text-4xl font-black tracking-tighter">₩{businessMetrics.estimatedMonthlyRevenue.toLocaleString()}</h3>
-            <div className="flex items-center justify-between mt-6">
-              <Badge variant="secondary" className={cn("font-black text-[9px]", activeDrillDown === 'revenue' ? "bg-white/20 text-white" : "")}>ESTIMATED</Badge>
-              <div className="flex items-center gap-1.5 opacity-40"><span className="text-[10px] font-bold">분석 보기</span><ChevronRight className={cn("h-4 w-4 transition-all", activeDrillDown === 'revenue' ? "rotate-90" : "")} /></div>
+    <div className="space-y-6 pb-20">
+      <Card className="rounded-3xl border-none shadow-lg ring-1 ring-border/60">
+        <CardHeader className={cn('gap-4', isMobile ? 'p-5' : 'p-8')}>
+          <div className={cn('flex items-start justify-between gap-4', isMobile ? 'flex-col' : 'flex-row')}>
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-2xl font-black tracking-tight">
+                <TrendingUp className="h-6 w-6 text-primary" />
+                수익분석 자동 리포트
+              </CardTitle>
+              <CardDescription className="font-medium">
+                수납/미납 관리에서 작성된 인보이스 데이터를 월별로 자동 집계합니다.
+              </CardDescription>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card onClick={() => setActiveDrillDown(activeDrillDown === 'zones' ? null : 'zones')} className={cn("rounded-[2.5rem] border-none shadow-xl cursor-pointer relative overflow-hidden group transition-all", activeDrillDown === 'zones' ? "ring-4 ring-blue-500 ring-offset-4 bg-blue-500 text-white" : "bg-white hover:bg-muted/5")}>
-          <div className="absolute top-0 left-0 w-2 h-full bg-blue-500" />
-          <CardHeader className="p-8 pb-2"><p className={cn("text-[10px] font-black uppercase tracking-widest", activeDrillDown === 'zones' ? "text-white/60" : "text-muted-foreground")}>좌석별 수익성</p></CardHeader>
-          <CardContent className="p-8 pt-0"><h3 className="text-4xl font-black tracking-tighter">Inventory<span className="text-lg opacity-40 ml-2">Efficiency</span></h3>
-            <div className="flex items-center justify-between mt-6">
-              <div className="flex items-center gap-2 text-[10px] font-bold"><Map className="h-3 w-3 opacity-40" />설정된 구역 기반</div>
-              <ChevronRight className={cn("h-5 w-5 transition-all", activeDrillDown === 'zones' ? "rotate-90" : "opacity-20")} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card onClick={() => setActiveDrillDown(activeDrillDown === 'elasticity' ? null : 'elasticity')} className={cn("rounded-[2.5rem] border-none shadow-xl cursor-pointer relative overflow-hidden group transition-all", activeDrillDown === 'elasticity' ? "ring-4 ring-amber-500 ring-offset-4 bg-amber-500 text-white" : "bg-white hover:bg-muted/5")}>
-          <div className="absolute top-0 left-0 w-2 h-full bg-amber-500" />
-          <CardHeader className="p-8 pb-2"><p className={cn("text-[10px] font-black uppercase tracking-widest", activeDrillDown === 'elasticity' ? "text-white/60" : "text-muted-foreground")}>할인 의존도 지수</p></CardHeader>
-          <CardContent className="p-8 pt-0"><h3 className="text-4xl font-black tracking-tighter">{businessMetrics.discountDependencyRate.toFixed(1)}<span className="text-lg opacity-40 ml-1">%</span></h3>
-            <div className="flex items-center justify-between mt-6">
-              <div className={cn("flex items-center gap-2 text-[10px] font-bold", businessMetrics.discountDependencyRate > 10 ? "text-rose-200" : "")}>
-                <Scale className="h-3 w-3 opacity-40" />{businessMetrics.discountDependencyRate > 10 ? '가격 전략 재검토 필요' : '안정적 구조'}
-              </div>
-              <ChevronRight className={cn("h-5 w-5 transition-all", activeDrillDown === 'elasticity' ? "rotate-90" : "opacity-20")} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 좌석별 수익성 심층 분석 */}
-      {activeDrillDown === 'zones' && (
-        <Card className="rounded-[2.5rem] border-none shadow-2xl bg-blue-50/30 overflow-hidden ring-1 ring-blue-100 animate-in slide-in-from-top-4 duration-500">
-          <CardHeader className="bg-white/50 border-b border-blue-100 p-8">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-500 p-2 rounded-xl shadow-lg shadow-blue-200"><LayoutGrid className="h-5 w-5 text-white" /></div>
-              <div className="space-y-0.5"><CardTitle className="text-2xl font-black tracking-tighter text-blue-700">설정 구역별 수익 기여도</CardTitle><CardDescription className="text-[10px] font-bold uppercase tracking-widest text-blue-600/60">Revenue per Configured Seat Zone</CardDescription></div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-8"><div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-            {businessMetrics.zoneChartData.length === 0 ? (
-              <div className="col-span-3 py-20 text-center opacity-20 italic font-black text-sm">관제 화면에서 좌석별 구역을 설정해 주세요.</div>
-            ) : businessMetrics.zoneChartData.map((zone) => (
-              <Card key={zone.name} className="rounded-2xl border-none shadow-sm bg-white p-6 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Map className="h-12 w-12" /></div>
-                <p className="text-[10px] font-black text-muted-foreground uppercase mb-4">{zone.name}</p>
-                <div className="space-y-4">
-                  <div><span className="text-[10px] font-bold opacity-40 block uppercase">Average Revenue</span><span className="text-2xl font-black text-blue-600">₩{zone.arpu.toLocaleString()}</span></div>
-                  <div className="pt-4 border-t border-dashed">
-                    <div className="flex justify-between items-center mb-1.5"><span className="text-[9px] font-black uppercase text-muted-foreground">Active Seats</span><span className="text-xs font-black text-primary">{zone.count}명</span></div>
-                    <div className="flex justify-between items-center mb-1.5"><span className="text-[9px] font-black uppercase text-muted-foreground">Discount Rate</span><span className="text-xs font-black text-primary">{zone.discountRate}%</span></div>
-                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${zone.discountRate}%` }} /></div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div></CardContent>
-        </Card>
-      )}
-
-      {/* 할인 의존도 및 탄력성 분석 */}
-      {activeDrillDown === 'elasticity' && (
-        <Card className="rounded-[2.5rem] border-none shadow-2xl bg-amber-50/30 overflow-hidden ring-1 ring-amber-100 animate-in slide-in-from-top-4 duration-500">
-          <CardHeader className="bg-white/50 border-b border-amber-100 p-8">
-            <div className="flex items-center gap-3">
-              <div className="bg-amber-500 p-2 rounded-xl shadow-lg shadow-amber-200"><Scale className="h-5 w-5 text-white" /></div>
-              <div className="space-y-0.5"><CardTitle className="text-2xl font-black tracking-tighter text-amber-700">할인 정책 의존도 및 탄력성</CardTitle><CardDescription className="text-[10px] font-bold uppercase tracking-widest text-amber-600/60">Price Sensitivity & Discount Risk Index</CardDescription></div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-8">
-            <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
-              <div className="md:col-span-5 space-y-4">
-                <Card className="rounded-2xl border-none shadow-sm bg-white p-8 text-center space-y-2">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase">총 할인 비중</p>
-                  <div className={cn("text-6xl font-black tracking-tighter", businessMetrics.discountDependencyRate > 10 ? "text-rose-600" : "text-emerald-600")}>{businessMetrics.discountDependencyRate.toFixed(1)}%</div>
-                  {businessMetrics.discountDependencyRate > 10 && (
-                    <div className="flex items-center justify-center gap-2 text-rose-600 bg-rose-50 p-2 rounded-xl border border-rose-100 animate-pulse"><AlertTriangle className="h-4 w-4" /><span className="text-[10px] font-black uppercase">전략 재검토 구간</span></div>
-                  )}
-                </Card>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><p className="text-[9px] font-black text-muted-foreground uppercase mb-1">과외 할인</p><p className="text-lg font-black text-primary">₩{(businessMetrics.tutoringDiscountTotal / 10000).toFixed(0)}만</p></div>
-                  <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><p className="text-[9px] font-black text-muted-foreground uppercase mb-1">형제 할인</p><p className="text-lg font-black text-primary">₩{(businessMetrics.siblingDiscountTotal / 10000).toFixed(0)}만</p></div>
-                </div>
-              </div>
-              <div className="md:col-span-7">
-                <Card className="rounded-2xl border-none shadow-sm bg-white p-8 h-full">
-                  <div className="flex items-center gap-2 mb-6"><TrendingUp className="h-4 w-4 text-primary" /><h4 className="text-xs font-black uppercase">그룹별 이탈률 (가격 탄력성 기초)</h4></div>
-                  <div className="h-[200px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={businessMetrics.elasticityData} layout="vertical" margin={{ left: 40, right: 40 }}>
-                        <XAxis type="number" hide />
-                        <YAxis dataKey="name" type="category" fontSize={11} fontWeight="bold" axisLine={false} tickLine={false} />
-                        <Tooltip />
-                        <Bar dataKey="churnRate" fill="#f59e0b" radius={[0, 10, 10, 0]} barSize={30}>
-                          <Badge className="ml-2 font-black">%</Badge>
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <p className="text-[10px] font-bold text-muted-foreground leading-relaxed mt-4">💡 **정가 수납군** 대비 **할인 적용군**의 이탈률이 낮다면 할인이 강력한 리텐션 도구임을 뜻하며, 반대라면 가격 저항선이 높은 상태입니다.</p>
-                </Card>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 등록 추이 및 학생 리스트 */}
-      <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-border/50">
-        <CardHeader className="bg-muted/5 border-b p-8 sm:p-10">
-          <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-start" : "flex-row")}>
-            <div className="space-y-1"><CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3"><CalendarDays className="h-6 w-6 text-primary" /> 학생 등록 및 개별 수강료 관리</CardTitle>
-              <div className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                {selectedMonth ? <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black">{selectedMonth} 등록</Badge> : <span className="text-sm font-bold">전체 학생 타임라인</span>}
-                <span className="opacity-40">|</span><span className="text-sm font-bold">총 {filteredTimelineMembers.length}명</span>
-              </div>
-            </div>
-            <div className={cn("flex items-center gap-3", isMobile ? "w-full" : "")}>
-              <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
-                <Input placeholder="이름으로 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-11 text-xs font-bold w-full sm:w-[200px]" />
-              </div>
-              <Button variant="outline" size="icon" className="rounded-xl h-11 w-11 shrink-0" onClick={() => { setSearchTerm(''); setSelectedMonth(null); setActiveDrillDown(null); }}><RefreshCw className="h-4 w-4 opacity-40" /></Button>
+          <div className={cn('flex items-center gap-2', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
+            <Label htmlFor="analytics-month" className="text-xs font-black text-muted-foreground">
+              조회 월
+            </Label>
+            <Input
+              id="analytics-month"
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value || format(new Date(), 'yyyy-MM'))}
+              className={cn('h-10 rounded-lg', isMobile ? 'w-full' : 'w-[180px]')}
+            />
+            <div className="flex flex-wrap gap-2">
+              {monthOptions.slice(0, 6).map((month) => (
+                <Button
+                  key={month}
+                  type="button"
+                  variant={month === selectedMonth ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 rounded-lg px-3 text-xs font-bold"
+                  onClick={() => setSelectedMonth(month)}
+                >
+                  {month}
+                </Button>
+              ))}
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-            <Table>
-              <TableHeader className="bg-muted/10 sticky top-0 z-20">
-                <TableRow className="hover:bg-transparent border-none h-14">
-                  <TableHead className="font-black text-[10px] uppercase pl-10 w-[200px]">STUDENT NAME</TableHead>
-                  <TableHead className="font-black text-[10px] uppercase w-[120px]">ZONE</TableHead>
-                  <TableHead className="font-black text-[10px] uppercase w-[180px]">DISCOUNTS</TableHead>
-                  <TableHead className="font-black text-[10px] uppercase text-right pr-10">MONTHLY FEE (₩)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTimelineMembers.length === 0 ? <TableRow><TableCell colSpan={4} className="h-64 text-center opacity-20 italic">데이터가 없습니다.</TableCell></TableRow> : 
-                  filteredTimelineMembers.map((student) => {
-                    const profile = studentsProfiles?.find(p => p.id === student.id);
-                    const basePrice = profile?.grade?.includes('N수생') ? 540000 : 390000;
-                    const finalFee = student.monthlyFee !== undefined ? student.monthlyFee : basePrice;
-                    
-                    // 해당 학생의 실시간 좌석 정보를 통해 설정된 구역을 가져옴
-                    const seat = attendanceList?.find(a => a.studentId === student.id);
-                    const zone = seat?.seatZone || 'Flex';
+      </Card>
 
-                    return (
-                      <TableRow key={student.id} className="hover:bg-muted/5 transition-all duration-300 h-24 group">
-                        <TableCell className="pl-10">
-                          <Link href={`/dashboard/teacher/students/${student.id}`} className="flex items-center gap-4 cursor-pointer">
-                            <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">{student.displayName?.charAt(0) || 'S'}</div>
-                            <div className="flex flex-col"><span className="font-black text-sm group-hover:text-primary transition-colors">{student.displayName || '학생'}</span><span className="text-[10px] font-bold text-muted-foreground">{profile?.grade || '학년 미정'}</span></div>
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={cn(
-                            "font-black text-[9px] border-2 uppercase", 
-                            zone.includes('A') ? "border-blue-200 text-blue-600 bg-blue-50" : 
-                            zone.includes('B') ? "border-emerald-200 text-emerald-600 bg-emerald-50" : 
-                            "border-slate-200 text-slate-600 bg-slate-50"
-                          )}>{zone}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant={student.tutoringDiscount ? "default" : "outline"} className={cn("h-8 rounded-lg font-black text-[10px] gap-1 px-2.5 transition-all", student.tutoringDiscount ? "bg-blue-500" : "text-blue-600 border-blue-100")} onClick={() => handleToggleDiscount(student.id, 'tutoring')} disabled={isUpdating || student.status !== 'active'}><Gift className="h-3 w-3" /> 과외</Button>
-                            <Button size="sm" variant={student.siblingDiscount ? "default" : "outline"} className={cn("h-8 rounded-lg font-black text-[10px] gap-1 px-2.5 transition-all", student.siblingDiscount ? "bg-emerald-500" : "text-emerald-600 border-emerald-100")} onClick={() => handleToggleDiscount(student.id, 'sibling')} disabled={isUpdating || student.status !== 'active'}><Users2 className="h-3 w-3" /> 형제</Button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="pr-10 text-right">
-                          {editingFeeId === student.id ? (
-                            <div className="flex items-center justify-end gap-2 animate-in slide-in-from-right-2 duration-300">
-                              <Input autoFocus value={tempFeeValue} onChange={(e) => setTempFeeValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateFee(student.id); if (e.key === 'Escape') setEditingFeeId(null); }} className="h-10 w-[140px] text-right font-black text-sm border-primary/30" />
-                              <Button size="icon" onClick={() => handleUpdateFee(student.id)} disabled={isUpdating} className="h-10 w-10 rounded-lg bg-emerald-500"><Save className="h-4 w-4" /></Button>
-                            </div>
-                          ) : (
-                            <div onClick={() => student.status === 'active' && (setEditingFeeId(student.id), setTempFeeValue(finalFee.toString()))} className={cn("flex items-center justify-end gap-2 cursor-pointer group/fee", student.status !== 'active' && "opacity-40")}>
-                              <span className="font-black text-lg tabular-nums text-primary/80 group-hover/fee:text-primary transition-colors">₩{finalFee.toLocaleString()}</span>
-                              {student.status === 'active' && <Edit2 className="h-3 w-3 text-primary opacity-0 group-hover/fee:opacity-100 transition-all" />}
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                }
-              </TableBody>
-            </Table>
-          </div>
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
+        <Card className="rounded-2xl border-none bg-primary text-primary-foreground shadow-md">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold opacity-70">당월 청구금액</p>
+            <p className="mt-2 text-2xl font-black">{formatWon(summary.billed)}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold text-muted-foreground">당월 수납금액</p>
+            <p className="mt-2 text-2xl font-black text-emerald-600">{formatWon(summary.collected)}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold text-muted-foreground">당월 미납금액</p>
+            <p className="mt-2 text-2xl font-black text-rose-600">{formatWon(summary.arrears)}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold text-muted-foreground">수납률 / 미납률</p>
+            <p className="mt-2 text-xl font-black">{collectionRate.toFixed(1)}% / {arrearsRate.toFixed(1)}%</p>
+            <p className="mt-1 text-[11px] font-bold text-muted-foreground">활성 학생 {activeStudentCount}명</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
+        {byTrackCards.map(({ key, title }) => {
+          const trackMetrics = selectedBucket.byTrack[key];
+          const trackMeta = INVOICE_TRACK_META[key];
+          const trackRate = trackMetrics.billed > 0 ? (trackMetrics.collected / trackMetrics.billed) * 100 : 0;
+          return (
+            <Card key={key} className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-lg font-black">
+                  <span>{title} 월별 현황</span>
+                  <Badge className={cn('border text-xs font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                </CardTitle>
+                <CardDescription>청구/수납/미납이 인보이스 기준으로 자동 계산됩니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
+                  <span>청구</span>
+                  <span className={trackMeta.accentClass}>{formatWon(trackMetrics.billed)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
+                  <span>수납</span>
+                  <span className="text-emerald-600">{formatWon(trackMetrics.collected)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
+                  <span>미납</span>
+                  <span className="text-rose-600">{formatWon(trackMetrics.arrears)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
+                  <span>인보이스</span>
+                  <span>{trackMetrics.invoiceCount}건</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
+                  <span>수납률</span>
+                  <span>{trackRate.toFixed(1)}%</span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </section>
+
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-12')}>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50 md:col-span-7">
+          <CardHeader>
+            <CardTitle className="text-lg font-black">월별 수납 추이</CardTitle>
+            <CardDescription>최근 12개월 청구/수납/미납 흐름</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" fontSize={11} />
+                  <YAxis fontSize={11} tickFormatter={(value) => `${Math.round(toNumber(value) / 10000)}만`} />
+                  <Tooltip formatter={(value: number) => formatWon(value)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="billed" name="청구" stroke="#1d4ed8" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="collected" name="수납" stroke="#059669" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="arrears" name="미납" stroke="#dc2626" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50 md:col-span-5">
+          <CardHeader>
+            <CardTitle className="text-lg font-black">트랙별 수납 비중</CardTitle>
+            <CardDescription>독서실/학원 수납금액 비교</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" fontSize={11} />
+                  <YAxis fontSize={11} tickFormatter={(value) => `${Math.round(toNumber(value) / 10000)}만`} />
+                  <Tooltip formatter={(value: number) => formatWon(value)} />
+                  <Legend />
+                  <Area type="monotone" dataKey="studyRoomCollected" name="독서실 수납" stackId="1" stroke="#2563eb" fill="#93c5fd" />
+                  <Area type="monotone" dataKey="academyCollected" name="학원 수납" stackId="1" stroke="#059669" fill="#86efac" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-black">
+            <CalendarRange className="h-5 w-5 text-primary" />
+            {selectedMonth} 인보이스 타임라인
+          </CardTitle>
+          <CardDescription>수납/미납 관리에서 작성된 인보이스를 시간순으로 보여줍니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {selectedTimeline.length === 0 ? (
+            <div className="rounded-xl border border-dashed py-10 text-center text-sm font-semibold text-muted-foreground">
+              해당 월 인보이스가 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {selectedTimeline.map((invoice) => {
+                const track = resolveInvoiceTrackCategory(invoice);
+                const trackMeta = INVOICE_TRACK_META[track];
+                return (
+                  <div
+                    key={invoice.id}
+                    className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-white p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-slate-800">{invoice.studentName}</span>
+                        <Badge className={cn('border text-[10px] font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                        <Badge className={cn('border text-[10px] font-black', getStatusBadgeClass(invoice.status))}>
+                          {getStatusLabel(invoice.status)}
+                        </Badge>
+                      </div>
+                      <p className="text-xs font-bold text-slate-400">마감일 {toDateLabel(invoice)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-base font-black text-slate-900">{formatWon(invoice.finalPrice)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

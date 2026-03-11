@@ -1,38 +1,92 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { CounselingLog, CenterMembership, AttendanceCurrent, StudyLogDay } from '@/lib/types';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import {
+  AttendanceCurrent,
+  CenterMembership,
+  PaymentRecord,
+  StudentProfile,
+  StudyLogDay,
+  StudySession,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { 
-  MessageCircle, 
-  Users, 
-  Clock, 
-  Zap, 
-  UserCheck, 
-  PieChart,
-  Loader2,
+import {
   Activity,
-  ArrowRight
+  Armchair,
+  BarChart3,
+  Clock3,
+  Loader2,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  CartesianGrid
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { format, subDays } from 'date-fns';
-import Link from 'next/link';
+import { eachDayOfInterval, format, subDays } from 'date-fns';
+
+type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
+
+function toDateSafe(value: TimestampLike): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    const parsed = value.toDate();
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function createEmptyHourBuckets() {
+  return Array.from({ length: 24 }, () => 0);
+}
+
+function addMinutesToHourBuckets(buckets: number[], start: Date, end: Date) {
+  if (!(start instanceof Date) || !(end instanceof Date)) return;
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+  if (start >= end) return;
+
+  let cursor = new Date(start);
+  while (cursor < end) {
+    const hourStart = new Date(cursor);
+    hourStart.setMinutes(0, 0, 0);
+
+    const nextHour = new Date(hourStart);
+    nextHour.setHours(hourStart.getHours() + 1);
+
+    const segmentEnd = end < nextHour ? end : nextHour;
+    const minutes = Math.max(0, (segmentEnd.getTime() - cursor.getTime()) / 60000);
+    buckets[hourStart.getHours()] += minutes;
+    cursor = segmentEnd;
+  }
+}
+
+function toPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function formatWon(value: number) {
+  return `${Math.round(value || 0).toLocaleString('ko-KR')}원`;
+}
 
 export function OperationalIntelligence() {
   const firestore = useFirestore();
@@ -40,78 +94,141 @@ export function OperationalIntelligence() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
 
-  // 1. 재원생 멤버 정보 (선생님/학생 비율 계산용)
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), where('status', '==', 'active'));
   }, [firestore, centerId]);
   const { data: allMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery);
 
-  // 2. 상담 일지 조회
-  const counselLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'counselingLogs'), orderBy('createdAt', 'desc'), limit(200));
-  }, [firestore, centerId]);
-  const { data: counselLogs, isLoading: logsLoading } = useCollection<CounselingLog>(counselLogsQuery);
-
-  // 3. 실시간 좌석 현황
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
+
+  const studentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'students');
+  }, [firestore, centerId]);
+  const { data: studentProfiles, isLoading: studentsLoading } = useCollection<StudentProfile>(studentsQuery);
+
+  const paymentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'payments'),
+      orderBy('processedAt', 'desc'),
+      limit(400)
+    );
+  }, [firestore, centerId]);
+  const { data: payments, isLoading: paymentsLoading } = useCollection<PaymentRecord>(paymentsQuery);
+
   const [studyMinutesByStudent, setStudyMinutesByStudent] = useState<Record<string, number>>({});
-  const [studyMinutesLoading, setStudyMinutesLoading] = useState(false);
+  const [dailyStudyMinutesByDate, setDailyStudyMinutesByDate] = useState<Record<string, number>>({});
+  const [todaySessionMinutesByHour, setTodaySessionMinutesByHour] = useState<number[]>(createEmptyHourBuckets());
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   useEffect(() => {
     let disposed = false;
-    if (!firestore || !centerId || !allMembers || allMembers.length === 0) {
+
+    if (!firestore || !centerId || !allMembers) {
       setStudyMinutesByStudent({});
+      setDailyStudyMinutesByDate({});
+      setTodaySessionMinutesByHour(createEmptyHourBuckets());
       return;
     }
 
-    const targetStudents = allMembers.filter((member) => member.role === 'student' && member.status === 'active');
-    if (targetStudents.length === 0) {
+    const students = allMembers.filter((member) => member.role === 'student' && member.status === 'active');
+    if (students.length === 0) {
       setStudyMinutesByStudent({});
+      setDailyStudyMinutesByDate({});
+      setTodaySessionMinutesByHour(createEmptyHourBuckets());
       return;
     }
 
-    const loadStudyMinutes = async () => {
-      setStudyMinutesLoading(true);
+    const loadStudyAnalytics = async () => {
+      setAnalyticsLoading(true);
       try {
-        const fromKey = format(subDays(new Date(), 29), 'yyyy-MM-dd');
-        const bucket: Record<string, number> = {};
+        const now = new Date();
+        const todayKey = format(now, 'yyyy-MM-dd');
+        const from30DaysKey = format(subDays(now, 29), 'yyyy-MM-dd');
+        const trendDateKeys = eachDayOfInterval({
+          start: subDays(now, 13),
+          end: now,
+        }).map((date) => format(date, 'yyyy-MM-dd'));
+
+        const minutesByStudent: Record<string, number> = {};
+        const minutesByDate = trendDateKeys.reduce<Record<string, number>>((acc, key) => {
+          acc[key] = 0;
+          return acc;
+        }, {});
+        const hourlyMinutes = createEmptyHourBuckets();
 
         await Promise.all(
-          targetStudents.map(async (student) => {
+          students.map(async (student) => {
             const daysRef = collection(firestore, 'centers', centerId, 'studyLogs', student.id, 'days');
-            const daysSnap = await getDocs(query(daysRef, where('dateKey', '>=', fromKey)));
-            let totalMinutes = 0;
+            const daysSnap = await getDocs(query(daysRef, where('dateKey', '>=', from30DaysKey)));
+
+            let studentTotalMinutes = 0;
+            let hasTodayLog = false;
+
             daysSnap.forEach((snap) => {
               const data = snap.data() as Partial<StudyLogDay>;
-              const mins = Number(data.totalMinutes || 0);
-              if (Number.isFinite(mins) && mins > 0) totalMinutes += mins;
+              const dateKey = typeof data.dateKey === 'string' ? data.dateKey : snap.id;
+              const minutes = Number(data.totalMinutes || 0);
+              if (!Number.isFinite(minutes) || minutes <= 0) return;
+
+              studentTotalMinutes += minutes;
+              if (Object.prototype.hasOwnProperty.call(minutesByDate, dateKey)) {
+                minutesByDate[dateKey] += minutes;
+              }
+              if (dateKey === todayKey) hasTodayLog = true;
             });
-            bucket[student.id] = totalMinutes;
+
+            minutesByStudent[student.id] = studentTotalMinutes;
+
+            if (!hasTodayLog) return;
+
+            const sessionsRef = collection(
+              firestore,
+              'centers',
+              centerId,
+              'studyLogs',
+              student.id,
+              'days',
+              todayKey,
+              'sessions'
+            );
+            const sessionsSnap = await getDocs(sessionsRef);
+            sessionsSnap.forEach((sessionDoc) => {
+              const session = sessionDoc.data() as Partial<StudySession>;
+              const startTime = toDateSafe(session.startTime as TimestampLike);
+              const endTime = toDateSafe(session.endTime as TimestampLike);
+              if (!startTime || !endTime) return;
+              addMinutesToHourBuckets(hourlyMinutes, startTime, endTime);
+            });
           })
         );
 
         if (!disposed) {
-          setStudyMinutesByStudent(bucket);
+          setStudyMinutesByStudent(minutesByStudent);
+          setDailyStudyMinutesByDate(minutesByDate);
+          setTodaySessionMinutesByHour(hourlyMinutes);
         }
       } catch (error) {
-        console.error('Operational study aggregation failed:', error);
+        console.error('Operational analytics aggregation failed:', error);
         if (!disposed) {
           setStudyMinutesByStudent({});
+          setDailyStudyMinutesByDate({});
+          setTodaySessionMinutesByHour(createEmptyHourBuckets());
         }
       } finally {
         if (!disposed) {
-          setStudyMinutesLoading(false);
+          setAnalyticsLoading(false);
         }
       }
     };
 
-    loadStudyMinutes();
+    loadStudyAnalytics();
     return () => {
       disposed = true;
     };
@@ -120,100 +237,143 @@ export function OperationalIntelligence() {
   const opsMetrics = useMemo(() => {
     if (!allMembers || !attendanceList) return null;
 
-    const students = allMembers.filter(m => m.role === 'student');
-    const teachers = allMembers.filter(m => m.role === 'teacher' || m.role === 'centerAdmin');
+    const activeStudents = allMembers.filter((member) => member.role === 'student' && member.status === 'active');
+    const activeTeachers = allMembers.filter(
+      (member) => (member.role === 'teacher' || member.role === 'centerAdmin') && member.status === 'active'
+    );
+    const studentCount = activeStudents.length;
+    const teacherCount = Math.max(1, activeTeachers.length);
+    const studentTeacherRatio = Number((studentCount / teacherCount).toFixed(1));
 
-    const studentCount = students.length;
-    const teacherCount = Math.max(1, teachers.length);
-    const ratio = Number((studentCount / teacherCount).toFixed(1));
+    const totalSeats = Math.max(1, attendanceList.filter((seat) => seat.type !== 'aisle').length);
+    const occupiedSeats = attendanceList.filter((seat) => seat.type !== 'aisle' && seat.status === 'studying').length;
+    const currentOccupancyRate = toPercent((occupiedSeats / totalSeats) * 100);
 
-    const totalSeats = attendanceList.filter(a => a.type !== 'aisle').length || 1;
-    const occupiedSeats = attendanceList.filter(a => a.status === 'studying').length;
-    const occupancyRate = Math.round((occupiedSeats / totalSeats) * 100);
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
-    const teacherStats: Record<string, { name: string; count: number; improvedCount: number }> = {};
-    const timeSlots = {
-      morning: { name: '?ㅼ쟾 (09-13)', counselCount: 0, improvedCount: 0 },
-      afternoon: { name: '?ㅽ썑 (13-18)', counselCount: 0, improvedCount: 0 },
-      evening: { name: '?쇨컙 (18-24)', counselCount: 0, improvedCount: 0 },
-    };
-
-    counselLogs?.forEach((log) => {
-      const tId = log.teacherId;
-      if (!teacherStats[tId]) {
-        teacherStats[tId] = { name: log.teacherName || 'Teacher', count: 0, improvedCount: 0 };
-      }
-      teacherStats[tId].count += 1;
-
-      const improved = (log.improvement || '').trim().length > 0;
-      if (improved) {
-        teacherStats[tId].improvedCount += 1;
-      }
-
-      const createdAt = (log as any).createdAt?.toDate?.();
-      if (!createdAt) return;
-      const hour = createdAt.getHours();
-      const slot = hour >= 9 && hour < 13
-        ? timeSlots.morning
-        : hour >= 13 && hour < 18
-          ? timeSlots.afternoon
-          : hour >= 18 && hour <= 23
-            ? timeSlots.evening
-            : null;
-      if (!slot) return;
-      slot.counselCount += 1;
-      if (improved) slot.improvedCount += 1;
+    const mergedHourlyMinutes = [...todaySessionMinutesByHour];
+    attendanceList.forEach((seat) => {
+      if (seat.type === 'aisle' || seat.status !== 'studying') return;
+      const checkInAt = toDateSafe(seat.lastCheckInAt as TimestampLike);
+      if (!checkInAt) return;
+      const clampedStart = checkInAt < todayStart ? todayStart : checkInAt;
+      if (clampedStart >= now) return;
+      addMinutesToHourBuckets(mergedHourlyMinutes, clampedStart, now);
     });
 
-    const teacherChartData = Object.values(teacherStats)
-      .map((t) => ({
-        name: t.name,
-        count: t.count,
-        improvement: t.count > 0 ? Math.round((t.improvedCount / t.count) * 100) : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
+    const displayHours = Array.from({ length: 15 }, (_, index) => index + 9);
+    const occupancyByHour = displayHours.map((hour) => {
+      const minuteLoad = mergedHourlyMinutes[hour] || 0;
+      const occupancyRate = toPercent((minuteLoad / (totalSeats * 60)) * 100);
+      return {
+        hour,
+        label: `${String(hour).padStart(2, '0')}:00`,
+        occupancyRate,
+      };
+    });
 
-    const totalCounselCount = counselLogs?.length || 0;
-    const totalImprovedCounsel = Object.values(teacherStats).reduce((sum, item) => sum + item.improvedCount, 0);
-    const counselQualityRate = totalCounselCount > 0 ? Math.round((totalImprovedCounsel / totalCounselCount) * 100) : 0;
+    const recentStart = new Date(subDays(now, 29));
+    recentStart.setHours(0, 0, 0, 0);
+    const revenueByHourBuckets = createEmptyHourBuckets();
+    let totalRecentRevenue = 0;
 
-    const totalSlotCounsel = Object.values(timeSlots).reduce((sum, slot) => sum + slot.counselCount, 0);
-    const timeSlotData = Object.values(timeSlots).map((slot) => ({
-      name: slot.name,
-      consultCount: slot.counselCount,
-      share: totalSlotCounsel > 0 ? Math.round((slot.counselCount / totalSlotCounsel) * 100) : 0,
-      improvementRate: slot.counselCount > 0 ? Math.round((slot.improvedCount / slot.counselCount) * 100) : 0,
+    (payments || []).forEach((payment) => {
+      if (payment.status && payment.status !== 'success') return;
+      const processedAt = toDateSafe(payment.processedAt as TimestampLike);
+      if (!processedAt || processedAt < recentStart) return;
+      const amount = Number(payment.amount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) return;
+      revenueByHourBuckets[processedAt.getHours()] += amount;
+      totalRecentRevenue += amount;
+    });
+
+    const revenueByHour = displayHours.map((hour) => ({
+      hour,
+      label: `${String(hour).padStart(2, '0')}:00`,
+      amount: Math.round(revenueByHourBuckets[hour] || 0),
     }));
 
-    const totalStudyMinutes30d = students.reduce((sum, s) => sum + (studyMinutesByStudent[s.id] || 0), 0);
-    const lowStudyStudentCount = students.filter((s) => (studyMinutesByStudent[s.id] || 0) < 540).length;
-    const studyHealthRate = studentCount > 0 ? Math.round(((studentCount - lowStudyStudentCount) / studentCount) * 100) : 0;
+    const studentProfileMap = new Map((studentProfiles || []).map((profile) => [profile.id, profile]));
+    let totalStudyMinutes30d = 0;
+    let totalTargetMinutes = 0;
+    let ratioAccumulator = 0;
 
-    const efficiencyScore = Math.round((studyHealthRate * 0.6) + (counselQualityRate * 0.4));
-    const lowestOccupancySlot = [...timeSlotData].sort((a, b) => a.consultCount - b.consultCount)[0] || null;
+    activeStudents.forEach((student) => {
+      const totalMinutes = Number(studyMinutesByStudent[student.id] || 0);
+      const targetDailyMinutes = Number(studentProfileMap.get(student.id)?.targetDailyMinutes || 180);
+      const safeTargetMinutes = Number.isFinite(targetDailyMinutes) && targetDailyMinutes > 0 ? targetDailyMinutes : 180;
+      const dailyAverageMinutes = totalMinutes / 30;
+
+      totalStudyMinutes30d += totalMinutes;
+      totalTargetMinutes += safeTargetMinutes;
+      ratioAccumulator += (dailyAverageMinutes / safeTargetMinutes) * 100;
+    });
+
+    const averageDailyStudyMinutes = studentCount > 0 ? Math.round(totalStudyMinutes30d / studentCount / 30) : 0;
+    const averageTargetMinutes = studentCount > 0 ? totalTargetMinutes / studentCount : 180;
+    const averageStudyRatio = studentCount > 0 ? toPercent(ratioAccumulator / studentCount) : 0;
+
+    const trendDates = eachDayOfInterval({ start: subDays(now, 13), end: now });
+    const studyRatioTrend = trendDates.map((date) => {
+      const key = format(date, 'yyyy-MM-dd');
+      const totalMinutes = Number(dailyStudyMinutesByDate[key] || 0);
+      const avgMinutes = studentCount > 0 ? totalMinutes / studentCount : 0;
+      const ratio = averageTargetMinutes > 0 ? toPercent((avgMinutes / averageTargetMinutes) * 100) : 0;
+      return {
+        dateKey: key,
+        label: format(date, 'M/d'),
+        ratio,
+        avgMinutes: Math.round(avgMinutes),
+      };
+    });
+
+    const peakOccupancySlot = occupancyByHour.reduce(
+      (best, slot) => (slot.occupancyRate > best.occupancyRate ? slot : best),
+      occupancyByHour[0] || { hour: 9, label: '09:00', occupancyRate: 0 }
+    );
+    const lowOccupancySlot = occupancyByHour.reduce(
+      (best, slot) => (slot.occupancyRate < best.occupancyRate ? slot : best),
+      occupancyByHour[0] || { hour: 9, label: '09:00', occupancyRate: 0 }
+    );
+    const peakRevenueSlot = revenueByHour.reduce(
+      (best, slot) => (slot.amount > best.amount ? slot : best),
+      revenueByHour[0] || { hour: 9, label: '09:00', amount: 0 }
+    );
+
+    const lastStudyRatio = studyRatioTrend[studyRatioTrend.length - 1]?.ratio ?? 0;
+    const prevStudyRatio = studyRatioTrend[studyRatioTrend.length - 2]?.ratio ?? 0;
+    const studyTrendDelta = lastStudyRatio - prevStudyRatio;
 
     return {
-      ratio,
-      occupancyRate,
-      teacherChartData,
-      timeSlotData,
-      totalCounselCount,
-      counselQualityRate,
-      studyHealthRate,
-      efficiencyScore,
-      lowestOccupancySlot,
-      lowStudyStudentCount,
-      totalStudyMinutes30d,
+      studentTeacherRatio,
+      currentOccupancyRate,
+      occupiedSeats,
+      totalSeats,
+      occupancyByHour,
+      peakOccupancySlot,
+      lowOccupancySlot,
+      revenueByHour,
+      peakRevenueSlot,
+      totalRecentRevenue,
+      averageStudyRatio,
+      averageDailyStudyMinutes,
+      averageTargetMinutes: Math.round(averageTargetMinutes),
+      studyRatioTrend,
+      studyTrendDelta,
     };
-  }, [allMembers, attendanceList, counselLogs, studyMinutesByStudent]);
+  }, [allMembers, attendanceList, dailyStudyMinutesByDate, payments, studyMinutesByStudent, studentProfiles, todaySessionMinutesByHour]);
 
-  const isLoading = membersLoading || logsLoading || attendanceLoading || studyMinutesLoading;
+  const isLoading = membersLoading || attendanceLoading || studentsLoading || paymentsLoading || analyticsLoading;
 
   if (isLoading) {
     return (
       <div className="py-40 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Calculating Operational Efficiency...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+          Building Operational Intelligence...
+        </p>
       </div>
     );
   }
@@ -222,111 +382,212 @@ export function OperationalIntelligence() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <section className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-blue-600 text-white p-10 relative overflow-hidden group">
-          <MessageCircle className="absolute -right-4 -top-4 h-48 w-48 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000" />
-          <div className="relative z-10 space-y-6">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60">상담 효율 지수 (Efficiency)</p>
-            <h3 className="text-7xl font-black tracking-tighter">{opsMetrics.efficiencyScore}<span className="text-2xl opacity-40 ml-2">점</span></h3>
-            <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10">
-              <p className="text-xs font-bold leading-relaxed">최근 진행된 {opsMetrics.totalCounselCount}건의 상담 중 {opsMetrics.efficiencyScore}%가 개선 액션으로 기록되었습니다.</p>
-            </div>
+      <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-blue-600 text-white p-8 relative overflow-hidden">
+          <Armchair className="absolute -right-4 -top-4 h-40 w-40 opacity-10" />
+          <div className="relative z-10 space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-widest opacity-70">현재 좌석 점유율</p>
+            <h3 className="text-6xl font-black tracking-tighter">
+              {opsMetrics.currentOccupancyRate}
+              <span className="text-2xl opacity-60 ml-1">%</span>
+            </h3>
+            <p className="text-xs font-bold opacity-80">
+              실시간 착석 {opsMetrics.occupiedSeats} / 전체 좌석 {opsMetrics.totalSeats}
+            </p>
           </div>
         </Card>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
-          <div className="flex items-center gap-3">
-            <UserCheck className="h-6 w-6 text-emerald-500" />
-            <h4 className="text-sm font-black uppercase tracking-widest text-muted-foreground">강사당 관리 인원</h4>
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-black/[0.03]">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock3 className="h-5 w-5 text-amber-500" />
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">시간대 피크 점유율</p>
           </div>
-          <div className="text-5xl font-black tracking-tighter text-primary">{opsMetrics.ratio}<span className="text-xl opacity-40 ml-1">명</span></div>
-          <Progress value={(opsMetrics.ratio / 25) * 100} className="h-2 bg-emerald-100" />
-          <p className="text-[10px] font-bold text-muted-foreground leading-relaxed mt-2">
-            권장 기준(20명) 대비 **{opsMetrics.ratio > 20 ? '과부하' : '안정적'}** 상태입니다.
+          <h4 className="text-4xl font-black tracking-tight text-amber-600">
+            {opsMetrics.peakOccupancySlot.occupancyRate}
+            <span className="text-xl opacity-50 ml-1">%</span>
+          </h4>
+          <p className="text-xs font-bold text-muted-foreground mt-2">
+            최고 점유 시간대: {opsMetrics.peakOccupancySlot.label}
           </p>
+          <Progress value={opsMetrics.peakOccupancySlot.occupancyRate} className="h-2 bg-amber-100 mt-4" />
         </Card>
 
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 flex flex-col justify-center gap-4 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
-          <div className="flex items-center gap-3">
-            <Clock className="h-6 w-6 text-amber-500" />
-            <h4 className="text-sm font-black uppercase tracking-widest text-muted-foreground">실시간 좌석 점유율</h4>
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-black/[0.03]">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="h-5 w-5 text-emerald-500" />
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">시간대 매출 피크</p>
           </div>
-          <div className="text-5xl font-black tracking-tighter text-amber-600">{opsMetrics.occupancyRate}<span className="text-xl opacity-40 ml-1">%</span></div>
-          <Badge variant="secondary" className="w-fit bg-amber-50 text-amber-700 font-black text-[9px] px-3">CURRENT PEAK</Badge>
+          <h4 className="text-3xl font-black tracking-tight text-emerald-600">{formatWon(opsMetrics.peakRevenueSlot.amount)}</h4>
+          <p className="text-xs font-bold text-muted-foreground mt-2">
+            최고 매출 시간대: {opsMetrics.peakRevenueSlot.label} (최근 30일)
+          </p>
+          <Badge variant="secondary" className="mt-4 bg-emerald-50 text-emerald-700 font-black text-[10px]">
+            누적 {formatWon(opsMetrics.totalRecentRevenue)}
+          </Badge>
+        </Card>
+
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-black/[0.03]">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="h-5 w-5 text-violet-500" />
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">평균 공부시간 달성률</p>
+          </div>
+          <h4 className="text-4xl font-black tracking-tight text-violet-600">
+            {opsMetrics.averageStudyRatio}
+            <span className="text-xl opacity-50 ml-1">%</span>
+          </h4>
+          <div className="mt-2 flex items-center gap-2 text-xs font-bold">
+            {opsMetrics.studyTrendDelta > 0 ? (
+              <>
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <span className="text-emerald-600">전일 대비 +{opsMetrics.studyTrendDelta}%p</span>
+              </>
+            ) : opsMetrics.studyTrendDelta < 0 ? (
+              <>
+                <TrendingDown className="h-4 w-4 text-rose-500" />
+                <span className="text-rose-600">전일 대비 {opsMetrics.studyTrendDelta}%p</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">전일 대비 변동 없음</span>
+            )}
+          </div>
+          <p className="text-[11px] font-bold text-muted-foreground mt-3">
+            평균 {opsMetrics.averageDailyStudyMinutes}분 / 목표 {opsMetrics.averageTargetMinutes}분
+          </p>
         </Card>
       </section>
 
-      <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-12")}>
+      <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-12')}>
         <Card className="md:col-span-7 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="bg-muted/5 border-b p-10">
-            <div className="flex justify-between items-center">
-              <div className="space-y-1">
-                <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-                  <Activity className="h-6 w-6 text-blue-600" /> 선생님별 상담 성과
-                </CardTitle>
-                <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Consultation Count vs Performance Impact</CardDescription>
-              </div>
-            </div>
+          <CardHeader className="bg-muted/5 border-b p-8">
+            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
+              <Armchair className="h-6 w-6 text-blue-600" /> 시간대별 좌석 점유율
+            </CardTitle>
+            <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
+              Today / 09:00-23:00
+            </CardDescription>
           </CardHeader>
-          <CardContent className="p-10">
-            <div className="h-[300px] w-full">
-              {opsMetrics.teacherChartData.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center opacity-20 italic font-black">
-                  <MessageCircle className="h-12 w-12 mb-2" />
-                  상담 기록이 부족합니다.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={opsMetrics.teacherChartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis dataKey="name" fontSize={11} fontWeight="bold" axisLine={false} tickLine={false} />
-                    <YAxis fontSize={11} fontWeight="900" axisLine={false} tickLine={false} />
-                    <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
-                    <Bar dataKey="count" name="상담 횟수" fill="hsl(var(--primary))" radius={[10, 10, 0, 0]} barSize={40} />
-                    <Bar dataKey="improvement" name="개선율(%)" fill="#10b981" radius={[10, 10, 0, 0]} barSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+          <CardContent className="p-8">
+            <div className="h-[320px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={opsMetrics.occupancyByHour} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="label" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                    fontSize={11}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${value}%`, '좌석 점유율']}
+                    labelFormatter={(label) => `${label}`}
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
+                  />
+                  <Area type="monotone" dataKey="occupancyRate" stroke="#2563eb" fill="#bfdbfe" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
         <Card className="md:col-span-5 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
-          <CardHeader className="bg-amber-50/30 border-b p-10">
-            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3">
-              <PieChart className="h-6 w-6 text-amber-600" /> 시간대별 운영 효율
+          <CardHeader className="bg-emerald-50/30 border-b p-8">
+            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
+              <BarChart3 className="h-6 w-6 text-emerald-600" /> 시간대별 매출 상황
             </CardTitle>
+            <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
+              Recent 30 days / payment logs
+            </CardDescription>
           </CardHeader>
-          <CardContent className="p-10 space-y-8">
-            {opsMetrics.timeSlotData.map((slot) => (
-              <div key={slot.name} className="space-y-3">
-                <div className="flex justify-between items-end">
-                  <div className="grid gap-0.5">
-                    <span className="text-xs font-black text-primary">{slot.name}</span>
-                    <span className="text-lg font-black text-amber-600">상담 비율 {slot.share}%</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Consult Count</span>
-                    <p className="text-base font-black text-primary">{slot.consultCount}건</p>
-                  </div>
-                </div>
-                <Progress value={slot.share} className={cn("h-2 bg-muted", slot.share < 20 ? "text-rose-400" : "text-amber-500")} />
-              </div>
-            ))}
-            
-            <div className="p-6 rounded-[2rem] bg-muted/20 border-2 border-dashed flex flex-col items-center text-center gap-3">
-              <Zap className="h-8 w-8 text-primary/20" />
-              <p className="text-xs font-bold text-muted-foreground leading-relaxed">
-                현재 **{opsMetrics.lowestOccupancySlot?.name || '해당 시간대'}** 효율이 가장 낮습니다. <br/>
-                해당 시간대 집중 캠페인으로 출석/상담 전환율을 높여보세요.
-              </p>
-              <Button asChild variant="outline" className="rounded-xl h-9 px-4 text-[10px] font-black mt-2 bg-white">
-                <Link href="/dashboard/settings/invites">프로모션 코드 생성 <ArrowRight className="ml-2 h-3 w-3" /></Link>
-              </Button>
+          <CardContent className="p-8">
+            <div className="h-[320px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={opsMetrics.revenueByHour} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ecfdf5" />
+                  <XAxis dataKey="label" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis
+                    fontSize={11}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => `${Math.round(value / 10000)}만`}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [formatWon(value), '매출']}
+                    labelFormatter={(label) => `${label}`}
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
+                  />
+                  <Bar dataKey="amount" name="매출" fill="#10b981" radius={[10, 10, 0, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
-      </div>
+      </section>
+
+      <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-12')}>
+        <Card className="md:col-span-8 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
+          <CardHeader className="bg-violet-50/30 border-b p-8">
+            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
+              <Activity className="h-6 w-6 text-violet-600" /> 평균 공부시간 비율 추세
+            </CardTitle>
+            <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
+              Last 14 days / target achievement
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="h-[280px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={opsMetrics.studyRatioTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f3ff" />
+                  <XAxis dataKey="label" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                    fontSize={11}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${value}%`, '달성률']}
+                    labelFormatter={(label) => `${label}`}
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
+                  />
+                  <Area type="monotone" dataKey="ratio" stroke="#7c3aed" fill="#ddd6fe" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-4 rounded-[3rem] border-none shadow-2xl bg-white p-8 ring-1 ring-black/[0.03]">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">운영 인사이트</p>
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4">
+              <p className="text-xs font-black text-blue-700">좌석 집중 시간</p>
+              <p className="text-sm font-bold text-blue-900 mt-1">
+                {opsMetrics.peakOccupancySlot.label}에 점유율 {opsMetrics.peakOccupancySlot.occupancyRate}%
+              </p>
+            </div>
+            <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
+              <p className="text-xs font-black text-amber-700">운영 여유 시간</p>
+              <p className="text-sm font-bold text-amber-900 mt-1">
+                {opsMetrics.lowOccupancySlot.label} 점유율 {opsMetrics.lowOccupancySlot.occupancyRate}% (홍보/상담 집중 권장)
+              </p>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+              <p className="text-xs font-black text-emerald-700">재무 집중 시간</p>
+              <p className="text-sm font-bold text-emerald-900 mt-1">
+                {opsMetrics.peakRevenueSlot.label} 매출 {formatWon(opsMetrics.peakRevenueSlot.amount)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-muted/40 border p-4">
+              <p className="text-xs font-black text-muted-foreground">학생/교사 비율</p>
+              <p className="text-sm font-bold text-primary mt-1">현재 {opsMetrics.studentTeacherRatio}:1</p>
+            </div>
+          </div>
+        </Card>
+      </section>
     </div>
   );
 }

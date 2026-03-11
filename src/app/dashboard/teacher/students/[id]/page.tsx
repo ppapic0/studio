@@ -164,9 +164,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const periodKey = format(today, 'yyyy-MM');
 
   const isAdmin = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
-  const canEditStudentInfo = isAdmin || activeMembership?.role === 'teacher';
-  const canEditGrowthData = isAdmin;
-  const canWriteCounseling = canEditStudentInfo;
+  const isStudentSelfView = activeMembership?.role === 'student';
+  const canEditStudentInfo = !isStudentSelfView && (isAdmin || activeMembership?.role === 'teacher');
+  const canEditGrowthData = !isStudentSelfView && isAdmin;
+  const canWriteCounseling = !isStudentSelfView && canEditStudentInfo;
+  const backHref = isStudentSelfView ? '/dashboard/analysis' : '/dashboard/teacher/students';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'counseling' | 'plans'>('overview');
   const [focusedChartView, setFocusedChartView] = useState<ChartRangeKey>('weekly');
@@ -622,18 +624,37 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
   }
 
+  if (isStudentSelfView && currentUser && studentId !== currentUser.uid) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center gap-3 px-4 py-24 text-center">
+        <AlertTriangle className="h-10 w-10 text-amber-500" />
+        <h2 className="text-2xl font-black tracking-tight text-slate-900">본인 분석만 확인할 수 있어요</h2>
+        <p className="text-sm font-semibold text-muted-foreground">다른 학생 계정 분석 화면에는 접근할 수 없습니다.</p>
+        <Button asChild className="rounded-xl px-5 font-black">
+          <Link href="/dashboard/analysis">분석트랙으로 돌아가기</Link>
+        </Button>
+      </div>
+    );
+  }
+
   const isDataLoading = statsLoading || plansLoading || studyLogLoading;
 
   return (
     <div className={cn('flex flex-col gap-6 max-w-7xl mx-auto pb-24 px-4')}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-4 min-w-0">
-          <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 mt-1" asChild><Link href="/dashboard/teacher/students"><ArrowLeft className="h-5 w-5" /></Link></Button>
+          {!isStudentSelfView && (
+            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 mt-1" asChild>
+              <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
+            </Button>
+          )}
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-black tracking-tighter truncate text-3xl sm:text-4xl">{student?.name || '학생'}</h1>
               <Badge className="bg-primary text-white px-2 py-0.5 rounded-full font-black text-[10px]">{student?.seatNo || '미배정'}번 좌석</Badge>
-              <Badge variant="outline" className="font-black text-[10px] rounded-full"><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
+              {!isStudentSelfView && (
+                <Badge variant="outline" className="font-black text-[10px] rounded-full"><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-bold">
               <span className="flex items-center gap-1 text-primary"><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>

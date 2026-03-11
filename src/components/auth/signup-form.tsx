@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 
@@ -213,6 +213,7 @@ export function SignupForm() {
     }
 
     setIsLoading(true);
+    router.prefetch('/dashboard');
     let createdUser = false;
 
     try {
@@ -243,13 +244,12 @@ export function SignupForm() {
       setLoadingStatus('회원가입 완료');
       toast({
         title: '회원가입 완료',
-        description: `${finalDisplayName} 계정이 생성되었습니다. 로그인 화면으로 이동합니다.`,
+        description: `${finalDisplayName} 계정이 생성되었습니다. 대시보드로 이동합니다.`,
       });
 
-      await signOut(auth);
-      setTimeout(() => {
-        router.replace('/login');
-      }, 1200);
+      setLoadingStatus('대시보드로 이동 중...');
+      router.replace('/dashboard');
+      router.refresh();
     } catch (error: any) {
       if (createdUser && auth.currentUser) {
         try {

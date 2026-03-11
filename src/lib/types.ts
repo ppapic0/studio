@@ -51,6 +51,7 @@ export interface Invoice {
   transactionId?: string;
   paymentKey?: string; // Toss Payments
   orderId?: string;    // Toss Payments
+  trackCategory?: 'studyRoom' | 'academy';
 }
 
 export interface PaymentRecord {
@@ -224,6 +225,24 @@ export interface AttendanceRequest {
   reason: string;
   status: 'requested' | 'approved' | 'rejected';
   penaltyApplied: boolean;
+  penaltyPointsDelta?: number;
+  updatedAt?: Timestamp;
+  updatedByUserId?: string;
+  createdAt: Timestamp;
+}
+
+export interface PenaltyLog {
+  id: string;
+  centerId: string;
+  studentId: string;
+  studentName?: string;
+  pointsDelta: number;
+  reason: string;
+  source: 'attendance_request' | 'manual' | 'reset';
+  requestId?: string;
+  requestType?: 'late' | 'absence';
+  createdByUserId?: string;
+  createdByName?: string;
   createdAt: Timestamp;
 }
 

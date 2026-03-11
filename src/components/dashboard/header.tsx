@@ -67,6 +67,7 @@ import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
 
 function resolveCallableErrorMessage(error: any): string {
+  const errorCode = String(error?.code || '').toLowerCase();
   const detailMessage =
     typeof error?.details === 'string'
       ? error.details
@@ -76,11 +77,28 @@ function resolveCallableErrorMessage(error: any): string {
           ? error.details.message
           : '';
 
-  const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
-  if (detailMessage) return detailMessage;
-  if (rawMessage && !/(functions\/internal|internal)$/i.test(rawMessage)) return rawMessage;
+  const looksCorrupted = (message: string): boolean => {
+    const trimmed = message.trim();
+    if (!trimmed) return false;
+    const questionCount = (trimmed.match(/\?/g) || []).length;
+    return questionCount >= Math.max(2, Math.floor(trimmed.length * 0.25));
+  };
 
-  return '서버 통신 중 오류가 발생했습니다.';
+  if (errorCode.includes('permission-denied')) {
+    return '\uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.';
+  }
+  if (errorCode.includes('failed-precondition')) {
+    return '\uC774\uBBF8 \uC0AC\uC6A9 \uC911\uC778 \uD559\uBD80\uBAA8 \uC5F0\uB3D9 \uCF54\uB4DC\uC785\uB2C8\uB2E4. \uB2E4\uB978 6\uC790\uB9AC \uC22B\uC790\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.';
+  }
+  if (errorCode.includes('invalid-argument')) {
+    return '\uC785\uB825\uAC12\uC744 \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694.';
+  }
+
+  const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
+  if (detailMessage && !looksCorrupted(detailMessage)) return detailMessage;
+  if (rawMessage && !/(functions\/internal|internal)$/i.test(rawMessage) && !looksCorrupted(rawMessage)) return rawMessage;
+
+  return '\uC11C\uBC84 \uD1B5\uC2E0 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
 }
 
 function normalizeParentLinkCode(value: unknown): string {
@@ -162,8 +180,8 @@ export function DashboardHeader() {
     if (activeMembership.role === 'student' && normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
       toast({
         variant: 'destructive',
-        title: '입력 확인',
-        description: '학부모 연동 코드는 6자리 숫자로 입력해 주세요.',
+        title: '\uC785\uB825 \uD655\uC778',
+        description: '\uD559\uBD80\uBAA8 \uC5F0\uB3D9 \uCF54\uB4DC\uB294 6\uC790\uB9AC \uC22B\uC790\uB85C \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
       });
       return;
     }
@@ -199,13 +217,13 @@ export function DashboardHeader() {
         await batch.commit();
       }
 
-      toast({ title: '정보가 성공적으로 업데이트되었습니다.' });
+      toast({ title: '\uC815\uBCF4\uAC00 \uC131\uACF5\uC801\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' });
       setIsSettingsOpen(false);
     } catch (error: any) {
       console.error('Settings Update Error:', error);
       toast({
         variant: 'destructive',
-        title: '업데이트 실패',
+        title: '\uC5C5\uB370\uC774\uD2B8 \uC2E4\uD328',
         description: resolveCallableErrorMessage(error),
       });
     } finally {
@@ -265,7 +283,7 @@ export function DashboardHeader() {
           {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
         </Button>
 
-        <NotificationBell />
+        {activeMembership?.role !== 'parent' && <NotificationBell />}
 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>

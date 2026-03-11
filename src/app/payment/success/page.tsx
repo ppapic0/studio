@@ -1,124 +1,162 @@
-
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useFirestore } from '@/firebase';
-import { completePayment } from '@/lib/finance-actions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { httpsCallable } from 'firebase/functions';
+import { CheckCircle2, Loader2, PartyPopper } from 'lucide-react';
+
+import { useAppContext } from '@/contexts/app-context';
+import { useFunctions } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Loader2, PartyPopper, ArrowRight, Sparkles, Building2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+
+type ConfirmInvoicePaymentResult = {
+  ok: boolean;
+  centerId: string;
+  invoiceId: string;
+  status: string;
+  amount: number;
+  alreadyProcessed?: boolean;
+};
+
+function resolveNextHref(role: string | undefined): string {
+  if (role === 'parent') return '/dashboard?parentTab=billing';
+  if (role === 'centerAdmin' || role === 'owner' || role === 'teacher') return '/dashboard/revenue';
+  return '/dashboard';
+}
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const firestore = useFirestore();
+  const functions = useFunctions();
+  const { activeMembership } = useAppContext();
   const { toast } = useToast();
-  
+
   const [isProcessing, setIsProcessing] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [processedAmount, setProcessedAmount] = useState<number>(0);
+  const [alreadyProcessed, setAlreadyProcessed] = useState(false);
+
+  const nextHref = useMemo(() => resolveNextHref(activeMembership?.role), [activeMembership?.role]);
 
   useEffect(() => {
-    const invoiceId = searchParams.get('invoiceId');
-    const centerId = searchParams.get('centerId');
-    const paymentKey = searchParams.get('paymentKey'); // 토스 결제 키
-    const amount = searchParams.get('amount'); // 실제 결제 금액
+    const invoiceId = (searchParams.get('invoiceId') || '').trim();
+    const centerIdFromQuery = (searchParams.get('centerId') || '').trim();
+    const centerId = centerIdFromQuery || activeMembership?.id || '';
+    const paymentKey = (searchParams.get('paymentKey') || '').trim();
+    const orderId = (searchParams.get('orderId') || '').trim();
+    const amountRaw = Number(searchParams.get('amount'));
+    const amount = Number.isFinite(amountRaw) ? amountRaw : null;
 
-    if (!invoiceId || !centerId || !firestore) return;
+    if (!invoiceId || !centerId || !functions) {
+      setErrorMessage('결제 확인 파라미터가 누락되었습니다. 다시 시도해 주세요.');
+      setIsProcessing(false);
+      return;
+    }
 
-    const finalize = async () => {
+    const confirm = async () => {
       try {
-        /**
-         * [운영 가이드]
-         * 실제 운영 환경에서는 여기서 서버(Next.js API Route)를 통해 토스페이먼츠 '승인 API'를 호출해야 합니다.
-         * POST https://api.tosspayments.com/v1/payments/confirm
-         * Authorization: Basic {SecretKey + ":"} (Base64 encoded)
-         */
-        
-        // 프로토타입: 승인 API 호출이 성공했다고 가정하고 DB 상태를 업데이트합니다.
-        await completePayment(firestore, centerId, invoiceId, 'card');
-        
+        const confirmFn = httpsCallable<
+          { centerId: string; invoiceId: string; paymentMethod: 'card'; paymentKey?: string; orderId?: string; amount?: number },
+          ConfirmInvoicePaymentResult
+        >(functions, 'confirmInvoicePayment');
+
+        const result = await confirmFn({
+          centerId,
+          invoiceId,
+          paymentMethod: 'card',
+          paymentKey: paymentKey || undefined,
+          orderId: orderId || undefined,
+          amount: amount === null ? undefined : amount,
+        });
+
+        const payload = result.data;
+        setProcessedAmount(Number(payload?.amount) || 0);
+        setAlreadyProcessed(!!payload?.alreadyProcessed);
         setIsProcessing(false);
-        toast({ title: "결제 완료 ✨", description: "수강료 납부가 성공적으로 처리되었습니다." });
-      } catch (e: any) {
-        console.error(e);
-        setError(e.message || "결제 처리 중 오류가 발생했습니다.");
+
+        toast({
+          title: payload?.alreadyProcessed ? '이미 처리된 결제입니다.' : '결제가 완료되었습니다.',
+          description: '감사합니다! 최선을 다해 관리하겠습니다!',
+        });
+      } catch (error: any) {
+        const fallback = '결제 후 처리 중 오류가 발생했습니다. 잠시 후 다시 확인해 주세요.';
+        const detail =
+          typeof error?.details === 'string'
+            ? error.details
+            : typeof error?.details?.userMessage === 'string'
+              ? error.details.userMessage
+              : typeof error?.message === 'string'
+                ? error.message.replace(/^FirebaseError:\s*/i, '').trim()
+                : fallback;
+
+        setErrorMessage(detail || fallback);
         setIsProcessing(false);
       }
     };
 
-    finalize();
-  }, [searchParams, firestore, toast]);
+    void confirm();
+  }, [searchParams, functions, activeMembership?.id, toast]);
 
   if (isProcessing) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#fafafa]">
-        <div className="relative">
-          <Loader2 className="h-16 w-16 animate-spin text-primary opacity-20" />
-          <Building2 className="h-8 w-8 text-primary absolute inset-0 m-auto animate-pulse" />
-        </div>
-        <div className="text-center space-y-2">
-          <p className="text-xl font-black text-primary tracking-tighter">결제 승인을 요청하고 있습니다</p>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-40 italic">Verifying Transaction...</p>
-        </div>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#fafafa] p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+        <p className="text-center text-sm font-black tracking-wide text-primary/70">
+          결제 승인 내용을 확인하고 있습니다.
+        </p>
       </div>
     );
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <Card className="max-w-md w-full rounded-[3rem] border-none shadow-2xl p-12 text-center bg-white overflow-hidden">
-          <div className="bg-rose-50 p-5 rounded-3xl w-fit mx-auto mb-8 shadow-inner">
-            <CheckCircle2 className="h-12 w-12 text-rose-500 rotate-180" />
-          </div>
-          <CardTitle className="text-rose-600 text-3xl font-black tracking-tighter">결제 처리 오류</CardTitle>
-          <CardDescription className="font-bold pt-4 text-base leading-relaxed text-muted-foreground/80">{error}</CardDescription>
-          <Button onClick={() => router.push('/dashboard/revenue')} className="mt-10 w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-100 transition-all active:scale-95">수납 관리로 돌아가기</Button>
+      <div className="flex min-h-screen items-center justify-center bg-[#fafafa] p-4">
+        <Card className="w-full max-w-md rounded-[2.25rem] border-none bg-white p-2 shadow-2xl">
+          <CardHeader className="items-center text-center">
+            <CardTitle className="text-2xl font-black tracking-tight text-rose-600">결제 반영 실패</CardTitle>
+            <CardDescription className="font-bold text-slate-500">{errorMessage}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <Button className="h-12 w-full rounded-xl font-black" onClick={() => router.push(nextHref)}>
+              대시보드로 이동
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 overflow-hidden relative">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 animate-bounce delay-75"><PartyPopper className="h-12 w-12 text-primary opacity-20" /></div>
-        <div className="absolute top-1/3 right-1/4 animate-bounce delay-300"><PartyPopper className="h-16 w-16 text-accent opacity-20" /></div>
-        <div className="absolute bottom-1/4 left-1/2 animate-bounce delay-500"><PartyPopper className="h-10 w-10 text-blue-500 opacity-20" /></div>
-      </div>
-
-      <Card className="w-full max-w-lg rounded-[4.5rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in zoom-in-95 duration-700">
-        <CardHeader className="bg-emerald-500 p-16 text-white text-center relative overflow-hidden">
-          <Sparkles className="absolute -bottom-10 -right-10 h-64 w-64 opacity-20 rotate-12" />
-          <div className="relative z-10 flex flex-col items-center gap-6">
-            <div className="bg-white/20 p-6 rounded-full shadow-inner backdrop-blur-md border border-white/30">
-              <CheckCircle2 className="h-16 w-16 text-white" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#fafafa] p-4">
+      <PartyPopper className="pointer-events-none absolute left-10 top-14 h-10 w-10 text-primary/20" />
+      <PartyPopper className="pointer-events-none absolute right-12 top-20 h-12 w-12 text-orange-400/30" />
+      <Card className="w-full max-w-lg overflow-hidden rounded-[2.75rem] border-none bg-white shadow-[0_40px_90px_-30px_rgba(17,24,39,0.35)]">
+        <CardHeader className="bg-emerald-500 px-8 py-10 text-white">
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-4 rounded-full bg-white/20 p-4">
+              <CheckCircle2 className="h-12 w-12" />
             </div>
-            <div className="space-y-2">
-              <CardTitle className="text-5xl font-black tracking-tighter">납부 완료!</CardTitle>
-              <CardDescription className="text-white/80 font-bold text-lg">성공적으로 수강료가 납부되었습니다.</CardDescription>
-            </div>
+            <CardTitle className="text-4xl font-black tracking-tight">수납 완료</CardTitle>
+            <CardDescription className="mt-1 text-white/85">
+              감사합니다! 최선을 다해 관리하겠습니다!
+            </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="p-16 space-y-10 text-center">
-          <div className="space-y-4">
-            <p className="text-base font-bold text-muted-foreground leading-relaxed">
-              정상적으로 입금이 확인되었으며, <br/>
-              인보이스 상태가 즉시 업데이트되었습니다.<br/>
-              이제 센터 대시보드에서 실시간 분석을 확인하실 수 있습니다.
+        <CardContent className="space-y-5 px-8 py-8">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-center">
+            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">처리 금액</p>
+            <p className="mt-1 text-3xl font-black tracking-tight text-[#14295F]">
+              ₩{Math.max(0, Math.round(processedAmount)).toLocaleString()}
             </p>
+            {alreadyProcessed && (
+              <p className="mt-1 text-[11px] font-bold text-slate-500">이미 처리된 결제건으로 확인되었습니다.</p>
+            )}
           </div>
-
-          <Button 
-            onClick={() => router.push('/dashboard/revenue')}
-            className="w-full h-20 rounded-[2rem] font-black text-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-2xl shadow-emerald-200 gap-3 active:scale-95 transition-all"
-          >
-            수납 관리로 돌아가기 <ArrowRight className="h-6 w-6" />
+          <Button className="h-14 w-full rounded-2xl bg-[#14295F] font-black text-white" onClick={() => router.push(nextHref)}>
+            대시보드로 돌아가기
           </Button>
-          
-          <p className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.3em]">Analytical Track Business Center</p>
         </CardContent>
       </Card>
     </div>
@@ -127,12 +165,13 @@ function SuccessContent() {
 
 export default function SuccessPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-        <p className="font-black text-primary/40 uppercase tracking-widest">Loading...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#fafafa] p-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary/40" />
+        </div>
+      }
+    >
       <SuccessContent />
     </Suspense>
   );

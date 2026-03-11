@@ -1,170 +1,159 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
-import { loadTossPayments } from '@tosspayments/payment-sdk';
-import { useFirestore, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import { Invoice } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, CreditCard, ShieldCheck, Sparkles, ArrowLeft, Lock, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppContext } from '@/contexts/app-context';
+import { loadTossPayments } from '@tosspayments/payment-sdk';
+import { AlertTriangle, ArrowLeft, CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 
-/**
- * [운영 가이드]
- * 1. 토스페이먼츠 개발자 센터(https://developers.tosspayments.com/) 로그인
- * 2. 내 상점 정보 -> API 키 확인
- * 3. 아래 clientKey를 발급받으신 '클라이언트 키'로 교체하세요.
- */
-const TOSS_CLIENT_KEY = 'test_ck_AQ92ymxN34NDobpk74e0rajRKXvd'; // 현재는 테스트 키입니다.
+import { useAppContext } from '@/contexts/app-context';
+import { useDoc, useFirestore } from '@/firebase';
+import type { Invoice } from '@/lib/types';
+import { doc } from 'firebase/firestore';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+const TOSS_CLIENT_KEY = 'test_ck_AQ92ymxN34NDobpk74e0rajRKXvd';
 
 export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = use(params);
   const firestore = useFirestore();
   const router = useRouter();
   const { activeMembership } = useAppContext();
+
+  const [isRequesting, setIsRequesting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const invoiceRef = (firestore && activeMembership) 
-    ? doc(firestore, 'centers', activeMembership.id, 'invoices', invoiceId) 
-    : null;
+  const centerId = activeMembership?.id || '';
+  const invoiceRef = firestore && centerId ? doc(firestore, 'centers', centerId, 'invoices', invoiceId) : null;
   const { data: invoice, isLoading: invoiceLoading } = useDoc<Invoice>(invoiceRef as any);
 
   useEffect(() => {
-    if (!invoiceLoading) {
-      setIsLoading(false);
-    }
+    if (!invoiceLoading) setIsLoading(false);
   }, [invoiceLoading]);
 
-  const handlePayment = async () => {
-    if (!invoice || !activeMembership) return;
+  const canRequestPayment = useMemo(() => {
+    if (!invoice) return false;
+    return invoice.status === 'issued' || invoice.status === 'overdue';
+  }, [invoice]);
 
+  const handlePayment = async () => {
+    if (!invoice || !centerId || isRequesting || !canRequestPayment) return;
+
+    setIsRequesting(true);
     try {
       const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
-      const orderId = `track_${invoiceId}_${Math.random().toString(36).substring(2, 9)}`;
-      
+      const orderId = `invoice_${invoiceId}_${Math.random().toString(36).slice(2, 10)}`;
+      const successUrl = `${window.location.origin}/payment/success?invoiceId=${invoiceId}&centerId=${centerId}`;
+      const failUrl = `${window.location.origin}/payment/fail?invoiceId=${invoiceId}&centerId=${centerId}`;
+
       await tossPayments.requestPayment('카드', {
-        amount: invoice.finalPrice,
-        orderId: orderId,
-        orderName: `${invoice.studentName} 학생 수강료 (Analytical Track)`,
-        customerName: invoice.studentName,
-        successUrl: `${window.location.origin}/payment/success?invoiceId=${invoiceId}&centerId=${activeMembership.id}`,
-        failUrl: `${window.location.origin}/payment/fail?invoiceId=${invoiceId}`,
+        amount: Math.max(0, Math.round(Number(invoice.finalPrice) || 0)),
+        orderId,
+        orderName: `${invoice.studentName} 학생 수납`,
+        customerName: invoice.studentName || '학부모',
+        successUrl,
+        failUrl,
       });
     } catch (error) {
       console.error('Payment request failed:', error);
+      setIsRequesting(false);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#fafafa]">
-        <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-        <p className="font-black text-primary tracking-tighter uppercase opacity-40">Securing Payment Channel...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#fafafa] p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary/40" />
+        <p className="text-sm font-black tracking-wide text-primary/70">결제 정보를 불러오고 있습니다.</p>
       </div>
     );
   }
 
-  if (!invoice) {
+  if (!invoice || !centerId) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <Card className="max-w-md w-full rounded-[2.5rem] border-none shadow-2xl text-center p-10">
-          <div className="bg-rose-50 p-4 rounded-2xl w-fit mx-auto mb-6">
-            <Lock className="h-10 w-10 text-rose-500" />
-          </div>
-          <CardTitle className="text-2xl font-black tracking-tighter">유효하지 않은 요청</CardTitle>
-          <CardDescription className="font-bold pt-2">만료된 결제 링크이거나 정보를 찾을 수 없습니다.</CardDescription>
-          <Button onClick={() => router.back()} className="mt-8 w-full h-14 rounded-2xl font-black border-2">대시보드로 돌아가기</Button>
+      <div className="flex min-h-screen items-center justify-center bg-[#fafafa] p-4">
+        <Card className="w-full max-w-md rounded-[2.25rem] border-none bg-white p-2 shadow-2xl">
+          <CardHeader className="items-center text-center">
+            <AlertTriangle className="h-10 w-10 text-rose-500" />
+            <CardTitle className="text-2xl font-black tracking-tight text-rose-600">결제 정보를 찾을 수 없습니다</CardTitle>
+            <CardDescription className="font-bold text-slate-500">유효하지 않은 결제 링크이거나 이미 처리된 요청일 수 있습니다.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="h-12 w-full rounded-xl font-black" onClick={() => router.back()}>
+              이전 화면으로
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Ornaments */}
-      <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-      
-      <header className="flex flex-col items-center text-center gap-2 mb-12 relative z-10">
-        <div className="bg-primary p-5 rounded-[2.5rem] shadow-2xl shadow-primary/20 mb-4 animate-in zoom-in duration-700">
-          <CreditCard className="h-12 w-12 text-white" />
-        </div>
-        <h1 className="text-5xl font-black tracking-tighter text-primary">안전 결제 시스템</h1>
-        <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.4em] opacity-40">Analytical Track Secure Checkout</p>
-      </header>
+  const dueDate = typeof invoice.cycleEndDate?.toDate === 'function' ? invoice.cycleEndDate.toDate() : null;
+  const amount = Math.max(0, Math.round(Number(invoice.finalPrice) || 0));
 
-      <Card className="w-full max-w-xl rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
-        <CardHeader className="bg-muted/5 border-b p-12">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <CardTitle className="text-3xl font-black tracking-tighter">결제 정보 확인</CardTitle>
-              <CardDescription className="font-bold text-base opacity-60">학생의 정보를 확인하고 결제를 진행하세요.</CardDescription>
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#fafafa] p-4">
+      <Card className="w-full max-w-xl overflow-hidden rounded-[2.75rem] border-none bg-white shadow-[0_40px_90px_-30px_rgba(17,24,39,0.35)]">
+        <CardHeader className="space-y-3 border-b bg-slate-50/70 px-8 py-8">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-[#14295F]/10 p-3 text-[#14295F]">
+              <CreditCard className="h-6 w-6" />
             </div>
-            <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] px-3 py-1">SECURE</Badge>
+            <div>
+              <CardTitle className="text-2xl font-black tracking-tight text-[#14295F]">수납 결제</CardTitle>
+              <CardDescription className="font-bold text-slate-500">
+                센터에서 요청한 수납 금액을 결제합니다.
+              </CardDescription>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="p-12 space-y-10">
-          <div className="space-y-8">
-            <div className="flex justify-between items-end border-b-4 border-dashed pb-8 border-muted">
-              <div className="grid gap-1">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Payment Item</span>
-                <h3 className="text-2xl font-black text-primary flex items-center gap-2">
-                  {invoice.studentName} <span className="text-sm opacity-40">학생 수강료</span>
-                </h3>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Grand Total</span>
-                <p className="text-5xl font-black text-blue-600 tracking-tighter drop-shadow-sm">₩{invoice.finalPrice.toLocaleString()}</p>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-4 p-5 rounded-3xl bg-[#fafafa] border-2 border-transparent hover:border-primary/5 transition-all group">
-                <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-md border border-black/5 group-hover:scale-110 transition-transform"><Sparkles className="h-6 w-6 text-amber-500" /></div>
-                <div className="grid leading-tight">
-                  <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Service</span>
-                  <span className="text-sm font-black text-primary">Analytical Track</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-5 rounded-3xl bg-blue-50/50 border-2 border-blue-100 shadow-sm group">
-                <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-md border border-blue-200 group-hover:scale-110 transition-transform"><ShieldCheck className="h-6 w-6 text-blue-600" /></div>
-                <div className="grid leading-tight">
-                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Security</span>
-                  <span className="text-sm font-black text-blue-900">금융 보안 적용됨</span>
-                </div>
-              </div>
+        <CardContent className="space-y-6 px-8 py-8">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">청구 대상</span>
+              <Badge className="h-5 border-none bg-[#14295F]/10 px-2 text-[10px] font-black text-[#14295F]">
+                {invoice.trackCategory === 'academy' ? '학원' : '독서실'}
+              </Badge>
             </div>
-          </div>
-
-          <div className="space-y-4">
-            <button 
-              onClick={handlePayment}
-              className="w-full h-24 rounded-[2rem] font-black text-2xl bg-primary hover:bg-primary/90 text-white shadow-2xl shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-4 group"
-            >
-              <CreditCard className="h-8 w-8 group-hover:rotate-12 transition-transform" /> 지금 결제하기
-            </button>
-            <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
-              <Lock className="h-3 w-3" /> Encrypted Transaction Processing
-            </div>
-          </div>
-
-          <div className="p-6 rounded-[2rem] bg-muted/20 border-2 border-dashed flex items-start gap-4">
-            <CheckCircle2 className="h-5 w-5 text-primary opacity-40 shrink-0 mt-0.5" />
-            <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-              결제 완료 후 인보이스 상태가 자동으로 '납부 완료'로 변경되며, <br/>
-              센터 관리 시스템에 실시간 매출로 집계됩니다.
+            <p className="text-lg font-black text-[#14295F]">{invoice.studentName} 학생</p>
+            <p className="mt-1 text-[11px] font-bold text-slate-500">
+              결제 마감일 {dueDate ? `${dueDate.getFullYear()}.${String(dueDate.getMonth() + 1).padStart(2, '0')}.${String(dueDate.getDate()).padStart(2, '0')}` : '-'}
             </p>
           </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">결제 금액</p>
+            <p className="mt-1 text-4xl font-black tracking-tight text-[#14295F]">₩{amount.toLocaleString()}</p>
+          </div>
+
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="flex items-center gap-2 text-blue-700">
+              <ShieldCheck className="h-4 w-4" />
+              <span className="text-[11px] font-black uppercase tracking-widest">안전 결제</span>
+            </div>
+            <p className="mt-1 text-xs font-bold text-blue-800/80">
+              토스페이먼츠 결제창으로 이동해 카드 결제를 진행합니다.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            disabled={!canRequestPayment || isRequesting}
+            onClick={handlePayment}
+            className="h-14 w-full rounded-2xl bg-[#14295F] font-black text-white"
+          >
+            {isRequesting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+            {canRequestPayment ? '토스페이먼츠로 결제하기' : '결제 가능한 상태가 아닙니다'}
+          </Button>
+
+          <Button type="button" variant="ghost" className="h-11 w-full rounded-xl font-black" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            이전으로
+          </Button>
         </CardContent>
       </Card>
-
-      <footer className="mt-12 opacity-30 flex items-center gap-4">
-        <Button variant="ghost" onClick={() => router.back()} className="font-black text-xs gap-2 hover:bg-white/50 rounded-xl px-6 h-12 transition-all"><ArrowLeft className="h-4 w-4" /> 취소하고 대시보드로 돌아가기</Button>
-      </footer>
     </div>
   );
 }

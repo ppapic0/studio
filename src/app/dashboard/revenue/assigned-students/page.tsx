@@ -6,31 +6,30 @@ import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, orderBy, where, doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { AttendanceCurrent, Invoice, CenterMembership, StudentProfile } from '@/lib/types';
+import { AttendanceCurrent, Invoice, CenterMembership } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
+import {
   ArrowLeft, 
   Search, 
-  Armchair, 
+  Building2,
   ChevronRight, 
   AlertTriangle, 
   PlusCircle,
-  RefreshCw,
   Loader2,
   Filter,
-  CheckCircle2,
-  Receipt,
-  History,
   Activity,
-  CalendarCheck
+  CalendarCheck,
+  LayoutGrid
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { issueInvoice, syncDailyKpi } from '@/lib/finance-actions';
+import { issueInvoice } from '@/lib/finance-actions';
+import { INVOICE_TRACK_META, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AssignedStudentsPage() {
@@ -50,21 +49,39 @@ export default function AssignedStudentsPage() {
     if (!firestore || !centerId) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
-  const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery);
+  const { data: attendanceList, isLoading: attendanceLoading, error: attendanceError } = useCollection<AttendanceCurrent>(attendanceQuery);
 
   // 2. 인보이스 조회
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'invoices'), orderBy('cycleEndDate', 'desc'));
   }, [firestore, centerId]);
-  const { data: allInvoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery);
+  const { data: allInvoices, isLoading: invoicesLoading, error: invoicesError } = useCollection<Invoice>(invoicesQuery);
 
   // 3. 학생 정보 조회
   const studentMembersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'student'), where('status', '==', 'active'));
   }, [firestore, centerId]);
-  const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery);
+  const { data: studentMembers, error: studentMembersError } = useCollection<CenterMembership>(studentMembersQuery);
+
+  const queryErrors = useMemo(
+    () => [attendanceError, invoicesError, studentMembersError].filter((error): error is Error => !!error),
+    [attendanceError, invoicesError, studentMembersError]
+  );
+
+  const hasPermissionIssue = useMemo(
+    () =>
+      queryErrors.some((error) => {
+        const message = (error?.message || '').toLowerCase();
+        return (
+          message.includes('permission-denied') ||
+          message.includes('insufficient permissions') ||
+          message.includes('missing or insufficient permissions')
+        );
+      }),
+    [queryErrors]
+  );
 
   // --- 수납 시급도 기반 정렬 및 필터링 로직 ---
   const filteredAndSortedStudents = useMemo(() => {
@@ -121,20 +138,46 @@ export default function AssignedStudentsPage() {
     });
   }, [attendanceList, allInvoices, studentMembers, searchTerm, filterStatus]);
 
-  const handleCreateInvoice = async (studentId: string, name: string) => {
+  const handleCreateInvoice = async (studentId: string, _name: string, trackCategory: InvoiceTrackCategory) => {
     if (!firestore || !centerId) return;
     setIsSaving(true);
     try {
-      await issueInvoice(firestore, centerId, studentId, 390000, "28일 정기 수강료");
-      toast({ title: "28일 주기 인보이스가 생성되었습니다." });
+      const trackMeta = INVOICE_TRACK_META[trackCategory];
+      const title = trackCategory === 'academy' ? '28일 정기 학원 수강료' : '28일 정기 독서실 이용료';
+      await issueInvoice(firestore, centerId, studentId, 390000, title, { trackCategory });
+      toast({ title: `${trackMeta.label} 인보이스가 추가 발급되었습니다.` });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "생성 실패", description: e.message });
+      toast({ variant: 'destructive', title: '생성 실패', description: e.message });
     } finally {
       setIsSaving(false);
     }
   };
 
+
   const isLoading = attendanceLoading || invoicesLoading;
+
+  if (hasPermissionIssue) {
+    return (
+      <div className={cn("flex w-full justify-center px-4 py-10", isMobile ? "min-h-[48vh]" : "min-h-[56vh]")}>
+        <Card className="w-full max-w-xl rounded-[2rem] border border-rose-100 bg-white shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-black text-rose-600">권한 확인이 필요합니다</CardTitle>
+            <CardDescription className="font-bold text-slate-600">
+              전체 배정 학생 보기는 선생님/센터관리자 권한에서만 접근할 수 있습니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="rounded-xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-xs font-bold leading-relaxed text-rose-700">
+              계정의 센터 역할(role)과 활성 상태(status)를 확인해 주세요.
+            </p>
+            <Button type="button" onClick={() => router.push('/dashboard/revenue')} className="h-11 rounded-xl font-black">
+              비즈니스 분석으로 돌아가기
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col gap-8 w-full max-w-6xl mx-auto pb-24", isMobile ? "px-1" : "px-4 py-8")}>
@@ -259,29 +302,39 @@ export default function AssignedStudentsPage() {
 
                       <div className="w-px h-12 bg-border/50 hidden sm:block" />
 
-                      <div className="w-full sm:w-auto">
-                        {latestInvoice ? (
-                          <Button 
-                            asChild 
+                      <div className="w-full sm:w-auto space-y-2">
+                        {latestInvoice && (
+                          <Button
+                            asChild
                             variant={latestInvoice.status === 'paid' ? 'outline' : 'default'}
                             className={cn(
-                              "h-14 rounded-2xl font-black px-8 gap-2 shadow-xl active:scale-95 transition-all w-full",
+                              "h-11 rounded-xl font-black px-6 gap-2 shadow-lg active:scale-95 transition-all w-full",
                               latestInvoice.status === 'paid' ? "border-2" : "bg-primary text-white"
                             )}
                           >
                             <Link href="/dashboard/revenue">
-                              상세 관리 <ChevronRight className="h-5 w-5" />
+                              상세 관리 <ChevronRight className="h-4 w-4" />
                             </Link>
                           </Button>
-                        ) : (
-                          <Button 
-                            onClick={() => handleCreateInvoice(seat.studentId!, student?.displayName || '학생')}
-                            disabled={isSaving}
-                            className="h-14 rounded-2xl font-black px-8 bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-xl shadow-blue-100 active:scale-95 transition-all w-full"
-                          >
-                            {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <PlusCircle className="h-5 w-5" />} 첫 인보이스 발행
-                          </Button>
                         )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <Button
+                            onClick={() => handleCreateInvoice(seat.studentId!, student?.displayName || '학생', 'studyRoom')}
+                            disabled={isSaving}
+                            variant="outline"
+                            className="h-11 rounded-xl font-black px-4 border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                          >
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 독서실 추가 발급
+                          </Button>
+                          <Button
+                            onClick={() => handleCreateInvoice(seat.studentId!, student?.displayName || '학생', 'academy')}
+                            disabled={isSaving}
+                            variant="outline"
+                            className="h-11 rounded-xl font-black px-4 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                          >
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 학원 추가 발급
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>

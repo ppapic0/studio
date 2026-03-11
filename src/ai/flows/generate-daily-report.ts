@@ -43,7 +43,153 @@ const DailyReportOutputSchema = z.object({
 export type DailyReportOutput = z.infer<typeof DailyReportOutputSchema>;
 
 export async function generateDailyReport(input: DailyReportInput): Promise<DailyReportOutput> {
-  return dailyReportFlow(input);
+  try {
+    return await dailyReportFlow(input);
+  } catch (error) {
+    console.error('[generateDailyReport] AI flow failed, using deterministic fallback', error);
+    return buildDeterministicDailyReport(input);
+  }
+}
+
+function minuteToLevel(minutes: number): number {
+  if (minutes < 60) return 1;
+  if (minutes < 120) return 2;
+  if (minutes < 180) return 3;
+  if (minutes < 240) return 4;
+  if (minutes < 300) return 5;
+  if (minutes < 360) return 6;
+  if (minutes < 420) return 7;
+  if (minutes < 480) return 8;
+  if (minutes < 540) return 9;
+  return 10;
+}
+
+function completionToLevel(completionRate: number): number {
+  if (completionRate < 40) return 1;
+  if (completionRate < 50) return 2;
+  if (completionRate < 60) return 3;
+  if (completionRate < 70) return 4;
+  if (completionRate < 75) return 5;
+  if (completionRate < 80) return 6;
+  if (completionRate < 85) return 7;
+  if (completionRate < 90) return 8;
+  if (completionRate < 95) return 9;
+  return 10;
+}
+
+function levelName(level: number): string {
+  const names: Record<number, string> = {
+    1: '학습 동기 형성 단계',
+    2: '적응 단계',
+    3: '기본 루틴 형성 단계',
+    4: '안정적 진입 단계',
+    5: '자기주도 시작 단계',
+    6: '집중력 향상 단계',
+    7: '상위권 루틴 단계',
+    8: '고효율 학습 단계',
+    9: '최상위 집중 단계',
+    10: '수능 상위권 완성 단계',
+  };
+  return names[level] ?? '학습 성장 단계';
+}
+
+function toHm(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}분`;
+  if (m === 0) return `${h}시간`;
+  return `${h}시간 ${m}분`;
+}
+
+function safePercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 10) / 10;
+}
+
+function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutput {
+  const minutes = Math.max(0, Number(input.totalStudyMinutes || 0));
+  const completionRate = Math.max(0, Math.min(100, Number(input.completionRate || 0)));
+  const minuteLevel = minuteToLevel(minutes);
+  const completionLevel = completionToLevel(completionRate);
+  const level = Math.max(1, Math.min(minuteLevel, completionLevel));
+  const levelLabel = levelName(level);
+
+  const history = (input.history7Days || []).map((h) => Number(h.minutes || 0)).filter((m) => Number.isFinite(m));
+  const avg7 = history.length > 0 ? history.reduce((sum, m) => sum + m, 0) / history.length : 0;
+  const growthRate = avg7 > 0 ? safePercent(((minutes - avg7) / avg7) * 100) : 0;
+  const maxPrev = history.length > 0 ? Math.max(...history) : 0;
+  const isNewRecord = history.length > 0 && minutes > maxPrev;
+  const last3 = history.slice(0, 3);
+  const alertLow = last3.length === 3 && last3.every((m) => m < 120) && minutes < 120;
+  const streakSource = [...history.slice(0, 4), minutes];
+  const streakBadge = streakSource.length >= 5 && streakSource.every((m) => m >= 300);
+
+  const studyPlanCount = input.plans?.length ?? 0;
+  const studyDoneCount = input.plans?.filter((p) => p.done).length ?? 0;
+  const attendanceText = input.schedule?.find((s) => s.title.includes('등원'))?.time ?? '-';
+  const leaveText = input.schedule?.find((s) => s.title.includes('하원'))?.time ?? '-';
+
+  const teacherMemo = input.teacherNote?.trim()
+    ? input.teacherNote.trim()
+    : '오늘은 기본 루틴 유지와 집중 시간 확보를 우선 목표로 삼았습니다.';
+
+  const phaseAdvice =
+    level <= 3
+      ? '학습 루틴을 짧고 확실하게 지키는 습관부터 만들면 성장 속도가 빨라집니다.'
+      : level <= 6
+        ? '현재 루틴이 안정적입니다. 집중 시간 20~30분 추가 확보가 다음 단계의 핵심입니다.'
+        : level <= 8
+          ? '상위권 루틴에 진입했습니다. 과목별 난이도 편차를 줄이면 성과가 더 크게 올라옵니다.'
+          : '최상위권 패턴입니다. 고난도 문제 대응력과 실전 감각 유지에 집중해 주세요.';
+
+  const growthText =
+    avg7 > 0
+      ? `최근 7일 평균(${toHm(Math.round(avg7))}) 대비 ${growthRate >= 0 ? '+' : ''}${growthRate}% 변동이 있었습니다.`
+      : '최근 7일 비교 데이터가 충분하지 않아 오늘 데이터를 기준으로 진단했습니다.';
+
+  const badgeText = [
+    isNewRecord ? '오늘 최고 기록을 갱신했습니다.' : '',
+    streakBadge ? '5일 연속 고집중 학습 루틴을 유지했습니다.' : '',
+    alertLow ? '최근 학습 시간이 낮아 다음 3일 집중 관리가 필요합니다.' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const content = [
+    `📘 [학습 AI 리포트] - ${input.date}`,
+    '',
+    '📍 출결 정보',
+    `- 등원: ${attendanceText}`,
+    `- 하원: ${leaveText}`,
+    `- 총 학습시간: ${toHm(minutes)}`,
+    `- 학습 계획: ${studyDoneCount}/${studyPlanCount} 완료`,
+    '',
+    '✅ 계획 수행률',
+    `- ${completionRate}% 달성`,
+    '',
+    '📊 AI 분석 결과',
+    `- 오늘은 **${level}단계 (${levelLabel})**에 해당합니다.`,
+    `- ${growthText}`,
+    badgeText ? `- ${badgeText}` : '- 오늘 데이터 기준으로 안정적 학습 흐름이 확인됩니다.',
+    '',
+    '🧠 오늘의 교사 코멘트',
+    `- ${teacherMemo}`,
+    '',
+    '🪬 AI 종합 피드백',
+    `- ${phaseAdvice}`,
+  ].join('\n');
+
+  return {
+    level,
+    levelName: levelLabel,
+    content,
+    metrics: {
+      growthRate,
+      isNewRecord,
+      alertLow,
+      streakBadge,
+    },
+  };
 }
 
 const dailyReportPrompt = ai.definePrompt({

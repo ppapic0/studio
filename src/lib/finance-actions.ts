@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { addDays, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { Invoice, KpiDaily, StudentProfile } from './types';
+import type { InvoiceTrackCategory } from './invoice-analytics';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -95,7 +96,10 @@ export async function issueInvoice(
   centerId: string,
   studentId: string,
   amount: number,
-  title: string
+  title: string,
+  options?: {
+    trackCategory?: InvoiceTrackCategory;
+  }
 ) {
   const studentSnap = await getDoc(doc(db, 'centers', centerId, 'students', studentId));
   if (!studentSnap.exists()) throw new Error('학생을 찾을 수 없습니다.');
@@ -103,8 +107,14 @@ export async function issueInvoice(
   const student = studentSnap.data() as StudentProfile;
   const now = serverTimestamp();
   const startDate = new Date();
-  // 관리형 독서실 표준: 28일(4주) 주기 자동 설정
   const endDate = addDays(startDate, 28);
+  const trackCategory = options?.trackCategory;
+  const productId =
+    trackCategory === 'academy'
+      ? 'manual_28d_academy'
+      : trackCategory === 'studyRoom'
+        ? 'manual_28d_studyroom'
+        : 'manual_28d';
 
   const invoiceData = {
     studentId,
@@ -116,12 +126,14 @@ export async function issueInvoice(
     issuedAt: now,
     updatedAt: now,
     priceSnapshot: {
-      productId: 'manual_28d',
+      productId,
       season: 'regular',
       studentType: 'student',
       basePrice: amount
     },
-    discountsSnapshot: []
+    discountsSnapshot: [],
+    title,
+    ...(trackCategory ? { trackCategory } : {})
   };
 
   const invoiceRef = doc(collection(db, `centers/${centerId}/invoices`));
@@ -175,3 +187,4 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
   await setDoc(doc(db, 'centers', centerId, 'kpiDaily', dateStr), kpiData, { merge: true });
   return { ok: true };
 }
+

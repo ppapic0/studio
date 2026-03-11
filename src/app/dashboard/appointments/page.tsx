@@ -62,9 +62,25 @@ import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebas
 import { useAppContext } from '@/contexts/app-context';
 import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { CounselingReservation, CounselingLog, CenterMembership } from '@/lib/types';
+import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+type ParentCommunicationRecord = {
+  id: string;
+  studentId: string;
+  parentUid: string;
+  parentName?: string;
+  type: 'consultation' | 'request' | 'suggestion';
+  title?: string;
+  body?: string;
+  channel?: 'visit' | 'phone' | 'online' | null;
+  status?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  handledByName?: string;
+  handledByUid?: string;
+};
 
 export default function AppointmentsPage() {
   const { user } = useUser();
@@ -88,6 +104,8 @@ export default function AppointmentsPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
+  const [parentTypeFilter, setParentTypeFilter] = useState<'all' | 'consultation' | 'request' | 'suggestion'>('all');
+  const [parentStatusFilter, setParentStatusFilter] = useState<'all' | 'requested' | 'in_progress' | 'in_review' | 'done'>('all');
 
   useEffect(() => {
     setAptDate(format(new Date(), 'yyyy-MM-dd'));
@@ -131,6 +149,22 @@ export default function AppointmentsPage() {
     return allStaff.filter(t => t.displayName !== '동백센터관리자');
   }, [allStaff]);
 
+  const studentProfilesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isStaff) return null;
+    return collection(firestore, 'centers', centerId, 'students');
+  }, [firestore, centerId, isStaff]);
+  const { data: studentProfiles } = useCollection<StudentProfile>(studentProfilesQuery, { enabled: isStaff && !!centerId });
+
+  const studentNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    (studentProfiles || []).forEach((profile) => {
+      if (profile.id) {
+        map.set(profile.id, profile.name || profile.id);
+      }
+    });
+    return map;
+  }, [studentProfiles]);
+
   // 예약 내역 쿼리
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentUid || !userRole) return null;
@@ -159,10 +193,34 @@ export default function AppointmentsPage() {
 
   const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
 
+  const parentCommunicationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isStaff) return null;
+    return collection(firestore, 'centers', centerId, 'parentCommunications');
+  }, [firestore, centerId, isStaff]);
+  const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, { enabled: isStaff && !!centerId });
+
   const reservations = useMemo(() => {
     if (!rawReservations) return [];
     return [...rawReservations].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
   }, [rawReservations]);
+
+  const parentCommunications = useMemo(() => {
+    if (!rawParentCommunications) return [];
+    return [...rawParentCommunications].sort((a, b) => {
+      const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+      const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+      return bMs - aMs;
+    });
+  }, [rawParentCommunications]);
+
+  const filteredParentCommunications = useMemo(() => {
+    return parentCommunications.filter((item) => {
+      const typeMatched = parentTypeFilter === 'all' || item.type === parentTypeFilter;
+      const status = item.status || 'requested';
+      const statusMatched = parentStatusFilter === 'all' || status === parentStatusFilter;
+      return typeMatched && statusMatched;
+    });
+  }, [parentCommunications, parentTypeFilter, parentStatusFilter]);
 
   const availableSeasons = useMemo(() => {
     if (!rawLogs) return [];
@@ -292,6 +350,40 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleParentCommunicationStatus = async (
+    communicationId: string,
+    status: 'in_progress' | 'in_review' | 'done'
+  ) => {
+    if (!firestore || !centerId || !user) return;
+    setIsSubmitting(true);
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'parentCommunications', communicationId), {
+        status,
+        updatedAt: serverTimestamp(),
+        handledByUid: user.uid,
+        handledByName: user.displayName || '운영자',
+      });
+      toast({ title: status === 'done' ? '처리 완료로 업데이트됨' : '진행 상태로 업데이트됨' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '상태 업데이트 실패', description: e?.message || '서버 오류가 발생했습니다.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getParentTypeBadge = (type: ParentCommunicationRecord['type']) => {
+    if (type === 'consultation') return <Badge className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">상담요청</Badge>;
+    if (type === 'request') return <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">일반요청</Badge>;
+    return <Badge className="border-none bg-violet-100 text-violet-700 font-black text-[10px]">건의사항</Badge>;
+  };
+
+  const getParentStatusBadge = (status?: string) => {
+    if (status === 'done') return <Badge className="border-none bg-emerald-100 text-emerald-700 font-black text-[10px]">처리 완료</Badge>;
+    if (status === 'in_progress') return <Badge className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">처리 중</Badge>;
+    if (status === 'in_review') return <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">검토 중</Badge>;
+    return <Badge variant="secondary" className="font-black text-[10px]">접수됨</Badge>;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'requested': return <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[10px]">승인 대기</Badge>;
@@ -378,13 +470,18 @@ export default function AppointmentsPage() {
       </header>
 
       <Tabs defaultValue="reservations" className="w-full flex flex-col items-center">
-        <TabsList className={cn("grid w-full grid-cols-2 rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isMobile ? "h-14 max-w-[340px]" : "h-16 max-w-sm mx-auto")}>
+        <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
           <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
             <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
           </TabsTrigger>
           <TabsTrigger value="logs" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
             <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
           </TabsTrigger>
+          {isStaff && (
+            <TabsTrigger value="parent" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+              <ClipboardCheck className="h-4 w-4" /> <span className="text-xs sm:text-sm">학부모 요청</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
@@ -543,6 +640,99 @@ export default function AppointmentsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isStaff && (
+          <TabsContent value="parent" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
+            <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+              <CardHeader className={cn("bg-blue-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
+                <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-stretch" : "flex-row")}>
+                  <CardTitle className={cn("font-black text-blue-700 flex items-center gap-3 whitespace-nowrap", isMobile ? "text-lg" : "text-xl")}>
+                    <ClipboardCheck className="h-6 w-6 opacity-60" /> 학부모 요청함
+                  </CardTitle>
+                  <div className={cn("flex items-center gap-2", isMobile ? "w-full flex-col" : "w-auto")}>
+                    <Select value={parentTypeFilter} onValueChange={(value: any) => setParentTypeFilter(value)}>
+                      <SelectTrigger className={cn("h-10 rounded-xl border-2 font-bold text-xs", isMobile ? "w-full" : "w-[150px]")}>
+                        <SelectValue placeholder="요청 유형" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">유형 전체</SelectItem>
+                        <SelectItem value="consultation">상담요청</SelectItem>
+                        <SelectItem value="request">일반요청</SelectItem>
+                        <SelectItem value="suggestion">건의사항</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={parentStatusFilter} onValueChange={(value: any) => setParentStatusFilter(value)}>
+                      <SelectTrigger className={cn("h-10 rounded-xl border-2 font-bold text-xs", isMobile ? "w-full" : "w-[150px]")}>
+                        <SelectValue placeholder="처리 상태" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">상태 전체</SelectItem>
+                        <SelectItem value="requested">접수됨</SelectItem>
+                        <SelectItem value="in_progress">처리 중</SelectItem>
+                        <SelectItem value="in_review">검토 중</SelectItem>
+                        <SelectItem value="done">처리 완료</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <CardDescription className="font-bold text-xs mt-1">상담 요청/일반 요청/건의사항을 이 탭에서 분리 확인하고 처리할 수 있습니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {parentCommsLoading ? (
+                  <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                ) : filteredParentCommunications.length === 0 ? (
+                  <div className="py-24 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
+                    <ClipboardCheck className="h-16 w-16 opacity-10" />
+                    학부모 요청 내역이 없습니다.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-muted/10">
+                    {filteredParentCommunications.map((item) => {
+                      const createdAtDate = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
+                      const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy.MM.dd HH:mm') : '-';
+                      const studentName = studentNameById.get(item.studentId) || item.studentId;
+                      const channelLabel =
+                        item.channel === 'visit' ? '방문' : item.channel === 'phone' ? '전화' : item.channel === 'online' ? '온라인' : null;
+                      return (
+                        <div key={item.id} className={cn("flex flex-col gap-4 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="space-y-2 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {getParentTypeBadge(item.type)}
+                                {getParentStatusBadge(item.status)}
+                                {channelLabel && <Badge variant="outline" className="font-black text-[10px]">채널: {channelLabel}</Badge>}
+                              </div>
+                              <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item.title || '학부모 요청'}</h3>
+                              <p className="text-[10px] font-bold text-muted-foreground">학부모: {item.parentName || item.parentUid} · 학생: {studentName} · {createdAtLabel}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {item.status !== 'in_progress' && item.status !== 'done' && (
+                                <Button size="sm" variant="outline" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, item.type === 'consultation' ? 'in_progress' : 'in_review')} className="rounded-xl font-black h-9">
+                                  {item.type === 'consultation' ? '처리 시작' : '검토 시작'}
+                                </Button>
+                              )}
+                              {item.status !== 'done' && (
+                                <Button size="sm" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, 'done')} className="rounded-xl font-black h-9 bg-emerald-600 hover:bg-emerald-700">
+                                  완료 처리
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border bg-slate-50/40 p-4">
+                            <p className="whitespace-pre-wrap text-sm font-bold text-slate-700 leading-relaxed">{item.body?.trim() || '요청 내용이 비어 있습니다.'}</p>
+                          </div>
+                          {item.handledByName && (
+                            <p className="text-[10px] font-bold text-emerald-700">담당자: {item.handledByName}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>

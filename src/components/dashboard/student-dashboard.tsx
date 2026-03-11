@@ -74,9 +74,10 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
+import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -88,6 +89,16 @@ const TIER_PRESETS = [
   { label: '그마', lp: 30000, stats: 98, rank: 2, color: 'bg-rose-500' },
   { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
+
+const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
+  late: 1,
+  absence: 2,
+};
+
+const REQUEST_TYPE_LABEL: Record<'late' | 'absence', string> = {
+  late: '지각',
+  absence: '결석',
+};
 
 function formatTimer(totalSecs: number) {
   const mins = Math.floor(totalSecs / 60);
@@ -363,6 +374,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+  const [selectedTeacherReport, setSelectedTeacherReport] = useState<DailyReport | null>(null);
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -422,7 +434,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .slice(0, 5);
   }, [myRequestsRaw]);
 
-  // 4. 스탯 계산
+  // 4. 선생님 리포트 조회 (학생 본인 발송 완료본)
+  const reportsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
+      where('studentId', '==', user.uid),
+      where('status', '==', 'sent')
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: teacherReportsRaw, isLoading: isTeacherReportsLoading } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
+
+  const teacherReports = useMemo(() => {
+    if (!teacherReportsRaw) return [];
+    return [...teacherReportsRaw].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  }, [teacherReportsRaw]);
+
+  // 5. 스탯 계산
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
     return {
@@ -819,8 +847,100 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleRequestSubmit = async () => {
+    if (!firestore || !activeMembership || !user || !progressRef) return;
+
+    const trimmedReason = requestReason.trim();
+    if (!requestDate) {
+      toast({
+        variant: 'destructive',
+        title: '요청 날짜를 선택해 주세요.',
+      });
+      return;
+    }
+    if (trimmedReason.length < 10) {
+      toast({
+        variant: 'destructive',
+        title: '사유는 10자 이상 입력해 주세요.',
+      });
+      return;
+    }
+
+    const penaltyDelta = REQUEST_PENALTY_POINTS[requestType] ?? 1;
+
+    setIsRequestSubmitting(true);
+    try {
+      const requestRef = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'));
+      const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
+      const batch = writeBatch(firestore);
+
+      batch.set(requestRef, {
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        centerId: activeMembership.id,
+        type: requestType,
+        date: requestDate,
+        reason: trimmedReason,
+        status: 'requested',
+        penaltyApplied: true,
+        penaltyPointsDelta: penaltyDelta,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      batch.set(progressRef, {
+        penaltyPoints: increment(penaltyDelta),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      batch.set(penaltyLogRef, {
+        centerId: activeMembership.id,
+        studentId: user.uid,
+        studentName: user.displayName || '학생',
+        pointsDelta: penaltyDelta,
+        reason: `${REQUEST_TYPE_LABEL[requestType]} 신청 - ${trimmedReason}`,
+        source: 'attendance_request',
+        requestId: requestRef.id,
+        requestType,
+        createdByUserId: user.uid,
+        createdByName: user.displayName || '학생',
+        createdAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      toast({
+        title: `${REQUEST_TYPE_LABEL[requestType]} 신청이 접수되었습니다.`,
+        description: `벌점 ${penaltyDelta}점이 자동 반영되었습니다.`,
+      });
+      setRequestReason('');
+    } catch (e: any) {
+      const errorMessage = typeof e?.message === 'string' && e.message.trim().length > 0
+        ? e.message
+        : '요청 처리 중 오류가 발생했습니다.';
+      toast({
+        variant: 'destructive',
+        title: '신청 저장 실패',
+        description: errorMessage,
+      });
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
+
   const handleRequestSubmitInternal = async () => {
     await handleRequestSubmit();
+  };
+
+  const handleOpenTeacherReport = async (report: DailyReport) => {
+    setSelectedTeacherReport(report);
+    if (report.viewedAt || !firestore || !activeMembership?.id || !report.id) return;
+
+    const reportRef = doc(firestore, 'centers', activeMembership.id, 'dailyReports', report.id);
+    updateDoc(reportRef, {
+      viewedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }).catch((err) => console.error('Error updating report viewed state:', err));
   };
 
   const PlanColumn = ({ dateKey, label }: { dateKey: string, label: string }) => {
@@ -1016,21 +1136,111 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </Card>
 
       <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-        <Link href="/dashboard/student-reports" className="group h-full">
-          <Card className={cn(
-            "h-full border border-slate-200/80 shadow-sm bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-row items-center gap-4",
-            isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
-          )}>
-            <div className={cn("rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 transition-all group-hover:bg-primary group-hover:text-white", isMobile ? "h-12 w-12" : "h-16 w-16")}>
-              <FileText className={cn(isMobile ? "h-6 w-6" : "h-8 w-8")} />
-            </div>
-            <div className="grid text-left min-w-0">
-              <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-xl")}>데일리 리포트</span>
-              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>Analysis Archive</span>
-            </div>
-            <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </Card>
-        </Link>
+        {isMobile ? (
+          <Dialog onOpenChange={(open) => { if (!open) setSelectedTeacherReport(null); }}>
+            <DialogTrigger asChild>
+              <button className="group text-left h-full w-full">
+                <Card className={cn(
+                  "h-full border border-slate-200/80 shadow-sm bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-row items-center gap-4",
+                  "rounded-2xl p-4"
+                )}>
+                  <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 transition-all group-hover:bg-primary group-hover:text-white h-12 w-12">
+                    <FileText className="h-6 w-6 text-primary group-hover:text-white" />
+                  </div>
+                  <div className="grid min-w-0">
+                    <span className="font-black tracking-tighter truncate text-sm">선생님 리포트</span>
+                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]">Teacher Reports</span>
+                  </div>
+                  <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
+                </Card>
+              </button>
+            </DialogTrigger>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]")}>
+              <div className="bg-primary p-8 text-white relative shrink-0">
+                <FileText className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black">{selectedTeacherReport ? `${selectedTeacherReport.dateKey} 리포트` : '선생님 리포트'}</DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold">
+                    {selectedTeacherReport ? '선생님이 발송한 리포트 상세 내용입니다.' : '최근에 발송된 리포트를 바로 확인할 수 있어요.'}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6">
+                {selectedTeacherReport ? (
+                  <div className="bg-white rounded-2xl border border-border/50 p-4 shadow-sm">
+                    <VisualReportViewer content={selectedTeacherReport.content} />
+                  </div>
+                ) : isTeacherReportsLoading ? (
+                  <div className="py-16 flex justify-center">
+                    <Loader2 className="animate-spin h-8 w-8 text-primary opacity-30" />
+                  </div>
+                ) : teacherReports.length === 0 ? (
+                  <div className="py-14 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] font-black text-muted-foreground">
+                    아직 받은 선생님 리포트가 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {teacherReports.slice(0, 10).map((report) => (
+                      <button
+                        key={report.id}
+                        type="button"
+                        onClick={() => handleOpenTeacherReport(report)}
+                        className="w-full text-left p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between gap-3 active:scale-[0.99] transition-all"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary/50">{report.dateKey}</span>
+                            <Badge className={cn(
+                              "font-black text-[8px] border-none px-2 h-4",
+                              report.viewedAt ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
+                            )}>
+                              {report.viewedAt ? '읽음' : 'NEW'}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] font-bold text-muted-foreground line-clamp-1 mt-1">
+                            {report.content.replace(/[🕒✅📊💬🧠]/g, '').trim()}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="p-4 border-t shrink-0 bg-white flex items-center gap-2">
+                {selectedTeacherReport && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-12 rounded-xl font-black"
+                    onClick={() => setSelectedTeacherReport(null)}
+                  >
+                    목록으로
+                  </Button>
+                )}
+                <DialogClose asChild>
+                  <Button className={cn("h-12 rounded-xl font-black", selectedTeacherReport ? "flex-1" : "w-full")}>
+                    닫기
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Link href="/dashboard/student-reports" className="group h-full">
+            <Card className="h-full border border-slate-200/80 shadow-sm bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-row items-center gap-4 rounded-[2rem] p-6">
+              <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 transition-all group-hover:bg-primary group-hover:text-white h-16 w-16">
+                <FileText className="h-8 w-8" />
+              </div>
+              <div className="grid text-left min-w-0">
+                <span className="font-black tracking-tighter truncate text-xl">선생님 리포트</span>
+                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">Teacher Reports</span>
+              </div>
+              <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+            </Card>
+          </Link>
+        )}
 
         <Dialog>
           <DialogTrigger asChild>
