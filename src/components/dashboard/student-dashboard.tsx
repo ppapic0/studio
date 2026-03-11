@@ -522,32 +522,45 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
 
         const batch = writeBatch(firestore);
-        const updateData: any = { updatedAt: serverTimestamp() };
+        const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
+        const dailyStatusUpdate: Record<string, any> = {};
+        const statsUpdate: Record<string, any> = {};
         let finalNewLp = progress?.seasonLp || 0;
+        let earnedLpThisSession = false;
         let wroteSomething = false;
 
         if (sessionSeconds > 0) {
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
-          updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1);
+          statsUpdate.focus = increment((sessionMinutes / 60) * 0.1);
 
           const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
           const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
 
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
-            updateData['dailyLpStatus.' + todayKey + '.attendance'] = true;
+            dailyStatusUpdate.attendance = true;
             toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 LP \uD68D\uB4DD' });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
-            updateData['stats.resilience'] = increment(0.5);
-            updateData['dailyLpStatus.' + todayKey + '.bonus6h'] = true;
+            statsUpdate.resilience = increment(0.5);
+            dailyStatusUpdate.bonus6h = true;
             toast({ title: '\u0036\uC2DC\uAC04 \uC5F0\uC18D \uD559\uC2B5! \uD68C\uBCF5\uB825 \uC2A4\uD0EF \uC0C1\uC2B9' });
           }
 
           finalNewLp += studyLpEarned;
-          updateData.seasonLp = increment(studyLpEarned);
-          updateData['dailyLpStatus.' + todayKey + '.dailyLpAmount'] = increment(studyLpEarned);
+          earnedLpThisSession = studyLpEarned > 0;
+          progressUpdate.seasonLp = increment(studyLpEarned);
+          dailyStatusUpdate.dailyLpAmount = increment(studyLpEarned);
+
+          if (Object.keys(statsUpdate).length > 0) {
+            progressUpdate.stats = statsUpdate;
+          }
+          if (Object.keys(dailyStatusUpdate).length > 0) {
+            progressUpdate.dailyLpStatus = {
+              [todayKey]: dailyStatusUpdate,
+            };
+          }
 
           if (studyLogRef) {
             batch.set(studyLogRef, {
@@ -579,17 +592,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           });
           wroteSomething = true;
 
-          batch.set(progressRef, updateData, { merge: true });
-          wroteSomething = true;
-
-          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', periodKey + '_lp', 'entries', user.uid);
-          batch.set(rankRef, {
-            studentId: user.uid,
-            displayNameSnapshot: user.displayName || '\uD559\uC0DD',
-            classNameSnapshot: activeMembership.className || null,
-            value: finalNewLp,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
+          batch.set(progressRef, progressUpdate, { merge: true });
           wroteSomething = true;
         }
         const stopSeatRef = seatDoc?.ref || fallbackSeatRef;
@@ -637,6 +640,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             }
 
             await setDoc(studyLogRef, fallbackStudyLogData, { merge: true });
+            if (sessionSeconds > 0) {
+              await setDoc(progressRef, progressUpdate, { merge: true });
+            }
 
             if (sessionSeconds > 0) {
               const fallbackSessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
@@ -653,6 +659,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             console.warn('[student-track] stop fallback saved core study logs while optional writes were skipped');
           } catch (fallbackError: any) {
             console.error('[student-track] stop fallback failed', fallbackError);
+          }
+        }
+
+        if (!stopCommitError && earnedLpThisSession) {
+          try {
+            const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+            await setDoc(rankRef, {
+              studentId: user.uid,
+              displayNameSnapshot: user.displayName || '학생',
+              classNameSnapshot: activeMembership.className || null,
+              value: finalNewLp,
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+          } catch (rankError: any) {
+            console.warn('[student-track] leaderboard sync skipped', rankError?.message || rankError);
           }
         }
 
@@ -675,14 +696,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       } else {
         const nowTs = Date.now();
         const batch = writeBatch(firestore);
+        const checkInProgressUpdate: Record<string, any> = {
+          updatedAt: serverTimestamp(),
+          stats: { consistency: increment(0.5) },
+          dailyLpStatus: { [todayKey]: { checkedIn: true } },
+        };
+        const needsCheckInSync = !progress?.dailyLpStatus?.[todayKey]?.checkedIn;
         let wroteSomething = false;
 
-        if (!progress?.dailyLpStatus?.[todayKey]?.checkedIn) {
-          batch.set(progressRef, {
-            'stats.consistency': increment(0.5),
-            ['dailyLpStatus.' + todayKey + '.checkedIn']: true,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
+        if (needsCheckInSync) {
+          batch.set(progressRef, checkInProgressUpdate, { merge: true });
           toast({ title: '\uC785\uC2E4 \uD655\uC778! \uAFB8\uC900\uD568 \uC2A4\uD0EF +0.5 \uC0C1\uC2B9' });
           wroteSomething = true;
         }
@@ -726,6 +749,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               dateKey: todayKey,
               updatedAt: serverTimestamp(),
             }, { merge: true });
+            if (needsCheckInSync) {
+              await setDoc(progressRef, checkInProgressUpdate, { merge: true });
+            }
             usedStartFallback = true;
             startCommitError = null;
             console.warn('[student-track] start fallback kept study-day doc in sync');
@@ -811,11 +837,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (nextState) {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[item.dateKey]?.achievementCount || 0;
+      const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
+      const dayStatusUpdate: Record<string, any> = {};
+      const statsUpdate: Record<string, any> = {};
+      let shouldCommitProgress = false;
+      let shouldSyncRank = false;
+
       if (achievementCount < 5) {
-        batch.update(progressRef, { 
-          'stats.achievement': increment(0.1),
-          [`dailyLpStatus.${item.dateKey}.achievementCount`]: increment(1)
-        });
+        statsUpdate.achievement = increment(0.1);
+        dayStatusUpdate.achievementCount = increment(1);
+        shouldCommitProgress = true;
       }
 
       const dailyItems = plansByDay[item.dateKey] || [];
@@ -827,23 +858,42 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       if (studyTasks.length >= 3 && doneCount === studyTasks.length && !progress?.dailyLpStatus?.[item.dateKey]?.plan) {
         const planLp = Math.round(100 * finalMultiplier);
         finalNewLp += planLp;
-        batch.update(progressRef, {
-          seasonLp: increment(planLp),
-          [`dailyLpStatus.${item.dateKey}.plan`]: true,
-          [`dailyLpStatus.${item.dateKey}.dailyLpAmount`]: increment(planLp),
-        });
+        progressUpdate.seasonLp = increment(planLp);
+        dayStatusUpdate.plan = true;
+        dayStatusUpdate.dailyLpAmount = increment(planLp);
+        shouldCommitProgress = true;
+        shouldSyncRank = true;
         toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
-
-        const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
-        batch.set(rankRef, {
-          studentId: user.uid,
-          displayNameSnapshot: user.displayName || '학생',
-          classNameSnapshot: activeMembership.className || null,
-          value: finalNewLp,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
       }
-      await batch.commit();
+
+      if (Object.keys(statsUpdate).length > 0) {
+        progressUpdate.stats = statsUpdate;
+      }
+      if (Object.keys(dayStatusUpdate).length > 0) {
+        progressUpdate.dailyLpStatus = {
+          [item.dateKey]: dayStatusUpdate,
+        };
+      }
+
+      if (shouldCommitProgress) {
+        batch.set(progressRef, progressUpdate, { merge: true });
+        await batch.commit();
+      }
+
+      if (shouldSyncRank) {
+        try {
+          const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+          await setDoc(rankRef, {
+            studentId: user.uid,
+            displayNameSnapshot: user.displayName || '학생',
+            classNameSnapshot: activeMembership.className || null,
+            value: finalNewLp,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        } catch (rankError: any) {
+          console.warn('[student-track] plan leaderboard sync skipped', rankError?.message || rankError);
+        }
+      }
     }
   };
 

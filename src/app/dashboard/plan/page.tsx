@@ -483,16 +483,20 @@ export default function StudyPlanPage() {
     if (nextState) {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[selectedDateKey]?.achievementCount || 0;
-      if (achievementCount < 5) {
-        batch.update(progressRef!, { 
-          'stats.achievement': increment(0.1),
-          [`dailyLpStatus.${selectedDateKey}.achievementCount`]: increment(1)
-        });
-      }
-      batch.update(progressRef!, {
+      const progressUpdate: Record<string, any> = {
         seasonLp: increment(10),
-        updatedAt: serverTimestamp()
-      });
+        dailyLpStatus: {
+          [selectedDateKey]: {
+            dailyLpAmount: increment(10),
+          },
+        },
+        updatedAt: serverTimestamp(),
+      };
+      if (achievementCount < 5) {
+        progressUpdate.stats = { achievement: increment(0.1) };
+        progressUpdate.dailyLpStatus[selectedDateKey].achievementCount = increment(1);
+      }
+      batch.set(progressRef!, progressUpdate, { merge: true });
       await batch.commit();
     }
   };

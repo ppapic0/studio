@@ -405,13 +405,20 @@ export default function StudyHistoryPage() {
     if (nextState) {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
+      const progressUpdate: Record<string, any> = {
+        seasonLp: increment(10),
+        dailyLpStatus: {
+          [dateKey]: {
+            dailyLpAmount: increment(10),
+          },
+        },
+        updatedAt: serverTimestamp(),
+      };
       if (achievementCount < 5) {
-        batch.update(progressRef, { 
-          'stats.achievement': increment(0.1),
-          [`dailyLpStatus.${dateKey}.achievementCount`]: increment(1)
-        });
+        progressUpdate.stats = { achievement: increment(0.1) };
+        progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
       }
-      batch.update(progressRef, { seasonLp: increment(10), updatedAt: serverTimestamp() });
+      batch.set(progressRef, progressUpdate, { merge: true });
       await batch.commit();
     }
   };
