@@ -13,13 +13,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
     <header className="sticky top-0 z-50 border-b border-[#14295F]/10 bg-white/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="inline-flex items-center gap-3">
-          <Image
-            src={brand.logoMark}
-            alt={`${brand.name} 로고`}
-            width={34}
-            height={34}
-            className="h-[34px] w-[34px] rounded-md object-cover"
-          />
+          <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={34} height={34} className="h-[34px] w-[34px] rounded-md object-cover" />
           <span className="font-display text-base font-bold text-[#14295F]">{brand.name}</span>
         </Link>
 

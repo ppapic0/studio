@@ -46,7 +46,7 @@ export function ConsultForm() {
         return;
       }
 
-      setResult({ type: "success", message: data.message ?? "상담 신청이 접수되었습니다." });
+      setResult({ type: "success", message: data.message ?? "상담 요청이 접수되었습니다." });
       setForm(INITIAL_FORM);
     } catch (error) {
       console.error("[consult-form] submit error", error);
@@ -59,7 +59,7 @@ export function ConsultForm() {
   return (
     <form onSubmit={onSubmit} className="rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_25px_rgba(20,41,95,0.08)]">
       <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">CONSULT FORM</p>
-      <h3 className="mt-2 text-xl font-black text-[#14295F]">입학 상담 신청</h3>
+      <h3 className="mt-2 text-xl font-black text-[#14295F]">입학 상담 요청</h3>
 
       <div className="mt-5 space-y-4">
         <div>
@@ -70,7 +70,7 @@ export function ConsultForm() {
             id="studentName"
             value={form.studentName}
             onChange={(event) => setForm((prev) => ({ ...prev, studentName: event.target.value }))}
-            placeholder="예: 홍길동"
+            placeholder="예: 김트랙"
             className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
           />
         </div>
@@ -123,7 +123,7 @@ export function ConsultForm() {
             접수 중...
           </>
         ) : (
-          "상담 신청 접수"
+          "상담 요청 접수"
         )}
       </button>
     </form>

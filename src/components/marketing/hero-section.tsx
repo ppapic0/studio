@@ -69,7 +69,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-[#14295F]/15 bg-white px-3 py-1.5">
                       <GraduationCap className="h-3.5 w-3.5 text-[#FF7A16]" />
-                      교육학·국문
+                      교육학·국어국문 전공
                     </span>
                   </div>
                 </div>
@@ -91,7 +91,12 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
         <div className="grid gap-4">
           <article className="group relative overflow-hidden rounded-3xl border border-[#14295F]/15 bg-[#0D235D] p-6 shadow-[0_24px_48px_rgba(8,22,56,0.22)]">
             <div className="pointer-events-none absolute inset-0">
-              <Image src={brand.heroBackground} alt="트랙 학습센터 비주얼" fill className="object-cover opacity-30 transition duration-500 group-hover:scale-105" />
+              <Image
+                src={brand.heroBackground}
+                alt="트랙 학습센터 비주얼"
+                fill
+                className="object-cover opacity-30 transition duration-500 group-hover:scale-105"
+              />
               <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(13,35,93,0.92),rgba(13,35,93,0.74)_45%,rgba(255,122,22,0.28))]" />
             </div>
 
