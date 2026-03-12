@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, doc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, deleteField, doc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy, Timestamp } from 'firebase/firestore';
 import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck } from 'lucide-react';
 import { CenterMembership, AttendanceRequest, AttendanceCurrent } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -37,58 +37,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  AttendanceRecordStatus,
+  AttendanceRoutineInfo,
+  DisplayAttendanceStatus,
+  buildAttendanceRoutineInfo,
+  deriveAttendanceDisplayState,
+  toDateSafe,
+} from '@/lib/attendance-auto';
 
-type AttendanceRecordStatus = 'requested' | 'confirmed_present' | 'confirmed_late' | 'confirmed_absent' | 'excused_absent';
 type AttendanceRecord = {
   id: string;
   status: AttendanceRecordStatus;
+  statusSource?: 'auto' | 'manual' | string;
   updatedAt?: any;
+  checkInAt?: any;
+  autoSyncedAt?: any;
   confirmedByUserId?: string;
   centerId?: string;
   studentId?: string;
   dateKey?: string;
   studentName?: string;
-};
-
-type AttendanceRoutineInfo = {
-  hasRoutine: boolean;
-  isNoAttendanceDay: boolean;
-  expectedArrivalTime: string | null;
-};
-
-type DisplayAttendanceStatus = AttendanceRecordStatus | 'missing_routine';
-
-const extractTimeFromRoutineTitle = (title: string): string | null => {
-  const match = title.match(/(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    return null;
-  }
-
-  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-};
-
-const combineDateWithTime = (date: Date, hhmm: string): Date | null => {
-  const [hourText, minuteText] = hhmm.split(':');
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-
-  const parsed = new Date(date);
-  parsed.setHours(hour, minute, 0, 0);
-  return parsed;
-};
-
-const toDateSafe = (value: any): Date | null => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return null;
 };
 
 export default function AttendancePage() {
@@ -164,19 +133,14 @@ export default function AttendancePage() {
             );
             const snap = await getDocs(routineQuery);
             const scheduleTitles = snap.docs.map((docSnap) => String(docSnap.data()?.title || ''));
-            const hasRoutine = scheduleTitles.some(
-              (title) => title.includes('등원 예정') || title.includes('하원 예정') || title.includes('등원하지 않습니다')
-            );
-            const isNoAttendanceDay = scheduleTitles.some((title) => title.includes('등원하지 않습니다'));
-            const arrivalTitle = scheduleTitles.find((title) => title.includes('등원 예정'));
-            const expectedArrivalTime = arrivalTitle ? extractTimeFromRoutineTitle(arrivalTitle) : null;
+            const routineInfo = buildAttendanceRoutineInfo(scheduleTitles);
 
             return [
               student.id,
               {
-                hasRoutine,
-                isNoAttendanceDay,
-                expectedArrivalTime,
+                hasRoutine: routineInfo.hasRoutine,
+                isNoAttendanceDay: routineInfo.isNoAttendanceDay,
+                expectedArrivalTime: routineInfo.expectedArrivalTime,
               },
             ] as const;
           })
@@ -209,7 +173,7 @@ export default function AttendancePage() {
     }
   };
 
-  const handleStatusChange = async (studentId: string, status: AttendanceRecord['status']) => {
+  const handleStatusChange = async (studentId: string, status: AttendanceRecord['status'], checkedAt?: Date | null) => {
       if (!firestore || !user || !centerId || !dateKey) return;
       
       const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
@@ -222,7 +186,16 @@ export default function AttendancePage() {
           centerId: centerId,
           studentId: studentId,
           dateKey: dateKey,
+          statusSource: 'manual',
       };
+
+      if ((status === 'confirmed_present' || status === 'confirmed_late') && checkedAt) {
+        recordData.checkInAt = Timestamp.fromDate(checkedAt);
+      } else if (status === 'confirmed_present' || status === 'confirmed_late') {
+        recordData.checkInAt = serverTimestamp() as any;
+      } else {
+        (recordData as any).checkInAt = deleteField();
+      }
 
       if (studentData) recordData.studentName = studentData.displayName;
       await setDoc(recordRef, recordData, { merge: true });
@@ -268,36 +241,19 @@ export default function AttendancePage() {
       const record = attendanceMap.get(student.id);
       const routine = attendanceRoutineMap[student.id];
       const liveAttendance = attendanceCurrentMap.get(student.id);
+      const derived = deriveAttendanceDisplayState({
+        selectedDate,
+        dateKey,
+        todayDateKey,
+        routine,
+        recordStatus: record?.status,
+        recordCheckedAt: toDateSafe(record?.checkInAt || record?.updatedAt),
+        liveCheckedAt: isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null,
+        nowMs,
+        isRoutineLoading: routineLoading,
+      });
 
-      let status: DisplayAttendanceStatus = record?.status || 'requested';
-      const checkedAtFromRecord = toDateSafe(record?.updatedAt);
-      const checkedAtFromSeat = isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null;
-      const checkedAt = checkedAtFromRecord || checkedAtFromSeat;
-
-      if (!record?.status || record.status === 'requested') {
-        if (!routineLoading && routine && !routine.hasRoutine) {
-          status = 'missing_routine';
-        } else if (routine?.isNoAttendanceDay) {
-          status = 'excused_absent';
-        } else if (routine?.expectedArrivalTime) {
-          const expectedArrivalAt = combineDateWithTime(selectedDate, routine.expectedArrivalTime);
-          const checkInAt = checkedAtFromSeat || checkedAtFromRecord;
-
-          if (checkInAt) {
-            status = expectedArrivalAt && checkInAt.getTime() > expectedArrivalAt.getTime()
-              ? 'confirmed_late'
-              : 'confirmed_present';
-          } else if (expectedArrivalAt) {
-            const isPastDate = dateKey < todayDateKey;
-            const hasTimedOutToday = isTodaySelected && nowMs > expectedArrivalAt.getTime();
-            if (isPastDate || hasTimedOutToday) {
-              status = 'confirmed_absent';
-            }
-          }
-        }
-      }
-
-      mapped.set(student.id, { status, checkedAt });
+      mapped.set(student.id, derived);
     });
 
     return mapped;
@@ -315,6 +271,97 @@ export default function AttendancePage() {
     () => (students || []).filter((student) => attendanceRoutineMap[student.id]?.hasRoutine === false),
     [students, attendanceRoutineMap]
   );
+
+  useEffect(() => {
+    if (
+      !firestore ||
+      !user?.uid ||
+      !centerId ||
+      !dateKey ||
+      !selectedDate ||
+      !isTeacherOrAdmin ||
+      isLoading ||
+      routineLoading ||
+      !students?.length
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const syncAutoAttendance = async () => {
+      try {
+        await Promise.all(
+          students.map(async (student) => {
+            const derived = attendanceDisplayMap.get(student.id);
+            if (!derived) return;
+
+            const autoStatus = derived.status;
+            if (
+              autoStatus !== 'confirmed_present' &&
+              autoStatus !== 'confirmed_late' &&
+              autoStatus !== 'confirmed_absent' &&
+              autoStatus !== 'excused_absent'
+            ) {
+              return;
+            }
+
+            const existingRecord = attendanceMap.get(student.id);
+            if (existingRecord?.statusSource === 'manual') return;
+
+            const existingCheckInAt = toDateSafe(existingRecord?.checkInAt || existingRecord?.updatedAt);
+            const shouldSyncStatus = existingRecord?.status !== autoStatus;
+            const shouldSyncCheckIn =
+              (autoStatus === 'confirmed_present' || autoStatus === 'confirmed_late') &&
+              !!derived.checkedAt &&
+              (!existingCheckInAt || Math.abs(existingCheckInAt.getTime() - derived.checkedAt.getTime()) > 60000);
+
+            if (!shouldSyncStatus && !shouldSyncCheckIn) return;
+            if (cancelled) return;
+
+            const autoRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', student.id);
+            const payload: Record<string, any> = {
+              status: autoStatus,
+              statusSource: 'auto',
+              autoSyncedAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              confirmedByUserId: user.uid,
+              centerId,
+              studentId: student.id,
+              dateKey,
+              studentName: student.displayName || '',
+            };
+
+            if ((autoStatus === 'confirmed_present' || autoStatus === 'confirmed_late') && derived.checkedAt) {
+              payload.checkInAt = Timestamp.fromDate(derived.checkedAt);
+            } else {
+              payload.checkInAt = deleteField();
+            }
+
+            await setDoc(autoRef, payload, { merge: true });
+          })
+        );
+      } catch (error) {
+        console.error('[attendance] auto-sync failed', error);
+      }
+    };
+
+    void syncAutoAttendance();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    attendanceDisplayMap,
+    attendanceMap,
+    centerId,
+    dateKey,
+    firestore,
+    isLoading,
+    isTeacherOrAdmin,
+    routineLoading,
+    selectedDate,
+    students,
+    user?.uid,
+  ]);
 
   if (!isTeacherOrAdmin) {
     return (
@@ -432,7 +479,7 @@ export default function AttendancePage() {
                         {checkedAt ? format(checkedAt, 'p') : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right pr-8">
-                        <Select value={manualStatus} onValueChange={(newStatus) => handleStatusChange(student.id, newStatus as any)}>
+                        <Select value={manualStatus} onValueChange={(newStatus) => handleStatusChange(student.id, newStatus as any, checkedAt)}>
                           <SelectTrigger className="w-[120px] h-10 rounded-xl font-bold border-2 ml-auto">
                             <SelectValue placeholder="상태 설정" />
                           </SelectTrigger>

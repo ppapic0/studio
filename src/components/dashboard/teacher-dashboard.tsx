@@ -99,6 +99,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { httpsCallable } from 'firebase/functions';
+import { syncAutoAttendanceRecord, toDateSafe as toDateSafeAttendance } from '@/lib/attendance-auto';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -844,6 +845,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       await batch.commit();
       // 카카오 알림톡 발송 (선생님 수동 조작)
       const studentName = students?.find(s => s.id === studentId)?.name || '학생';
+      const autoCheckInAt =
+        nextStatus === 'studying'
+          ? new Date()
+          : (toDateSafeAttendance(selectedSeat.lastCheckInAt) || null);
+      void syncAutoAttendanceRecord({
+        firestore,
+        centerId,
+        studentId,
+        studentName,
+        targetDate: new Date(),
+        checkInAt: autoCheckInAt,
+        confirmedByUserId: user?.uid,
+      }).catch((syncError: any) => {
+        console.warn('[teacher-dashboard] auto attendance sync skipped', syncError?.message || syncError);
+      });
+
       const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
       sendKakaoNotification(firestore, centerId, {
         studentName,

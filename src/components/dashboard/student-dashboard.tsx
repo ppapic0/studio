@@ -78,6 +78,7 @@ import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, S
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { syncAutoAttendanceRecord, toDateSafe as toDateSafeAttendance } from '@/lib/attendance-auto';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -692,6 +693,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
 
+        if (!stopCommitError) {
+          const checkInAtForAttendance = toDateSafeAttendance(safeSeatStart) || new Date(safeStartTs);
+          void syncAutoAttendanceRecord({
+            firestore,
+            centerId,
+            studentId: user.uid,
+            studentName: user.displayName || '학생',
+            targetDate: new Date(nowTs),
+            checkInAt: checkInAtForAttendance,
+            confirmedByUserId: user.uid,
+          }).catch((syncError: any) => {
+            console.warn('[student-track] auto attendance sync skipped', syncError?.message || syncError);
+          });
+        }
+
         void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'exit' })
           .catch((notifyError: any) => {
             console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
@@ -775,6 +791,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           } catch (fallbackError: any) {
             console.error('[student-track] start fallback failed', fallbackError);
           }
+        }
+
+        if (!startCommitError) {
+          void syncAutoAttendanceRecord({
+            firestore,
+            centerId,
+            studentId: user.uid,
+            studentName: user.displayName || '학생',
+            targetDate: new Date(nowTs),
+            checkInAt: new Date(nowTs),
+            confirmedByUserId: user.uid,
+          }).catch((syncError: any) => {
+            console.warn('[student-track] auto attendance sync skipped', syncError?.message || syncError);
+          });
         }
 
         void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'entry' })

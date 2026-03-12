@@ -48,6 +48,7 @@ import { format } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
+import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 
 export default function KioskPage() {
   const firestore = useFirestore();
@@ -282,6 +283,22 @@ export default function KioskPage() {
 
       batch.update(seatRef, updateData);
       await batch.commit();
+
+      const autoCheckInAt =
+        nextStatus === 'studying'
+          ? new Date()
+          : (seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : null);
+      void syncAutoAttendanceRecord({
+        firestore,
+        centerId,
+        studentId: student.id,
+        studentName: student.name,
+        targetDate: new Date(),
+        checkInAt: autoCheckInAt,
+      }).catch((syncError: any) => {
+        console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
+      });
+
       // 카카오톡 알림 발송
       const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
       sendKakaoNotification(firestore, centerId, {
@@ -295,7 +312,12 @@ export default function KioskPage() {
         void triggerAttendanceSms(student.id, 'check_out');
       }
 
-      const statusLabels = { studying: '입실', away: '외출/휴식', absent: '퇴실' };
+      const statusLabels: Record<AttendanceCurrent['status'], string> = {
+        studying: '입실',
+        away: '외출/휴식',
+        break: '휴식',
+        absent: '퇴실',
+      };
       toast({ 
         title: `${statusLabels[nextStatus]} 확인 ✨`,
         description: `${student.name} 학생, 열공하세요!`
