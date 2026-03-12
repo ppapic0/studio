@@ -904,7 +904,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               </Badge>
                             )}
                           </div>
-                          <p className="line-clamp-1 text-[12px] font-bold text-slate-600">{notification.body}</p>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
                             {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
                           </p>
@@ -1309,7 +1308,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       {n.isImportant && <Badge className="bg-orange-100 text-[#FF7A16] border-none font-black text-[8px] h-5 px-2">중요</Badge>}
                     </div>
                     <p className="text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
-                    <p className="text-xs font-bold text-slate-500 leading-relaxed">{n.body}</p>
                   </button>
                 ))
               )}
