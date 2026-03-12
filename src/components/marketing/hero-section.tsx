@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Award, GraduationCap } from "lucide-react";
 
 import type { MarketingContent } from "@/lib/marketing-content";
 
@@ -9,6 +10,8 @@ type HeroSectionProps = {
 };
 
 export function HeroSection({ brand, heroStats }: HeroSectionProps) {
+  const [directorResult, ...otherStats] = heroStats;
+
   return (
     <section className="relative overflow-hidden bg-white pb-14 pt-10 sm:pb-20 sm:pt-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_4%,rgba(20,41,95,0.06),transparent_36%),radial-gradient(circle_at_92%_2%,rgba(255,122,22,0.1),transparent_36%)]" />
@@ -45,14 +48,43 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
             </Link>
           </div>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {heroStats.map((stat) => (
-              <article key={stat.label} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-4">
-                <p className="text-[11px] font-black text-[#14295F]/70">{stat.label}</p>
-                <p className="font-display mt-2 break-keep text-xl font-bold text-[#14295F]">{stat.value}</p>
-                {stat.detail ? <p className="mt-1 text-xs font-bold text-[#FF7A16]">{stat.detail}</p> : null}
+          <div className="mt-8 grid gap-3">
+            {directorResult ? (
+              <article className="relative overflow-hidden rounded-2xl border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#FFF5EC,#FFFFFF)] p-5 shadow-[0_14px_34px_rgba(255,122,22,0.18)]">
+                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#FF7A16]/10" />
+                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-black tracking-[0.14em] text-[#FF7A16]">DIRECTOR PERFORMANCE</p>
+                    <p className="font-display mt-2 break-keep text-2xl font-bold text-[#14295F] sm:text-3xl">
+                      {directorResult.value}
+                    </p>
+                    {directorResult.detail ? (
+                      <p className="mt-1 text-sm font-bold text-[#14295F]/75">{directorResult.detail}</p>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-black text-[#14295F]">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#14295F]/15 bg-white px-3 py-1.5">
+                      <Award className="h-3.5 w-3.5 text-[#FF7A16]" />
+                      원장 직강
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#14295F]/15 bg-white px-3 py-1.5">
+                      <GraduationCap className="h-3.5 w-3.5 text-[#FF7A16]" />
+                      교육학·국문
+                    </span>
+                  </div>
+                </div>
               </article>
-            ))}
+            ) : null}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {otherStats.map((stat) => (
+                <article key={stat.label} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-4">
+                  <p className="text-[11px] font-black text-[#14295F]/70">{stat.label}</p>
+                  <p className="font-display mt-2 break-keep text-xl font-bold text-[#14295F]">{stat.value}</p>
+                  {stat.detail ? <p className="mt-1 text-xs font-bold text-[#FF7A16]">{stat.detail}</p> : null}
+                </article>
+              ))}
+            </div>
           </div>
         </div>
 

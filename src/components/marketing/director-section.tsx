@@ -1,4 +1,5 @@
 import type { MarketingContent } from "@/lib/marketing-content";
+import { BadgeCheck } from "lucide-react";
 
 import { SectionHeading } from "./section-heading";
 
@@ -13,6 +14,10 @@ export function DirectorSection({ director }: DirectorSectionProps) {
         <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
           <div>
             <SectionHeading eyebrow="Director" title={director.heading} description={director.description} />
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#14295F]/15 bg-[#F8FAFF] px-4 py-2">
+              <BadgeCheck className="h-4 w-4 text-[#FF7A16]" />
+              <span className="text-sm font-black text-[#14295F]">교육학·국어국문 전공 기반 수업 설계</span>
+            </div>
             <ul className="mt-6 space-y-3">
               {director.highlights.map((item) => (
                 <li key={item} className="flex items-start gap-3 rounded-xl border border-[#14295F]/10 bg-[#F8FAFF] px-4 py-3">
