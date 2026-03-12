@@ -121,9 +121,50 @@ function formatMinutes(minutes: number) {
   return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
+function getFocusProgress(minutes: number) {
+  return Math.min(100, Math.round((minutes / 360) * 100));
+}
+
 function formatWon(value: number) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
   return `₩${safe.toLocaleString()}`;
+}
+
+type InvoiceStatusMeta = {
+  label: string;
+  mobileLabel: string;
+  className: string;
+};
+
+function getInvoiceStatusMeta(status: Invoice['status']): InvoiceStatusMeta | null {
+  if (status === 'paid') {
+    return {
+      label: '수납 완료',
+      mobileLabel: '완납',
+      className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    };
+  }
+  if (status === 'overdue') {
+    return {
+      label: '미납',
+      mobileLabel: '미납',
+      className: 'bg-rose-100 text-rose-700 border-rose-200',
+    };
+  }
+  if (status === 'issued') {
+    return {
+      label: '청구',
+      mobileLabel: '미납',
+      className: 'bg-amber-100 text-amber-700 border-amber-200',
+    };
+  }
+  return null;
+}
+
+function getInvoiceTrackLabel(category?: Invoice['trackCategory']) {
+  if (category === 'academy') return '학원 수납';
+  if (category === 'studyRoom') return '독서실 수납';
+  return '센터 수납';
 }
 
 const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
@@ -392,18 +433,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [studentInvoices]);
 
-  const latestInvoice = sortedInvoices[0];
-  const latestInvoiceDueDate = toDateSafe((latestInvoice as any)?.cycleEndDate);
+  const displayInvoices = useMemo(
+    () => sortedInvoices.filter((invoice) => invoice.status !== 'void' && invoice.status !== 'refunded'),
+    [sortedInvoices]
+  );
+  const latestInvoice = displayInvoices[0];
 
   const billingSummary = useMemo(() => {
-    return sortedInvoices.reduce(
+    return displayInvoices.reduce(
       (acc, invoice) => {
         const amount = Number(invoice.finalPrice || 0);
         if (!Number.isFinite(amount) || amount <= 0) return acc;
 
-        if (invoice.status !== 'void' && invoice.status !== 'refunded') {
-          acc.billed += amount;
-        }
+        acc.billed += amount;
         if (invoice.status === 'paid') {
           acc.paid += amount;
         }
@@ -414,31 +456,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       },
       { billed: 0, paid: 0, overdue: 0 }
     );
-  }, [sortedInvoices]);
-
-  const latestInvoiceStatusMeta = useMemo(() => {
-    if (!latestInvoice) return null;
-    if (latestInvoice.status === 'paid') {
-      return {
-        label: '수납 완료',
-        className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-      };
-    }
-    if (latestInvoice.status === 'overdue') {
-      return {
-        label: '미납',
-        className: 'bg-rose-100 text-rose-700 border-rose-200',
-      };
-    }
-    return {
-      label: '청구',
-      className: 'bg-amber-100 text-amber-700 border-amber-200',
-    };
-  }, [latestInvoice]);
+  }, [displayInvoices]);
 
   const mobileBillingStatusMeta = useMemo(() => {
-    if (!latestInvoice) return null;
-    if (latestInvoice.status === 'paid') {
+    if (displayInvoices.length === 0) return null;
+    const hasUnpaidInvoice = displayInvoices.some(
+      (invoice) => invoice.status === 'issued' || invoice.status === 'overdue'
+    );
+    if (!hasUnpaidInvoice) {
       return {
         label: '완납',
         className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -448,7 +473,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       label: '미납',
       className: 'bg-rose-100 text-rose-700 border-rose-200',
     };
-  }, [latestInvoice]);
+  }, [displayInvoices]);
 
   const studyPlans = (todayPlans || []).filter((item) => item.category === 'study' || !item.category);
   const totalMinutes = todayLog?.totalMinutes || 0;
@@ -711,6 +736,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [notifications]);
 
   const recentNotifications = useMemo(() => sortedNotifications.slice(0, 3), [sortedNotifications]);
+  const unreadRecentCount = useMemo(
+    () => recentNotifications.filter((notification) => !(notification.isRead || !!readMap[notification.id])).length,
+    [recentNotifications, readMap]
+  );
 
   const penaltyMeta = useMemo(() => {
     const points = penaltyRecovery.effectivePoints;
@@ -869,15 +898,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-1 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-[#14295F]" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 알림 3개</span>
                   </div>
-                  <Badge className="h-5 border border-slate-200 bg-slate-50 px-2 text-[9px] font-black text-slate-500">
-                    {recentNotifications.length}건
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {unreadRecentCount > 0 && (
+                      <Badge className="h-5 border-none bg-[#FF7A16]/15 px-2 text-[9px] font-black text-[#FF7A16] animate-pulse">
+                        미읽음 {unreadRecentCount}
+                      </Badge>
+                    )}
+                    <Badge className="h-5 border border-slate-200 bg-slate-50 px-2 text-[9px] font-black text-slate-500">
+                      {recentNotifications.length}건
+                    </Badge>
+                  </div>
                 </div>
+                <p className="mb-3 text-[11px] font-bold text-slate-500">알림 카드를 누르면 상세 내용을 읽을 수 있어요.</p>
                 {recentNotifications.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
                     최근 알림이 없습니다.
@@ -891,18 +928,34 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           type="button"
                           key={notification.id}
                           className={cn(
-                            'w-full rounded-2xl border p-3 text-left transition-all',
-                            isRead ? 'border-slate-200 bg-slate-50/60' : 'border-[#14295F]/15 bg-[#f8fbff] shadow-sm'
+                            'relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-all',
+                            isRead
+                              ? 'border-slate-200 bg-slate-50/60'
+                              : 'border-[#14295F]/20 bg-[#f8fbff] shadow-sm ring-1 ring-[#FF7A16]/25 hover:shadow-md'
                           )}
                           onClick={() => void openNotificationDetail(notification)}
                         >
+                          {!isRead && (
+                            <>
+                              <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-[#FF7A16]/20 blur-xl animate-pulse" />
+                              <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16] animate-pulse" />
+                            </>
+                          )}
                           <div className="mb-1 flex items-center justify-between gap-2">
-                            <p className="truncate text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
-                            {notification.isImportant && (
-                              <Badge className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">
-                                중요
-                              </Badge>
-                            )}
+                            <p className="truncate pr-6 text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {!isRead && (
+                                <span className="relative inline-flex h-2.5 w-2.5">
+                                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#FF7A16] opacity-70 animate-ping" />
+                                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
+                                </span>
+                              )}
+                              {notification.isImportant && (
+                                <Badge className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">
+                                  중요
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
                             {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
@@ -913,7 +966,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 )}
               </Card>
-
               <div className="grid grid-cols-1 gap-3">
                 <Dialog>
                   <DialogTrigger asChild>
@@ -968,12 +1020,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </div>
 
-              <Card className="rounded-[2rem] border-none bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
-                <div className="grid grid-cols-7 border-b bg-gradient-to-r from-slate-50 via-white to-slate-50">
-                  {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
+              <Card className="rounded-[2.5rem] border-2 border-[#14295F]/5 bg-white shadow-xl ring-1 ring-black/[0.03] overflow-hidden">
+                <div className={cn(
+                  "grid grid-cols-7 border-b-2 border-[#14295F]/10",
+                  isMobile ? "bg-slate-50" : "bg-gradient-to-r from-slate-50 via-white to-slate-50"
+                )}>
+                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, i) => (
                     <div key={day} className={cn(
-                      "py-3 text-center text-[10px] font-black uppercase tracking-widest",
-                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-slate-400"
+                      isMobile ? "py-3 text-[9px]" : "py-4 text-[11px]",
+                      "text-center font-black uppercase tracking-widest",
+                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/60"
                     )}>{day}</div>
                   ))}
                 </div>
@@ -986,6 +1042,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     const minutes = log?.totalMinutes || 0;
                     const isCurrentMonth = isSameMonth(day, currentCalendarDate);
                     const isTodayCalendar = isSameDay(day, new Date());
+                    const hasPlans = (weeklyPlans || []).some((plan) => plan.dateKey === dateKey);
+                    const progressPercent = getFocusProgress(minutes);
+                    const hour = Math.floor(minutes / 60);
+                    const minuteRemainder = minutes % 60;
 
                     return (
                       <button
@@ -993,23 +1053,67 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={dateKey}
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
-                          "p-1.5 aspect-square border-r border-b relative flex flex-col items-center justify-between text-left group transition-all hover:z-10 hover:scale-[1.02] hover:shadow-md active:scale-100",
-                          !isCurrentMonth ? "opacity-[0.05] grayscale" : getHeatmapColor(minutes),
-                          isTodayCalendar && "ring-2 ring-inset ring-[#FF7A16]/40 z-10"
+                          "relative text-left border-r-2 border-b-2 border-[#14295F]/5 transition-all cursor-pointer group overflow-hidden",
+                          isMobile ? "aspect-square p-1.5" : "min-h-[156px] p-3.5",
+                          !isCurrentMonth ? "opacity-[0.14] grayscale bg-slate-100" : getHeatmapColor(minutes),
+                          isTodayCalendar && "ring-4 ring-inset ring-[#FF7A16]/35 z-10 shadow-lg scale-[1.01] rounded-xl"
                         )}
                       >
-                        <span className={cn(
-                          "text-[9px] font-black tracking-tighter tabular-nums self-start",
-                          idx % 7 === 5 && isCurrentMonth ? "text-blue-600" : idx % 7 === 6 && isCurrentMonth ? "text-rose-600" : "opacity-40"
-                        )}>
-                          {format(day, 'd')}
-                        </span>
-                        {minutes > 0 && (
-                          <div className="flex flex-col items-center gap-0.5 mb-1">
-                            <span className="text-[9px] font-mono font-black tracking-tighter tabular-nums leading-none">
-                              {formatMinutes(minutes)}
-                            </span>
-                            {minutes >= 180 && <Zap className="h-2 w-2 text-orange-500 fill-orange-500" />}
+                        {!isMobile && isCurrentMonth && minutes > 0 && (
+                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white/35 to-transparent pointer-events-none" />
+                        )}
+                        <div className={cn("flex justify-between items-start", isMobile ? "mb-1" : "mb-2.5")}>
+                          <span
+                            className={cn(
+                              "font-black tracking-tighter tabular-nums rounded-full",
+                              isMobile ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1",
+                              idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/80" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/80" : "text-[#14295F]/60 bg-white/75",
+                              isTodayCalendar && "text-[#14295F] scale-110"
+                            )}
+                          >
+                            {format(day, 'd')}
+                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            {minutes >= 180 && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5")} />}
+                            {hasPlans && <div className={cn("rounded-full bg-[#14295F]/35", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                          </div>
+                        </div>
+                        {isMobile ? (
+                          <div className="absolute inset-x-1 bottom-1.5">
+                            <div
+                              className={cn(
+                                "rounded-md border text-center font-mono font-black tabular-nums py-1 leading-none",
+                                minutes > 0 ? "text-[#14295F] bg-white/85 border-white/80 shadow-sm" : "text-slate-400 bg-white/55 border-white/65"
+                              )}
+                            >
+                              {isCurrentMonth ? formatMinutes(minutes) : '--:--'}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-2.5 flex flex-col gap-2">
+                            {isCurrentMonth && minutes > 0 ? (
+                              <>
+                                <span className="font-mono font-black tracking-tighter tabular-nums leading-none text-2xl text-[#14295F]">
+                                  {formatMinutes(minutes)}
+                                </span>
+                                <div className="h-1.5 w-full rounded-full bg-white/55 overflow-hidden">
+                                  <div className="h-full rounded-full bg-[#14295F]/80" style={{ width: progressPercent + '%' }} />
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] font-black text-[#14295F]/70">
+                                  <span>{progressPercent}% FOCUS</span>
+                                  <span>{hour}h {minuteRemainder.toString().padStart(2, '0')}m</span>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="mt-auto text-[11px] font-bold text-slate-400">No record</span>
+                            )}
+                          </div>
+                        )}
+                        {isTodayCalendar && (
+                          <div className="absolute bottom-1 right-1">
+                            <div className="bg-[#14295F] text-white p-0.5 rounded-full shadow-lg">
+                              <Activity className="h-1.5 w-1.5" />
+                            </div>
                           </div>
                         )}
                       </button>
@@ -1017,7 +1121,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   })}
                 </div>
               </Card>
-
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
                   <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-400 uppercase">
@@ -1198,7 +1301,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="space-y-1">
                       <h3 className="text-4xl font-black tracking-tight text-[#14295F] leading-none">수납</h3>
                       <p className="text-[15px] font-bold text-slate-700 leading-snug">
-                        센터수납요청건을 비대면으로 결제할 수 있어요 !
+                        <span className="block">센터수납요청건을 비대면으로</span>
+                        <span className="block">결제할 수 있어요!</span>
                       </p>
                     </div>
                     <span className="shrink-0 text-[14px] font-black text-[#14295F]">실시간 연동</span>
@@ -1244,38 +1348,50 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               {latestInvoice ? (
-                <Card className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
-                  <div className={cn("flex justify-between gap-3", isMobile ? "items-center" : "items-start")}>
-                    <div className="space-y-2 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <p className={cn("font-black tracking-tight text-[#14295F] min-w-0 truncate whitespace-nowrap", isMobile ? "text-[1.45rem] leading-none" : "text-[20px]")}>
-                          {latestInvoice.studentName || student?.name || '학생'}
-                        </p>
-                        {latestInvoiceStatusMeta && (
-                          <Badge className={cn('h-6 border px-2 text-[10px] font-black shrink-0', latestInvoiceStatusMeta.className)}>
-                            {isMobile ? (latestInvoice.status === 'paid' ? '완납' : '미납') : latestInvoiceStatusMeta.label}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-[15px] font-bold text-slate-600">
-                        결제 마감일 {latestInvoiceDueDate ? format(latestInvoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
-                      </p>
-                    </div>
-                    <p className={cn("font-black tracking-tight leading-none text-[#14295F] tabular-nums whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
-                      {formatWon(Number(latestInvoice.finalPrice || 0))}
-                    </p>
-                  </div>
+                <div className="space-y-3">
+                  {displayInvoices.map((invoice) => {
+                    const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
+                    const statusMeta = getInvoiceStatusMeta(invoice.status);
 
-                  {(latestInvoice.status === 'issued' || latestInvoice.status === 'overdue') && (
-                    <Link
-                      href={`/payment/checkout/${latestInvoice.id}`}
-                      className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#14295F] text-[15px] font-black text-white shadow-sm transition-colors hover:bg-[#10224f]"
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      결제하기
-                    </Link>
-                  )}
-                </Card>
+                    return (
+                      <Card key={invoice.id} className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+                        <div className={cn("flex justify-between gap-3", isMobile ? "items-center" : "items-start")}>
+                          <div className="space-y-2 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              <p className={cn("font-black tracking-tight text-[#14295F] min-w-0 truncate whitespace-nowrap", isMobile ? "text-[1.45rem] leading-none" : "text-[20px]")}>
+                                {invoice.studentName || student?.name || '학생'}
+                              </p>
+                              <Badge className="h-6 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-600">
+                                {getInvoiceTrackLabel(invoice.trackCategory)}
+                              </Badge>
+                              {statusMeta && (
+                                <Badge className={cn('h-6 border px-2 text-[10px] font-black shrink-0', statusMeta.className)}>
+                                  {isMobile ? statusMeta.mobileLabel : statusMeta.label}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[15px] font-bold text-slate-600">
+                              결제 마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
+                            </p>
+                          </div>
+                          <p className={cn("font-black tracking-tight leading-none text-[#14295F] tabular-nums whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
+                            {formatWon(Number(invoice.finalPrice || 0))}
+                          </p>
+                        </div>
+
+                        {(invoice.status === 'issued' || invoice.status === 'overdue') && (
+                          <Link
+                            href={`/payment/checkout/${invoice.id}`}
+                            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#14295F] text-[15px] font-black text-white shadow-sm transition-colors hover:bg-[#10224f]"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            결제하기
+                          </Link>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
               ) : (
                 <Card className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
                   <p className="text-[14px] font-bold text-slate-500">현재 발행된 인보이스가 없습니다.</p>

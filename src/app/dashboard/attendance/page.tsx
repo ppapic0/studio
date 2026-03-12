@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, deleteField, doc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy, Timestamp } from 'firebase/firestore';
 import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck } from 'lucide-react';
 import { CenterMembership, AttendanceRequest, AttendanceCurrent } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -63,6 +63,12 @@ type AttendanceRecord = {
   studentName?: string;
 };
 
+type StudyLogSummary = {
+  hasStudyLog: boolean;
+  studyMinutes: number;
+  checkedAt: Date | null;
+};
+
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -73,6 +79,8 @@ export default function AttendancePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [attendanceRoutineMap, setAttendanceRoutineMap] = useState<Record<string, AttendanceRoutineInfo>>({});
   const [routineLoading, setRoutineLoading] = useState(false);
+  const [studyLogMap, setStudyLogMap] = useState<Record<string, StudyLogSummary>>({});
+  const [studyLogLoading, setStudyLogLoading] = useState(false);
 
   useEffect(() => {
     setSelectedDate(new Date());
@@ -166,6 +174,61 @@ export default function AttendancePage() {
     };
   }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, students]);
 
+  useEffect(() => {
+    if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !students) {
+      setStudyLogMap({});
+      setStudyLogLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadStudyLogMap = async () => {
+      setStudyLogLoading(true);
+      try {
+        const entries = await Promise.all(
+          students.map(async (student) => {
+            const dayRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', dateKey);
+            const daySnap = await getDoc(dayRef);
+            if (!daySnap.exists()) {
+              return [
+                student.id,
+                { hasStudyLog: false, studyMinutes: 0, checkedAt: null },
+              ] as const;
+            }
+
+            const data = daySnap.data() as any;
+            const rawMinutes = Number(data?.totalMinutes || 0);
+            const studyMinutes = Number.isFinite(rawMinutes) ? Math.max(0, Math.round(rawMinutes)) : 0;
+            const checkedAt = toDateSafe(data?.updatedAt || data?.createdAt);
+
+            return [
+              student.id,
+              {
+                hasStudyLog: studyMinutes > 0,
+                studyMinutes,
+                checkedAt,
+              },
+            ] as const;
+          })
+        );
+
+        if (!cancelled) {
+          setStudyLogMap(Object.fromEntries(entries));
+        }
+      } catch (error) {
+        console.error('[attendance] study log map load failed', error);
+        if (!cancelled) setStudyLogMap({});
+      } finally {
+        if (!cancelled) setStudyLogLoading(false);
+      }
+    };
+
+    void loadStudyLogMap();
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore, centerId, isTeacherOrAdmin, dateKey, students]);
+
   const getBadgeVariant = (status: string) => {
     switch (status) {
       case 'confirmed_present': return 'default';
@@ -223,7 +286,7 @@ export default function AttendancePage() {
     }
   };
 
-  const isLoading = !selectedDate || membersLoading || attendanceLoading || attendanceCurrentLoading;
+  const isLoading = !selectedDate || membersLoading || attendanceLoading || attendanceCurrentLoading || studyLogLoading;
   const attendanceMap = useMemo(() => new Map(attendanceRecords?.map(r => [r.id, r])), [attendanceRecords]);
   const attendanceCurrentMap = useMemo(() => {
     const mapped = new Map<string, AttendanceCurrent>();
@@ -247,17 +310,27 @@ export default function AttendancePage() {
       const record = attendanceMap.get(student.id);
       const routine = attendanceRoutineMap[student.id];
       const liveAttendance = attendanceCurrentMap.get(student.id);
+      const studyLog = studyLogMap[student.id];
+      const accessCheckedAt = isTodaySelected
+        ? toDateSafe(liveAttendance?.updatedAt || liveAttendance?.lastCheckInAt)
+        : null;
       const derived = deriveAttendanceDisplayState({
         selectedDate,
         dateKey,
         todayDateKey,
         routine,
         recordStatus: record?.status,
+        recordStatusSource: record?.statusSource,
         recordRoutineMissingAtCheckIn: Boolean(record?.routineMissingAtCheckIn),
         recordCheckedAt: toDateSafe(record?.checkInAt || record?.updatedAt),
         liveCheckedAt: isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null,
+        accessCheckedAt,
+        studyCheckedAt: studyLog?.checkedAt || null,
+        studyMinutes: studyLog?.studyMinutes || 0,
+        hasStudyLog: Boolean(studyLog?.hasStudyLog),
         nowMs,
         isRoutineLoading: routineLoading,
+        isStudyLogLoading: studyLogLoading,
       });
 
       mapped.set(student.id, derived);
@@ -270,6 +343,8 @@ export default function AttendancePage() {
     attendanceRoutineMap,
     dateKey,
     routineLoading,
+    studyLogLoading,
+    studyLogMap,
     selectedDate,
     students,
   ]);

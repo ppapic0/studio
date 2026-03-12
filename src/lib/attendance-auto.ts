@@ -51,6 +51,7 @@ const ATTENDANCE_ROUTINE_KEYWORDS = {
 } as const;
 
 const AUTO_SYNC_STATUSES = new Set<DisplayAttendanceStatus>([
+  'requested',
   'confirmed_present',
   'confirmed_present_missing_routine',
   'confirmed_late',
@@ -115,11 +116,17 @@ export function deriveAttendanceDisplayState(params: {
   todayDateKey: string;
   routine?: AttendanceRoutineInfo;
   recordStatus?: AttendanceRecordStatus;
+  recordStatusSource?: AttendanceRecordLike['statusSource'];
   recordRoutineMissingAtCheckIn?: boolean;
   recordCheckedAt?: Date | null;
   liveCheckedAt?: Date | null;
+  accessCheckedAt?: Date | null;
+  studyCheckedAt?: Date | null;
+  studyMinutes?: number;
+  hasStudyLog?: boolean;
   nowMs?: number;
   isRoutineLoading?: boolean;
+  isStudyLogLoading?: boolean;
 }): { status: DisplayAttendanceStatus; checkedAt: Date | null } {
   const {
     selectedDate,
@@ -127,44 +134,112 @@ export function deriveAttendanceDisplayState(params: {
     todayDateKey,
     routine,
     recordStatus,
+    recordStatusSource,
     recordRoutineMissingAtCheckIn = false,
     recordCheckedAt,
     liveCheckedAt,
+    accessCheckedAt,
+    studyCheckedAt,
+    studyMinutes = 0,
+    hasStudyLog = studyMinutes > 0,
     nowMs = Date.now(),
     isRoutineLoading = false,
+    isStudyLogLoading = false,
   } = params;
 
   const isTodaySelected = dateKey === todayDateKey;
-  const checkedAt = recordCheckedAt || liveCheckedAt || null;
-  let status: DisplayAttendanceStatus = recordStatus || 'requested';
+  const hasStudyEvidence = hasStudyLog || studyMinutes > 0;
+  const studyEvidenceCheckedAt = studyCheckedAt || null;
+  const fallbackCheckedAt = studyEvidenceCheckedAt || recordCheckedAt || liveCheckedAt || accessCheckedAt || null;
+  let checkedAt: Date | null = fallbackCheckedAt;
 
-  if (recordStatus === 'confirmed_present' && recordRoutineMissingAtCheckIn && checkedAt) {
-    status = 'confirmed_present_missing_routine';
-  } else if (!recordStatus || recordStatus === 'requested') {
-    if (!isRoutineLoading && routine && !routine.hasRoutine) {
-      status = checkedAt ? 'confirmed_present_missing_routine' : 'missing_routine';
-    } else if (routine?.isNoAttendanceDay) {
-      status = 'excused_absent';
-    } else if (routine?.expectedArrivalTime) {
-      const expectedArrivalAt = combineDateWithTime(selectedDate, routine.expectedArrivalTime);
-      const checkInAt = liveCheckedAt || recordCheckedAt;
-
-      if (checkInAt) {
-        status =
-          expectedArrivalAt && checkInAt.getTime() > expectedArrivalAt.getTime()
-            ? 'confirmed_late'
-            : 'confirmed_present';
-      } else if (expectedArrivalAt) {
-        const isPastDate = dateKey < todayDateKey;
-        const hasTimedOutToday = isTodaySelected && nowMs > expectedArrivalAt.getTime();
-        if (isPastDate || hasTimedOutToday) {
-          status = 'confirmed_absent';
-        }
-      }
-    }
+  const isManualStatus = recordStatusSource === 'manual' && !!recordStatus && recordStatus !== 'requested';
+  if (isManualStatus) {
+    const status =
+      recordStatus === 'confirmed_present' && recordRoutineMissingAtCheckIn && checkedAt
+        ? 'confirmed_present_missing_routine'
+        : (recordStatus as DisplayAttendanceStatus);
+    return { status, checkedAt };
   }
 
-  return { status, checkedAt };
+  if (isStudyLogLoading) {
+    return { status: recordStatus || 'requested', checkedAt };
+  }
+
+  if (!isRoutineLoading && routine && !routine.hasRoutine) {
+    return {
+      status: hasStudyEvidence ? 'confirmed_present_missing_routine' : 'missing_routine',
+      checkedAt: hasStudyEvidence ? (studyEvidenceCheckedAt || fallbackCheckedAt) : (accessCheckedAt || liveCheckedAt || recordCheckedAt || null),
+    };
+  }
+
+  if (routine?.isNoAttendanceDay) {
+    return {
+      status: 'excused_absent',
+      checkedAt: accessCheckedAt || liveCheckedAt || recordCheckedAt || null,
+    };
+  }
+
+  if (routine?.expectedArrivalTime) {
+    const expectedArrivalAt = combineDateWithTime(selectedDate, routine.expectedArrivalTime);
+    if (hasStudyEvidence) {
+      const attendanceEvidenceAt = studyEvidenceCheckedAt || liveCheckedAt || recordCheckedAt || accessCheckedAt || null;
+      const status =
+        attendanceEvidenceAt && expectedArrivalAt && attendanceEvidenceAt.getTime() > expectedArrivalAt.getTime()
+          ? 'confirmed_late'
+          : 'confirmed_present';
+      return { status, checkedAt: attendanceEvidenceAt };
+    }
+
+    let status: DisplayAttendanceStatus = 'requested';
+    if (expectedArrivalAt) {
+      const isPastDate = dateKey < todayDateKey;
+      const hasTimedOutToday = isTodaySelected && nowMs > expectedArrivalAt.getTime();
+      if (isPastDate || hasTimedOutToday) {
+        status = 'confirmed_absent';
+      }
+    }
+
+    return {
+      status,
+      checkedAt: accessCheckedAt || liveCheckedAt || recordCheckedAt || null,
+    };
+  }
+
+  if (hasStudyEvidence) {
+    return {
+      status: 'confirmed_present',
+      checkedAt: studyEvidenceCheckedAt || liveCheckedAt || recordCheckedAt || accessCheckedAt || null,
+    };
+  }
+
+  return {
+    status: 'requested',
+    checkedAt: accessCheckedAt || liveCheckedAt || recordCheckedAt || null,
+  };
+}
+
+async function fetchStudyLogInfo(
+  firestore: Firestore,
+  centerId: string,
+  studentId: string,
+  dateKey: string
+): Promise<{ hasStudyLog: boolean; studyMinutes: number; checkedAt: Date | null }> {
+  const dayRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey);
+  const daySnap = await getDoc(dayRef);
+  if (!daySnap.exists()) {
+    return { hasStudyLog: false, studyMinutes: 0, checkedAt: null };
+  }
+
+  const data = daySnap.data() as any;
+  const rawMinutes = Number(data?.totalMinutes || 0);
+  const studyMinutes = Number.isFinite(rawMinutes) ? Math.max(0, Math.round(rawMinutes)) : 0;
+  const checkedAt = toDateSafe(data?.updatedAt || data?.createdAt);
+  return {
+    hasStudyLog: studyMinutes > 0,
+    studyMinutes,
+    checkedAt,
+  };
 }
 
 async function fetchAttendanceRoutineInfo(
@@ -218,15 +293,23 @@ export async function syncAutoAttendanceRecord(params: {
   }
 
   const routine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey);
+  const studyLogInfo = await fetchStudyLogInfo(firestore, centerId, studentId, dateKey);
+  const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
+  const accessCheckedAt = checkInAt || existingCheckedAt;
   const derived = deriveAttendanceDisplayState({
     selectedDate: targetDate,
     dateKey,
     todayDateKey,
     routine,
     recordStatus: existing?.status,
+    recordStatusSource: existing?.statusSource,
     recordRoutineMissingAtCheckIn: Boolean(existing?.routineMissingAtCheckIn),
-    recordCheckedAt: checkInAt || toDateSafe(existing?.checkInAt || existing?.updatedAt),
-    liveCheckedAt: checkInAt,
+    recordCheckedAt: existingCheckedAt,
+    liveCheckedAt: checkInAt || null,
+    accessCheckedAt,
+    studyCheckedAt: studyLogInfo.checkedAt,
+    studyMinutes: studyLogInfo.studyMinutes,
+    hasStudyLog: studyLogInfo.hasStudyLog,
   });
 
   if (!AUTO_SYNC_STATUSES.has(derived.status)) {
