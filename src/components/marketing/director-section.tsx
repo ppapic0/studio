@@ -35,7 +35,7 @@ export function DirectorSection({ director }: DirectorSectionProps) {
                     <p className="px-4 text-xs font-bold leading-relaxed text-[#14295F]/70">수업자료 이미지 교체 영역</p>
                   </div>
                   <p className="mt-4 text-[11px] font-black tracking-[0.12em] text-[#FF7A16]">{sample.subtitle}</p>
-                  <h3 className="mt-1 break-keep text-lg font-black text-[#14295F]">{sample.title}</h3>
+                  <h3 className="font-display mt-1 break-keep text-lg font-bold text-[#14295F]">{sample.title}</h3>
                   <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{sample.caption}</p>
                 </article>
               ))}

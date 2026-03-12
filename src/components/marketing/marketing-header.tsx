@@ -10,7 +10,7 @@ type MarketingHeaderProps = {
 
 export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/15 bg-[#0A1C4D]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-[#14295F]/10 bg-white/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="inline-flex items-center gap-3">
           <Image
@@ -20,12 +20,12 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             height={34}
             className="h-[34px] w-[34px] rounded-md object-cover"
           />
-          <span className="text-sm font-black tracking-tight text-white">{brand.name}</span>
+          <span className="font-display text-base font-bold text-[#14295F]">{brand.name}</span>
         </Link>
 
         <nav className="hidden items-center gap-6 lg:flex">
           {nav.map((item) => (
-            <a key={item.href} href={item.href} className="text-xs font-bold text-white/80 transition hover:text-white">
+            <a key={item.href} href={item.href} className="text-[13px] font-bold text-[#14295F]/80 transition hover:text-[#14295F]">
               {item.label}
             </a>
           ))}
@@ -40,17 +40,17 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
           </a>
           <Link
             href="/app"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-white/30 px-3.5 text-xs font-black text-white transition hover:bg-white/10"
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-[#14295F]/20 bg-white px-3.5 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
           >
-            앱 바로가기
+            웹앱
           </Link>
         </div>
       </div>
 
-      <div className="border-t border-white/10 lg:hidden">
+      <div className="border-t border-[#14295F]/10 lg:hidden">
         <nav className="mx-auto flex h-10 w-full max-w-7xl items-center gap-4 overflow-x-auto px-4 sm:px-6">
           {nav.map((item) => (
-            <a key={item.href} href={item.href} className="whitespace-nowrap text-[11px] font-bold text-white/75">
+            <a key={item.href} href={item.href} className="whitespace-nowrap text-[11px] font-bold text-[#14295F]/70">
               {item.label}
             </a>
           ))}

@@ -22,8 +22,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['Pretendard', 'sans-serif'],
-        headline: ['Pretendard', 'sans-serif'],
+        body: ['var(--font-gangwon)', 'Pretendard', 'sans-serif'],
+        headline: ['var(--font-aggro)', 'var(--font-gangwon)', 'Pretendard', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',

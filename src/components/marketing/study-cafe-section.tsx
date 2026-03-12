@@ -22,21 +22,21 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
             ))}
           </div>
 
-          <div className="rounded-2xl border border-[#14295F]/10 bg-[#0D235D] p-6 text-white shadow-[0_18px_40px_rgba(7,20,57,0.28)]">
-            <p className="text-xs font-black tracking-[0.2em] text-[#FFB273]">PREMIUM SEAT</p>
-            <h3 className="mt-3 break-keep text-2xl font-black">집중도를 높이는 좌석 설계</h3>
+          <div className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-6 shadow-[0_18px_40px_rgba(20,41,95,0.1)]">
+            <p className="text-xs font-black tracking-[0.2em] text-[#FF7A16]">PREMIUM SEAT</p>
+            <h3 className="font-display mt-3 break-keep text-2xl font-bold text-[#14295F]">집중도를 높이는 좌석 설계</h3>
 
             <div className="mt-5 space-y-4">
               {studyCafe.seatTypes.map((seat) => (
-                <article key={seat.title} className="rounded-xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-                  <h4 className="text-lg font-black">{seat.title}</h4>
-                  <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-white/80">{seat.description}</p>
+                <article key={seat.title} className="rounded-xl border border-[#14295F]/10 bg-white p-4">
+                  <h4 className="text-lg font-black text-[#14295F]">{seat.title}</h4>
+                  <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{seat.description}</p>
                 </article>
               ))}
             </div>
 
-            <div className="mt-5 rounded-xl border border-dashed border-white/25 bg-white/5 px-4 py-6 text-center">
-              <p className="text-sm font-bold text-white/75">좌석/공간 실제 사진 교체 영역</p>
+            <div className="mt-5 rounded-xl border border-dashed border-[#14295F]/20 bg-white px-4 py-6 text-center">
+              <p className="text-sm font-bold text-[#14295F]/70">좌석/공간 실제 사진 교체 영역</p>
             </div>
           </div>
         </div>

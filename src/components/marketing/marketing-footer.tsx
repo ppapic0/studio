@@ -10,14 +10,14 @@ type MarketingFooterProps = {
 
 export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
   return (
-    <footer className="border-t border-white/10 bg-[#08173E] py-10">
+    <footer className="border-t border-[#14295F]/10 bg-white py-10">
       <div className="mx-auto grid w-full max-w-7xl gap-7 px-4 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:px-8">
         <div>
           <div className="inline-flex items-center gap-3">
             <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={36} height={36} className="h-9 w-9 rounded-md object-cover" />
-            <p className="text-base font-black text-white">{brand.name}</p>
+            <p className="font-display text-base font-bold text-[#14295F]">{brand.name}</p>
           </div>
-          <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-white/75">{footer.line}</p>
+          <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{footer.line}</p>
           <div className="mt-5 flex gap-2">
             <a
               href="#consult"
@@ -27,17 +27,17 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
             </a>
             <Link
               href="/app"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-white/25 px-4 text-xs font-black text-white transition hover:bg-white/10"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#14295F]/25 px-4 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
             >
               웹앱 바로가기
             </Link>
           </div>
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <p className="text-sm font-bold text-white/80">{footer.phone}</p>
-          <p className="text-sm font-bold text-white/80">{footer.location}</p>
-          <p className="text-sm font-bold text-white/80">{footer.hours}</p>
+        <div className="space-y-3 rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-5">
+          <p className="text-sm font-bold text-[#14295F]/85">{footer.phone}</p>
+          <p className="break-keep text-sm font-bold text-[#14295F]/85">{footer.location}</p>
+          <p className="text-sm font-bold text-[#14295F]/85">{footer.hours}</p>
         </div>
       </div>
     </footer>
