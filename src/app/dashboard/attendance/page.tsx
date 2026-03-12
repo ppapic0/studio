@@ -240,6 +240,11 @@ export default function AttendancePage() {
     }
   };
 
+  const formatLastVisitAt = (visitedAt: Date | null) => {
+    if (!visitedAt) return '방문 기록 없음';
+    return format(visitedAt, 'yyyy.MM.dd HH:mm');
+  };
+
   const handleStatusChange = async (studentId: string, status: AttendanceRecord['status'], checkedAt?: Date | null) => {
       if (!firestore || !user || !centerId || !dateKey) return;
       
@@ -472,7 +477,7 @@ export default function AttendancePage() {
                   <TableRow className="border-none hover:bg-transparent h-12">
                     <TableHead className="font-black text-[10px] pl-8">STUDENT</TableHead>
                     <TableHead className="font-black text-[10px]">STATUS</TableHead>
-                    <TableHead className="hidden md:table-cell font-black text-[10px]">CHECKED AT</TableHead>
+                    <TableHead className="hidden md:table-cell font-black text-[10px]">최근 방문 기록</TableHead>
                     <TableHead className="text-right pr-8 font-black text-[10px]">ACTION</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -528,7 +533,7 @@ export default function AttendancePage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-xs font-bold text-muted-foreground">
-                        {checkedAt ? format(checkedAt, 'p') : 'N/A'}
+                        {formatLastVisitAt(checkedAt ?? null)}
                       </TableCell>
                       <TableCell className="text-right pr-8">
                         <Select value={manualStatus} onValueChange={(newStatus) => handleStatusChange(student.id, newStatus as any, checkedAt)}>
