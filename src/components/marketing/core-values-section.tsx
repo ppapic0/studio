@@ -12,11 +12,11 @@ export function CoreValuesSection({ valueCards }: CoreValuesSectionProps) {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Core Value"
-          title="성과를 만드는 핵심 가치"
-          description="트랙 학습센터는 수업 전문성, 관리 정교함, 공간 품질을 하나의 운영 체계로 묶습니다."
+          title="한눈에 보이는 트랙의 차별점"
+          description="관리형 스터디카페 우선 운영, 선택형 입시학원, 데이터 기반 관리. 트랙은 구조가 다릅니다."
         />
 
-        <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {valueCards.map((card) => (
             <article
               key={card.title}

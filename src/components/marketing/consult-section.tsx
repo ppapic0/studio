@@ -34,7 +34,7 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
                   href="#"
                   className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white transition hover:bg-[#f06905]"
                 >
-                  상담 예약 안내
+                  방문 상담 예약
                 </a>
                 <Link
                   href="/app"

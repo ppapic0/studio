@@ -16,12 +16,12 @@ export default function HomePage() {
     <main className="min-h-screen bg-white text-slate-900">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} heroStats={marketingContent.heroStats} />
-      <CoreValuesSection valueCards={marketingContent.valueCards} />
-      <DirectorSection director={marketingContent.director} />
-      <OutcomesSection outcomes={marketingContent.outcomes} />
-      <ClassSystemSection classSystem={marketingContent.classSystem} />
       <StudyCafeSection studyCafe={marketingContent.studyCafe} />
       <AppSystemSection appSystem={marketingContent.appSystem} />
+      <OutcomesSection outcomes={marketingContent.outcomes} />
+      <CoreValuesSection valueCards={marketingContent.valueCards} />
+      <DirectorSection director={marketingContent.director} />
+      <ClassSystemSection classSystem={marketingContent.classSystem} />
       <FacilitySection facility={marketingContent.facility} />
       <ConsultSection consult={marketingContent.consult} />
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />

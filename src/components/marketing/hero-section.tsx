@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Award, GraduationCap } from "lucide-react";
+import { Building2, CheckCircle2, GraduationCap, Trophy } from "lucide-react";
 
 import type { MarketingContent } from "@/lib/marketing-content";
 
@@ -10,35 +10,39 @@ type HeroSectionProps = {
 };
 
 export function HeroSection({ brand, heroStats }: HeroSectionProps) {
-  const [directorResult, ...otherStats] = heroStats;
+  const [resultStat, ...otherStats] = heroStats;
 
   return (
     <section className="relative overflow-hidden bg-white pb-14 pt-10 sm:pb-20 sm:pt-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_4%,rgba(20,41,95,0.06),transparent_36%),radial-gradient(circle_at_92%_2%,rgba(255,122,22,0.1),transparent_36%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_6%,rgba(20,41,95,0.06),transparent_32%),radial-gradient(circle_at_94%_8%,rgba(255,122,22,0.11),transparent_34%)]" />
 
-      <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[1.03fr_0.97fr] lg:px-8">
+      <div className="relative mx-auto grid w-full max-w-7xl gap-6 px-4 sm:gap-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-10 lg:px-8">
         <div>
-          <p className="text-xs font-black tracking-[0.2em] text-[#FF7A16]">TRACK INTELLIGENCE</p>
-          <h1 className="font-display mt-5 break-keep text-4xl font-bold leading-tight text-[#14295F] sm:text-5xl lg:text-6xl">
+          <p className="text-xs font-black tracking-[0.2em] text-[#FF7A16]">TRACK PREMIUM EDUCATION</p>
+          <h1 className="font-display mt-4 break-keep text-4xl font-bold leading-tight text-[#14295F] sm:text-5xl lg:text-6xl">
             {brand.heroTitle}
           </h1>
           <p className="mt-5 max-w-2xl break-keep text-base font-bold leading-relaxed text-slate-600 sm:text-lg">
             {brand.heroDescription}
           </p>
-          <p className="mt-5 text-sm font-black text-[#14295F]">{brand.slogan}</p>
+
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-[#F6F9FF] px-4 py-2 text-sm font-black text-[#14295F]">
+            <CheckCircle2 className="h-4 w-4 text-[#FF7A16]" />
+            {brand.slogan}
+          </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <a
-              href="#consult"
-              className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white shadow-[0_12px_28px_rgba(255,122,22,0.3)] transition hover:bg-[#f06905]"
+              href="#study-cafe"
+              className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white shadow-[0_12px_26px_rgba(255,122,22,0.3)] transition hover:bg-[#f06905]"
             >
-              상담 문의
+              스터디카페 안내
             </a>
             <a
-              href="#study-cafe"
+              href="#outcome"
               className="inline-flex h-12 items-center justify-center rounded-xl border border-[#14295F]/20 bg-white px-6 text-sm font-black text-[#14295F] transition hover:bg-[#F7FAFF]"
             >
-              시설·프로그램 보기
+              2026 실적 보기
             </a>
             <Link
               href="/app"
@@ -47,66 +51,52 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               웹앱 바로가기
             </Link>
           </div>
-
-          <div className="mt-8 grid gap-3">
-            {directorResult ? (
-              <article className="relative overflow-hidden rounded-2xl border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#FFF5EC,#FFFFFF)] p-5 shadow-[0_14px_34px_rgba(255,122,22,0.18)]">
-                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#FF7A16]/10" />
-                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-[11px] font-black tracking-[0.14em] text-[#FF7A16]">DIRECTOR PERFORMANCE</p>
-                    <p className="font-display mt-2 break-keep text-2xl font-bold text-[#14295F] sm:text-3xl">
-                      {directorResult.value}
-                    </p>
-                    {directorResult.detail ? (
-                      <p className="mt-1 text-sm font-bold text-[#14295F]/75">{directorResult.detail}</p>
-                    ) : null}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-black text-[#14295F]">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#14295F]/15 bg-white px-3 py-1.5">
-                      <Award className="h-3.5 w-3.5 text-[#FF7A16]" />
-                      원장 직강
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#14295F]/15 bg-white px-3 py-1.5">
-                      <GraduationCap className="h-3.5 w-3.5 text-[#FF7A16]" />
-                      교육학·국어국문 전공
-                    </span>
-                  </div>
-                </div>
-              </article>
-            ) : null}
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {otherStats.map((stat) => (
-                <article key={stat.label} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-4">
-                  <p className="text-[11px] font-black text-[#14295F]/70">{stat.label}</p>
-                  <p className="font-display mt-2 break-keep text-xl font-bold text-[#14295F]">{stat.value}</p>
-                  {stat.detail ? <p className="mt-1 text-xs font-bold text-[#FF7A16]">{stat.detail}</p> : null}
-                </article>
-              ))}
-            </div>
-          </div>
         </div>
 
-        <div className="grid gap-4">
-          <article className="group relative overflow-hidden rounded-3xl border border-[#14295F]/15 bg-[#0D235D] p-6 shadow-[0_24px_48px_rgba(8,22,56,0.22)]">
-            <div className="pointer-events-none absolute inset-0">
-              <Image
-                src={brand.heroBackground}
-                alt="트랙 학습센터 비주얼"
-                fill
-                className="object-cover opacity-30 transition duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(13,35,93,0.92),rgba(13,35,93,0.74)_45%,rgba(255,122,22,0.28))]" />
-            </div>
+        <div className="space-y-4">
+          {resultStat ? (
+            <article className="relative overflow-hidden rounded-3xl border border-[#14295F]/18 bg-[linear-gradient(165deg,#13295D,#1B3C88)] p-6 text-white shadow-[0_20px_42px_rgba(20,41,95,0.25)] sm:p-7">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#FF7A16]/20 blur-2xl" />
+              <div className="relative">
+                <p className="text-[11px] font-black tracking-[0.14em] text-[#FFB070]">{resultStat.label}</p>
+                <p className="font-display mt-3 break-keep text-xl font-bold leading-snug sm:text-2xl">{resultStat.value}</p>
+                {resultStat.detail ? <p className="mt-2 text-sm font-bold text-white/80">{resultStat.detail}</p> : null}
 
-            <div className="relative">
-              <Image src={brand.logoFull} alt={`${brand.name} 로고`} width={220} height={130} className="h-auto w-[160px] sm:w-[220px]" />
-              <p className="font-display mt-8 break-keep text-3xl font-bold text-white sm:text-4xl">국어 중심 입시학원</p>
-              <p className="mt-2 text-sm font-bold text-white/80">원장 직강 · 직접 제작 자료 · 학생 맞춤 피드백</p>
-              <div className="mt-6 h-px bg-white/20" />
-              <p className="font-display mt-6 break-keep text-3xl font-bold text-white sm:text-4xl">관리형 스터디카페</p>
-              <p className="mt-2 text-sm font-bold text-white/80">자체 앱 기반 출결·생활관리 · 프리미엄 좌석 운영</p>
+                <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-black">
+                    <Building2 className="h-3.5 w-3.5 text-[#FFB070]" />
+                    관리형 스터디카페 중심
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-black">
+                    <GraduationCap className="h-3.5 w-3.5 text-[#FFB070]" />
+                    입시학원 별도 선택
+                  </span>
+                </div>
+              </div>
+            </article>
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {otherStats.map((stat) => (
+              <article key={stat.label} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-4">
+                <p className="text-[11px] font-black text-[#14295F]/70">{stat.label}</p>
+                <p className="font-display mt-2 break-keep text-lg font-bold text-[#14295F] sm:text-xl">{stat.value}</p>
+                {stat.detail ? <p className="mt-1 text-xs font-bold text-[#FF7A16]">{stat.detail}</p> : null}
+              </article>
+            ))}
+          </div>
+
+          <article className="rounded-2xl border border-[#14295F]/10 bg-white p-4 shadow-[0_10px_24px_rgba(20,41,95,0.08)]">
+            <div className="flex items-center gap-3">
+              <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={40} height={40} className="h-10 w-10 object-contain" />
+              <div>
+                <p className="text-sm font-black text-[#14295F]">{brand.name}</p>
+                <p className="text-xs font-bold text-slate-500">트랙은 실적으로 증명합니다</p>
+              </div>
+              <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#FFF4EB] px-3 py-1 text-xs font-black text-[#B55200]">
+                <Trophy className="h-3.5 w-3.5" />
+                2026 합격 실적 공개
+              </span>
             </div>
           </article>
         </div>

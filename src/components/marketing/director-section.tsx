@@ -38,7 +38,7 @@ export function DirectorSection({ director }: DirectorSectionProps) {
                   className="rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_30px_rgba(20,41,95,0.08)]"
                 >
                   <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-[#14295F]/25 bg-[#F4F7FF] text-center">
-                    <p className="px-4 text-xs font-bold leading-relaxed text-[#14295F]/70">수업자료 실제 이미지 교체 영역</p>
+                    <p className="px-4 text-xs font-bold leading-relaxed text-[#14295F]/70">자료 샘플 영역 (개원 후 실자료로 교체 가능)</p>
                   </div>
                   <p className="mt-4 text-[11px] font-black tracking-[0.12em] text-[#FF7A16]">{sample.subtitle}</p>
                   <h3 className="font-display mt-1 break-keep text-lg font-bold text-[#14295F]">{sample.title}</h3>

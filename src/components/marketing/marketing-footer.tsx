@@ -14,7 +14,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
       <div className="mx-auto grid w-full max-w-7xl gap-7 px-4 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:px-8">
         <div>
           <div className="inline-flex items-center gap-3">
-            <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={36} height={36} className="h-9 w-9 rounded-md object-cover" />
+            <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={36} height={36} className="h-9 w-9 rounded-md object-contain" />
             <p className="font-display text-base font-bold text-[#14295F]">{brand.name}</p>
           </div>
           <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{footer.line}</p>

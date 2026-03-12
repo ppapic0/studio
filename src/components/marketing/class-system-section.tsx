@@ -11,12 +11,16 @@ export function ClassSystemSection({ classSystem }: ClassSystemSectionProps) {
     <section id="class-system" className="scroll-mt-28 bg-[#F3F7FF] py-16 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="Class System"
-          title="국어 수업 운영 프로세스"
-          description="진단부터 수업, 자료, 복습, 생활관리까지 연결되는 구조로 성과의 재현성을 높입니다."
+          eyebrow="Academy Program"
+          title="국어 입시학원 수업 시스템 (별도 등록)"
+          description="입시학원 프로그램은 별도 등록 학생 대상이며, 원장 직강과 직접 제작 자료로 성과 중심 수업을 운영합니다."
         />
 
-        <div className="mt-10 grid gap-4 md:grid-cols-5">
+        <div className="mt-8 rounded-2xl border border-[#14295F]/12 bg-white px-4 py-3 text-sm font-bold text-[#14295F] sm:px-5">
+          ※ 관리형 스터디카페 이용과 입시학원 수강은 각각 선택 가능합니다.
+        </div>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {classSystem.map((step, index) => (
             <article
               key={step.title}
@@ -28,7 +32,7 @@ export function ClassSystemSection({ classSystem }: ClassSystemSectionProps) {
               <h3 className="font-display break-keep text-lg font-bold text-[#14295F]">{step.title}</h3>
               <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{step.description}</p>
               {index < classSystem.length - 1 ? (
-                <span className="absolute -right-2 top-1/2 hidden h-0.5 w-4 -translate-y-1/2 bg-[#FF7A16] md:block" />
+                <span className="absolute -right-2 top-1/2 hidden h-0.5 w-4 -translate-y-1/2 bg-[#FF7A16] xl:block" />
               ) : null}
             </article>
           ))}
