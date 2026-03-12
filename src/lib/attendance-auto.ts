@@ -52,6 +52,7 @@ const ATTENDANCE_ROUTINE_KEYWORDS = {
 
 const AUTO_SYNC_STATUSES = new Set<DisplayAttendanceStatus>([
   'requested',
+  'missing_routine',
   'confirmed_present',
   'confirmed_present_missing_routine',
   'confirmed_late',
@@ -316,22 +317,25 @@ export async function syncAutoAttendanceRecord(params: {
     return { status: derived.status, wrote: false, reason: 'not_sync_target' };
   }
 
+  const isRoutineMissingDay =
+    derived.status === 'missing_routine' || derived.status === 'confirmed_present_missing_routine';
   const persistedStatus: AttendanceRecordStatus =
     derived.status === 'confirmed_present_missing_routine'
       ? 'confirmed_present'
-      : (derived.status as AttendanceRecordStatus);
-  const isRoutineMissingAttendance = derived.status === 'confirmed_present_missing_routine';
+      : derived.status === 'missing_routine'
+        ? 'requested'
+        : (derived.status as AttendanceRecordStatus);
 
   const normalizedExistingCheckInAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
   const shouldSyncStatus =
     existing?.status !== persistedStatus ||
-    Boolean(existing?.routineMissingAtCheckIn) !== isRoutineMissingAttendance;
+    Boolean(existing?.routineMissingAtCheckIn) !== isRoutineMissingDay;
   const shouldSyncCheckIn =
     (persistedStatus === 'confirmed_present' || persistedStatus === 'confirmed_late') &&
     !!derived.checkedAt &&
     (!normalizedExistingCheckInAt || Math.abs(normalizedExistingCheckInAt.getTime() - derived.checkedAt.getTime()) > 60000);
   const shouldApplyMissingRoutinePenalty =
-    isRoutineMissingAttendance && !existing?.routineMissingPenaltyApplied;
+    isRoutineMissingDay && !existing?.routineMissingPenaltyApplied;
 
   if (!shouldSyncStatus && !shouldSyncCheckIn && !shouldApplyMissingRoutinePenalty) {
     return { status: derived.status, wrote: false, reason: 'already_synced' };
@@ -356,14 +360,13 @@ export async function syncAutoAttendanceRecord(params: {
     payload.checkInAt = deleteField();
   }
 
-  if (isRoutineMissingAttendance) {
+  if (isRoutineMissingDay) {
     payload.routineMissingAtCheckIn = true;
     if (shouldApplyMissingRoutinePenalty) {
       payload.routineMissingPenaltyApplied = true;
     }
   } else {
     payload.routineMissingAtCheckIn = deleteField();
-    payload.routineMissingPenaltyApplied = deleteField();
   }
 
   batch.set(recordRef, payload, { merge: true });
@@ -385,7 +388,7 @@ export async function syncAutoAttendanceRecord(params: {
       studentId,
       studentName: studentName || '학생',
       pointsDelta: ROUTINE_MISSING_PENALTY_POINTS,
-      reason: `루틴 미작성 출석 (${dateKey})`,
+      reason: `루틴 미작성 (${dateKey})`,
       source: 'routine_missing',
       createdByUserId: confirmedByUserId,
       createdByName: '자동 규칙',

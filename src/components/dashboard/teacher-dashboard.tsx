@@ -1606,7 +1606,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
                               <p>지각 출석: +1점</p>
                               <p>결석: +2점</p>
-                              <p>루틴 미작성 출석: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
+                              <p>루틴 미작성: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
                               <p>센터 수동 부여: 입력 점수만큼 반영</p>
                             </div>
                             <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">

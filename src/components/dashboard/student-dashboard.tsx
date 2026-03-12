@@ -1458,7 +1458,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <ul className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700 leading-relaxed">
                       <li>지각 신청 접수 시 `+1점`이 반영됩니다.</li>
                       <li>결석 신청 접수 시 `+2점`이 반영됩니다.</li>
-                      <li>루틴이 없는 날 출석하면 +{ROUTINE_MISSING_PENALTY_POINTS}점이 자동 반영됩니다.</li>
+                      <li>루틴이 없는 날은 +{ROUTINE_MISSING_PENALTY_POINTS}점이 자동 반영됩니다.</li>
                       <li>센터 관리자/선생님이 생활 기록 벌점을 부여하면 누적 점수에 추가됩니다.</li>
                     </ul>
                   </div>

@@ -1447,7 +1447,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="mt-2 space-y-1.5 text-sm font-bold text-slate-700">
                 <p>지각 출석: +{REQUEST_PENALTY_POINTS.late}점</p>
                 <p>결석: +{REQUEST_PENALTY_POINTS.absence}점</p>
-                <p>루틴 미작성 상태로 출석: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
+                <p>루틴 미작성: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
                 <p>센터 수동 부여: 관리자가 설정한 점수</p>
               </div>
             </div>
