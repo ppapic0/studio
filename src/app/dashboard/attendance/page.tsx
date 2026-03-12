@@ -43,6 +43,7 @@ import {
   DisplayAttendanceStatus,
   buildAttendanceRoutineInfo,
   deriveAttendanceDisplayState,
+  syncAutoAttendanceRecord,
   toDateSafe,
 } from '@/lib/attendance-auto';
 
@@ -53,6 +54,8 @@ type AttendanceRecord = {
   updatedAt?: any;
   checkInAt?: any;
   autoSyncedAt?: any;
+  routineMissingAtCheckIn?: boolean;
+  routineMissingPenaltyApplied?: boolean;
   confirmedByUserId?: string;
   centerId?: string;
   studentId?: string;
@@ -166,6 +169,7 @@ export default function AttendancePage() {
   const getBadgeVariant = (status: string) => {
     switch (status) {
       case 'confirmed_present': return 'default';
+      case 'confirmed_present_missing_routine': return 'default';
       case 'confirmed_absent': return 'destructive';
       case 'confirmed_late': return 'secondary';
       case 'excused_absent': return 'outline';
@@ -188,6 +192,8 @@ export default function AttendancePage() {
           dateKey: dateKey,
           statusSource: 'manual',
       };
+      (recordData as any).routineMissingAtCheckIn = deleteField();
+      (recordData as any).routineMissingPenaltyApplied = deleteField();
 
       if ((status === 'confirmed_present' || status === 'confirmed_late') && checkedAt) {
         recordData.checkInAt = Timestamp.fromDate(checkedAt);
@@ -247,6 +253,7 @@ export default function AttendancePage() {
         todayDateKey,
         routine,
         recordStatus: record?.status,
+        recordRoutineMissingAtCheckIn: Boolean(record?.routineMissingAtCheckIn),
         recordCheckedAt: toDateSafe(record?.checkInAt || record?.updatedAt),
         liveCheckedAt: isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null,
         nowMs,
@@ -295,49 +302,17 @@ export default function AttendancePage() {
             const derived = attendanceDisplayMap.get(student.id);
             if (!derived) return;
 
-            const autoStatus = derived.status;
-            if (
-              autoStatus !== 'confirmed_present' &&
-              autoStatus !== 'confirmed_late' &&
-              autoStatus !== 'confirmed_absent' &&
-              autoStatus !== 'excused_absent'
-            ) {
-              return;
-            }
-
-            const existingRecord = attendanceMap.get(student.id);
-            if (existingRecord?.statusSource === 'manual') return;
-
-            const existingCheckInAt = toDateSafe(existingRecord?.checkInAt || existingRecord?.updatedAt);
-            const shouldSyncStatus = existingRecord?.status !== autoStatus;
-            const shouldSyncCheckIn =
-              (autoStatus === 'confirmed_present' || autoStatus === 'confirmed_late') &&
-              !!derived.checkedAt &&
-              (!existingCheckInAt || Math.abs(existingCheckInAt.getTime() - derived.checkedAt.getTime()) > 60000);
-
-            if (!shouldSyncStatus && !shouldSyncCheckIn) return;
             if (cancelled) return;
 
-            const autoRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', student.id);
-            const payload: Record<string, any> = {
-              status: autoStatus,
-              statusSource: 'auto',
-              autoSyncedAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              confirmedByUserId: user.uid,
+            await syncAutoAttendanceRecord({
+              firestore,
               centerId,
               studentId: student.id,
-              dateKey,
               studentName: student.displayName || '',
-            };
-
-            if ((autoStatus === 'confirmed_present' || autoStatus === 'confirmed_late') && derived.checkedAt) {
-              payload.checkInAt = Timestamp.fromDate(derived.checkedAt);
-            } else {
-              payload.checkInAt = deleteField();
-            }
-
-            await setDoc(autoRef, payload, { merge: true });
+              targetDate: selectedDate,
+              checkInAt: derived.checkedAt,
+              confirmedByUserId: user.uid,
+            });
           })
         );
       } catch (error) {
@@ -351,7 +326,6 @@ export default function AttendancePage() {
     };
   }, [
     attendanceDisplayMap,
-    attendanceMap,
     centerId,
     dateKey,
     firestore,
@@ -459,11 +433,14 @@ export default function AttendancePage() {
                           variant={getBadgeVariant(status) as any}
                           className={cn(
                             "font-black text-[10px] rounded-md shadow-sm border-none",
-                            status === 'missing_routine' && "bg-amber-100 text-amber-700"
+                            status === 'missing_routine' && "bg-amber-100 text-amber-700",
+                            status === 'confirmed_present_missing_routine' && "bg-emerald-100 text-emerald-700"
                           )}
                         >
                           {status === 'confirmed_present'
                             ? '출석'
+                            : status === 'confirmed_present_missing_routine'
+                              ? '출석(미작성)'
                             : status === 'confirmed_late'
                               ? '지각출석'
                               : status === 'confirmed_absent'

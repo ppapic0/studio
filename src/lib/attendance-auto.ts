@@ -6,11 +6,12 @@ import {
   Firestore,
   getDoc,
   getDocs,
+  increment,
   limit,
   query,
   serverTimestamp,
-  setDoc,
   Timestamp,
+  writeBatch,
   where,
 } from 'firebase/firestore';
 
@@ -21,7 +22,12 @@ export type AttendanceRecordStatus =
   | 'confirmed_absent'
   | 'excused_absent';
 
-export type DisplayAttendanceStatus = AttendanceRecordStatus | 'missing_routine';
+export type DisplayAttendanceStatus =
+  | AttendanceRecordStatus
+  | 'missing_routine'
+  | 'confirmed_present_missing_routine';
+
+export const ROUTINE_MISSING_PENALTY_POINTS = 1;
 
 export interface AttendanceRoutineInfo {
   hasRoutine: boolean;
@@ -34,6 +40,8 @@ export interface AttendanceRecordLike {
   statusSource?: 'auto' | 'manual' | string;
   updatedAt?: any;
   checkInAt?: any;
+  routineMissingAtCheckIn?: boolean;
+  routineMissingPenaltyApplied?: boolean;
 }
 
 const ATTENDANCE_ROUTINE_KEYWORDS = {
@@ -42,8 +50,9 @@ const ATTENDANCE_ROUTINE_KEYWORDS = {
   off: '등원하지 않습니다',
 } as const;
 
-const AUTO_SYNC_STATUSES = new Set<AttendanceRecordStatus>([
+const AUTO_SYNC_STATUSES = new Set<DisplayAttendanceStatus>([
   'confirmed_present',
+  'confirmed_present_missing_routine',
   'confirmed_late',
   'confirmed_absent',
   'excused_absent',
@@ -106,6 +115,7 @@ export function deriveAttendanceDisplayState(params: {
   todayDateKey: string;
   routine?: AttendanceRoutineInfo;
   recordStatus?: AttendanceRecordStatus;
+  recordRoutineMissingAtCheckIn?: boolean;
   recordCheckedAt?: Date | null;
   liveCheckedAt?: Date | null;
   nowMs?: number;
@@ -117,6 +127,7 @@ export function deriveAttendanceDisplayState(params: {
     todayDateKey,
     routine,
     recordStatus,
+    recordRoutineMissingAtCheckIn = false,
     recordCheckedAt,
     liveCheckedAt,
     nowMs = Date.now(),
@@ -127,9 +138,11 @@ export function deriveAttendanceDisplayState(params: {
   const checkedAt = recordCheckedAt || liveCheckedAt || null;
   let status: DisplayAttendanceStatus = recordStatus || 'requested';
 
-  if (!recordStatus || recordStatus === 'requested') {
+  if (recordStatus === 'confirmed_present' && recordRoutineMissingAtCheckIn && checkedAt) {
+    status = 'confirmed_present_missing_routine';
+  } else if (!recordStatus || recordStatus === 'requested') {
     if (!isRoutineLoading && routine && !routine.hasRoutine) {
-      status = 'missing_routine';
+      status = checkedAt ? 'confirmed_present_missing_routine' : 'missing_routine';
     } else if (routine?.isNoAttendanceDay) {
       status = 'excused_absent';
     } else if (routine?.expectedArrivalTime) {
@@ -211,27 +224,39 @@ export async function syncAutoAttendanceRecord(params: {
     todayDateKey,
     routine,
     recordStatus: existing?.status,
+    recordRoutineMissingAtCheckIn: Boolean(existing?.routineMissingAtCheckIn),
     recordCheckedAt: checkInAt || toDateSafe(existing?.checkInAt || existing?.updatedAt),
     liveCheckedAt: checkInAt,
   });
 
-  if (!AUTO_SYNC_STATUSES.has(derived.status as AttendanceRecordStatus)) {
+  if (!AUTO_SYNC_STATUSES.has(derived.status)) {
     return { status: derived.status, wrote: false, reason: 'not_sync_target' };
   }
 
+  const persistedStatus: AttendanceRecordStatus =
+    derived.status === 'confirmed_present_missing_routine'
+      ? 'confirmed_present'
+      : (derived.status as AttendanceRecordStatus);
+  const isRoutineMissingAttendance = derived.status === 'confirmed_present_missing_routine';
+
   const normalizedExistingCheckInAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
-  const shouldSyncStatus = existing?.status !== derived.status;
+  const shouldSyncStatus =
+    existing?.status !== persistedStatus ||
+    Boolean(existing?.routineMissingAtCheckIn) !== isRoutineMissingAttendance;
   const shouldSyncCheckIn =
-    (derived.status === 'confirmed_present' || derived.status === 'confirmed_late') &&
+    (persistedStatus === 'confirmed_present' || persistedStatus === 'confirmed_late') &&
     !!derived.checkedAt &&
     (!normalizedExistingCheckInAt || Math.abs(normalizedExistingCheckInAt.getTime() - derived.checkedAt.getTime()) > 60000);
+  const shouldApplyMissingRoutinePenalty =
+    isRoutineMissingAttendance && !existing?.routineMissingPenaltyApplied;
 
-  if (!shouldSyncStatus && !shouldSyncCheckIn) {
+  if (!shouldSyncStatus && !shouldSyncCheckIn && !shouldApplyMissingRoutinePenalty) {
     return { status: derived.status, wrote: false, reason: 'already_synced' };
   }
 
+  const batch = writeBatch(firestore);
   const payload: Record<string, any> = {
-    status: derived.status,
+    status: persistedStatus,
     statusSource: 'auto',
     autoSyncedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -242,12 +267,49 @@ export async function syncAutoAttendanceRecord(params: {
   if (studentName) payload.studentName = studentName;
   if (confirmedByUserId) payload.confirmedByUserId = confirmedByUserId;
 
-  if ((derived.status === 'confirmed_present' || derived.status === 'confirmed_late') && derived.checkedAt) {
+  if ((persistedStatus === 'confirmed_present' || persistedStatus === 'confirmed_late') && derived.checkedAt) {
     payload.checkInAt = Timestamp.fromDate(derived.checkedAt);
   } else {
     payload.checkInAt = deleteField();
   }
 
-  await setDoc(recordRef, payload, { merge: true });
+  if (isRoutineMissingAttendance) {
+    payload.routineMissingAtCheckIn = true;
+    if (shouldApplyMissingRoutinePenalty) {
+      payload.routineMissingPenaltyApplied = true;
+    }
+  } else {
+    payload.routineMissingAtCheckIn = deleteField();
+    payload.routineMissingPenaltyApplied = deleteField();
+  }
+
+  batch.set(recordRef, payload, { merge: true });
+
+  if (shouldApplyMissingRoutinePenalty) {
+    const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+    batch.set(
+      progressRef,
+      {
+        penaltyPoints: increment(ROUTINE_MISSING_PENALTY_POINTS),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
+    batch.set(penaltyLogRef, {
+      centerId,
+      studentId,
+      studentName: studentName || '학생',
+      pointsDelta: ROUTINE_MISSING_PENALTY_POINTS,
+      reason: `루틴 미작성 출석 (${dateKey})`,
+      source: 'routine_missing',
+      createdByUserId: confirmedByUserId,
+      createdByName: '자동 규칙',
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
   return { status: derived.status, wrote: true };
 }

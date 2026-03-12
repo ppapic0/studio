@@ -238,7 +238,7 @@ export interface PenaltyLog {
   studentName?: string;
   pointsDelta: number;
   reason: string;
-  source: 'attendance_request' | 'manual' | 'reset';
+  source: 'attendance_request' | 'manual' | 'reset' | 'routine_missing';
   requestId?: string;
   requestType?: 'late' | 'absence';
   createdByUserId?: string;

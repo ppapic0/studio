@@ -99,7 +99,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { httpsCallable } from 'firebase/functions';
-import { syncAutoAttendanceRecord, toDateSafe as toDateSafeAttendance } from '@/lib/attendance-auto';
+import {
+  ROUTINE_MISSING_PENALTY_POINTS,
+  syncAutoAttendanceRecord,
+  toDateSafe as toDateSafeAttendance,
+} from '@/lib/attendance-auto';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -1531,6 +1535,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                         ? '초기화'
                                         : log.source === 'manual'
                                           ? '수동 부여'
+                                          : log.source === 'routine_missing'
+                                            ? '루틴 미작성'
                                           : '지각/결석 신청';
                                     return (
                                       <div key={log.id} className="p-4 rounded-2xl bg-white border border-rose-100 shadow-sm flex items-start justify-between gap-3">
@@ -1600,6 +1606,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
                               <p>지각 출석: +1점</p>
                               <p>결석: +2점</p>
+                              <p>루틴 미작성 출석: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
                               <p>센터 수동 부여: 입력 점수만큼 반영</p>
                             </div>
                             <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
