@@ -1,4 +1,4 @@
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 
 @tailwind base;
 @tailwind components;
@@ -6,9 +6,6 @@
 
 @layer base {
   :root {
-    /* 트랙학습센터 BI 컬러 시스템 적용 */
-    /* 네이비: #14295F (223 65% 22%) */
-    /* 오렌지: #FF7A16 (25 100% 54%) */
     --background: 210 20% 98%;
     --foreground: 223 65% 10%;
 
@@ -18,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 223 65% 15%;
 
-    --primary: 223 65% 22%; /* 네이비 */
+    --primary: 223 65% 22%;
     --primary-foreground: 25 100% 98%;
 
     --secondary: 223 20% 94%;
@@ -27,7 +24,7 @@
     --muted: 223 10% 90%;
     --muted-foreground: 223 20% 45%;
 
-    --accent: 25 100% 54%; /* 오렌지 */
+    --accent: 25 100% 54%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -75,6 +72,10 @@
     --input: 223 30% 18%;
     --ring: 25 100% 54%;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 @layer base {
@@ -82,29 +83,30 @@
     @apply border-border;
     -webkit-tap-highlight-color: transparent;
   }
+
   body {
-    @apply bg-background text-foreground font-body transition-colors duration-300;
+    @apply bg-background text-foreground font-body antialiased transition-colors duration-300;
     touch-action: manipulation;
   }
 }
 
 @layer components {
   .premium-card {
-    @apply bg-card text-card-foreground shadow-sm active:scale-[0.99] transition-all duration-300 ease-out border border-border/50;
+    @apply border border-border/50 bg-card text-card-foreground shadow-sm transition-all duration-300 ease-out active:scale-[0.99];
   }
-  
+
   @media (hover: hover) {
     .premium-card:hover {
-      @apply shadow-xl scale-[1.01];
+      @apply scale-[1.01] shadow-xl;
     }
   }
-  
+
   .glass-panel {
-    @apply bg-white/40 backdrop-blur-md border border-white/20 shadow-lg;
+    @apply border border-white/20 bg-white/40 shadow-lg backdrop-blur-md;
   }
-  
+
   .interactive-button {
-    @apply active:scale-95 transition-all duration-200 ease-in-out;
+    @apply transition-all duration-200 ease-in-out active:scale-95;
   }
 
   @media (hover: hover) {
