@@ -26,7 +26,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
               상담 문의
             </a>
             <Link
-              href="/app"
+              href="/experience"
               className="inline-flex h-10 items-center justify-center rounded-lg border border-[#14295F]/25 px-4 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
             >
               웹앱 바로가기

@@ -33,7 +33,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             상담 문의
           </a>
           <Link
-            href="/app"
+            href="/experience"
             className="inline-flex h-9 items-center justify-center rounded-lg border border-[#14295F]/20 bg-white px-3.5 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
           >
             웹앱

@@ -45,7 +45,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               2026 실적 보기
             </a>
             <Link
-              href="/app"
+              href="/experience"
               className="inline-flex h-12 items-center justify-center rounded-xl border border-[#14295F]/20 bg-white px-6 text-sm font-black text-[#14295F] transition hover:bg-[#F7FAFF]"
             >
               웹앱 바로가기

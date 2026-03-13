@@ -37,7 +37,7 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
                   상담 폼 작성하기
                 </a>
                 <Link
-                  href="/app"
+                  href="/experience"
                   className="inline-flex h-12 items-center justify-center rounded-xl border border-[#14295F]/25 bg-white px-6 text-sm font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
                 >
                   웹앱 체험하기
