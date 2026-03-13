@@ -19,9 +19,26 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
   return (
     <section id="app-system" className="scroll-mt-28 bg-[#F6F9FF] py-16 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
+        <SectionHeading eyebrow="Track Web App" title={appSystem.heading} description={appSystem.description} />
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {appSystem.modes.map((mode) => (
+            <article key={mode.mode} className="rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_10px_24px_rgba(20,41,95,0.08)]">
+              <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">{mode.mode}</p>
+              <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{mode.description}</p>
+              <ul className="mt-3 space-y-1.5">
+                {mode.items.map((item) => (
+                  <li key={`${mode.mode}-${item}`} className="text-sm font-black text-[#14295F]">
+                    · {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
           <div>
-            <SectionHeading eyebrow="Student App" title={appSystem.heading} description={appSystem.description} />
             <ul className="mt-7 grid gap-3 sm:grid-cols-2">
               {appSystem.features.map((item) => (
                 <li key={item.title} className="rounded-xl border border-[#14295F]/10 bg-white p-4 shadow-[0_8px_20px_rgba(20,41,95,0.06)]">

@@ -57,7 +57,11 @@ export function ConsultForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_25px_rgba(20,41,95,0.08)]">
+    <form
+      id="consult-form"
+      onSubmit={onSubmit}
+      className="rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_25px_rgba(20,41,95,0.08)]"
+    >
       <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">CONSULT FORM</p>
       <h3 className="mt-2 text-xl font-black text-[#14295F]">입학 상담 요청</h3>
 

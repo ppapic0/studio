@@ -31,10 +31,10 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
 
               <div className="flex flex-wrap gap-3">
                 <a
-                  href="#"
+                  href="#consult-form"
                   className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white transition hover:bg-[#f06905]"
                 >
-                  방문 상담 예약
+                  상담 폼 작성하기
                 </a>
                 <Link
                   href="/app"

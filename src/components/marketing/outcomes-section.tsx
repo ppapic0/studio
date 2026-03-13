@@ -4,16 +4,17 @@ import { SectionHeading } from "./section-heading";
 
 type OutcomesSectionProps = {
   outcomes: MarketingContent["outcomes"];
+  successStory: MarketingContent["successStory"];
 };
 
-export function OutcomesSection({ outcomes }: OutcomesSectionProps) {
+export function OutcomesSection({ outcomes, successStory }: OutcomesSectionProps) {
   return (
     <section id="outcome" className="scroll-mt-28 bg-white py-16 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Outcome"
           title="트랙은 실적으로 증명합니다"
-          description="과장된 문구보다 실제 합격 결과를 중심으로 신뢰를 보여드립니다."
+          description="과장된 광고 문구 대신, 실제 합격 결과와 성장 사례를 중심으로 신뢰를 보여드립니다."
         />
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -29,6 +30,11 @@ export function OutcomesSection({ outcomes }: OutcomesSectionProps) {
             </article>
           ))}
         </div>
+
+        <article className="mt-6 rounded-2xl border border-[#FF7A16]/25 bg-[#FFF4EB] p-5">
+          <p className="text-xs font-black tracking-[0.14em] text-[#B55200]">{successStory.title}</p>
+          <p className="font-display mt-2 break-keep text-2xl font-bold text-[#14295F] sm:text-3xl">{successStory.summary}</p>
+        </article>
       </div>
     </section>
   );
