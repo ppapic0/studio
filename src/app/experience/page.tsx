@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 
 type DemoMode = 'student' | 'parent';
 type StudentView = 'desktop' | 'mobile';
+type StudentInsight = 'analysis' | 'growth' | 'record' | 'plan';
+type ParentInsight = 'alerts' | 'calendar' | 'weekly' | 'billing';
 
 function SelectorLink({ href, label, active }: { href: string; label: string; active?: boolean }) {
   return (
@@ -42,6 +44,31 @@ function SelectorLink({ href, label, active }: { href: string; label: string; ac
     >
       {label}
     </Link>
+  );
+}
+
+function DetailTabButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-black transition-all duration-200',
+        active
+          ? 'bg-[#14295F] text-white shadow-[0_10px_24px_rgba(20,41,95,0.22)]'
+          : 'border border-[#14295F]/10 bg-white text-[#14295F]/72 hover:border-[#FF7A16]/30 hover:text-[#14295F]'
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -272,6 +299,193 @@ function ExperienceHighlights({ items }: { items: Array<{ title: string; body: s
           <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.body}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ExperienceDetailShell({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_18px_45px_rgba(20,41,95,0.1)] sm:p-6">
+      <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">{eyebrow}</p>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-2xl font-black tracking-tight text-[#14295F]">더 깊게 보는 체험 포인트</h3>
+          <p className="mt-2 max-w-3xl break-keep text-sm font-bold leading-relaxed text-slate-600">{description}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/#consult" className="inline-flex h-10 items-center justify-center rounded-full bg-[#FF7A16] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(255,122,22,0.25)]">
+            {title}
+          </Link>
+          <Link href="/login" className="inline-flex h-10 items-center justify-center rounded-full border border-[#14295F]/10 bg-white px-4 text-sm font-black text-[#14295F]">
+            실제 로그인
+          </Link>
+        </div>
+      </div>
+      <div className="mt-5">{children}</div>
+    </div>
+  );
+}
+
+function StudentInsightDetail({ insight }: { insight: StudentInsight }) {
+  const data = {
+    analysis: {
+      label: '학습 분석',
+      summary: '공부시간, 시작 리듬, 과목 편중, 위험 신호를 한 번에 묶어 학생의 현재 상태를 빠르게 해석합니다.',
+      bullets: ['최근 14일 평균 공부시간 4시간 49분', '평균 시작 시각 08:57', '독서 강세 / 언매 회전 부족', '미제출 과제 1건 즉시 감지'],
+      stats: [
+        ['몰입 시간', '14h 23m'],
+        ['시작 리듬', '08:57'],
+        ['리듬 점수', '92점'],
+      ],
+      note: '학생은 숫자로 현재 상태를 바로 보고, 원장은 어떤 보완이 필요한지 빠르게 개입할 수 있습니다.',
+    },
+    growth: {
+      label: '성장 지표',
+      summary: 'LP, 스킬 점수, 시즌 진행 상황을 함께 보여줘 성장이 추상적이지 않도록 설계했습니다.',
+      bullets: ['시즌 LP 3,164 누적', '집중력 98.3 / 꾸준함 98.5', '달성률 82%', '보상 구조로 동기 유지'],
+      stats: [
+        ['시즌 LP', '3,164'],
+        ['평균 스킬', '98.2'],
+        ['현재 티어', '브론즈'],
+      ],
+      note: '학생이 지금 어느 구간에 있는지 시각적으로 확인할 수 있어 장기 루틴 유지에 유리합니다.',
+    },
+    record: {
+      label: '기록 캘린더',
+      summary: '날짜별 누적 시간과 주간 그래프를 함께 보여줘 공부가 언제 무너지고 언제 회복되는지 확인할 수 있습니다.',
+      bullets: ['캘린더에서 날짜별 총 시간 확인', '주간 막대로 흐름 해석', '상세 일자 클릭 시 루틴/학습 데이터 연결', '공백 구간이 눈에 띄게 설계'],
+      stats: [
+        ['최고 몰입일', '03/09'],
+        ['최고 시간', '8:25'],
+        ['공백 구간', '2일'],
+      ],
+      note: '기록은 단순 저장이 아니라 다음 계획을 수정하는 근거 데이터가 됩니다.',
+    },
+    plan: {
+      label: '계획 루틴',
+      summary: '계획은 매주 세우고, 매일 체크하고, 피드백이 다시 다음 계획으로 연결되도록 구성했습니다.',
+      bullets: ['주간 LP 작성', '오늘의 할 일 분리', '실행 체크와 완료율 산출', '다음 주 계획에 피드백 반영'],
+      stats: [
+        ['이번 주 계획', '12개'],
+        ['완료', '10개'],
+        ['달성률', '82%'],
+      ],
+      note: '막연한 공부를 구체적인 행동 단위로 바꾸는 것이 트랙 학생 모드의 핵심입니다.',
+    },
+  }[insight];
+
+  return (
+    <div key={insight} className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+      <div className="rounded-[1.5rem] border border-[#14295F]/8 bg-[#FBFCFF] p-5">
+        <p className="text-lg font-black tracking-tight text-[#14295F]">{data.label}</p>
+        <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-slate-600">{data.summary}</p>
+        <div className="mt-4 grid gap-3">
+          {data.bullets.map((bullet) => (
+            <div key={bullet} className="rounded-2xl border border-[#14295F]/8 bg-white px-4 py-3 text-sm font-black text-[#14295F]/82 shadow-sm">
+              {bullet}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-[1.5rem] bg-[linear-gradient(145deg,#14295F_0%,#1A3B82_100%)] p-5 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
+        <p className="text-[11px] font-black tracking-[0.18em] text-white/62">DETAIL SNAPSHOT</p>
+        <div className="mt-4 grid gap-3">
+          {data.stats.map(([label, value]) => (
+            <div key={label} className="rounded-2xl bg-white/10 px-4 py-3">
+              <p className="text-[10px] font-black tracking-[0.16em] text-white/55">{label}</p>
+              <p className="dashboard-number mt-2 text-[1.8rem] text-white">{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-2xl bg-white/8 px-4 py-4 text-sm font-black leading-relaxed text-white/82">{data.note}</div>
+      </div>
+    </div>
+  );
+}
+
+function ParentInsightDetail({ insight }: { insight: ParentInsight }) {
+  const data = {
+    alerts: {
+      label: '알림 읽기 흐름',
+      summary: '학부모 KPI 관리 목적에 맞춰 알림은 제목 중심으로 먼저 보여주고, 눌러서 읽어야 상세가 열리도록 설계했습니다.',
+      bullets: ['미확인 알림은 오렌지 점과 글로우로 표시', '제목만 먼저 노출', '탭 후 상세 팝업에서 읽음 처리', '알림 방문 이력도 관리 지표로 반영 가능'],
+      stats: [
+        ['미확인', '2건'],
+        ['최근 읽음', '17시간 전'],
+        ['응답 필요', '1건'],
+      ],
+      note: '학부모가 어떤 정보에 반응했는지까지 관리할 수 있어 센터 소통 우선순위를 잡는 데 도움이 됩니다.',
+    },
+    calendar: {
+      label: '학습 캘린더',
+      summary: '주간 누적 몰입과 날짜별 학습 시간을 앱 안에서 바로 확인하고, 특정 날짜 상세 데이터까지 자연스럽게 이어집니다.',
+      bullets: ['날짜별 총 공부시간 노출', '선택 날짜 상세 모달 연결', '캘린더 + 주간 그래프 동시 확인', '과목별 학습비중 카드 연동'],
+      stats: [
+        ['주간 누적', '14h 23m'],
+        ['최고 몰입일', '03/02'],
+        ['계획 달성', '50%'],
+      ],
+      note: '출결만 보는 앱이 아니라 학습 과정 전체를 캘린더형으로 이해하는 앱이라는 인상을 줍니다.',
+    },
+    weekly: {
+      label: '주간 분석',
+      summary: '그래프와 AI/교사 피드백을 같이 배치해, 학부모가 숫자만 보는 것이 아니라 해석까지 함께 받는 구조를 보여줍니다.',
+      bullets: ['일별 집중 시간 그래프', '과목별 비중 차트', '목표 대비 달성도 문장 피드백', '벌점/생활 관리 상태도 함께 요약'],
+      stats: [
+        ['목표 대비', '48%'],
+        ['가장 많이 한 과목', '독서'],
+        ['벌점 지수', '5점'],
+      ],
+      note: '주간 분석은 학부모의 불안을 줄이고, 상담 시 어떤 부분을 먼저 이야기해야 할지 기준을 줍니다.',
+    },
+    billing: {
+      label: '수납 상태',
+      summary: '학원과 독서실 수납을 따로 보여 추후 분리될 결제 흐름을 미리 이해할 수 있도록 정리했습니다.',
+      bullets: ['독서실 수납 / 학원 수납 분리 노출', '완납 / 청구 / 미납 상태 명확화', '앱에서 바로 결제 인지 가능', '실시간 상태 업데이트'],
+      stats: [
+        ['독서실 수납', '₩50,000'],
+        ['학원 수납', '₩320,000'],
+        ['결제 상태', '완납/청구'],
+      ],
+      note: '학부모는 지금 어떤 비용이 어떤 상태인지 혼동 없이 확인하고, 센터는 결제 안내 흐름을 명확히 유지할 수 있습니다.',
+    },
+  }[insight];
+
+  return (
+    <div key={insight} className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+      <div className="rounded-[1.5rem] border border-[#14295F]/8 bg-[#FBFCFF] p-5">
+        <p className="text-lg font-black tracking-tight text-[#14295F]">{data.label}</p>
+        <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-slate-600">{data.summary}</p>
+        <div className="mt-4 grid gap-3">
+          {data.bullets.map((bullet) => (
+            <div key={bullet} className="rounded-2xl border border-[#14295F]/8 bg-white px-4 py-3 text-sm font-black text-[#14295F]/82 shadow-sm">
+              {bullet}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-[1.5rem] border border-[#FF7A16]/12 bg-[linear-gradient(145deg,#FFF8EF_0%,#FFFFFF_100%)] p-5 shadow-[0_18px_36px_rgba(20,41,95,0.09)]">
+        <p className="text-[11px] font-black tracking-[0.18em] text-[#C46C17]">PARENT SNAPSHOT</p>
+        <div className="mt-4 grid gap-3">
+          {data.stats.map(([label, value], index) => (
+            <div key={label} className={cn('rounded-2xl px-4 py-3', index === data.stats.length - 1 ? 'bg-[#FFF3E7]' : 'bg-white border border-[#14295F]/8 shadow-sm')}>
+              <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/46">{label}</p>
+              <p className="dashboard-number mt-2 text-[1.75rem] text-[#14295F]">{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-2xl bg-[#14295F] px-4 py-4 text-sm font-black leading-relaxed text-white/82">{data.note}</div>
+      </div>
     </div>
   );
 }
@@ -556,6 +770,13 @@ export default function ExperiencePage() {
   const searchParams = useSearchParams();
   const mode = (searchParams.get('mode') as DemoMode | null) ?? null;
   const studentView = (searchParams.get('view') as StudentView | null) ?? 'desktop';
+  const [studentInsight, setStudentInsight] = useState<StudentInsight>('analysis');
+  const [parentInsight, setParentInsight] = useState<ParentInsight>('alerts');
+
+  useEffect(() => {
+    if (mode === 'student') setStudentInsight('analysis');
+    if (mode === 'parent') setParentInsight('alerts');
+  }, [mode, studentView]);
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#F5F8FF_0%,#FFFFFF_100%)] text-[#14295F]">
@@ -621,6 +842,30 @@ export default function ExperiencePage() {
                 { title: '동기 유지 장치', body: 'LP, 스킬 지표, 성장 카드처럼 학생이 성장을 시각적으로 느낄 수 있는 요소를 함께 배치했습니다.', icon: <Trophy className="h-5 w-5" /> },
               ]}
             />
+            <ExperienceDetailShell
+              eyebrow="STUDENT DETAIL PREVIEW"
+              title="학생 모드 기준 상담 문의"
+              description="학생 체험 화면 안에서도 어떤 데이터를 중심으로 관리하는지 탭처럼 살펴볼 수 있게 구성했습니다. 실제 서비스처럼 포인트를 나눠서 확인하는 흐름을 강조합니다."
+            >
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ['analysis', '학습 분석'],
+                  ['growth', '성장 지표'],
+                  ['record', '기록 캘린더'],
+                  ['plan', '계획 루틴'],
+                ].map(([key, label]) => (
+                  <DetailTabButton
+                    key={key}
+                    label={label}
+                    active={studentInsight === key}
+                    onClick={() => setStudentInsight(key as StudentInsight)}
+                  />
+                ))}
+              </div>
+              <div className="mt-5">
+                <StudentInsightDetail insight={studentInsight} />
+              </div>
+            </ExperienceDetailShell>
           </ExperienceSection>
         ) : null}
 
@@ -639,6 +884,30 @@ export default function ExperiencePage() {
                 { title: '관리와 소통 연결', body: '수납, 상담 요청, 리포트 확인까지 한 앱 흐름 안에서 이어져 학부모가 실제 관리 체계를 체감할 수 있습니다.', icon: <MessageCircle className="h-5 w-5" /> },
               ]}
             />
+            <ExperienceDetailShell
+              eyebrow="PARENT DETAIL PREVIEW"
+              title="학부모 모드 기준 상담 문의"
+              description="학부모 체험도 앱 안에서 어떤 흐름으로 정보를 읽고 해석하는지 더 자세히 볼 수 있게 나눴습니다. 관리 앱이라는 점이 숫자와 행동 흐름으로 바로 느껴지도록 구성했습니다."
+            >
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ['alerts', '알림 읽기'],
+                  ['calendar', '학습 캘린더'],
+                  ['weekly', '주간 분석'],
+                  ['billing', '수납 상태'],
+                ].map(([key, label]) => (
+                  <DetailTabButton
+                    key={key}
+                    label={label}
+                    active={parentInsight === key}
+                    onClick={() => setParentInsight(key as ParentInsight)}
+                  />
+                ))}
+              </div>
+              <div className="mt-5">
+                <ParentInsightDetail insight={parentInsight} />
+              </div>
+            </ExperienceDetailShell>
           </ExperienceSection>
         ) : null}
 
