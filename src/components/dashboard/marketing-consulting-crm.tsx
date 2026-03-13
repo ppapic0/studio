@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import {
   Download,
+  Globe2,
   Loader2,
   Megaphone,
   Phone,
@@ -66,6 +67,20 @@ interface LeadFormState {
   memo: string;
 }
 
+interface WebsiteConsultRequest {
+  id: string;
+  studentName: string;
+  school: string;
+  consultPhone: string;
+  consultationDate?: string;
+  status: LeadStatus;
+  source?: string;
+  sourceLabel?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  linkedLeadId?: string;
+}
+
 const STATUS_META: Record<LeadStatus, { label: string; className: string }> = {
   new: { label: '신규', className: 'bg-blue-100 text-blue-700 border-blue-200' },
   contacted: { label: '연락완료', className: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -111,6 +126,12 @@ function csvEscape(value: unknown): string {
   return text;
 }
 
+function formatDateTimeLabel(value: any): string {
+  const ms = toDateMs(value);
+  if (!ms) return '-';
+  return format(new Date(ms), 'yyyy.MM.dd HH:mm');
+}
+
 export function MarketingConsultingCRM({
   centerId,
   isMobile,
@@ -125,6 +146,7 @@ export function MarketingConsultingCRM({
   const [form, setForm] = useState<LeadFormState>(INITIAL_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [promotingWebsiteId, setPromotingWebsiteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | LeadStatus>('all');
 
@@ -140,9 +162,28 @@ export function MarketingConsultingCRM({
     enabled: !!centerId,
   });
 
+  const websiteRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'websiteConsultRequests'),
+      orderBy('createdAt', 'desc'),
+      limit(200)
+    );
+  }, [firestore, centerId]);
+  const { data: websiteRequestsRaw, isLoading: websiteRequestsLoading } = useCollection<WebsiteConsultRequest>(
+    websiteRequestsQuery,
+    {
+      enabled: !!centerId,
+    }
+  );
+
   const leads = useMemo(() => {
     return [...(leadsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt));
   }, [leadsRaw]);
+
+  const websiteRequests = useMemo(() => {
+    return [...(websiteRequestsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt));
+  }, [websiteRequestsRaw]);
 
   const filteredLeads = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -166,6 +207,21 @@ export function MarketingConsultingCRM({
     });
   }, [leads, searchTerm, statusFilter]);
 
+  const filteredWebsiteRequests = useMemo(() => {
+    const keyword = searchTerm.trim().toLowerCase();
+    return websiteRequests.filter((request) => {
+      const matchesStatus = statusFilter === 'all' ? true : request.status === statusFilter;
+      if (!matchesStatus) return false;
+      if (!keyword) return true;
+
+      const haystack = [request.studentName, request.school, request.consultPhone, request.sourceLabel]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [searchTerm, statusFilter, websiteRequests]);
+
   const summary = useMemo(() => {
     const total = leads.length;
     const enrolled = leads.filter((lead) => lead.status === 'enrolled').length;
@@ -184,6 +240,13 @@ export function MarketingConsultingCRM({
 
     return { total, enrolled, consulted, conversionRate, channels };
   }, [leads]);
+
+  const websiteSummary = useMemo(() => {
+    const total = websiteRequests.length;
+    const newCount = websiteRequests.filter((request) => request.status === 'new').length;
+    const contactedCount = websiteRequests.filter((request) => request.status === 'contacted').length;
+    return { total, newCount, contactedCount };
+  }, [websiteRequests]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM());
@@ -295,6 +358,65 @@ export function MarketingConsultingCRM({
     }
   };
 
+  const handleWebsiteStatusUpdate = async (requestId: string, nextStatus: LeadStatus) => {
+    if (!firestore || !centerId) return;
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', requestId), {
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: '웹 상담 상태 변경 실패',
+        description: '웹사이트 상담폼 상태를 바꾸는 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  const handlePromoteWebsiteRequest = async (request: WebsiteConsultRequest) => {
+    if (!firestore || !centerId) return;
+
+    setPromotingWebsiteId(request.id);
+    try {
+      const leadRef = await addDoc(collection(firestore, 'centers', centerId, 'consultingLeads'), {
+        studentName: request.studentName?.trim() || '',
+        parentName: '웹사이트 문의',
+        parentPhone: request.consultPhone?.trim() || '',
+        studentPhone: '',
+        marketingChannel: request.sourceLabel || '웹사이트 상담폼',
+        consultationDate: request.consultationDate || format(new Date(), 'yyyy-MM-dd'),
+        status: request.status || 'new',
+        memo: [`학교: ${request.school || '-'}`, `웹 접수: ${formatDateTimeLabel(request.createdAt)}`].join('\n'),
+        source: 'website',
+        sourceRequestId: request.id,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdByUid: user?.uid || null,
+      });
+
+      await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', request.id), {
+        linkedLeadId: leadRef.id,
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: '웹 상담폼 내역을 리드 DB로 옮겼습니다.',
+        description: '센터 홍보 DB에서 후속 상담 상태를 이어서 관리할 수 있습니다.',
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: '리드 이동 실패',
+        description: '웹사이트 상담폼 내역을 일반 리드 DB로 옮기는 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setPromotingWebsiteId(null);
+    }
+  };
+
   const exportToCsv = () => {
     const headers = [
       '상담일',
@@ -370,6 +492,104 @@ export function MarketingConsultingCRM({
           </div>
         </CardHeader>
         <CardContent className={cn('space-y-4', isMobile ? 'p-5 pt-0' : 'p-6 pt-0')}>
+          <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4">
+            <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Globe2 className="h-4 w-4 text-[#FF7A16]" />
+                  <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
+                </div>
+                <p className="text-xs font-semibold text-slate-600">
+                  랜딩페이지 방문 상담·입학 문의가 이 영역에 따로 쌓입니다. 필요하면 일반 리드 DB로 옮겨 후속 상담을 이어갈 수 있습니다.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge className="border-none bg-white text-[#C25A00] shadow-sm">
+                  전체 {websiteSummary.total}건
+                </Badge>
+                <Badge className="border-none bg-white text-blue-700 shadow-sm">
+                  신규 {websiteSummary.newCount}건
+                </Badge>
+                <Badge className="border-none bg-white text-amber-700 shadow-sm">
+                  연락중 {websiteSummary.contactedCount}건
+                </Badge>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {websiteRequestsLoading ? (
+                <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-orange-200 bg-white/80">
+                  <Loader2 className="h-5 w-5 animate-spin text-[#FF7A16]" />
+                </div>
+              ) : filteredWebsiteRequests.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-orange-200 bg-white/80 px-4 py-6 text-center text-sm font-semibold text-slate-500">
+                  아직 웹사이트 상담폼으로 접수된 내역이 없습니다.
+                </div>
+              ) : (
+                filteredWebsiteRequests.slice(0, 8).map((request) => (
+                  <div key={request.id} className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
+                    <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-black text-slate-900">{request.studentName || '(학생명 미입력)'}</p>
+                          <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
+                            {STATUS_META[request.status || 'new'].label}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px] font-black">
+                            {request.sourceLabel || '웹사이트'}
+                          </Badge>
+                          {request.linkedLeadId ? (
+                            <Badge className="border-none bg-emerald-100 text-[10px] font-black text-emerald-700">
+                              리드 이동 완료
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-xs font-semibold text-slate-600">
+                          학교: {request.school || '-'} · 연락처: {request.consultPhone || '-'}
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-500">
+                          접수일: {request.consultationDate || '-'} · 접수시각: {formatDateTimeLabel(request.createdAt)}
+                        </p>
+                      </div>
+
+                      <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
+                        <Select
+                          value={request.status || 'new'}
+                          onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
+                        >
+                          <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(STATUS_META).map(([value, meta]) => (
+                              <SelectItem key={value} value={value}>
+                                {meta.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-lg px-3 text-xs font-black"
+                          onClick={() => void handlePromoteWebsiteRequest(request)}
+                          disabled={promotingWebsiteId === request.id || !!request.linkedLeadId}
+                        >
+                          {promotingWebsiteId === request.id ? (
+                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                          ) : null}
+                          {request.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
             <Card className="rounded-xl border-none bg-primary text-primary-foreground shadow-sm">
               <CardContent className="p-4">

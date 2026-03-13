@@ -28,6 +28,12 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
                 <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">LOCATION</p>
                 <p className="mt-2 break-keep text-lg font-black text-[#14295F]">{consult.locationLine}</p>
               </article>
+              <article className="marketing-card p-5">
+                <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">HOURS</p>
+                <p className="mt-2 break-keep text-lg font-black leading-relaxed text-[#14295F]">
+                  {consult.hoursLine}
+                </p>
+              </article>
 
               <div className="flex flex-wrap gap-3">
                 <a

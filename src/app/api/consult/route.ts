@@ -3,6 +3,9 @@ import { z } from "zod";
 
 import { adminDb } from "@/lib/firebase-admin";
 
+const WEBSITE_CONSULT_SOURCE = "website";
+const WEBSITE_CONSULT_LABEL = "웹사이트 상담폼";
+
 const consultSchema = z.object({
   studentName: z.string().trim().min(1, "학생 이름을 입력해주세요.").max(40, "학생 이름이 너무 깁니다."),
   school: z.string().trim().min(1, "학교명을 입력해주세요.").max(80, "학교명이 너무 깁니다."),
@@ -12,6 +15,23 @@ const consultSchema = z.object({
     .min(8, "연락처를 입력해주세요.")
     .max(30, "연락처 형식이 올바르지 않습니다."),
 });
+
+function getKoreaDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+async function resolveMarketingCenterId() {
+  const envCenterId = process.env.MARKETING_CENTER_ID || process.env.NEXT_PUBLIC_MARKETING_CENTER_ID;
+  if (envCenterId) return envCenterId;
+
+  const snapshot = await adminDb.collection("centers").limit(1).get();
+  return snapshot.empty ? null : snapshot.docs[0]?.id ?? null;
+}
 
 export async function POST(request: Request) {
   try {
@@ -29,13 +49,32 @@ export async function POST(request: Request) {
     }
 
     const payload = parsed.data;
+    const centerId = await resolveMarketingCenterId();
+    const createdAt = new Date().toISOString();
+    const consultationDate = getKoreaDateKey();
 
     await adminDb.collection("marketingConsultRequests").add({
       ...payload,
-      source: "landing",
+      centerId,
+      consultationDate,
+      source: WEBSITE_CONSULT_SOURCE,
+      sourceLabel: WEBSITE_CONSULT_LABEL,
       status: "new",
-      createdAt: new Date().toISOString(),
+      createdAt,
     });
+
+    if (centerId) {
+      await adminDb.collection("centers").doc(centerId).collection("websiteConsultRequests").add({
+        ...payload,
+        centerId,
+        consultationDate,
+        source: WEBSITE_CONSULT_SOURCE,
+        sourceLabel: WEBSITE_CONSULT_LABEL,
+        status: "new",
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
 
     return NextResponse.json({ ok: true, message: "상담 신청이 접수되었습니다." });
   } catch (error) {

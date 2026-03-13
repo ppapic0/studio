@@ -115,6 +115,7 @@ export type MarketingContent = {
     description: string;
     contactLine: string;
     locationLine: string;
+    hoursLine: string;
   };
   footer: {
     line: string;
@@ -405,11 +406,12 @@ export const marketingContent: MarketingContent = {
       "학생의 현재를 확인한 뒤, 스터디카페 이용 또는 국어 수업 선택을 포함해 가장 적합한 시작 경로를 안내드립니다. 재학생과 N수생 모두 상담 가능합니다.",
     contactLine: "상담 문의: 상담 폼 접수 후 순차 연락",
     locationLine: "위치: 경기 용인시 기흥구 동백중앙로 283 B동 906호, 907호",
+    hoursLine: "스터디카페 운영: 매일 오전 8:30 ~ 익일 오전 1:30 (거의 연중무휴) · 학원 운영: 매일 오후 10:00 종료",
   },
   footer: {
     line: "트랙은 화려한 문구보다, 학생의 성장 과정과 실제 결과로 신뢰를 증명합니다.",
     phone: "상담 문의: 상담 폼 접수 후 순차 연락",
     location: "경기 용인시 기흥구 동백중앙로 283 B동 906호, 907호",
-    hours: "운영 시간: 평일 13:00 - 22:00 / 토요일 10:00 - 18:00",
+    hours: "운영 시간: 스터디카페 매일 오전 8:30 ~ 익일 오전 1:30 · 학원 매일 오후 10:00 종료",
   },
 };
