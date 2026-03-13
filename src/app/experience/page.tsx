@@ -21,6 +21,7 @@ import {
   Sparkles,
   Target,
   Trophy,
+  X,
   Zap,
 } from 'lucide-react';
 
@@ -121,7 +122,7 @@ function DemoValueCard({
   };
 
   return (
-    <div className={cn('rounded-2xl border border-[#14295F]/8 p-4 shadow-sm', toneMap[tone])}>
+    <div className={cn('app-depth-card p-4', toneMap[tone])}>
       <p className="text-[11px] font-black tracking-tight opacity-70">{label}</p>
       <p className="dashboard-number mt-2 text-[1.7rem] leading-none tracking-tight">{value}</p>
       {caption ? <p className="mt-2 text-[11px] font-bold opacity-65">{caption}</p> : null}
@@ -143,7 +144,7 @@ function DemoPanel({
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-[1.5rem] border border-[#14295F]/8 bg-white p-5 shadow-sm', className)}>
+    <div className={cn('app-depth-card p-5', className)}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-lg font-black tracking-tight text-[#14295F]">{title}</p>
@@ -159,7 +160,7 @@ function DemoPanel({
 function PhoneFrame({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-[386px] rounded-[2.7rem] border-[10px] border-[#132B63] bg-[linear-gradient(180deg,#eff4ff_0%,#ffffff_100%)] p-3 shadow-[0_34px_90px_rgba(20,41,95,0.24)]">
-      <div className="relative overflow-hidden rounded-[2rem] border border-[#14295F]/10 bg-[#FFFDFB]">
+      <div className="relative overflow-hidden rounded-[2rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFDFB_0%,#F7FAFF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
         <div className="pointer-events-none absolute left-1/2 top-0 z-20 h-6 w-32 -translate-x-1/2 rounded-b-[1rem] bg-[#10224B]" />
         {children}
       </div>
@@ -293,7 +294,7 @@ function ExperienceHighlights({ items }: { items: Array<{ title: string; body: s
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       {items.map((item) => (
-        <div key={item.title} className="rounded-[1.5rem] border border-[#14295F]/10 bg-white p-5 shadow-sm">
+        <div key={item.title} className="app-depth-card p-5">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FFF5EC] text-[#FF7A16] shadow-sm">{item.icon}</div>
           <p className="mt-4 text-lg font-black tracking-tight text-[#14295F]">{item.title}</p>
           <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.body}</p>
@@ -332,6 +333,68 @@ function ExperienceDetailShell({
         </div>
       </div>
       <div className="mt-5">{children}</div>
+    </div>
+  );
+}
+
+function DemoOverlay({
+  eyebrow,
+  title,
+  description,
+  onClose,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0E2148]/48 p-4 backdrop-blur-[3px]">
+      <div className="app-depth-card max-h-[86%] w-full overflow-hidden rounded-[1.75rem]">
+        <div className="bg-[linear-gradient(145deg,#14295F_0%,#1B3C82_100%)] px-5 py-4 text-white">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black tracking-[0.22em] text-[#FFD3A7]">{eyebrow}</p>
+              <h4 className="mt-2 text-[1.7rem] font-black leading-tight tracking-tight">{title}</h4>
+              {description ? <p className="mt-2 text-[12px] font-black leading-relaxed text-white/74">{description}</p> : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/14 bg-white/10 text-white/82"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        </div>
+        <div className="max-h-[420px] overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function DemoOverlayStat({
+  label,
+  value,
+  tone = 'navy',
+}: {
+  label: string;
+  value: string;
+  tone?: 'navy' | 'warm' | 'emerald' | 'rose';
+}) {
+  const toneClassName = {
+    navy: 'app-depth-card border-[#14295F]/10 text-[#14295F]',
+    warm: 'app-depth-card-warm text-[#14295F]',
+    emerald: 'app-depth-card border-emerald-200/80 text-emerald-700',
+    rose: 'app-depth-card border-rose-200/80 text-rose-700',
+  };
+
+  return (
+    <div className={cn('px-4 py-3', toneClassName[tone])}>
+      <p className="text-[10px] font-black tracking-[0.16em] opacity-55">{label}</p>
+      <p className="dashboard-number mt-2 text-[1.55rem]">{value}</p>
     </div>
   );
 }
@@ -579,9 +642,11 @@ function StudentDesktopDemo() {
 }
 
 function StudentMobileDemo() {
+  const [overlay, setOverlay] = useState<'report' | 'penalty' | 'record' | null>(null);
+
   return (
     <PhoneFrame>
-      <div className="flex h-full flex-col bg-[linear-gradient(180deg,#fff8f1_0%,#ffffff_22%,#f7faff_100%)]">
+      <div className="relative flex h-full flex-col bg-[linear-gradient(180deg,#fff8f1_0%,#ffffff_22%,#f7faff_100%)]">
         <AppHeader />
         <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-5">
           <div>
@@ -612,7 +677,19 @@ function StudentMobileDemo() {
             </div>
           </DemoPanel>
 
-          <DemoPanel title="기록트랙" subtitle="STUDY CONSISTENCY MAP" right={<div className="rounded-full bg-[#F4F7FD] px-3 py-1 text-[11px] font-black text-[#14295F]">2026년 3월</div>}>
+          <DemoPanel
+            title="기록트랙"
+            subtitle="STUDY CONSISTENCY MAP"
+            right={
+              <button
+                type="button"
+                onClick={() => setOverlay('record')}
+                className="rounded-full bg-[#F4F7FD] px-3 py-1 text-[11px] font-black text-[#14295F] transition hover:bg-[#EBF1FF]"
+              >
+                3월 5일 상세
+              </button>
+            }
+          >
             <div className="grid grid-cols-4 gap-2 text-center text-[9px] font-black uppercase tracking-[0.16em] text-[#14295F]/38">
               {['MON', 'TUE', 'WED', 'THU'].map((day) => <span key={day}>{day}</span>)}
             </div>
@@ -620,7 +697,9 @@ function StudentMobileDemo() {
               <HeatCell day="3/2" value="8:25" />
               <HeatCell day="3/3" value="4:23" />
               <HeatCell day="3/4" value="2:46" />
-              <HeatCell day="3/5" value="1:36" active />
+              <button type="button" onClick={() => setOverlay('record')}>
+                <HeatCell day="3/5" value="1:36" active />
+              </button>
             </div>
             <div className="mt-4 rounded-2xl border border-[#14295F]/8 bg-[#14295F] px-4 py-4 text-white">
               <p className="text-[10px] font-black tracking-[0.18em] text-white/65">WEEKLY DETAIL</p>
@@ -634,30 +713,121 @@ function StudentMobileDemo() {
 
           <div className="grid gap-3">
             {[
-              ['계획트랙', '매일 계획 → 실행 → 피드백 루프'],
-              ['선생님 리포트', '이번 주 분석과 다음 전략 확인'],
-              ['벌점 현황', '생활관리 기준과 회복 흐름 안내'],
-            ].map(([title, subtitle]) => (
-              <div key={title} className="flex items-center justify-between rounded-[1.6rem] border border-[#14295F]/8 bg-white px-4 py-4 shadow-sm">
+              ['계획트랙', '매일 계획 → 실행 → 피드백 루프', null],
+              ['선생님 리포트', '이번 주 분석과 다음 전략 확인', 'report'],
+              ['벌점 현황', '생활관리 기준과 회복 흐름 안내', 'penalty'],
+            ].map(([title, subtitle, target]) => (
+              <button
+                type="button"
+                key={title}
+                onClick={() => target && setOverlay(target as 'report' | 'penalty')}
+                className="app-depth-card flex items-center justify-between px-4 py-4 text-left transition hover:-translate-y-0.5"
+              >
                 <div>
                   <p className="text-base font-black tracking-tight text-[#14295F]">{title}</p>
                   <p className="mt-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/42">{subtitle}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-[#14295F]/40" />
-              </div>
+              </button>
             ))}
           </div>
         </div>
 
         <BottomNav active="홈" items={[{ label: '홈', icon: LayoutDashboard }, { label: '성장', icon: Zap }, { label: '기록', icon: CalendarDays }, { label: '계획', icon: ClipboardList }, { label: '상담', icon: MessageCircle }]} />
+
+        {overlay === 'report' ? (
+          <DemoOverlay
+            eyebrow="TEACHER REPORT"
+            title="3월 12일 선생님 리포트"
+            description="이번 주 누적 데이터와 교사 코멘트를 앱 안에서 바로 확인하는 흐름입니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <DemoOverlayStat label="주간 누적" value="14시간 23분" />
+                <DemoOverlayStat label="계획 달성" value="82%" tone="warm" />
+              </div>
+              <div className="app-depth-card px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">이번 주 해석</p>
+                <div className="mt-3 space-y-2 text-[13px] font-black leading-relaxed text-[#14295F]/82">
+                  <p>• 누적 공부시간은 안정적이지만 시작 시각이 늦어지는 날이 2일 있었습니다.</p>
+                  <p>• 독서 파트 집중력은 좋지만 언매 회전 수가 부족해 다음 주 보완이 필요합니다.</p>
+                  <p>• 계획 달성률은 82%로 우수하나, 미완료 2개는 루틴 시간 고정이 핵심입니다.</p>
+                </div>
+              </div>
+              <div className="app-depth-card-warm px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#B85A00]/70">다음 전략</p>
+                <p className="mt-3 text-[13px] font-black leading-relaxed text-[#14295F]/82">
+                  월·수·금은 언매 40분 고정 루틴을 추가하고, 주말에는 평가원 독서 지문 복기를 우선 배치합니다.
+                </p>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
+
+        {overlay === 'penalty' ? (
+          <DemoOverlay
+            eyebrow="PENALTY GUIDE"
+            title="벌점 및 규정 가이드"
+            description="현재 점수와 회복 흐름까지 앱 안에서 바로 이해할 수 있도록 정리한 화면입니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <DemoOverlayStat label="현재 누적" value="5점" tone="rose" />
+                <DemoOverlayStat label="회복 예정" value="7일 주기" tone="emerald" />
+              </div>
+              <div className="app-depth-card px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">누적 시 적용 규정</p>
+                <div className="mt-3 space-y-2 text-[13px] font-black text-[#14295F]/78">
+                  <p>• 7점 이상: 선생님 상담</p>
+                  <p>• 12점 이상: 학부모 상담</p>
+                  <p>• 20점 이상: 퇴원 검토</p>
+                </div>
+              </div>
+              <div className="app-depth-card-warm px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#B85A00]/70">회복 방식</p>
+                <p className="mt-3 text-[13px] font-black leading-relaxed text-[#14295F]/82">
+                  생활 이슈가 없고 루틴이 안정적으로 유지되면 일정 주기마다 벌점이 회복되어 누적 부담을 줄일 수 있습니다.
+                </p>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
+
+        {overlay === 'record' ? (
+          <DemoOverlay
+            eyebrow="DAILY RECORD"
+            title="2026.03.05(목)"
+            description="선택한 날짜의 공부 시간, 계획 달성, 획득 LP가 연결되는 상세 화면 예시입니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <DemoOverlayStat label="공부 시간" value="1시간 36분" />
+                <DemoOverlayStat label="계획 달성" value="100%" tone="warm" />
+                <DemoOverlayStat label="획득 LP" value="124 LP" tone="emerald" />
+                <DemoOverlayStat label="출결 상태" value="정상 입실" />
+              </div>
+              <div className="app-depth-card px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">학습 계획 내역</p>
+                <div className="mt-3 rounded-2xl border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4 text-[13px] font-black text-[#14295F]/82">
+                  평가원 독서 복기 1회, 언매 오답 정리 1회, 루틴 체크 1회 완료
+                </div>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
       </div>
     </PhoneFrame>
   );
 }
 function ParentMobileDemo() {
+  const [overlay, setOverlay] = useState<'alert' | 'calendar' | 'weekly' | 'billing' | null>(null);
+
   return (
     <PhoneFrame>
-      <div className="flex h-full flex-col bg-[linear-gradient(180deg,#fff7f0_0%,#ffffff_24%,#f7faff_100%)]">
+      <div className="relative flex h-full flex-col bg-[linear-gradient(180deg,#fff7f0_0%,#ffffff_24%,#f7faff_100%)]">
         <AppHeader avatar="학" />
         <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-5">
           <div>
@@ -688,18 +858,35 @@ function ParentMobileDemo() {
                 ['생활 기록 알림', true],
                 ['학습 리포트 도착', false],
               ].map(([title, unread]) => (
-                <div key={title} className={cn('rounded-2xl border px-4 py-4 shadow-sm', unread ? 'border-[#FFB46A] bg-[#FFF9F3]' : 'border-[#14295F]/8 bg-[#F8FBFF]')}>
+                <button
+                  type="button"
+                  key={title}
+                  onClick={() => setOverlay('alert')}
+                  className={cn('w-full rounded-2xl border px-4 py-4 text-left shadow-sm transition hover:-translate-y-0.5', unread ? 'border-[#FFB46A] bg-[#FFF9F3]' : 'border-[#14295F]/8 bg-[#F8FBFF]')}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-black text-[#14295F]">{title}</p>
                     {unread ? <div className="h-2.5 w-2.5 rounded-full bg-[#FF7A16] shadow-[0_0_14px_rgba(255,122,22,0.75)]" /> : null}
                   </div>
                   <p className="mt-1 text-[11px] font-black text-[#14295F]/45">제목만 먼저 보이고, 눌러서 상세 내용을 읽고 읽음 처리합니다.</p>
-                </div>
+                </button>
               ))}
             </div>
           </DemoPanel>
 
-          <DemoPanel title="기록트랙" subtitle="STUDY CONSISTENCY MAP" right={<div className="rounded-full bg-[#F4F7FD] px-3 py-2 text-[11px] font-black text-[#14295F]">2026년 3월</div>}>
+          <DemoPanel
+            title="기록트랙"
+            subtitle="STUDY CONSISTENCY MAP"
+            right={
+              <button
+                type="button"
+                onClick={() => setOverlay('calendar')}
+                className="rounded-full bg-[#F4F7FD] px-3 py-2 text-[11px] font-black text-[#14295F] transition hover:bg-[#EBF1FF]"
+              >
+                2026년 3월
+              </button>
+            }
+          >
             <div className="grid grid-cols-4 gap-2 text-center text-[9px] font-black uppercase tracking-[0.16em] text-[#14295F]/38">
               {['MON', 'TUE', 'WED', 'THU'].map((day) => <span key={day}>{day}</span>)}
             </div>
@@ -707,7 +894,9 @@ function ParentMobileDemo() {
               <HeatCell day="3/2" value="8:25" />
               <HeatCell day="3/3" value="4:23" />
               <HeatCell day="3/4" value="2:46" />
-              <HeatCell day="3/5" value="1:36" active />
+              <button type="button" onClick={() => setOverlay('calendar')}>
+                <HeatCell day="3/5" value="1:36" active />
+              </button>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4">
@@ -716,7 +905,11 @@ function ParentMobileDemo() {
                   <SubjectBars items={[{ label: '독서', value: 78, tone: 'blue' }, { label: '문학', value: 74, tone: 'orange' }]} />
                 </div>
               </div>
-              <div className="rounded-2xl bg-[#14295F] px-4 py-4 text-white">
+              <button
+                type="button"
+                onClick={() => setOverlay('weekly')}
+                className="rounded-2xl bg-[#14295F] px-4 py-4 text-left text-white transition hover:-translate-y-0.5"
+              >
                 <p className="text-[10px] font-black tracking-[0.16em] text-white/62">WEEKLY DETAIL</p>
                 <div className="mt-3 h-24 rounded-2xl bg-white/8 p-3">
                   <div className="flex h-full items-end gap-2">
@@ -724,14 +917,22 @@ function ParentMobileDemo() {
                   </div>
                 </div>
                 <p className="mt-3 text-[12px] font-black leading-relaxed text-white/82">주간 누적 14시간 23분, 목표 대비 48%입니다.</p>
-              </div>
+              </button>
             </div>
           </DemoPanel>
 
-          <DemoPanel title="수납" subtitle="REALTIME PAYMENT STATUS" right={<CreditCard className="h-5 w-5 text-[#FF7A16]" />}>
+          <DemoPanel
+            title="수납"
+            subtitle="REALTIME PAYMENT STATUS"
+            right={
+              <button type="button" onClick={() => setOverlay('billing')}>
+                <CreditCard className="h-5 w-5 text-[#FF7A16]" />
+              </button>
+            }
+          >
             <p className="break-keep text-[13px] font-black leading-relaxed text-[#14295F]/72">센터 수납 요청건을 비대면으로 결제할 수 있어요.</p>
             <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4">
+              <button type="button" onClick={() => setOverlay('billing')} className="w-full rounded-2xl border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4 text-left transition hover:-translate-y-0.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black text-[#14295F]/55">독서실 수납</p>
@@ -739,8 +940,8 @@ function ParentMobileDemo() {
                   </div>
                   <div className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">완납</div>
                 </div>
-              </div>
-              <div className="rounded-2xl border border-[#14295F]/8 bg-[#FFF9F3] px-4 py-4">
+              </button>
+              <button type="button" onClick={() => setOverlay('billing')} className="w-full rounded-2xl border border-[#14295F]/8 bg-[#FFF9F3] px-4 py-4 text-left transition hover:-translate-y-0.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black text-[#14295F]/55">학원 수납</p>
@@ -748,7 +949,7 @@ function ParentMobileDemo() {
                   </div>
                   <div className="rounded-full bg-[#FFE0C2] px-3 py-1 text-[11px] font-black text-[#D96809]">청구</div>
                 </div>
-              </div>
+              </button>
             </div>
           </DemoPanel>
 
@@ -761,6 +962,99 @@ function ParentMobileDemo() {
         </div>
 
         <BottomNav active="홈" items={[{ label: '홈', icon: LayoutDashboard }, { label: '학습', icon: Clock3 }, { label: '데이터', icon: FileText }, { label: '소통', icon: MessageCircle }, { label: '수납', icon: CreditCard }]} />
+
+        {overlay === 'alert' ? (
+          <DemoOverlay
+            eyebrow="NOTIFICATION DETAIL"
+            title="출결 상태 업데이트"
+            description="제목만 먼저 보이고, 눌러서 상세 내용을 읽는 실제 학부모 알림 흐름을 보여줍니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <DemoOverlayStat label="발송 시각" value="17시간 전" />
+                <DemoOverlayStat label="읽음 처리" value="탭 시 반영" tone="warm" />
+              </div>
+              <div className="app-depth-card px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">상세 내용</p>
+                <div className="mt-3 space-y-2 text-[13px] font-black leading-relaxed text-[#14295F]/82">
+                  <p>• 오늘 학생은 오전 8:57에 입실했고, 계획 루틴 3건 중 2건을 완료했습니다.</p>
+                  <p>• 실시간 몰입 시간은 3시간 40분이며, 언매 복기 과제 1건이 남아 있습니다.</p>
+                  <p>• 앱에서 확인한 후 읽음으로 전환되어 학부모 방문 흐름도 관리 지표에 반영됩니다.</p>
+                </div>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
+
+        {overlay === 'calendar' ? (
+          <DemoOverlay
+            eyebrow="CALENDAR DETAIL"
+            title="2026.03.05 학습 요약"
+            description="캘린더에서 날짜를 누르면 그날의 공부시간과 실행 결과를 바로 확인하는 구조입니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <DemoOverlayStat label="공부 시간" value="1시간 36분" />
+                <DemoOverlayStat label="계획 달성" value="100%" tone="warm" />
+                <DemoOverlayStat label="획득 LP" value="556 LP" tone="emerald" />
+                <DemoOverlayStat label="출결 유형" value="기록 없음" />
+              </div>
+              <div className="app-depth-card px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">학습 계획 내역</p>
+                <div className="mt-3 rounded-2xl border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4 text-[13px] font-black text-[#14295F]/82">
+                  미적분 복습, 독서 복기, 루틴 체크 완료
+                </div>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
+
+        {overlay === 'weekly' ? (
+          <DemoOverlay
+            eyebrow="WEEKLY ANALYTICS"
+            title="주간 성과 데이터"
+            description="최근 7일 학습 지표와 교사 해석을 한 번에 보는 실제 분석형 팝업 흐름입니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="app-depth-card px-4 py-4">
+                <LineChartDemo values={[0, 0, 0, 340, 265, 170, 90]} labels={['03/06', '03/07', '03/08', '03/09', '03/10', '03/11', '03/12']} />
+              </div>
+              <div className="app-depth-card-warm px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#B85A00]/70">선생님 종합 피드백</p>
+                <p className="mt-3 text-[13px] font-black leading-relaxed text-[#14295F]/82">
+                  이번 주 누적 학습은 14시간 23분으로 목표 대비 48%입니다. 완문풀이 구간을 조금 더 끌어올리면 다음 주 회복폭이 커질 수 있습니다.
+                </p>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
+
+        {overlay === 'billing' ? (
+          <DemoOverlay
+            eyebrow="BILLING DETAIL"
+            title="수납 상태 상세"
+            description="독서실과 학원 수납을 따로 보여 추후 분리 결제 구조까지 자연스럽게 이해할 수 있도록 한 화면입니다."
+            onClose={() => setOverlay(null)}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <DemoOverlayStat label="독서실 수납" value="₩50,000" tone="emerald" />
+                <DemoOverlayStat label="학원 수납" value="₩320,000" tone="warm" />
+              </div>
+              <div className="app-depth-card px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">결제 상태</p>
+                <div className="mt-3 space-y-2 text-[13px] font-black text-[#14295F]/78">
+                  <p>• 독서실 수납: 완납</p>
+                  <p>• 학원 수납: 2026.04.02 청구 예정</p>
+                  <p>• 앱에서 각각의 상태를 따로 확인할 수 있도록 분리 노출</p>
+                </div>
+              </div>
+            </div>
+          </DemoOverlay>
+        ) : null}
       </div>
     </PhoneFrame>
   );

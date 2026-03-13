@@ -144,7 +144,15 @@
 
 @layer components {
   .premium-card {
-    @apply border border-border/50 bg-card text-card-foreground shadow-sm transition-all duration-300 ease-out active:scale-[0.99];
+    @apply border border-border/50 bg-card text-card-foreground transition-all duration-300 ease-out active:scale-[0.99];
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(247,250,255,0.98) 100%),
+      radial-gradient(circle at top left, rgba(255,255,255,0.84), transparent 32%);
+    box-shadow:
+      0 24px 56px rgba(20, 41, 95, 0.10),
+      0 8px 18px rgba(20, 41, 95, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.96),
+      inset 0 -1px 0 rgba(20, 41, 95, 0.03);
   }
 
   @media (hover: hover) {
@@ -160,21 +168,66 @@
   .marketing-card {
     @apply rounded-[1.6rem] border bg-white;
     border-color: rgba(20, 41, 95, 0.14);
-    box-shadow: 0 16px 40px rgba(20, 41, 95, 0.08);
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(249,251,255,0.99) 100%),
+      radial-gradient(circle at 12% 0%, rgba(255,255,255,0.82), transparent 34%);
+    box-shadow:
+      0 26px 58px rgba(20, 41, 95, 0.09),
+      0 8px 20px rgba(20, 41, 95, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      inset 0 -1px 0 rgba(20, 41, 95, 0.03);
   }
 
   .marketing-card-soft {
     @apply rounded-[1.6rem] border;
     background-color: #f8faff;
     border-color: rgba(20, 41, 95, 0.14);
-    box-shadow: 0 16px 38px rgba(20, 41, 95, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+    background-image:
+      linear-gradient(180deg, rgba(248,250,255,0.99) 0%, rgba(255,255,255,0.97) 100%),
+      radial-gradient(circle at 0% 0%, rgba(255,255,255,0.78), transparent 38%);
+    box-shadow:
+      0 24px 52px rgba(20, 41, 95, 0.09),
+      0 8px 18px rgba(20, 41, 95, 0.04),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.78);
   }
 
   .marketing-card-warm {
     @apply rounded-[1.6rem] border;
     background-color: #fff5ec;
     border-color: rgba(255, 122, 22, 0.2);
-    box-shadow: 0 16px 38px rgba(20, 41, 95, 0.08), inset 0 0 0 1px rgba(255, 122, 22, 0.08);
+    background-image:
+      linear-gradient(180deg, rgba(255,245,236,0.98) 0%, rgba(255,255,255,0.98) 100%),
+      radial-gradient(circle at 0% 0%, rgba(255,255,255,0.72), transparent 34%);
+    box-shadow:
+      0 24px 52px rgba(20, 41, 95, 0.09),
+      0 8px 18px rgba(20, 41, 95, 0.04),
+      inset 0 0 0 1px rgba(255, 122, 22, 0.12);
+  }
+
+  .app-depth-card {
+    @apply rounded-[1.5rem] border bg-white;
+    border-color: rgba(20, 41, 95, 0.12);
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(247,250,255,0.98) 100%),
+      radial-gradient(circle at top left, rgba(255,255,255,0.8), transparent 36%);
+    box-shadow:
+      0 22px 48px rgba(20, 41, 95, 0.10),
+      0 6px 16px rgba(20, 41, 95, 0.04),
+      inset 0 1px 0 rgba(255,255,255,0.96),
+      inset 0 -1px 0 rgba(20,41,95,0.03);
+  }
+
+  .app-depth-card-warm {
+    @apply rounded-[1.5rem] border;
+    border-color: rgba(255, 122, 22, 0.18);
+    background-image:
+      linear-gradient(180deg, rgba(255,247,239,0.98) 0%, rgba(255,255,255,0.98) 100%),
+      radial-gradient(circle at top left, rgba(255,255,255,0.72), transparent 36%);
+    box-shadow:
+      0 22px 48px rgba(20, 41, 95, 0.10),
+      0 6px 16px rgba(20, 41, 95, 0.04),
+      inset 0 1px 0 rgba(255,255,255,0.96),
+      inset 0 -1px 0 rgba(255,122,22,0.05);
   }
 
   .interactive-button {

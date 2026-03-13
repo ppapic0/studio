@@ -48,14 +48,17 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
 
           <Link
             href="/experience"
-            className="group mt-4 flex w-full max-w-xl items-center justify-between gap-4 rounded-[1.6rem] border border-[#FF7A16]/18 bg-[linear-gradient(135deg,#FFF6ED_0%,#FFFFFF_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(255,122,22,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(255,122,22,0.18)]"
+            className="group mt-4 flex w-full max-w-xl items-center justify-between gap-4 rounded-[1.75rem] border border-[#FF7A16]/24 bg-[linear-gradient(135deg,#FFF6ED_0%,#FFFFFF_100%)] px-5 py-5 shadow-[0_22px_48px_rgba(255,122,22,0.15)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:shadow-[0_28px_60px_rgba(255,122,22,0.22)]"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_10px_20px_rgba(255,122,22,0.26)]">
                 <Smartphone className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">LIVE DEMO</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">LIVE DEMO</p>
+                  <span className="inline-flex rounded-full bg-[#14295F] px-2 py-1 text-[10px] font-black text-white">학생 · 학부모 체험</span>
+                </div>
                 <p className="mt-1 text-lg font-black tracking-tight text-[#14295F]">웹앱 체험하기</p>
                 <p className="mt-1 break-keep text-sm font-bold text-slate-600">학생 모드와 학부모 모드를 실제 앱처럼 바로 체험해보세요.</p>
               </div>
