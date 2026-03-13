@@ -99,6 +99,41 @@
     letter-spacing: -0.02em;
   }
 
+  .font-numeric {
+    font-family: "Pretendard Variable", Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
+    font-weight: 900;
+    font-variation-settings: "wght" 900;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+    font-synthesis: none;
+    letter-spacing: -0.045em;
+    line-height: 0.94;
+    text-rendering: geometricPrecision;
+  }
+
+  .tabular-nums {
+    font-family: "Pretendard Variable", Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
+    font-weight: 820;
+    font-variation-settings: "wght" 820;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+    font-synthesis: none;
+    letter-spacing: -0.04em;
+    text-rendering: geometricPrecision;
+  }
+
+  .dashboard-number {
+    font-family: "Pretendard Variable", Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
+    font-weight: 900;
+    font-variation-settings: "wght" 900;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+    font-synthesis: none;
+    letter-spacing: -0.05em;
+    line-height: 0.92;
+    text-rendering: geometricPrecision;
+  }
+
   button,
   input,
   textarea,

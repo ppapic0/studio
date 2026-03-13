@@ -387,7 +387,7 @@ export function OperationalIntelligence() {
           <Armchair className="absolute -right-4 -top-4 h-40 w-40 opacity-10" />
           <div className="relative z-10 space-y-3">
             <p className="text-[10px] font-black uppercase tracking-widest opacity-70">현재 좌석 점유율</p>
-            <h3 className="text-6xl font-black tracking-tighter">
+            <h3 className="dashboard-number text-6xl text-white">
               {opsMetrics.currentOccupancyRate}
               <span className="text-2xl opacity-60 ml-1">%</span>
             </h3>
@@ -402,7 +402,7 @@ export function OperationalIntelligence() {
             <Clock3 className="h-5 w-5 text-amber-500" />
             <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">시간대 피크 점유율</p>
           </div>
-          <h4 className="text-4xl font-black tracking-tight text-amber-600">
+          <h4 className="dashboard-number text-4xl text-amber-600">
             {opsMetrics.peakOccupancySlot.occupancyRate}
             <span className="text-xl opacity-50 ml-1">%</span>
           </h4>
@@ -417,7 +417,7 @@ export function OperationalIntelligence() {
             <BarChart3 className="h-5 w-5 text-emerald-500" />
             <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">시간대 매출 피크</p>
           </div>
-          <h4 className="text-3xl font-black tracking-tight text-emerald-600">{formatWon(opsMetrics.peakRevenueSlot.amount)}</h4>
+          <h4 className="dashboard-number text-3xl text-emerald-600">{formatWon(opsMetrics.peakRevenueSlot.amount)}</h4>
           <p className="text-xs font-bold text-muted-foreground mt-2">
             최고 매출 시간대: {opsMetrics.peakRevenueSlot.label} (최근 30일)
           </p>
@@ -431,7 +431,7 @@ export function OperationalIntelligence() {
             <Activity className="h-5 w-5 text-violet-500" />
             <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">평균 공부시간 달성률</p>
           </div>
-          <h4 className="text-4xl font-black tracking-tight text-violet-600">
+          <h4 className="dashboard-number text-4xl text-violet-600">
             {opsMetrics.averageStudyRatio}
             <span className="text-xl opacity-50 ml-1">%</span>
           </h4>

@@ -228,25 +228,25 @@ export function RevenueAnalysis() {
         <Card className="rounded-2xl border-none bg-primary text-primary-foreground shadow-md">
           <CardContent className="p-5">
             <p className="text-[11px] font-bold opacity-70">당월 청구금액</p>
-            <p className="mt-2 text-2xl font-black">{formatWon(summary.billed)}</p>
+            <p className="dashboard-number mt-2 text-2xl">{formatWon(summary.billed)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
           <CardContent className="p-5">
             <p className="text-[11px] font-bold text-muted-foreground">당월 수납금액</p>
-            <p className="mt-2 text-2xl font-black text-emerald-600">{formatWon(summary.collected)}</p>
+            <p className="dashboard-number mt-2 text-2xl text-emerald-600">{formatWon(summary.collected)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
           <CardContent className="p-5">
             <p className="text-[11px] font-bold text-muted-foreground">당월 미납금액</p>
-            <p className="mt-2 text-2xl font-black text-rose-600">{formatWon(summary.arrears)}</p>
+            <p className="dashboard-number mt-2 text-2xl text-rose-600">{formatWon(summary.arrears)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
           <CardContent className="p-5">
             <p className="text-[11px] font-bold text-muted-foreground">수납률 / 미납률</p>
-            <p className="mt-2 text-xl font-black">{collectionRate.toFixed(1)}% / {arrearsRate.toFixed(1)}%</p>
+            <p className="dashboard-number mt-2 text-xl">{collectionRate.toFixed(1)}% / {arrearsRate.toFixed(1)}%</p>
             <p className="mt-1 text-[11px] font-bold text-muted-foreground">활성 학생 {activeStudentCount}명</p>
           </CardContent>
         </Card>
@@ -269,15 +269,15 @@ export function RevenueAnalysis() {
               <CardContent className="space-y-2">
                 <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
                   <span>청구</span>
-                  <span className={trackMeta.accentClass}>{formatWon(trackMetrics.billed)}</span>
+                  <span className={cn("tabular-nums", trackMeta.accentClass)}>{formatWon(trackMetrics.billed)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
                   <span>수납</span>
-                  <span className="text-emerald-600">{formatWon(trackMetrics.collected)}</span>
+                  <span className="tabular-nums text-emerald-600">{formatWon(trackMetrics.collected)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
                   <span>미납</span>
-                  <span className="text-rose-600">{formatWon(trackMetrics.arrears)}</span>
+                  <span className="tabular-nums text-rose-600">{formatWon(trackMetrics.arrears)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm font-bold text-muted-foreground">
                   <span>인보이스</span>
@@ -374,7 +374,7 @@ export function RevenueAnalysis() {
                       <p className="text-xs font-bold text-slate-400">마감일 {toDateLabel(invoice)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-base font-black text-slate-900">{formatWon(invoice.finalPrice)}</p>
+                      <p className="dashboard-number text-base text-slate-900">{formatWon(invoice.finalPrice)}</p>
                     </div>
                   </div>
                 );

@@ -851,11 +851,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-2xl border-none bg-slate-50 p-4 text-center space-y-1 shadow-sm group hover:bg-white hover:ring-1 hover:ring-slate-200 transition-all">
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">오늘 공부</span>
-                  <p className="text-xl font-black text-[#14295F] leading-tight">{toHm(totalMinutes)}</p>
+                  <p className="dashboard-number text-xl text-[#14295F] leading-tight">{toHm(totalMinutes)}</p>
                 </Card>
                 <Card className="rounded-2xl border-none bg-[#fff7ed] p-4 text-center space-y-1 shadow-sm border border-orange-100 group hover:bg-white hover:ring-1 hover:ring-orange-200 transition-all">
                   <span className="text-[8px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
-                  <p className="text-xl font-black text-[#14295F] leading-tight">{planRate}%</p>
+                  <p className="dashboard-number text-xl text-[#14295F] leading-tight">{planRate}%</p>
                 </Card>
                 <Card className={cn(
                   "rounded-2xl border-none p-4 text-center space-y-1 shadow-sm border transition-all",
@@ -871,7 +871,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 >
                   <span className="text-[8px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
                   <div className="flex items-center justify-center gap-1">
-                    <p className="text-xl font-black text-rose-700 leading-tight">{penaltyRecovery.effectivePoints}</p>
+                    <p className="dashboard-number text-xl text-rose-700 leading-tight">{penaltyRecovery.effectivePoints}</p>
                     <span className="text-xs font-black text-rose-500/70">점</span>
                   </div>
                   <Badge className={cn('h-5 border px-2 text-[9px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
@@ -1000,11 +1000,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">주간 누적 몰입</span>
-                  <p className="text-2xl font-black text-[#14295F]">{toHm(weeklyTotalStudyMinutes)}</p>
+                  <p className="dashboard-number text-2xl text-[#14295F]">{toHm(weeklyTotalStudyMinutes)}</p>
                 </Card>
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
-                  <p className="text-2xl font-black text-[#FF7A16]">{weeklyPlanCompletionRate}%</p>
+                  <p className="dashboard-number text-2xl text-[#FF7A16]">{weeklyPlanCompletionRate}%</p>
                 </Card>
               </div>
 
@@ -1093,7 +1093,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           <div className="mt-2.5 flex flex-col gap-2">
                             {isCurrentMonth && minutes > 0 ? (
                               <>
-                                <span className="font-mono font-black tracking-tighter tabular-nums leading-none text-2xl text-[#14295F]">
+                                <span className="dashboard-number text-2xl text-[#14295F]">
                                   {formatMinutes(minutes)}
                                 </span>
                                 <div className="h-1.5 w-full rounded-full bg-white/55 overflow-hidden">
@@ -1191,7 +1191,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex items-center justify-between">
                   <div className="grid gap-1">
                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">누적 벌점 지수</span>
-                    <h3 className="text-4xl font-black tracking-tighter text-rose-900">
+                    <h3 className="dashboard-number text-4xl text-rose-900">
                       {penaltyRecovery.effectivePoints}
                       <span className="ml-1 text-lg opacity-40">점</span>
                     </h3>
@@ -1261,7 +1261,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           <span className="text-[10px] font-black text-slate-400">{r.dateLabel} · 규정 준수 안내</span>
                         </div>
                         <Badge variant="destructive" className="border-none bg-rose-100 px-3 py-1 text-xs font-black text-rose-700">
-                          +{r.points}점
+                          <span className="font-numeric">+{r.points}</span>점
                         </Badge>
                       </div>
                     ))}
@@ -1318,7 +1318,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           </Badge>
                         )}
                       </div>
-                      <p className="mt-2 text-[1.05rem] font-black tracking-tight leading-none tabular-nums text-[#14295F] whitespace-nowrap">
+                      <p className="dashboard-number mt-2 text-[1.05rem] leading-none text-[#14295F] whitespace-nowrap">
                         {formatWon(billingSummary.billed)}
                       </p>
                     </div>
@@ -1326,19 +1326,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3.5 text-center shadow-sm">
                         <p className="text-[12px] font-black text-[#14295F]">청구</p>
-                        <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-[#14295F] whitespace-nowrap">
+                        <p className="dashboard-number mt-1 text-[1.2rem] leading-none text-[#14295F] whitespace-nowrap">
                           {formatWon(billingSummary.billed)}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 px-3 py-3.5 text-center shadow-sm">
                         <p className="text-[12px] font-black text-emerald-700">수납</p>
-                        <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-emerald-700 whitespace-nowrap">
+                        <p className="dashboard-number mt-1 text-[1.2rem] leading-none text-emerald-700 whitespace-nowrap">
                           {formatWon(billingSummary.paid)}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 px-3 py-3.5 text-center shadow-sm">
                         <p className="text-[12px] font-black text-rose-700">미납</p>
-                        <p className="mt-1 text-[1.2rem] font-black tracking-tight leading-none tabular-nums text-rose-700 whitespace-nowrap">
+                        <p className="dashboard-number mt-1 text-[1.2rem] leading-none text-rose-700 whitespace-nowrap">
                           {formatWon(billingSummary.overdue)}
                         </p>
                       </div>
@@ -1374,7 +1374,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               결제 마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
                             </p>
                           </div>
-                          <p className={cn("font-black tracking-tight leading-none text-[#14295F] tabular-nums whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
+                          <p className={cn("dashboard-number leading-none text-[#14295F] whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
                             {formatWon(Number(invoice.finalPrice || 0))}
                           </p>
                         </div>
@@ -1528,15 +1528,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <div className="grid grid-cols-2 gap-2">
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">공부 시간</p>
-                <p className="mt-1 text-xl font-black text-[#14295F]">{toHm(selectedDateLog?.totalMinutes || 0)}</p>
+                <p className="dashboard-number mt-1 text-xl text-[#14295F]">{toHm(selectedDateLog?.totalMinutes || 0)}</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">계획 달성</p>
-                <p className="mt-1 text-xl font-black text-[#FF7A16]">{selectedDatePlanRate}%</p>
+                <p className="dashboard-number mt-1 text-xl text-[#FF7A16]">{selectedDatePlanRate}%</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">획득 LP</p>
-                <p className="mt-1 text-xl font-black text-emerald-600">{selectedDateLp.toLocaleString()} LP</p>
+                <p className="dashboard-number mt-1 text-xl text-emerald-600">{selectedDateLp.toLocaleString()} LP</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">출결 요청</p>

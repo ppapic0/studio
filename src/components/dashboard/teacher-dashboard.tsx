@@ -114,7 +114,7 @@ const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{label}</p>
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-3xl font-black text-primary tracking-tighter drop-shadow-sm">{payload[0].value}</span>
+          <span className="dashboard-number text-3xl text-primary drop-shadow-sm">{payload[0].value}</span>
           <span className="text-xs font-black text-primary/60">{unit}</span>
         </div>
       </div>
@@ -1063,7 +1063,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       return (
                         <div className="bg-white p-3 rounded-xl shadow-2xl border-none ring-1 ring-black/5">
                           <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">{label}</p>
-                          <p className="text-base font-black text-emerald-600">{payload[0].value}h ({Number(payload[0].payload.totalMinutes).toLocaleString()}m)</p>
+                          <p className="dashboard-number text-base text-emerald-600">{payload[0].value}h ({Number(payload[0].payload.totalMinutes).toLocaleString()}m)</p>
                         </div>
                       );
                     }
@@ -1090,7 +1090,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               <item.icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5", item.color)} />
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-5xl", item.color)}>{item.val}</div>
+              <div className={cn("dashboard-number", isMobile ? "text-3xl" : "text-5xl", item.color)}>{item.val}</div>
               {item.hasEdit && (
                 <Button 
                   variant={isEditMode ? "default" : "outline"} 
@@ -1430,7 +1430,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                         <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (hLog.totalMinutes / 480) * 100)}%` }} />
                                       </div>
                                       <div className="text-right min-w-[60px]">
-                                        <span className="text-sm font-black tracking-tighter">{Math.floor(hLog.totalMinutes / 60)}h {hLog.totalMinutes % 60}m</span>
+                                        <span className="dashboard-number text-sm text-slate-900">{Math.floor(hLog.totalMinutes / 60)}h {hLog.totalMinutes % 60}m</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1460,7 +1460,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">현재 누적 벌점</p>
-                                  <p className="text-3xl font-black tracking-tighter text-rose-600 tabular-nums">{selectedPenaltyRecovery.effectivePoints}점</p>
+                                  <p className="dashboard-number text-3xl text-rose-600">{selectedPenaltyRecovery.effectivePoints}점</p>
                                   {selectedPenaltyRecovery.recoveredPoints > 0 && (
                                     <p className="text-[10px] font-bold text-rose-500/80">
                                       원점수 {selectedPenaltyRecovery.basePoints}점 · 회복 {selectedPenaltyRecovery.recoveredPoints}점

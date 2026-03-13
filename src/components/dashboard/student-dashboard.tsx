@@ -242,7 +242,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
             </div>
           </CardHeader>
           <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-6" : "")}>
-            <div className={cn("font-black tracking-tighter text-amber-600 drop-shadow-sm leading-none", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
+            <div className={cn("dashboard-number text-amber-600 drop-shadow-sm", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
               {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>lp</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
@@ -279,7 +279,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-black text-primary tabular-nums">{(data.dailyLpAmount || 0).toLocaleString()}</span>
+                      <span className="dashboard-number text-sm text-primary">{(data.dailyLpAmount || 0).toLocaleString()}</span>
                       <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40">LP</span>
                     </div>
                   </div>
@@ -325,7 +325,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
             </div>
           </CardHeader>
           <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-6" : "")}>
-            <div className={cn("font-black tracking-tighter text-blue-600 drop-shadow-sm leading-none", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
+            <div className={cn("dashboard-number text-blue-600 drop-shadow-sm", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
               {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>m</span>
             </div>
             <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-3" : "mt-6")}>
@@ -1134,7 +1134,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             {isTimerActive && (
               <div className={cn("flex flex-col items-center bg-black/25 rounded-2xl border border-white/20 shadow-lg px-6 py-3", isMobile ? "w-full" : "")}>
                 <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">Live Session</span>
-                <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-3xl" : "text-7xl")}>
+                <span className={cn("dashboard-number text-white", isMobile ? "text-3xl" : "text-7xl")}>
                   {formatTimer(localSeconds)}
                 </span>
               </div>
@@ -1447,7 +1447,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn("p-10 text-center space-y-6", isMobile ? "p-5" : "")}>
                 <div className="inline-flex flex-col items-center gap-1">
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Penalty Score</span>
-                  <h3 className={cn("text-8xl font-black tracking-tighter leading-none", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
+                  <h3 className={cn("dashboard-number text-8xl", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
                 </div>
                 <Progress value={penaltyPoints * 3.3} className="h-3 bg-muted" />
                 <p className="text-sm font-bold text-slate-600">{penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : "주의가 필요한 단계입니다. ⚠️"}</p>
