@@ -35,13 +35,13 @@ export function DirectorSection({ director }: DirectorSectionProps) {
               {director.materialSamples.map((sample) => (
                 <article
                   key={sample.title}
-                  className="overflow-hidden rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_30px_rgba(20,41,95,0.08)]"
+                  className="marketing-card overflow-hidden p-5"
                 >
                   <div className="relative h-28 rounded-xl bg-[linear-gradient(145deg,#14295F,#1E418F)] p-4 text-white">
                     <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_22%_26%,rgba(255,255,255,0.18),transparent_18%),radial-gradient(circle_at_80%_74%,rgba(255,122,22,0.42),transparent_22%),linear-gradient(135deg,transparent_0%,transparent_44%,rgba(255,255,255,0.12)_44%,rgba(255,255,255,0.12)_45%,transparent_45%)]" />
                     <div className="relative flex h-full flex-col justify-between">
                       <p className="text-[11px] font-black tracking-[0.16em] text-[#FFD5AE]">{sample.subtitle}</p>
-                      <p className="font-display max-w-[12rem] break-keep text-xl font-bold leading-tight">{sample.title}</p>
+                      <p className="font-brand max-w-[12rem] break-keep text-xl font-bold leading-tight">{sample.title}</p>
                     </div>
                   </div>
                   <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{sample.caption}</p>

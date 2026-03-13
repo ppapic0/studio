@@ -16,12 +16,12 @@ export function LPSystemSection({ lpSystem }: LPSystemSectionProps) {
           {lpSystem.cycle.map((step, index) => (
             <article
               key={step.title}
-              className="relative rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-5 shadow-[0_10px_20px_rgba(20,41,95,0.08)]"
+              className="marketing-card-soft relative p-5"
             >
               <p className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#14295F] text-xs font-black text-white">
                 {index + 1}
               </p>
-              <h3 className="font-display mt-3 break-keep text-xl font-bold text-[#14295F]">{step.title}</h3>
+              <h3 className="font-brand mt-3 break-keep text-xl font-bold text-[#14295F]">{step.title}</h3>
               <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{step.description}</p>
               {index < lpSystem.cycle.length - 1 ? (
                 <span className="absolute -right-2 top-1/2 hidden h-0.5 w-4 -translate-y-1/2 bg-[#FF7A16] lg:block" />
@@ -32,7 +32,7 @@ export function LPSystemSection({ lpSystem }: LPSystemSectionProps) {
 
         <div className="mt-8 grid gap-3 sm:grid-cols-3">
           {lpSystem.benefits.map((benefit) => (
-            <article key={benefit} className="rounded-xl border border-[#14295F]/10 bg-[#F3F8FF] px-4 py-3 text-sm font-black text-[#14295F]">
+            <article key={benefit} className="marketing-card-soft px-4 py-3 text-sm font-black text-[#14295F]">
               {benefit}
             </article>
           ))}

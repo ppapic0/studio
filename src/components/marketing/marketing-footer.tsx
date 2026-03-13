@@ -15,7 +15,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
         <div>
           <div className="inline-flex items-center gap-3">
             <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={36} height={36} className="h-9 w-9 rounded-md object-contain" />
-            <p className="font-display text-base font-bold text-[#14295F]">{brand.name}</p>
+            <p className="font-brand text-base font-bold text-[#14295F]">{brand.name}</p>
           </div>
           <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{footer.line}</p>
           <div className="mt-5 flex gap-2">
@@ -34,7 +34,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
           </div>
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-5">
+        <div className="marketing-card-soft space-y-3 p-5">
           <p className="text-sm font-bold text-[#14295F]/85">{footer.phone}</p>
           <p className="break-keep text-sm font-bold text-[#14295F]/85">{footer.location}</p>
           <p className="text-sm font-bold text-[#14295F]/85">{footer.hours}</p>

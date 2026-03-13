@@ -14,7 +14,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Study Cafe First" title={studyCafe.heading} description={studyCafe.description} />
 
-        <div className="mt-8 rounded-2xl border border-[#14295F]/12 bg-[#F7FAFF] p-4 sm:p-5">
+        <div className="marketing-card-soft mt-8 p-4 sm:p-5">
           <p className="inline-flex items-center gap-2 text-sm font-black text-[#14295F]">
             <ShieldCheck className="h-4 w-4 text-[#FF7A16]" />
             운영 안내
@@ -28,7 +28,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
         <div className="mt-8 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
           <div className="grid gap-4 sm:grid-cols-2">
             {studyCafe.features.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-5">
+              <article key={item.title} className="marketing-card-soft p-5">
                 <p className="inline-flex items-center gap-2 text-xs font-black tracking-[0.08em] text-[#FF7A16]">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   TRACK STANDARD
@@ -39,20 +39,20 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
             ))}
           </div>
 
-          <div className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-6 shadow-[0_16px_35px_rgba(20,41,95,0.1)]">
+          <div className="marketing-card-soft p-6">
             <p className="text-xs font-black tracking-[0.18em] text-[#FF7A16]">PREMIUM SEAT</p>
-            <h3 className="font-display mt-3 break-keep text-2xl font-bold text-[#14295F]">집중을 높이는 좌석 설계</h3>
+            <h3 className="font-brand mt-3 break-keep text-2xl font-bold text-[#14295F]">집중을 높이는 좌석 설계</h3>
 
             <div className="mt-5 space-y-4">
               {studyCafe.seatTypes.map((seat) => (
-                <article key={seat.title} className="rounded-xl border border-[#14295F]/10 bg-white p-4">
+                <article key={seat.title} className="marketing-card p-4">
                   <h4 className="text-lg font-black text-[#14295F]">{seat.title}</h4>
                   <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{seat.description}</p>
                 </article>
               ))}
             </div>
 
-            <div className="mt-5 rounded-xl border border-[#14295F]/10 bg-white p-4">
+            <div className="marketing-card mt-5 p-4">
               <p className="text-sm font-black text-[#14295F]">이용 형태</p>
               <ul className="mt-2 space-y-1 text-sm font-bold text-slate-600">
                 <li>• 스터디카페 단독 이용 가능</li>

@@ -23,7 +23,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {appSystem.modes.map((mode) => (
-            <article key={mode.mode} className="rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_10px_24px_rgba(20,41,95,0.08)]">
+            <article key={mode.mode} className="marketing-card p-5">
               <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">{mode.mode}</p>
               <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{mode.description}</p>
               <ul className="mt-3 space-y-1.5">
@@ -41,25 +41,25 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           <div>
             <ul className="mt-7 grid gap-3 sm:grid-cols-2">
               {appSystem.features.map((item) => (
-                <li key={item.title} className="rounded-xl border border-[#14295F]/10 bg-white p-4 shadow-[0_8px_20px_rgba(20,41,95,0.06)]">
+                <li key={item.title} className="marketing-card p-4">
                   <p className="text-base font-black text-[#14295F]">{item.title}</p>
                   <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.description}</p>
                 </li>
               ))}
             </ul>
 
-            <div className="mt-8 rounded-2xl border border-[#14295F]/10 bg-white p-5 shadow-[0_10px_24px_rgba(20,41,95,0.08)]">
+            <div className="marketing-card mt-8 p-5">
               <p className="text-xs font-black tracking-[0.16em] text-[#FF7A16]">DATA SNAPSHOT</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {appSystem.dataMetrics.map((metric) => (
                   <article
                     key={`${metric.label}-${metric.value}`}
                     className={`rounded-xl border px-3 py-3 ${
-                      metric.tone ? toneClassMap[metric.tone] : "border-[#14295F]/10 bg-[#F8FAFF] text-[#14295F]"
+                      metric.tone ? toneClassMap[metric.tone] : "border-[#14295F]/14 bg-[#F8FAFF] text-[#14295F] ring-1 ring-white/70"
                     }`}
                   >
                     <p className="text-xs font-black">{metric.label}</p>
-                    <p className="font-display mt-1 text-xl font-bold">{metric.value}</p>
+                    <p className="font-brand mt-1 text-xl font-bold">{metric.value}</p>
                     <p className="mt-1 text-[11px] font-bold opacity-80">{metric.detail}</p>
                   </article>
                 ))}
@@ -71,7 +71,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
             {appSystem.appScreens.map((screen, index) => (
               <article
                 key={screen.title}
-                className="rounded-[1.8rem] border border-[#14295F]/12 bg-white p-4 shadow-[0_16px_30px_rgba(20,41,95,0.12)]"
+                className="marketing-card rounded-[1.8rem] p-4"
               >
                 <div className="rounded-[1.25rem] border border-[#14295F]/10 bg-[linear-gradient(170deg,#EEF3FF,#FFFFFF)] p-4">
                   <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FF7A16]/15 text-[#FF7A16]">
@@ -103,7 +103,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                 </div>
 
                 <div className="px-1 pb-1 pt-4">
-                  <p className="font-display break-keep text-base font-bold text-[#14295F]">{screen.title}</p>
+                  <p className="font-brand break-keep text-base font-bold text-[#14295F]">{screen.title}</p>
                   <p className="mt-1 break-keep text-xs font-black text-[#FF7A16]">{screen.subtitle}</p>
                   <p className="mt-2 break-keep text-xs font-bold leading-relaxed text-slate-600">{screen.caption}</p>
                 </div>

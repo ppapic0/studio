@@ -21,19 +21,19 @@ export function OutcomesSection({ outcomes, successStory }: OutcomesSectionProps
           {outcomes.map((item) => (
             <article
               key={item.label}
-              className="relative overflow-hidden rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-6 shadow-[0_12px_28px_rgba(20,41,95,0.08)]"
+              className="marketing-card-soft relative overflow-hidden p-6"
             >
               <div className="absolute right-0 top-0 h-16 w-16 rounded-bl-full bg-[#FF7A16]/10" />
               <p className="text-sm font-black text-[#14295F]/80">{item.label}</p>
-              <p className="font-display mt-3 break-keep text-4xl font-bold text-[#14295F]">{item.value}</p>
+              <p className="font-brand mt-3 break-keep text-4xl font-bold text-[#14295F]">{item.value}</p>
               {item.detail ? <p className="mt-2 text-sm font-bold text-[#FF7A16]">{item.detail}</p> : null}
             </article>
           ))}
         </div>
 
-        <article className="mt-6 rounded-2xl border border-[#FF7A16]/25 bg-[#FFF4EB] p-5">
+        <article className="marketing-card-warm mt-6 p-5">
           <p className="text-xs font-black tracking-[0.14em] text-[#B55200]">{successStory.title}</p>
-          <p className="font-display mt-2 break-keep text-2xl font-bold text-[#14295F] sm:text-3xl">{successStory.summary}</p>
+          <p className="font-brand mt-2 break-keep text-2xl font-bold text-[#14295F] sm:text-3xl">{successStory.summary}</p>
         </article>
       </div>
     </section>

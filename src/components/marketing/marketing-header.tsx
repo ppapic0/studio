@@ -14,7 +14,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="inline-flex items-center gap-3">
           <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={34} height={34} className="h-[34px] w-[34px] rounded-md object-contain" />
-          <span className="font-display text-base font-bold text-[#14295F]">{brand.name}</span>
+          <span className="font-brand text-base font-bold text-[#14295F]">{brand.name}</span>
         </Link>
 
         <nav className="hidden items-center gap-5 lg:flex">

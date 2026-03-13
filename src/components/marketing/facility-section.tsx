@@ -14,7 +14,7 @@ export function FacilitySection({ facility }: FacilitySectionProps) {
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {facility.gallery.map((item, index) => (
-            <article key={item.title} className="group overflow-hidden rounded-2xl border border-[#14295F]/10 bg-white">
+            <article key={item.title} className="marketing-card group overflow-hidden">
               <div className="relative h-56 p-5">
                 <div
                   className={`absolute inset-0 ${
@@ -41,7 +41,7 @@ export function FacilitySection({ facility }: FacilitySectionProps) {
               </div>
 
               <div className="p-5">
-                <h3 className="font-display mt-1 break-keep text-xl font-bold text-[#14295F]">{item.title}</h3>
+                <h3 className="font-brand mt-1 break-keep text-xl font-bold text-[#14295F]">{item.title}</h3>
                 <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.caption}</p>
               </div>
             </article>

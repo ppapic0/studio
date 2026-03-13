@@ -19,7 +19,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
       <div className="relative mx-auto grid w-full max-w-7xl gap-6 px-4 sm:gap-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-10 lg:px-8">
         <div>
           <p className="text-xs font-black tracking-[0.2em] text-[#FF7A16]">TRACK PREMIUM EDUCATION</p>
-          <h1 className="font-display mt-4 break-keep text-4xl font-bold leading-tight text-[#14295F] sm:text-5xl lg:text-6xl">
+          <h1 className="font-brand mt-4 break-keep text-4xl font-bold leading-tight text-[#14295F] sm:text-5xl lg:text-6xl">
             {brand.heroTitle}
           </h1>
           <p className="mt-5 max-w-2xl break-keep text-base font-bold leading-relaxed text-slate-600 sm:text-lg">
@@ -55,12 +55,12 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
 
         <div className="space-y-4">
           {resultStat ? (
-            <article className="relative overflow-hidden rounded-3xl border border-[#14295F]/18 bg-[linear-gradient(165deg,#13295D,#1B3C88)] p-6 text-white shadow-[0_20px_42px_rgba(20,41,95,0.25)] sm:p-7">
+            <article className="relative overflow-hidden rounded-3xl border border-[#14295F]/18 bg-[linear-gradient(165deg,#13295D,#1B3C88)] p-6 text-white shadow-[0_20px_42px_rgba(20,41,95,0.25)] ring-1 ring-white/10 sm:p-7">
               <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#FF7A16]/20 blur-2xl" />
               <div className="pointer-events-none absolute bottom-0 left-0 right-0 top-0 opacity-40 [background-image:linear-gradient(130deg,transparent_0%,transparent_38%,rgba(255,255,255,0.12)_38%,rgba(255,255,255,0.12)_39%,transparent_39%),radial-gradient(circle_at_78%_22%,rgba(255,122,22,0.35),transparent_28%)]" />
               <div className="relative">
                 <p className="text-[11px] font-black tracking-[0.14em] text-[#FFB070]">{resultStat.label}</p>
-                <p className="font-display mt-3 break-keep text-xl font-bold leading-snug sm:text-2xl">{resultStat.value}</p>
+                <p className="font-brand mt-3 break-keep text-xl font-bold leading-snug sm:text-2xl">{resultStat.value}</p>
                 {resultStat.detail ? <p className="mt-2 text-sm font-bold text-white/80">{resultStat.detail}</p> : null}
 
                 <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -77,7 +77,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
             </article>
           ) : null}
 
-          <article className="relative overflow-hidden rounded-3xl border border-[#14295F]/10 bg-white p-5 shadow-[0_16px_35px_rgba(20,41,95,0.1)]">
+          <article className="marketing-card relative overflow-hidden rounded-3xl p-5">
             <div className="absolute inset-0 opacity-80 [background-image:radial-gradient(circle_at_24%_28%,rgba(20,41,95,0.08),transparent_22%),radial-gradient(circle_at_76%_72%,rgba(255,122,22,0.14),transparent_20%)]" />
             <div className="relative grid gap-3 sm:grid-cols-[0.85fr_1.15fr]">
               <div className="rounded-2xl bg-[linear-gradient(165deg,#F7F9FF,#ECF2FF)] p-4">
@@ -111,7 +111,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
             {otherStats.map((stat) => (
               <article key={stat.label} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-4">
                 <p className="text-[11px] font-black text-[#14295F]/70">{stat.label}</p>
-                <p className="font-display mt-2 break-keep text-lg font-bold text-[#14295F] sm:text-xl">{stat.value}</p>
+                <p className="font-brand mt-2 break-keep text-lg font-bold text-[#14295F] sm:text-xl">{stat.value}</p>
                 {stat.detail ? <p className="mt-1 text-xs font-bold text-[#FF7A16]">{stat.detail}</p> : null}
               </article>
             ))}
