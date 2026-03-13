@@ -1,11 +1,11 @@
-import Image from "next/image";
-import Link from "next/link";
+﻿import Image from 'next/image';
+import Link from 'next/link';
 
-import type { MarketingContent } from "@/lib/marketing-content";
+import type { MarketingContent } from '@/lib/marketing-content';
 
 type MarketingHeaderProps = {
-  brand: MarketingContent["brand"];
-  nav: MarketingContent["nav"];
+  brand: MarketingContent['brand'];
+  nav: MarketingContent['nav'];
 };
 
 export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
@@ -14,7 +14,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="inline-flex items-center gap-3">
           <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={34} height={34} className="h-[34px] w-[34px] rounded-md object-contain" />
-          <span className="font-brand text-base font-bold text-[#14295F]">{brand.name}</span>
+          <span className="font-brand text-base text-[#14295F] sm:text-[1.05rem]">{brand.name}</span>
         </Link>
 
         <nav className="hidden items-center gap-5 lg:flex">
@@ -34,9 +34,9 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
           </a>
           <Link
             href="/experience"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-[#14295F]/20 bg-white px-3.5 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-[#14295F]/12 bg-[#14295F] px-3.5 text-xs font-black text-white shadow-[0_10px_18px_rgba(20,41,95,0.2)] transition hover:bg-[#10224B]"
           >
-            웹앱
+            웹앱 체험
           </Link>
         </div>
       </div>
