@@ -130,7 +130,7 @@ export const marketingContent: MarketingContent = {
     slogan: "학생의 성장 궤적을 함께 그립니다",
     heroTitle: "트랙은 실적으로 증명합니다",
     heroDescription:
-      "관리형 스터디카페 운영을 중심으로 학습 루틴을 먼저 만들고, 수능 국어 전문 수업은 별도 선택형으로 운영합니다. 학생의 현재를 데이터로 확인하고, 다음 전략을 명확하게 설계합니다.",
+      "학습 루틴은 스터디카페에서, 성적 전략은 국어 수업에서. 학생의 현재를 데이터로 확인하고 다음 전략을 명확하게 설계합니다.",
     logoFull: "/track-logo-full.svg",
     logoMark: "/track-logo-mark.svg",
     heroBackground: "",
@@ -157,31 +157,31 @@ export const marketingContent: MarketingContent = {
     {
       label: "실시간 운영 데이터",
       value: "출입·학습시간·실행률 점검",
-      detail: "학습환경 운영 중심",
+      detail: "과정이 보이는 관리",
     },
   ],
   valueCards: [
     {
       title: "수능 국어 전문 수업",
-      description: "진단 기반 커리큘럼으로 학생별 취약 유형을 보완하고 실전 점수로 연결합니다.",
+      description: "진단 기반 설계로 취약 유형을 보완하고 실전 점수로 연결합니다.",
     },
     {
       title: "개인 맞춤 설계",
-      description: "학생별 목표와 현재 상태를 기준으로 학습 흐름을 다르게 설계합니다.",
+      description: "학생별 목표와 현재 상태에 맞춰 학습 흐름을 다르게 설계합니다.",
     },
     {
       title: "학부모 실시간 확인",
-      description: "출결, 학습 현황, 피드백, 성적 추이를 앱에서 확인할 수 있습니다.",
+      description: "출결, 학습 현황, 피드백, 성적 추이를 앱으로 확인합니다.",
     },
     {
       title: "계획-실행-피드백 루프",
-      description: "LP 시스템으로 공부 과정을 구조화해 막연한 공부를 구체적인 실행으로 전환합니다.",
+      description: "LP 시스템으로 막연한 공부를 구체적인 실행으로 바꿉니다.",
     },
   ],
   director: {
     heading: "원장 소개 · 지도 철학",
     description:
-      "트랙은 개인과외의 밀착 관리 방식을 학원 시스템으로 확장한 브랜드입니다. 수능 국어 전문 지도 경험과 학생별 맞춤 피드백 방식을 기반으로, 성적을 만드는 과정을 정밀하게 관리합니다.",
+      "개인과외의 밀착 관리 방식을 학원 시스템으로 확장했습니다. 수능 국어 전문 지도와 학생별 맞춤 피드백을 구조화해 성적이 만들어지는 과정을 관리합니다.",
     highlights: [
       "수능 국어 전문 지도 및 개인 맞춤 설계",
       "개인과외 시절 직접 지도 학생 70% 인서울 달성",
@@ -194,17 +194,17 @@ export const marketingContent: MarketingContent = {
       {
         title: "진단 리포트",
         subtitle: "약점 유형 분류",
-        caption: "학생별 독해 습관과 오답 패턴을 분석해 우선 보완 과제를 도출합니다.",
+        caption: "오답 패턴을 분석해 먼저 고쳐야 할 지점을 찾습니다.",
       },
       {
         title: "수업 해설 자료",
         subtitle: "원장 직접 제작",
-        caption: "개념-문항-오답교정 흐름이 끊기지 않도록 수업 자료를 직접 설계합니다.",
+        caption: "개념-문항-오답교정 흐름이 이어지도록 직접 설계합니다.",
       },
       {
         title: "주간 피드백 노트",
         subtitle: "학부모 공유형",
-        caption: "실행률과 성적 추이를 함께 보며 다음 주 전략을 조정합니다.",
+        caption: "실행률과 성적 추이를 함께 보며 다음 전략을 조정합니다.",
       },
     ],
   },
@@ -245,11 +245,11 @@ export const marketingContent: MarketingContent = {
   studyCafe: {
     heading: "관리형 스터디카페가 운영의 중심입니다",
     description:
-      "트랙 스터디카페는 학습환경 운영 서비스입니다. 출입 기록, 학습 시간, 실행 루틴을 관리하며 학생의 공부 흐름이 끊기지 않도록 지원합니다. 입시학원 수강과 별개로 단독 이용이 가능합니다.",
+      "트랙 스터디카페는 학습환경 운영 서비스입니다. 출입 기록, 학습 시간, 실행 루틴을 관리하며 공부 흐름이 끊기지 않도록 돕습니다. 입시학원과 별개로 단독 이용도 가능합니다.",
     features: [
       {
         title: "학습 루틴 완성 공간",
-        description: "예쁜 공간 소개보다, 매일 공부가 이어지는 루틴 구조를 먼저 설계합니다.",
+        description: "예쁜 공간보다 매일 공부가 이어지는 구조를 먼저 설계합니다.",
       },
       {
         title: "학원과 별도 이용 가능",
@@ -261,7 +261,7 @@ export const marketingContent: MarketingContent = {
       },
       {
         title: "학부모 실시간 확인",
-        description: "학부모 앱에서 출입/학습 현황을 확인하며 가정 내 소통 부담을 줄입니다.",
+        description: "학부모 앱에서 출입과 학습 현황을 바로 확인할 수 있습니다.",
       },
     ],
     seatTypes: [
@@ -278,7 +278,7 @@ export const marketingContent: MarketingContent = {
   appSystem: {
     heading: "학생을 놓치지 않는 전용 웹앱",
     description:
-      "트랙 앱은 기술 홍보를 위한 화면이 아니라 관리 품질을 위한 시스템입니다. 학부모·학생·관리자가 같은 지표를 보고 빠르게 대응합니다.",
+      "트랙 앱은 기술 과시가 아니라 관리 품질을 위한 시스템입니다. 학부모·학생·관리자가 같은 지표를 보고 빠르게 대응합니다.",
     modes: [
       {
         mode: "학부모 모드",
@@ -329,7 +329,7 @@ export const marketingContent: MarketingContent = {
   lpSystem: {
     heading: "LP 학습 계획 시스템",
     description:
-      "학생이 계획을 세우고, 매일 실행을 체크하고, 원장이 피드백을 반영해 다음 주 전략을 다시 설계하는 루프입니다.",
+      "학생이 계획을 세우고 실행을 체크하면, 원장이 피드백을 반영해 다음 전략을 다시 설계하는 루프입니다.",
     cycle: [
       { title: "계획", description: "주간 목표와 일일 실행 항목을 직접 작성" },
       { title: "실행", description: "매일 실제 수행 여부와 학습 시간을 기록" },
@@ -340,7 +340,7 @@ export const marketingContent: MarketingContent = {
     benefits: [
       "막연한 공부가 구체적인 공부로 바뀝니다.",
       "자기관리 습관이 형성되어 장기전에서 흔들림이 줄어듭니다.",
-      "학부모는 잔소리 대신 객관적 지표를 통해 현황을 확인할 수 있습니다.",
+      "학부모는 잔소리보다 객관적 지표로 현황을 확인할 수 있습니다.",
     ],
   },
   comparison: {
@@ -391,14 +391,14 @@ export const marketingContent: MarketingContent = {
       {
         title: "상담 · 피드백 존",
         subtitle: "전략 조정 공간",
-        caption: "학습 데이터를 바탕으로 다음 전략을 설계하는 상담 공간입니다.",
+        caption: "학습 데이터를 바탕으로 다음 전략을 설계하는 공간입니다.",
       },
     ],
   },
   consult: {
     heading: "방문 상담 · 입학 문의",
     description:
-      "학생의 현재 상태를 확인한 뒤, 스터디카페 이용 또는 국어 수업 선택을 포함해 가장 적합한 시작 경로를 안내드립니다.",
+      "학생의 현재를 확인한 뒤, 스터디카페 이용 또는 국어 수업 선택을 포함해 가장 적합한 시작 경로를 안내드립니다.",
     contactLine: "상담 문의: 상담 폼 접수 후 순차 연락",
     locationLine: "위치: 경기 용인시 기흥구 동백중앙로 283 B동 906호, 907호",
   },
