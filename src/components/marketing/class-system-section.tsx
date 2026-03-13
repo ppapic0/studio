@@ -13,7 +13,7 @@ export function ClassSystemSection({ classSystem }: ClassSystemSectionProps) {
         <SectionHeading
           eyebrow="Academy Program"
           title="국어 입시학원 수업 시스템 (별도 등록)"
-          description="입시학원 프로그램은 별도 등록 학생 대상이며, 원장 직강과 직접 제작 자료로 성과 중심 수업을 운영합니다."
+          description="입시학원 프로그램은 별도 등록 학생 대상이며, 그룹 수업 방식으로 수능 대비 중심 커리큘럼을 운영합니다."
         />
 
         <div className="mt-8 rounded-2xl border border-[#14295F]/12 bg-white px-4 py-3 text-sm font-bold text-[#14295F] sm:px-5">

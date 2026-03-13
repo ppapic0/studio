@@ -130,7 +130,7 @@ export const marketingContent: MarketingContent = {
     slogan: "학생의 성장 궤적을 함께 그립니다",
     heroTitle: "트랙은 실적으로 증명합니다",
     heroDescription:
-      "학습 루틴은 스터디카페에서, 성적 전략은 국어 수업에서. 학생의 현재를 데이터로 확인하고 다음 전략을 명확하게 설계합니다.",
+      "학습 루틴은 스터디카페에서, 성적 전략은 국어 수업에서. 재학생과 N수생 모두를 위한 구조로 학생의 현재를 데이터로 확인하고 다음 전략을 설계합니다.",
     logoFull: "/track-logo-full.svg",
     logoMark: "/track-logo-mark.svg",
     heroBackground: "",
@@ -214,7 +214,7 @@ export const marketingContent: MarketingContent = {
     { label: "성균관대학교", value: "1명", detail: "2026학년도 합격" },
     { label: "홍익대학교", value: "1명", detail: "2026학년도 합격" },
     { label: "아주대학교", value: "1명", detail: "2026학년도 합격" },
-    { label: "인서울 합격 흐름", value: "70%", detail: "개인과외 시절 기준" },
+    { label: "특별 성장 사례", value: "백분위 99", detail: "3등급에서 고려대 합격" },
   ],
   successStory: {
     title: "특별 성장 사례",
@@ -222,30 +222,30 @@ export const marketingContent: MarketingContent = {
   },
   classSystem: [
     {
-      title: "실력 진단",
-      description: "기출 기반 진단으로 학생의 취약 유형과 독해 습관을 먼저 파악합니다.",
+      title: "그룹 수업 운영",
+      description: "재학생과 N수생을 대상으로 그룹 수업을 진행하며, 수능 대비 흐름에 맞춰 수업을 운영합니다.",
     },
     {
-      title: "개인 설계",
-      description: "학생별 목표와 학습 시간표에 맞춘 맞춤 커리큘럼을 설계합니다.",
+      title: "평가원 중심 분석",
+      description: "평가원 기출을 중심으로 독해 방식과 문항 접근 사고를 정리합니다.",
     },
     {
-      title: "독해 원리 확립",
-      description: "정확하게 읽는 힘을 중심으로 문학·비문학 사고 체계를 정리합니다.",
+      title: "수능특강 독서 진행",
+      description: "수능특강 독서를 포함해 수능과 직접 연결되는 지문 훈련을 진행합니다.",
     },
     {
-      title: "유형 집중 훈련",
-      description: "약점 유형을 반복 훈련하며 실전에서 흔들리지 않는 풀이 습관을 만듭니다.",
+      title: "사설 모의고사 훈련",
+      description: "사설 모의고사를 활용해 시간 운영과 실전 감각을 반복 점검합니다.",
     },
     {
-      title: "실전 분석",
-      description: "기출/모의 성과를 분석해 전략을 수정하고 다음 단계로 연결합니다.",
+      title: "실전 피드백",
+      description: "시험 후에는 결과만 보는 것이 아니라 약점 유형을 다시 분석해 다음 전략으로 연결합니다.",
     },
   ],
   studyCafe: {
     heading: "관리형 스터디카페가 운영의 중심입니다",
     description:
-      "트랙 스터디카페는 학습환경 운영 서비스입니다. 출입 기록, 학습 시간, 실행 루틴을 관리하며 공부 흐름이 끊기지 않도록 돕습니다. 입시학원과 별개로 단독 이용도 가능합니다.",
+      "트랙 스터디카페는 학습환경 운영 서비스입니다. 출입 기록, 학습 시간, 실행 루틴을 관리하며 공부 흐름이 끊기지 않도록 돕습니다. 입시학원과 별개로 단독 이용도 가능하며, 재학생과 N수생 모두 등록할 수 있습니다.",
     features: [
       {
         title: "학습 루틴 완성 공간",
@@ -263,10 +263,14 @@ export const marketingContent: MarketingContent = {
         title: "학부모 실시간 확인",
         description: "학부모 앱에서 출입과 학습 현황을 바로 확인할 수 있습니다.",
       },
+      {
+        title: "모의고사 운영",
+        description: "이감 모의고사와 매달 더프리미엄 모의고사를 실시해 실전 감각을 점검합니다.",
+      },
     ],
     seatTypes: [
       {
-        title: "러셀형 책상",
+        title: "프리미엄 책상",
         description: "시야 분산을 줄이고 몰입을 높이도록 설계된 좌석 구조입니다.",
       },
       {
@@ -386,7 +390,7 @@ export const marketingContent: MarketingContent = {
       {
         title: "프라이빗 좌석 존",
         subtitle: "개인 몰입 구조",
-        caption: "러셀형/독서실형 좌석으로 개인 집중 구간을 안정적으로 확보합니다.",
+        caption: "프리미엄 책상과 독서실형 좌석으로 개인 집중 구간을 안정적으로 확보합니다.",
       },
       {
         title: "상담 · 피드백 존",
@@ -398,7 +402,7 @@ export const marketingContent: MarketingContent = {
   consult: {
     heading: "방문 상담 · 입학 문의",
     description:
-      "학생의 현재를 확인한 뒤, 스터디카페 이용 또는 국어 수업 선택을 포함해 가장 적합한 시작 경로를 안내드립니다.",
+      "학생의 현재를 확인한 뒤, 스터디카페 이용 또는 국어 수업 선택을 포함해 가장 적합한 시작 경로를 안내드립니다. 재학생과 N수생 모두 상담 가능합니다.",
     contactLine: "상담 문의: 상담 폼 접수 후 순차 연락",
     locationLine: "위치: 경기 용인시 기흥구 동백중앙로 283 B동 906호, 907호",
   },
