@@ -101,7 +101,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [isInviteSubmitting, setIsInviteSubmitting] = useState(false);
   const [isParentLinkSubmitting, setIsParentLinkSubmitting] = useState(false);
-  const isMobile = viewMode === 'mobile';
+  const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
 
   const inviteForm = useForm<z.infer<typeof inviteFormSchema>>({
     resolver: zodResolver(inviteFormSchema),

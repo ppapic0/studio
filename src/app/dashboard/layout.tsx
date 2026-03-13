@@ -13,8 +13,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { viewMode } = useAppContext();
-  const isMobileView = viewMode === 'mobile';
+  const { activeMembership, viewMode } = useAppContext();
+  const isMobileView = activeMembership?.role === 'parent' || viewMode === 'mobile';
 
   return (
     <div

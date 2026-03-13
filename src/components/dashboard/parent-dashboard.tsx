@@ -227,7 +227,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { memberships, activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
 
-  const isMobile = viewMode === 'mobile';
+  const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const [today, setToday] = useState<Date | null>(null);
   const [tab, setTab] = useState<ParentPortalTab>('home');
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());

@@ -119,7 +119,8 @@ export function DashboardHeader() {
   const router = useRouter();
   const { toast } = useToast();
   const { activeMembership, viewMode, setViewMode } = useAppContext();
-  const isMobileView = viewMode === 'mobile';
+  const isParentMode = activeMembership?.role === 'parent';
+  const isMobileView = isParentMode || viewMode === 'mobile';
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -269,21 +270,23 @@ export function DashboardHeader() {
       </Breadcrumb>
 
       <div className="relative ml-auto flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            'rounded-full text-muted-foreground hover:bg-primary/5 transition-all',
-            isMobileView &&
-              'bg-[#14295F] text-white shadow-[0_8px_18px_rgba(20,41,95,0.28)] hover:bg-[#10214a] hover:text-white'
-          )}
-          onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
-          title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
-        >
-          {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
-        </Button>
+        {!isParentMode && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'rounded-full text-muted-foreground hover:bg-primary/5 transition-all',
+              isMobileView &&
+                'bg-[#14295F] text-white shadow-[0_8px_18px_rgba(20,41,95,0.28)] hover:bg-[#10214a] hover:text-white'
+            )}
+            onClick={() => setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile')}
+            title={viewMode === 'mobile' ? '데스크톱 모드로 전환' : '앱 모드로 전환'}
+          >
+            {viewMode === 'mobile' ? <Monitor className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+          </Button>
+        )}
 
-        {activeMembership?.role !== 'parent' && <NotificationBell />}
+        {!isParentMode && <NotificationBell />}
 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>

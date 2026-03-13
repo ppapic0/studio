@@ -304,6 +304,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [user, firestore, activeMembership]);
 
+  useEffect(() => {
+    if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {
+      setViewMode('mobile');
+    }
+  }, [activeMembership?.role, viewMode]);
+
   const contextValue = useMemo(
     () => ({
       memberships,
