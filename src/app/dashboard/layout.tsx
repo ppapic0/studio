@@ -57,7 +57,7 @@ export default function DashboardLayout({
         className={cn(
           'flex flex-col transition-all duration-700 relative z-10',
           isMobileView
-            ? 'dashboard-mobile-shell w-full max-w-[430px] overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-4'
+            ? 'dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-4'
             : 'w-full min-h-screen'
         )}
       >

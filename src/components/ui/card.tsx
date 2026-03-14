@@ -1,4 +1,4 @@
-import * as React from "react"
+﻿import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -10,7 +10,7 @@ const Card = React.forwardRef<
     ref={ref}
     data-slot="card"
     className={cn(
-      "relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(247,250,255,0.985)_100%)] text-card-foreground ring-1 ring-white/70 shadow-[0_28px_64px_rgba(20,41,95,0.12),0_10px_22px_rgba(20,41,95,0.05),inset_0_1px_0_rgba(255,255,255,0.96),inset_0_-1px_0_rgba(20,41,95,0.03)] before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_14%_0%,rgba(255,255,255,0.82),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0)_28%)] before:opacity-100 transition-[transform,box-shadow] duration-150 ease-out hover:-translate-y-[1px] hover:shadow-[0_34px_74px_rgba(20,41,95,0.14),0_12px_24px_rgba(20,41,95,0.06),inset_0_1px_0_rgba(255,255,255,0.97),inset_0_-1px_0_rgba(20,41,95,0.03)]",
+      "relative overflow-hidden rounded-[1.5rem] border border-[#d7e0f0] bg-[linear-gradient(180deg,rgba(255,255,255,1)_0%,rgba(248,250,255,0.995)_100%)] text-card-foreground shadow-[0_24px_56px_rgba(20,41,95,0.11),0_8px_20px_rgba(20,41,95,0.05),inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(20,41,95,0.04)] before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_16%_0%,rgba(255,255,255,0.62),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_24%)] before:opacity-100 transition-[transform,box-shadow,border-color] duration-150 ease-out hover:-translate-y-[1px] hover:border-[#c8d5ea] hover:shadow-[0_30px_68px_rgba(20,41,95,0.14),0_10px_22px_rgba(20,41,95,0.06),inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(20,41,95,0.04)]",
       className
     )}
     {...props}
@@ -39,7 +39,7 @@ const CardTitle = React.forwardRef<
     ref={ref}
     data-slot="card-title"
     className={cn(
-      "text-2xl font-body font-black leading-none tracking-[-0.03em]",
+      "text-2xl font-body font-black leading-none tracking-[-0.03em] text-[#14295f]",
       className
     )}
     {...props}
@@ -54,7 +54,7 @@ const CardDescription = React.forwardRef<
   <p
     ref={ref}
     data-slot="card-description"
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sm text-[#64748b]", className)}
     {...props}
   />
 ))
