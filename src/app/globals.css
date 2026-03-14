@@ -1,52 +1,4 @@
 @font-face {
-  font-family: "TrackBody";
-  src: url("/fonts/custom/GangwonEduAll-Light.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TrackBody";
-  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TrackBody";
-  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TrackBody";
-  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TrackBody";
-  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "TrackBody";
-  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
   font-family: "TrackDisplay";
   src: url("/fonts/custom/SB-Aggro-L.ttf") format("truetype");
   font-weight: 400;
@@ -181,60 +133,69 @@
   body {
     @apply bg-background text-foreground font-body antialiased transition-colors duration-300;
     touch-action: manipulation;
-    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-weight: 400;
+    text-rendering: optimizeLegibility;
+    font-weight: 500;
     letter-spacing: 0;
-    line-height: 1.82;
+    line-height: 1.68;
+    font-synthesis: none;
   }
 
   .font-body {
-    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     letter-spacing: 0;
-    line-height: 1.82;
+    line-height: 1.68;
+    font-weight: 500;
   }
 
   .font-display {
-    font-family: "TrackDisplay", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     font-weight: 800;
-    letter-spacing: -0.01em;
-    line-height: 1.14;
-  }
-
-  .font-brand {
-    font-family: "TrackDisplay", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 800;
-    letter-spacing: -0.014em;
+    letter-spacing: -0.038em;
     line-height: 1.08;
   }
 
-  .font-numeric {
-    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  .font-brand {
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.042em;
+    line-height: 1.04;
+  }
+
+  .font-accent {
+    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .font-numeric {
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 750;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.016em;
     line-height: 1.08;
   }
 
   .tabular-nums {
-    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.006em;
+    letter-spacing: -0.012em;
   }
 
   .dashboard-number {
-    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 700;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 820;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.008em;
+    letter-spacing: -0.02em;
     line-height: 1.08;
   }
 
@@ -255,11 +216,11 @@
 
   .text-slate-500,
   .text-muted-foreground {
-    color: #495b75 !important;
+    color: #41546f !important;
   }
 
   .text-slate-600 {
-    color: #384c67 !important;
+    color: #344761 !important;
   }
 }
 

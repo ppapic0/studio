@@ -1,6 +1,5 @@
-﻿import Image from 'next/image';
-import Link from 'next/link';
-import { ArrowRight, Building2, CheckCircle2, GraduationCap, Smartphone, Sparkles } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, CheckCircle2, GraduationCap, Smartphone } from 'lucide-react';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
@@ -9,158 +8,135 @@ type HeroSectionProps = {
   heroStats: MarketingContent['heroStats'];
 };
 
+const heroKeywords = ['ROUTINE', 'DATA', 'RESULT'];
+const heroSignals = ['관리형 스터디센터 중심', '수능 국어 수업 별도 선택', '재학생 · N수생 등록 가능'];
+
 export function HeroSection({ brand, heroStats }: HeroSectionProps) {
-  const [resultStat, ...otherStats] = heroStats;
+  const [resultStat, entryStat, dataStat] = heroStats;
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FF_58%,#FFFFFF_100%)] pb-14 pt-10 sm:pb-20 sm:pt-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_12%,rgba(20,41,95,0.08),transparent_28%),radial-gradient(circle_at_88%_10%,rgba(255,122,22,0.12),transparent_24%),linear-gradient(118deg,transparent_0%,transparent_45%,rgba(20,41,95,0.04)_45%,rgba(20,41,95,0.04)_46%,transparent_46%)]" />
+    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_44%,#FFFFFF_100%)] pb-12 pt-8 sm:pb-16 sm:pt-12">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(20,41,95,0.06),transparent_24%),radial-gradient(circle_at_88%_8%,rgba(255,122,22,0.14),transparent_18%),linear-gradient(126deg,transparent_0%,transparent_54%,rgba(20,41,95,0.03)_54%,rgba(20,41,95,0.03)_55%,transparent_55%)]" />
 
-      <div className="relative mx-auto grid w-full max-w-7xl gap-6 px-4 sm:gap-8 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-start lg:gap-10 lg:px-8">
-        <div>
-          <p className="text-xs font-black tracking-[0.22em] text-[#FF7A16]">TRACK MANAGED STUDY CENTER</p>
-          <h1 className="font-brand mt-4 break-keep text-4xl leading-[1.08] text-[#14295F] sm:text-5xl lg:text-[4.1rem]">
-            {brand.heroTitle}
-          </h1>
-          <p className="mt-5 max-w-2xl break-keep text-[15px] font-semibold leading-[1.86] text-slate-600 sm:text-lg">
-            {brand.heroDescription}
-          </p>
+      <div className="relative mx-auto grid w-full max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:gap-10 lg:px-8">
+        <div className="space-y-6">
+          <p className="text-[11px] font-black tracking-[0.26em] text-[#FF7A16]">TRACK MANAGED STUDY CENTER</p>
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            {['관리형 스터디센터 중심', '수능 국어 수업 별도 선택', '학부모 앱 실시간 확인', '재학생 · N수생 등록 가능'].map((keyword) => (
-              <span
-                key={keyword}
-                className="inline-flex rounded-full border border-[#14295F]/10 bg-white px-3.5 py-2 text-[12px] font-extrabold tracking-[-0.02em] text-[#14295F] shadow-[0_10px_20px_rgba(20,41,95,0.06)]"
-              >
-                {keyword}
-              </span>
-            ))}
+          <div className="space-y-3">
+            <h1 className="font-brand max-w-4xl break-keep text-[3rem] leading-[0.94] text-[#14295F] sm:text-[4.7rem] lg:text-[5.6rem]">
+              관리형
+              <br />
+              스터디센터가
+              <br />
+              중심입니다
+            </h1>
+            <p className="max-w-xl break-keep text-[16px] font-medium leading-[1.82] text-slate-600 sm:text-[17px]">
+              {brand.heroDescription}
+            </p>
           </div>
 
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-[#F6F9FF] px-4 py-2 text-sm font-black text-[#14295F] shadow-sm">
-            <CheckCircle2 className="h-4 w-4 text-[#FF7A16]" />
-            {brand.slogan}
+          <div className="grid gap-3 sm:grid-cols-[0.95fr_1.05fr]">
+            <div className="marketing-card p-4 sm:p-5">
+              <p className="text-[11px] font-black tracking-[0.22em] text-[#FF7A16]">KEYWORD</p>
+              <div className="mt-4 space-y-2.5">
+                {heroKeywords.map((keyword) => (
+                  <div key={keyword} className="rounded-2xl bg-[#14295F] px-4 py-3 text-[1.05rem] font-black tracking-[-0.03em] text-white sm:text-[1.18rem]">
+                    {keyword}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="marketing-card-soft p-4 sm:p-5">
+              <p className="text-[11px] font-black tracking-[0.22em] text-[#14295F]/46">TRACK SIGNAL</p>
+              <div className="mt-4 space-y-2.5">
+                {heroSignals.map((signal) => (
+                  <div key={signal} className="flex items-start gap-3 rounded-2xl border border-[#14295F]/8 bg-white px-4 py-3 shadow-sm">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FF7A16]" />
+                    <p className="break-keep text-sm font-semibold leading-[1.6] text-[#14295F]">{signal}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <a
-              href="/go/login?placement=hero_login"
-              className="premium-cta premium-cta-primary h-12 px-6 text-sm"
-            >
+          <div className="flex flex-wrap gap-3">
+            <a href="/go/login?placement=hero_login" className="premium-cta premium-cta-secondary h-12 px-6 text-sm">
               웹앱 로그인
             </a>
-            <a
-              href="#study-cafe"
-              className="premium-cta premium-cta-secondary h-12 px-6 text-sm"
-            >
-              관리형 스터디센터 안내
+            <a href="/go/experience?placement=hero_experience_primary" className="premium-cta premium-cta-primary h-12 px-6 text-sm">
+              웹앱 체험하기
             </a>
-            <a
-              href="#outcome"
-              className="premium-cta premium-cta-muted h-12 px-6 text-sm"
-            >
-              2026 실적 보기
+            <a href="#consult" className="premium-cta premium-cta-muted h-12 px-6 text-sm">
+              방문 상담 문의
             </a>
           </div>
-
-          <a
-            href="/go/experience?placement=hero_experience"
-            className="group premium-surface-button mt-4 flex w-full max-w-xl items-center justify-between gap-4 border-[#FF7A16]/24 bg-[linear-gradient(135deg,#FFF6ED_0%,#FFFFFF_100%)] px-5 py-5 shadow-[0_22px_48px_rgba(255,122,22,0.15)]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_10px_20px_rgba(255,122,22,0.26)]">
-                <Smartphone className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">LIVE DEMO</p>
-                  <span className="inline-flex rounded-full bg-[#14295F] px-2 py-1 text-[10px] font-black text-white">학생 · 학부모 체험</span>
-                </div>
-                <p className="mt-1 text-lg font-black tracking-tight text-[#14295F]">웹앱 체험하기</p>
-                <p className="mt-1 break-keep text-sm font-medium leading-[1.68] text-slate-600">학생 모드와 학부모 모드를 실제 앱처럼 바로 체험해보세요.</p>
-              </div>
-            </div>
-            <div className="inline-flex items-center gap-2 text-sm font-black text-[#14295F]">
-              바로 보기
-              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-            </div>
-          </a>
         </div>
 
-        <div className="space-y-4">
-          {resultStat ? (
-            <article className="relative overflow-hidden rounded-3xl border border-[#14295F]/18 bg-[linear-gradient(165deg,#13295D,#1B3C88)] p-6 text-white shadow-[0_20px_42px_rgba(20,41,95,0.25)] ring-1 ring-white/10 sm:p-7">
-              <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#FF7A16]/20 blur-2xl" />
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 top-0 opacity-40 [background-image:linear-gradient(130deg,transparent_0%,transparent_38%,rgba(255,255,255,0.12)_38%,rgba(255,255,255,0.12)_39%,transparent_39%),radial-gradient(circle_at_78%_22%,rgba(255,122,22,0.35),transparent_28%)]" />
-              <div className="relative">
-                <p className="text-[11px] font-black tracking-[0.14em] text-[#FFB070]">{resultStat.label}</p>
-                <p className="font-brand mt-3 break-keep text-xl leading-snug sm:text-2xl">{resultStat.value}</p>
-                {resultStat.detail ? <p className="mt-2 text-sm font-medium text-white/80">{resultStat.detail}</p> : null}
-
-                <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-black">
-                    <Building2 className="h-3.5 w-3.5 text-[#FFB070]" />
-                    관리형 스터디센터 중심 운영
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-black">
-                    <GraduationCap className="h-3.5 w-3.5 text-[#FFB070]" />
-                    수능 국어 수업 별도 선택
-                  </span>
-                </div>
+        <div className="grid gap-4">
+          <article className="marketing-card relative overflow-hidden p-5 sm:p-6">
+            <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(20,41,95,0.045),transparent_52%),radial-gradient(circle_at_88%_16%,rgba(255,122,22,0.16),transparent_22%)]" />
+            <div className="relative flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black tracking-[0.2em] text-[#FF7A16]">RESULT</p>
+                <p className="mt-3 max-w-[16rem] break-keep text-[2rem] font-black leading-[1.04] tracking-[-0.03em] text-[#14295F] sm:text-[2.4rem]">
+                  {resultStat?.value}
+                </p>
+                <p className="mt-3 text-sm font-semibold text-slate-600">{resultStat?.detail}</p>
               </div>
-            </article>
-          ) : null}
-
-          <article className="marketing-card relative overflow-hidden rounded-3xl p-5">
-            <div className="absolute inset-0 opacity-80 [background-image:radial-gradient(circle_at_24%_28%,rgba(20,41,95,0.08),transparent_22%),radial-gradient(circle_at_76%_72%,rgba(255,122,22,0.14),transparent_20%)]" />
-            <div className="relative grid gap-3 sm:grid-cols-[0.85fr_1.15fr]">
-              <div className="rounded-2xl bg-[linear-gradient(165deg,#F7F9FF,#ECF2FF)] p-4">
-                <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">TRACK FLOW</p>
-                <div className="mt-4 space-y-2">
-                  <div className="rounded-xl bg-white px-3 py-2 text-sm font-black text-[#14295F]">입실</div>
-                  <div className="rounded-xl bg-white px-3 py-2 text-sm font-black text-[#14295F]">계획</div>
-                  <div className="rounded-xl bg-white px-3 py-2 text-sm font-black text-[#14295F]">실행</div>
-                  <div className="rounded-xl bg-white px-3 py-2 text-sm font-black text-[#14295F]">피드백</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-between rounded-2xl border border-[#14295F]/10 bg-white/90 p-4">
-                <div className="flex items-center gap-3">
-                  <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={40} height={40} className="h-10 w-10 object-contain" />
-                  <div>
-                    <p className="text-sm font-black text-[#14295F]">{brand.name}</p>
-                    <p className="text-xs font-bold text-slate-500">과정과 구조가 먼저 보이는 홍보 메인</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-2">
-                  <div className="rounded-xl bg-[#F8FAFF] px-3 py-2 text-sm font-black text-[#14295F]">관리형 스터디센터 중심 운영</div>
-                  <div className="rounded-xl bg-[#FFF4EB] px-3 py-2 text-sm font-black text-[#B55200]">수능 국어 그룹 수업 별도 선택</div>
-                  <div className="rounded-xl bg-[#F8FAFF] px-3 py-2 text-sm font-black text-[#14295F]">학부모 앱으로 과정 확인</div>
-                </div>
+              <div className="rounded-[1.6rem] border border-[#14295F]/10 bg-[#F7FAFF] p-4 shadow-sm">
+                <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={56} height={56} className="h-14 w-14 object-contain" />
               </div>
             </div>
           </article>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {otherStats.map((stat) => (
-              <article key={stat.label} className="rounded-2xl border border-[#14295F]/10 bg-[#F8FAFF] p-4 shadow-sm">
-                <p className="text-[11px] font-black text-[#14295F]/70">{stat.label}</p>
-                <p className="font-brand mt-2 break-keep text-lg text-[#14295F] sm:text-xl">{stat.value}</p>
-                {stat.detail ? <p className="mt-1 text-xs font-bold text-[#FF7A16]">{stat.detail}</p> : null}
-              </article>
-            ))}
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="marketing-card-soft p-5">
+              <p className="text-[11px] font-black tracking-[0.2em] text-[#14295F]/44">{entryStat?.label}</p>
+              <p className="mt-3 break-keep text-[1.65rem] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
+                {entryStat?.value}
+              </p>
+              <p className="mt-2 text-sm font-medium leading-[1.72] text-slate-600">{entryStat?.detail}</p>
+            </article>
+
+            <article className="marketing-card-warm p-5">
+              <p className="text-[11px] font-black tracking-[0.2em] text-[#B85A00]/58">{dataStat?.label}</p>
+              <p className="mt-3 break-keep text-[1.65rem] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
+                {dataStat?.value}
+              </p>
+              <p className="mt-2 text-sm font-medium leading-[1.72] text-slate-600">{dataStat?.detail}</p>
+            </article>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <a href="/go/experience?placement=hero_student_demo&mode=student&view=mobile" className="premium-surface-button px-4 py-4">
-              <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">STUDENT DEMO</p>
-              <p className="mt-1 text-lg font-black text-[#14295F]">학생 모드 체험</p>
-              <p className="mt-1 text-sm font-medium leading-[1.68] text-slate-600">성장, 기록, 계획 탭까지 실제 앱처럼 확인</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <a href="/go/experience?placement=hero_student_demo&mode=student&view=mobile" className="premium-surface-button marketing-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#14295F] text-white shadow-[0_10px_20px_rgba(20,41,95,0.18)]">
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-[#F6F9FF] px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]">STUDENT DEMO</span>
+              </div>
+              <p className="mt-5 text-[1.45rem] font-black tracking-[-0.03em] text-[#14295F]">학생 모드 체험</p>
+              <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">성장 · 기록 · 계획 화면을 앱처럼 바로 확인</p>
+              <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#14295F]">
+                체험 시작
+                <ArrowRight className="h-4 w-4" />
+              </span>
             </a>
-            <a href="/go/experience?placement=hero_parent_demo&mode=parent" className="premium-surface-button px-4 py-4">
-              <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">PARENT DEMO</p>
-              <p className="mt-1 text-lg font-black text-[#14295F]">학부모 모드 체험</p>
-              <p className="mt-1 text-sm font-medium leading-[1.68] text-slate-600">앱모드 전용 알림, 캘린더, 수납 흐름 확인</p>
+
+            <a href="/go/experience?placement=hero_parent_demo&mode=parent" className="premium-surface-button marketing-card-soft p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_10px_20px_rgba(255,122,22,0.18)]">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#B85A00]">PARENT DEMO</span>
+              </div>
+              <p className="mt-5 text-[1.45rem] font-black tracking-[-0.03em] text-[#14295F]">학부모 모드 체험</p>
+              <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">알림 · 캘린더 · 수납 흐름을 앱모드 전용으로 확인</p>
+              <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#14295F]">
+                체험 시작
+                <ArrowRight className="h-4 w-4" />
+              </span>
             </a>
           </div>
         </div>

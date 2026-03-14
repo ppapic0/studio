@@ -129,9 +129,9 @@ export const marketingContent: MarketingContent = {
   brand: {
     name: '트랙 국어 학원 · 트랙 관리형 스터디센터',
     slogan: '학생의 성장 궤적을 함께 그립니다',
-    heroTitle: '트랙은 실적으로 증명합니다',
+    heroTitle: '관리형 스터디센터가 중심입니다',
     heroDescription:
-      '관리형 스터디센터 중심 운영. 출입 기록 · 공부시간 · 실행 데이터 확인. 수능 국어 수업은 별도 선택. 재학생 · N수생 모두 등록 가능.',
+      '루틴을 먼저 세우고, 데이터로 확인합니다. 수능 국어 수업은 필요할 때 따로 선택하고, 재학생과 N수생 모두 등록할 수 있습니다.',
     logoFull: '/track-logo-full.svg',
     logoMark: '/track-logo-mark.svg',
     heroBackground: '',
@@ -146,43 +146,43 @@ export const marketingContent: MarketingContent = {
   ],
   heroStats: [
     {
-      label: '2026학년도 주요 대학 합격',
+      label: '2026 주요 대학 합격',
       value: '고려대 2 · 서강대 1 · 성균관대 1 · 홍익대 1 · 아주대 1',
-      detail: '과정을 관리한 결과가 실적으로 이어졌습니다',
+      detail: '실적으로 증명한 운영 구조',
     },
     {
-      label: '관리형 스터디센터 운영 방식',
-      value: '학원 등록 없이도 이용 가능',
-      detail: '학원 수업은 별도 선택 프로그램입니다',
+      label: '센터 이용 구조',
+      value: '센터 단독 등록 가능',
+      detail: '수업은 필요할 때 별도 선택',
     },
     {
-      label: '실시간 관리 데이터',
-      value: '출결 · 공부시간 · 실행률 · 피드백 연결',
-      detail: '보여주는 관리가 아니라 남는 관리입니다',
+      label: '실시간 운영 데이터',
+      value: '출결 · 공부시간 · 실행률 연결',
+      detail: '보여주는 관리가 아니라 남는 관리',
     },
   ],
   valueCards: [
     {
-      title: '관리형 스터디센터 중심 운영',
-      description: '학습 루틴을 먼저 세우고, 학생별 상황에 맞게 수업과 자습을 선택적으로 연결합니다.',
+      title: '루틴 중심 운영',
+      description: '공간 제공보다 루틴 유지가 먼저 보이도록 설계했습니다.',
     },
     {
-      title: '수능 국어 전문 수업',
-      description: '수능 대비 흐름에 맞춘 그룹 수업으로 독서, 평가원, 사설 모의고사를 촘촘하게 다룹니다.',
+      title: '수능 국어 전문',
+      description: '독서, 평가원, 사설 모의고사 흐름을 그룹 수업으로 정리합니다.',
     },
     {
-      title: '학부모 앱 실시간 확인',
-      description: '출결, 공부시간, 리포트, 알림, 수납 상태를 앱에서 바로 확인할 수 있습니다.',
+      title: '학부모 앱 확인',
+      description: '출결, 공부시간, 리포트, 수납 상태를 앱에서 바로 확인합니다.',
     },
     {
-      title: '데이터 기반 운영 시스템',
-      description: '막연한 관리가 아니라 계획, 실행, 피드백, 회복 흐름이 모두 숫자로 남도록 설계했습니다.',
+      title: '데이터 기반 관리',
+      description: '계획, 실행, 피드백, 회복 흐름이 숫자로 남는 구조입니다.',
     },
   ],
   director: {
     heading: '원장 소개 · 지도 철학',
     description:
-      '트랙은 개인과외의 밀착 관리 방식을 시스템으로 확장한 브랜드입니다. 국어국문·교육학 전공 기반으로 학생별 진단과 피드백을 구조화하고, 수능 국어를 장기 루틴 안에서 관리합니다.',
+      '개인과외의 밀착 지도 강점을 시스템으로 확장했습니다. 학생별 진단, 빠른 피드백, 장기 루틴 설계를 한 구조 안에 묶었습니다.',
     highlights: [
       '국어국문·교육학 전공 기반 수업 설계',
       '수능 국어 전문 지도와 개인 맞춤 피드백',
@@ -219,7 +219,7 @@ export const marketingContent: MarketingContent = {
   ],
   successStory: {
     title: '성장 사례',
-    summary: '6월 모의고사 국어 3등급에서 출발해 수능 백분위 99, 고려대학교 합격으로 이어진 실제 사례가 있습니다.',
+    summary: '3등급에서 출발해 수능 백분위 99, 고려대학교 합격으로 이어진 실제 사례가 있습니다.',
   },
   classSystem: [
     {
@@ -246,11 +246,11 @@ export const marketingContent: MarketingContent = {
   studyCafe: {
     heading: '관리형 스터디센터가 중심입니다',
     description:
-      '관리형 스터디센터 중심 운영. 입실 기록 · 공부시간 · 실행 데이터 확인. 수능 국어 수업은 별도 선택. 재학생 · N수생 모두 등록 가능합니다.',
+      '입실 기록, 공부시간, 실행 데이터를 확인합니다. 수능 국어 수업은 별도 선택, 재학생과 N수생 모두 등록 가능합니다.',
     features: [
       {
         title: '학습 루틴 완성 중심',
-        description: '좌석 제공이 아니라 매일 같은 흐름으로 공부가 이어지도록 운영 구조를 설계합니다.',
+        description: '좌석 제공이 아니라 매일 같은 흐름으로 공부가 이어지도록 설계합니다.',
       },
       {
         title: '별도 선택 가능한 수업 구조',
@@ -258,7 +258,7 @@ export const marketingContent: MarketingContent = {
       },
       {
         title: '실시간 출입·학습 기록',
-        description: '출입과 공부시간이 자동으로 쌓여 학생의 루틴과 몰입 흐름을 데이터로 확인할 수 있습니다.',
+        description: '출입과 공부시간이 자동으로 쌓여 학생의 루틴과 몰입 흐름을 확인할 수 있습니다.',
       },
       {
         title: '학부모 앱 연동',
@@ -266,7 +266,7 @@ export const marketingContent: MarketingContent = {
       },
       {
         title: '상시 모의고사 운영',
-        description: '이감 모의고사와 더프 모의고사를 상시 진행하며, 실전 감각과 현재 위치를 정기적으로 점검합니다.',
+        description: '이감 모의고사와 더프 모의고사를 상시 진행하며 실전 감각을 점검합니다.',
       },
     ],
     seatTypes: [
@@ -283,7 +283,7 @@ export const marketingContent: MarketingContent = {
   appSystem: {
     heading: '학생을 놓치지 않는 전용 웹앱',
     description:
-      '학생 · 학부모 · 관리자 모두가 같은 흐름을 봅니다. 기술보다 관리 품질을 위해 설계한 전용 웹앱입니다.',
+      '학생, 학부모, 관리자 모두가 같은 흐름을 봅니다. 관리 품질을 위해 설계한 전용 웹앱입니다.',
     modes: [
       {
         mode: '학부모 모드',
@@ -302,10 +302,10 @@ export const marketingContent: MarketingContent = {
       },
     ],
     features: [
-      { title: '학습 계획 확인', description: '해야 할 일을 단순 목록이 아니라 주간 계획 흐름으로 정리합니다.' },
-      { title: '기록 캘린더', description: '날짜별 공부시간과 실행 결과를 시각적으로 확인할 수 있습니다.' },
-      { title: '성장 데이터', description: 'LP, 스킬 지표, 리듬 점수로 학생의 변화가 수치로 남습니다.' },
-      { title: '상담·요청 연동', description: '상담 요청, 리포트, 알림, 수납 상태가 모두 하나의 앱 흐름으로 연결됩니다.' },
+      { title: '계획 확인', description: '해야 할 일을 주간 계획 흐름으로 정리합니다.' },
+      { title: '기록 캘린더', description: '날짜별 공부시간과 실행 결과를 바로 확인합니다.' },
+      { title: '성장 데이터', description: 'LP와 스킬 지표로 학생의 변화가 숫자로 남습니다.' },
+      { title: '알림·수납 연동', description: '상담, 리포트, 알림, 수납 상태가 하나의 흐름으로 연결됩니다.' },
     ],
     appScreens: [
       {
@@ -334,7 +334,7 @@ export const marketingContent: MarketingContent = {
   lpSystem: {
     heading: 'LP 학습 계획 시스템',
     description:
-      '계획 · 실행 · 체크 · 피드백 · 개선. 막연한 공부를 구체적인 행동으로 바꾸는 트랙의 핵심 루프입니다.',
+      '계획 · 실행 · 체크 · 피드백 · 개선. 막연한 공부를 행동으로 바꾸는 핵심 루프입니다.',
     cycle: [
       { title: '계획', description: '주간 목표와 일별 실행 항목을 직접 작성합니다.' },
       { title: '실행', description: '매일 실제 수행 여부와 공부시간을 기록합니다.' },
@@ -350,7 +350,7 @@ export const marketingContent: MarketingContent = {
   },
   comparison: {
     heading: '왜 트랙인가',
-    description: '같은 시간이라도 관리 구조가 다르면 결과는 달라집니다. 트랙은 과정이 먼저 보이도록 설계합니다.',
+    description: '같은 시간이라도 구조가 다르면 결과는 달라집니다. 트랙은 과정이 먼저 보이도록 설계합니다.',
     rows: [
       {
         topic: '운영 중심',
@@ -381,7 +381,7 @@ export const marketingContent: MarketingContent = {
   },
   facility: {
     heading: '몰입을 위한 프리미엄 환경',
-    description: '사진보다 구조가 먼저 보이도록, 좌석과 동선의 목적을 명확하게 설명하는 구성을 유지합니다.',
+    description: '사진보다 구조가 먼저 보이도록, 좌석과 동선의 목적을 명확하게 보여줍니다.',
     gallery: [
       {
         title: '집중 학습 구역',
@@ -403,7 +403,7 @@ export const marketingContent: MarketingContent = {
   consult: {
     heading: '방문 상담 · 입학 문의',
     description:
-      '관리형 스터디센터 이용부터 수능 국어 수업 선택 여부까지 학생 상황에 맞춰 시작 경로를 함께 안내합니다. 재학생과 N수생 모두 상담 가능합니다.',
+      '관리형 스터디센터 이용부터 수능 국어 수업 선택 여부까지, 학생 상황에 맞는 시작 경로를 안내합니다.',
     contactLine: '상담 문의: 웹사이트 상담폼 접수 후 순차 연락',
     locationLine: '위치: 경기 용인시 기흥구 동백중앙로 283 B동 906호, 907호',
     hoursLine: '스터디센터 운영: 매일 오전 8:30 ~ 다음날 오전 1:30 · 학원 운영: 매일 오후 10:00 종료',

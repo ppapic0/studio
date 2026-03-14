@@ -25,8 +25,8 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-black tracking-[0.16em] text-[#FF7A16]">EXPERIENCE FIRST</p>
-              <p className="mt-2 break-keep text-xl font-black text-[#14295F]">학생 모드와 학부모 모드를 실제 앱처럼 체험해보세요</p>
-              <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">그래프, 캘린더, 알림, 수납, 성장 지표까지 실제 운영 화면처럼 확인할 수 있습니다.</p>
+              <p className="mt-2 break-keep text-[1.65rem] font-black tracking-[-0.03em] text-[#14295F]">학생 · 학부모 모드를 실제 앱처럼 체험</p>
+              <p className="mt-2 break-keep text-sm font-medium leading-[1.74] text-slate-600">그래프, 캘린더, 알림, 수납, 성장 지표까지 실제 운영 화면처럼 확인할 수 있습니다.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <a href="/go/login?placement=app_section_login" className="premium-cta premium-cta-primary h-11 rounded-full px-5 text-sm">
@@ -43,10 +43,10 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           {appSystem.modes.map((mode) => (
             <article key={mode.mode} className="marketing-card p-5">
               <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">{mode.mode}</p>
-              <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{mode.description}</p>
+              <p className="mt-2 break-keep text-sm font-medium leading-[1.74] text-slate-600">{mode.description}</p>
               <ul className="mt-3 space-y-1.5">
                 {mode.items.map((item) => (
-                  <li key={`${mode.mode}-${item}`} className="text-sm font-black text-[#14295F]">
+                  <li key={`${mode.mode}-${item}`} className="text-sm font-extrabold text-[#14295F]">
                     • {item}
                   </li>
                 ))}
@@ -61,7 +61,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
               {appSystem.features.map((item) => (
                 <li key={item.title} className="marketing-card p-4">
                   <p className="text-base font-black text-[#14295F]">{item.title}</p>
-                  <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.description}</p>
+                  <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">{item.description}</p>
                 </li>
               ))}
             </ul>
@@ -77,8 +77,8 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                     }`}
                   >
                     <p className="text-xs font-black">{metric.label}</p>
-                    <p className="font-brand mt-1 text-xl">{metric.value}</p>
-                    <p className="mt-1 text-[11px] font-bold opacity-80">{metric.detail}</p>
+                    <p className="dashboard-number mt-1 text-[1.4rem]">{metric.value}</p>
+                    <p className="mt-1 text-[11px] font-medium opacity-80">{metric.detail}</p>
                   </article>
                 ))}
               </div>
@@ -118,9 +118,9 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                 </div>
 
                 <div className="px-1 pb-1 pt-4">
-                  <p className="font-brand break-keep text-base text-[#14295F]">{screen.title}</p>
+                  <p className="break-keep text-[1rem] font-extrabold tracking-[-0.02em] text-[#14295F]">{screen.title}</p>
                   <p className="mt-1 break-keep text-xs font-black text-[#FF7A16]">{screen.subtitle}</p>
-                  <p className="mt-2 break-keep text-xs font-bold leading-relaxed text-slate-600">{screen.caption}</p>
+                  <p className="mt-2 break-keep text-xs font-medium leading-[1.7] text-slate-600">{screen.caption}</p>
                 </div>
               </article>
             ))}

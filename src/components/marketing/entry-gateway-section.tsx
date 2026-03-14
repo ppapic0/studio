@@ -13,7 +13,7 @@ export function EntryGatewaySection() {
               <h2 className="mt-2 break-keep text-2xl font-black tracking-tight text-[#14295F] sm:text-[2rem]">
                 기존 재원생 입구와 체험 입구를 분리했습니다
               </h2>
-              <p className="mt-3 max-w-3xl break-keep text-sm font-bold leading-relaxed text-slate-600 sm:text-[15px]">
+              <p className="mt-3 max-w-3xl break-keep text-sm font-medium leading-[1.82] text-slate-600 sm:text-[15px]">
                 바로 로그인하려는 재원생과, 학생·학부모 체험을 먼저 보려는 신규 방문자를
                 분리해 운영 흐름과 방문 데이터를 더 정확하게 확인합니다.
               </p>
@@ -36,7 +36,7 @@ export function EntryGatewaySection() {
               <p className="mt-5 text-2xl font-black tracking-tight text-[#14295F]">
                 기존 재원생은 바로 로그인
               </p>
-              <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-slate-600">
+              <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
                 학생, 학부모, 선생님 모두 기존 계정으로 바로 웹앱에 들어갈 수 있도록
                 가장 빠른 입구를 따로 두었습니다.
               </p>
@@ -61,7 +61,7 @@ export function EntryGatewaySection() {
               <p className="mt-5 text-2xl font-black tracking-tight text-[#14295F]">
                 처음 방문했다면 체험부터 확인
               </p>
-              <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-slate-600">
+              <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
                 학생 모드와 학부모 모드를 실제 앱처럼 확인하고, 그래프·기록·수납·알림
                 흐름까지 한 번에 체험할 수 있습니다.
               </p>

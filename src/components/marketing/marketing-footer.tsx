@@ -14,9 +14,9 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
         <div>
           <div className="inline-flex items-center gap-3">
             <Image src={brand.logoMark} alt={`${brand.name} 로고`} width={36} height={36} className="h-9 w-9 rounded-md object-contain" />
-            <p className="font-brand text-base font-bold text-[#14295F]">{brand.name}</p>
+            <p className="font-body text-base font-extrabold tracking-[-0.04em] text-[#14295F]">{brand.name}</p>
           </div>
-          <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{footer.line}</p>
+          <p className="mt-4 break-keep text-sm font-medium leading-[1.8] text-slate-600">{footer.line}</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <a
               href="#consult"
@@ -40,9 +40,9 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
         </div>
 
         <div className="marketing-card-soft space-y-3 p-5">
-          <p className="text-sm font-bold text-[#14295F]/85">{footer.phone}</p>
-          <p className="break-keep text-sm font-bold text-[#14295F]/85">{footer.location}</p>
-          <p className="text-sm font-bold text-[#14295F]/85">{footer.hours}</p>
+          <p className="text-sm font-semibold text-[#14295F]/88">{footer.phone}</p>
+          <p className="break-keep text-sm font-semibold text-[#14295F]/88">{footer.location}</p>
+          <p className="text-sm font-semibold text-[#14295F]/88">{footer.hours}</p>
         </div>
       </div>
     </footer>

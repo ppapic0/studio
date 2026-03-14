@@ -1,4 +1,4 @@
-import type { MarketingContent } from "@/lib/marketing-content";
+﻿import type { MarketingContent } from "@/lib/marketing-content";
 
 import { SectionHeading } from "./section-heading";
 
@@ -22,9 +22,9 @@ export function ComparisonSection({ comparison }: ComparisonSectionProps) {
           <div className="divide-y divide-[#14295F]/10">
             {comparison.rows.map((row) => (
               <article key={row.topic} className="grid gap-3 px-5 py-4 md:grid-cols-[0.9fr_1fr_1fr] md:items-center">
-                <p className="font-brand text-lg font-bold text-[#14295F]">{row.topic}</p>
-                <p className="rounded-lg bg-[#F5F7FB] px-3 py-2 text-sm font-bold text-slate-600">{row.common}</p>
-                <p className="rounded-lg bg-[#FFF3E8] px-3 py-2 text-sm font-black text-[#B85A00]">{row.track}</p>
+                <p className="text-lg font-extrabold tracking-[-0.03em] text-[#14295F]">{row.topic}</p>
+                <p className="rounded-lg bg-[#F5F7FB] px-3 py-2 text-sm font-medium leading-[1.74] text-slate-600">{row.common}</p>
+                <p className="rounded-lg bg-[#FFF3E8] px-3 py-2 text-sm font-extrabold leading-[1.66] text-[#B85A00]">{row.track}</p>
               </article>
             ))}
           </div>

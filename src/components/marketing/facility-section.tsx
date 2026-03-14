@@ -1,4 +1,4 @@
-import type { MarketingContent } from "@/lib/marketing-content";
+﻿import type { MarketingContent } from "@/lib/marketing-content";
 
 import { SectionHeading } from "./section-heading";
 
@@ -41,8 +41,8 @@ export function FacilitySection({ facility }: FacilitySectionProps) {
               </div>
 
               <div className="p-5">
-                <h3 className="font-brand mt-1 break-keep text-xl font-bold text-[#14295F]">{item.title}</h3>
-                <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.caption}</p>
+                <h3 className="mt-1 break-keep text-[1.32rem] font-extrabold tracking-[-0.04em] text-[#14295F]">{item.title}</h3>
+                <p className="mt-2 break-keep text-sm font-medium leading-[1.76] text-slate-600">{item.caption}</p>
               </div>
             </article>
           ))}
