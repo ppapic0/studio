@@ -690,7 +690,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <div className={isMobile ? "space-y-1.5" : "space-y-4"}>
             <div className="flex flex-col gap-0.5">
               <Badge className={cn("w-fit bg-white/20 text-white border-none font-black tracking-[0.2em] uppercase px-2 py-0.5", isMobile ? "mx-auto text-[6px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
-              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-lg" : "text-6xl")}>
+              <h2 className={cn("font-body font-extrabold leading-[1.18] whitespace-pre-line", isMobile ? "text-[1.9rem] tracking-[-0.018em]" : "text-6xl tracking-[-0.02em]")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
