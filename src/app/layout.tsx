@@ -9,15 +9,6 @@ import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 import "./globals.css";
 
-const gangwonEdu = localFont({
-  src: [
-    { path: "./fonts/gangwon-edu-light.ttf", weight: "400", style: "normal" },
-    { path: "./fonts/gangwon-edu-bold.ttf", weight: "700", style: "normal" },
-  ],
-  variable: "--font-gangwon",
-  display: "swap",
-});
-
 const sbAggro = localFont({
   src: [
     { path: "./fonts/sb-aggro-m.ttf", weight: "500", style: "normal" },
@@ -41,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className={`${gangwonEdu.variable} ${sbAggro.variable} font-body antialiased selection:bg-primary selection:text-white`}
+        className={`${sbAggro.variable} font-body antialiased selection:bg-primary selection:text-white`}
       >
         <FirebaseClientProvider>
           <AppProvider>

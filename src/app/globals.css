@@ -87,16 +87,19 @@
     touch-action: manipulation;
     font-feature-settings: "palt" 1, "liga" 1;
     text-rendering: optimizeLegibility;
+    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   }
 
   .font-display {
-    font-family: var(--font-gangwon), "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
-    letter-spacing: -0.02em;
+    font-family: var(--font-aggro), "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
   }
 
   .font-brand {
-    font-family: var(--font-aggro), var(--font-gangwon), "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
-    letter-spacing: -0.02em;
+    font-family: var(--font-aggro), "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
+    letter-spacing: -0.04em;
+    line-height: 0.98;
   }
 
   .font-numeric {
