@@ -26,7 +26,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
                 height={36}
                 className="h-9 w-9 rounded-lg object-contain"
               />
-              <p className="font-body text-base font-extrabold tracking-[-0.04em] text-white">{brand.name}</p>
+              <p className="font-brand text-base text-white">{brand.name}</p>
             </div>
             <p className="mt-4 max-w-md break-keep text-sm font-medium leading-[1.82] text-white/55">
               {footer.line}

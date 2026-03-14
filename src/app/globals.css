@@ -151,16 +151,16 @@
   }
 
   .font-display {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 800;
-    letter-spacing: -0.038em;
-    line-height: 1.08;
+    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
   }
 
   .font-brand {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.042em;
+    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.035em;
     line-height: 1.04;
   }
 

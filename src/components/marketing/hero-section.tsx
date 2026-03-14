@@ -49,7 +49,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           </div>
 
           <div className="space-y-4">
-            <h1 className="font-brand max-w-4xl break-keep text-[clamp(2.8rem,7vw,5.4rem)] leading-[0.92] text-white">
+            <h1 className="font-brand max-w-4xl break-keep text-[clamp(2.9rem,7.5vw,5.8rem)] leading-[0.92] text-white">
               관리형
               <br />
               스터디센터가
