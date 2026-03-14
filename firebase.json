@@ -9,7 +9,10 @@
         "firebase-debug.*.log",
         "functions",
         "node_modules",
-        ".next"
+        ".next",
+        ".next_old_*",
+        ".playwright-cli_old_*",
+        "output_old_*"
       ]
     }
   ],
