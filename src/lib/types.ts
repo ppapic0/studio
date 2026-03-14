@@ -272,3 +272,17 @@ export interface ParentActivityEvent {
   createdAt: Timestamp;
   metadata?: Record<string, any>;
 }
+
+export interface StudentNotification {
+  id: string;
+  centerId: string;
+  studentId: string;
+  teacherId: string;
+  teacherName: string;
+  type: 'one_line_feedback';
+  title?: string;
+  message: string;
+  readAt?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}

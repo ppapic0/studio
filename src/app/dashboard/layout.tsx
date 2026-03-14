@@ -4,6 +4,7 @@ import { MainNav } from '@/components/dashboard/main-nav';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { BottomNav } from '@/components/dashboard/bottom-nav';
 import { AppointmentNotifier } from '@/components/dashboard/appointment-notifier';
+import { FeedbackNotifier } from '@/components/dashboard/feedback-notifier';
 import { ReportNotifier } from '@/components/dashboard/report-notifier';
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
@@ -68,13 +69,14 @@ export default function DashboardLayout({
 
         <main
           className={cn(
-            'flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10',
+            'flex-1 min-h-0 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10',
             isMobileView ? 'dashboard-mobile-main p-4 px-4 pb-24 pt-5' : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
           )}
         >
           {children}
         </main>
 
+        <FeedbackNotifier />
         <AppointmentNotifier />
         <ReportNotifier />
 

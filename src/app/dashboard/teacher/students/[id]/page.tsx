@@ -9,10 +9,10 @@ import { ko } from 'date-fns/locale';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar } from 'recharts';
-import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen } from 'lucide-react';
+import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -213,11 +213,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isAvgStudyModalOpen, setIsAvgStudyModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isQuickFeedbackModalOpen, setIsQuickFeedbackModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
   const [logContent, setLogContent] = useState('');
   const [logImprovement, setLogImprovement] = useState('');
+  const [quickFeedbackMessage, setQuickFeedbackMessage] = useState('');
 
   const [aptDate, setAptDate] = useState(format(today, 'yyyy-MM-dd'));
   const [aptTime, setAptTime] = useState('14:00');
@@ -225,6 +227,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isQuickFeedbackSubmitting, setIsQuickFeedbackSubmitting] = useState(false);
 
   const [isEditStats, setIsEditStats] = useState(false);
   const [editLp, setEditLp] = useState(0);
@@ -269,6 +272,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const counselingLogsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'counselingLogs'), orderBy('createdAt', 'desc'), limit(200))), [firestore, centerId]);
   const { data: counselingLogsRaw, isLoading: counselingLoading } = useCollection<CounselingLog>(counselingLogsQuery, { enabled: !!centerId });
+
+  const studentNotificationsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'studentNotifications'), where('studentId', '==', studentId))), [firestore, centerId, studentId]);
+  const { data: studentNotificationsRaw } = useCollection<StudentNotification>(studentNotificationsQuery, { enabled: !!centerId });
 
   const reservationsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'counselingReservations'), orderBy('scheduledAt', 'desc'), limit(200))), [firestore, centerId]);
   const { data: reservationsRaw, isLoading: reservationLoading } = useCollection<CounselingReservation>(reservationsQuery, { enabled: !!centerId });
@@ -402,6 +408,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const studentCounselingLogs = useMemo(() => {
     return (counselingLogsRaw || []).filter((log) => log.studentId === studentId).sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
   }, [counselingLogsRaw, studentId]);
+
+  const studentQuickFeedbacks = useMemo(() => {
+    return (studentNotificationsRaw || [])
+      .filter((item) => item.type === 'one_line_feedback')
+      .sort((a, b) => toTime(b.updatedAt || b.createdAt) - toTime(a.updatedAt || a.createdAt));
+  }, [studentNotificationsRaw]);
 
   const studentReservations = useMemo(() => {
     return (reservationsRaw || []).filter((reservation) => reservation.studentId === studentId).sort((a, b) => toTime(b.scheduledAt) - toTime(a.scheduledAt));
@@ -838,6 +850,38 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleCreateQuickFeedback = async () => {
+    if (!firestore || !centerId || !student || !currentUser || !canWriteCounseling) return;
+    if (!quickFeedbackMessage.trim()) {
+      toast({ variant: 'destructive', title: '한 줄 피드백을 입력해 주세요.' });
+      return;
+    }
+
+    setIsQuickFeedbackSubmitting(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'studentNotifications'), {
+        centerId,
+        studentId,
+        teacherId: currentUser.uid,
+        teacherName: currentUser.displayName || '담당 선생님',
+        type: 'one_line_feedback',
+        title: '한 줄 피드백',
+        message: quickFeedbackMessage.trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({ title: '한 줄 피드백 전송 완료' });
+      setQuickFeedbackMessage('');
+      setIsQuickFeedbackModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: '한 줄 피드백 전송 실패' });
+    } finally {
+      setIsQuickFeedbackSubmitting(false);
+    }
+  };
+
   const handleCreateReservation = async () => {
     if (!firestore || !centerId || !student || !currentUser || !canWriteCounseling) return;
 
@@ -914,6 +958,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-wrap gap-2">
           {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
           {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
+          {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
           {canEditStudentInfo && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
           {canEditGrowthData && (
             <Button
@@ -1097,12 +1142,47 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-7 rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader><CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><MessageSquare className="h-5 w-5 text-rose-500" /> 개인 상담 일지</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {counselingLoading ? (
-                  <div className="flex items-center justify-center h-36 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
-                ) : studentCounselingLogs.length === 0 ? (
+              <Card className="lg:col-span-7 rounded-[2rem] border-none shadow-lg bg-white">
+                <CardHeader><CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><MessageSquare className="h-5 w-5 text-rose-500" /> 개인 상담 일지</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="rounded-2xl border border-[#ffd9b7] bg-[#fff8f2] p-3.5 shadow-sm">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <MessageSquareMore className="h-4 w-4 text-[#ff7a16]" />
+                        <p className="text-[11px] font-black uppercase tracking-widest text-[#ff7a16]">최근 한 줄 피드백</p>
+                      </div>
+                      {canWriteCounseling && (
+                        <Button variant="ghost" className="h-8 rounded-xl px-3 text-[10px] font-black text-[#14295F]" onClick={() => setIsQuickFeedbackModalOpen(true)}>
+                          바로 작성
+                        </Button>
+                      )}
+                    </div>
+                    {studentQuickFeedbacks.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-[#ffd7b6] bg-white px-3 py-4 text-center text-xs font-bold text-muted-foreground">
+                        아직 전달한 한 줄 피드백이 없습니다.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {studentQuickFeedbacks.slice(0, 4).map((feedback) => (
+                          <div key={feedback.id} className="rounded-xl border border-white bg-white px-3 py-3 shadow-sm">
+                            <div className="mb-1 flex items-center gap-2">
+                              <Badge className="border-none bg-[#fff3e9] text-[#ff7a16] font-black text-[9px] h-5 px-2">
+                                한 줄 피드백
+                              </Badge>
+                              <span className="text-[10px] font-bold text-muted-foreground">
+                                {feedback.createdAt ? format(feedback.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}
+                              </span>
+                            </div>
+                            <p className="text-sm font-bold leading-relaxed text-slate-800">{feedback.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {counselingLoading ? (
+                    <div className="flex items-center justify-center h-36 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                  ) : studentCounselingLogs.length === 0 ? (
                   <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">작성된 상담 일지가 없습니다.</div>
                 ) : (
                   studentCounselingLogs.slice(0, 10).map((log) => (
@@ -1440,19 +1520,53 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
-        <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
-          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">상담 일지 작성</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-1">
-            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">상담 유형</Label><Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}><SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학습 상담</SelectItem><SelectItem value="life">생활 상담</SelectItem><SelectItem value="career">진로 상담</SelectItem></SelectContent></Select></div>
+        <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
+          <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
+            <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">상담 일지 작성</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-1">
+              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">상담 유형</Label><Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}><SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학습 상담</SelectItem><SelectItem value="life">생활 상담</SelectItem><SelectItem value="career">진로 상담</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">상담 내용</Label><Textarea value={logContent} onChange={(event) => setLogContent(event.target.value)} placeholder="핵심 상담 내용을 입력하세요." className="rounded-xl min-h-[120px]" /></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">개선 포인트</Label><Textarea value={logImprovement} onChange={(event) => setLogImprovement(event.target.value)} placeholder="향후 실행 포인트를 기록하세요." className="rounded-xl min-h-[90px]" /></div>
-          </div>
-          <DialogFooter><Button onClick={handleCreateCounselingLog} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '상담 일지 저장'}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </div>
+            <DialogFooter><Button onClick={handleCreateCounselingLog} disabled={isSubmitting} className="w-full h-12 rounded-xl font-black">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '상담 일지 저장'}</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Card className="rounded-[2rem] border-none shadow-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white overflow-hidden">
+        <Dialog open={isQuickFeedbackModalOpen} onOpenChange={setIsQuickFeedbackModalOpen}>
+          <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight">한 줄 피드백 전송</DialogTitle>
+              <DialogDescription className="font-semibold">
+                학생 알림창과 팝업으로 바로 확인되는 짧은 피드백입니다.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-1">
+              <div className="rounded-2xl border border-[#ffd9b7] bg-[#fff8f2] px-4 py-3 text-sm font-bold leading-relaxed text-slate-700">
+                예시: 오늘은 독서 지문에서 근거 표시를 더 또렷하게 해봅시다.
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">피드백 내용</Label>
+                <Textarea
+                  value={quickFeedbackMessage}
+                  onChange={(event) => setQuickFeedbackMessage(event.target.value)}
+                  placeholder="학생에게 바로 전달할 한 줄 피드백을 입력하세요."
+                  className="rounded-xl min-h-[110px]"
+                  maxLength={160}
+                />
+                <p className="text-right text-[10px] font-bold text-muted-foreground">
+                  {quickFeedbackMessage.trim().length}/160
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleCreateQuickFeedback} disabled={isQuickFeedbackSubmitting} className="w-full h-12 rounded-xl font-black">
+                {isQuickFeedbackSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '한 줄 피드백 보내기'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Card className="rounded-[2rem] border-none shadow-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white overflow-hidden">
         <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">Mastery Snapshot</p>

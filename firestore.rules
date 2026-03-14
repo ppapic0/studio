@@ -270,6 +270,18 @@ service cloud.firestore {
         allow delete: if isCenterAdmin(centerId);
       }
 
+      match /studentNotifications/{notificationId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
+        allow create: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId)
+              && resource.data.studentId == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'updatedAt']));
+        allow delete: if isCenterAdmin(centerId);
+      }
+
       match /parentCommunications/{commId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isParent(centerId) && resource.data.parentUid == request.auth.uid);
