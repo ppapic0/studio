@@ -22,7 +22,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           <h1 className="font-brand mt-4 break-keep text-4xl leading-[1.08] text-[#14295F] sm:text-5xl lg:text-[4.1rem]">
             {brand.heroTitle}
           </h1>
-          <p className="mt-5 max-w-2xl break-keep text-base font-bold leading-relaxed text-slate-600 sm:text-lg">
+          <p className="mt-5 max-w-2xl break-keep text-base font-medium leading-[1.72] text-slate-600 sm:text-lg">
             {brand.heroDescription}
           </p>
 
@@ -66,7 +66,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
                   <span className="inline-flex rounded-full bg-[#14295F] px-2 py-1 text-[10px] font-black text-white">학생 · 학부모 체험</span>
                 </div>
                 <p className="mt-1 text-lg font-black tracking-tight text-[#14295F]">웹앱 체험하기</p>
-                <p className="mt-1 break-keep text-sm font-bold text-slate-600">학생 모드와 학부모 모드를 실제 앱처럼 바로 체험해보세요.</p>
+                <p className="mt-1 break-keep text-sm font-medium leading-[1.68] text-slate-600">학생 모드와 학부모 모드를 실제 앱처럼 바로 체험해보세요.</p>
               </div>
             </div>
             <div className="inline-flex items-center gap-2 text-sm font-black text-[#14295F]">
@@ -84,7 +84,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               <div className="relative">
                 <p className="text-[11px] font-black tracking-[0.14em] text-[#FFB070]">{resultStat.label}</p>
                 <p className="font-brand mt-3 break-keep text-xl leading-snug sm:text-2xl">{resultStat.value}</p>
-                {resultStat.detail ? <p className="mt-2 text-sm font-bold text-white/80">{resultStat.detail}</p> : null}
+                {resultStat.detail ? <p className="mt-2 text-sm font-medium text-white/80">{resultStat.detail}</p> : null}
 
                 <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-black">
@@ -144,12 +144,12 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
             <a href="/go/experience?placement=hero_student_demo&mode=student&view=mobile" className="premium-surface-button px-4 py-4">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">STUDENT DEMO</p>
               <p className="mt-1 text-lg font-black text-[#14295F]">학생 모드 체험</p>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">성장, 기록, 계획 탭까지 실제 앱처럼 확인</p>
+              <p className="mt-1 text-sm font-medium leading-[1.68] text-slate-600">성장, 기록, 계획 탭까지 실제 앱처럼 확인</p>
             </a>
             <a href="/go/experience?placement=hero_parent_demo&mode=parent" className="premium-surface-button px-4 py-4">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">PARENT DEMO</p>
               <p className="mt-1 text-lg font-black text-[#14295F]">학부모 모드 체험</p>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">앱모드 전용 알림, 캘린더, 수납 흐름 확인</p>
+              <p className="mt-1 text-sm font-medium leading-[1.68] text-slate-600">앱모드 전용 알림, 캘린더, 수납 흐름 확인</p>
             </a>
           </div>
         </div>

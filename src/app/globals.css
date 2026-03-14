@@ -90,7 +90,7 @@
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-weight: 500;
+    font-weight: 450;
   }
 
   .font-body {
@@ -101,15 +101,15 @@
 
   .font-display {
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 820;
-    letter-spacing: -0.024em;
+    font-weight: 780;
+    letter-spacing: -0.02em;
     line-height: 1.14;
   }
 
   .font-brand {
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.03em;
+    font-weight: 820;
+    letter-spacing: -0.024em;
     line-height: 1.08;
   }
 

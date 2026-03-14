@@ -52,7 +52,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                 <br />
                 운영 구조까지 설계했습니다
               </h3>
-              <p className="mt-4 max-w-2xl break-keep text-sm font-bold leading-relaxed text-slate-600 sm:text-[15px]">
+              <p className="mt-4 max-w-2xl break-keep text-sm font-medium leading-[1.78] text-slate-600 sm:text-[15px]">
                 트랙 관리형 스터디센터는 단순히 좌석을 제공하는 공간이 아니라, 입실부터 계획,
                 실행, 피드백까지 이어지는 흐름을 유지하도록 설계된 운영형 학습 공간입니다.
                 학생은 혼자 공부해도 혼자 남겨지지 않게, 학부모는 과정을 데이터로 확인할 수 있게
@@ -63,17 +63,17 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                 <div className="marketing-card-soft p-4">
                   <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/46">운영</p>
                   <p className="mt-2 text-lg font-black text-[#14295F]">매일 08:30 ~ 익일 01:30</p>
-                  <p className="mt-2 text-xs font-bold leading-relaxed text-slate-600">거의 연중무휴 흐름으로 학습 루틴을 끊기지 않게 운영합니다.</p>
+                  <p className="mt-2 text-xs font-medium leading-[1.72] text-slate-600">거의 연중무휴 흐름으로 학습 루틴을 끊기지 않게 운영합니다.</p>
                 </div>
                 <div className="marketing-card-warm p-4">
                   <p className="text-[10px] font-black tracking-[0.16em] text-[#B85A00]/58">실전 점검</p>
                   <p className="mt-2 text-lg font-black text-[#14295F]">이감 · 더프 상시 진행</p>
-                  <p className="mt-2 text-xs font-bold leading-relaxed text-slate-600">실전 감각과 현재 위치를 정기적으로 점검합니다.</p>
+                  <p className="mt-2 text-xs font-medium leading-[1.72] text-slate-600">실전 감각과 현재 위치를 정기적으로 점검합니다.</p>
                 </div>
                 <div className="marketing-card-soft p-4">
                   <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/46">등록 구조</p>
                   <p className="mt-2 text-lg font-black text-[#14295F]">센터 단독 / 수업 별도 선택</p>
-                  <p className="mt-2 text-xs font-bold leading-relaxed text-slate-600">재학생과 N수생 모두 상황에 맞게 유연하게 시작할 수 있습니다.</p>
+                  <p className="mt-2 text-xs font-medium leading-[1.72] text-slate-600">재학생과 N수생 모두 상황에 맞게 유연하게 시작할 수 있습니다.</p>
                 </div>
               </div>
             </div>
@@ -91,7 +91,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#14295F] text-xs font-black text-white shadow-[0_8px_14px_rgba(20,41,95,0.2)]">
                     {index + 1}
                   </div>
-                  <p className="break-keep text-sm font-bold leading-relaxed text-slate-600">{copy}</p>
+                  <p className="break-keep text-sm font-medium leading-[1.72] text-slate-600">{copy}</p>
                 </div>
               ))}
             </div>
@@ -121,7 +121,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   {item.icon}
                 </div>
               </div>
-              <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.description}</p>
+              <p className="mt-4 break-keep text-sm font-medium leading-[1.72] text-slate-600">{item.description}</p>
               {'note' in item && item.note ? (
                 <p className="mt-3 text-[11px] font-black text-[#B85A00]/78">{item.note}</p>
               ) : null}
@@ -138,7 +138,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   TRACK STANDARD
                 </p>
                 <h3 className="mt-2 break-keep text-xl font-black text-[#14295F]">{item.title}</h3>
-                <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.description}</p>
+                <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">{item.description}</p>
               </article>
             ))}
           </div>
@@ -151,7 +151,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
               {studyCafe.seatTypes.map((seat) => (
                 <article key={seat.title} className="marketing-card p-4">
                   <h4 className="text-lg font-black text-[#14295F]">{seat.title}</h4>
-                  <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">{seat.description}</p>
+                  <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">{seat.description}</p>
                 </article>
               ))}
             </div>
@@ -169,7 +169,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   재학생 · N수생 모두 등록 가능
                 </span>
               </div>
-              <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-slate-600">
+              <p className="mt-3 break-keep text-sm font-medium leading-[1.72] text-slate-600">
                 학생 상황에 따라 관리형 스터디센터만 먼저 시작하거나, 수능 국어 그룹 수업을 함께 선택하는 구조로 유연하게 안내합니다.
               </p>
             </div>

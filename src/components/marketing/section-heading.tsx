@@ -17,7 +17,7 @@ export function SectionHeading({ eyebrow, title, description, light = false }: S
         {title}
       </h2>
       {description ? (
-        <p className={`mt-4 break-keep text-base font-bold leading-relaxed ${light ? "text-white/80" : "text-slate-600"}`}>
+        <p className={`mt-4 break-keep text-base font-medium leading-[1.72] ${light ? "text-white/80" : "text-slate-600"}`}>
           {description}
         </p>
       ) : null}
