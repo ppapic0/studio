@@ -8,6 +8,18 @@ const TARGET_PATHS: Record<string, string> = {
   experience: '/experience',
 };
 
+function resolvePublicOrigin(request: NextRequest) {
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const host = forwardedHost || request.headers.get('host');
+
+  if (host) {
+    return `${forwardedProto || 'https'}://${host}`;
+  }
+
+  return request.nextUrl.origin;
+}
+
 async function resolveMarketingCenterId() {
   const envCenterId = process.env.MARKETING_CENTER_ID || process.env.NEXT_PUBLIC_MARKETING_CENTER_ID;
   if (envCenterId) return envCenterId;
@@ -22,9 +34,10 @@ export async function GET(
 ) {
   const { target } = await context.params;
   const targetPath = TARGET_PATHS[target];
+  const publicOrigin = resolvePublicOrigin(request);
 
   if (!targetPath) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/', publicOrigin));
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -35,7 +48,7 @@ export async function GET(
   const visitorId = request.cookies.get('track_marketing_vid')?.value || null;
   const sessionId = request.cookies.get('track_marketing_sid')?.value || null;
 
-  const destination = new URL(targetPath, request.url);
+  const destination = new URL(targetPath, publicOrigin);
   for (const [key, value] of searchParams.entries()) {
     if (key === 'placement' || key === 'source') continue;
     destination.searchParams.set(key, value);
