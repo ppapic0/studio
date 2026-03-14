@@ -210,7 +210,15 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
               {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>lp</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-amber-50 text-amber-700 border border-amber-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>히스토리 분석 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "font-body border-[#e87010]/60 bg-[linear-gradient(180deg,#ff9a48,#ff7a16)] text-white font-extrabold leading-none shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_8px_rgba(255,122,22,0.25)] transition-all hover:brightness-105",
+                    isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
+                  )}
+                >
+                  히스토리 분석 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                </Badge>
             </div>
           </CardContent>
         </Card>
@@ -293,7 +301,15 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>m</span>
             </div>
             <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-blue-50 text-blue-700 border border-blue-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>세션 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "font-body border-[#e87010]/60 bg-[linear-gradient(180deg,#ff9a48,#ff7a16)] text-white font-extrabold leading-none shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_8px_rgba(255,122,22,0.25)] transition-all hover:brightness-105",
+                    isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
+                  )}
+                >
+                  세션 보기 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                </Badge>
             </div>
           </CardContent>
         </Card>
