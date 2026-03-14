@@ -225,80 +225,115 @@
 }
 
 @layer components {
+  /* ───────────────────────────────────────────────
+     Premium Card System - 세련된 깊이감 카드들
+  ─────────────────────────────────────────────── */
+
   .premium-card {
     @apply border bg-card text-card-foreground transition-all duration-300 ease-out active:scale-[0.99];
-    border-color: rgba(20, 41, 95, 0.18);
-    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,255,0.995) 100%);
+    border-color: rgba(20, 41, 95, 0.14);
+    background-image: linear-gradient(160deg, rgba(255,255,255,1) 0%, rgba(246,250,255,0.97) 100%);
     box-shadow:
-      0 18px 38px rgba(20, 41, 95, 0.10),
-      0 6px 14px rgba(20, 41, 95, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.98),
-      inset 0 -1px 0 rgba(20, 41, 95, 0.04);
+      0 1px 0 0 rgba(255,255,255,0.9) inset,
+      0 -1px 0 0 rgba(20,41,95,0.06) inset,
+      0 4px 6px -1px rgba(20,41,95,0.06),
+      0 12px 24px -4px rgba(20,41,95,0.09),
+      0 24px 48px -8px rgba(20,41,95,0.07);
   }
 
   @media (hover: hover) {
     .premium-card:hover {
-      @apply scale-[1.01] shadow-xl;
+      @apply scale-[1.01];
+      box-shadow:
+        0 1px 0 0 rgba(255,255,255,0.95) inset,
+        0 -1px 0 0 rgba(20,41,95,0.08) inset,
+        0 4px 8px -1px rgba(20,41,95,0.08),
+        0 16px 32px -4px rgba(20,41,95,0.12),
+        0 32px 56px -8px rgba(20,41,95,0.09);
     }
   }
 
   .glass-panel {
-    @apply border border-white/20 bg-white/40 shadow-lg backdrop-blur-md;
+    @apply border border-white/25 bg-white/45 shadow-lg backdrop-blur-md;
   }
 
+  /* 기본 마케팅 카드 - 화이트 베이스 고급스러운 느낌 */
   .marketing-card {
     @apply rounded-[1.6rem] border bg-white;
-    border-color: rgba(20, 41, 95, 0.18);
-    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(249,251,255,0.995) 100%);
+    border-color: rgba(20, 41, 95, 0.11);
+    background-image: linear-gradient(160deg, rgba(255,255,255,1) 0%, rgba(247,251,255,0.98) 100%);
     box-shadow:
-      0 18px 40px rgba(20, 41, 95, 0.10),
-      0 6px 14px rgba(20, 41, 95, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.96),
-      inset 0 -1px 0 rgba(20, 41, 95, 0.04);
+      0 1px 0 0 rgba(255,255,255,1) inset,
+      0 -1px 0 0 rgba(20,41,95,0.05) inset,
+      0 2px 4px 0 rgba(20,41,95,0.04),
+      0 8px 20px -4px rgba(20,41,95,0.08),
+      0 20px 44px -8px rgba(20,41,95,0.07),
+      0 0 0 1px rgba(20,41,95,0.04);
   }
 
+  /* 소프트 블루 카드 */
   .marketing-card-soft {
     @apply rounded-[1.6rem] border;
-    background-color: #f8faff;
-    border-color: rgba(20, 41, 95, 0.18);
-    background-image: linear-gradient(180deg, rgba(248,250,255,1) 0%, rgba(255,255,255,0.985) 100%);
+    background-color: #f4f7ff;
+    border-color: rgba(20, 41, 95, 0.10);
+    background-image: linear-gradient(160deg, rgba(244,247,255,1) 0%, rgba(255,255,255,0.98) 100%);
     box-shadow:
-      0 18px 40px rgba(20, 41, 95, 0.10),
-      0 6px 14px rgba(20, 41, 95, 0.05),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.86);
+      0 1px 0 0 rgba(255,255,255,0.9) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 2px 4px 0 rgba(20,41,95,0.03),
+      0 8px 20px -4px rgba(20,41,95,0.07),
+      0 20px 40px -8px rgba(20,41,95,0.05);
   }
 
+  /* 웜 오렌지 카드 */
   .marketing-card-warm {
     @apply rounded-[1.6rem] border;
-    background-color: #fff5ec;
-    border-color: rgba(255, 122, 22, 0.28);
-    background-image: linear-gradient(180deg, rgba(255,245,236,1) 0%, rgba(255,255,255,0.99) 100%);
+    background-color: #fff3e8;
+    border-color: rgba(255, 122, 22, 0.22);
+    background-image: linear-gradient(160deg, rgba(255,243,232,1) 0%, rgba(255,255,255,0.98) 100%);
     box-shadow:
-      0 18px 40px rgba(20, 41, 95, 0.10),
-      0 6px 14px rgba(20, 41, 95, 0.05),
-      inset 0 0 0 1px rgba(255, 122, 22, 0.16);
+      0 1px 0 0 rgba(255,255,255,0.9) inset,
+      0 -1px 0 0 rgba(255,122,22,0.08) inset,
+      0 2px 4px 0 rgba(255,122,22,0.04),
+      0 8px 20px -4px rgba(255,122,22,0.10),
+      0 20px 40px -8px rgba(20,41,95,0.06);
   }
 
+  /* 다크 네이비 카드 - 프리미엄 강조 */
+  .marketing-card-dark {
+    @apply rounded-[1.6rem] border;
+    border-color: rgba(255,255,255,0.10);
+    background-image: linear-gradient(145deg, #1a3472 0%, #0f1e4a 52%, #0a1534 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.12) inset,
+      0 -1px 0 0 rgba(0,0,0,0.18) inset,
+      0 4px 8px 0 rgba(0,0,0,0.18),
+      0 16px 36px -4px rgba(0,0,0,0.22),
+      0 32px 56px -8px rgba(0,0,0,0.18);
+  }
+
+  /* 앱 카드 */
   .app-depth-card {
     @apply rounded-[1.5rem] border bg-white;
-    border-color: rgba(20, 41, 95, 0.18);
-    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(247,250,255,0.99) 100%);
+    border-color: rgba(20, 41, 95, 0.12);
+    background-image: linear-gradient(160deg, rgba(255,255,255,1) 0%, rgba(246,249,255,0.99) 100%);
     box-shadow:
-      0 16px 32px rgba(20, 41, 95, 0.10),
-      0 6px 16px rgba(20, 41, 95, 0.05),
-      inset 0 1px 0 rgba(255,255,255,0.98),
-      inset 0 -1px 0 rgba(20,41,95,0.04);
+      0 1px 0 0 rgba(255,255,255,1) inset,
+      0 -1px 0 0 rgba(20,41,95,0.05) inset,
+      0 4px 8px -2px rgba(20,41,95,0.07),
+      0 16px 32px -4px rgba(20,41,95,0.10),
+      0 0 0 1px rgba(20,41,95,0.03);
   }
 
   .app-depth-card-warm {
     @apply rounded-[1.5rem] border;
-    border-color: rgba(255, 122, 22, 0.24);
-    background-image: linear-gradient(180deg, rgba(255,247,239,1) 0%, rgba(255,255,255,0.99) 100%);
+    border-color: rgba(255, 122, 22, 0.20);
+    background-image: linear-gradient(160deg, rgba(255,247,238,1) 0%, rgba(255,255,255,0.99) 100%);
     box-shadow:
-      0 16px 32px rgba(20, 41, 95, 0.10),
-      0 6px 16px rgba(20, 41, 95, 0.05),
-      inset 0 1px 0 rgba(255,255,255,0.98),
-      inset 0 -1px 0 rgba(255,122,22,0.06);
+      0 1px 0 0 rgba(255,255,255,0.9) inset,
+      0 -1px 0 0 rgba(255,122,22,0.07) inset,
+      0 4px 8px -2px rgba(255,122,22,0.08),
+      0 16px 32px -4px rgba(20,41,95,0.09);
   }
 
   .interactive-button {
@@ -311,8 +346,12 @@
     }
   }
 
+  /* ───────────────────────────────────────────────
+     Premium CTA Button System
+  ─────────────────────────────────────────────── */
+
   .premium-cta {
-    @apply relative inline-flex items-center justify-center overflow-hidden rounded-[1.05rem] border font-black tracking-[-0.02em] transition-all duration-150 ease-out active:scale-[0.97];
+    @apply relative inline-flex items-center justify-center overflow-hidden rounded-[0.9rem] border font-black tracking-[-0.025em] transition-all duration-150 ease-out active:scale-[0.96];
     will-change: transform, box-shadow, filter;
     transform: translateZ(0);
   }
@@ -322,108 +361,224 @@
     position: absolute;
     inset: 1px;
     border-radius: inherit;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0) 32%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 40%);
     pointer-events: none;
-    opacity: 0.92;
+    opacity: 0.88;
   }
 
   .premium-cta::after {
     content: "";
     position: absolute;
-    inset: -38%;
-    background: linear-gradient(108deg, transparent 30%, rgba(255,255,255,0.22) 47%, transparent 64%);
-    transform: translateX(-55%);
+    inset: -40%;
+    background: linear-gradient(108deg, transparent 30%, rgba(255,255,255,0.24) 47%, transparent 64%);
+    transform: translateX(-60%);
     opacity: 0;
-    transition: transform 260ms ease, opacity 180ms ease;
+    transition: transform 300ms ease, opacity 200ms ease;
     pointer-events: none;
   }
 
   @media (hover: hover) {
     .premium-cta:hover {
-      transform: translateY(-1px) scale(1.01);
-      filter: saturate(1.03);
+      transform: translateY(-1.5px) scale(1.015);
+      filter: saturate(1.04);
     }
 
     .premium-cta:hover::after {
-      transform: translateX(32%);
+      transform: translateX(36%);
       opacity: 1;
     }
   }
 
+  /* Orange CTA - 주 행동 유도 */
   .premium-cta-primary {
-    border-color: #ff9848;
+    border-color: #f98c3a;
     color: #ffffff;
-    background-image: linear-gradient(180deg, #ff9a48 0%, #ff7a16 48%, #ea6400 100%);
+    background-image: linear-gradient(170deg, #ff9d4e 0%, #ff7a16 45%, #e86800 100%);
     box-shadow:
-      0 16px 32px rgba(255, 122, 22, 0.22),
-      0 6px 14px rgba(255, 122, 22, 0.14),
-      inset 0 1px 0 rgba(255,255,255,0.48),
-      inset 0 -2px 0 rgba(128, 48, 0, 0.12);
+      0 1px 0 0 rgba(255,255,255,0.52) inset,
+      0 -2px 0 0 rgba(120,44,0,0.14) inset,
+      0 4px 8px -2px rgba(255,122,22,0.32),
+      0 12px 24px -4px rgba(255,122,22,0.22),
+      0 0 0 1px rgba(255,105,10,0.18);
   }
 
   .premium-cta-primary:hover {
     box-shadow:
-      0 20px 36px rgba(255, 122, 22, 0.28),
-      0 8px 18px rgba(255, 122, 22, 0.16),
-      inset 0 1px 0 rgba(255,255,255,0.54),
-      inset 0 -2px 0 rgba(128, 48, 0, 0.12);
+      0 1px 0 0 rgba(255,255,255,0.58) inset,
+      0 -2px 0 0 rgba(120,44,0,0.14) inset,
+      0 6px 12px -2px rgba(255,122,22,0.38),
+      0 18px 32px -4px rgba(255,122,22,0.26),
+      0 0 0 1px rgba(255,105,10,0.20);
   }
 
+  /* Navy CTA - 보조 행동 */
   .premium-cta-secondary {
-    border-color: #213e7a;
+    border-color: #1a3470;
     color: #ffffff;
-    background-image: linear-gradient(180deg, #1f4a8f 0%, #14295f 52%, #0d1f49 100%);
+    background-image: linear-gradient(170deg, #1f4898 0%, #14295f 50%, #0c1d47 100%);
     box-shadow:
-      0 18px 34px rgba(20, 41, 95, 0.22),
-      0 7px 16px rgba(20, 41, 95, 0.14),
-      inset 0 1px 0 rgba(255,255,255,0.22),
-      inset 0 -2px 0 rgba(8, 18, 44, 0.18);
+      0 1px 0 0 rgba(255,255,255,0.24) inset,
+      0 -2px 0 0 rgba(6,14,36,0.22) inset,
+      0 4px 8px -2px rgba(20,41,95,0.28),
+      0 12px 24px -4px rgba(20,41,95,0.18),
+      0 0 0 1px rgba(14,28,70,0.16);
   }
 
   .premium-cta-secondary:hover {
     box-shadow:
-      0 22px 38px rgba(20, 41, 95, 0.26),
-      0 8px 18px rgba(20, 41, 95, 0.15),
-      inset 0 1px 0 rgba(255,255,255,0.24),
-      inset 0 -2px 0 rgba(8, 18, 44, 0.2);
+      0 1px 0 0 rgba(255,255,255,0.28) inset,
+      0 -2px 0 0 rgba(6,14,36,0.24) inset,
+      0 6px 12px -2px rgba(20,41,95,0.34),
+      0 18px 32px -4px rgba(20,41,95,0.22),
+      0 0 0 1px rgba(14,28,70,0.18);
   }
 
+  /* Muted CTA - 화이트 투명 */
   .premium-cta-muted {
-    border-color: rgba(20, 41, 95, 0.12);
+    border-color: rgba(20, 41, 95, 0.14);
     color: #14295F;
     background-image:
-      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,248,255,0.98) 100%),
-      radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 38%);
+      linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(243,247,255,0.98) 100%);
     box-shadow:
-      0 14px 28px rgba(20, 41, 95, 0.08),
-      0 5px 12px rgba(20, 41, 95, 0.05),
-      inset 0 1px 0 rgba(255,255,255,0.96);
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.06) inset,
+      0 2px 4px 0 rgba(20,41,95,0.05),
+      0 8px 18px -4px rgba(20,41,95,0.09),
+      0 0 0 1px rgba(20,41,95,0.04);
+  }
+
+  .premium-cta-muted:hover {
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.99) inset,
+      0 -1px 0 0 rgba(20,41,95,0.07) inset,
+      0 3px 6px 0 rgba(20,41,95,0.07),
+      0 12px 24px -4px rgba(20,41,95,0.11),
+      0 0 0 1px rgba(20,41,95,0.05);
+  }
+
+  /* Ghost CTA - 다크 배경 위 */
+  .premium-cta-ghost {
+    border-color: rgba(255,255,255,0.22);
+    color: #ffffff;
+    background-image: linear-gradient(160deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%);
+    backdrop-filter: blur(8px);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.18) inset,
+      0 -1px 0 0 rgba(0,0,0,0.14) inset,
+      0 4px 12px -2px rgba(0,0,0,0.18);
+  }
+
+  .premium-cta-ghost:hover {
+    border-color: rgba(255,255,255,0.32);
+    background-image: linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.10) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.24) inset,
+      0 -1px 0 0 rgba(0,0,0,0.16) inset,
+      0 6px 16px -2px rgba(0,0,0,0.22);
   }
 
   .premium-surface-button {
     @apply relative overflow-hidden rounded-[1.25rem] border transition-all duration-150 ease-out active:scale-[0.98];
-    border-color: rgba(20, 41, 95, 0.12);
+    border-color: rgba(20, 41, 95, 0.11);
     background-image:
-      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(246,249,255,0.98) 100%),
-      radial-gradient(circle at 14% 0%, rgba(255,255,255,0.88), transparent 34%);
+      linear-gradient(160deg, rgba(255,255,255,1) 0%, rgba(245,249,255,0.98) 100%);
     box-shadow:
-      0 18px 34px rgba(20, 41, 95, 0.10),
-      0 5px 14px rgba(20, 41, 95, 0.05),
-      inset 0 1px 0 rgba(255,255,255,0.95),
-      inset 0 -1px 0 rgba(20,41,95,0.04);
+      0 1px 0 0 rgba(255,255,255,1) inset,
+      0 -1px 0 0 rgba(20,41,95,0.05) inset,
+      0 2px 4px 0 rgba(20,41,95,0.04),
+      0 10px 22px -4px rgba(20,41,95,0.09),
+      0 20px 40px -8px rgba(20,41,95,0.06);
     will-change: transform, box-shadow;
     transform: translateZ(0);
   }
 
   @media (hover: hover) {
     .premium-surface-button:hover {
-      transform: translateY(-1px);
+      transform: translateY(-1.5px);
       box-shadow:
-        0 22px 40px rgba(20, 41, 95, 0.13),
-        0 8px 18px rgba(20, 41, 95, 0.06),
-        inset 0 1px 0 rgba(255,255,255,0.96),
-        inset 0 -1px 0 rgba(20,41,95,0.04);
+        0 1px 0 0 rgba(255,255,255,1) inset,
+        0 -1px 0 0 rgba(20,41,95,0.06) inset,
+        0 3px 6px 0 rgba(20,41,95,0.06),
+        0 14px 28px -4px rgba(20,41,95,0.12),
+        0 28px 48px -8px rgba(20,41,95,0.08);
     }
+  }
+
+  /* ───────────────────────────────────────────────
+     Section Background Utilities
+  ─────────────────────────────────────────────── */
+
+  /* 그라디언트 섹션 배경 */
+  .section-bg-light {
+    background: linear-gradient(180deg, #ffffff 0%, #f4f7ff 100%);
+  }
+
+  .section-bg-soft {
+    background: linear-gradient(180deg, #f4f7ff 0%, #eef2ff 60%, #f4f7ff 100%);
+  }
+
+  .section-bg-dark {
+    background: linear-gradient(145deg, #111d3f 0%, #14295f 50%, #0e1e4a 100%);
+  }
+
+  .section-bg-navy-mesh {
+    background-color: #0f1e4a;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(30,70,160,0.5) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(255,122,22,0.15) 0%, transparent 40%),
+      radial-gradient(ellipse at 60% 10%, rgba(50,90,180,0.3) 0%, transparent 40%);
+  }
+
+  /* ───────────────────────────────────────────────
+     Stat / Number Display
+  ─────────────────────────────────────────────── */
+
+  .stat-number {
+    font-family: "Pretendard Variable", Pretendard, sans-serif;
+    font-weight: 900;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.04em;
+    line-height: 1.0;
+  }
+
+  /* ───────────────────────────────────────────────
+     Eyebrow Label Badge
+  ─────────────────────────────────────────────── */
+
+  .eyebrow-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1;
+    border-color: rgba(255,122,22,0.28);
+    background-color: rgba(255,122,22,0.07);
+    color: #c96200;
+    font-size: 10.5px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .eyebrow-badge-light {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1;
+    border-color: rgba(255,165,80,0.30);
+    background-color: rgba(255,165,80,0.12);
+    color: #ffb273;
+    font-size: 10.5px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* ───────────────────────────────────────────────
+     Step Connector
+  ─────────────────────────────────────────────── */
+
+  .step-badge {
+    @apply inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-black;
+    background: linear-gradient(145deg, #1e4898, #14295f);
+    color: #ffffff;
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.18) inset,
+      0 3px 8px -1px rgba(20,41,95,0.32);
   }
 }
 
@@ -448,10 +603,10 @@
   border-radius: 1.35rem;
   border-color: rgba(20, 41, 95, 0.16);
   box-shadow:
-    0 18px 36px rgba(20, 41, 95, 0.11),
-    0 6px 14px rgba(20, 41, 95, 0.05),
-    inset 0 1px 0 rgba(255,255,255,0.98),
-    inset 0 -1px 0 rgba(20,41,95,0.04);
+    0 1px 0 0 rgba(255,255,255,0.98) inset,
+    0 -1px 0 0 rgba(20,41,95,0.04) inset,
+    0 4px 8px -2px rgba(20,41,95,0.08),
+    0 16px 32px -4px rgba(20,41,95,0.11);
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-header"] {
