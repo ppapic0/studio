@@ -325,10 +325,10 @@ function ExperienceDetailShell({
           <p className="mt-2 max-w-3xl break-keep text-sm font-bold leading-relaxed text-slate-600">{description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/#consult" className="inline-flex h-10 items-center justify-center rounded-full bg-[#FF7A16] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(255,122,22,0.25)]">
+          <Link href="/#consult" className="premium-cta premium-cta-primary h-10 rounded-full px-4 text-sm">
             {title}
           </Link>
-          <Link href="/go/login?placement=experience_top" className="inline-flex h-10 items-center justify-center rounded-full border border-[#14295F]/10 bg-white px-4 text-sm font-black text-[#14295F]">
+          <Link href="/go/login?placement=experience_top" className="premium-cta premium-cta-muted h-10 rounded-full px-4 text-sm">
             실제 로그인
           </Link>
         </div>
@@ -352,8 +352,8 @@ function DemoOverlay({
   children: ReactNode;
 }) {
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0E2148]/48 p-4 backdrop-blur-[3px]">
-      <div className="app-depth-card max-h-[86%] w-full overflow-hidden rounded-[1.75rem]">
+    <div className="absolute inset-0 z-30 flex animate-in fade-in-0 items-center justify-center bg-[#0E2148]/48 p-4 backdrop-blur-[3px] duration-200">
+      <div className="app-depth-card max-h-[86%] w-full animate-in zoom-in-95 slide-in-from-bottom-4 overflow-hidden rounded-[1.75rem] duration-300">
         <div className="bg-[linear-gradient(145deg,#14295F_0%,#1B3C82_100%)] px-5 py-4 text-white">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -364,7 +364,7 @@ function DemoOverlay({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/14 bg-white/10 text-white/82"
+              className="premium-surface-button flex h-9 w-9 items-center justify-center rounded-full border-white/14 bg-white/10 text-white/82"
             >
               <X className="h-4.5 w-4.5" />
             </button>
@@ -685,7 +685,7 @@ function StudentMobileDemo() {
               <button
                 type="button"
                 onClick={() => setOverlay('record')}
-                className="rounded-full bg-[#F4F7FD] px-3 py-1 text-[11px] font-black text-[#14295F] transition hover:bg-[#EBF1FF]"
+                className="premium-cta premium-cta-muted h-8 rounded-full px-3 text-[11px]"
               >
                 3월 5일 상세
               </button>
@@ -722,7 +722,7 @@ function StudentMobileDemo() {
                 type="button"
                 key={title}
                 onClick={() => target && setOverlay(target as 'report' | 'penalty')}
-                className="app-depth-card flex items-center justify-between px-4 py-4 text-left transition hover:-translate-y-0.5"
+                className="premium-surface-button app-depth-card flex items-center justify-between px-4 py-4 text-left"
               >
                 <div>
                   <p className="text-base font-black tracking-tight text-[#14295F]">{title}</p>
@@ -860,10 +860,10 @@ function ParentMobileDemo() {
                 ['학습 리포트 도착', false],
               ].map(([title, unread]) => (
                 <button
-                  type="button"
-                  key={title}
-                  onClick={() => setOverlay('alert')}
-                  className={cn('w-full rounded-2xl border px-4 py-4 text-left shadow-sm transition hover:-translate-y-0.5', unread ? 'border-[#FFB46A] bg-[#FFF9F3]' : 'border-[#14295F]/8 bg-[#F8FBFF]')}
+                type="button"
+                key={title}
+                onClick={() => setOverlay('alert')}
+                  className={cn('premium-surface-button w-full px-4 py-4 text-left shadow-sm', unread ? 'border-[#FFB46A] bg-[#FFF9F3]' : 'border-[#14295F]/8 bg-[#F8FBFF]')}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-black text-[#14295F]">{title}</p>
@@ -882,7 +882,7 @@ function ParentMobileDemo() {
               <button
                 type="button"
                 onClick={() => setOverlay('calendar')}
-                className="rounded-full bg-[#F4F7FD] px-3 py-2 text-[11px] font-black text-[#14295F] transition hover:bg-[#EBF1FF]"
+                className="premium-cta premium-cta-muted h-9 rounded-full px-3 text-[11px]"
               >
                 2026년 3월
               </button>
@@ -909,7 +909,7 @@ function ParentMobileDemo() {
               <button
                 type="button"
                 onClick={() => setOverlay('weekly')}
-                className="rounded-2xl bg-[#14295F] px-4 py-4 text-left text-white transition hover:-translate-y-0.5"
+                className="premium-surface-button rounded-2xl bg-[#14295F] px-4 py-4 text-left text-white"
               >
                 <p className="text-[10px] font-black tracking-[0.16em] text-white/62">WEEKLY DETAIL</p>
                 <div className="mt-3 h-24 rounded-2xl bg-white/8 p-3">
@@ -933,7 +933,7 @@ function ParentMobileDemo() {
           >
             <p className="break-keep text-[13px] font-black leading-relaxed text-[#14295F]/72">센터 수납 요청건을 비대면으로 결제할 수 있어요.</p>
             <div className="mt-4 space-y-3">
-              <button type="button" onClick={() => setOverlay('billing')} className="w-full rounded-2xl border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4 text-left transition hover:-translate-y-0.5">
+              <button type="button" onClick={() => setOverlay('billing')} className="premium-surface-button w-full border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4 text-left">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black text-[#14295F]/55">독서실 수납</p>
@@ -942,7 +942,7 @@ function ParentMobileDemo() {
                   <div className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">완납</div>
                 </div>
               </button>
-              <button type="button" onClick={() => setOverlay('billing')} className="w-full rounded-2xl border border-[#14295F]/8 bg-[#FFF9F3] px-4 py-4 text-left transition hover:-translate-y-0.5">
+              <button type="button" onClick={() => setOverlay('billing')} className="premium-surface-button w-full border-[#14295F]/8 bg-[#FFF9F3] px-4 py-4 text-left">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black text-[#14295F]/55">학원 수납</p>

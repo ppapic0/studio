@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import type { MarketingContent } from '@/lib/marketing-content';
 
 import { ConsultForm } from './consult-form';
@@ -38,22 +36,22 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
               <div className="flex flex-wrap gap-3">
                 <a
                   href="#consult-form"
-                  className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white transition hover:bg-[#f06905]"
+                  className="premium-cta premium-cta-primary h-12 px-6 text-sm"
                 >
                   상담 폼 작성하기
                 </a>
-                <Link
+                <a
                   href="/go/login?placement=consult_section"
-                  className="inline-flex h-12 items-center justify-center rounded-xl border border-[#14295F]/18 bg-white px-6 text-sm font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
+                  className="premium-cta premium-cta-muted h-12 px-6 text-sm"
                 >
                   웹앱 로그인
-                </Link>
-                <Link
+                </a>
+                <a
                   href="/go/experience?placement=consult_section"
-                  className="inline-flex h-12 items-center justify-center rounded-xl border border-[#14295F]/25 bg-white px-6 text-sm font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
+                  className="premium-cta premium-cta-secondary h-12 px-6 text-sm"
                 >
                   웹앱 체험하기
-                </Link>
+                </a>
               </div>
             </div>
           </div>

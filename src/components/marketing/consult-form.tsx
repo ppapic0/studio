@@ -119,7 +119,7 @@ export function ConsultForm() {
       <button
         type="submit"
         disabled={isDisabled}
-        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#FF7A16] px-4 text-sm font-black text-white transition enabled:hover:bg-[#f06905] disabled:cursor-not-allowed disabled:bg-[#FFB273]"
+        className="premium-cta premium-cta-primary mt-5 h-11 w-full gap-2 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
           <>

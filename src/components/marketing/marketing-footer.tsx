@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
@@ -21,22 +20,22 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
           <div className="mt-5 flex flex-wrap gap-2">
             <a
               href="#consult"
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-[#FF7A16] px-4 text-xs font-black text-white transition hover:bg-[#f06905]"
+              className="premium-cta premium-cta-primary h-10 px-4 text-xs"
             >
               상담 문의
             </a>
-            <Link
+            <a
               href="/go/login?placement=footer"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#14295F]/18 bg-white px-4 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
+              className="premium-cta premium-cta-muted h-10 px-4 text-xs"
             >
               웹앱 로그인
-            </Link>
-            <Link
+            </a>
+            <a
               href="/go/experience?placement=footer"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#14295F]/25 px-4 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
+              className="premium-cta premium-cta-secondary h-10 px-4 text-xs"
             >
               웹앱 체험
-            </Link>
+            </a>
           </div>
         </div>
 
