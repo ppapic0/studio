@@ -1,4 +1,100 @@
-﻿@tailwind base;
+@font-face {
+  font-family: "TrackBody";
+  src: url("/fonts/custom/GangwonEduAll-Light.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackBody";
+  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackBody";
+  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackBody";
+  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackBody";
+  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackBody";
+  src: url("/fonts/custom/GangwonEduAll-Bold.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackDisplay";
+  src: url("/fonts/custom/SB-Aggro-L.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackDisplay";
+  src: url("/fonts/custom/SB-Aggro-M.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackDisplay";
+  src: url("/fonts/custom/SB-Aggro-M.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackDisplay";
+  src: url("/fonts/custom/SB-Aggro-B.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackDisplay";
+  src: url("/fonts/custom/SB-Aggro-B.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TrackDisplay";
+  src: url("/fonts/custom/SB-Aggro-B.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -85,61 +181,61 @@
   body {
     @apply bg-background text-foreground font-body antialiased transition-colors duration-300;
     touch-action: manipulation;
-    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-weight: 400;
     letter-spacing: 0;
-    line-height: 1.7;
+    line-height: 1.82;
   }
 
   .font-body {
-    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     letter-spacing: 0;
-    line-height: 1.7;
+    line-height: 1.82;
   }
 
   .font-display {
-    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "TrackDisplay", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     font-weight: 800;
-    letter-spacing: -0.024em;
+    letter-spacing: -0.01em;
     line-height: 1.14;
   }
 
   .font-brand {
-    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.03em;
+    font-family: "TrackDisplay", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.014em;
     line-height: 1.08;
   }
 
   .font-numeric {
-    font-family: Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
-    font-weight: 800;
+    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.022em;
-    line-height: 1;
+    letter-spacing: -0.01em;
+    line-height: 1.08;
   }
 
   .tabular-nums {
-    font-family: Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
-    font-weight: 800;
+    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.006em;
   }
 
   .dashboard-number {
-    font-family: Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
-    font-weight: 800;
+    font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.022em;
-    line-height: 1.04;
+    letter-spacing: -0.008em;
+    line-height: 1.08;
   }
 
   button,
@@ -411,19 +507,19 @@
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-title"] {
-  font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   color: #14295f;
-  font-size: clamp(1rem, 4.2vw, 1.2rem);
-  font-weight: 800;
-  line-height: 1.24;
-  letter-spacing: -0.012em;
+  font-size: clamp(1rem, 4.2vw, 1.18rem);
+  font-weight: 700;
+  line-height: 1.34;
+  letter-spacing: 0;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-description"] {
   color: #55657d;
-  font-size: 0.79rem;
-  font-weight: 600;
-  line-height: 1.56;
+  font-size: 0.83rem;
+  font-weight: 400;
+  line-height: 1.7;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main .text-slate-400 {
@@ -437,7 +533,7 @@
 
 .dashboard-mobile-shell .dashboard-mobile-main .dashboard-number {
   color: inherit;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.008em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
@@ -520,4 +616,3 @@
     padding-bottom: 5.15rem;
   }
 }
-

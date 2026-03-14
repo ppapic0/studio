@@ -39,7 +39,7 @@ const CardTitle = React.forwardRef<
     ref={ref}
     data-slot="card-title"
     className={cn(
-      "text-2xl font-body font-extrabold leading-[1.18] tracking-[-0.018em] text-[#14295f]",
+      "text-2xl font-body font-bold leading-[1.28] tracking-[0] text-[#14295f]",
       className
     )}
     {...props}

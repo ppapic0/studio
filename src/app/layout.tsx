@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import "pretendard/dist/web/static/pretendard.css";
 
 import { FirebaseErrorListener } from "@/components/FirebaseErrorListener";
 import { AuthGuard } from "@/components/auth/auth-guard";
