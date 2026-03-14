@@ -56,12 +56,12 @@ export default function DashboardLayout({
         className={cn(
           'flex flex-col transition-all duration-700 relative z-10',
           isMobileView
-            ? 'w-full max-w-[430px] h-[94vh] max-h-[932px] overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-4'
+            ? 'dashboard-mobile-shell w-full max-w-[430px] overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-4'
             : 'w-full min-h-screen'
         )}
       >
         {isMobileView && (
-          <div className="pointer-events-none absolute left-1/2 top-0 z-30 h-6 w-32 -translate-x-1/2 rounded-b-[1.2rem] bg-[#0f224f] shadow-[0_5px_14px_rgba(0,0,0,0.32)]" />
+          <div className="dashboard-mobile-notch pointer-events-none absolute left-1/2 top-0 z-30 h-6 w-32 -translate-x-1/2 rounded-b-[1.2rem] bg-[#0f224f] shadow-[0_5px_14px_rgba(0,0,0,0.32)]" />
         )}
 
         <DashboardHeader />
@@ -69,7 +69,7 @@ export default function DashboardLayout({
         <main
           className={cn(
             'flex-1 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10',
-            isMobileView ? 'p-4 px-4 pb-24 pt-5' : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
+            isMobileView ? 'dashboard-mobile-main p-4 px-4 pb-24 pt-5' : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
           )}
         >
           {children}

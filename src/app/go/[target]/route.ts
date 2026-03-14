@@ -32,6 +32,8 @@ export async function GET(
   const mode = searchParams.get('mode');
   const view = searchParams.get('view');
   const source = searchParams.get('source') || 'marketing';
+  const visitorId = request.cookies.get('track_marketing_vid')?.value || null;
+  const sessionId = request.cookies.get('track_marketing_sid')?.value || null;
 
   const destination = new URL(targetPath, request.url);
   for (const [key, value] of searchParams.entries()) {
@@ -42,12 +44,15 @@ export async function GET(
   try {
     const centerId = await resolveMarketingCenterId();
     const payload = {
+      eventType: 'entry_click',
       target,
       targetPath,
       placement,
       source,
       mode: mode || null,
       view: view || null,
+      visitorId,
+      sessionId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       userAgent: request.headers.get('user-agent') || null,
       referer: request.headers.get('referer') || null,

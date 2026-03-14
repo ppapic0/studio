@@ -1,19 +1,28 @@
-﻿import { AuthFormWrapper } from '@/components/auth/auth-form-wrapper';
+import { AuthFormWrapper } from '@/components/auth/auth-form-wrapper';
 import { LoginForm } from '@/components/auth/login-form';
+import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { TrackLogo } from '@/components/ui/track-logo';
 
 export default function LoginPage() {
   return (
-    <AuthFormWrapper
-      title={
-        <div className="flex flex-col items-center gap-5">
-          <TrackLogo variant="mark" className="h-28 w-auto object-contain animate-in fade-in slide-in-from-top-4 duration-700" />
-          <span className="text-lg font-black tracking-tight text-[#14295F]">트랙 학습센터에 와주셔서 감사합니다.</span>
-        </div>
-      }
-      subtitle=""
-    >
-      <LoginForm />
-    </AuthFormWrapper>
+    <>
+      <MarketingPageTracker pageType="login" placement="login_page" />
+      <AuthFormWrapper
+        title={
+          <div className="flex flex-col items-center gap-5">
+            <TrackLogo
+              variant="mark"
+              className="h-28 w-auto object-contain animate-in fade-in slide-in-from-top-4 duration-700"
+            />
+            <span className="text-lg font-black tracking-tight text-[#14295F]">
+              트랙 학습센터에 와주셔서 감사합니다.
+            </span>
+          </div>
+        }
+        subtitle=""
+      >
+        <LoginForm />
+      </AuthFormWrapper>
+    </>
   );
 }

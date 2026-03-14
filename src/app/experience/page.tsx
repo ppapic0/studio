@@ -25,6 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { cn } from '@/lib/utils';
 
 type DemoMode = 'student' | 'parent';
@@ -159,9 +160,9 @@ function DemoPanel({
 
 function PhoneFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[386px] rounded-[2.7rem] border-[10px] border-[#132B63] bg-[linear-gradient(180deg,#eff4ff_0%,#ffffff_100%)] p-3 shadow-[0_34px_90px_rgba(20,41,95,0.24)]">
+    <div className="experience-phone-shell mx-auto w-full max-w-[386px] rounded-[2.7rem] border-[10px] border-[#132B63] bg-[linear-gradient(180deg,#eff4ff_0%,#ffffff_100%)] p-3 shadow-[0_34px_90px_rgba(20,41,95,0.24)]">
       <div className="relative overflow-hidden rounded-[2rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFDFB_0%,#F7FAFF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-        <div className="pointer-events-none absolute left-1/2 top-0 z-20 h-6 w-32 -translate-x-1/2 rounded-b-[1rem] bg-[#10224B]" />
+        <div className="experience-phone-notch pointer-events-none absolute left-1/2 top-0 z-20 h-6 w-32 -translate-x-1/2 rounded-b-[1rem] bg-[#10224B]" />
         {children}
       </div>
     </div>
@@ -327,7 +328,7 @@ function ExperienceDetailShell({
           <Link href="/#consult" className="inline-flex h-10 items-center justify-center rounded-full bg-[#FF7A16] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(255,122,22,0.25)]">
             {title}
           </Link>
-          <Link href="/login" className="inline-flex h-10 items-center justify-center rounded-full border border-[#14295F]/10 bg-white px-4 text-sm font-black text-[#14295F]">
+          <Link href="/go/login?placement=experience_top" className="inline-flex h-10 items-center justify-center rounded-full border border-[#14295F]/10 bg-white px-4 text-sm font-black text-[#14295F]">
             실제 로그인
           </Link>
         </div>
@@ -1074,13 +1075,14 @@ export default function ExperiencePage() {
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#F5F8FF_0%,#FFFFFF_100%)] text-[#14295F]">
+      <MarketingPageTracker pageType="experience" placement="experience_page" />
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-4 py-2 text-sm font-black text-[#14295F] shadow-sm">
             <ChevronLeft className="h-4 w-4" />
             홍보 페이지로 돌아가기
           </Link>
-          <Link href="/login" className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-sm font-black text-white shadow-[0_12px_24px_rgba(255,122,22,0.28)]">
+          <Link href="/go/login?placement=experience_header" className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-sm font-black text-white shadow-[0_12px_24px_rgba(255,122,22,0.28)]">
             실제 로그인
           </Link>
         </div>
@@ -1213,7 +1215,7 @@ export default function ExperiencePage() {
               <p className="mt-3 max-w-2xl break-keep text-sm font-bold leading-relaxed text-white/78">실제 계정으로 로그인하면 학생별 계획, 출결, 리포트, 알림, 수납, 상담 이력이 센터 데이터와 그대로 연결됩니다.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/login" className="inline-flex h-11 items-center justify-center rounded-full bg-[#FF7A16] px-5 text-sm font-black text-white shadow-[0_12px_24px_rgba(255,122,22,0.28)]">실제 로그인</Link>
+              <Link href="/go/login?placement=experience_detail" className="inline-flex h-11 items-center justify-center rounded-full bg-[#FF7A16] px-5 text-sm font-black text-white shadow-[0_12px_24px_rgba(255,122,22,0.28)]">실제 로그인</Link>
               <Link href="/#consult" className="inline-flex h-11 items-center justify-center rounded-full border border-white/18 px-5 text-sm font-black text-white">상담 문의</Link>
             </div>
           </div>

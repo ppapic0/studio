@@ -13,10 +13,14 @@ import { cn } from '@/lib/utils';
 
 type WebsiteEntryEvent = {
   id: string;
-  target: 'login' | 'experience';
+  eventType?: 'entry_click' | 'page_view' | 'login_success';
+  pageType?: 'landing' | 'experience' | 'login';
+  target?: 'login' | 'experience';
   placement?: string | null;
   mode?: string | null;
   view?: string | null;
+  sessionId?: string | null;
+  visitorId?: string | null;
   createdAt?: unknown;
 };
 
@@ -78,11 +82,34 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
   );
 
   const summary = useMemo(() => {
-    const loginCount = events.filter((event) => event.target === 'login').length;
-    const experienceCount = events.filter((event) => event.target === 'experience').length;
+    const pageViewEvents = events.filter((event) => event.eventType === 'page_view');
+    const landingViews = pageViewEvents.filter((event) => event.pageType === 'landing');
+    const experienceViews = pageViewEvents.filter((event) => event.pageType === 'experience');
+    const loginClickEvents = events.filter(
+      (event) => event.eventType === 'entry_click' && event.target === 'login',
+    );
+    const experienceClickEvents = events.filter(
+      (event) => event.eventType === 'entry_click' && event.target === 'experience',
+    );
+    const loginSuccessEvents = events.filter((event) => event.eventType === 'login_success');
     const placementCount = new Map<string, number>();
+    const loginClickSessions = new Set(
+      loginClickEvents
+        .map((event) => event.sessionId)
+        .filter((sessionId): sessionId is string => !!sessionId),
+    );
+    const loginSuccessSessions = new Set(
+      loginSuccessEvents
+        .map((event) => event.sessionId)
+        .filter((sessionId): sessionId is string => !!sessionId),
+    );
+    const convertedSessions = Array.from(loginClickSessions).filter((sessionId) =>
+      loginSuccessSessions.has(sessionId),
+    ).length;
 
-    events.forEach((event) => {
+    events
+      .filter((event) => event.eventType === 'entry_click')
+      .forEach((event) => {
       const label = placementLabel(event.placement);
       placementCount.set(label, (placementCount.get(label) || 0) + 1);
     });
@@ -93,9 +120,17 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
       .slice(0, 5);
 
     return {
-      total: events.length,
-      loginCount,
-      experienceCount,
+      totalEvents: events.length,
+      landingViews: landingViews.length,
+      experienceViews: experienceViews.length,
+      loginClickCount: loginClickEvents.length,
+      experienceClickCount: experienceClickEvents.length,
+      loginSuccessCount: loginSuccessEvents.length,
+      convertedSessions,
+      conversionRate:
+        loginClickSessions.size > 0
+          ? Math.round((convertedSessions / loginClickSessions.size) * 100)
+          : 0,
       latestEvent: events[0] || null,
       topPlacements,
     };
@@ -125,8 +160,11 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
       <CardContent className="space-y-4 p-6 pt-2">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-[#14295F]/10 bg-[#F7FAFF] p-4 shadow-sm">
-            <p className="text-xs font-black tracking-[0.12em] text-[#14295F]/50">전체 입구 클릭</p>
-            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.total}</p>
+            <p className="text-xs font-black tracking-[0.12em] text-[#14295F]/50">랜딩 방문수</p>
+            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.landingViews}</p>
+            <p className="mt-2 text-[11px] font-black text-[#14295F]/45">
+              체험 페이지 방문 {summary.experienceViews}회
+            </p>
           </div>
 
           <div className="rounded-2xl border border-[#FF7A16]/15 bg-[#FFF5EC] p-4 shadow-sm">
@@ -134,15 +172,21 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
               <LogIn className="h-3.5 w-3.5" />
               웹앱 로그인
             </p>
-            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.loginCount}</p>
+            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.loginClickCount}</p>
+            <p className="mt-2 text-[11px] font-black text-[#B85A00]/72">
+              실제 로그인 완료 {summary.loginSuccessCount}회
+            </p>
           </div>
 
           <div className="rounded-2xl border border-[#14295F]/10 bg-white p-4 shadow-sm">
             <p className="flex items-center gap-2 text-xs font-black tracking-[0.12em] text-[#14295F]/55">
               <Smartphone className="h-3.5 w-3.5 text-[#FF7A16]" />
-              웹앱 체험
+              로그인 전환율
             </p>
-            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.experienceCount}</p>
+            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.conversionRate}%</p>
+            <p className="mt-2 text-[11px] font-black text-[#14295F]/48">
+              체험 클릭 {summary.experienceClickCount}회
+            </p>
           </div>
         </div>
 
@@ -154,13 +198,25 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
                 <p>
                   유형:{' '}
                   <span className="font-black text-[#14295F]">
-                    {summary.latestEvent.target === 'login' ? '웹앱 로그인' : '웹앱 체험'}
+                    {summary.latestEvent.eventType === 'page_view'
+                      ? `${summary.latestEvent.pageType === 'landing' ? '랜딩' : summary.latestEvent.pageType === 'experience' ? '체험' : '로그인'} 방문`
+                      : summary.latestEvent.eventType === 'login_success'
+                        ? '로그인 완료'
+                        : summary.latestEvent.target === 'login'
+                          ? '웹앱 로그인'
+                          : '웹앱 체험'}
                   </span>
                 </p>
                 <p>
                   위치:{' '}
                   <span className="font-black text-[#14295F]">
-                    {placementLabel(summary.latestEvent.placement)}
+                    {summary.latestEvent.eventType === 'page_view'
+                      ? summary.latestEvent.pageType === 'landing'
+                        ? '메인 랜딩'
+                        : summary.latestEvent.pageType === 'experience'
+                          ? '체험 페이지'
+                          : '로그인 페이지'
+                      : placementLabel(summary.latestEvent.placement)}
                   </span>
                 </p>
                 <p>
@@ -200,7 +256,7 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
                           'h-2.5 rounded-full bg-[linear-gradient(90deg,#FFB16D_0%,#FF7A16_100%)]',
                         )}
                         style={{
-                          width: `${summary.total > 0 ? Math.max(12, (item.count / summary.total) * 100) : 0}%`,
+                          width: `${summary.totalEvents > 0 ? Math.max(12, (item.count / summary.totalEvents) * 100) : 0}%`,
                         }}
                       />
                     </div>

@@ -19,6 +19,7 @@ import { useAuth } from '@/firebase';
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
 import { Loader2, Mail } from 'lucide-react';
 import {
   Dialog,
@@ -72,6 +73,14 @@ export function LoginForm() {
     try {
       const trimmedEmail = values.email.trim();
       await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
+      await trackMarketingClientEvent({
+        eventType: 'login_success',
+        pageType: 'login',
+        target: 'login',
+        extra: {
+          emailDomain: trimmedEmail.includes('@') ? trimmedEmail.split('@')[1] : null,
+        },
+      });
       router.replace('/dashboard');
     } catch (error: any) {
       console.error('Login failed:', error);
