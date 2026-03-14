@@ -88,24 +88,29 @@
     font-feature-settings: "palt" 1, "liga" 1;
     text-rendering: optimizeLegibility;
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-weight: 500;
   }
 
   .font-body {
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    letter-spacing: -0.014em;
-    line-height: 1.42;
+    letter-spacing: -0.012em;
+    line-height: 1.48;
   }
 
   .font-display {
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    letter-spacing: -0.028em;
-    line-height: 1.12;
+    font-weight: 820;
+    letter-spacing: -0.024em;
+    line-height: 1.14;
   }
 
   .font-brand {
     font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    letter-spacing: -0.034em;
-    line-height: 1.05;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
   }
 
   .font-numeric {
@@ -149,18 +154,33 @@
   select {
     font: inherit;
   }
+
+  .text-slate-300 {
+    color: #8694a8 !important;
+  }
+
+  .text-slate-400 {
+    color: #6c7a91 !important;
+  }
+
+  .text-slate-500,
+  .text-muted-foreground {
+    color: #57667d !important;
+  }
+
+  .text-slate-600 {
+    color: #475569 !important;
+  }
 }
 
 @layer components {
   .premium-card {
     @apply border bg-card text-card-foreground transition-all duration-300 ease-out active:scale-[0.99];
-    border-color: rgba(20, 41, 95, 0.16);
-    background-image:
-      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(247,250,255,0.99) 100%),
-      radial-gradient(circle at top left, rgba(255,255,255,0.7), transparent 30%);
+    border-color: rgba(20, 41, 95, 0.18);
+    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,255,0.995) 100%);
     box-shadow:
-      0 22px 48px rgba(20, 41, 95, 0.12),
-      0 8px 18px rgba(20, 41, 95, 0.05),
+      0 18px 38px rgba(20, 41, 95, 0.10),
+      0 6px 14px rgba(20, 41, 95, 0.05),
       inset 0 1px 0 rgba(255, 255, 255, 0.98),
       inset 0 -1px 0 rgba(20, 41, 95, 0.04);
   }
@@ -178,12 +198,10 @@
   .marketing-card {
     @apply rounded-[1.6rem] border bg-white;
     border-color: rgba(20, 41, 95, 0.18);
-    background-image:
-      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(249,251,255,0.995) 100%),
-      radial-gradient(circle at 12% 0%, rgba(255,255,255,0.66), transparent 32%);
+    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(249,251,255,0.995) 100%);
     box-shadow:
-      0 24px 54px rgba(20, 41, 95, 0.11),
-      0 8px 18px rgba(20, 41, 95, 0.05),
+      0 18px 40px rgba(20, 41, 95, 0.10),
+      0 6px 14px rgba(20, 41, 95, 0.05),
       inset 0 1px 0 rgba(255, 255, 255, 0.96),
       inset 0 -1px 0 rgba(20, 41, 95, 0.04);
   }
@@ -192,12 +210,10 @@
     @apply rounded-[1.6rem] border;
     background-color: #f8faff;
     border-color: rgba(20, 41, 95, 0.18);
-    background-image:
-      linear-gradient(180deg, rgba(248,250,255,1) 0%, rgba(255,255,255,0.985) 100%),
-      radial-gradient(circle at 0% 0%, rgba(255,255,255,0.68), transparent 34%);
+    background-image: linear-gradient(180deg, rgba(248,250,255,1) 0%, rgba(255,255,255,0.985) 100%);
     box-shadow:
-      0 22px 48px rgba(20, 41, 95, 0.11),
-      0 8px 18px rgba(20, 41, 95, 0.05),
+      0 18px 40px rgba(20, 41, 95, 0.10),
+      0 6px 14px rgba(20, 41, 95, 0.05),
       inset 0 0 0 1px rgba(255, 255, 255, 0.86);
   }
 
@@ -205,23 +221,19 @@
     @apply rounded-[1.6rem] border;
     background-color: #fff5ec;
     border-color: rgba(255, 122, 22, 0.28);
-    background-image:
-      linear-gradient(180deg, rgba(255,245,236,1) 0%, rgba(255,255,255,0.99) 100%),
-      radial-gradient(circle at 0% 0%, rgba(255,255,255,0.62), transparent 32%);
+    background-image: linear-gradient(180deg, rgba(255,245,236,1) 0%, rgba(255,255,255,0.99) 100%);
     box-shadow:
-      0 22px 48px rgba(20, 41, 95, 0.11),
-      0 8px 18px rgba(20, 41, 95, 0.05),
+      0 18px 40px rgba(20, 41, 95, 0.10),
+      0 6px 14px rgba(20, 41, 95, 0.05),
       inset 0 0 0 1px rgba(255, 122, 22, 0.16);
   }
 
   .app-depth-card {
     @apply rounded-[1.5rem] border bg-white;
     border-color: rgba(20, 41, 95, 0.18);
-    background-image:
-      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(247,250,255,0.99) 100%),
-      radial-gradient(circle at top left, rgba(255,255,255,0.64), transparent 34%);
+    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(247,250,255,0.99) 100%);
     box-shadow:
-      0 20px 44px rgba(20, 41, 95, 0.12),
+      0 16px 32px rgba(20, 41, 95, 0.10),
       0 6px 16px rgba(20, 41, 95, 0.05),
       inset 0 1px 0 rgba(255,255,255,0.98),
       inset 0 -1px 0 rgba(20,41,95,0.04);
@@ -230,11 +242,9 @@
   .app-depth-card-warm {
     @apply rounded-[1.5rem] border;
     border-color: rgba(255, 122, 22, 0.24);
-    background-image:
-      linear-gradient(180deg, rgba(255,247,239,1) 0%, rgba(255,255,255,0.99) 100%),
-      radial-gradient(circle at top left, rgba(255,255,255,0.6), transparent 34%);
+    background-image: linear-gradient(180deg, rgba(255,247,239,1) 0%, rgba(255,255,255,0.99) 100%);
     box-shadow:
-      0 20px 44px rgba(20, 41, 95, 0.12),
+      0 16px 32px rgba(20, 41, 95, 0.10),
       0 6px 16px rgba(20, 41, 95, 0.05),
       inset 0 1px 0 rgba(255,255,255,0.98),
       inset 0 -1px 0 rgba(255,122,22,0.06);
