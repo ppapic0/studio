@@ -443,6 +443,17 @@ export default function StudyHistoryPage() {
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const isToday = selectedDateForPlan ? isSameDay(selectedDateForPlan, new Date()) : false;
+  const tierHeroGradient = useMemo(() => {
+    const tierTone = currentTier?.bg ?? '';
+    if (tierTone.includes('cyan')) return 'linear-gradient(145deg, #1A5CCF 0%, #143F9A 45%, #0B2358 100%)';
+    if (tierTone.includes('rose')) return 'linear-gradient(145deg, #E55185 0%, #B43663 45%, #611C40 100%)';
+    if (tierTone.includes('purple')) return 'linear-gradient(145deg, #7B3FC4 0%, #5A2F98 45%, #2E1952 100%)';
+    if (tierTone.includes('blue')) return 'linear-gradient(145deg, #2D61D8 0%, #2047A3 45%, #102557 100%)';
+    if (tierTone.includes('emerald')) return 'linear-gradient(145deg, #14A76D 0%, #0E7E54 45%, #0A4B33 100%)';
+    if (tierTone.includes('yellow')) return 'linear-gradient(145deg, #D79B1B 0%, #A77315 45%, #5E410E 100%)';
+    if (tierTone.includes('slate')) return 'linear-gradient(145deg, #607287 0%, #475A72 45%, #24374B 100%)';
+    return 'linear-gradient(145deg, #E56817 0%, #BE4D11 45%, #672D0E 100%)';
+  }, [currentTier?.bg]);
 
   if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
@@ -461,24 +472,26 @@ export default function StudyHistoryPage() {
       </header>
 
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
-        <Card className={cn(
-          "md:col-span-2 border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 text-white",
-          "bg-gradient-to-br", currentTier.gradient
-        )}>
-          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+        <Card
+          className={cn(
+            "md:col-span-2 tier-hero-card border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 !text-white"
+          )}
+          style={{ backgroundImage: tierHeroGradient }}
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
             {currentTier.name === '챌린저' ? <Crown className="h-48 w-48" /> : <Trophy className="h-48 w-48" />}
           </div>
           <div className="relative z-10">
             <div className="flex justify-between items-center mb-10">
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60">Monthly Analytics</span>
-                <Badge className="w-fit bg-white/20 text-white border-none font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-85">Monthly Analytics</span>
+                <Badge className="w-fit bg-white/24 text-white border border-white/20 font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
               </div>
-              <Badge className="bg-white/10 text-white border-none font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} TIER</Badge>
+              <Badge className="bg-white/22 text-white border border-white/20 font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} TIER</Badge>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
-              <span className="text-xl font-bold opacity-40 uppercase ml-2">Total Time</span>
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none drop-shadow-[0_2px_12px_rgba(5,15,40,0.45)]", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
+              <span className="text-xl font-bold opacity-80 uppercase ml-2">Total Time</span>
             </div>
           </div>
         </Card>
