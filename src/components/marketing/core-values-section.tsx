@@ -13,7 +13,7 @@ export function CoreValuesSection({ valueCards }: CoreValuesSectionProps) {
         <SectionHeading
           eyebrow="Core Value"
           title="한눈에 보이는 트랙의 차별점"
-          description="관리형 스터디카페 우선 운영, 선택형 입시학원, 데이터 기반 관리. 트랙은 구조가 다릅니다."
+          description="관리형 스터디센터 중심. 수능 국어 수업 별도 선택. 학부모 앱 실시간 확인. 데이터 기반 관리."
         />
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -24,7 +24,7 @@ export function CoreValuesSection({ valueCards }: CoreValuesSectionProps) {
             >
               <div className="h-1.5 w-12 rounded-full bg-[#FF7A16] transition group-hover:w-16" />
               <h3 className="font-brand mt-4 break-keep text-2xl font-bold text-[#14295F]">{card.title}</h3>
-              <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-slate-600">{card.description}</p>
+              <p className="mt-3 break-keep text-sm font-semibold leading-[1.72] text-slate-600">{card.description}</p>
             </article>
           ))}
         </div>

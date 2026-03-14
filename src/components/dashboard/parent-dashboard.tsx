@@ -112,7 +112,7 @@ function toHm(minutes: number) {
   const m = minutes % 60;
   if (h === 0) return `${m}분`;
   if (m === 0) return `${h}시간`;
-  return `${h}시간 ${m}분`;
+  return `${h}시간\u00A0${m}분`;
 }
 
 function formatMinutes(minutes: number) {

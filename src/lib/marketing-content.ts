@@ -131,7 +131,7 @@ export const marketingContent: MarketingContent = {
     slogan: '학생의 성장 궤적을 함께 그립니다',
     heroTitle: '트랙은 실적으로 증명합니다',
     heroDescription:
-      '관리형 스터디센터를 중심으로 학습 루틴을 세우고, 필요할 때 수능 국어 수업을 별도로 선택할 수 있습니다. 재학생과 N수생 모두를 위한 구조로, 학생의 현재를 데이터로 확인하고 다음 전략까지 설계합니다.',
+      '관리형 스터디센터 중심 운영. 출입 기록 · 공부시간 · 실행 데이터 확인. 수능 국어 수업은 별도 선택. 재학생 · N수생 모두 등록 가능.',
     logoFull: '/track-logo-full.svg',
     logoMark: '/track-logo-mark.svg',
     heroBackground: '',
@@ -246,7 +246,7 @@ export const marketingContent: MarketingContent = {
   studyCafe: {
     heading: '관리형 스터디센터가 중심입니다',
     description:
-      '트랙은 예쁜 공간보다 학습 루틴을 먼저 설계하는 관리형 스터디센터입니다. 출입 기록, 공부시간, 실행 데이터가 남고, 필요할 때 수능 국어 수업을 별도로 선택할 수 있습니다. 재학생과 N수생 모두 등록 가능합니다.',
+      '관리형 스터디센터 중심 운영. 입실 기록 · 공부시간 · 실행 데이터 확인. 수능 국어 수업은 별도 선택. 재학생 · N수생 모두 등록 가능합니다.',
     features: [
       {
         title: '학습 루틴 완성 중심',
@@ -283,7 +283,7 @@ export const marketingContent: MarketingContent = {
   appSystem: {
     heading: '학생을 놓치지 않는 전용 웹앱',
     description:
-      '트랙의 웹앱은 기술 과시가 아니라 관리 품질을 위한 시스템입니다. 학생, 학부모, 관리자 모두가 같은 흐름을 보며 빠르게 대응할 수 있도록 설계했습니다.',
+      '학생 · 학부모 · 관리자 모두가 같은 흐름을 봅니다. 기술보다 관리 품질을 위해 설계한 전용 웹앱입니다.',
     modes: [
       {
         mode: '학부모 모드',
@@ -334,7 +334,7 @@ export const marketingContent: MarketingContent = {
   lpSystem: {
     heading: 'LP 학습 계획 시스템',
     description:
-      '학생이 계획을 세우고 실행을 체크하면, 원장이 피드백하고 다음 주 계획에 반영하는 구조입니다. 막연한 공부를 구체적인 행동으로 바꾸는 트랙의 핵심 루프입니다.',
+      '계획 · 실행 · 체크 · 피드백 · 개선. 막연한 공부를 구체적인 행동으로 바꾸는 트랙의 핵심 루프입니다.',
     cycle: [
       { title: '계획', description: '주간 목표와 일별 실행 항목을 직접 작성합니다.' },
       { title: '실행', description: '매일 실제 수행 여부와 공부시간을 기록합니다.' },
@@ -350,7 +350,7 @@ export const marketingContent: MarketingContent = {
   },
   comparison: {
     heading: '왜 트랙인가',
-    description: '같은 시간을 써도 관리 구조가 다르면 결과는 달라집니다. 트랙은 과정부터 보이는 구조를 만듭니다.',
+    description: '같은 시간이라도 관리 구조가 다르면 결과는 달라집니다. 트랙은 과정이 먼저 보이도록 설계합니다.',
     rows: [
       {
         topic: '운영 중심',

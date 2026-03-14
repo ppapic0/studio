@@ -52,11 +52,23 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                 <br />
                 운영 구조까지 설계했습니다
               </h3>
-              <p className="mt-4 max-w-2xl break-keep text-sm font-medium leading-[1.78] text-slate-600 sm:text-[15px]">
-                트랙 관리형 스터디센터는 단순히 좌석을 제공하는 공간이 아니라, 입실부터 계획,
-                실행, 피드백까지 이어지는 흐름을 유지하도록 설계된 운영형 학습 공간입니다.
-                학생은 혼자 공부해도 혼자 남겨지지 않게, 학부모는 과정을 데이터로 확인할 수 있게
-                구성했습니다.
+              <div className="mt-4 flex flex-wrap gap-2.5">
+                {[
+                  '입실 기록',
+                  '공부시간 확인',
+                  '실행 데이터 누적',
+                  '수능 국어 수업 별도 선택',
+                ].map((keyword) => (
+                  <span
+                    key={keyword}
+                    className="inline-flex rounded-full border border-[#14295F]/10 bg-white px-3.5 py-2 text-[12px] font-extrabold tracking-[-0.02em] text-[#14295F] shadow-[0_10px_20px_rgba(20,41,95,0.06)]"
+                  >
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-4 max-w-2xl break-keep text-[15px] font-semibold leading-[1.82] text-slate-600">
+                좌석만 제공하는 공간이 아니라, 공부 흐름이 끊기지 않도록 운영 구조까지 설계한 관리형 스터디센터입니다.
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -91,7 +103,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#14295F] text-xs font-black text-white shadow-[0_8px_14px_rgba(20,41,95,0.2)]">
                     {index + 1}
                   </div>
-                  <p className="break-keep text-sm font-medium leading-[1.72] text-slate-600">{copy}</p>
+                  <p className="break-keep text-sm font-semibold leading-[1.72] text-slate-600">{copy}</p>
                 </div>
               ))}
             </div>

@@ -22,9 +22,20 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           <h1 className="font-brand mt-4 break-keep text-4xl leading-[1.08] text-[#14295F] sm:text-5xl lg:text-[4.1rem]">
             {brand.heroTitle}
           </h1>
-          <p className="mt-5 max-w-2xl break-keep text-base font-medium leading-[1.72] text-slate-600 sm:text-lg">
+          <p className="mt-5 max-w-2xl break-keep text-[15px] font-semibold leading-[1.86] text-slate-600 sm:text-lg">
             {brand.heroDescription}
           </p>
+
+          <div className="mt-5 flex flex-wrap gap-2.5">
+            {['관리형 스터디센터 중심', '수능 국어 수업 별도 선택', '학부모 앱 실시간 확인', '재학생 · N수생 등록 가능'].map((keyword) => (
+              <span
+                key={keyword}
+                className="inline-flex rounded-full border border-[#14295F]/10 bg-white px-3.5 py-2 text-[12px] font-extrabold tracking-[-0.02em] text-[#14295F] shadow-[0_10px_20px_rgba(20,41,95,0.06)]"
+              >
+                {keyword}
+              </span>
+            ))}
+          </div>
 
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-[#F6F9FF] px-4 py-2 text-sm font-black text-[#14295F] shadow-sm">
             <CheckCircle2 className="h-4 w-4 text-[#FF7A16]" />

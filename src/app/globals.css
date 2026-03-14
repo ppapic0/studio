@@ -85,67 +85,61 @@
   body {
     @apply bg-background text-foreground font-body antialiased transition-colors duration-300;
     touch-action: manipulation;
-    font-feature-settings: "palt" 1, "liga" 1;
-    text-rendering: optimizeLegibility;
-    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-weight: 450;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.7;
   }
 
   .font-body {
-    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    letter-spacing: -0.012em;
-    line-height: 1.48;
+    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    letter-spacing: 0;
+    line-height: 1.7;
   }
 
   .font-display {
-    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 780;
-    letter-spacing: -0.02em;
+    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.024em;
     line-height: 1.14;
   }
 
   .font-brand {
-    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    font-weight: 820;
-    letter-spacing: -0.024em;
+    font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.03em;
     line-height: 1.08;
   }
 
   .font-numeric {
-    font-family: "Pretendard Variable", Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
-    font-weight: 900;
-    font-variation-settings: "wght" 900;
+    font-family: Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
+    font-weight: 800;
     font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+    font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.045em;
-    line-height: 0.94;
-    text-rendering: geometricPrecision;
+    letter-spacing: -0.022em;
+    line-height: 1;
   }
 
   .tabular-nums {
-    font-family: "Pretendard Variable", Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
-    font-weight: 820;
-    font-variation-settings: "wght" 820;
+    font-family: Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
+    font-weight: 800;
     font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+    font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.04em;
-    text-rendering: geometricPrecision;
+    letter-spacing: -0.02em;
   }
 
   .dashboard-number {
-    font-family: "Pretendard Variable", Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
-    font-weight: 900;
-    font-variation-settings: "wght" 900;
+    font-family: Pretendard, "Inter", "Segoe UI", "Noto Sans KR", sans-serif;
+    font-weight: 800;
     font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+    font-feature-settings: "tnum" 1, "lnum" 1;
     font-synthesis: none;
-    letter-spacing: -0.05em;
-    line-height: 0.92;
-    text-rendering: geometricPrecision;
+    letter-spacing: -0.022em;
+    line-height: 1.04;
   }
 
   button,
@@ -156,20 +150,20 @@
   }
 
   .text-slate-300 {
-    color: #8694a8 !important;
+    color: #6f7e95 !important;
   }
 
   .text-slate-400 {
-    color: #6c7a91 !important;
+    color: #5d6d84 !important;
   }
 
   .text-slate-500,
   .text-muted-foreground {
-    color: #57667d !important;
+    color: #495b75 !important;
   }
 
   .text-slate-600 {
-    color: #475569 !important;
+    color: #384c67 !important;
   }
 }
 
@@ -417,33 +411,34 @@
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-title"] {
-  font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-family: Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   color: #14295f;
   font-size: clamp(1rem, 4.2vw, 1.2rem);
-  font-weight: 850;
-  line-height: 1.14;
-  letter-spacing: -0.028em;
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.012em;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-description"] {
-  color: #64748b;
-  font-size: 0.74rem;
-  line-height: 1.45;
+  color: #55657d;
+  font-size: 0.79rem;
+  font-weight: 600;
+  line-height: 1.56;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main .text-slate-400 {
-  color: #72819a;
+  color: #607088;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main .text-slate-500,
 .dashboard-mobile-shell .dashboard-mobile-main .text-muted-foreground {
-  color: #58677e;
+  color: #4f6078;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main .dashboard-number {
   color: inherit;
-  letter-spacing: -0.045em;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main .bg-slate-50 {
