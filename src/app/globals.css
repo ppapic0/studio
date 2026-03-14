@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -97,15 +97,15 @@
   }
 
   .font-display {
-    font-family: var(--font-aggro), "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
-    letter-spacing: -0.03em;
-    line-height: 1.06;
+    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    letter-spacing: -0.028em;
+    line-height: 1.12;
   }
 
   .font-brand {
-    font-family: var(--font-aggro), "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
-    letter-spacing: -0.035em;
-    line-height: 1;
+    font-family: "Pretendard Variable", Pretendard, "SUIT Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    letter-spacing: -0.034em;
+    line-height: 1.05;
   }
 
   .font-numeric {
@@ -412,7 +412,7 @@
   font-size: clamp(1rem, 4.2vw, 1.2rem);
   font-weight: 850;
   line-height: 1.14;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.028em;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-description"] {
@@ -515,3 +515,4 @@
     padding-bottom: 5.15rem;
   }
 }
+
