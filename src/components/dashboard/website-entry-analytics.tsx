@@ -1,0 +1,219 @@
+'use client';
+
+import { useMemo } from 'react';
+import { BarChart3, LogIn, MousePointerClick, Smartphone } from 'lucide-react';
+import { collection, limit, orderBy, query } from 'firebase/firestore';
+import { format } from 'date-fns';
+
+import { useCollection, useFirestore } from '@/firebase';
+import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+type WebsiteEntryEvent = {
+  id: string;
+  target: 'login' | 'experience';
+  placement?: string | null;
+  mode?: string | null;
+  view?: string | null;
+  createdAt?: unknown;
+};
+
+function toDateMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof (value as { toDate?: () => Date }).toDate === 'function') {
+    const parsed = (value as { toDate: () => Date }).toDate();
+    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? 0 : value.getTime();
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function formatDateTime(value: unknown) {
+  const ms = toDateMs(value);
+  if (!ms) return '-';
+  return format(new Date(ms), 'MM.dd HH:mm');
+}
+
+function placementLabel(value?: string | null) {
+  const map: Record<string, string> = {
+    header: '헤더',
+    hero_login: '메인 로그인 버튼',
+    hero_experience: '메인 체험 버튼',
+    hero_student_demo: '학생 체험 카드',
+    hero_parent_demo: '학부모 체험 카드',
+    app_section: '앱 소개 섹션',
+    footer: '푸터',
+    consult_section: '상담 섹션',
+    experience_page: '체험 페이지',
+  };
+
+  if (!value) return '기타';
+  return map[value] || value;
+}
+
+export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
+  const firestore = useFirestore();
+
+  const eventsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'websiteEntryEvents'),
+      orderBy('createdAt', 'desc'),
+      limit(300),
+    );
+  }, [firestore, centerId]);
+
+  const { data: rawEvents, isLoading } = useCollection<WebsiteEntryEvent>(eventsQuery, {
+    enabled: !!centerId,
+  });
+
+  const events = useMemo(
+    () => [...(rawEvents || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
+    [rawEvents],
+  );
+
+  const summary = useMemo(() => {
+    const loginCount = events.filter((event) => event.target === 'login').length;
+    const experienceCount = events.filter((event) => event.target === 'experience').length;
+    const placementCount = new Map<string, number>();
+
+    events.forEach((event) => {
+      const label = placementLabel(event.placement);
+      placementCount.set(label, (placementCount.get(label) || 0) + 1);
+    });
+
+    const topPlacements = Array.from(placementCount.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      total: events.length,
+      loginCount,
+      experienceCount,
+      latestEvent: events[0] || null,
+      topPlacements,
+    };
+  }, [events]);
+
+  if (!centerId) return null;
+
+  return (
+    <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+      <CardHeader className="p-6 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg font-black">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              웹사이트 입구 방문 추적
+            </CardTitle>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">
+              기존 재원생의 로그인 직행 유입과 홍보용 체험 유입을 따로 집계해 볼 수 있습니다.
+            </p>
+          </div>
+          <Badge className="border-none bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+            입구 클릭 집계
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4 p-6 pt-2">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-[#14295F]/10 bg-[#F7FAFF] p-4 shadow-sm">
+            <p className="text-xs font-black tracking-[0.12em] text-[#14295F]/50">전체 입구 클릭</p>
+            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.total}</p>
+          </div>
+
+          <div className="rounded-2xl border border-[#FF7A16]/15 bg-[#FFF5EC] p-4 shadow-sm">
+            <p className="flex items-center gap-2 text-xs font-black tracking-[0.12em] text-[#B85A00]">
+              <LogIn className="h-3.5 w-3.5" />
+              웹앱 로그인
+            </p>
+            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.loginCount}</p>
+          </div>
+
+          <div className="rounded-2xl border border-[#14295F]/10 bg-white p-4 shadow-sm">
+            <p className="flex items-center gap-2 text-xs font-black tracking-[0.12em] text-[#14295F]/55">
+              <Smartphone className="h-3.5 w-3.5 text-[#FF7A16]" />
+              웹앱 체험
+            </p>
+            <p className="dashboard-number mt-2 text-3xl text-[#14295F]">{summary.experienceCount}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-2xl border border-[#14295F]/10 bg-white p-4 shadow-sm">
+            <p className="text-sm font-black text-[#14295F]">최근 클릭</p>
+            {summary.latestEvent ? (
+              <div className="mt-3 space-y-2 text-sm font-bold text-slate-600">
+                <p>
+                  유형:{' '}
+                  <span className="font-black text-[#14295F]">
+                    {summary.latestEvent.target === 'login' ? '웹앱 로그인' : '웹앱 체험'}
+                  </span>
+                </p>
+                <p>
+                  위치:{' '}
+                  <span className="font-black text-[#14295F]">
+                    {placementLabel(summary.latestEvent.placement)}
+                  </span>
+                </p>
+                <p>
+                  시간:{' '}
+                  <span className="font-black text-[#14295F]">
+                    {formatDateTime(summary.latestEvent.createdAt)}
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm font-semibold text-slate-500">
+                아직 집계된 입구 클릭 기록이 없습니다.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-[#14295F]/10 bg-white p-4 shadow-sm">
+            <p className="flex items-center gap-2 text-sm font-black text-[#14295F]">
+              <MousePointerClick className="h-4 w-4 text-[#FF7A16]" />
+              상위 클릭 위치
+            </p>
+
+            <div className="mt-3 space-y-3">
+              {isLoading ? (
+                <p className="text-sm font-semibold text-slate-500">불러오는 중...</p>
+              ) : summary.topPlacements.length === 0 ? (
+                <p className="text-sm font-semibold text-slate-500">
+                  아직 집계된 위치 데이터가 없습니다.
+                </p>
+              ) : (
+                summary.topPlacements.map((item) => (
+                  <div key={item.label} className="grid grid-cols-[112px_1fr_48px] items-center gap-3">
+                    <span className="text-sm font-black text-[#14295F]/78">{item.label}</span>
+                    <div className="h-2.5 rounded-full bg-[#EEF2F8]">
+                      <div
+                        className={cn(
+                          'h-2.5 rounded-full bg-[linear-gradient(90deg,#FFB16D_0%,#FF7A16_100%)]',
+                        )}
+                        style={{
+                          width: `${summary.total > 0 ? Math.max(12, (item.count / summary.total) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="dashboard-number text-right text-sm text-[#14295F]">
+                      {item.count}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

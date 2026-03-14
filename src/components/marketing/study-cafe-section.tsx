@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, Clock3, GraduationCap, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clock3, GraduationCap, ShieldCheck } from 'lucide-react';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
@@ -19,10 +19,11 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
       warm: false,
     },
     {
-      eyebrow: 'MONTHLY MOCK EXAM',
-      title: '이감 + 더프리미엄',
+      eyebrow: 'MOCK EXAM FLOW',
+      title: '이감 · 더프 상시 진행',
       description:
-        '이감 모의고사와 매달 더프리미엄 모의고사를 통해 실전 감각과 현재 위치를 정기적으로 점검합니다.',
+        '이감 모의고사와 더프 모의고사를 상시 진행해 실전 감각과 현재 위치를 점검합니다.',
+      note: '이감모의고사와 더프 모의고사는 별도 구매입니다.',
       icon: <CheckCircle2 className="h-4.5 w-4.5 text-[#FF7A16]" />,
       warm: true,
     },
@@ -65,6 +66,9 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                 </div>
               </div>
               <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{item.description}</p>
+              {'note' in item && item.note ? (
+                <p className="mt-3 text-[11px] font-black text-[#B85A00]/78">{item.note}</p>
+              ) : null}
             </article>
           ))}
         </div>

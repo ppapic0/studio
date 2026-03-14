@@ -1,11 +1,11 @@
-import Image from "next/image";
-import Link from "next/link";
+import Image from 'next/image';
+import Link from 'next/link';
 
-import type { MarketingContent } from "@/lib/marketing-content";
+import type { MarketingContent } from '@/lib/marketing-content';
 
 type MarketingFooterProps = {
-  brand: MarketingContent["brand"];
-  footer: MarketingContent["footer"];
+  brand: MarketingContent['brand'];
+  footer: MarketingContent['footer'];
 };
 
 export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
@@ -18,7 +18,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
             <p className="font-brand text-base font-bold text-[#14295F]">{brand.name}</p>
           </div>
           <p className="mt-4 break-keep text-sm font-bold leading-relaxed text-slate-600">{footer.line}</p>
-          <div className="mt-5 flex gap-2">
+          <div className="mt-5 flex flex-wrap gap-2">
             <a
               href="#consult"
               className="inline-flex h-10 items-center justify-center rounded-lg bg-[#FF7A16] px-4 text-xs font-black text-white transition hover:bg-[#f06905]"
@@ -26,10 +26,16 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
               상담 문의
             </a>
             <Link
-              href="/experience"
+              href="/go/login?placement=footer"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#14295F]/18 bg-white px-4 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
+            >
+              웹앱 로그인
+            </Link>
+            <Link
+              href="/go/experience?placement=footer"
               className="inline-flex h-10 items-center justify-center rounded-lg border border-[#14295F]/25 px-4 text-xs font-black text-[#14295F] transition hover:bg-[#F6F9FF]"
             >
-              웹앱 바로가기
+              웹앱 체험
             </Link>
           </div>
         </div>

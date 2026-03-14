@@ -1,4 +1,4 @@
-﻿export type MarketingNavItem = {
+export type MarketingNavItem = {
   label: string;
   href: string;
 };
@@ -265,8 +265,8 @@ export const marketingContent: MarketingContent = {
         description: '학부모는 앱에서 출결, 학습 현황, 리포트, 결제 상태를 실시간으로 확인할 수 있습니다.',
       },
       {
-        title: '정기 모의고사 운영',
-        description: '이감 모의고사와 매달 더프리미엄 모의고사를 통해 실전 감각과 현재 위치를 점검합니다.',
+        title: '상시 모의고사 운영',
+        description: '이감 모의고사와 더프 모의고사를 상시 진행하며, 실전 감각과 현재 위치를 정기적으로 점검합니다.',
       },
     ],
     seatTypes: [

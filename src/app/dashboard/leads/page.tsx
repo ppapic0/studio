@@ -3,6 +3,7 @@
 import { Loader2, Megaphone } from 'lucide-react';
 
 import { MarketingConsultingCRM } from '@/components/dashboard/marketing-consulting-crm';
+import { WebsiteEntryAnalytics } from '@/components/dashboard/website-entry-analytics';
 import { Badge } from '@/components/ui/badge';
 import { useAppContext } from '@/contexts/app-context';
 
@@ -24,7 +25,7 @@ export default function LeadsPage() {
   if (!activeMembership || !canAccess) {
     return (
       <div className="rounded-2xl border border-dashed bg-white p-8 text-center shadow-sm">
-        <p className="text-base font-black text-slate-700">이 메뉴는 선생님/관리자만 사용할 수 있습니다.</p>
+        <p className="text-base font-black text-slate-700">이 메뉴는 선생님과 관리자만 사용할 수 있습니다.</p>
       </div>
     );
   }
@@ -38,7 +39,7 @@ export default function LeadsPage() {
         <div className="grid gap-0.5">
           <h1 className="text-2xl font-black tracking-tight text-primary">홍보/상담 리드 DB</h1>
           <p className="text-xs font-semibold text-muted-foreground">
-            수동 입력 리드와 웹사이트 상담폼 접수를 한 화면에서 나눠 보고, 상태 관리와 엑셀 다운로드까지 처리합니다.
+            상담 입력 리드와 웹사이트 상담·입구 클릭 데이터를 한 화면에서 보고, 상태 관리와 다운로드까지 처리합니다.
           </p>
         </div>
         <Badge className="rounded-full border-none bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
@@ -46,8 +47,8 @@ export default function LeadsPage() {
         </Badge>
       </div>
 
+      <WebsiteEntryAnalytics centerId={activeMembership.id} />
       <MarketingConsultingCRM centerId={activeMembership.id} isMobile={isMobile} />
     </div>
   );
 }
-

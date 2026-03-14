@@ -1,4 +1,4 @@
-﻿import Image from 'next/image';
+import Image from 'next/image';
 import Link from 'next/link';
 
 import type { MarketingContent } from '@/lib/marketing-content';
@@ -26,14 +26,14 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-2">
-          <a
-            href="#consult"
+          <Link
+            href="/go/login?placement=header"
             className="inline-flex h-9 items-center justify-center rounded-lg bg-[#FF7A16] px-3.5 text-xs font-black text-white transition hover:bg-[#f16803]"
           >
-            상담 문의
-          </a>
+            웹앱 로그인
+          </Link>
           <Link
-            href="/experience"
+            href="/go/experience?placement=header"
             className="inline-flex h-9 items-center justify-center rounded-lg border border-[#14295F]/12 bg-[#14295F] px-3.5 text-xs font-black text-white shadow-[0_10px_18px_rgba(20,41,95,0.2)] transition hover:bg-[#10224B]"
           >
             웹앱 체험

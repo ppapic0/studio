@@ -28,7 +28,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
               <p className="mt-2 break-keep text-xl font-black text-[#14295F]">학생 모드와 학부모 모드를 실제 앱처럼 체험해보세요</p>
               <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">그래프, 캘린더, 알림, 수납, 성장 지표까지 실제 운영 화면처럼 확인할 수 있습니다.</p>
             </div>
-            <a href="/experience" className="inline-flex h-11 items-center justify-center rounded-full bg-[#14295F] px-5 text-sm font-black text-white shadow-[0_12px_24px_rgba(20,41,95,0.22)] transition hover:bg-[#10224B]">
+            <a href="/go/experience?placement=app_section" className="inline-flex h-11 items-center justify-center rounded-full bg-[#14295F] px-5 text-sm font-black text-white shadow-[0_12px_24px_rgba(20,41,95,0.22)] transition hover:bg-[#10224B]">
               웹앱 체험하기
             </a>
           </div>

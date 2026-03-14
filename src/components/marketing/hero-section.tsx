@@ -32,6 +32,12 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/go/login?placement=hero_login"
+              className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(255,122,22,0.24)] transition hover:bg-[#f06905]"
+            >
+              웹앱 로그인
+            </Link>
             <a
               href="#study-cafe"
               className="inline-flex h-12 items-center justify-center rounded-xl bg-[#14295F] px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(20,41,95,0.24)] transition hover:bg-[#0F2149]"
@@ -47,7 +53,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           </div>
 
           <Link
-            href="/experience"
+            href="/go/experience?placement=hero_experience"
             className="group mt-4 flex w-full max-w-xl items-center justify-between gap-4 rounded-[1.75rem] border border-[#FF7A16]/24 bg-[linear-gradient(135deg,#FFF6ED_0%,#FFFFFF_100%)] px-5 py-5 shadow-[0_22px_48px_rgba(255,122,22,0.15)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:shadow-[0_28px_60px_rgba(255,122,22,0.22)]"
           >
             <div className="flex items-center gap-3">
@@ -135,12 +141,12 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/experience?mode=student&view=mobile" className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            <Link href="/go/experience?placement=hero_student_demo&mode=student&view=mobile" className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">STUDENT DEMO</p>
               <p className="mt-1 text-lg font-black text-[#14295F]">학생 모드 체험</p>
               <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">성장, 기록, 계획 탭까지 실제 앱처럼 확인</p>
             </Link>
-            <Link href="/experience?mode=parent" className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            <Link href="/go/experience?placement=hero_parent_demo&mode=parent" className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">PARENT DEMO</p>
               <p className="mt-1 text-lg font-black text-[#14295F]">학부모 모드 체험</p>
               <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">앱모드 전용 알림, 캘린더, 수납 흐름 확인</p>
