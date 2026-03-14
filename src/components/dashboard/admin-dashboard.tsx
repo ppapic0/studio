@@ -629,22 +629,26 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">LIVE TRACKING</Badge>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <Card className="rounded-[2.5rem] border-none shadow-2xl bg-primary text-primary-foreground p-10 overflow-hidden relative group">
-                <div className="absolute -right-4 -top-4 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000">
+              <Card className="rounded-[2.5rem] border border-[#2A4E97]/40 bg-[linear-gradient(145deg,#12275A_0%,#1C4285_58%,#244B90_100%)] p-10 text-white shadow-[0_28px_60px_rgba(20,41,95,0.28),0_10px_20px_rgba(20,41,95,0.12),inset_0_1px_0_rgba(255,255,255,0.12)] overflow-hidden relative group">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(255,122,22,0.26),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_34%)]" />
+                <div className="absolute -right-4 -top-4 opacity-[0.12] rotate-12 group-hover:scale-110 transition-transform duration-1000">
                   <Flame className="h-48 w-48" />
                 </div>
                 <div className="space-y-1 relative z-10">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">오늘의 트랙 총량 (Accrued)</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/72">오늘의 트랙 총량 (Accrued)</p>
                   <div className="flex items-baseline gap-1">
-                    <h3 className="text-6xl font-black tracking-tighter">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="text-2xl opacity-40 ml-1">h</span></h3>
+                    <h3 className="dashboard-number text-6xl text-white drop-shadow-[0_10px_24px_rgba(7,16,40,0.35)]">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="ml-1 text-2xl text-white/52">h</span></h3>
                   </div>
                   <div className="pt-8 space-y-3">
-                    <div className="flex justify-between text-[10px] font-black opacity-60 uppercase tracking-widest">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/68">
                       <span>일일 활성 목표 (Avg 6h)</span>
                       <span>{Math.min(100, Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100))}%</span>
                     </div>
-                    <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-white transition-all duration-1000" style={{ width: `${Math.min(100, (metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)}%` }} />
+                    <div className="h-2.5 w-full rounded-full bg-white/14 overflow-hidden shadow-[inset_0_2px_4px_rgba(6,15,38,0.32)]">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(90deg,#FFE1C0_0%,#FFB46C_42%,#FF7A16_100%)] shadow-[0_0_18px_rgba(255,122,22,0.38)] transition-all duration-700"
+                        style={{ width: `${Math.min(100, (metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)}%` }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -654,18 +658,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex justify-between items-start mb-6">
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
-                    <h3 className="text-5xl font-black tracking-tighter text-primary">{metrics.checkedInCount}<span className="text-2xl opacity-40 ml-1">명</span></h3>
+                    <h3 className="dashboard-number text-5xl text-primary">{metrics.checkedInCount}<span className="ml-1 text-2xl opacity-40">명</span></h3>
                   </div>
                   <div className="bg-blue-50 p-4 rounded-[1.5rem] group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm"><Users className="h-8 w-8 text-blue-600 group-hover:text-white" /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-dashed">
                   <div className="space-y-1">
                     <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">재원생(대상)</p>
-                    <p className="text-xl font-black">{metrics.totalStudents}명</p>
+                    <p className="dashboard-number text-xl">{metrics.totalStudents}명</p>
                   </div>
                   <div className="space-y-1 text-right">
                     <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
-                    <p className="text-xl font-black text-blue-600">{metrics.seatOccupancy}%</p>
+                    <p className="dashboard-number text-xl text-blue-600">{metrics.seatOccupancy}%</p>
                   </div>
                 </div>
               </Card>
@@ -674,7 +678,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex justify-between items-start mb-6">
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">이탈 위험 고득점자</p>
-                    <h3 className="text-5xl font-black tracking-tighter text-rose-600">{metrics.riskCount}<span className="text-2xl opacity-40 ml-1">명</span></h3>
+                    <h3 className="dashboard-number text-5xl text-rose-600">{metrics.riskCount}<span className="ml-1 text-2xl opacity-40">명</span></h3>
                   </div>
                   <div className="bg-rose-50 p-4 rounded-[1.5rem] group-hover:bg-rose-600 group-hover:text-white transition-all duration-500 shadow-sm"><ShieldAlert className="h-8 w-8 text-rose-600 group-hover:text-white" /></div>
                 </div>
@@ -719,7 +723,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-blue-500" /> 최근 30일 앱 방문 수</span>
-                        <div className="text-5xl font-black text-blue-600 tabular-nums">{metrics.parentVisitCount30d}</div>
+                        <div className="dashboard-number text-5xl text-blue-600">{metrics.parentVisitCount30d}</div>
                         <p className="text-[11px] font-bold text-blue-500/80">활성 학부모 {metrics.activeParentCount30d}명</p>
                       </div>
                     </div>
@@ -733,7 +737,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><MessageSquare className="h-3 w-3 text-rose-500" /> 최근 30일 상담 신청 (주의)</span>
-                        <div className="text-5xl font-black text-rose-600 tabular-nums">{metrics.consultationRequestCount30d}</div>
+                        <div className="dashboard-number text-5xl text-rose-600">{metrics.consultationRequestCount30d}</div>
                         <p className="text-[11px] font-bold text-rose-500/80">신뢰 하락 리스크 이벤트</p>
                       </div>
                     </div>
@@ -747,7 +751,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex justify-between items-end">
                       <div className="grid gap-1">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><Eye className="h-3 w-3 text-amber-500" /> 최근 30일 리포트 열람</span>
-                        <div className="text-5xl font-black text-amber-600 tabular-nums">{metrics.reportReadCount30d}</div>
+                        <div className="dashboard-number text-5xl text-amber-600">{metrics.reportReadCount30d}</div>
                         <p className="text-[11px] font-bold text-amber-500/80">당일 리포트 열람률 {metrics.readRate}%</p>
                       </div>
                     </div>
@@ -947,7 +951,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">신뢰 점수</p>
-                        <p className="text-2xl font-black text-primary">{row.trustScore}점</p>
+                        <p className="dashboard-number text-2xl text-primary">{row.trustScore}점</p>
                         <p className="text-[10px] font-bold text-rose-500">리스크 {row.riskScore}점</p>
                       </div>
                     </div>

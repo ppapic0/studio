@@ -38,10 +38,10 @@ function SelectorLink({ href, label, active }: { href: string; label: string; ac
     <Link
       href={href}
       className={cn(
-        'inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-black transition-all duration-200',
+        'premium-cta h-11 rounded-full px-5 text-sm',
         active
-          ? 'bg-[#14295F] text-white shadow-[0_12px_26px_rgba(20,41,95,0.24)]'
-          : 'border border-[#14295F]/12 bg-white text-[#14295F] hover:border-[#FF7A16]/35 hover:bg-[#FFF8F2]'
+          ? 'premium-cta-secondary'
+          : 'premium-cta-muted border-[#14295F]/12 bg-white text-[#14295F] hover:border-[#FF7A16]/35 hover:bg-[#FFF8F2]'
       )}
     >
       {label}
@@ -63,10 +63,10 @@ function DetailTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-black transition-all duration-200',
+        'premium-cta h-10 rounded-full px-4 text-sm',
         active
-          ? 'bg-[#14295F] text-white shadow-[0_10px_24px_rgba(20,41,95,0.22)]'
-          : 'border border-[#14295F]/10 bg-white text-[#14295F]/72 hover:border-[#FF7A16]/30 hover:text-[#14295F]'
+          ? 'premium-cta-secondary'
+          : 'premium-cta-muted border-[#14295F]/10 bg-white text-[#14295F]/72 hover:border-[#FF7A16]/30 hover:text-[#14295F]'
       )}
     >
       {label}

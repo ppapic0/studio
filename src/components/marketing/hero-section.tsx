@@ -32,29 +32,29 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link
+            <a
               href="/go/login?placement=hero_login"
-              className="inline-flex h-12 items-center justify-center rounded-xl bg-[#FF7A16] px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(255,122,22,0.24)] transition hover:bg-[#f06905]"
+              className="premium-cta premium-cta-primary h-12 px-6 text-sm"
             >
               웹앱 로그인
-            </Link>
+            </a>
             <a
               href="#study-cafe"
-              className="inline-flex h-12 items-center justify-center rounded-xl bg-[#14295F] px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(20,41,95,0.24)] transition hover:bg-[#0F2149]"
+              className="premium-cta premium-cta-secondary h-12 px-6 text-sm"
             >
               관리형 스터디센터 안내
             </a>
             <a
               href="#outcome"
-              className="inline-flex h-12 items-center justify-center rounded-xl border border-[#14295F]/16 bg-white px-6 text-sm font-black text-[#14295F] transition hover:bg-[#F7FAFF]"
+              className="premium-cta premium-cta-muted h-12 px-6 text-sm"
             >
               2026 실적 보기
             </a>
           </div>
 
-          <Link
+          <a
             href="/go/experience?placement=hero_experience"
-            className="group mt-4 flex w-full max-w-xl items-center justify-between gap-4 rounded-[1.75rem] border border-[#FF7A16]/24 bg-[linear-gradient(135deg,#FFF6ED_0%,#FFFFFF_100%)] px-5 py-5 shadow-[0_22px_48px_rgba(255,122,22,0.15)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:shadow-[0_28px_60px_rgba(255,122,22,0.22)]"
+            className="group premium-surface-button mt-4 flex w-full max-w-xl items-center justify-between gap-4 border-[#FF7A16]/24 bg-[linear-gradient(135deg,#FFF6ED_0%,#FFFFFF_100%)] px-5 py-5 shadow-[0_22px_48px_rgba(255,122,22,0.15)]"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_10px_20px_rgba(255,122,22,0.26)]">
@@ -73,7 +73,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               바로 보기
               <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </div>
-          </Link>
+          </a>
         </div>
 
         <div className="space-y-4">
@@ -141,16 +141,16 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/go/experience?placement=hero_student_demo&mode=student&view=mobile" className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            <a href="/go/experience?placement=hero_student_demo&mode=student&view=mobile" className="premium-surface-button px-4 py-4">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">STUDENT DEMO</p>
               <p className="mt-1 text-lg font-black text-[#14295F]">학생 모드 체험</p>
               <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">성장, 기록, 계획 탭까지 실제 앱처럼 확인</p>
-            </Link>
-            <Link href="/go/experience?placement=hero_parent_demo&mode=parent" className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            </a>
+            <a href="/go/experience?placement=hero_parent_demo&mode=parent" className="premium-surface-button px-4 py-4">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">PARENT DEMO</p>
               <p className="mt-1 text-lg font-black text-[#14295F]">학부모 모드 체험</p>
               <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">앱모드 전용 알림, 캘린더, 수납 흐름 확인</p>
-            </Link>
+            </a>
           </div>
         </div>
       </div>

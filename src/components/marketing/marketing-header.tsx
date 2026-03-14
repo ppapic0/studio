@@ -26,18 +26,18 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
+          <a
             href="/go/login?placement=header"
-            className="inline-flex h-9 items-center justify-center rounded-lg bg-[#FF7A16] px-3.5 text-xs font-black text-white transition hover:bg-[#f16803]"
+            className="premium-cta premium-cta-primary h-9 px-3.5 text-xs"
           >
             웹앱 로그인
-          </Link>
-          <Link
+          </a>
+          <a
             href="/go/experience?placement=header"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-[#14295F]/12 bg-[#14295F] px-3.5 text-xs font-black text-white shadow-[0_10px_18px_rgba(20,41,95,0.2)] transition hover:bg-[#10224B]"
+            className="premium-cta premium-cta-secondary h-9 px-3.5 text-xs"
           >
             웹앱 체험
-          </Link>
+          </a>
         </div>
       </div>
 

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ArrowRight, LogIn, Smartphone, Users } from 'lucide-react';
 
 export function EntryGatewaySection() {
@@ -22,9 +21,9 @@ export function EntryGatewaySection() {
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <Link
+            <a
               href="/go/login?placement=gateway_login"
-              className="group app-depth-card-warm overflow-hidden p-5 sm:p-6"
+              className="group app-depth-card-warm premium-surface-button overflow-hidden p-5 sm:p-6"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_12px_24px_rgba(255,122,22,0.26)]">
@@ -45,11 +44,11 @@ export function EntryGatewaySection() {
                 웹앱 로그인으로 이동
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </div>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="/go/experience?placement=gateway_experience"
-              className="group app-depth-card overflow-hidden p-5 sm:p-6"
+              className="group app-depth-card premium-surface-button overflow-hidden p-5 sm:p-6"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#14295F] text-white shadow-[0_12px_24px_rgba(20,41,95,0.22)]">
@@ -76,7 +75,7 @@ export function EntryGatewaySection() {
                 웹앱 체험으로 이동
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </div>
-            </Link>
+            </a>
           </div>
         </div>
       </div>

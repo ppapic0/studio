@@ -29,10 +29,10 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
               <p className="mt-2 break-keep text-sm font-bold leading-relaxed text-slate-600">그래프, 캘린더, 알림, 수납, 성장 지표까지 실제 운영 화면처럼 확인할 수 있습니다.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <a href="/go/login?placement=app_section_login" className="inline-flex h-11 items-center justify-center rounded-full bg-[#FF7A16] px-5 text-sm font-black text-white shadow-[0_12px_24px_rgba(255,122,22,0.22)] transition hover:bg-[#f06905]">
+              <a href="/go/login?placement=app_section_login" className="premium-cta premium-cta-primary h-11 rounded-full px-5 text-sm">
                 웹앱 로그인
               </a>
-              <a href="/go/experience?placement=app_section" className="inline-flex h-11 items-center justify-center rounded-full bg-[#14295F] px-5 text-sm font-black text-white shadow-[0_12px_24px_rgba(20,41,95,0.22)] transition hover:bg-[#10224B]">
+              <a href="/go/experience?placement=app_section" className="premium-cta premium-cta-secondary h-11 rounded-full px-5 text-sm">
                 웹앱 체험하기
               </a>
             </div>
