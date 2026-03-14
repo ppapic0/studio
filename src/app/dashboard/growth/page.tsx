@@ -367,6 +367,17 @@ export default function GrowthPage() {
 
   const currentLp = progress?.seasonLp || 0;
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+  const heroGradient = useMemo(() => {
+    const tierTone = currentTier?.bg ?? '';
+    if (tierTone.includes('cyan')) return 'linear-gradient(145deg, #1A5CCF 0%, #143F9A 45%, #0B2358 100%)';
+    if (tierTone.includes('rose')) return 'linear-gradient(145deg, #E55185 0%, #B43663 45%, #611C40 100%)';
+    if (tierTone.includes('purple')) return 'linear-gradient(145deg, #7B3FC4 0%, #5A2F98 45%, #2E1952 100%)';
+    if (tierTone.includes('blue')) return 'linear-gradient(145deg, #2D61D8 0%, #2047A3 45%, #102557 100%)';
+    if (tierTone.includes('emerald')) return 'linear-gradient(145deg, #14A76D 0%, #0E7E54 45%, #0A4B33 100%)';
+    if (tierTone.includes('yellow')) return 'linear-gradient(145deg, #D79B1B 0%, #A77315 45%, #5E410E 100%)';
+    if (tierTone.includes('slate')) return 'linear-gradient(145deg, #607287 0%, #475A72 45%, #24374B 100%)';
+    return 'linear-gradient(145deg, #E56817 0%, #BE4D11 45%, #672D0E 100%)';
+  }, [currentTier?.bg]);
 
   if (isLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
 
@@ -387,12 +398,14 @@ export default function GrowthPage() {
       </header>
 
       {/* 시즌 메인 대시보드 - 현재 티어 그라디언트 적용 */}
-      <Card className={cn(
-        "border-none text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
-        "bg-gradient-to-br", currentTier.gradient,
-        isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
-      )}>
-        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+      <Card
+        className={cn(
+          "tier-hero-card border-none !text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
+          isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
+        )}
+        style={{ backgroundImage: heroGradient }}
+      >
+        <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 space-y-6", isMobile ? "space-y-4" : "space-y-10")}>
@@ -400,15 +413,15 @@ export default function GrowthPage() {
             <div className="space-y-1">
               <Badge className="bg-white/20 text-white border-none font-black text-[8px] sm:text-[10px] px-2 py-0.5 mb-1 sm:mb-2 uppercase tracking-widest">SEASON {format(new Date(), 'MMM').toUpperCase()}</Badge>
               <h2 className={cn("font-black tracking-tighter leading-none", isMobile ? "text-4xl" : "text-7xl")}>
-                {currentLp.toLocaleString()}<span className={cn("opacity-40 ml-1 uppercase font-bold", isMobile ? "text-sm" : "text-2xl")}>lp</span>
+                {currentLp.toLocaleString()}<span className={cn("opacity-80 ml-1 uppercase font-bold", isMobile ? "text-sm" : "text-2xl")}>lp</span>
               </h2>
-              <p className={cn("font-bold opacity-60", isMobile ? "text-[10px]" : "text-sm")}>이번 시즌 누적 포인트</p>
+              <p className={cn("font-bold opacity-90", isMobile ? "text-[10px]" : "text-sm")}>이번 시즌 누적 포인트</p>
             </div>
             
-            <div className={cn("p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-white/10 backdrop-blur-xl border border-white/10 flex flex-col items-center shadow-2xl", isMobile ? "w-fit" : "min-w-[180px]")}>
-              <span className={cn("font-black uppercase tracking-widest opacity-60 mb-1", isMobile ? "text-[7px]" : "text-[10px]")}>Current Tier</span>
+            <div className={cn("p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-white/20 backdrop-blur-xl border border-white/20 flex flex-col items-center shadow-2xl", isMobile ? "w-fit" : "min-w-[180px]")}>
+              <span className={cn("font-black uppercase tracking-widest opacity-80 mb-1", isMobile ? "text-[7px]" : "text-[10px]")}>Current Tier</span>
               <span className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>{currentTier.name}</span>
-              {!isMobile && <span className="text-[10px] font-bold mt-1 opacity-40">NEXT: {(25000 - currentLp).toLocaleString()} LP</span>}
+              {!isMobile && <span className="text-[10px] font-bold mt-1 opacity-80">NEXT: {(25000 - currentLp).toLocaleString()} LP</span>}
             </div>
           </div>
 
@@ -419,10 +432,10 @@ export default function GrowthPage() {
               { label: '부스트', val: `x${totalBoost.toFixed(2)}`, icon: Zap, color: 'text-emerald-400' },
               { label: '시즌 리셋', val: '매월 1일', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
-              <div key={i} className={cn("bg-white/5 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/5 flex flex-col gap-0.5")}>
+              <div key={i} className={cn("bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5")}>
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
-                  <span className={cn("font-black uppercase tracking-widest opacity-40", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+                  <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
                 </div>
                 <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
               </div>
