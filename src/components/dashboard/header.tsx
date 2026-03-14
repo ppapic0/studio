@@ -237,8 +237,8 @@ export function DashboardHeader() {
       className={cn(
         'sticky top-0 z-30 flex h-14 items-center gap-4 px-4 md:static md:h-auto md:px-6',
         isMobileView
-          ? 'border-b border-[#ffd9b7] bg-[linear-gradient(180deg,#fff2e6_0%,#ffffff_82%)] shadow-[0_8px_22px_rgba(20,41,95,0.14)] backdrop-blur-sm'
-          : 'border-b bg-background/80 backdrop-blur-sm md:border-0 md:bg-transparent'
+          ? 'border-b border-[rgba(255,170,80,0.20)] bg-[linear-gradient(180deg,rgba(255,247,238,0.98)_0%,rgba(255,255,255,0.96)_100%)] shadow-[0_1px_0_0_rgba(255,255,255,0.9)_inset,0_4px_16px_rgba(20,41,95,0.09)] backdrop-blur-md'
+          : 'border-b border-[rgba(20,41,95,0.07)] bg-white/85 backdrop-blur-xl shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset] md:border-0 md:bg-transparent md:shadow-none'
       )}
     >
       <div className="flex items-center gap-2">

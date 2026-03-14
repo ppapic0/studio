@@ -29,7 +29,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             className="h-9 w-9 rounded-lg object-contain"
           />
           <div className="grid gap-0.5">
-            <span className="font-body text-[1rem] font-extrabold tracking-[-0.04em] text-white sm:text-[1.05rem]">
+            <span className="font-brand text-[1rem] text-white sm:text-[1.05rem]">
               {brand.name}
             </span>
             <span className="text-[9.5px] font-black tracking-[0.18em] text-white/38">

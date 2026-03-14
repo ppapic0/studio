@@ -50,7 +50,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
             </div>
             <div className="relative">
               <span className="eyebrow-badge">BROCHURE STATEMENT</span>
-              <h3 className="mt-5 max-w-2xl break-keep text-[1.95rem] font-black leading-[1.06] tracking-[-0.04em] text-[#14295F] sm:text-[2.6rem]">
+              <h3 className="font-brand mt-5 max-w-2xl break-keep text-[1.95rem] leading-[1.06] text-[#14295F] sm:text-[2.6rem]">
                 공간보다 먼저,
                 <br />
                 루틴이 보이게 만듭니다
@@ -84,7 +84,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-[10.5px] font-black tracking-[0.2em] text-[#FF7A16]">{block.eyebrow}</p>
-                      <h3 className="mt-3 break-keep text-[1.6rem] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
+                      <h3 className="font-brand mt-3 break-keep text-[1.6rem] leading-[1.08] text-[#14295F]">
                         {block.title}
                       </h3>
                     </div>
@@ -126,7 +126,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
               <ShieldCheck className="h-4 w-4" />
               PREMIUM SEAT &amp; FLOW
             </p>
-            <h3 className="mt-4 max-w-xl break-keep text-[1.85rem] font-black leading-[1.06] tracking-[-0.04em] text-[#14295F]">
+            <h3 className="font-brand mt-4 max-w-xl break-keep text-[1.85rem] leading-[1.06] text-[#14295F]">
               몰입을 높이는 좌석과
               <br />
               운영 구조

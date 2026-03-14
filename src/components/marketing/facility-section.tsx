@@ -53,7 +53,7 @@ export function FacilitySection({ facility }: FacilitySectionProps) {
                 </div>
 
                 <div className="p-5">
-                  <h3 className="break-keep text-[1.28rem] font-extrabold tracking-[-0.04em] text-[#14295F]">
+                  <h3 className="font-display break-keep text-[1.28rem] text-[#14295F]">
                     {item.title}
                   </h3>
                   <p className="mt-2 break-keep text-sm font-medium leading-[1.76] text-slate-600">

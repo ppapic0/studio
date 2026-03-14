@@ -12,7 +12,7 @@ export function SectionHeading({ eyebrow, title, description, light = false }: S
         {eyebrow}
       </div>
       <h2
-        className={`font-brand mt-4 break-keep text-[clamp(1.9rem,4.5vw,2.8rem)] leading-[1.04] tracking-[-0.045em] ${
+        className={`font-brand mt-4 break-keep text-[clamp(2rem,4.8vw,3rem)] leading-[1.04] ${
           light ? "text-white" : "text-[#14295F]"
         }`}
       >

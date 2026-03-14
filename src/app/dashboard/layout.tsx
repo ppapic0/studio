@@ -23,7 +23,7 @@ export default function DashboardLayout({
         'min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
         isMobileView
           ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-3 pb-6'
-          : 'bg-[#f0f0f0] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-background'
+          : 'bg-[#f2f4f8] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
       )}
     >
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -46,7 +46,7 @@ export default function DashboardLayout({
       </div>
 
       {!isMobileView && (
-        <div className="hidden border-r bg-white/40 backdrop-blur-2xl md:block sticky top-0 h-screen overflow-y-auto z-20">
+        <div className="hidden border-r border-[rgba(20,41,95,0.07)] bg-white/80 backdrop-blur-xl md:block sticky top-0 h-screen overflow-y-auto z-20 shadow-[1px_0_0_0_rgba(20,41,95,0.04)]">
           <div className="flex h-full flex-col justify-start">
             <MainNav />
           </div>

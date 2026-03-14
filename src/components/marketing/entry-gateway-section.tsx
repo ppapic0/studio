@@ -11,7 +11,7 @@ export function EntryGatewaySection() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="eyebrow-badge">QUICK ENTRANCE</span>
-              <h2 className="mt-3 break-keep text-[1.85rem] font-black leading-[1.10] tracking-[-0.04em] text-[#14295F] sm:text-[2.2rem]">
+              <h2 className="font-brand mt-3 break-keep text-[1.85rem] leading-[1.10] text-[#14295F] sm:text-[2.2rem]">
                 기존 재원생 입구와 체험 입구를 분리했습니다
               </h2>
               <p className="mt-3 max-w-3xl break-keep text-[14.5px] font-medium leading-[1.82] text-slate-600">
@@ -40,7 +40,7 @@ export function EntryGatewaySection() {
                   RETURNING USER
                 </span>
               </div>
-              <p className="mt-5 text-[1.5rem] font-black tracking-[-0.04em] text-[#14295F]">
+              <p className="font-brand mt-5 text-[1.5rem] text-[#14295F]">
                 기존 재원생은 바로 로그인
               </p>
               <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
@@ -71,7 +71,7 @@ export function EntryGatewaySection() {
                   STUDENT · PARENT DEMO
                 </span>
               </div>
-              <p className="mt-5 text-[1.5rem] font-black tracking-[-0.04em] text-[#14295F]">
+              <p className="font-brand mt-5 text-[1.5rem] text-[#14295F]">
                 처음 방문했다면 체험부터 확인
               </p>
               <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">

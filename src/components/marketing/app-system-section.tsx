@@ -33,7 +33,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <span className="eyebrow-badge">EXPERIENCE FIRST</span>
-              <p className="mt-3 break-keep text-[1.55rem] font-black leading-[1.14] tracking-[-0.03em] text-[#14295F]">
+              <p className="font-brand mt-3 break-keep text-[1.55rem] leading-[1.14] text-[#14295F]">
                 학생 · 학부모 모드를 실제 앱처럼 체험
               </p>
               <p className="mt-2 break-keep text-[14px] font-medium leading-[1.74] text-slate-600">

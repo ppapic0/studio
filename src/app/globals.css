@@ -151,16 +151,16 @@
   }
 
   .font-display {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 800;
-    letter-spacing: -0.038em;
-    line-height: 1.08;
+    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
   }
 
   .font-brand {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.042em;
+    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.035em;
     line-height: 1.04;
   }
 
@@ -582,6 +582,109 @@
   }
 }
 
+/* ───────────────────────────────────────────────
+   Toss-style App Interactive Element System
+   - 클릭/탭 가능한 요소에 질감과 입체감 부여
+─────────────────────────────────────────────── */
+
+/* 앱 인터랙티브 행 (리스트 아이템, 메뉴 항목 등) */
+.app-row {
+  @apply relative flex items-center rounded-2xl border transition-all duration-100 ease-out active:scale-[0.985];
+  border-color: rgba(20, 41, 95, 0.07);
+  background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,252,255,0.98) 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.95) inset,
+    0 -1px 0 0 rgba(20,41,95,0.04) inset,
+    0 1px 3px 0 rgba(20,41,95,0.04),
+    0 4px 10px -2px rgba(20,41,95,0.06);
+}
+
+@media (hover: hover) {
+  .app-row:hover {
+    border-color: rgba(20, 41, 95, 0.11);
+    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(246,249,255,0.99) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,1) inset,
+      0 -1px 0 0 rgba(20,41,95,0.05) inset,
+      0 2px 6px 0 rgba(20,41,95,0.07),
+      0 8px 18px -4px rgba(20,41,95,0.09);
+    transform: translateY(-0.5px);
+  }
+}
+
+/* 앱 인터랙티브 카드 (탭/클릭 전체가 눌리는 카드) */
+.app-interactive-card {
+  @apply relative overflow-hidden rounded-[1.5rem] border transition-all duration-100 ease-out active:scale-[0.99] active:brightness-[0.99];
+  border-color: rgba(20, 41, 95, 0.08);
+  background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(249,251,255,0.99) 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,1) inset,
+    0 -1px 0 0 rgba(20,41,95,0.04) inset,
+    0 2px 4px 0 rgba(20,41,95,0.04),
+    0 8px 20px -4px rgba(20,41,95,0.08),
+    0 18px 36px -8px rgba(20,41,95,0.06);
+  will-change: transform;
+}
+
+@media (hover: hover) {
+  .app-interactive-card:hover {
+    border-color: rgba(20, 41, 95, 0.12);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,1) inset,
+      0 -1px 0 0 rgba(20,41,95,0.05) inset,
+      0 3px 8px 0 rgba(20,41,95,0.07),
+      0 12px 28px -4px rgba(20,41,95,0.11),
+      0 24px 44px -8px rgba(20,41,95,0.08);
+    transform: translateY(-1px);
+  }
+}
+
+/* 앱 내부 섹션 서피스 (카드 안의 서브 카드) */
+.app-surface {
+  @apply rounded-2xl border;
+  border-color: rgba(20, 41, 95, 0.07);
+  background-image: linear-gradient(180deg, rgba(249,251,255,1) 0%, rgba(243,247,255,0.98) 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.9) inset,
+    0 1px 3px 0 rgba(20,41,95,0.04),
+    0 4px 10px -3px rgba(20,41,95,0.05);
+}
+
+/* 따뜻한 색조 서피스 (주의/강조용) */
+.app-surface-warm {
+  @apply rounded-2xl border;
+  border-color: rgba(255, 122, 22, 0.14);
+  background-image: linear-gradient(180deg, rgba(255,248,240,1) 0%, rgba(255,255,255,0.99) 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.9) inset,
+    0 1px 3px 0 rgba(255,122,22,0.04),
+    0 4px 10px -3px rgba(255,122,22,0.06);
+}
+
+/* 커스텀 스크롤바 (Toss 스타일 얇은 스크롤바) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(20, 41, 95, 0.12) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(20, 41, 95, 0.12);
+  border-radius: 100px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(20, 41, 95, 0.20);
+}
+
 /* iPhone 15 baseline shell for app mode */
 .dashboard-mobile-shell {
   width: 393px;
@@ -601,12 +704,13 @@
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"] {
   border-radius: 1.35rem;
-  border-color: rgba(20, 41, 95, 0.16);
+  border-color: rgba(20, 41, 95, 0.09);
+  background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(249,251,255,0.98) 100%);
   box-shadow:
-    0 1px 0 0 rgba(255,255,255,0.98) inset,
+    0 1px 0 0 rgba(255,255,255,0.96) inset,
     0 -1px 0 0 rgba(20,41,95,0.04) inset,
-    0 4px 8px -2px rgba(20,41,95,0.08),
-    0 16px 32px -4px rgba(20,41,95,0.11);
+    0 2px 4px rgba(20,41,95,0.04),
+    0 8px 20px -4px rgba(20,41,95,0.08);
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-header"] {
@@ -623,12 +727,12 @@
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-title"] {
-  font-family: "TrackBody", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   color: #14295f;
-  font-size: clamp(1rem, 4.2vw, 1.18rem);
+  font-size: 1.05rem;
   font-weight: 700;
-  line-height: 1.34;
-  letter-spacing: 0;
+  line-height: 1.32;
+  letter-spacing: -0.018em;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-description"] {

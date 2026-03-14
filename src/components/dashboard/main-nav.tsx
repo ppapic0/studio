@@ -96,9 +96,9 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   const isStudent = userRole === 'student';
   const activeParentTab = searchParams.get('parentTab') || 'home';
 
-  const navClass = cn('flex-1 items-start px-4 text-sm font-medium pt-0', isMobile ? 'grid gap-6 text-lg' : 'flex flex-col gap-2');
+  const navClass = cn('flex-1 items-start px-3 text-sm font-medium pt-0', isMobile ? 'grid gap-5 text-lg' : 'flex flex-col gap-1');
   const linkClass = cn(
-    'flex items-center gap-4 rounded-2xl px-4 py-3 text-muted-foreground transition-all duration-300 hover:text-primary hover:bg-primary/5 active:scale-95 group',
+    'relative flex items-center gap-3 rounded-[0.9rem] px-3.5 py-2.5 text-[#5c6e88] transition-all duration-100 ease-out hover:text-[#14295F] hover:bg-[rgba(20,41,95,0.05)] active:scale-[0.98] group overflow-hidden',
     isMobile ? 'text-lg' : ''
   );
 
@@ -116,10 +116,29 @@ export function MainNav({ isMobile = false }: MainNavProps) {
           <Link
             key={item.href}
             href={item.href}
-            className={cn(linkClass, isActive && (isStudent ? `bg-gradient-to-br ${currentTier.gradient} text-white shadow-xl` : 'bg-primary text-primary-foreground shadow-xl'))}
+            className={cn(
+              linkClass,
+              isActive && (
+                isStudent
+                  ? `bg-gradient-to-r ${currentTier.gradient} text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.14)] hover:text-white hover:bg-transparent`
+                  : 'bg-[linear-gradient(135deg,#1e4898,#14295f)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.14)] hover:text-white hover:bg-transparent'
+              )
+            )}
           >
-            <item.icon className={cn('h-5 w-5 transition-transform duration-300 group-hover:scale-110', isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary')} />
-            <span className="font-bold whitespace-nowrap truncate">{item.label}</span>
+            {/* 좌측 액센트 바 */}
+            {isActive && !isStudent && (
+              <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white/50" />
+            )}
+            <item.icon className={cn(
+              'h-[1.05rem] w-[1.05rem] flex-shrink-0 transition-all duration-200',
+              isActive ? 'text-white' : 'text-[#8a9daf] group-hover:text-[#14295F] group-hover:scale-105'
+            )} />
+            <span className={cn(
+              'whitespace-nowrap truncate',
+              isActive ? 'font-bold' : 'font-semibold'
+            )}>
+              {item.label}
+            </span>
           </Link>
         );
       })}

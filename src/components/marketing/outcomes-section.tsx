@@ -66,7 +66,7 @@ export function OutcomesSection({ outcomes, successStory }: OutcomesSectionProps
           }}
         >
           <p className="text-xs font-black tracking-[0.18em] text-[#FFB273]/70">{successStory.title}</p>
-          <p className="mt-3 break-keep text-[1.7rem] font-black leading-[1.18] tracking-[-0.04em] text-white sm:text-[2rem]">
+          <p className="font-brand mt-3 break-keep text-[1.7rem] leading-[1.18] text-white sm:text-[2rem]">
             {successStory.summary}
           </p>
         </article>
