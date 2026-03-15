@@ -142,10 +142,10 @@ export function TrackKoreanMethodSection() {
                 비문학, 문학, 언어와 매체, 내신까지 과목별로 수업 방식을 다르게 설계해 실전 적용력을 완성합니다.
               </p>
               <div className="flex flex-wrap gap-3">
-                <a href="#korean-method-detail" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
+                <Link href="/class" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
                   수업 방식 자세히 보기
-                </a>
-                <Link href="#consult" className="premium-cta premium-cta-ghost h-11 px-6 text-sm">
+                </Link>
+                <Link href="/class#class-consult" className="premium-cta premium-cta-ghost h-11 px-6 text-sm">
                   상담 문의하기
                 </Link>
               </div>
@@ -402,12 +402,12 @@ export function TrackKoreanMethodSection() {
             상담을 통해 현재 상태에 맞는 학습 루틴과 수업 방향을 함께 설계해드립니다.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="#consult" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
+            <Link href="/class#class-consult" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
               상담 문의하기
             </Link>
-            <a href="#korean-method-detail" className="premium-cta premium-cta-ghost h-11 px-6 text-sm">
+            <Link href="/class" className="premium-cta premium-cta-ghost h-11 px-6 text-sm">
               수업 방식 더 보기
-            </a>
+            </Link>
           </div>
         </div>
       </div>

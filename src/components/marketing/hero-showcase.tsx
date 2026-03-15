@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BookOpen, Building2, Smartphone } from 'lucide-react';
+import { ArrowRight, BookOpen, Building2, Smartphone } from 'lucide-react';
 
 type ShowcaseItem = {
   label: string;
   title: string;
   desc: string;
   stat: string;
+  ctaHint?: string;
   icon: typeof Building2;
   color: 'navy' | 'blue' | 'orange';
   targetId?: string;
@@ -18,29 +19,30 @@ const items: ShowcaseItem[] = [
   {
     label: 'STUDY CENTER',
     title: '관리형 스터디센터 중심',
-    desc: '입실부터 퇴실까지, 루틴과 데이터가 기록됩니다',
+    desc: '입실부터 퇴실까지, 루틴과 데이터가 기록됩니다.',
     stat: '매일 오전 8:30 시작',
     icon: Building2,
     targetId: 'features',
-    color: 'navy' as const,
+    color: 'navy',
   },
   {
     label: 'CLASS SYSTEM',
     title: '국어 수업 선택형 구조',
-    desc: '센터만 이용하거나, 필요할 때 수업을 추가합니다',
+    desc: '센터만 이용하거나 필요할 때 국어 수업을 추가합니다.',
     stat: '재학생 · N수생 모두 가능',
+    ctaHint: '클릭하면 국어 수업 방식·자료·내신 대비를 확인할 수 있습니다',
     icon: BookOpen,
     targetHref: '/class',
-    color: 'blue' as const,
+    color: 'blue',
   },
   {
     label: 'APP SYSTEM',
     title: '앱 기반 관리 시스템',
-    desc: '학생과 학부모가 각자의 화면에서 흐름을 확인합니다',
+    desc: '학생과 학부모가 각자 화면에서 흐름을 확인합니다.',
     stat: '출결 · 공부시간 · 실행률 연결',
     icon: Smartphone,
     targetId: 'app',
-    color: 'orange' as const,
+    color: 'orange',
   },
 ];
 
@@ -49,10 +51,12 @@ export function HeroShowcase() {
 
   const handleItemClick = (index: number, targetId?: string, targetHref?: string) => {
     setActive(index);
+
     if (targetHref) {
       window.location.href = targetHref;
       return;
     }
+
     if (!targetId) return;
     const target = document.getElementById(targetId);
     if (!target) return;
@@ -69,15 +73,14 @@ export function HeroShowcase() {
       {items.map((item, i) => {
         const Icon = item.icon;
         const isActive = i === active;
+
         return (
           <button
             key={item.label}
             onClick={() => handleItemClick(i, item.targetId, item.targetHref)}
             aria-label={item.title}
-            className={`flex items-start gap-4 rounded-2xl border p-5 text-left transition-all duration-500 ${
-              isActive
-                ? 'border-white/18 bg-white/9'
-                : 'border-white/6 bg-white/3 opacity-38 hover:opacity-55'
+            className={`group flex items-start gap-4 rounded-2xl border p-5 text-left transition-all duration-500 ${
+              isActive ? 'border-white/18 bg-white/9' : 'border-white/6 bg-white/3 opacity-40 hover:opacity-62'
             }`}
           >
             <div
@@ -100,6 +103,7 @@ export function HeroShowcase() {
               >
                 {item.label}
               </p>
+
               <p
                 className={`mt-1.5 break-keep font-black leading-[1.2] transition-all duration-400 ${
                   isActive ? 'text-[1.1rem] text-white' : 'text-[1rem] text-white/45'
@@ -107,16 +111,20 @@ export function HeroShowcase() {
               >
                 {item.title}
               </p>
-              <div
-                className={`grid transition-all duration-500 ${isActive ? 'mt-2.5 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-              >
+
+              <div className={`grid transition-all duration-500 ${isActive ? 'mt-2.5 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                 <div className="overflow-hidden">
-                  <p className="break-keep text-[13px] font-semibold leading-[1.65] text-blue-100/55">
-                    {item.desc}
-                  </p>
+                  <p className="break-keep text-[13px] font-semibold leading-[1.65] text-blue-100/55">{item.desc}</p>
                   <p className="mt-2.5 inline-block rounded-lg border border-white/10 bg-white/6 px-3 py-1.5 text-[12px] font-black text-white/70">
                     {item.stat}
                   </p>
+
+                  {item.ctaHint ? (
+                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
+                      {item.ctaHint}
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -124,7 +132,6 @@ export function HeroShowcase() {
         );
       })}
 
-      {/* Indicator dots */}
       <div className="mt-1 flex items-center justify-center gap-2">
         {items.map((_, i) => (
           <button
@@ -140,3 +147,4 @@ export function HeroShowcase() {
     </div>
   );
 }
+
