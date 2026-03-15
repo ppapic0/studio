@@ -635,16 +635,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <Flame className="h-48 w-48" />
                 </div>
                 <div className="space-y-1 relative z-10">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/72">오늘의 트랙 총량 (누적)</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/70">오늘의 트랙 총량 (누적)</p>
                   <div className="flex items-baseline gap-1">
-                    <h3 className="dashboard-number text-6xl text-white drop-shadow-[0_10px_24px_rgba(7,16,40,0.35)]">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="ml-1 text-2xl text-white/52">시간</span></h3>
+                    <h3 className="dashboard-number text-6xl text-white drop-shadow-[0_10px_24px_rgba(7,16,40,0.35)]">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="ml-1 text-2xl text-white/50">시간</span></h3>
                   </div>
                   <div className="pt-8 space-y-3">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/68">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/70">
                       <span>일일 활성 목표 (평균 6시간)</span>
                       <span>{Math.min(100, Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100))}%</span>
                     </div>
-                    <div className="h-2.5 w-full rounded-full bg-white/14 overflow-hidden shadow-[inset_0_2px_4px_rgba(6,15,38,0.32)]">
+                    <div className="h-2.5 w-full rounded-full bg-white/15 overflow-hidden shadow-[inset_0_2px_4px_rgba(6,15,38,0.32)]">
                       <div
                         className="h-full rounded-full bg-[linear-gradient(90deg,#FFE1C0_0%,#FFB46C_42%,#FF7A16_100%)] shadow-[0_0_18px_rgba(255,122,22,0.38)] transition-all duration-700"
                         style={{ width: `${Math.min(100, (metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)}%` }}
