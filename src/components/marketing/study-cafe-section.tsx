@@ -84,7 +84,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-[10.5px] font-black tracking-[0.2em] text-[#FF7A16]">{block.eyebrow}</p>
-                      <h3 className="font-brand mt-3 break-keep text-[1.6rem] leading-[1.08] text-[#14295F]">
+                      <h3 className="mt-3 break-keep text-[1.6rem] font-black leading-[1.08] tracking-[-0.035em] text-[#14295F]">
                         {block.title}
                       </h3>
                     </div>

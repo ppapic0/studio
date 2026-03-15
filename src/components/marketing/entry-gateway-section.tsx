@@ -40,7 +40,7 @@ export function EntryGatewaySection() {
                   RETURNING USER
                 </span>
               </div>
-              <p className="font-brand mt-5 text-[1.5rem] text-[#14295F]">
+              <p className="mt-5 text-[1.4rem] font-extrabold leading-[1.18] tracking-[-0.03em] text-[#14295F]">
                 기존 재원생은 바로 로그인
               </p>
               <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
@@ -71,7 +71,7 @@ export function EntryGatewaySection() {
                   STUDENT · PARENT DEMO
                 </span>
               </div>
-              <p className="font-brand mt-5 text-[1.5rem] text-[#14295F]">
+              <p className="mt-5 text-[1.4rem] font-extrabold leading-[1.18] tracking-[-0.03em] text-[#14295F]">
                 처음 방문했다면 체험부터 확인
               </p>
               <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
