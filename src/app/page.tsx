@@ -1,7 +1,9 @@
 import { AppPreviewSection } from '@/components/marketing/app-preview-section';
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { DataManagementSection } from '@/components/marketing/data-management-section';
 import { FeatureStepsSection } from '@/components/marketing/feature-steps-section';
 import { HeroSection } from '@/components/marketing/hero-section';
+import { KoreanClassSection } from '@/components/marketing/korean-class-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
@@ -17,8 +19,10 @@ export default function HomePage() {
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
       <ScrollReveal><FeatureStepsSection /></ScrollReveal>
+      <ScrollReveal><DataManagementSection /></ScrollReveal>
       <ScrollReveal><AppPreviewSection /></ScrollReveal>
       <ScrollReveal><ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} /></ScrollReveal>
+      <ScrollReveal><KoreanClassSection /></ScrollReveal>
       <ScrollReveal><ConsultSection consult={marketingContent.consult} /></ScrollReveal>
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
       <StickyConsultCTA />

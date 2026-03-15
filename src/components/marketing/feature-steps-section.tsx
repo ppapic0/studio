@@ -29,27 +29,27 @@ const steps = [
 
 export function FeatureStepsSection() {
   return (
-    <section id="features" className="scroll-mt-20 py-20 sm:py-28" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f2f6ff 100%)' }}>
+    <section id="features" className="scroll-mt-20 py-12 sm:py-16" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f2f6ff 100%)' }}>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section heading */}
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">HOW WE WORK</span>
-          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.9rem,3.9vw,2.8rem)] font-black leading-[1.08] text-[#14295F]">
+          <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.75rem,3.5vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
             트랙이 다른 이유는
             <br />
             구조에 있습니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-[#384f6a]">
+          <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-[#384f6a]">
             공간을 제공하는 것이 아니라, 루틴을 설계하고 데이터로 관리합니다.
           </p>
         </div>
 
         {/* Steps — stagger on scroll */}
-        <StaggerChildren stagger={130} className="mt-14 grid gap-5 sm:grid-cols-3">
+        <StaggerChildren stagger={130} className="mt-9 grid gap-4 sm:grid-cols-3">
           {steps.map((step) => (
             <article
               key={step.num}
-              className={`flex flex-col rounded-[1.4rem] border p-7 ${
+              className={`flex flex-col rounded-[1.25rem] border p-5 ${
                 step.dark
                   ? 'border-[#0c1d47] bg-[#14295F] text-white'
                   : 'border-[rgba(20,41,95,0.1)] bg-white'
@@ -75,7 +75,7 @@ export function FeatureStepsSection() {
 
               {/* Tag + Heading */}
               <p
-                className={`mt-6 text-[11px] font-black tracking-[0.18em] uppercase ${
+                className={`mt-5 text-[10.5px] font-black tracking-[0.18em] uppercase ${
                   step.dark ? 'text-[#FF9848]' : 'text-[#FF7A16]'
                 }`}
               >
@@ -98,7 +98,7 @@ export function FeatureStepsSection() {
 
               {/* Accent stat */}
               <div
-                className={`mt-6 rounded-xl border px-4 py-3 ${
+                className={`mt-4 rounded-xl border px-4 py-3 ${
                   step.dark
                     ? 'border-white/12 bg-white/7'
                     : 'border-[#14295F]/8 bg-[#14295F]/4'
