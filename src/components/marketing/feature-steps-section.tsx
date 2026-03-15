@@ -59,7 +59,7 @@ export function FeatureStepsSection() {
               <div className="flex items-center justify-between">
                 <span
                   className={`rounded-lg px-2.5 py-1 text-[10.5px] font-black tracking-[0.14em] ${
-                    step.dark ? 'bg-white/12 text-white/60' : 'bg-[#14295F]/6 text-[#14295F]/55'
+                    step.dark ? 'bg-white/15 text-white/70' : 'bg-[#14295F]/6 text-[#14295F]/55'
                   }`}
                 >
                   STEP {step.num}
@@ -90,7 +90,7 @@ export function FeatureStepsSection() {
               </h3>
               <p
                 className={`mt-3 flex-1 break-keep text-[13.5px] font-semibold leading-[1.74] ${
-                  step.dark ? 'text-blue-100/58' : 'text-slate-500'
+                  step.dark ? 'text-blue-100/80' : 'text-slate-500'
                 }`}
               >
                 {step.body}
@@ -113,7 +113,7 @@ export function FeatureStepsSection() {
                 </p>
                 <p
                   className={`mt-0.5 text-[11px] font-semibold ${
-                    step.dark ? 'text-white/42' : 'text-slate-400'
+                    step.dark ? 'text-white/55' : 'text-slate-400'
                   }`}
                 >
                   {step.accent.label}

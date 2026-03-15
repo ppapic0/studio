@@ -25,14 +25,14 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
             <br />
             데이터로 말합니다
           </h2>
-          <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-white/82">
+          <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-white/80">
             2026학년도 수능, 트랙의 운영 구조가 만들어 낸 결과입니다.
           </p>
         </div>
 
         {/* University data board */}
         <div className="mt-9">
-          <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-white/45">
+          <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-white/60">
             2026학년도 주요 합격
           </p>
           <StaggerChildren stagger={80} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -44,10 +44,10 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
                 <p className="font-brand text-[2.2rem] font-black leading-none text-white">
                   {u.value}
                 </p>
-                <p className="mt-2 break-keep text-[12px] font-semibold text-white/68">
+                <p className="mt-2 break-keep text-[12px] font-semibold text-white/70">
                   {u.label}
                 </p>
-                <p className="mt-1 text-[10px] font-semibold text-white/42">{u.detail}</p>
+                <p className="mt-1 text-[10px] font-semibold text-white/50">{u.detail}</p>
               </article>
             ))}
           </StaggerChildren>
