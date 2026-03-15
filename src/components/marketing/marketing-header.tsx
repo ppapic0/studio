@@ -32,7 +32,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             <span className="text-[1rem] font-bold text-white sm:text-[1.05rem]">
               {brand.name}
             </span>
-            <span className="text-[9.5px] font-black tracking-[0.18em] text-white/38">
+            <span className="text-[9.5px] font-black tracking-[0.18em] text-white/50">
               MANAGED STUDY CENTER
             </span>
           </div>
