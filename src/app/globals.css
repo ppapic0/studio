@@ -201,24 +201,73 @@
   }
 
   .font-numeric {
+    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
-    letter-spacing: -0.016em;
-    line-height: 1.08;
+    letter-spacing: -0.018em;
+    line-height: 1.1;
   }
 
   .tabular-nums {
+    font-weight: 700;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.014em;
+  }
+
+  .dashboard-number {
+    font-weight: 800;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.025em;
+    line-height: 1.06;
+  }
+
+  /* ── Metric scale system — data-UI hierarchy ── */
+  /* hero: landmark KPI, 1 per screen */
+  .metric-hero {
+    font-family: "Pretendard Variable", Pretendard, sans-serif;
+    font-weight: 900;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.03em;
+    line-height: 1.0;
+  }
+  /* primary: card KPI main value */
+  .metric-primary {
+    font-family: "Pretendard Variable", Pretendard, sans-serif;
+    font-weight: 800;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.025em;
+    line-height: 1.04;
+  }
+  /* secondary: list / small-card value */
+  .metric-secondary {
+    font-family: "Pretendard Variable", Pretendard, sans-serif;
+    font-weight: 700;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.018em;
+    line-height: 1.1;
+  }
+  /* inline: numbers mixed into body text */
+  .metric-inline {
+    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
     letter-spacing: -0.012em;
   }
-
-  .dashboard-number {
-    font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "tnum" 1, "lnum" 1;
-    letter-spacing: -0.02em;
-    line-height: 1.08;
+  /* unit: %, 시간, 점, 회, 명 etc. — lighter than the number */
+  .metric-unit {
+    font-weight: 500;
+    opacity: 0.58;
+    letter-spacing: -0.005em;
   }
+  /* delta tones */
+  .metric-positive { color: #16a34a; }
+  .metric-negative { color: #dc2626; }
+  .metric-muted    { opacity: 0.55; }
 
   .dashboard-shell {
     word-break: keep-all;
@@ -533,7 +582,7 @@
     font-weight: 900;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.035em;
     line-height: 1.0;
   }
 
@@ -757,7 +806,8 @@
 
 .dashboard-mobile-shell .dashboard-mobile-main .dashboard-number {
   color: inherit;
-  letter-spacing: -0.008em;
+  font-weight: 800;
+  letter-spacing: -0.022em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
