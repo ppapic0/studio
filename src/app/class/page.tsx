@@ -82,7 +82,7 @@ const materialPreviews = [
 ];
 
 const koreanMaterialPdfPath = '/materials/2026-korean-nonfiction-2passages-commentary.pdf';
-const koreanMaterialPreviewUrl = `${koreanMaterialPdfPath}#page=1&view=FitH`;
+const koreanMaterialPreviewImagePath = '/materials/2026-korean-nonfiction-2passages-commentary-page1.png';
 
 const scoreProofCards = [
   {
@@ -102,6 +102,24 @@ const scoreProofCards = [
     result: '국어 백분위 99',
     detail: '실제 성적표 기반',
     image: '/marketing/proof/csat-score-redacted.jpg',
+  },
+];
+
+const kakaoFeedbackCards = [
+  {
+    label: '성적 확인 직후',
+    summary: '국어 93점 후기',
+    image: '/marketing/reviews/kakao-feedback-2-redacted.jpg',
+  },
+  {
+    label: '백분위 97 사례',
+    summary: '시험 직후 피드백',
+    image: '/marketing/reviews/kakao-feedback-1-redacted.jpg',
+  },
+  {
+    label: '문항 질의응답',
+    summary: '시험 후 해설 대화',
+    image: '/marketing/reviews/kakao-feedback-3-redacted.jpg',
   },
 ];
 
@@ -402,7 +420,11 @@ export default function ClassPage() {
                     key={card.phase}
                     className="overflow-hidden rounded-[1.1rem] border border-[rgba(20,41,95,0.12)] bg-[#F8FAFF]"
                   >
-                    <img src={card.image} alt={`${card.phase} score proof (redacted)`} className="h-[230px] w-full object-cover object-top" />
+                    <img
+                      src={card.image}
+                      alt={`${card.phase} score proof (redacted)`}
+                      className="h-[320px] w-full bg-white object-contain object-top"
+                    />
                     <figcaption className="space-y-1 border-t border-[rgba(20,41,95,0.08)] bg-white px-4 py-3.5">
                       <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FF7A16]">{card.phase}</p>
                       <p className="text-[15px] font-black text-[#14295F]">{card.result}</p>
@@ -410,6 +432,30 @@ export default function ClassPage() {
                     </figcaption>
                   </figure>
                 ))}
+              </div>
+              <div className="mt-8 rounded-[1.1rem] border border-[rgba(20,41,95,0.10)] bg-[#f8fbff] p-4 sm:p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[12px] font-black uppercase tracking-[0.14em] text-[#FF7A16]">
+                    성적 공개 이후 카카오톡 후기
+                  </p>
+                  <span className="rounded-full border border-[#14295F]/12 bg-white px-2.5 py-1 text-[11px] font-black text-[#14295F]/75">
+                    이름 익명 처리
+                  </span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {kakaoFeedbackCards.map((card) => (
+                    <figure
+                      key={card.label}
+                      className="overflow-hidden rounded-[0.95rem] border border-[#14295F]/10 bg-white"
+                    >
+                      <img src={card.image} alt={`${card.label} kakao feedback (redacted)`} className="h-[200px] w-full object-cover object-top" />
+                      <figcaption className="space-y-1 border-t border-[#14295F]/8 px-3.5 py-3">
+                        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#FF7A16]">{card.label}</p>
+                        <p className="text-[13px] font-black text-[#14295F]">{card.summary}</p>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
               </div>
             </article>
 
@@ -537,16 +583,18 @@ export default function ClassPage() {
               </p>
               <div className="mx-auto mb-6 max-w-3xl overflow-hidden rounded-[1.2rem] border border-white/18 bg-white">
                 <div className="flex items-center justify-between border-b border-[#14295F]/10 px-4 py-2.5">
-                  <p className="text-[12px] font-black text-[#14295F]">PDF First Page Preview</p>
+                  <p className="text-[12px] font-black text-[#14295F]">PDF 1페이지 미리보기</p>
                   <a href={koreanMaterialPdfPath} download className="text-[11.5px] font-black text-[#14295F]/70 hover:text-[#14295F]">
-                    Download
+                    다운로드
                   </a>
                 </div>
-                <iframe
-                  title="PDF first page preview"
-                  src={koreanMaterialPreviewUrl}
-                  className="h-[280px] w-full bg-white"
-                />
+                <a href={koreanMaterialPdfPath} target="_blank" rel="noreferrer" className="block bg-white">
+                  <img
+                    src={koreanMaterialPreviewImagePath}
+                    alt="수업자료 PDF 1페이지 미리보기"
+                    className="h-[360px] w-full object-contain"
+                  />
+                </a>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
