@@ -1,3 +1,14 @@
+/* ── Pretendard Variable — base UI font ── */
+@font-face {
+  font-family: "Pretendard Variable";
+  src: url("/fonts/pretendard/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+0020-007E, U+00A0-00FF;
+}
+
+/* ── TrackDisplay (SB-Aggro) — display only ── */
 @font-face {
   font-family: "TrackDisplay";
   src: url("/fonts/custom/SB-Aggro-L.ttf") format("truetype");
@@ -154,34 +165,39 @@
     @apply bg-background text-foreground font-body antialiased transition-colors duration-300;
     touch-action: manipulation;
     font-weight: 500;
-    line-height: 1.6;
+    line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
+  /* ── Display token: body/button/card headings (Pretendard-based) ── */
   .font-display {
-    font-weight: 800;
-    letter-spacing: -0.024em;
-    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.28;
   }
 
+  /* ── Brand token: same Pretendard family, heavier ── */
   .font-brand {
-    font-weight: 900;
-    letter-spacing: -0.028em;
-    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
   }
 
   .font-accent {
-    font-weight: 700;
-    letter-spacing: -0.015em;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
+  /* ── TrackDisplay (어그로체): ONLY for brand hero / large display copy ── */
   .font-aggro-display {
-    font-family: "TrackDisplay", system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
     font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.02;
+    letter-spacing: -0.025em;
+    line-height: 1.06;
   }
 
   .font-numeric {

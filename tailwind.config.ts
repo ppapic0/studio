@@ -22,8 +22,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"Noto Sans KR"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Apple SD Gothic Neo"', '"Malgun Gothic"', 'sans-serif'],
-        headline: ['var(--font-aggro)', 'var(--font-gangwon)', 'sans-serif'],
+        body: ['"Pretendard Variable"', '"Pretendard"', '"Noto Sans KR"', '-apple-system', 'BlinkMacSystemFont', '"Apple SD Gothic Neo"', '"Segoe UI"', 'sans-serif'],
+        headline: ['var(--font-aggro)', '"Pretendard Variable"', '"Pretendard"', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',
