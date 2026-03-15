@@ -19,11 +19,11 @@ export default function HomePage() {
       <MarketingPageTracker pageType="landing" placement="landing_root" />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
+      <ScrollReveal><ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} /></ScrollReveal>
       <ScrollReveal><FeatureStepsSection /></ScrollReveal>
       <ScrollReveal><DataManagementSection /></ScrollReveal>
       <ScrollReveal><DataAnalyticsPreviewSection /></ScrollReveal>
       <ScrollReveal><AppPreviewSection /></ScrollReveal>
-      <ScrollReveal><ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} /></ScrollReveal>
       <ScrollReveal><KoreanClassSection /></ScrollReveal>
       <ScrollReveal><ConsultSection consult={marketingContent.consult} /></ScrollReveal>
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
