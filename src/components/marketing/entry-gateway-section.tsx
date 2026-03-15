@@ -2,7 +2,7 @@ import { ArrowRight, LogIn, Smartphone, Users } from 'lucide-react';
 
 export function EntryGatewaySection() {
   return (
-    <section className="bg-white pb-10 pt-3 sm:pb-14">
+    <section id="intro" className="bg-white pb-10 pt-3 sm:pb-14">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="marketing-card overflow-hidden p-5 sm:p-6">
           {/* Top accent line */}

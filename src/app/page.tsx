@@ -12,6 +12,7 @@ import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { OutcomesSection } from '@/components/marketing/outcomes-section';
+import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StudyCafeSection } from '@/components/marketing/study-cafe-section';
 import { marketingContent } from '@/lib/marketing-content';
 
@@ -21,17 +22,17 @@ export default function HomePage() {
       <MarketingPageTracker pageType="landing" placement="landing_root" />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} heroStats={marketingContent.heroStats} />
-      <EntryGatewaySection />
-      <StudyCafeSection studyCafe={marketingContent.studyCafe} />
-      <AppSystemSection appSystem={marketingContent.appSystem} />
-      <LPSystemSection lpSystem={marketingContent.lpSystem} />
-      <OutcomesSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
-      <ComparisonSection comparison={marketingContent.comparison} />
-      <CoreValuesSection valueCards={marketingContent.valueCards} />
-      <DirectorSection director={marketingContent.director} />
-      <ClassSystemSection classSystem={marketingContent.classSystem} />
-      <FacilitySection facility={marketingContent.facility} />
-      <ConsultSection consult={marketingContent.consult} />
+      <ScrollReveal><EntryGatewaySection /></ScrollReveal>
+      <ScrollReveal><StudyCafeSection studyCafe={marketingContent.studyCafe} /></ScrollReveal>
+      <ScrollReveal><AppSystemSection appSystem={marketingContent.appSystem} /></ScrollReveal>
+      <ScrollReveal><LPSystemSection lpSystem={marketingContent.lpSystem} /></ScrollReveal>
+      <ScrollReveal><OutcomesSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} /></ScrollReveal>
+      <ScrollReveal><ComparisonSection comparison={marketingContent.comparison} /></ScrollReveal>
+      <ScrollReveal><CoreValuesSection valueCards={marketingContent.valueCards} /></ScrollReveal>
+      <ScrollReveal><DirectorSection director={marketingContent.director} /></ScrollReveal>
+      <ScrollReveal><ClassSystemSection classSystem={marketingContent.classSystem} /></ScrollReveal>
+      <ScrollReveal><FacilitySection facility={marketingContent.facility} /></ScrollReveal>
+      <ScrollReveal><ConsultSection consult={marketingContent.consult} /></ScrollReveal>
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
     </main>
   );

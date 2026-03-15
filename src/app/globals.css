@@ -119,6 +119,26 @@
     --ring: 25 100% 54%;
   }
 
+  /* ── Scroll reveal ── */
+  .sr-hidden {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.65s ease, transform 0.65s ease;
+  }
+
+  .sr-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sr-hidden {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
   html {
     scroll-behavior: smooth;
   }
@@ -405,156 +425,61 @@
   ─────────────────────────────────────────────── */
 
   .premium-cta {
-    @apply relative inline-flex items-center justify-center overflow-hidden rounded-[0.9rem] border font-black tracking-[-0.025em] transition-all duration-150 ease-out active:scale-[0.96];
-    will-change: transform, box-shadow, filter;
-    transform: translateZ(0);
-  }
-
-  .premium-cta::before {
-    content: "";
-    position: absolute;
-    inset: 1px;
-    border-radius: inherit;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 40%);
-    pointer-events: none;
-    opacity: 0.88;
-  }
-
-  .premium-cta::after {
-    content: "";
-    position: absolute;
-    inset: -40%;
-    background: linear-gradient(108deg, transparent 30%, rgba(255,255,255,0.24) 47%, transparent 64%);
-    transform: translateX(-60%);
-    opacity: 0;
-    transition: transform 300ms ease, opacity 200ms ease;
-    pointer-events: none;
+    @apply inline-flex items-center justify-center rounded-[0.9rem] border font-black tracking-[-0.025em] transition-all duration-150 ease-out active:scale-[0.97] active:opacity-90;
   }
 
   @media (hover: hover) {
     .premium-cta:hover {
-      transform: translateY(-1.5px) scale(1.015);
-      filter: saturate(1.04);
-    }
-
-    .premium-cta:hover::after {
-      transform: translateX(36%);
-      opacity: 1;
+      opacity: 0.88;
     }
   }
 
   /* Orange CTA - 주 행동 유도 */
   .premium-cta-primary {
-    border-color: #f98c3a;
+    border-color: #e86800;
     color: #ffffff;
-    background-image: linear-gradient(170deg, #ff9d4e 0%, #ff7a16 45%, #e86800 100%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.52) inset,
-      0 -2px 0 0 rgba(120,44,0,0.14) inset,
-      0 4px 8px -2px rgba(255,122,22,0.32),
-      0 12px 24px -4px rgba(255,122,22,0.22),
-      0 0 0 1px rgba(255,105,10,0.18);
-  }
-
-  .premium-cta-primary:hover {
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.58) inset,
-      0 -2px 0 0 rgba(120,44,0,0.14) inset,
-      0 6px 12px -2px rgba(255,122,22,0.38),
-      0 18px 32px -4px rgba(255,122,22,0.26),
-      0 0 0 1px rgba(255,105,10,0.20);
+    background-color: #ff7a16;
   }
 
   /* Navy CTA - 보조 행동 */
   .premium-cta-secondary {
-    border-color: #1a3470;
+    border-color: #0c1d47;
     color: #ffffff;
-    background-image: linear-gradient(170deg, #1f4898 0%, #14295f 50%, #0c1d47 100%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.24) inset,
-      0 -2px 0 0 rgba(6,14,36,0.22) inset,
-      0 4px 8px -2px rgba(20,41,95,0.28),
-      0 12px 24px -4px rgba(20,41,95,0.18),
-      0 0 0 1px rgba(14,28,70,0.16);
+    background-color: #14295f;
   }
 
-  .premium-cta-secondary:hover {
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.28) inset,
-      0 -2px 0 0 rgba(6,14,36,0.24) inset,
-      0 6px 12px -2px rgba(20,41,95,0.34),
-      0 18px 32px -4px rgba(20,41,95,0.22),
-      0 0 0 1px rgba(14,28,70,0.18);
-  }
-
-  /* Muted CTA - 화이트 투명 */
+  /* Muted CTA - 화이트 라이트 */
   .premium-cta-muted {
-    border-color: rgba(20, 41, 95, 0.14);
+    border-color: rgba(20, 41, 95, 0.18);
     color: #14295F;
-    background-image:
-      linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(243,247,255,0.98) 100%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.98) inset,
-      0 -1px 0 0 rgba(20,41,95,0.06) inset,
-      0 2px 4px 0 rgba(20,41,95,0.05),
-      0 8px 18px -4px rgba(20,41,95,0.09),
-      0 0 0 1px rgba(20,41,95,0.04);
-  }
-
-  .premium-cta-muted:hover {
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.99) inset,
-      0 -1px 0 0 rgba(20,41,95,0.07) inset,
-      0 3px 6px 0 rgba(20,41,95,0.07),
-      0 12px 24px -4px rgba(20,41,95,0.11),
-      0 0 0 1px rgba(20,41,95,0.05);
+    background-color: #ffffff;
   }
 
   /* Ghost CTA - 다크 배경 위 */
   .premium-cta-ghost {
-    border-color: rgba(255,255,255,0.22);
+    border-color: rgba(255,255,255,0.28);
     color: #ffffff;
-    background-image: linear-gradient(160deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%);
+    background-color: rgba(255,255,255,0.10);
     backdrop-filter: blur(8px);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.18) inset,
-      0 -1px 0 0 rgba(0,0,0,0.14) inset,
-      0 4px 12px -2px rgba(0,0,0,0.18);
   }
 
-  .premium-cta-ghost:hover {
-    border-color: rgba(255,255,255,0.32);
-    background-image: linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.10) 100%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.24) inset,
-      0 -1px 0 0 rgba(0,0,0,0.16) inset,
-      0 6px 16px -2px rgba(0,0,0,0.22);
+  @media (hover: hover) {
+    .premium-cta-ghost:hover {
+      border-color: rgba(255,255,255,0.42);
+      background-color: rgba(255,255,255,0.16);
+      opacity: 1;
+    }
   }
 
   .premium-surface-button {
-    @apply relative overflow-hidden rounded-[1.25rem] border transition-all duration-150 ease-out active:scale-[0.98];
-    border-color: rgba(20, 41, 95, 0.11);
-    background-image:
-      linear-gradient(160deg, rgba(255,255,255,1) 0%, rgba(245,249,255,0.98) 100%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,1) inset,
-      0 -1px 0 0 rgba(20,41,95,0.05) inset,
-      0 2px 4px 0 rgba(20,41,95,0.04),
-      0 10px 22px -4px rgba(20,41,95,0.09),
-      0 20px 40px -8px rgba(20,41,95,0.06);
-    will-change: transform, box-shadow;
-    transform: translateZ(0);
+    @apply rounded-[1.25rem] border bg-white transition-all duration-150 ease-out active:scale-[0.98];
+    border-color: rgba(20, 41, 95, 0.13);
   }
 
   @media (hover: hover) {
     .premium-surface-button:hover {
-      transform: translateY(-1.5px);
-      box-shadow:
-        0 1px 0 0 rgba(255,255,255,1) inset,
-        0 -1px 0 0 rgba(20,41,95,0.06) inset,
-        0 3px 6px 0 rgba(20,41,95,0.06),
-        0 14px 28px -4px rgba(20,41,95,0.12),
-        0 28px 48px -8px rgba(20,41,95,0.08);
+      border-color: rgba(20, 41, 95, 0.22);
+      background-color: #f8faff;
     }
   }
 
