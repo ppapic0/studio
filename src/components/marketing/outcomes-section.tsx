@@ -16,7 +16,7 @@ export function OutcomesSection({ outcomes, successStory }: OutcomesSectionProps
         background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 50%, #0d1e4a 100%)',
       }}
     >
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
         {/* Decorative */}
         <div className="pointer-events-none absolute left-0 right-0 overflow-hidden" aria-hidden="true">
           <div className="mx-auto max-w-7xl px-4">
@@ -31,7 +31,7 @@ export function OutcomesSection({ outcomes, successStory }: OutcomesSectionProps
           light
         />
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
           {outcomes.map((item, i) => (
             <article
               key={item.label}

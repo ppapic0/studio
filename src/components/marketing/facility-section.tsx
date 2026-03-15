@@ -15,10 +15,10 @@ export function FacilitySection({ facility }: FacilitySectionProps) {
 
   return (
     <section id="facility" className="scroll-mt-28 bg-white py-16 sm:py-20">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Facility" title={facility.heading} description={facility.description} />
 
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
+        <div className="mt-10 mx-auto max-w-3xl grid gap-5 sm:grid-cols-2">
           {facility.gallery.map((item, index) => {
             const g = cardGradients[index % cardGradients.length];
             return (

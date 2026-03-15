@@ -1,0 +1,81 @@
+import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
+
+import { MarketingFooter } from '@/components/marketing/marketing-footer';
+import { MarketingHeader } from '@/components/marketing/marketing-header';
+import { SectionHeading } from '@/components/marketing/section-heading';
+import { marketingContent } from '@/lib/marketing-content';
+
+export default function LPPage() {
+  const { lpSystem } = marketingContent;
+
+  return (
+    <main className="min-h-screen bg-white text-slate-900">
+      <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
+
+      <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-32 sm:px-6 lg:px-8">
+        <Link
+          href="/#lp-system"
+          className="mb-8 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#14295F]/60 transition-colors hover:text-[#14295F]"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          홈으로 돌아가기
+        </Link>
+
+        <SectionHeading
+          eyebrow="LP System"
+          title={lpSystem.heading}
+          description={lpSystem.description}
+        />
+
+        <div className="mt-9 grid gap-4">
+          {lpSystem.cycle.map((step, index) => (
+            <article key={step.title} className="marketing-card flex gap-5 p-7">
+              <div className="step-badge mt-0.5 shrink-0">{index + 1}</div>
+              <div>
+                <h3 className="break-keep text-[1.3rem] font-extrabold leading-[1.22] tracking-[-0.03em] text-[#14295F]">
+                  {step.title}
+                </h3>
+                <p className="mt-2.5 break-keep text-[15px] font-medium leading-[1.85] text-slate-600">
+                  {step.description}
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {lpSystem.benefits.length > 0 && (
+          <div className="mt-6">
+            <p className="mb-3 text-[12px] font-black tracking-[0.16em] text-[#FF7A16]">BENEFITS</p>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {lpSystem.benefits.map((benefit) => (
+                <div
+                  key={benefit}
+                  className="flex items-center gap-3 rounded-[1.2rem] border border-[#14295F]/10 bg-[#F4F7FF] px-4 py-3.5"
+                >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: 'linear-gradient(135deg, #FF7A16, #FF9848)' }}
+                  />
+                  <p className="text-[14px] font-extrabold text-[#14295F]">{benefit}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-10 rounded-[1.5rem] border border-[rgba(20,41,95,0.08)] bg-[#F4F7FF] p-6 text-center">
+          <p className="text-[15px] font-semibold text-slate-600">LP 시스템 운영 방식과 등록 절차는 상담을 통해 안내해 드립니다.</p>
+          <Link
+            href="/#consult"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#14295F] px-6 py-3 text-[14px] font-bold text-white shadow-sm transition-[transform,background-color] duration-100 hover:bg-[#1a3570] active:scale-[0.97] active:brightness-[0.93]"
+          >
+            상담 문의하기
+          </Link>
+        </div>
+      </div>
+
+      <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
+    </main>
+  );
+}
