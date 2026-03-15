@@ -108,7 +108,7 @@ function MiniStudentToday() {
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <ValueCard label="오늘의 누적 트랙" value="1h 36m" />
+        <ValueCard label="오늘의 트랙" value="1h 36m" />
         <ValueCard label="시즌 LP" value="3,164" tone="orange" />
       </div>
     </PreviewShell>
@@ -637,20 +637,9 @@ function WebAppLanding() {
         <p className="mt-1.5 break-keep text-[13px] font-semibold text-slate-400">
           같은 데이터를 보더라도 학생과 학부모에게 필요한 화면은 다르게 설계됩니다.
         </p>
-        <div className="mt-5 flex flex-wrap gap-2.5">
-          <Link
-            href="/experience?mode=student"
-            className="premium-cta premium-cta-primary h-10 px-5 text-sm"
-          >
-            학생 화면 체험하기
-          </Link>
-          <Link
-            href="/experience?mode=parent"
-            className="premium-cta premium-cta-muted h-10 px-5 text-sm"
-          >
-            학부모 화면 체험하기
-          </Link>
-        </div>
+        <p className="mt-5 text-[12px] font-semibold text-slate-500">
+          모드 탭에서 학생/학부모 화면을 선택해 바로 확인할 수 있어요.
+        </p>
       </div>
 
       {/* Two mode cards */}
@@ -668,7 +657,7 @@ function WebAppLanding() {
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <ValueCard label="오늘의 누적 트랙" value="1h 36m" />
+            <ValueCard label="오늘의 트랙" value="1h 36m" />
             <ValueCard label="시즌 LP" value="3,164" tone="orange" />
           </div>
 
@@ -683,12 +672,6 @@ function WebAppLanding() {
             ))}
           </div>
 
-          <Link
-            href="/experience?mode=student"
-            className="premium-cta premium-cta-primary mt-5 h-10 w-full text-[13px]"
-          >
-            학생 화면 체험하기
-          </Link>
         </article>
 
         {/* Parent */}
@@ -719,12 +702,6 @@ function WebAppLanding() {
             ))}
           </div>
 
-          <Link
-            href="/experience?mode=parent"
-            className="premium-cta premium-cta-primary mt-5 h-10 w-full text-[13px]"
-          >
-            학부모 화면 체험하기
-          </Link>
         </article>
       </div>
     </div>

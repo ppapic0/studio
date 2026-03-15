@@ -850,18 +850,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-2xl border-none bg-slate-50 p-4 text-center space-y-1 shadow-sm group hover:bg-white hover:ring-1 hover:ring-slate-200 transition-all">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
                   <p className="dashboard-number text-xl text-[#14295F] leading-tight whitespace-nowrap">{toHm(totalMinutes)}</p>
                 </Card>
                 <Card className="rounded-2xl border-none bg-[#fff7ed] p-4 text-center space-y-1 shadow-sm border border-orange-100 group hover:bg-white hover:ring-1 hover:ring-orange-200 transition-all">
-                  <span className="text-[8px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
+                  <span className="text-[10px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
                   <p className="dashboard-number text-2xl text-[#14295F] leading-tight">{planRate}%</p>
                 </Card>
                 <Card className={cn(
                   "rounded-2xl border-none p-4 text-center space-y-1 shadow-sm border transition-all",
                   attendanceStatus.color
                 )}>
-                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
                   <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
                 <Card
@@ -869,14 +869,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   role="button"
                   onClick={() => setIsPenaltyGuideOpen(true)}
                 >
-                  <span className="text-[8px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
                   <div className="flex items-center justify-center gap-1">
                     <p className="dashboard-number text-xl text-rose-700 leading-tight">{penaltyRecovery.effectivePoints}</p>
                     <span className="text-xs font-black text-rose-500/70">점</span>
                   </div>
-                  <Badge variant="outline" className={cn('h-5 border px-2 text-[9px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
+                  <Badge variant="outline" className={cn('h-5 border px-2 text-[10px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
                   {penaltyRecovery.recoveredPoints > 0 && (
-                    <p className="text-[9px] font-bold text-rose-500/80">자동 회복 -{penaltyRecovery.recoveredPoints}점 반영</p>
+                    <p className="text-[10px] font-bold text-rose-500/80">자동 회복 -{penaltyRecovery.recoveredPoints}점 반영</p>
                   )}
                 </Card>
               </div>
@@ -890,7 +890,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <Sparkles className="h-4 w-4 text-[#FF7A16] fill-current" />
                     <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">어제의 분석 결과</span>
                   </div>
-                  {report?.viewedAt && <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[8px] h-4 px-1.5">읽음</Badge>}
+                  {report?.viewedAt && <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] h-4 px-1.5">읽음</Badge>}
                 </div>
                 <p className="text-sm font-bold text-slate-800 leading-relaxed break-keep relative z-10 line-clamp-2">
                   {report?.content || '선생님과 인공지능이 어제의 학습 데이터를 분석 중입니다.'}
@@ -905,11 +905,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <div className="flex items-center gap-2">
                     {unreadRecentCount > 0 && (
-                      <Badge variant="outline" className="h-5 border-none bg-[#FF7A16]/15 px-2 text-[9px] font-black text-[#FF7A16] animate-pulse">
+                      <Badge variant="outline" className="h-5 border-none bg-[#FF7A16]/15 px-2 text-[10px] font-black text-[#FF7A16] animate-pulse">
                         미읽음 {unreadRecentCount}
                       </Badge>
                     )}
-                    <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[9px] font-black text-slate-500">
+                    <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-500">
                       {recentNotifications.length}건
                     </Badge>
                   </div>
@@ -951,7 +951,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 </span>
                               )}
                               {notification.isImportant && (
-                                <Badge variant="outline" className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">
+                                <Badge variant="outline" className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
                                   중요
                                 </Badge>
                               )}
@@ -1036,7 +1036,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
-                      isMobile ? "py-3 text-[9px]" : "py-4 text-[11px]",
+                      isMobile ? "py-3 text-[10px]" : "py-4 text-[11px]",
                       "text-center font-black uppercase tracking-widest",
                       i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
@@ -1430,7 +1430,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
-                      {n.isImportant && <Badge variant="outline" className="bg-orange-100 text-[#FF7A16] border-none font-black text-[8px] h-5 px-2">중요</Badge>}
+                      {n.isImportant && <Badge variant="outline" className="bg-orange-100 text-[#FF7A16] border-none font-black text-[10px] h-5 px-2">중요</Badge>}
                     </div>
                     <p className="text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
                   </button>
@@ -1506,7 +1506,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-base font-black tracking-tight text-[#14295F]">{selectedNotification?.title}</p>
                 {selectedNotification?.isImportant && (
-                  <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[9px] font-black text-[#FF7A16]">중요</Badge>
+                  <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">중요</Badge>
                 )}
               </div>
               <p className="whitespace-pre-line text-sm font-bold leading-relaxed text-slate-700">{selectedNotification?.body}</p>
@@ -1558,7 +1558,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <Card className="rounded-xl border border-slate-100 p-4 shadow-none">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">학습 계획 내역</p>
-                <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[9px] font-black text-slate-500">
+                <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-500">
                   {selectedDatePlanDone}/{selectedDatePlanTotal}
                 </Badge>
               </div>
@@ -1571,7 +1571,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   {selectedDateStudyPlans.slice(0, 6).map((plan) => (
                     <div key={plan.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                       <p className="line-clamp-1 text-xs font-bold text-slate-700">{plan.title}</p>
-                      <Badge variant="outline" className={cn('h-5 border-none px-2 text-[9px] font-black', plan.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600')}>
+                      <Badge variant="outline" className={cn('h-5 border-none px-2 text-[10px] font-black', plan.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600')}>
                         {plan.done ? '완료' : '진행중'}
                       </Badge>
                     </div>
