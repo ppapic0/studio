@@ -68,7 +68,7 @@
     --secondary-foreground: 223 65% 22%;
 
     --muted: 223 10% 90%;
-    --muted-foreground: 223 20% 45%;
+    --muted-foreground: 223 22% 36%;
 
     --accent: 25 100% 54%;
     --accent-foreground: 0 0% 100%;
@@ -133,6 +133,8 @@
   body {
     @apply bg-background text-foreground font-body antialiased transition-colors duration-300;
     touch-action: manipulation;
+    font-weight: 500;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -224,20 +226,20 @@
   }
 
   .text-slate-300 {
-    color: #6f7e95 !important;
+    color: #6a7a91 !important;
   }
 
   .text-slate-400 {
-    color: #5d6d84 !important;
+    color: #546278 !important;
   }
 
   .text-slate-500,
   .text-muted-foreground {
-    color: #41546f !important;
+    color: #384f6a !important;
   }
 
   .text-slate-600 {
-    color: #344761 !important;
+    color: #2c3f58 !important;
   }
 }
 

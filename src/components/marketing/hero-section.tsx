@@ -56,7 +56,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               <br />
               <span className="text-[#FF7A16]">중심입니다</span>
             </h1>
-            <p className="max-w-xl break-keep text-[15px] font-medium leading-[1.86] text-blue-100/75 sm:text-[16px]">
+            <p className="max-w-xl break-keep text-[15px] font-semibold leading-[1.86] text-blue-100/75 sm:text-[16px]">
               {brand.heroDescription}
             </p>
           </div>
@@ -160,7 +160,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               <p className="stat-number mt-3 break-keep text-[1.7rem] text-white">
                 {entryStat?.value}
               </p>
-              <p className="mt-2 text-sm font-medium leading-[1.72] text-blue-100/65">{entryStat?.detail}</p>
+              <p className="mt-2 text-sm font-semibold leading-[1.72] text-blue-100/65">{entryStat?.detail}</p>
             </article>
 
             <article
@@ -175,7 +175,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
               <p className="stat-number mt-3 break-keep text-[1.7rem] text-white">
                 {dataStat?.value}
               </p>
-              <p className="mt-2 text-sm font-medium leading-[1.72] text-blue-100/65">{dataStat?.detail}</p>
+              <p className="mt-2 text-sm font-semibold leading-[1.72] text-blue-100/65">{dataStat?.detail}</p>
             </article>
           </div>
 
@@ -208,7 +208,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
                 </span>
               </div>
               <p className="mt-5 text-[1.35rem] font-black tracking-[-0.03em] text-white">학생 모드 체험</p>
-              <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-blue-100/65">성장 · 기록 · 계획 화면을 앱처럼 바로 확인</p>
+              <p className="mt-2 break-keep text-sm font-semibold leading-[1.72] text-blue-100/65">성장 · 기록 · 계획 화면을 앱처럼 바로 확인</p>
               <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#FF9848]">
                 체험 시작
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
@@ -242,7 +242,7 @@ export function HeroSection({ brand, heroStats }: HeroSectionProps) {
                 </span>
               </div>
               <p className="mt-5 text-[1.35rem] font-black tracking-[-0.03em] text-white">학부모 모드 체험</p>
-              <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-blue-100/65">알림 · 캘린더 · 수납 흐름을 앱모드 전용으로 확인</p>
+              <p className="mt-2 break-keep text-sm font-semibold leading-[1.72] text-blue-100/65">알림 · 캘린더 · 수납 흐름을 앱모드 전용으로 확인</p>
               <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#FFB273]">
                 체험 시작
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />

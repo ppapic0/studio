@@ -36,7 +36,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
               <p className="mt-3 break-keep text-[1.55rem] font-black leading-[1.14] text-[#14295F]">
                 학생 · 학부모 모드를 실제 앱처럼 체험
               </p>
-              <p className="mt-2 break-keep text-[14px] font-medium leading-[1.74] text-slate-600">
+              <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.74] text-slate-600">
                 그래프, 캘린더, 알림, 수납, 성장 지표까지 실제 운영 화면처럼 확인할 수 있습니다.
               </p>
             </div>
@@ -56,7 +56,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           {appSystem.modes.map((mode) => (
             <article key={mode.mode} className="marketing-card p-5">
               <span className="eyebrow-badge">{mode.mode}</span>
-              <p className="mt-3 break-keep text-sm font-medium leading-[1.74] text-slate-600">{mode.description}</p>
+              <p className="mt-3 break-keep text-sm font-semibold leading-[1.74] text-slate-600">{mode.description}</p>
               <ul className="mt-3.5 space-y-1.5">
                 {mode.items.map((item) => (
                   <li key={`${mode.mode}-${item}`} className="flex items-center gap-2 text-sm font-extrabold text-[#14295F]">
@@ -79,7 +79,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
               {appSystem.features.map((item) => (
                 <li key={item.title} className="marketing-card p-4">
                   <p className="text-[1rem] font-black text-[#14295F]">{item.title}</p>
-                  <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">{item.description}</p>
+                  <p className="mt-2 break-keep text-sm font-semibold leading-[1.72] text-slate-600">{item.description}</p>
                 </li>
               ))}
             </ul>
@@ -96,7 +96,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                   >
                     <p className="text-[11px] font-black">{metric.label}</p>
                     <p className="dashboard-number mt-1.5 text-[1.45rem]">{metric.value}</p>
-                    <p className="mt-1 text-[11px] font-medium opacity-75">{metric.detail}</p>
+                    <p className="mt-1 text-[11px] font-semibold opacity-75">{metric.detail}</p>
                   </article>
                 ))}
               </div>
@@ -154,7 +154,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                 <div className="px-1 pb-1 pt-4">
                   <p className="break-keep text-[1rem] font-extrabold text-[#14295F]">{screen.title}</p>
                   <p className="mt-1 break-keep text-xs font-black text-[#FF7A16]">{screen.subtitle}</p>
-                  <p className="mt-1.5 break-keep text-xs font-medium leading-[1.7] text-slate-600">{screen.caption}</p>
+                  <p className="mt-1.5 break-keep text-xs font-semibold leading-[1.7] text-slate-600">{screen.caption}</p>
                 </div>
               </article>
             ))}

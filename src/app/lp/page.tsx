@@ -36,7 +36,7 @@ export default function LPPage() {
                 <h3 className="break-keep text-[1.3rem] font-extrabold leading-[1.22] text-[#14295F]">
                   {step.title}
                 </h3>
-                <p className="mt-2.5 break-keep text-[15px] font-medium leading-[1.85] text-slate-600">
+                <p className="mt-2.5 break-keep text-[15px] font-semibold leading-[1.85] text-slate-600">
                   {step.description}
                 </p>
               </div>

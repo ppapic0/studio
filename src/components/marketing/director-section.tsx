@@ -39,7 +39,7 @@ export function DirectorSection({ director }: DirectorSectionProps) {
                     className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                     style={{ background: 'linear-gradient(135deg, #FF7A16, #FF9848)' }}
                   />
-                  <p className="break-keep text-sm font-medium leading-[1.72] text-slate-600">{item}</p>
+                  <p className="break-keep text-sm font-semibold leading-[1.72] text-slate-600">{item}</p>
                 </li>
               ))}
             </ul>
@@ -62,7 +62,7 @@ export function DirectorSection({ director }: DirectorSectionProps) {
                       </p>
                     </div>
                   </div>
-                  <p className="mt-3 break-keep text-sm font-medium leading-[1.74] text-slate-600">{sample.caption}</p>
+                  <p className="mt-3 break-keep text-sm font-semibold leading-[1.74] text-slate-600">{sample.caption}</p>
                 </article>
               ))}
             </div>

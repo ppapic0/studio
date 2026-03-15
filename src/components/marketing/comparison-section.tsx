@@ -32,7 +32,7 @@ export function ComparisonSection({ comparison }: ComparisonSectionProps) {
                 }`}
               >
                 <p className="text-[1.05rem] font-extrabold tracking-[-0.03em] text-[#14295F]">{row.topic}</p>
-                <p className="rounded-xl border border-[#14295F]/8 bg-[#F4F7FB] px-3.5 py-2.5 text-sm font-medium leading-[1.74] text-slate-600">
+                <p className="rounded-xl border border-[#14295F]/8 bg-[#F4F7FB] px-3.5 py-2.5 text-sm font-semibold leading-[1.74] text-slate-600">
                   {row.common}
                 </p>
                 <p
