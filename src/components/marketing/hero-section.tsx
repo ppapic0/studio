@@ -62,28 +62,17 @@ export function HeroSection({ brand }: HeroSectionProps) {
       <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_0.88fr] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
         {/* LEFT: Headline + copy + CTA */}
         <div className="space-y-8">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5">
-            <Image
-              src={brand.logoMark}
-              alt={brand.name}
-              width={28}
-              height={28}
-              className="h-7 w-7 object-contain opacity-75"
-            />
-            <span className="text-[10.5px] font-black tracking-[0.24em] text-white/45 uppercase">
-              Track
-            </span>
-          </div>
+          {/* Eyebrow */}
+          <span className="eyebrow-badge-light">관리형 스터디센터</span>
 
-          {/* Headline */}
+          {/* Headline — 어그로체 */}
           <div className="space-y-5">
-            <h1 className="font-brand break-keep text-[clamp(2.5rem,5.2vw,4rem)] leading-[1.04] text-white">
+            <h1 className="font-aggro-display break-keep text-[clamp(2.8rem,5.6vw,4.5rem)] font-black leading-[1.06] text-white">
               관리의 중심은
               <br />
               <span className="text-[#FF7A16]">스터디센터</span>입니다
             </h1>
-            <p className="max-w-[420px] break-keep text-[15px] font-semibold leading-[1.82] text-blue-100/58">
+            <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-blue-100/80">
               루틴을 먼저 세우고, 데이터로 확인합니다.
               <br />
               수능 국어 수업은 필요할 때 별도로 선택합니다.
@@ -107,7 +96,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
           </div>
 
           {/* Trust signal */}
-          <p className="text-[12px] font-semibold text-white/28">
+          <p className="text-[12.5px] font-bold text-white/55">
             2026학년도 · 고려대 2명 포함 주요 대학 합격
           </p>
         </div>
