@@ -387,8 +387,8 @@ function ModeCTA({
   note: string;
   primaryHref: string;
   primaryLabel: string;
-  secondaryHref: string;
-  secondaryLabel: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
 }) {
   return (
     <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-white p-6 text-center shadow-sm">
@@ -399,9 +399,11 @@ function ModeCTA({
         <Link href={primaryHref} className="premium-cta premium-cta-primary h-11 px-6 text-sm">
           {primaryLabel}
         </Link>
-        <Link href={secondaryHref} className="premium-cta premium-cta-muted h-11 px-6 text-sm">
-          {secondaryLabel}
-        </Link>
+        {secondaryHref && secondaryLabel ? (
+          <Link href={secondaryHref} className="premium-cta premium-cta-muted h-11 px-6 text-sm">
+            {secondaryLabel}
+          </Link>
+        ) : null}
       </div>
     </div>
   );
@@ -427,8 +429,8 @@ function ModeHero({
   subdesc?: string;
   primaryHref: string;
   primaryLabel: string;
-  secondaryHref: string;
-  secondaryLabel: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
   badge?: ReactNode;
 }) {
   return (
@@ -451,9 +453,11 @@ function ModeHero({
             <Link href={primaryHref} className="premium-cta premium-cta-primary h-10 px-5 text-sm">
               {primaryLabel}
             </Link>
-            <Link href={secondaryHref} className="premium-cta premium-cta-muted h-10 px-5 text-sm">
-              {secondaryLabel}
-            </Link>
+            {secondaryHref && secondaryLabel ? (
+              <Link href={secondaryHref} className="premium-cta premium-cta-muted h-10 px-5 text-sm">
+                {secondaryLabel}
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
@@ -530,10 +534,8 @@ function StudentModeSection() {
         eyebrow="STUDENT MODE"
         title="학생 화면을 직접 확인해보세요"
         note="실제 화면에서 루틴, 기록, 누적 흐름이 어떻게 보이는지 바로 체험할 수 있습니다."
-        primaryHref="/go/experience?placement=experience_student&mode=student"
-        primaryLabel="학생 화면 체험하기"
-        secondaryHref="/experience?mode=parent"
-        secondaryLabel="학부모 화면 보기"
+        primaryHref="/go/login?placement=experience_student"
+        primaryLabel="실제 로그인"
       />
     </div>
   );
@@ -608,8 +610,8 @@ function ParentModeSection() {
         eyebrow="PARENT MODE"
         title="학부모 화면을 직접 확인해보세요"
         note="출결, 학습 현황, 기록 흐름이 어떻게 정리되어 보이는지 바로 체험할 수 있습니다."
-        primaryHref="/go/experience?placement=experience_parent&mode=parent"
-        primaryLabel="학부모 화면 체험하기"
+        primaryHref="/go/login?placement=experience_parent"
+        primaryLabel="실제 로그인"
         secondaryHref="/experience?mode=student"
         secondaryLabel="학생 화면 보기"
       />
@@ -781,12 +783,6 @@ export default function ExperiencePage() {
             active={mode === 'student'}
             icon={<Trophy className="h-3.5 w-3.5" />}
           />
-          <ModeTab
-            href="/experience?mode=parent"
-            label="학부모 모드"
-            active={mode === 'parent'}
-            icon={<Smartphone className="h-3.5 w-3.5" />}
-          />
         </div>
 
         {/* Content */}
@@ -800,10 +796,8 @@ export default function ExperiencePage() {
                 title="학생 모드 체험"
                 desc="루틴, 기록, 누적 흐름까지 학생 화면에서 직접 확인해보세요."
                 subdesc="오늘 해야 할 루틴부터 누적 기록, 날짜별 학습 흐름까지 학생에게 필요한 화면을 한눈에 볼 수 있도록 구성했습니다."
-                primaryHref="/go/experience?placement=experience_hero_student&mode=student"
-                primaryLabel="학생 화면 체험하기"
-                secondaryHref="/experience?mode=parent"
-                secondaryLabel="학부모 화면도 보기"
+                primaryHref="/go/login?placement=experience_hero_student"
+                primaryLabel="실제 로그인"
               />
               <StudentModeSection />
             </>
@@ -816,8 +810,8 @@ export default function ExperiencePage() {
                 title="학부모 모드 체험"
                 desc="출결, 학습 현황, 기록 흐름까지 학부모 화면에서 직접 확인해보세요."
                 subdesc="학생의 하루 현황부터 주간 기록, 날짜별 학습 흐름까지 학부모가 필요한 정보를 빠르게 확인할 수 있도록 구성했습니다."
-                primaryHref="/go/experience?placement=experience_hero_parent&mode=parent"
-                primaryLabel="학부모 화면 체험하기"
+                primaryHref="/go/login?placement=experience_hero_parent"
+                primaryLabel="실제 로그인"
                 secondaryHref="/experience?mode=student"
                 secondaryLabel="학생 화면도 보기"
                 badge={

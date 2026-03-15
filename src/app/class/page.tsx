@@ -1,6 +1,7 @@
 import {
   BookOpen,
   CheckCircle2,
+  Download,
   FileText,
   GraduationCap,
   Layers,
@@ -76,6 +77,29 @@ const materialPreviews = [
     tag: '수업 계획 자료',
     desc: '수업 흐름과 학생별 보완 포인트를 기록한 운영 자료입니다.',
     lines: [4, 3, 2, 3],
+  },
+];
+
+const koreanMaterialPdfPath = '/materials/2026-korean-nonfiction-2passages-commentary.pdf';
+
+const scoreProofCards = [
+  {
+    phase: '6월 모의평가',
+    result: '국어 3등급',
+    detail: '백분위 82',
+    image: '/marketing/proof/june-mock-redacted.jpg',
+  },
+  {
+    phase: '9월 모의평가',
+    result: '국어 1등급',
+    detail: '백분위 96',
+    image: '/marketing/proof/september-mock-redacted.jpg',
+  },
+  {
+    phase: '수능 본시험',
+    result: '국어 백분위 99',
+    detail: '실제 성적표 기반',
+    image: '/marketing/proof/csat-score-redacted.jpg',
   },
 ];
 
@@ -343,6 +367,49 @@ export default function ClassPage() {
               </article>
             </div>
 
+            <article
+              className="mt-8 rounded-[1.4rem] border border-[rgba(20,41,95,0.10)] bg-white px-6 py-7"
+              style={{ boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06), 0 8px 24px -4px rgba(20,41,95,0.07)' }}
+            >
+              <p className="text-[10.5px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">
+                성적 상승 사례
+              </p>
+              <h3 className="mt-3 break-keep text-[1.35rem] font-black leading-[1.3] text-[#14295F]">
+                6월 3등급에서 수능 백분위 99까지
+              </h3>
+              <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.74] text-[#445f7e]">
+                동일 학생의 6월 모의평가, 9월 모의평가, 수능 성적표를 기준으로 한 실제 상승 흐름입니다.
+                개인정보 보호를 위해 이름과 학교 정보는 가림 처리했습니다.
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {['6월 3등급', '9월 1등급', '수능 백분위 99'].map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-full border border-[#14295F]/10 bg-[#F3F7FF] px-3 py-1.5 text-[12px] font-black text-[#14295F]"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {scoreProofCards.map((card) => (
+                  <figure
+                    key={card.phase}
+                    className="overflow-hidden rounded-[1.1rem] border border-[rgba(20,41,95,0.12)] bg-[#F8FAFF]"
+                  >
+                    <img src={card.image} alt={`${card.phase} score proof (redacted)`} className="h-[230px] w-full object-cover object-top" />
+                    <figcaption className="space-y-1 border-t border-[rgba(20,41,95,0.08)] bg-white px-4 py-3.5">
+                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FF7A16]">{card.phase}</p>
+                      <p className="text-[15px] font-black text-[#14295F]">{card.result}</p>
+                      <p className="text-[12px] font-semibold text-[#4B6380]">{card.detail}</p>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </article>
+
             <p className="mx-auto mt-12 max-w-xl text-center break-keep text-[15px] font-semibold leading-[1.88] text-[#334e6a]">
               결과는 한 번의 운이 아니라,<br />
               누적된 수업 경험과 정확한 피드백 구조에서 나옵니다.
@@ -465,9 +532,19 @@ export default function ClassPage() {
               <p className="mb-6 break-keep text-[14.5px] font-semibold text-white/75">
                 자료를 통해 수업의 기준, 설명의 밀도, 정리 방식까지 미리 확인해보세요.
               </p>
-              <a href="#class-consult" className="premium-cta premium-cta-primary inline-flex h-12 px-8 text-[14px]">
-                자료로 수업 방식 확인하기
-              </a>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <a
+                  href={koreanMaterialPdfPath}
+                  download
+                  className="premium-cta premium-cta-primary inline-flex h-12 px-8 text-[14px]"
+                >
+                  <Download className="h-4 w-4" />
+                  수업자료 PDF 다운로드
+                </a>
+                <a href="#class-consult" className="premium-cta premium-cta-ghost inline-flex h-12 px-8 text-[14px]">
+                  수업 상담 요청
+                </a>
+              </div>
             </div>
           </div>
         </section>

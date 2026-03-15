@@ -3,7 +3,18 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, Building2, Smartphone } from 'lucide-react';
 
-const items = [
+type ShowcaseItem = {
+  label: string;
+  title: string;
+  desc: string;
+  stat: string;
+  icon: typeof Building2;
+  color: 'navy' | 'blue' | 'orange';
+  targetId?: string;
+  targetHref?: string;
+};
+
+const items: ShowcaseItem[] = [
   {
     label: 'STUDY CENTER',
     title: '관리형 스터디센터 중심',
@@ -19,7 +30,7 @@ const items = [
     desc: '센터만 이용하거나, 필요할 때 수업을 추가합니다',
     stat: '재학생 · N수생 모두 가능',
     icon: BookOpen,
-    targetId: 'korean-class',
+    targetHref: '/class',
     color: 'blue' as const,
   },
   {
@@ -36,8 +47,13 @@ const items = [
 export function HeroShowcase() {
   const [active, setActive] = useState(0);
 
-  const handleItemClick = (index: number, targetId: string) => {
+  const handleItemClick = (index: number, targetId?: string, targetHref?: string) => {
     setActive(index);
+    if (targetHref) {
+      window.location.href = targetHref;
+      return;
+    }
+    if (!targetId) return;
     const target = document.getElementById(targetId);
     if (!target) return;
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -56,7 +72,7 @@ export function HeroShowcase() {
         return (
           <button
             key={item.label}
-            onClick={() => handleItemClick(i, item.targetId)}
+            onClick={() => handleItemClick(i, item.targetId, item.targetHref)}
             aria-label={item.title}
             className={`flex items-start gap-4 rounded-2xl border p-5 text-left transition-all duration-500 ${
               isActive

@@ -260,7 +260,7 @@ export function FeatureStepsSection() {
               </div>
               <div className="mt-auto pt-4 flex items-center justify-between">
                 <span className="text-[12.5px] font-black text-[#FF7A16]/80 group-hover:text-[#FF7A16] transition-colors">
-                  학부모 화면 체험하기
+                  학부모 기능 안내
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-[#FF7A16]/45 group-hover:text-[#FF7A16] group-hover:translate-x-0.5 transition-all" />
               </div>
