@@ -15,7 +15,6 @@ import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
-import { TrackKoreanMethodSection } from '@/components/marketing/track-korean-method-section';
 import { marketingContent } from '@/lib/marketing-content';
 
 /* ─────────────────────────────────────────────────
@@ -41,22 +40,22 @@ const methods = [
   {
     icon: BookOpen,
     title: '읽는 방식 정리',
-    body: '지문을 어디서 끊고, 무엇을 기준으로 읽어야 하는지 막연한 감이 아니라 구체적인 방식으로 정리합니다.',
+    body: '지문 구조를 빠르게 잡고 핵심 개념만 남기도록 읽는 기준을 세웁니다.',
   },
   {
     icon: Target,
     title: '선지 판단 기준 정리',
-    body: '틀리는 문제를 다시 틀리지 않도록 선지를 판단하는 기준과 흔들리는 포인트를 함께 잡습니다.',
+    body: '정답 근거와 오답 함정을 분리해 선지 판단 속도와 정확도를 올립니다.',
   },
   {
     icon: Users,
     title: '학생별 약점 보완',
-    body: '학생마다 막히는 지점은 다릅니다. 읽기, 개념, 적용, 시간 관리 중 필요한 부분을 중심으로 보완합니다.',
+    body: '학생마다 다른 약점을 진단해 필요한 포인트만 집중 보완합니다.',
   },
   {
     icon: Layers,
     title: '자료 기반 수업',
-    body: '원장이 직접 만든 해설 자료와 수업 자료를 바탕으로 수업의 흐름이 남고, 복습의 기준도 분명해집니다.',
+    body: '원장 제작 자료로 수업과 복습 기준을 하나로 맞춥니다.',
   },
 ];
 
@@ -65,19 +64,19 @@ const materialPreviews = [
     label: '독서 지문 분석 자료',
     tag: '지문 구조 해설',
     desc: '단락별 핵심 정보와 연결 구조를 정리한 해설 자료입니다.',
-    lines: [4, 3, 4, 2],
+    focus: '구조와 출제 포인트를 한 장에서 확인',
   },
   {
     label: '선지 판단 기준 노트',
     tag: '오답 패턴 분석',
     desc: '자주 틀리는 유형의 선지 판단 기준과 함정 패턴 정리.',
-    lines: [3, 4, 3],
+    focus: '헷갈리는 선지 표현을 기준화',
   },
   {
     label: '수업 설계 노트',
     tag: '수업 계획 자료',
     desc: '수업 흐름과 학생별 보완 포인트를 기록한 운영 자료입니다.',
-    lines: [4, 3, 2, 3],
+    focus: '학생별 보완 흐름을 누적 관리',
   },
 ];
 
@@ -156,7 +155,6 @@ export default function ClassPage() {
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
-      <TrackKoreanMethodSection />
 
       {/* ══════════════════════════════════════════
           1. HERO
@@ -262,10 +260,8 @@ export default function ClassPage() {
               국어 수업은 이렇게 진행됩니다
             </h2>
             <p className="mx-auto mt-6 max-w-[560px] break-keep text-[15.5px] font-semibold leading-[1.88] text-[#334e6a]">
-              트랙의 국어 수업은 단순 문제풀이 반복이 아닙니다.
-              지문을 읽는 방식, 선지 판단의 기준,
-              흔들리는 포인트를 함께 점검하며
-              학생마다 필요한 부분을 분명하게 잡아가는 수업입니다.
+              단순 반복이 아니라 기준을 세우는 수업입니다.
+              읽기 구조, 선지 판단, 약점 보완을 짧고 명확하게 훈련합니다.
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -420,11 +416,7 @@ export default function ClassPage() {
                     key={card.phase}
                     className="overflow-hidden rounded-[1.1rem] border border-[rgba(20,41,95,0.12)] bg-[#F8FAFF]"
                   >
-                    <img
-                      src={card.image}
-                      alt={`${card.phase} score proof (redacted)`}
-                      className="h-[320px] w-full bg-white object-contain object-top"
-                    />
+                    <img src={card.image} alt={`${card.phase} score proof (redacted)`} className="block h-auto w-full" />
                     <figcaption className="space-y-1 border-t border-[rgba(20,41,95,0.08)] bg-white px-4 py-3.5">
                       <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FF7A16]">{card.phase}</p>
                       <p className="text-[15px] font-black text-[#14295F]">{card.result}</p>
@@ -476,9 +468,9 @@ export default function ClassPage() {
             <div className="mx-auto max-w-xl text-center">
               <span className="eyebrow-badge">수업 방식</span>
               <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-                수업은 이해보다
+                시험장에서 바로 쓰는
                 <br />
-                적용까지 가야 합니다
+                핵심 기준 4가지
               </h2>
             </div>
 
@@ -534,44 +526,24 @@ export default function ClassPage() {
               {materialPreviews.map((m) => (
                 <article
                   key={m.label}
-                  className="overflow-hidden rounded-[1.4rem] border"
+                  className="rounded-[1.4rem] border px-6 py-6"
                   style={{
                     borderColor: 'rgba(255,255,255,0.10)',
-                    background: 'rgba(255,255,255,0.04)',
+                    background: 'rgba(255,255,255,0.05)',
                   }}
                 >
-                  {/* Document thumbnail mock */}
-                  <div
-                    className="border-b px-6 py-6"
-                    style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
-                  >
-                    <div className="mb-4 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-[#FF9848]" />
-                      <span className="text-[10px] font-black tracking-[0.16em] text-[#FFB273] uppercase">
-                        {m.tag}
-                      </span>
-                    </div>
-                    {/* mock text lines */}
-                    <div className="space-y-2">
-                      {m.lines.map((w, i) => (
-                        <div key={i} className="flex gap-1.5">
-                          {Array.from({ length: w }).map((_, j) => (
-                            <div
-                              key={j}
-                              className="h-2 rounded-full bg-white/18"
-                              style={{ width: `${20 + Math.random() * 40}%` }}
-                            />
-                          ))}
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-[#FF9848]" />
+                    <span className="text-[10px] font-black tracking-[0.16em] text-[#FFB273] uppercase">
+                      {m.tag}
+                    </span>
                   </div>
-                  {/* Card body */}
-                  <div className="px-6 py-5">
-                    <p className="text-[13.5px] font-black text-white">{m.label}</p>
-                    <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.72] text-white/70">
-                      {m.desc}
-                    </p>
+                  <p className="mt-4 text-[14px] font-black text-white">{m.label}</p>
+                  <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-white/75">
+                    {m.desc}
+                  </p>
+                  <div className="mt-4 rounded-lg border border-white/15 bg-white/5 px-3 py-2">
+                    <p className="text-[12px] font-bold text-white/85">{m.focus}</p>
                   </div>
                 </article>
               ))}

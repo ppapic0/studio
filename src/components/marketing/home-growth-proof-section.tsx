@@ -59,9 +59,7 @@ export function HomeGrowthProofSection() {
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
             {growthProofCards.map((card) => (
               <article key={card.phase} className="overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white shadow-[0_10px_26px_-20px_rgba(20,41,95,0.42)]">
-                <div className="relative h-[230px] bg-[#f4f7ff]">
-                  <img src={card.image} alt={`${card.phase} 성적표 익명 처리본`} className="h-full w-full bg-white object-contain object-top" />
-                </div>
+                <img src={card.image} alt={`${card.phase} 성적표 익명 처리본`} className="block h-auto w-full" />
                 <div className="space-y-1 border-t border-[#14295F]/8 px-4 py-3.5">
                   <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#FF7A16]">{card.phase}</p>
                   <p className="text-[14px] font-black text-[#14295F]">{card.summary}</p>
