@@ -13,11 +13,50 @@ export function HeroSection({ brand }: HeroSectionProps) {
       id="hero"
       className="relative flex min-h-[100svh] items-center overflow-hidden bg-[#0b1631]"
     >
-      {/* Background */}
+      {/* ── Layer 1: base gradients ── */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_15%_0%,rgba(25,65,170,0.52),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_85%_8%,rgba(255,122,22,0.13),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_85%_8%,rgba(255,122,22,0.08),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_50%_105%,rgba(8,18,52,0.65),transparent)]" />
+      </div>
+
+      {/* ── Layer 2: logo watermark — embedded, not floating ── */}
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden="true"
+      >
+        {/* Logo image: desaturated + blurred → just a silhouette */}
+        <div
+          className="absolute bottom-[-8%] right-[-6%] h-[420px] w-[420px] sm:bottom-[-10%] sm:right-[-4%] sm:h-[540px] sm:w-[540px] lg:bottom-[-12%] lg:right-[-3%] lg:h-[680px] lg:w-[680px]"
+          style={{ opacity: 0.11 }}
+        >
+          <Image
+            src={brand.logoMark}
+            alt=""
+            fill
+            sizes="680px"
+            className="object-contain"
+            style={{
+              filter: 'blur(2px) saturate(0.15) brightness(0.55)',
+            }}
+          />
+          {/* Gradient overlay fades edges back into navy */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse 75% 75% at 62% 58%, transparent 28%, rgba(11,22,49,0.72) 68%, rgba(11,22,49,1) 100%)',
+            }}
+          />
+        </div>
+        {/* Left-side hard fade so watermark never intrudes on text */}
+        <div
+          className="absolute inset-y-0 right-0 w-[75%] lg:w-[65%]"
+          style={{
+            background:
+              'linear-gradient(to right, rgba(11,22,49,1) 0%, rgba(11,22,49,0.55) 28%, transparent 60%)',
+          }}
+        />
       </div>
 
       <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_0.88fr] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
