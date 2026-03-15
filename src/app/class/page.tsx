@@ -117,7 +117,7 @@ export default function ClassPage() {
           1. HERO
       ══════════════════════════════════════════ */}
       <section
-        className="relative flex min-h-[92svh] items-center overflow-hidden"
+        className="on-dark relative flex min-h-[92svh] items-center overflow-hidden"
         style={{ background: 'linear-gradient(145deg, #080f28 0%, #0d1d47 50%, #0b1631 100%)' }}
       >
         {/* subtle radial ambience */}
@@ -139,7 +139,7 @@ export default function ClassPage() {
                 <br />
                 쌓입니다
               </h1>
-              <p className="max-w-[440px] break-keep text-[15.5px] font-semibold leading-[1.82] text-blue-100/78">
+              <p className="max-w-[440px] break-keep text-[15.5px] font-semibold leading-[1.82] text-white/85">
                 원장 직강으로 진행합니다.
                 직접 만든 해설 자료와 수업 자료를 바탕으로
                 읽는 방식, 선지 판단 기준, 적용 흐름까지 함께 잡아갑니다.
@@ -183,7 +183,7 @@ export default function ClassPage() {
                     className="rounded-xl border border-white/8 bg-white/5 px-4 py-3"
                   >
                     <p className="text-[1.4rem] font-black leading-none text-white">{r.count}</p>
-                    <p className="mt-1.5 break-keep text-[11.5px] font-semibold text-blue-100/60">{r.school}</p>
+                    <p className="mt-1.5 break-keep text-[11.5px] font-semibold text-white/68">{r.school}</p>
                   </div>
                 ))}
                 <div className="rounded-xl border border-[#FF7A16]/22 bg-[#FF7A16]/8 px-4 py-3">
@@ -197,7 +197,7 @@ export default function ClassPage() {
                 {['원장 직강', '직접 제작 해설 자료', '학생별 맞춤 보완'].map((item) => (
                   <div key={item} className="flex items-center gap-2.5">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-[#FF9848]" />
-                    <span className="text-[13.5px] font-semibold text-blue-100/78">{item}</span>
+                    <span className="text-[13.5px] font-semibold text-white/85">{item}</span>
                   </div>
                 ))}
               </div>
@@ -397,7 +397,7 @@ export default function ClassPage() {
       <ScrollReveal>
         <section
           id="materials"
-          className="scroll-mt-20 py-20 sm:py-28"
+          className="on-dark scroll-mt-20 py-20 sm:py-28"
           style={{ background: 'linear-gradient(155deg, #080f28 0%, #0d1d47 55%, #0b1631 100%)' }}
         >
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -408,7 +408,7 @@ export default function ClassPage() {
                 <br />
                 수업의 밀도와 연결됩니다
               </h2>
-              <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.88] text-blue-100/70">
+              <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.88] text-white/75">
                 트랙의 국어 수업은 직접 제작한 해설 자료와 수업 자료를 바탕으로 진행합니다.
                 설명이 많은 자료보다, 학생이 실제로 이해하고 다시 적용할 수 있는 자료를 지향합니다.
               </p>
@@ -453,7 +453,7 @@ export default function ClassPage() {
                   {/* Card body */}
                   <div className="px-6 py-5">
                     <p className="text-[13.5px] font-black text-white">{m.label}</p>
-                    <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.72] text-blue-100/55">
+                    <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.72] text-white/62">
                       {m.desc}
                     </p>
                   </div>
@@ -462,7 +462,7 @@ export default function ClassPage() {
             </StaggerChildren>
 
             <div className="mt-12 text-center">
-              <p className="mb-6 break-keep text-[14.5px] font-semibold text-blue-100/60">
+              <p className="mb-6 break-keep text-[14.5px] font-semibold text-white/68">
                 자료를 통해 수업의 기준, 설명의 밀도, 정리 방식까지 미리 확인해보세요.
               </p>
               <a href="#class-consult" className="premium-cta premium-cta-primary inline-flex h-12 px-8 text-[14px]">
@@ -512,6 +512,7 @@ export default function ClassPage() {
       <ScrollReveal>
         <section
           className="py-24 sm:py-36"
+          className="on-dark"
           style={{ background: 'linear-gradient(155deg, #0a1330 0%, #111d3f 60%, #0d1840 100%)' }}
         >
           <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
@@ -522,7 +523,7 @@ export default function ClassPage() {
               국어는 결국,<br />
               설명 가능한 실력이 되어야 합니다
             </h2>
-            <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-blue-100/72">
+            <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-white/78">
               잘 읽었다고 느끼는 것과
               실제로 다시 설명할 수 있는 것은 다릅니다.
               트랙의 국어 수업은 학생이 스스로 판단 기준을 세우고,
@@ -537,7 +538,7 @@ export default function ClassPage() {
       ══════════════════════════════════════════ */}
       <section
         id="class-consult"
-        className="scroll-mt-24 py-20 sm:py-28"
+        className="on-dark scroll-mt-24 py-20 sm:py-28"
         style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
       >
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">

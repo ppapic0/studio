@@ -836,7 +836,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       <Card className="overflow-hidden rounded-[2.5rem] border-none bg-white shadow-2xl ring-1 ring-slate-200/60 transition-all duration-500">
         <CardContent className={cn('p-6 space-y-6')}>
           <div className="flex flex-col gap-1 px-1">
-            <CardTitle className="text-2xl font-black tracking-tighter text-[#14295F] leading-none">
+            <CardTitle className="font-aggro-display text-[1.85rem] font-black tracking-[-0.02em] text-[#14295F] leading-[1.1]">
               {student?.name || '자녀'} 학생 현황
             </CardTitle>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">

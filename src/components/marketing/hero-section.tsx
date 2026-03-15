@@ -11,7 +11,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
   return (
     <section
       id="hero"
-      className="relative flex min-h-[100svh] items-center overflow-hidden bg-[#0b1631]"
+      className="on-dark relative flex min-h-[100svh] items-center overflow-hidden bg-[#0b1631]"
     >
       {/* ── Layer 1: base gradients ── */}
       <div className="pointer-events-none absolute inset-0">
@@ -72,7 +72,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
               <br />
               <span className="text-[#FF7A16]">스터디센터</span>입니다
             </h1>
-            <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-blue-100/80">
+            <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-white/85">
               루틴을 먼저 세우고, 데이터로 확인합니다.
               <br />
               수능 국어 수업은 필요할 때 별도로 선택합니다.

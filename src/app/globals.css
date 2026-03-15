@@ -310,6 +310,7 @@
     font: inherit;
   }
 
+  /* ── Light-bg context: slate text overrides ─────────── */
   .text-slate-300 {
     color: #7a8fa8 !important;
   }
@@ -326,6 +327,28 @@
   .text-slate-600 {
     color: #334e6a !important;
   }
+
+  /* ── Dark-bg context: .on-dark overrides slate tokens ── */
+  /* Add class="on-dark" to any dark section container    */
+  .on-dark .text-slate-300,
+  .on-dark .text-slate-400 {
+    color: rgba(255, 255, 255, 0.70) !important;
+  }
+
+  .on-dark .text-slate-500,
+  .on-dark .text-muted-foreground {
+    color: rgba(255, 255, 255, 0.58) !important;
+  }
+
+  .on-dark .text-slate-600 {
+    color: rgba(255, 255, 255, 0.46) !important;
+  }
+
+  /* Dark section headline / body helpers */
+  .dark-heading  { color: rgba(255, 255, 255, 0.97); }
+  .dark-body     { color: rgba(255, 255, 255, 0.82); font-weight: 600; }
+  .dark-muted    { color: rgba(255, 255, 255, 0.60); }
+  .dark-subtle   { color: rgba(255, 255, 255, 0.42); }
 }
 
 @layer components {
