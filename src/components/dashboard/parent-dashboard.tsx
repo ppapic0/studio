@@ -1218,7 +1218,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
                   <CardTitle className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <TrendingUp className="h-4 w-4 text-[#FF7A16]" />
-                    최근 7일 공부시간
+                    학습 리듬 시간
                   </CardTitle>
                   <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
