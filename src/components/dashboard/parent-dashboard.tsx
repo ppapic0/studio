@@ -839,9 +839,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <CardTitle className="font-aggro-display text-[1.85rem] font-black tracking-[-0.02em] text-[#14295F] leading-[1.1]">
               {student?.name || '자녀'} 학생 현황
             </CardTitle>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
               {today && format(today, 'yyyy. MM. dd (EEEE)', {locale: ko})}
-              <span className="opacity-20">|</span>
+              <span className="opacity-30">|</span>
               <span className="text-[#FF7A16]">실시간 업데이트 중</span>
             </p>
           </div>
@@ -850,19 +850,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-2xl border-none bg-slate-50 p-4 text-center space-y-1 shadow-sm group hover:bg-white hover:ring-1 hover:ring-slate-200 transition-all">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">오늘 공부</span>
-                  <p className="dashboard-number text-xl text-[#14295F] leading-tight">{toHm(totalMinutes)}</p>
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
+                  <p className="dashboard-number text-xl text-[#14295F] leading-tight whitespace-nowrap">{toHm(totalMinutes)}</p>
                 </Card>
                 <Card className="rounded-2xl border-none bg-[#fff7ed] p-4 text-center space-y-1 shadow-sm border border-orange-100 group hover:bg-white hover:ring-1 hover:ring-orange-200 transition-all">
                   <span className="text-[8px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
-                  <p className="dashboard-number text-xl text-[#14295F] leading-tight">{planRate}%</p>
+                  <p className="dashboard-number text-2xl text-[#14295F] leading-tight">{planRate}%</p>
                 </Card>
                 <Card className={cn(
                   "rounded-2xl border-none p-4 text-center space-y-1 shadow-sm border transition-all",
                   attendanceStatus.color
                 )}>
-                  <span className="text-[8px] font-black uppercase tracking-widest opacity-60">출결 상태</span>
-                  <p className="text-lg font-black leading-tight truncate">{attendanceStatus.label.split(' ')[0]}</p>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
+                  <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
                 <Card
                   className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-center space-y-1 shadow-sm transition-all hover:bg-white hover:ring-1 hover:ring-rose-200 cursor-pointer"
@@ -892,7 +892,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   {report?.viewedAt && <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[8px] h-4 px-1.5">읽음</Badge>}
                 </div>
-                <p className="text-sm font-bold text-slate-700 leading-relaxed break-keep relative z-10 line-clamp-2">
+                <p className="text-sm font-bold text-slate-800 leading-relaxed break-keep relative z-10 line-clamp-2">
                   {report?.content || '선생님과 인공지능이 어제의 학습 데이터를 분석 중입니다.'}
                 </p>
               </Card>
@@ -957,7 +957,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               )}
                             </div>
                           </div>
-                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
                             {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
                           </p>
                         </button>
@@ -998,12 +998,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="studyDetail" className="mt-0 space-y-6 animate-in fade-in duration-500">
               {/* 주간 성과 요약 (기존 리포트 내용 통합) */}
               <div className="grid grid-cols-2 gap-3">
-                <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
-                  <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">주간 누적 몰입</span>
-                  <p className="dashboard-number text-2xl text-[#14295F]">{toHm(weeklyTotalStudyMinutes)}</p>
+                <Card className="rounded-[1.5rem] border-none bg-white p-4 ring-1 ring-slate-100 text-center shadow-sm">
+                  <span className="text-[10px] font-black text-slate-500 block mb-2 uppercase tracking-widest">주간 누적 트랙</span>
+                  <div className="flex items-baseline justify-center gap-0.5 flex-wrap leading-tight">
+                    {Math.floor(weeklyTotalStudyMinutes / 60) > 0 && (
+                      <>
+                        <span className="dashboard-number text-2xl text-[#14295F] tabular-nums leading-none">{Math.floor(weeklyTotalStudyMinutes / 60)}</span>
+                        <span className="text-[11px] font-black text-[#14295F]/50 mr-0.5">시간</span>
+                      </>
+                    )}
+                    <span className="dashboard-number text-2xl text-[#14295F] tabular-nums leading-none">{(weeklyTotalStudyMinutes % 60).toString().padStart(2, '0')}</span>
+                    <span className="text-[11px] font-black text-[#14295F]/50">분</span>
+                  </div>
                 </Card>
                 <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
-                  <span className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
+                  <span className="text-[10px] font-black text-slate-500 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
                   <p className="dashboard-number text-2xl text-[#FF7A16]">{weeklyPlanCompletionRate}%</p>
                 </Card>
               </div>
@@ -1011,7 +1020,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="flex items-center justify-between px-1">
                 <div className="flex flex-col">
                   <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">학습 일관성 맵</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">학습 일관성 맵</p>
                 </div>
                 <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -1029,7 +1038,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div key={day} className={cn(
                       isMobile ? "py-3 text-[9px]" : "py-4 text-[11px]",
                       "text-center font-black uppercase tracking-widest",
-                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/60"
+                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
                   ))}
                 </div>
@@ -1067,7 +1076,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             className={cn(
                               "font-black tracking-tighter tabular-nums rounded-full",
                               isMobile ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1",
-                              idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/80" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/80" : "text-[#14295F]/60 bg-white/75",
+                              idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/90" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/90" : "text-[#14295F]/80 bg-white/85",
                               isTodayCalendar && "text-[#14295F] scale-110"
                             )}
                           >
@@ -1079,14 +1088,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           </div>
                         </div>
                         {isMobile ? (
-                          <div className="absolute inset-x-1 bottom-1.5">
+                          <div className="absolute inset-x-0.5 bottom-1">
                             <div
                               className={cn(
-                                "rounded-md border text-center font-mono font-black tabular-nums py-1 leading-none",
-                                minutes > 0 ? "text-[#14295F] bg-white/85 border-white/80 shadow-sm" : "text-slate-400 bg-white/55 border-white/65"
+                                "rounded-md border text-center font-mono font-black tabular-nums py-0.5 leading-tight text-[10px] tracking-tighter whitespace-nowrap",
+                                minutes > 0 ? "text-[#14295F] bg-white/90 border-white/80 shadow-sm" : "text-slate-500 bg-white/75 border-white/60"
                               )}
                             >
-                              {isCurrentMonth ? formatMinutes(minutes) : '--:--'}
+                              {isCurrentMonth ? formatMinutes(minutes) : '--'}
                             </div>
                           </div>
                         ) : (
@@ -1099,13 +1108,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 <div className="h-1.5 w-full rounded-full bg-white/55 overflow-hidden">
                                   <div className="h-full rounded-full bg-[#14295F]/80" style={{ width: progressPercent + '%' }} />
                                 </div>
-                                <div className="flex items-center justify-between text-[10px] font-black text-[#14295F]/70">
+                                <div className="flex items-center justify-between text-[10px] font-black text-[#14295F]/85">
                                   <span>{progressPercent}% 집중도</span>
                                   <span>{hour}시간 {minuteRemainder.toString().padStart(2, '0')}분</span>
                                 </div>
                               </>
                             ) : (
-                              <span className="mt-auto text-[11px] font-bold text-slate-400">기록 없음</span>
+                              <span className="mt-auto text-[11px] font-bold text-slate-500">기록 없음</span>
                             )}
                           </div>
                         )}
@@ -1123,7 +1132,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
-                  <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-400 uppercase">
+                  <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-500 uppercase">
                     <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
                   </CardTitle>
                   <div className="space-y-4">
@@ -1144,7 +1153,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <Card className="rounded-[1.5rem] border-none shadow-sm bg-[#14295F] p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
                       <BarChart3 className="h-6 w-6 text-white/40" />
                       <div className="grid gap-0.5 text-white">
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">주간 상세</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white/80">주간 상세</span>
                         <span className="text-xs font-black">성과 상세 분석</span>
                       </div>
                     </Card>

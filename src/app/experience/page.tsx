@@ -492,7 +492,7 @@ function ParentInsightDetail({ insight }: { insight: ParentInsight }) {
     },
     calendar: {
       label: '학습 캘린더',
-      summary: '주간 누적 몰입과 날짜별 학습 시간을 앱 안에서 바로 확인하고, 특정 날짜 상세 데이터까지 자연스럽게 이어집니다.',
+      summary: '주간 누적 트랙과 날짜별 학습 시간을 앱 안에서 바로 확인하고, 특정 날짜 상세 데이터까지 자연스럽게 이어집니다.',
       bullets: ['날짜별 총 공부시간 노출', '선택 날짜 상세 모달 연결', '캘린더 + 주간 그래프 동시 확인', '과목별 학습비중 카드 연동'],
       stats: [
         ['주간 누적', '14h 23m'],
@@ -845,7 +845,7 @@ function ParentMobileDemo() {
               <Sparkles className="h-5 w-5 text-[#FF7A16]" />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <DemoValueCard label="주간 누적 몰입" value="14시간 23분" />
+              <DemoValueCard label="주간 누적 트랙" value="14시간 23분" />
               <DemoValueCard label="평균 목표 달성" value="50%" tone="orange" />
               <DemoValueCard label="결제 상태" value="완납" tone="emerald" />
               <DemoValueCard label="벌점 지수" value="5점" tone="rose" />
