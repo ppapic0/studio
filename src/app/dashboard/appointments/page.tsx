@@ -403,22 +403,22 @@ export function AppointmentsPageContent({
   };
 
   const getParentTypeBadge = (type: ParentCommunicationRecord['type']) => {
-    if (type === 'consultation') return <Badge className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">상담요청</Badge>;
-    if (type === 'request') return <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">일반요청</Badge>;
-    return <Badge className="border-none bg-violet-100 text-violet-700 font-black text-[10px]">건의사항</Badge>;
+    if (type === 'consultation') return <Badge variant="outline" className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">상담요청</Badge>;
+    if (type === 'request') return <Badge variant="outline" className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">일반요청</Badge>;
+    return <Badge variant="outline" className="border-none bg-violet-100 text-violet-700 font-black text-[10px]">건의사항</Badge>;
   };
 
   const getParentStatusBadge = (status?: string) => {
-    if (status === 'done') return <Badge className="border-none bg-emerald-100 text-emerald-700 font-black text-[10px]">처리 완료</Badge>;
-    if (status === 'in_progress') return <Badge className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">처리 중</Badge>;
-    if (status === 'in_review') return <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">검토 중</Badge>;
+    if (status === 'done') return <Badge variant="outline" className="border-none bg-emerald-100 text-emerald-700 font-black text-[10px]">처리 완료</Badge>;
+    if (status === 'in_progress') return <Badge variant="outline" className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">처리 중</Badge>;
+    if (status === 'in_review') return <Badge variant="outline" className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">검토 중</Badge>;
     return <Badge variant="secondary" className="font-black text-[10px]">접수됨</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'requested': return <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[10px]">승인 대기</Badge>;
-      case 'confirmed': return <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-sm">예약 확정</Badge>;
+      case 'confirmed': return <Badge variant="outline" className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-sm">예약 확정</Badge>;
       case 'done': return <Badge variant="outline" className="opacity-40 font-black text-[10px]">상담 완료</Badge>;
       case 'canceled': return <Badge variant="destructive" className="font-black text-[10px]">취소됨</Badge>;
       default: return <Badge variant="outline" className="font-black text-[10px]">{status}</Badge>;
@@ -658,7 +658,7 @@ export function AppointmentsPageContent({
                               <Clock className="h-3 w-3 opacity-40" />
                               {log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd') : ''}
                             </span>
-                            <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px] px-2 py-0.5 whitespace-nowrap">
+                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] px-2 py-0.5 whitespace-nowrap">
                               {log.createdAt ? getSeasonName(log.createdAt.toDate()) : ''}
                             </Badge>
                             {!isStudent && (
