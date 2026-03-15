@@ -236,7 +236,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           isMobile ? "rounded-[1.25rem]" : ""
         )}>
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[9px]" : "text-[10px]")}>시즌 러닝 포인트</CardTitle>
+            <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[9px]" : "text-[10px]")}>시즌 LP</CardTitle>
             <div className={cn("bg-amber-50 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md", isMobile ? "p-2" : "p-2.5")}>
               <Zap className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
@@ -249,7 +249,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "font-body border-[#e87010]/60 bg-[linear-gradient(180deg,#ff9a48,#ff7a16)] text-white font-extrabold leading-none shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_8px_rgba(255,122,22,0.25)] transition-all hover:brightness-105",
+                    "font-aggro-display border border-[#FF7A16]/60 bg-[#FF7A16] text-white font-extrabold leading-none transition-colors hover:bg-[#E56D00]",
                     isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
                   )}
                 >
@@ -327,7 +327,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
         )}>
           
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>오늘의 누적 트랙</CardTitle>
+            <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>오늘의 트랙</CardTitle>
             <div className={cn("bg-blue-50 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md", isMobile ? "p-2" : "p-2.5")}>
               <Clock className={cn("text-blue-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
@@ -340,7 +340,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "font-body border-[#e87010]/60 bg-[linear-gradient(180deg,#ff9a48,#ff7a16)] text-white font-extrabold leading-none shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_8px_rgba(255,122,22,0.25)] transition-all hover:brightness-105",
+                    "font-aggro-display border border-[#FF7A16]/60 bg-[#FF7A16] text-white font-extrabold leading-none transition-colors hover:bg-[#E56D00]",
                     isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
                   )}
                 >
@@ -1159,7 +1159,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <button 
                 disabled={isProcessingAction}
                 className={cn(
-                  "w-full rounded-2xl font-black transition-all md:w-auto shadow-lg active:scale-[0.98] border border-white/20 flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+                  "w-full rounded-2xl font-aggro-display font-black transition-colors md:w-auto border border-white/20 flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
                   isMobile ? "h-16 text-xl px-10" : "h-24 px-16 text-3xl",
                   isTimerActive ? "bg-rose-500 text-white" : "bg-white text-primary"
                 )} 
@@ -1176,7 +1176,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               
               <Dialog>
                 <DialogTrigger asChild>
-                  <button className="w-full h-12 rounded-2xl bg-white/15 border border-white/25 text-white font-black hover:bg-white hover:text-primary gap-2 shadow-lg flex items-center justify-center transition-all active:scale-95">
+                  <button className="w-full h-12 rounded-2xl bg-white/15 border border-white/25 text-white font-aggro-display font-black hover:bg-white hover:text-primary gap-2 flex items-center justify-center transition-colors">
                     <QrCode className="h-4 w-4" /> 나의 출입 QR
                   </button>
                 </DialogTrigger>
@@ -1218,8 +1218,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <ListTodo className="h-6 w-6" />
             </div>
             <div className="grid">
-              <CardTitle className="font-black text-2xl tracking-tighter text-slate-900 leading-none">계획트랙</CardTitle>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">학습 매트릭스</p>
+              <CardTitle className="font-aggro-display font-black text-2xl tracking-tighter text-slate-900 leading-none">계획트랙</CardTitle>
+              <p className="font-aggro-display text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">학습 루틴 보드</p>
             </div>
           </div>
           {isMobile ? (

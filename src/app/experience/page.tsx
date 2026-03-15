@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Fragment, type ReactNode } from 'react';
 import Link from 'next/link';

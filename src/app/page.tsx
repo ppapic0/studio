@@ -1,5 +1,6 @@
 import { AppPreviewSection } from '@/components/marketing/app-preview-section';
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
 import { DataManagementSection } from '@/components/marketing/data-management-section';
 import { FeatureStepsSection } from '@/components/marketing/feature-steps-section';
 import { HeroSection } from '@/components/marketing/hero-section';
@@ -20,6 +21,7 @@ export default function HomePage() {
       <HeroSection brand={marketingContent.brand} />
       <ScrollReveal><FeatureStepsSection /></ScrollReveal>
       <ScrollReveal><DataManagementSection /></ScrollReveal>
+      <ScrollReveal><DataAnalyticsPreviewSection /></ScrollReveal>
       <ScrollReveal><AppPreviewSection /></ScrollReveal>
       <ScrollReveal><ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} /></ScrollReveal>
       <ScrollReveal><KoreanClassSection /></ScrollReveal>
