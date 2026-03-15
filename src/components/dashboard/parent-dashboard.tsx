@@ -849,11 +849,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
             <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
               <div className="grid grid-cols-2 gap-3">
-                <Card className="rounded-2xl border-none bg-slate-50 p-4 text-center space-y-1 shadow-sm group hover:bg-white hover:ring-1 hover:ring-slate-200 transition-all">
+                <Card className="rounded-2xl border border-[#d7e3fb] bg-[linear-gradient(135deg,#eef4ff_0%,#e7efff_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#c4d5ff] transition-all">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
                   <p className="dashboard-number text-xl text-[#14295F] leading-tight whitespace-nowrap">{toHm(totalMinutes)}</p>
                 </Card>
-                <Card className="rounded-2xl border-none bg-[#fff7ed] p-4 text-center space-y-1 shadow-sm border border-orange-100 group hover:bg-white hover:ring-1 hover:ring-orange-200 transition-all">
+                <Card className="rounded-2xl border border-[#ffd1a8] bg-[linear-gradient(135deg,#fff4e8_0%,#ffe9d5_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#ffbf8a] transition-all">
                   <span className="text-[10px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
                   <p className="dashboard-number text-2xl text-[#14295F] leading-tight">{planRate}%</p>
                 </Card>
@@ -865,7 +865,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
                 <Card
-                  className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-center space-y-1 shadow-sm transition-all hover:bg-white hover:ring-1 hover:ring-rose-200 cursor-pointer"
+                  className="rounded-2xl border border-[#ffd7b4] bg-[linear-gradient(135deg,#fff7ef_0%,#ffeedd_100%)] p-4 text-center space-y-1 shadow-sm transition-all hover:ring-1 hover:ring-[#ffc593] cursor-pointer"
                   role="button"
                   onClick={() => setIsPenaltyGuideOpen(true)}
                 >
@@ -881,7 +881,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <Card className="rounded-[2rem] border-none bg-slate-50 p-6 ring-1 ring-slate-100 relative overflow-hidden group">
+              <Card className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#eef4ff_0%,#f5f9ff_55%,#fff4e8_100%)] p-6 ring-1 ring-[#d7e3fb]/70 relative overflow-hidden group shadow-sm">
                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:rotate-12 transition-transform duration-700">
                   <MessageCircle className="h-20 w-20 text-[#14295F]" />
                 </div>
@@ -930,8 +930,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           className={cn(
                             'relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-all',
                             isRead
-                              ? 'border-slate-200 bg-slate-50/60'
-                              : 'border-[#14295F]/20 bg-[#f8fbff] shadow-sm ring-1 ring-[#FF7A16]/25 hover:shadow-md'
+                              ? 'border-[#dbe4f8] bg-[#f3f7ff]'
+                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff5ea_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/80 hover:shadow-md'
                           )}
                           onClick={() => void openNotificationDetail(notification)}
                         >
