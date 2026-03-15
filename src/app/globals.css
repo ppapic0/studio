@@ -208,7 +208,7 @@
 
   .dashboard-shell {
     word-break: keep-all;
-    overflow-wrap: normal;
+    overflow-wrap: break-word;
   }
 
   .dashboard-shell [data-slot="badge"],
@@ -224,17 +224,14 @@
   .dashboard-shell h2,
   .dashboard-shell h3,
   .dashboard-shell h4,
-  .dashboard-shell [data-slot="card-title"],
+  .dashboard-shell [data-slot="card-title"] {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
   .dashboard-shell [role="tab"] {
     white-space: nowrap;
     word-break: keep-all;
-    overflow-wrap: normal;
-  }
-
-  .dashboard-shell .allow-wrap,
-  .dashboard-shell .break-keep,
-  .dashboard-shell .whitespace-pre-wrap {
-    white-space: normal;
   }
 
   .dashboard-shell th,

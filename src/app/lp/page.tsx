@@ -33,7 +33,7 @@ export default function LPPage() {
             <article key={step.title} className="marketing-card flex gap-5 p-7">
               <div className="step-badge mt-0.5 shrink-0">{index + 1}</div>
               <div>
-                <h3 className="break-keep text-[1.3rem] font-extrabold leading-[1.22] tracking-[-0.03em] text-[#14295F]">
+                <h3 className="break-keep text-[1.3rem] font-extrabold leading-[1.22] text-[#14295F]">
                   {step.title}
                 </h3>
                 <p className="mt-2.5 break-keep text-[15px] font-medium leading-[1.85] text-slate-600">

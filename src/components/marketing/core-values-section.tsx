@@ -36,7 +36,7 @@ export function CoreValuesSection({ valueCards }: CoreValuesSectionProps) {
                 style={{ background: 'linear-gradient(90deg, #FF7A16, #FF9848)' }}
               />
 
-              <h3 className="mt-5 break-keep text-[1.4rem] font-extrabold leading-[1.18] tracking-[-0.035em] text-[#14295F]">
+              <h3 className="mt-5 break-keep text-[1.4rem] font-extrabold leading-[1.18] text-[#14295F]">
                 {card.title}
               </h3>
               <p className="mt-3 break-keep text-[15px] font-medium leading-[1.8] text-slate-600">

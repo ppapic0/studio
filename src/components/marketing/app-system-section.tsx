@@ -33,7 +33,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <span className="eyebrow-badge">EXPERIENCE FIRST</span>
-              <p className="mt-3 break-keep text-[1.55rem] font-black leading-[1.14] tracking-[-0.035em] text-[#14295F]">
+              <p className="mt-3 break-keep text-[1.55rem] font-black leading-[1.14] text-[#14295F]">
                 학생 · 학부모 모드를 실제 앱처럼 체험
               </p>
               <p className="mt-2 break-keep text-[14px] font-medium leading-[1.74] text-slate-600">
@@ -78,7 +78,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
             <ul className="grid gap-3 sm:grid-cols-2">
               {appSystem.features.map((item) => (
                 <li key={item.title} className="marketing-card p-4">
-                  <p className="text-[1rem] font-black tracking-[-0.02em] text-[#14295F]">{item.title}</p>
+                  <p className="text-[1rem] font-black text-[#14295F]">{item.title}</p>
                   <p className="mt-2 break-keep text-sm font-medium leading-[1.72] text-slate-600">{item.description}</p>
                 </li>
               ))}
@@ -152,7 +152,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                 </div>
 
                 <div className="px-1 pb-1 pt-4">
-                  <p className="break-keep text-[1rem] font-extrabold tracking-[-0.02em] text-[#14295F]">{screen.title}</p>
+                  <p className="break-keep text-[1rem] font-extrabold text-[#14295F]">{screen.title}</p>
                   <p className="mt-1 break-keep text-xs font-black text-[#FF7A16]">{screen.subtitle}</p>
                   <p className="mt-1.5 break-keep text-xs font-medium leading-[1.7] text-slate-600">{screen.caption}</p>
                 </div>
