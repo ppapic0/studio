@@ -37,7 +37,7 @@ export function ClassSystemSection({ classSystem }: ClassSystemSectionProps) {
               )}
               <div className="marketing-card h-full p-5">
                 <div className="step-badge mb-4">{index + 1}</div>
-                <h3 className="font-display break-keep text-[1.12rem] text-[#14295F]">
+                <h3 className="break-keep text-[1.12rem] font-extrabold tracking-[-0.03em] text-[#14295F]">
                   {step.title}
                 </h3>
                 <p className="mt-2 break-keep text-sm font-medium leading-[1.76] text-slate-600">

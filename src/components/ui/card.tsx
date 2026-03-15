@@ -10,7 +10,7 @@ const Card = React.forwardRef<
     ref={ref}
     data-slot="card"
     className={cn(
-      "relative overflow-hidden rounded-[1.5rem] border border-[rgba(20,41,95,0.09)] bg-[linear-gradient(180deg,rgba(255,255,255,1)_0%,rgba(249,251,255,0.98)_100%)] text-card-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.96)_inset,0_-1px_0_0_rgba(20,41,95,0.04)_inset,0_2px_6px_rgba(20,41,95,0.04),0_10px_24px_-4px_rgba(20,41,95,0.08)] transition-[transform,box-shadow,border-color] duration-150 ease-out",
+      "relative overflow-hidden rounded-[1.5rem] border border-[rgba(20,41,95,0.09)] bg-[linear-gradient(180deg,rgba(255,255,255,1)_0%,rgba(249,251,255,0.98)_100%)] text-card-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.96)_inset,0_-1px_0_0_rgba(20,41,95,0.04)_inset,0_2px_6px_rgba(20,41,95,0.04),0_10px_24px_-4px_rgba(20,41,95,0.08)] transition-[transform,box-shadow,border-color] duration-150 ease-out hover:border-[rgba(20,41,95,0.13)] hover:shadow-[0_1px_0_0_rgba(255,255,255,0.97)_inset,0_-1px_0_0_rgba(20,41,95,0.05)_inset,0_4px_10px_rgba(20,41,95,0.07),0_16px_32px_-4px_rgba(20,41,95,0.11)] hover:-translate-y-[1px]",
       className
     )}
     {...props}
