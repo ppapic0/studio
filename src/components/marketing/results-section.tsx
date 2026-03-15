@@ -13,25 +13,25 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
   return (
     <section
       id="results"
-      className="on-dark scroll-mt-20 py-20 sm:py-28"
+      className="on-dark scroll-mt-20 py-12 sm:py-16"
       style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section heading */}
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge-light">2026 RESULT</span>
-          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.9rem,3.9vw,2.8rem)] font-black leading-[1.08] text-white">
+          <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.75rem,3.5vw,2.5rem)] font-black leading-[1.1] text-white">
             실적은 감성이 아니라
             <br />
             데이터로 말합니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-white/82">
+          <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-white/82">
             2026학년도 수능, 트랙의 운영 구조가 만들어 낸 결과입니다.
           </p>
         </div>
 
         {/* University data board */}
-        <div className="mt-14">
+        <div className="mt-9">
           <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-white/45">
             2026학년도 주요 합격
           </p>
