@@ -11,7 +11,7 @@ type StudyCafeSectionProps = {
 const brochureBlocks = [
   {
     eyebrow: 'OPERATING HOURS',
-    title: '매일 08:30 ~ 익일 01:30',
+    title: '매일 08:30 ~ 익일 01:00',
     body: '센터는 거의 연중무휴 흐름으로 운영하고, 학원은 매일 오후 10시에 종료합니다.',
     note: '',
     icon: Clock3,
