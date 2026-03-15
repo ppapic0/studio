@@ -34,12 +34,12 @@ export function FeatureStepsSection() {
         {/* Section heading */}
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">HOW WE WORK</span>
-          <h2 className="font-brand mt-4 break-keep text-[clamp(1.8rem,3.8vw,2.65rem)] leading-[1.08] text-[#14295F]">
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.9rem,3.9vw,2.8rem)] font-black leading-[1.08] text-[#14295F]">
             트랙이 다른 이유는
             <br />
             구조에 있습니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.78] text-slate-500">
+          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-[#384f6a]">
             공간을 제공하는 것이 아니라, 루틴을 설계하고 데이터로 관리합니다.
           </p>
         </div>

@@ -20,12 +20,12 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
         {/* Section heading */}
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge-light">2026 RESULT</span>
-          <h2 className="font-brand mt-4 break-keep text-[clamp(1.8rem,3.8vw,2.65rem)] leading-[1.08] text-white">
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.9rem,3.9vw,2.8rem)] font-black leading-[1.08] text-white">
             실적은 감성이 아니라
             <br />
             데이터로 말합니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.78] text-blue-100/52">
+          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-blue-100/75">
             2026학년도 수능, 트랙의 운영 구조가 만들어 낸 결과입니다.
           </p>
         </div>

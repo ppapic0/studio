@@ -21,12 +21,12 @@ export function AppPreviewSection() {
         {/* Section heading */}
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">APP SYSTEM</span>
-          <h2 className="font-brand mt-4 break-keep text-[clamp(1.8rem,3.8vw,2.65rem)] leading-[1.08] text-[#14295F]">
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.9rem,3.9vw,2.8rem)] font-black leading-[1.08] text-[#14295F]">
             학생과 학부모가
             <br />
             각자의 화면을 갖습니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.78] text-slate-500">
+          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-[#384f6a]">
             관리는 보여주는 것이 아니라 확인 가능한 것이어야 합니다.
           </p>
         </div>

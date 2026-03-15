@@ -137,10 +137,11 @@ export const marketingContent: MarketingContent = {
     heroBackground: '',
   },
   nav: [
-    { label: '운영 방식', href: '#features' },
-    { label: '앱 시스템', href: '#app' },
-    { label: '합격 실적', href: '#results' },
-    { label: '상담 문의', href: '#consult' },
+    { label: '운영 방식', href: '/#features' },
+    { label: '웹앱 시스템', href: '/#app' },
+    { label: '합격 실적', href: '/#results' },
+    { label: '국어 수업', href: '/class' },
+    { label: '상담 문의', href: '/#consult' },
   ],
   heroStats: [
     {

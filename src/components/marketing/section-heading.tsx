@@ -12,7 +12,7 @@ export function SectionHeading({ eyebrow, title, description, light = false }: S
         {eyebrow}
       </div>
       <h2
-        className={`font-brand mt-4 break-keep text-[clamp(2rem,4.8vw,3rem)] leading-[1.04] ${
+        className={`font-aggro-display mt-4 break-keep text-[clamp(2rem,4.8vw,3rem)] font-black leading-[1.04] ${
           light ? "text-white" : "text-[#14295F]"
         }`}
       >
@@ -20,8 +20,8 @@ export function SectionHeading({ eyebrow, title, description, light = false }: S
       </h2>
       {description ? (
         <p
-          className={`mt-4 max-w-2xl break-keep text-[15px] font-semibold leading-[1.82] sm:text-[15.5px] ${
-            light ? "text-white/78" : "text-slate-600"
+          className={`mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] sm:text-[15.5px] ${
+            light ? "text-white/85" : "text-[#2c3f58]"
           }`}
         >
           {description}

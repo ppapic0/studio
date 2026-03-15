@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   title: "트랙 국어 학원 | 관리형 스터디센터 · 수능 국어",
   description:
     "관리형 스터디센터 중심 운영, 수능 국어 그룹 수업, 학부모 앱과 학생 웹앱이 연결된 트랙의 학습 관리 시스템입니다.",
+  icons: {
+    icon: '/track-logo-mark.svg',
+    shortcut: '/track-logo-mark.svg',
+    apple: '/track-logo-mark.png',
+  },
 };
 
 export default function RootLayout({
