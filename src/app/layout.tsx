@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { AppProvider } from "@/contexts/app-context";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
 
-import "pretendard/dist/web/variable/pretendardvariable.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

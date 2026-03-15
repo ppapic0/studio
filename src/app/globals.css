@@ -139,14 +139,12 @@
   }
 
   .font-display {
-    font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     font-weight: 800;
     letter-spacing: -0.024em;
     line-height: 1.12;
   }
 
   .font-brand {
-    font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     font-weight: 900;
     letter-spacing: -0.028em;
     line-height: 1.1;
@@ -158,37 +156,28 @@
   }
 
   .font-aggro-display {
-    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-family: "TrackDisplay", system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1.02;
   }
 
   .font-numeric {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 750;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
-    font-synthesis: none;
     letter-spacing: -0.016em;
     line-height: 1.08;
   }
 
   .tabular-nums {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
-    font-synthesis: none;
     letter-spacing: -0.012em;
   }
 
   .dashboard-number {
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 820;
     font-variant-numeric: lining-nums tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
-    font-synthesis: none;
     letter-spacing: -0.02em;
     line-height: 1.08;
   }
