@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import type { MarketingContent } from "@/lib/marketing-content";
 
 import { SectionHeading } from "./section-heading";
@@ -7,28 +9,22 @@ type LPSystemSectionProps = {
 };
 
 export function LPSystemSection({ lpSystem }: LPSystemSectionProps) {
+  const preview = lpSystem.cycle.slice(0, 2);
+
   return (
-    <section id="lp-system" className="scroll-mt-28 bg-[#F4F7FF] py-16 sm:py-20">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="lp-system" className="scroll-mt-28 bg-white py-16 sm:py-20">
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="LP System" title={lpSystem.heading} description={lpSystem.description} />
 
-        <div className="mt-9 grid gap-3 lg:grid-cols-5">
-          {lpSystem.cycle.map((step, index) => (
-            <article key={step.title} className="relative">
-              {/* Connector line */}
-              {index < lpSystem.cycle.length - 1 && (
-                <div
-                  className="absolute -right-1.5 top-8 z-10 hidden h-0.5 w-3 lg:block"
-                  style={{ background: 'linear-gradient(90deg, #FF7A16, rgba(255,122,22,0.3))' }}
-                />
-              )}
-
-              <div className="marketing-card h-full p-5">
-                <div className="step-badge mb-4">{index + 1}</div>
-                <h3 className="break-keep text-[1.15rem] font-extrabold leading-[1.22] tracking-[-0.03em] text-[#14295F]">
+        <div className="mt-9 grid gap-4">
+          {preview.map((step, index) => (
+            <article key={step.title} className="marketing-card flex gap-5 p-6">
+              <div className="step-badge mt-0.5 shrink-0">{index + 1}</div>
+              <div>
+                <h3 className="break-keep text-[1.2rem] font-extrabold leading-[1.22] tracking-[-0.03em] text-[#14295F]">
                   {step.title}
                 </h3>
-                <p className="mt-2.5 break-keep text-sm font-medium leading-[1.76] text-slate-600">
+                <p className="mt-2 break-keep text-[15px] font-medium leading-[1.8] text-slate-600">
                   {step.description}
                 </p>
               </div>
@@ -36,22 +32,16 @@ export function LPSystemSection({ lpSystem }: LPSystemSectionProps) {
           ))}
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          {lpSystem.benefits.map((benefit) => (
-            <article
-              key={benefit}
-              className="flex items-center gap-3 rounded-[1.2rem] border border-[#14295F]/10 bg-white px-4 py-3.5"
-              style={{
-                boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06)',
-              }}
-            >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: 'linear-gradient(135deg, #FF7A16, #FF9848)' }}
-              />
-              <p className="text-sm font-extrabold text-[#14295F]">{benefit}</p>
-            </article>
-          ))}
+        <div className="mt-5 text-center">
+          <Link
+            href="/lp"
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(20,41,95,0.18)] bg-white px-6 py-3 text-[14px] font-bold text-[#14295F] shadow-sm transition-[transform,background-color] duration-100 hover:bg-[#f0f4ff] active:scale-[0.97] active:brightness-[0.93]"
+          >
+            LP 사이클 전체 보기
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       </div>
     </section>
