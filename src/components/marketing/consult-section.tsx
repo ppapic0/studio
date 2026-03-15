@@ -11,7 +11,7 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
   return (
     <section
       id="consult"
-      className="scroll-mt-28 py-16 sm:py-20"
+      className="on-dark scroll-mt-28 py-16 sm:py-20"
       style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">

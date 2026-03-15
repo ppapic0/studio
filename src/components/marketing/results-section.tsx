@@ -13,7 +13,7 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
   return (
     <section
       id="results"
-      className="scroll-mt-20 py-20 sm:py-28"
+      className="on-dark scroll-mt-20 py-20 sm:py-28"
       style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -25,14 +25,14 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
             <br />
             데이터로 말합니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-blue-100/75">
+          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.78] text-white/82">
             2026학년도 수능, 트랙의 운영 구조가 만들어 낸 결과입니다.
           </p>
         </div>
 
         {/* University data board */}
         <div className="mt-14">
-          <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-white/28">
+          <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-white/45">
             2026학년도 주요 합격
           </p>
           <StaggerChildren stagger={80} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -44,10 +44,10 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
                 <p className="font-brand text-[2.2rem] font-black leading-none text-white">
                   {u.value}
                 </p>
-                <p className="mt-2 break-keep text-[12px] font-semibold text-blue-100/52">
+                <p className="mt-2 break-keep text-[12px] font-semibold text-white/68">
                   {u.label}
                 </p>
-                <p className="mt-1 text-[10px] font-semibold text-white/24">{u.detail}</p>
+                <p className="mt-1 text-[10px] font-semibold text-white/42">{u.detail}</p>
               </article>
             ))}
           </StaggerChildren>
