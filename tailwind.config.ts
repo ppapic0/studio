@@ -22,7 +22,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"Pretendard Variable"', 'Pretendard', '"Noto Sans KR"', 'var(--font-gangwon)', 'sans-serif'],
+        body: ['system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Apple SD Gothic Neo"', '"Noto Sans KR"', '"Malgun Gothic"', 'sans-serif'],
         headline: ['var(--font-aggro)', 'var(--font-gangwon)', 'Pretendard', 'sans-serif'],
       },
       colors: {
