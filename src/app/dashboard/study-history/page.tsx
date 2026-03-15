@@ -484,10 +484,10 @@ export default function StudyHistoryPage() {
           <div className="relative z-10">
             <div className="flex justify-between items-center mb-10">
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-85">월간 분석</span>
-                <Badge className="w-fit bg-white/24 text-white border border-white/20 font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/90">월간 분석</span>
+                <Badge className="w-fit bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
               </div>
-              <Badge className="bg-white/22 text-white border border-white/20 font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} 티어</Badge>
+              <Badge className="bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} 티어</Badge>
             </div>
             <div className="flex items-baseline gap-2">
               <span className={cn("font-black tracking-tighter tabular-nums leading-none drop-shadow-[0_2px_12px_rgba(5,15,40,0.45)]", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
@@ -562,7 +562,7 @@ export default function StudyHistoryPage() {
                       className={cn(
                         "font-black tracking-tighter tabular-nums rounded-full",
                         isMobile ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1",
-                        idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/80" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/80" : "text-primary/60 bg-white/70",
+                        idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/90" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/90" : "text-primary/80 bg-white/85",
                         isTodayCalendar && "text-primary scale-110"
                       )}
                     >
@@ -575,14 +575,14 @@ export default function StudyHistoryPage() {
                   </div>
 
                   {isMobile ? (
-                    <div className="absolute inset-x-1 bottom-1.5">
+                    <div className="absolute inset-x-0.5 bottom-1">
                       <div
                         className={cn(
-                          "rounded-md text-center font-mono font-black tabular-nums py-1 leading-none border",
-                          minutes > 0 ? "text-primary bg-white/85 border-white/80 shadow-sm" : "text-slate-400 bg-white/55 border-white/65"
+                          "rounded-md text-center font-mono font-black tabular-nums py-0.5 leading-tight border text-[10px] tracking-tighter whitespace-nowrap",
+                          minutes > 0 ? "text-primary bg-white/90 border-white/80 shadow-sm" : "text-slate-500 bg-white/75 border-white/60"
                         )}
                       >
-                        {isCurrentMonth ? formatMinutes(minutes) : '--:--'}
+                        {isCurrentMonth ? formatMinutes(minutes) : '--'}
                       </div>
                     </div>
                   ) : (
@@ -595,12 +595,12 @@ export default function StudyHistoryPage() {
                           <div className="h-1.5 w-full rounded-full bg-white/55 overflow-hidden">
                             <div className="h-full rounded-full bg-primary/80" style={{ width: `${progressPercent}%` }} />
                           </div>
-                          <div className="flex items-center justify-between text-[10px] font-black opacity-75">
+                          <div className="flex items-center justify-between text-[10px] font-black opacity-90">
                             <span>{progressPercent}% 집중도</span>
                             <span>{hour}시간 {minuteRemainder.toString().padStart(2, '0')}분</span>
                           </div>
                           {minutes >= 360 && (
-                            <Badge className="w-fit bg-white/40 text-primary border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">집중 최고치</Badge>
+                            <Badge className="w-fit bg-white/85 text-emerald-900 border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">집중 최고치</Badge>
                           )}
                         </>
                       ) : (
@@ -621,11 +621,18 @@ export default function StudyHistoryPage() {
         </CardContent>
       </Card>
 
+      {!selectedDateForPlan && (
+        <div className="flex items-center justify-center gap-2 py-2.5 px-4 mx-1 rounded-2xl bg-muted/20 border border-dashed border-muted-foreground/10">
+          <Info className="h-3.5 w-3.5 text-primary/30 shrink-0" />
+          <p className="text-[11px] font-bold text-muted-foreground/50 text-center leading-relaxed">날짜를 누르면 그날의 기록을 확인할 수 있어요.</p>
+        </div>
+      )}
+
       <Dialog open={!!selectedDateForPlan} onOpenChange={(open) => !open && setSelectedDateForPlan(null)}>
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2.5rem]" : "sm:max-w-xl rounded-[3rem]")}>
           <div className="bg-primary p-8 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[600px]")}>
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
