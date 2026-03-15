@@ -24,7 +24,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
                 alt={`${brand.name} 로고`}
                 width={36}
                 height={36}
-                className="h-9 w-9 rounded-lg object-contain"
+                className="h-9 w-9 object-contain"
               />
               <p className="font-brand text-base text-white">{brand.name}</p>
             </div>
