@@ -15,6 +15,7 @@ import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
+import { TrackKoreanMethodSection } from '@/components/marketing/track-korean-method-section';
 import { marketingContent } from '@/lib/marketing-content';
 
 /* ─────────────────────────────────────────────────
@@ -81,6 +82,7 @@ const materialPreviews = [
 ];
 
 const koreanMaterialPdfPath = '/materials/2026-korean-nonfiction-2passages-commentary.pdf';
+const koreanMaterialPreviewUrl = `${koreanMaterialPdfPath}#page=1&view=FitH`;
 
 const scoreProofCards = [
   {
@@ -136,6 +138,7 @@ export default function ClassPage() {
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
+      <TrackKoreanMethodSection />
 
       {/* ══════════════════════════════════════════
           1. HERO
@@ -532,6 +535,19 @@ export default function ClassPage() {
               <p className="mb-6 break-keep text-[14.5px] font-semibold text-white/75">
                 자료를 통해 수업의 기준, 설명의 밀도, 정리 방식까지 미리 확인해보세요.
               </p>
+              <div className="mx-auto mb-6 max-w-3xl overflow-hidden rounded-[1.2rem] border border-white/18 bg-white">
+                <div className="flex items-center justify-between border-b border-[#14295F]/10 px-4 py-2.5">
+                  <p className="text-[12px] font-black text-[#14295F]">PDF First Page Preview</p>
+                  <a href={koreanMaterialPdfPath} download className="text-[11.5px] font-black text-[#14295F]/70 hover:text-[#14295F]">
+                    Download
+                  </a>
+                </div>
+                <iframe
+                  title="PDF first page preview"
+                  src={koreanMaterialPreviewUrl}
+                  className="h-[280px] w-full bg-white"
+                />
+              </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
                   href={koreanMaterialPdfPath}
