@@ -63,7 +63,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                     className={index % 2 === 0 ? 'marketing-card-soft px-4 py-4' : 'marketing-card-warm px-4 py-4'}
                   >
                     <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">KEYWORD</p>
-                    <p className="mt-2 text-[1.05rem] font-black tracking-[-0.03em] text-[#14295F]">{keyword}</p>
+                    <p className="mt-2 text-[1.05rem] font-black text-[#14295F]">{keyword}</p>
                   </div>
                 ))}
               </div>
@@ -84,7 +84,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-[10.5px] font-black tracking-[0.2em] text-[#FF7A16]">{block.eyebrow}</p>
-                      <h3 className="mt-3 break-keep text-[1.6rem] font-black leading-[1.08] tracking-[-0.035em] text-[#14295F]">
+                      <h3 className="mt-3 break-keep text-[1.6rem] font-black leading-[1.08] text-[#14295F]">
                         {block.title}
                       </h3>
                     </div>
@@ -113,7 +113,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
             {studyCafe.features.map((item) => (
               <article key={item.title} className="marketing-card p-5">
                 <p className="text-[10.5px] font-black tracking-[0.16em] text-[#FF7A16]">TRACK STANDARD</p>
-                <h3 className="mt-3 break-keep text-[1.3rem] font-extrabold tracking-[-0.03em] text-[#14295F]">
+                <h3 className="mt-3 break-keep text-[1.3rem] font-extrabold text-[#14295F]">
                   {item.title}
                 </h3>
                 <p className="mt-2 break-keep text-sm font-medium leading-[1.74] text-slate-600">{item.description}</p>
@@ -135,7 +135,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
             <div className="mt-5 space-y-3">
               {studyCafe.seatTypes.map((seat) => (
                 <article key={seat.title} className="marketing-card-soft p-4">
-                  <h4 className="text-[1.05rem] font-extrabold tracking-[-0.03em] text-[#14295F]">{seat.title}</h4>
+                  <h4 className="text-[1.05rem] font-extrabold text-[#14295F]">{seat.title}</h4>
                   <p className="mt-1.5 break-keep text-sm font-medium leading-[1.72] text-slate-600">{seat.description}</p>
                 </article>
               ))}

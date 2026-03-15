@@ -33,7 +33,7 @@ export function ClassSystemSection({ classSystem }: ClassSystemSectionProps) {
             <article key={step.title} className="marketing-card flex gap-5 p-6">
               <div className="step-badge mt-0.5 shrink-0">{index + 1}</div>
               <div>
-                <h3 className="break-keep text-[1.2rem] font-extrabold tracking-[-0.03em] text-[#14295F]">
+                <h3 className="break-keep text-[1.2rem] font-extrabold text-[#14295F]">
                   {step.title}
                 </h3>
                 <p className="mt-2 break-keep text-[15px] font-medium leading-[1.8] text-slate-600">
