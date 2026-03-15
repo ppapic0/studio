@@ -26,7 +26,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             alt={`${brand.name} 로고`}
             width={36}
             height={36}
-            className="h-9 w-9 rounded-lg object-contain"
+            className="h-9 w-9 object-contain"
           />
           <div className="grid gap-0.5">
             <span className="text-[1rem] font-bold text-white sm:text-[1.05rem]">

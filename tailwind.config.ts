@@ -22,7 +22,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Apple SD Gothic Neo"', '"Noto Sans KR"', '"Malgun Gothic"', 'sans-serif'],
+        body: ['"Noto Sans KR"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Apple SD Gothic Neo"', '"Malgun Gothic"', 'sans-serif'],
         headline: ['var(--font-aggro)', 'var(--font-gangwon)', 'sans-serif'],
       },
       colors: {

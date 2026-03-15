@@ -132,8 +132,8 @@ export const marketingContent: MarketingContent = {
     heroTitle: '관리형 스터디센터가 중심입니다',
     heroDescription:
       '루틴을 먼저 세우고, 데이터로 확인합니다. 수능 국어 수업은 필요할 때 따로 선택하고, 재학생과 N수생 모두 등록할 수 있습니다.',
-    logoFull: '/track-logo-full.svg',
-    logoMark: '/track-logo-mark.svg',
+    logoFull: '/track-logo-full.png',
+    logoMark: '/track-logo-mark.png',
     heroBackground: '',
   },
   nav: [
