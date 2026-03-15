@@ -28,10 +28,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 
 const STAT_CONFIG = {
-  focus: { label: '집중력', sub: 'FOCUS', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
-  consistency: { label: '꾸준함', sub: 'CONSISTENCY', icon: RefreshCw, color: 'text-emerald-500', accent: 'bg-emerald-50', guide: '매일 비슷한 시간대 루틴이 핵심입니다.' },
-  achievement: { label: '목표달성', sub: 'ACHIEVEMENT', icon: CheckCircle2, color: 'text-amber-500', accent: 'bg-amber-50', guide: '계획 완료율이 높을수록 빠르게 성장합니다.' },
-  resilience: { label: '회복력', sub: 'RESILIENCE', icon: ShieldCheck, color: 'text-rose-500', accent: 'bg-rose-50', guide: '흔들린 날 이후 빠른 회복 능력입니다.' },
+  focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
+  consistency: { label: '꾸준함', sub: '꾸준', icon: RefreshCw, color: 'text-emerald-500', accent: 'bg-emerald-50', guide: '매일 비슷한 시간대 루틴이 핵심입니다.' },
+  achievement: { label: '목표달성', sub: '달성', icon: CheckCircle2, color: 'text-amber-500', accent: 'bg-amber-50', guide: '계획 완료율이 높을수록 빠르게 성장합니다.' },
+  resilience: { label: '회복력', sub: '회복', icon: ShieldCheck, color: 'text-rose-500', accent: 'bg-rose-50', guide: '흔들린 날 이후 빠른 회복 능력입니다.' },
 } as const;
 
 const RANGE_MAP = { today: 7, weekly: 14, monthly: 28 } as const;
@@ -998,7 +998,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <StatAnalysisCard
           title="계획 완수율"
           value={`${avgCompletionRate}%`}
-          subValue="학습 To-do 완료율"
+          subValue="학습 할 일 완료율"
           icon={CheckCircle2}
           colorClass="text-amber-500"
           isMobile={isMobile}
@@ -1204,7 +1204,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         <TabsContent value="plans" className="space-y-6 mt-0">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> 오늘 학습 계획</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-primary">{todayPlanSummary.studyDone}/{todayPlanSummary.studyTotal}</p><p className="text-xs font-bold text-muted-foreground mt-1">완료 / 전체 학습 To-do</p></CardContent></Card>
+            <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> 오늘 학습 계획</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-primary">{todayPlanSummary.studyDone}/{todayPlanSummary.studyTotal}</p><p className="text-xs font-bold text-muted-foreground mt-1">완료 / 전체 학습 할 일</p></CardContent></Card>
             <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Timer className="h-4 w-4 text-blue-500" /> 오늘 루틴 수</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-blue-600">{todayPlanSummary.routineCount}</p><p className="text-xs font-bold text-muted-foreground mt-1">등원/식사/학원 등 시간 루틴</p></CardContent></Card>
             <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><PlusCircle className="h-4 w-4 text-amber-500" /> 개인 할 일</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-amber-600">{todayPlanSummary.personalCount}</p><p className="text-xs font-bold text-muted-foreground mt-1">생활/기타 개인 체크 항목</p></CardContent></Card>
           </div>
@@ -1223,7 +1223,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <div key={group.dateKey} className="rounded-xl border border-border/60 p-3.5 bg-muted/10">
                       <div className="flex items-center justify-between mb-2"><p className="text-sm font-black text-slate-800">{format(date, 'M월 d일 (EEE)', { locale: ko })}</p><Badge variant="outline" className="font-black text-[10px] rounded-full">학습 {group.studies.length} · 루틴 {group.routines.length}</Badge></div>
                       <div className="grid gap-2 md:grid-cols-2">
-                        <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-2.5"><p className="text-[11px] font-black text-emerald-700 mb-1.5">학습 To-do</p>{group.studies.length === 0 ? <p className="text-xs font-bold text-emerald-700/70">등록된 학습 계획 없음</p> : <div className="space-y-1">{group.studies.slice(0, 4).map((item) => <div key={item.id} className="flex items-center justify-between text-xs font-semibold text-emerald-800"><span className="truncate pr-2">{item.title}</span><span className="shrink-0 font-black">{item.done ? '완료' : '대기'}</span></div>)}</div>}</div>
+                        <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-2.5"><p className="text-[11px] font-black text-emerald-700 mb-1.5">학습 할 일</p>{group.studies.length === 0 ? <p className="text-xs font-bold text-emerald-700/70">등록된 학습 계획 없음</p> : <div className="space-y-1">{group.studies.slice(0, 4).map((item) => <div key={item.id} className="flex items-center justify-between text-xs font-semibold text-emerald-800"><span className="truncate pr-2">{item.title}</span><span className="shrink-0 font-black">{item.done ? '완료' : '대기'}</span></div>)}</div>}</div>
                         <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-2.5"><p className="text-[11px] font-black text-blue-700 mb-1.5">루틴/스케줄</p>{group.routines.length === 0 ? <p className="text-xs font-bold text-blue-700/70">등록된 루틴 없음</p> : <div className="space-y-1">{group.routines.slice(0, 4).map((item) => <div key={item.id} className="text-xs font-semibold text-blue-800 truncate">{item.title}</div>)}</div>}</div>
                       </div>
                     </div>
@@ -1390,7 +1390,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <Zap className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
             <DialogHeader>
               <div className="flex justify-between items-center">
-                <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest">Growth Management</Badge>
+                <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest whitespace-nowrap">성장 지표 관리</Badge>
                 {!isEditStats && canEditGrowthData && <Button variant="ghost" size="sm" onClick={() => setIsEditStats(true)} className="text-white hover:bg-white/10 gap-2 h-8 rounded-lg font-black text-xs"><Settings2 className="h-3.5 w-3.5" /> 수동 보정</Button>}
               </div>
               <DialogTitle className="text-3xl font-black tracking-tighter">성장 및 스킬 마스터 관리</DialogTitle>
@@ -1399,7 +1399,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="flex-1 overflow-y-auto bg-white p-10 space-y-10 custom-scrollbar">
             <section className="space-y-4">
-              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2"><Zap className="h-4 w-4" /> 시즌 보유 LP</h4>
+              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4" /> 시즌 보유 포인트</h4>
               <Card className="rounded-[1.5rem] border-2 border-primary/5 bg-muted/5 p-6 flex flex-col items-center text-center gap-4">
                 {isEditStats && canEditGrowthData ? (
                   <div className="w-full space-y-4">
@@ -1407,7 +1407,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <Input type="number" value={editLp} onChange={(event) => setEditLp(Number(event.target.value))} className="h-12 rounded-xl text-center font-black text-xl border-2" />
                   </div>
                 ) : (
-                  <div className="text-5xl font-black text-primary">{(progress?.seasonLp || 0).toLocaleString()}<span className="text-xl opacity-20 ml-1">LP</span></div>
+                  <div className="text-5xl font-black text-primary">{(progress?.seasonLp || 0).toLocaleString()}<span className="text-xl opacity-20 ml-1">점</span></div>
                 )}
               </Card>
             </section>
@@ -1457,7 +1457,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             )}
 
             <section className="space-y-6">
-              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2"><Activity className="h-4 w-4" /> 핵심 역량 분석 (Stats)</h4>
+              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2 whitespace-nowrap"><Activity className="h-4 w-4" /> 핵심 역량 분석</h4>
               <div className="grid gap-8">
                 {Object.entries(STAT_CONFIG).map(([key, config]) => {
                   const statKey = key as keyof typeof editStats;
@@ -1569,8 +1569,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <Card className="rounded-[2rem] border-none shadow-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white overflow-hidden">
         <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">Mastery Snapshot</p>
-            <p className="text-xl sm:text-2xl font-black tracking-tight">LP {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
+            <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
           </div>
           <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
         </CardContent>

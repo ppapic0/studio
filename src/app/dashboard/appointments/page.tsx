@@ -434,7 +434,7 @@ export function AppointmentsPageContent({
             <p className="text-[11px] font-black text-primary/70 ml-1">전체 내역 보기</p>
           ) : (
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
-              {isAdmin ? 'All Center Appointments' : 'Appointment & Feedback Center'}
+              {isAdmin ? '센터 전체 상담 일정' : '상담 예약 · 피드백 센터'}
             </p>
           )}
         </div>
@@ -548,12 +548,12 @@ export function AppointmentsPageContent({
                     <div key={res.id} className={cn("flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4", isMobile ? "p-5" : "p-6 sm:p-8")}>
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
                         <div className={cn("rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
-                          <span className={cn("font-black text-primary/60 uppercase group-hover:text-white/60 tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'MMM') : ''}</span>
+                          <span className={cn("font-black text-primary/60 group-hover:text-white/60 tracking-tighter whitespace-nowrap", isMobile ? "text-[8px]" : "text-[10px]")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
                           <span className={cn("font-black text-primary group-hover:text-white leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
                         </div>
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-base sm:text-lg")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'p') : ''} 상담</h3>
+                            <h3 className={cn("font-black tracking-tight whitespace-nowrap", isMobile ? "text-sm" : "text-base sm:text-lg")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
                             {getStatusBadge(res.status)}
                           </div>
                           <p className={cn("font-bold text-muted-foreground flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs")}>
@@ -667,7 +667,7 @@ export function AppointmentsPageContent({
                               </Badge>
                             )}
                           </div>
-                          {!isMobile && <span className="text-[8px] font-black text-primary/30 uppercase tracking-[0.3em]">Verified</span>}
+                          {!isMobile && <span className="text-[8px] font-black text-primary/30 tracking-[0.3em] whitespace-nowrap">상담 로그</span>}
                         </div>
                         
                         <div className="space-y-3">

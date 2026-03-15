@@ -151,23 +151,30 @@
   }
 
   .font-display {
-    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.024em;
+    line-height: 1.12;
   }
 
   .font-brand {
-    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.04;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.028em;
+    line-height: 1.1;
   }
 
   .font-accent {
-    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
+  }
+
+  .font-aggro-display {
+    font-family: "TrackDisplay", "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
   }
 
   .font-numeric {
@@ -197,6 +204,43 @@
     font-synthesis: none;
     letter-spacing: -0.02em;
     line-height: 1.08;
+  }
+
+  .dashboard-shell {
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .dashboard-shell [data-slot="badge"],
+  .dashboard-shell button,
+  .dashboard-shell .dashboard-number,
+  .dashboard-shell .stat-number,
+  .dashboard-shell .tabular-nums {
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
+  .dashboard-shell h1,
+  .dashboard-shell h2,
+  .dashboard-shell h3,
+  .dashboard-shell h4,
+  .dashboard-shell [data-slot="card-title"],
+  .dashboard-shell [role="tab"] {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .dashboard-shell .allow-wrap,
+  .dashboard-shell .break-keep,
+  .dashboard-shell .whitespace-pre-wrap {
+    white-space: normal;
+  }
+
+  .dashboard-shell th,
+  .dashboard-shell .tracking-widest {
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   button,
@@ -323,6 +367,7 @@
       0 4px 8px -2px rgba(20,41,95,0.07),
       0 16px 32px -4px rgba(20,41,95,0.10),
       0 0 0 1px rgba(20,41,95,0.03);
+    transition: transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out;
   }
 
   .app-depth-card-warm {
@@ -334,6 +379,7 @@
       0 -1px 0 0 rgba(255,122,22,0.07) inset,
       0 4px 8px -2px rgba(255,122,22,0.08),
       0 16px 32px -4px rgba(20,41,95,0.09);
+    transition: transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out;
   }
 
   .interactive-button {
@@ -341,6 +387,39 @@
   }
 
   @media (hover: hover) {
+    .marketing-card,
+    .marketing-card-soft,
+    .marketing-card-warm {
+      transition: transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out;
+    }
+
+    .marketing-card:hover,
+    .marketing-card-soft:hover,
+    .marketing-card-warm:hover {
+      transform: translateY(-2px);
+    }
+
+    .app-depth-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(20, 41, 95, 0.24);
+      box-shadow:
+        0 6px 12px -2px rgba(20,41,95,0.08),
+        0 22px 38px -6px rgba(20,41,95,0.14),
+        0 0 0 1px rgba(20,41,95,0.04),
+        inset 0 1px 0 rgba(255,255,255,1),
+        inset 0 -1px 0 rgba(20,41,95,0.05);
+    }
+
+    .app-depth-card-warm:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 122, 22, 0.28);
+      box-shadow:
+        0 6px 12px -2px rgba(255,122,22,0.08),
+        0 22px 38px -6px rgba(20,41,95,0.13),
+        inset 0 1px 0 rgba(255,255,255,0.92),
+        inset 0 -1px 0 rgba(255,122,22,0.08);
+    }
+
     .interactive-button:hover {
       @apply scale-105;
     }
@@ -702,7 +781,7 @@
   scrollbar-gutter: stable;
 }
 
-.dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"] {
+.dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"]:not(.tier-hero-card) {
   border-radius: 1.35rem;
   border-color: rgba(20, 41, 95, 0.09);
   background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(249,251,255,0.98) 100%);
@@ -711,6 +790,15 @@
     0 -1px 0 0 rgba(20,41,95,0.04) inset,
     0 2px 4px rgba(20,41,95,0.04),
     0 8px 20px -4px rgba(20,41,95,0.08);
+}
+
+.dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"].tier-hero-card {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.22) inset,
+    0 -1px 0 0 rgba(0,0,0,0.18) inset,
+    0 6px 14px rgba(10,18,45,0.22),
+    0 18px 36px -8px rgba(10,18,45,0.28);
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card-header"] {

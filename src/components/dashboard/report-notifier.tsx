@@ -82,13 +82,13 @@ export function ReportNotifier() {
               <div className="bg-white/20 p-1.5 rounded-lg">
                 <FileText className="h-4 w-4 text-white animate-bounce" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">New Analysis Arrived</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 whitespace-nowrap">새 분석 도착</span>
             </div>
             <DialogTitle className="text-3xl font-black tracking-tighter">
               데일리 리포트가 도착했습니다
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1">
-              성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.
+              성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.
             </DialogDescription>
           </DialogHeader>
         </div>

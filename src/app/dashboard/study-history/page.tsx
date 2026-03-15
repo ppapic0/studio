@@ -443,6 +443,17 @@ export default function StudyHistoryPage() {
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const isToday = selectedDateForPlan ? isSameDay(selectedDateForPlan, new Date()) : false;
+  const tierHeroGradient = useMemo(() => {
+    const tierTone = currentTier?.bg ?? '';
+    if (tierTone.includes('cyan')) return 'linear-gradient(145deg, #1A5CCF 0%, #143F9A 45%, #0B2358 100%)';
+    if (tierTone.includes('rose')) return 'linear-gradient(145deg, #E55185 0%, #B43663 45%, #611C40 100%)';
+    if (tierTone.includes('purple')) return 'linear-gradient(145deg, #7B3FC4 0%, #5A2F98 45%, #2E1952 100%)';
+    if (tierTone.includes('blue')) return 'linear-gradient(145deg, #2D61D8 0%, #2047A3 45%, #102557 100%)';
+    if (tierTone.includes('emerald')) return 'linear-gradient(145deg, #14A76D 0%, #0E7E54 45%, #0A4B33 100%)';
+    if (tierTone.includes('yellow')) return 'linear-gradient(145deg, #D79B1B 0%, #A77315 45%, #5E410E 100%)';
+    if (tierTone.includes('slate')) return 'linear-gradient(145deg, #607287 0%, #475A72 45%, #24374B 100%)';
+    return 'linear-gradient(145deg, #E56817 0%, #BE4D11 45%, #672D0E 100%)';
+  }, [currentTier?.bg]);
 
   if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
@@ -451,7 +462,7 @@ export default function StudyHistoryPage() {
       <header className={cn("flex justify-between items-center px-2", isMobile ? "flex-col gap-4" : "flex-row")}>
         <div className="flex flex-col gap-1">
           <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 ml-1">Study Logs & History</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 ml-1">학습 기록·히스토리</p>
         </div>
         <div className="flex items-center gap-2 bg-white/80 p-1.5 rounded-2xl border shadow-xl">
            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
@@ -461,24 +472,26 @@ export default function StudyHistoryPage() {
       </header>
 
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
-        <Card className={cn(
-          "md:col-span-2 border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 text-white",
-          "bg-gradient-to-br", currentTier.gradient
-        )}>
-          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+        <Card
+          className={cn(
+            "md:col-span-2 tier-hero-card border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 !text-white"
+          )}
+          style={{ backgroundImage: tierHeroGradient }}
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
             {currentTier.name === '챌린저' ? <Crown className="h-48 w-48" /> : <Trophy className="h-48 w-48" />}
           </div>
           <div className="relative z-10">
             <div className="flex justify-between items-center mb-10">
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60">Monthly Analytics</span>
-                <Badge className="w-fit bg-white/20 text-white border-none font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-85">월간 분석</span>
+                <Badge className="w-fit bg-white/24 text-white border border-white/20 font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
               </div>
-              <Badge className="bg-white/10 text-white border-none font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} TIER</Badge>
+              <Badge className="bg-white/22 text-white border border-white/20 font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} 티어</Badge>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
-              <span className="text-xl font-bold opacity-40 uppercase ml-2">Total Time</span>
+              <span className={cn("font-black tracking-tighter tabular-nums leading-none drop-shadow-[0_2px_12px_rgba(5,15,40,0.45)]", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
+              <span className="text-xl font-bold opacity-80 uppercase ml-2">총 학습 시간</span>
             </div>
           </div>
         </Card>
@@ -487,7 +500,7 @@ export default function StudyHistoryPage() {
           <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-10 flex flex-col justify-center gap-6 relative overflow-hidden ring-1 ring-black/[0.03]">
             <div className="bg-primary/5 p-3 rounded-2xl w-fit"><Sparkles className="h-6 w-6 text-primary" /></div>
             <div className="space-y-2">
-              <h3 className="font-black text-sm uppercase tracking-widest text-primary/40">Insight</h3>
+              <h3 className="font-black text-sm uppercase tracking-widest text-primary/40">학습 인사이트</h3>
               <p className="text-base font-bold leading-relaxed text-foreground/70">
                 {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 시즌 LP가 대폭 상승합니다.'}
               </p>
@@ -500,7 +513,7 @@ export default function StudyHistoryPage() {
       <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full border-2 border-primary/5 ring-1 ring-black/[0.03]">
         <CardContent className="p-0">
           <div className={cn("grid grid-cols-7 border-b-2 border-primary/10", isMobile ? "bg-slate-50" : "bg-gradient-to-r from-slate-50 via-white to-slate-50")}>
-            {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, i) => (
+            {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
               <div
                 key={day}
                 className={cn(
@@ -583,15 +596,15 @@ export default function StudyHistoryPage() {
                             <div className="h-full rounded-full bg-primary/80" style={{ width: `${progressPercent}%` }} />
                           </div>
                           <div className="flex items-center justify-between text-[10px] font-black opacity-75">
-                            <span>{progressPercent}% FOCUS</span>
-                            <span>{hour}h {minuteRemainder.toString().padStart(2, '0')}m</span>
+                            <span>{progressPercent}% 집중도</span>
+                            <span>{hour}시간 {minuteRemainder.toString().padStart(2, '0')}분</span>
                           </div>
                           {minutes >= 360 && (
-                            <Badge className="w-fit bg-white/40 text-primary border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">FOCUS MAX</Badge>
+                            <Badge className="w-fit bg-white/40 text-primary border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">집중 최고치</Badge>
                           )}
                         </>
                       ) : (
-                        <span className="mt-auto text-[11px] font-bold text-slate-400">No record</span>
+                        <span className="mt-auto text-[11px] font-bold text-slate-400">기록 없음</span>
                       )}
                     </div>
                   )}
@@ -618,7 +631,7 @@ export default function StudyHistoryPage() {
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
               <TabsList className="grid w-full grid-cols-4 rounded-none h-16 bg-muted/20 p-0 border-b">
                 <TabsTrigger value="ai-report" disabled={!dailyReport || dailyReport.status !== 'sent'} className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
-                  <Sparkles className="h-3.5 w-3.5" /> AI 리포트
+                  <Sparkles className="h-3.5 w-3.5" /> 인공지능 리포트
                 </TabsTrigger>
                 <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
                   <Clock className="h-3.5 w-3.5" /> 루틴

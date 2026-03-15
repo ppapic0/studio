@@ -73,11 +73,11 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, 센터Membership, AttendanceCurrent } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 
-const TIER_PRESETS = [
+const 티어_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
   { label: '실버', lp: 5000, stats: 45, rank: 50, color: 'bg-slate-300' },
   { label: '골드', lp: 10000, stats: 65, rank: 20, color: 'bg-yellow-500' },
@@ -125,7 +125,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
     }
   };
 
-  const applyPreset = (preset: typeof TIER_PRESETS[0]) => {
+  const applyPreset = (preset: typeof 티어_PRESETS[0]) => {
     setLp(preset.lp);
     setMockRank(preset.rank);
     setStats({ focus: preset.stats, consistency: preset.stats, achievement: preset.stats, resilience: preset.stats });
@@ -138,11 +138,11 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
           <div className="flex items-center gap-3">
             <div className="bg-primary p-2 rounded-xl text-white shadow-lg"><Settings2 className="h-5 w-5" /></div>
             <div>
-              <CardTitle className="text-xl font-black tracking-tighter">Jacob's Dev Stat Controller</CardTitle>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">Rank & Tier Simulator</p>
+              <CardTitle className="text-xl font-black tracking-tighter">개발용 스탯 컨트롤러</CardTitle>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">랭크·티어 시뮬레이터</p>
             </div>
           </div>
-          <Badge className="bg-rose-500 text-white font-black px-3 py-1 rounded-full shadow-lg">TEST ACCOUNT ONLY</Badge>
+          <Badge className="bg-rose-500 text-white font-black px-3 py-1 rounded-full shadow-lg">테스트 계정 전용</Badge>
         </div>
       </CardHeader>
       
@@ -150,8 +150,8 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         <div className="flex-1 space-y-8">
           <div className="space-y-4">
             <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 LP</span>
-              <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
+              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 포인트</span>
+              <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()}점</span>
             </div>
             <Slider value={[lp]} max={45000} step={500} onValueChange={([val]) => setLp(val)} />
           </div>
@@ -200,17 +200,25 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           isMobile ? "rounded-[1.5rem]" : ""
         )}>
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-10 pt-10", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>시즌 러닝 포인트 (LP)</CardTitle>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>시즌 러닝 포인트</CardTitle>
             <div className={cn("bg-amber-50 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md", isMobile ? "p-1.5" : "p-2.5")}>
               <Zap className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
           <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
             <div className={cn("font-black tracking-tighter text-amber-600 drop-shadow-sm leading-none", isMobile ? "text-3xl" : "text-6xl sm:text-7xl")}>
-              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>lp</span>
+              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>점</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-amber-50 text-amber-700 border border-amber-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-amber-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>히스토리 분석 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "font-body border-[#e87010]/60 bg-[linear-gradient(180deg,#ff9a48,#ff7a16)] text-white font-extrabold leading-none shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_8px_rgba(255,122,22,0.25)] transition-all hover:brightness-105",
+                    isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
+                  )}
+                >
+                  히스토리 분석 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                </Badge>
             </div>
           </CardContent>
         </Card>
@@ -219,12 +227,12 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
           <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>LP 획득 히스토리</DialogTitle>
+            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>포인트 획득 기록</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 러닝 포인트 내역입니다.</DialogDescription>
           </DialogHeader>
         </div>
         <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "p-4" : "")}>
-          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
+          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 포인트가 없습니다.</div>) : (
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
                 const discreteLp = (data.attendance ? 100 : 0) + (data.plan ? 100 : 0) + (data.routine ? 100 : 0);
@@ -244,7 +252,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                     </div>
                     <div className="text-right">
                       <span className="text-sm font-black text-primary tabular-nums">{(data.dailyLpAmount || 0).toLocaleString()}</span>
-                      <span className="text-[8px] ml-0.5 font-bold text-muted-foreground/40">LP</span>
+                      <span className="text-[8px] ml-0.5 font-bold text-muted-foreground/40">점</span>
                     </div>
                   </div>
                 );
@@ -290,10 +298,18 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
           </CardHeader>
           <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
             <div className={cn("font-black tracking-tighter text-blue-600 drop-shadow-sm leading-none", isMobile ? "text-3xl" : "text-6xl sm:text-7xl")}>
-              {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>m</span>
+              {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>시간</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-xs ml-1" : "text-xl ml-1.5")}>분</span>
             </div>
             <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-3" : "mt-6")}>
-              <Badge variant="secondary" className={cn("bg-blue-50 text-blue-700 border border-blue-100 font-black px-4 py-1.5 rounded-full shadow-sm hover:bg-blue-100 transition-all", isMobile ? "text-[8px] px-2 py-0.5" : "text-[10px]")}>세션 보기 <ChevronRight className="ml-1 h-3 w-3" /></Badge>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "font-body border-[#e87010]/60 bg-[linear-gradient(180deg,#ff9a48,#ff7a16)] text-white font-extrabold leading-none shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_2px_8px_rgba(255,122,22,0.25)] transition-all hover:brightness-105",
+                    isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
+                  )}
+                >
+                  세션 보기 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                </Badge>
             </div>
           </CardContent>
         </Card>
@@ -321,7 +337,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
                     </div>
                     <div className="grid leading-tight">
                       <span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">기록됨</span>
                     </div>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[9px] px-2">{session.durationMinutes}분</Badge>
@@ -422,7 +438,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
             updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
-            toast({ title: "3시간 달성! 출석 보너스 LP 획득 🎉" });
+            toast({ title: "3시간 달성! 출석 보너스 포인트 획득 🎉" });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
@@ -568,21 +584,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyTasks = useMemo(() => todayPlans?.filter(p => p.category === 'study' || !p.category) || [], [todayPlans]);
   const scheduleItems = useMemo(() => todayPlans?.filter(p => p.category === 'schedule') || [], [todayPlans]);
 
-  const myRequestsQuery = useMemoFirebase(() => {
+  const my요청Query = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
+      collection(firestore, 'centers', activeMembership.id, 'attendance요청'),
       where('studentId', '==', user.uid)
     );
   }, [firestore, activeMembership, user]);
-  const { data: rawRequests } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
+  const { data: raw요청 } = useCollection<AttendanceRequest>(my요청Query, { enabled: isActive });
 
-  const myRequests = useMemo(() => {
-    if (!rawRequests) return [];
-    return [...rawRequests]
+  const my요청 = useMemo(() => {
+    if (!raw요청) return [];
+    return [...raw요청]
       .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
       .slice(0, 5);
-  }, [rawRequests]);
+  }, [raw요청]);
 
   const handleRequestSubmit = async () => {
     if (!firestore || !activeMembership || !user || !requestReason.trim() || !requestDate) return;
@@ -606,7 +622,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'), requestData);
+      await addDoc(collection(firestore, 'centers', activeMembership.id, 'attendance요청'), requestData);
       toast({ title: "신청서가 제출되었습니다. 선생님의 승인을 기다려주세요." });
       setRequestReason('');
     } catch (e: any) {
@@ -646,7 +662,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           [`dailyLpStatus.${todayKey}.plan`]: true,
           [`dailyLpStatus.${todayKey}.dailyLpAmount`]: increment(planLp),
         });
-        toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+        toast({ title: "모든 계획 완료! 계획 보너스 포인트 획득 🎉" });
 
         // 랭킹 보드 스냅샷 업데이트
         const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
@@ -689,20 +705,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <div className={cn("relative z-10 flex flex-col gap-3", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
           <div className={isMobile ? "space-y-1.5" : "space-y-4"}>
             <div className="flex flex-col gap-0.5">
-              <Badge className={cn("w-fit bg-white/20 text-white border-none font-black tracking-[0.2em] uppercase px-2 py-0.5", isMobile ? "mx-auto text-[6px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
-              <h2 className={cn("font-black tracking-tighter leading-[1.1] whitespace-pre-line", isMobile ? "text-lg" : "text-6xl")}>
+              <Badge className={cn("w-fit bg-white/20 text-white border-none font-black tracking-[0.2em] uppercase px-2 py-0.5", isMobile ? "mx-auto text-[6px]" : "text-[10px]")}>{currentTier.name} 티어 활성</Badge>
+              <h2 className={cn("font-body font-extrabold leading-[1.18] whitespace-pre-line", isMobile ? "text-[1.9rem] tracking-[-0.018em]" : "text-6xl tracking-[-0.02em]")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
             <div className={cn("flex items-center gap-1.5 bg-white/10 backdrop-blur-xl w-fit px-2.5 py-1 rounded-full border border-white/20 shadow-2xl", isMobile ? "mx-auto" : "md:mx-0")}>
               <span className="relative flex h-1.5 w-1.5"><span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isTimerActive ? "bg-accent" : "bg-white")}></span><span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", isTimerActive ? "bg-accent" : "bg-white")}></span></span>
-              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[7px]" : "text-[11px]")}>Performance Engine</span>
+              <span className={cn("font-black uppercase tracking-[0.1em] opacity-90 whitespace-nowrap", isMobile ? "text-[7px]" : "text-[11px]")}>성장 엔진</span>
             </div>
           </div>
           <div className={cn("flex items-center gap-2.5", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
               <div className={cn("flex flex-col items-center bg-black/20 backdrop-blur-3xl rounded-xl border border-white/10 shadow-2xl px-4 py-2", isMobile ? "w-full" : "")}>
-                <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">Live Session</span>
+                <span className="text-[7px] font-black uppercase tracking-widest opacity-50 mb-0.5">실시간 세션</span>
                 <span className={cn("font-mono font-black tracking-tighter tabular-nums text-white leading-none", isMobile ? "text-2xl" : "text-6xl")}>
                   {formatTimer(localSeconds)}
                 </span>
@@ -759,7 +775,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <div className="text-center space-y-1">
                       <p className="font-black text-primary text-xl tracking-tight">{user?.displayName}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Attendance Authentication</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">출입 인증</p>
                     </div>
                   </div>
                   <DialogFooter className="p-6 bg-muted/30">
@@ -788,7 +804,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <ListTodo className={cn("text-emerald-600", isMobile ? "h-5 w-5" : "h-8 w-8")} /> 계획트랙
                 </CardTitle>
                 <Badge variant="secondary" className={cn("bg-emerald-500 text-white border-none font-black h-5 uppercase tracking-widest", isMobile ? "text-[8px] px-1.5" : "text-[10px] px-3")}>
-                  {studyTasks.filter(t => t.done).length} / {studyTasks.length} DONE
+                  {studyTasks.filter(t => t.done).length} / {studyTasks.length} 완료
                 </Badge>
               </div>
             </CardHeader>
@@ -815,7 +831,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       >
                         {task.title}
                       </Label>
-                      {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
+                      {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}분 목표</span>}
                     </div>
                   </div>
                 ))}
@@ -867,7 +883,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="grid">
               <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>데일리 리포트</span>
-              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Analysis</span>
+              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>분석</span>
             </div>
           </Card>
         </Link>
@@ -883,7 +899,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="grid">
                 <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>지각/결석 신청</span>
-                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Requests</span>
+                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>요청</span>
               </div>
             </Card>
           </DialogTrigger>
@@ -904,8 +920,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
                         <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="late">지각 (Late)</SelectItem>
-                          <SelectItem value="absence">결석 (Absence)</SelectItem>
+                          <SelectItem value="late">지각</SelectItem>
+                          <SelectItem value="absence">결석</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -951,10 +967,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <History className="h-3.5 w-3.5" /> 최근 신청 내역 (최근 5건)
                   </h4>
                   <div className="grid gap-2">
-                    {myRequests?.length === 0 ? (
+                    {my요청?.length === 0 ? (
                       <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">신청 내역이 없습니다.</div>
                     ) : (
-                      myRequests?.map(req => (
+                      my요청?.map(req => (
                         <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>
@@ -994,7 +1010,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="grid">
                 <span className={cn("font-black tracking-tighter", isMobile ? "text-[10px]" : "text-lg")}>벌점 현황</span>
-                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>Penalties</span>
+                <span className={cn("font-bold text-muted-foreground uppercase tracking-widest", isMobile ? "text-[6px]" : "text-[10px]")}>벌점</span>
               </div>
             </Card>
           </DialogTrigger>
@@ -1003,7 +1019,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <ShieldAlert className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-widest">Growth Guard</Badge>
+                  <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-widest">벌점 가이드</Badge>
                 </div>
                 <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
                 <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
@@ -1030,7 +1046,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       </p>
                       {penaltyRate > 0 && (
                         <Badge variant="destructive" className="mx-auto rounded-full px-4 py-1 font-black shadow-lg">
-                          LP 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
+                          포인트 획득량 -{(penaltyRate * 100).toFixed(0)}% 패널티 적용 중
                         </Badge>
                       )}
                     </div>

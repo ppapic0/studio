@@ -460,7 +460,7 @@ export default function RevenuePage() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-primary/60">
             <Calculator className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Advanced Finance Center</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">고급 수납 관리 센터</span>
           </div>
           <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-3xl" : "text-5xl")}>
             센터관리자 실전 수납·수익 통합 분석
@@ -700,7 +700,7 @@ export default function RevenuePage() {
                     <div className="space-y-1">
                       <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
                         <History className="h-6 w-6 opacity-40" /> 인보이스 타임라인</CardTitle>
-                      <CardDescription className="font-bold text-xs uppercase tracking-widest text-muted-foreground/60">28-Day Billing Cycles Sync</CardDescription>
+                      <CardDescription className="font-bold text-xs tracking-widest text-muted-foreground/60 whitespace-nowrap">28일 결제 주기 기준</CardDescription>
                       <div className="flex flex-wrap items-center gap-2 pt-1">
                         <Badge variant="outline" className="font-black text-[10px]">
                           조회월 {timelineMonth}
@@ -757,12 +757,12 @@ export default function RevenuePage() {
                               <div className="grid gap-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-black text-xl tracking-tight truncate">{inv.studentName} 학생</span>
-                                  {studentSeat && <Badge variant="outline" className="font-black text-[8px] border-primary/20 text-primary/60 uppercase">{studentSeat.seatZone || 'Flex'}</Badge>}
+                                  {studentSeat && <Badge variant="outline" className="font-black text-[8px] border-primary/20 text-primary/60 whitespace-nowrap">{studentSeat.seatZone || '미정'}</Badge>}
                                   <Badge className={cn("border text-[9px] font-black", trackMeta.badgeClass)}>{trackMeta.label}</Badge>
                                   {getStatusBadge(inv.status)}
                                 </div>
                                 <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
-                                  <span className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md"><CalendarCheck className="h-3 w-3" /> 기간: {inv.cycleStartDate ? format(inv.cycleStartDate.toDate(), 'MM.dd') : 'N/A'} ~ {inv.cycleEndDate ? format(inv.cycleEndDate.toDate(), 'MM.dd') : 'N/A'} (28일)</span>
+                                  <span className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md whitespace-nowrap"><CalendarCheck className="h-3 w-3" /> 기간: {inv.cycleStartDate ? format(inv.cycleStartDate.toDate(), 'MM.dd') : '--.--'} ~ {inv.cycleEndDate ? format(inv.cycleEndDate.toDate(), 'MM.dd') : '--.--'} (28일)</span>
                                   {inv.paidAt && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> 완료: {format(inv.paidAt.toDate(), 'MM.dd HH:mm')}</span>}
                                 </div>
                               </div>
@@ -801,10 +801,10 @@ export default function RevenuePage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-xl border-none shadow-2xl">
-                                  <SelectItem value="issued" className="font-bold">대기 (Issued)</SelectItem>
-                                  <SelectItem value="paid" className="font-bold">완료 (Paid)</SelectItem>
-                                  <SelectItem value="overdue" className="font-bold">미납 (Overdue)</SelectItem>
-                                  <SelectItem value="void" className="font-bold">무효 (Void)</SelectItem>
+                                  <SelectItem value="issued" className="font-bold">대기</SelectItem>
+                                  <SelectItem value="paid" className="font-bold">완료</SelectItem>
+                                  <SelectItem value="overdue" className="font-bold">미납</SelectItem>
+                                  <SelectItem value="void" className="font-bold">무효</SelectItem>
                                 </SelectContent>
                               </Select>
                               <Select
@@ -950,15 +950,15 @@ export default function RevenuePage() {
                 <div className="relative z-10 space-y-6">
                   <div className="flex items-center gap-2">
                     <Activity className="h-5 w-5 opacity-60" />
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Revenue Health Score</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60 whitespace-nowrap">매출 건전성 지수</span>
                   </div>
                   <div className="grid gap-1">
                     <h3 className="text-5xl font-black tracking-tighter">{(metrics?.collected && metrics?.accrued) ? Math.round((metrics.collected / metrics.accrued) * 100) : 0}%</h3>
-                    <p className="text-xs font-bold opacity-60">당월 수납 달성률 (Cash/Accrued)</p>
+                    <p className="text-xs font-bold opacity-60">당월 수납 달성률 (수납액/발생액)</p>
                   </div>
                   <div className="space-y-4 pt-4 border-t border-white/10">
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60"><span>Accrued Revenue</span><span>{formatWon(metrics?.accrued || 0)}</span></div>
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60"><span>Collected Cash</span><span>{formatWon(metrics?.collected || 0)}</span></div>
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60"><span>발생 매출</span><span>{formatWon(metrics?.accrued || 0)}</span></div>
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60"><span>수납 매출</span><span>{formatWon(metrics?.collected || 0)}</span></div>
                   </div>
                 </div>
               </Card>
@@ -966,7 +966,7 @@ export default function RevenuePage() {
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group ring-1 ring-border/50">
                 <CardTitle className="text-base font-black mb-6 uppercase tracking-widest text-primary/40 flex items-center gap-2"><PieChart className="h-4 w-4" /> 결제 수단 비중</CardTitle>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">카드 (Toss SDK)</span><span className="text-lg font-black text-blue-600">72%</span></div>
+                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground whitespace-nowrap">카드 결제 연동</span><span className="text-lg font-black text-blue-600">72%</span></div>
                   <Progress value={72} className="h-1.5" />
                   <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">계좌/현금</span><span className="text-lg font-black text-emerald-600">28%</span></div>
                   <Progress value={28} className="h-1.5 bg-muted" />
@@ -983,7 +983,7 @@ export default function RevenuePage() {
               <div className="relative z-10 space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-60">당월 발생 매출</p>
                 <h3 className="text-4xl font-black tracking-tighter">{formatWon(metrics?.accrued || 0)}</h3>
-                <Badge className="bg-white/20 border-none text-[10px] px-3 text-emerald-400">Accrued Basis</Badge>
+                <Badge className="bg-white/20 border-none text-[10px] px-3 text-emerald-400 whitespace-nowrap">발생 기준</Badge>
               </div>
             </Card>
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-emerald-600 text-white p-8 overflow-hidden relative">
@@ -991,18 +991,18 @@ export default function RevenuePage() {
               <div className="relative z-10 space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-60">실제 수납 금액</p>
                 <h3 className="text-4xl font-black tracking-tighter">{formatWon(metrics?.collected || 0)}</h3>
-                <Badge className="bg-white/20 border-none text-[10px] px-3 text-white">Cash Basis</Badge>
+                <Badge className="bg-white/20 border-none text-[10px] px-3 text-white whitespace-nowrap">수납 기준</Badge>
               </div>
             </Card>
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-border/50">
               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2"><Receipt className="h-3 w-3 text-rose-500" /> 미수금 합계</p>
               <h3 className="text-4xl font-black tracking-tighter text-rose-600">{formatWon(metrics?.uncollected || 0)}</h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1">Outstanding Balance</p>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1 whitespace-nowrap">미수 잔액</p>
             </Card>
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-border/50">
               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2"><Users className="h-3 w-3 text-blue-500" /> 수납 인원</p>
               <h3 className="text-4xl font-black tracking-tighter text-primary">{todayKpi?.activeStudentCount || 0}<span className="text-lg opacity-40 ml-1">명</span></h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1">Paid Enrollments</p>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1 whitespace-nowrap">수납 인원</p>
             </Card>
           </section>
 

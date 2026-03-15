@@ -22,7 +22,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['var(--font-gangwon)', 'Pretendard', 'sans-serif'],
+        body: ['"Pretendard Variable"', 'Pretendard', '"Noto Sans KR"', 'var(--font-gangwon)', 'sans-serif'],
         headline: ['var(--font-aggro)', 'var(--font-gangwon)', 'Pretendard', 'sans-serif'],
       },
       colors: {

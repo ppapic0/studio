@@ -152,11 +152,11 @@ export default function DailyReportsPage() {
 
       const result = await generateDailyReport(aiInput);
       setReportContent(result.content);
-      toast({ title: `AI 리포트 생성 완료 (진단: Lv.${result.level})` });
+      toast({ title: `인공지능 리포트 생성 완료 (진단: Lv.${result.level})` });
     } catch (e: any) {
       toast({ 
         variant: "destructive", 
-        title: "AI 생성 실패", 
+        title: "인공지능 생성 실패", 
         description: e.message || "연결 상태를 확인해 주세요." 
       });
     } finally {
@@ -209,7 +209,7 @@ export default function DailyReportsPage() {
             <FileText className={cn("text-primary", isMobile ? "h-6 w-6" : "h-10 w-10")} />
             데일리 리포트 센터
           </h1>
-          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>Yesterday Analysis & Reports</p>
+          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest whitespace-nowrap", isMobile ? "text-[9px]" : "text-xs")}>어제 분석 리포트</p>
         </div>
         <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "")}>
           <div className="relative flex-1 sm:flex-none">
@@ -278,14 +278,14 @@ export default function DailyReportsPage() {
             {isFullLoading ? (
               <div className="flex flex-col items-center justify-center py-40 gap-4">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
-                <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-[0.2em]">Syncing Reports...</p>
+                <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-[0.2em] whitespace-nowrap">리포트 동기화 중...</p>
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="py-20 text-center flex flex-col items-center gap-6 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
                 <Search className="h-16 w-16 text-muted-foreground opacity-10" />
                 <div className="space-y-1">
                   <p className="text-xl font-black text-muted-foreground/40">학생을 찾을 수 없습니다.</p>
-                  <p className="text-sm font-bold text-muted-foreground/20 uppercase">Try another name</p>
+                  <p className="text-sm font-bold text-muted-foreground/20 uppercase whitespace-nowrap">다른 이름으로 검색해 보세요</p>
                 </div>
               </div>
             ) : filteredStudents.map((student) => {
@@ -317,12 +317,12 @@ export default function DailyReportsPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-3xl")}>{student.displayName}</h3>
                             {isSent && (
-                              <Badge className="bg-emerald-500/10 text-emerald-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter">Report Sent</Badge>
+                              <Badge className="bg-emerald-500/10 text-emerald-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">발송 완료</Badge>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
                             <p className="font-bold text-muted-foreground/60 text-[10px] sm:text-xs">
-                              {report ? `Last Edit: ${format((report.updatedAt as any).toDate(), 'HH:mm')}` : "Not Started Yet"}
+                              {report ? `최종 수정: ${format((report.updatedAt as any).toDate(), 'HH:mm')}` : "아직 작성 전"}
                             </p>
                             {report?.status === 'draft' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -361,11 +361,11 @@ export default function DailyReportsPage() {
             </div>
             <DialogHeader className="relative z-10">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">Premium AI Analysis</Badge>
+                <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1 whitespace-nowrap">프리미엄 인공지능 분석</Badge>
                 <span className="text-white/60 font-black text-[10px] tracking-widest">{dateKey}</span>
               </div>
               <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-5xl")}>{selectedStudent?.name} 학생</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold text-sm mt-1">성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
+              <DialogDescription className="text-white/70 font-bold text-sm mt-1">성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
             </DialogHeader>
           </div>
 
@@ -380,7 +380,7 @@ export default function DailyReportsPage() {
                   </CardHeader>
                   <CardContent className="p-6 space-y-4">
                     <Textarea 
-                      placeholder="학습 태도나 특이사항을 기록해 주세요. AI 분석의 핵심 맥락으로 활용됩니다." 
+                      placeholder="학습 태도나 특이사항을 기록해 주세요. 인공지능 분석의 핵심 맥락으로 활용됩니다." 
                       value={teacherNote}
                       onChange={(e) => setTeacherNote(e.target.value)}
                       className="min-h-[100px] rounded-2xl border-2 font-bold text-sm resize-none shadow-inner"
@@ -391,7 +391,7 @@ export default function DailyReportsPage() {
                       className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-base gap-3 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
                     >
                       {aiLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5" />}
-                      AI 정밀 분석 리포트 생성
+                      인공지능 정밀 분석 리포트 생성
                     </Button>
                   </CardContent>
                 </Card>
@@ -431,7 +431,7 @@ export default function DailyReportsPage() {
                   {!reportContent && !aiLoading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20 gap-4">
                       <Sparkles className="h-16 w-16" />
-                      <p className="font-black text-xl tracking-tighter">AI 분석을 실행해 주세요.</p>
+                      <p className="font-black text-xl tracking-tighter">인공지능 분석을 실행해 주세요.</p>
                     </div>
                   )}
                 </div>

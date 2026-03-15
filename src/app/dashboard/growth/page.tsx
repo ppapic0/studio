@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { doc, collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { AttendanceCurrent, CenterMembership, GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
+import { AttendanceCurrent, 센터Membership, GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -41,11 +41,12 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 const STAT_CONFIG = {
   focus: { 
     label: '집중력', 
-    sub: 'FOCUS', 
+    sub: '집중', 
     icon: Target, 
     color: 'text-blue-500', 
     bg: 'bg-blue-500', 
@@ -54,7 +55,7 @@ const STAT_CONFIG = {
   },
   consistency: { 
     label: '꾸준함', 
-    sub: 'CONSISTENCY', 
+    sub: '꾸준', 
     icon: RefreshCw, 
     color: 'text-emerald-500', 
     bg: 'bg-emerald-500', 
@@ -63,16 +64,16 @@ const STAT_CONFIG = {
   },
   achievement: { 
     label: '목표달성', 
-    sub: 'ACHIEVEMENT', 
+    sub: '달성', 
     icon: CheckCircle2, 
     color: 'text-amber-500', 
     bg: 'bg-amber-500', 
     accent: 'bg-amber-50',
-    guide: 'To-do 완료 시 상승 (항목당 +0.1)'
+    guide: '할 일 완료 시 상승 (항목당 +0.1)'
   },
   resilience: { 
     label: '회복력', 
-    sub: 'RESILIENCE', 
+    sub: '회복', 
     icon: ShieldCheck, 
     color: 'text-rose-500', 
     bg: 'bg-rose-500', 
@@ -130,14 +131,14 @@ function SystemGuideDialog() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tighter">성장트랙 가이드</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 font-bold mt-1 text-xs">
-              활동량(LP)으로 증명하는 시즌제 등급 시스템입니다.
+              활동량(포인트)으로 증명하는 시즌제 등급 시스템입니다.
             </DialogDescription>
           </DialogHeader>
         </div>
         <div className="p-8 space-y-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-white">
           <div className="space-y-3">
             <h4 className="font-black text-primary flex items-center gap-2 text-sm">
-              <Zap className="h-3.5 w-3.5 fill-current text-accent" /> 1. 행동 보상 LP (일일 보너스)
+              <Zap className="h-3.5 w-3.5 fill-current text-accent" /> 1. 행동 보상 포인트 (일일 보너스)
             </h4>
             <div className="grid grid-cols-1 gap-2">
               {[
@@ -158,13 +159,13 @@ function SystemGuideDialog() {
 
           <div className="space-y-3">
             <h4 className="font-black text-primary flex items-center gap-2 text-sm">
-              <Trophy className="h-3.5 w-3.5 text-emerald-500" /> 2. 티어 판정 (LP + 랭킹)
+              <Trophy className="h-3.5 w-3.5 text-emerald-500" /> 2. 티어 판정 (포인트 + 랭킹)
             </h4>
             <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100">
               <p className="text-[11px] font-bold text-emerald-900/70 leading-relaxed">
-                - **브론즈 ~ 다이아몬드**: 0 ~ 25,000 LP 구간<br/>
-                - **챌린저**: 25,000 LP 이상 중 **센터 1위**<br/>
-                - **그랜드마스터**: 25,000 LP 이상 중 **2, 3위**
+                - **브론즈 ~ 다이아몬드**: 0 ~ 25,000포인트 구간<br/>
+                - **챌린저**: 25,000포인트 이상 중 **센터 1위**<br/>
+                - **그랜드마스터**: 25,000포인트 이상 중 **2, 3위**
               </p>
             </div>
           </div>
@@ -207,7 +208,7 @@ export default function GrowthPage() {
   }, [firestore, activeMembership, user, periodKey]);
   const { data: rankEntries } = useCollection<LeaderboardEntry>(rankQuery);
 
-  // ??? ??? ????? (??????????
+  // 재원생 기준 랭킹 집계(퇴원/가상 계정 제외)
   const totalEntriesQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
@@ -222,7 +223,7 @@ export default function GrowthPage() {
       where('status', '==', 'active')
     );
   }, [firestore, activeMembership]);
-  const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<CenterMembership>(membersQuery);
+  const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<센터Membership>(membersQuery);
 
   const activeStudentIds = useMemo(() => {
     if (!activeStudentMembers) return null;
@@ -276,15 +277,15 @@ export default function GrowthPage() {
   }, [rankEntries, validRankEntries, user?.uid]);
 
   const rankDisplay = useMemo(() => {
-    if (isRankContextLoading) return 'Calculating';
-    if (currentRank === 0 || currentRank >= 999) return 'Pending';
+    if (isRankContextLoading) return '계산 중';
+    if (currentRank === 0 || currentRank >= 999) return '집계 대기';
     if (currentRank <= 3) return `#${currentRank}`;
 
     if (totalCount <= 0) return `#${currentRank}`;
     if (totalCount < 10) return `#${currentRank} / ${totalCount}`;
 
     const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
-    return `Top ${percent}%`;
+    return `상위 ${percent}%`;
 
   }, [isRankContextLoading, currentRank, totalCount]);
 
@@ -325,7 +326,7 @@ export default function GrowthPage() {
       if (achievementCount > 0) {
         result.achievement.push({
           dateKey,
-          reason: '학습 To-do 완료',
+          reason: '학습 할 일 완료',
           detail: `완료 ${achievementCount}회`,
           gained: Number((achievementCount * 0.1).toFixed(1)),
         });
@@ -367,6 +368,17 @@ export default function GrowthPage() {
 
   const currentLp = progress?.seasonLp || 0;
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+  const heroGradient = useMemo(() => {
+    const tierTone = currentTier?.bg ?? '';
+    if (tierTone.includes('cyan')) return 'linear-gradient(145deg, #1A5CCF 0%, #143F9A 45%, #0B2358 100%)';
+    if (tierTone.includes('rose')) return 'linear-gradient(145deg, #E55185 0%, #B43663 45%, #611C40 100%)';
+    if (tierTone.includes('purple')) return 'linear-gradient(145deg, #7B3FC4 0%, #5A2F98 45%, #2E1952 100%)';
+    if (tierTone.includes('blue')) return 'linear-gradient(145deg, #2D61D8 0%, #2047A3 45%, #102557 100%)';
+    if (tierTone.includes('emerald')) return 'linear-gradient(145deg, #14A76D 0%, #0E7E54 45%, #0A4B33 100%)';
+    if (tierTone.includes('yellow')) return 'linear-gradient(145deg, #D79B1B 0%, #A77315 45%, #5E410E 100%)';
+    if (tierTone.includes('slate')) return 'linear-gradient(145deg, #607287 0%, #475A72 45%, #24374B 100%)';
+    return 'linear-gradient(145deg, #E56817 0%, #BE4D11 45%, #672D0E 100%)';
+  }, [currentTier?.bg]);
 
   if (isLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
 
@@ -381,34 +393,36 @@ export default function GrowthPage() {
             <h1 className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-4xl")}>성장트랙</h1>
           </div>
           <Badge variant="secondary" className={cn("rounded-full font-black gap-1.5 bg-accent/10 text-accent border-none", isMobile ? "h-7 px-3 text-[8px]" : "h-9 px-4 text-xs")}>
-            <Sparkles className="h-3 w-3 sm:h-4 w-4" /> LP 부스트 x{totalBoost.toFixed(2)}
+            <Sparkles className="h-3 w-3 sm:h-4 w-4" /> 포인트 부스트 x{totalBoost.toFixed(2)}
           </Badge>
         </div>
       </header>
 
       {/* 시즌 메인 대시보드 - 현재 티어 그라디언트 적용 */}
-      <Card className={cn(
-        "border-none text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
-        "bg-gradient-to-br", currentTier.gradient,
-        isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
-      )}>
-        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+      <Card
+        className={cn(
+          "tier-hero-card border-none !text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
+          isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
+        )}
+        style={{ backgroundImage: heroGradient }}
+      >
+        <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 space-y-6", isMobile ? "space-y-4" : "space-y-10")}>
           <div className={cn("flex flex-col justify-between gap-4", isMobile ? "" : "md:flex-row md:items-end")}>
             <div className="space-y-1">
-              <Badge className="bg-white/20 text-white border-none font-black text-[8px] sm:text-[10px] px-2 py-0.5 mb-1 sm:mb-2 uppercase tracking-widest">SEASON {format(new Date(), 'MMM').toUpperCase()}</Badge>
+              <Badge className="bg-white/20 text-white border-none font-black text-[8px] sm:text-[10px] px-2 py-0.5 mb-1 sm:mb-2 tracking-widest whitespace-nowrap">시즌 {format(new Date(), 'M월', { locale: ko })}</Badge>
               <h2 className={cn("font-black tracking-tighter leading-none", isMobile ? "text-4xl" : "text-7xl")}>
-                {currentLp.toLocaleString()}<span className={cn("opacity-40 ml-1 uppercase font-bold", isMobile ? "text-sm" : "text-2xl")}>lp</span>
+                {currentLp.toLocaleString()}<span className={cn("opacity-80 ml-1 font-bold whitespace-nowrap", isMobile ? "text-sm" : "text-2xl")}>점</span>
               </h2>
-              <p className={cn("font-bold opacity-60", isMobile ? "text-[10px]" : "text-sm")}>이번 시즌 누적 포인트</p>
+              <p className={cn("font-bold opacity-90", isMobile ? "text-[10px]" : "text-sm")}>이번 시즌 누적 포인트</p>
             </div>
             
-            <div className={cn("p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-white/10 backdrop-blur-xl border border-white/10 flex flex-col items-center shadow-2xl", isMobile ? "w-fit" : "min-w-[180px]")}>
-              <span className={cn("font-black uppercase tracking-widest opacity-60 mb-1", isMobile ? "text-[7px]" : "text-[10px]")}>Current Tier</span>
+            <div className={cn("p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-white/20 backdrop-blur-xl border border-white/20 flex flex-col items-center shadow-2xl", isMobile ? "w-fit" : "min-w-[180px]")}>
+              <span className={cn("font-black uppercase tracking-widest opacity-80 mb-1", isMobile ? "text-[7px]" : "text-[10px]")}>현재 티어</span>
               <span className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>{currentTier.name}</span>
-              {!isMobile && <span className="text-[10px] font-bold mt-1 opacity-40">NEXT: {(25000 - currentLp).toLocaleString()} LP</span>}
+              {!isMobile && <span className="text-[10px] font-bold mt-1 opacity-80">다음: {(25000 - currentLp).toLocaleString()}점</span>}
             </div>
           </div>
 
@@ -419,10 +433,10 @@ export default function GrowthPage() {
               { label: '부스트', val: `x${totalBoost.toFixed(2)}`, icon: Zap, color: 'text-emerald-400' },
               { label: '시즌 리셋', val: '매월 1일', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
-              <div key={i} className={cn("bg-white/5 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/5 flex flex-col gap-0.5")}>
+              <div key={i} className={cn("bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5")}>
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
-                  <span className={cn("font-black uppercase tracking-widest opacity-40", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+                  <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
                 </div>
                 <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
               </div>
@@ -438,7 +452,7 @@ export default function GrowthPage() {
             <Target className={cn("text-primary opacity-40", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             <h2 className={cn("font-black tracking-tighter", isMobile ? "text-lg" : "text-2xl")}>스킬트랙</h2>
           </div>
-          <Badge variant="outline" className="rounded-full font-black text-[9px] border-primary/20 px-2 h-5">AVG: {avgStat.toFixed(1)}</Badge>
+          <Badge variant="outline" className="rounded-full font-black text-[9px] border-primary/20 px-2 h-5">평균: {avgStat.toFixed(1)}</Badge>
         </div>
 
         <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
@@ -511,16 +525,16 @@ export default function GrowthPage() {
       <section className="px-1">
         <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-black/[0.02]", isMobile ? "rounded-[1.25rem] p-5" : "rounded-[2.5rem] p-8")}>
           <CardTitle className={cn("font-black flex items-center gap-2 tracking-tighter mb-4", isMobile ? "text-sm" : "text-xl")}>
-            <BookOpen className={cn("text-primary", isMobile ? "h-4 w-4" : "h-6 w-6")} /> LP 획득 가이드
+            <BookOpen className={cn("text-primary", isMobile ? "h-4 w-4" : "h-6 w-6")} /> 포인트 획득 가이드
           </CardTitle>
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-3")}>
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 font-black text-[10px] text-primary uppercase"><Zap className="h-3 w-3 text-accent fill-current" /> 보너스 보상</div>
               <div className="grid gap-1.5">
                 {[
-                  { l: '출석 보너스 (3h↑)', v: '+100 LP' },
-                  { l: '계획 보너스 (전부 완료)', v: '+100 LP' },
-                  { l: '실시간 몰입 학습', v: '1분당 1 LP' }
+                  { l: '출석 보너스 (3h↑)', v: '+100점' },
+                  { l: '계획 보너스 (전부 완료)', v: '+100점' },
+                  { l: '실시간 몰입 학습', v: '1분당 1점' }
                 ].map(item => (
                   <div key={item.l} className="flex justify-between items-center px-3 py-2 rounded-lg bg-[#fafafa] border text-[9px] font-bold">
                     <span>{item.l}</span>
@@ -532,11 +546,11 @@ export default function GrowthPage() {
             {!isMobile && (
               <>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-emerald-600"><TrendingUp className="h-3 w-3" /> Season Tier</div>
-                  <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-full flex items-center"><p className="text-11px] font-bold leading-relaxed text-emerald-900/70">2.5만 LP 이상은 센터 내 상대 순위로 결정됩니다. (1위: 챌린저, 2~3위: 그랜드마스터)</p></div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-emerald-600"><TrendingUp className="h-3 w-3" /> 시즌 티어</div>
+                  <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 h-full flex items-center"><p className="text-11px] font-bold leading-relaxed text-emerald-900/70">2.5만 포인트 이상은 센터 내 상대 순위로 결정됩니다. (1위: 챌린저, 2~3위: 그랜드마스터)</p></div>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-purple-600"><Star className="h-3 w-3 fill-current" /> Decay Rule</div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-purple-600"><Star className="h-3 w-3 fill-current" /> 감쇠 규칙</div>
                   <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 h-full flex items-center"><p className="text-[11px] font-bold leading-relaxed text-purple-900/70">매월 1일 시즌 종료 시 4대 스킬은 5%씩 감쇠합니다. 꾸준한 학습 품질 유지가 필수입니다.</p></div>
                 </div>
               </>

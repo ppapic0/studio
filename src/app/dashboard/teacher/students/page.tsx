@@ -235,7 +235,7 @@ export default function StudentListPage() {
             <GraduationCap className={cn("text-primary", isMobile ? "h-6 w-6" : "h-10 w-10")} />
             학생 관리 센터
           </h1>
-          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>Student Roster & Management</p>
+          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest whitespace-nowrap", isMobile ? "text-[9px]" : "text-xs")}>학생 명단 및 관리</p>
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
@@ -255,7 +255,7 @@ export default function StudentListPage() {
               </div>
               <div className="p-8 space-y-5 bg-white overflow-y-auto custom-scrollbar max-h-[50vh]">
                 <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이름</Label><Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" /></div>
-                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label><Input type="email" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" /></div>
+                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label><Input type="email" placeholder="이메일을 입력하세요" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" /></div>
                 <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label><Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" /></div>
                 <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label><Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" /></div>
                 <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">학년</Label><Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}><SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
@@ -311,7 +311,7 @@ export default function StudentListPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" disabled={isDeleting === member.id} className="w-full h-11 rounded-xl font-black text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 gap-2 transition-all">
-                              {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} 강제 삭제 실행 (Recursive)
+                              {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} 강제 삭제 실행
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">

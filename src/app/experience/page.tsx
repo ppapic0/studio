@@ -657,7 +657,7 @@ function StudentMobileDemo() {
 
           <div className="rounded-[1.9rem] bg-[linear-gradient(145deg,#D85810_0%,#A83D0A_100%)] p-5 text-white shadow-[0_22px_34px_rgba(196,82,18,0.28)]">
             <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-white/85">GROWTH TRACK ACTIVE</div>
-            <h3 className="mt-4 text-[2rem] font-black leading-tight tracking-tight">오늘의 성장을 위해 트랙을 시작하세요</h3>
+            <h3 className="font-body mt-4 text-[2rem] font-extrabold leading-[1.18] tracking-[-0.02em]">오늘의 성장을 위해 트랙을 시작하세요</h3>
             <div className="mt-5 grid gap-3">
               <div className="flex h-14 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#14295F]">트랙 시작</div>
               <div className="flex h-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-sm font-black">나의 출입 QR</div>

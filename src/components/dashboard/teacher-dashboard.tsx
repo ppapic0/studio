@@ -128,6 +128,19 @@ const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
   absence: 2,
 };
 
+const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
+  studying: '입실',
+  away: '외출',
+  break: '휴식',
+  absent: '미입실',
+  requested: '대기',
+};
+
+function formatAttendanceStatus(status?: string): string {
+  if (!status) return '상태 없음';
+  return ATTENDANCE_STATUS_LABEL[status] || status;
+}
+
 function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   const explicitDelta = Number((req as any).penaltyPointsDelta);
   if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
@@ -571,7 +584,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           .map((log) => log.requestId as string)
       );
 
-      const requestRef = collection(firestore, 'centers', centerId, 'attendanceRequests');
+      const requestRef = collection(firestore, 'centers', centerId, 'attendance요청');
       const requestSnap = await getDocs(query(requestRef, where('studentId', '==', studentId), limit(30)));
       const requestLogs: PenaltyLog[] = requestSnap.docs
         .map((snap) => ({ id: snap.id, ...(snap.data() as Omit<AttendanceRequest, 'id'>) } as AttendanceRequest))
@@ -973,7 +986,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   if (!mounted) return (
     <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-      <p className="font-black text-primary tracking-tighter uppercase opacity-40">Initializing Command Matrix...</p>
+      <p className="font-black text-primary tracking-tighter uppercase opacity-40">대시보드 불러오는 중...</p>
     </div>
   );
 
@@ -984,9 +997,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           <Monitor className={cn("text-primary", isMobile ? "h-6 w-6" : "h-8 w-8")} />
           <div className="grid">
             <h1 className={cn("font-black tracking-tight", isMobile ? "text-2xl" : "text-3xl")}>실시간 관제 홈</h1>
-            <p className={cn("font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1", isMobile ? "text-[8px]" : "text-[10px]")}>Command & Control Center</p>
+            <p className={cn("font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1", isMobile ? "text-[8px]" : "text-[10px]")}>통합 관제 센터</p>
           </div>
-          <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">LIVE</Badge>
+          <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">실시간</Badge>
         </div>
 
         <div className="flex items-center gap-3">
@@ -1009,22 +1022,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center gap-2 px-4 border-r">
               <Activity className="h-4 w-4 text-emerald-500" />
               <div className="grid leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">{selectedClass === 'all' ? 'Center' : selectedClass} Today Total</span>
-                <span className="text-sm font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}h {stats.totalCenterMinutes % 60}m</span>
+                <span className="text-[8px] font-black text-muted-foreground uppercase">{selectedClass === 'all' ? '센터 전체' : selectedClass} 오늘 누적</span>
+                <span className="text-sm font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}시간 {stats.totalCenterMinutes % 60}분</span>
               </div>
             </div>
             <div className="flex items-center gap-2 px-4 border-r">
               <Users className="h-4 w-4 text-blue-500" />
               <div className="grid leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">Avg Study</span>
-                <span className="text-sm font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}h {stats.avgMinutes % 60}m</span>
+                <span className="text-[8px] font-black text-muted-foreground uppercase">평균 학습</span>
+                <span className="text-sm font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}시간 {stats.avgMinutes % 60}분</span>
               </div>
             </div>
             <div className="flex items-center gap-2 px-4">
               <Trophy className="h-4 w-4 text-amber-500" />
               <div className="grid leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">Top 20% Avg</span>
-                <span className="text-sm font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}h {stats.top20Avg % 60}m</span>
+                <span className="text-[8px] font-black text-muted-foreground uppercase">상위 20% 평균</span>
+                <span className="text-sm font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}시간 {stats.top20Avg % 60}분</span>
               </div>
             </div>
           </div>
@@ -1040,9 +1053,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-emerald-500" /> 최근 30일 센터 학습 추이
                 </CardTitle>
-                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Historical Study Trend (Actual Study Minutes Analysis)</CardDescription>
+                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">누적 공부시간 추이 (실제 공부시간 기준)</CardDescription>
               </div>
-              <div className="flex items-center gap-2">{trendLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/50" />}<Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">{trendLoading ? "UPDATING" : "PAST 30 DAYS"}</Badge></div>
+              <div className="flex items-center gap-2">{trendLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/50" />}<Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">{trendLoading ? "업데이트 중" : "최근 30일"}</Badge></div>
             </div>
           </CardHeader>
           <div className="h-[200px] w-full">
@@ -1063,7 +1076,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       return (
                         <div className="bg-white p-3 rounded-xl shadow-2xl border-none ring-1 ring-black/5">
                           <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">{label}</p>
-                          <p className="dashboard-number text-base text-emerald-600">{payload[0].value}h ({Number(payload[0].payload.totalMinutes).toLocaleString()}m)</p>
+                          <p className="dashboard-number text-base text-emerald-600">{payload[0].value}시간 ({Number(payload[0].payload.totalMinutes).toLocaleString()}분)</p>
                         </div>
                       );
                     }
@@ -1136,7 +1149,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       const student = students?.find(s => s.id === seat?.studentId);
                       const studentMember = studentMembers?.find(m => m.id === seat?.studentId);
                       const occupantId = typeof seat?.studentId === 'string' ? seat.studentId : '';
-                      const occupantName = student?.name || studentMember?.displayName || (occupantId ? 'Assigned' : '');
+                      const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
                       const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
                       
                       const timeInfo = occupantId ? getStudentStudyTimes(occupantId, seat.status, seat.lastCheckInAt) : null;
@@ -1162,13 +1175,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
                               <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{occupantName}</span>
                               <div className="flex flex-col items-center leading-[1.1]">
-                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white" : "text-primary")}>{`L: ${timeInfo?.session}`}</span>
-                                <span className={cn("text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white/90" : "text-primary/80")}>{`T: ${timeInfo?.total}`}</span>
+                                <span className={cn("text-[8px] font-black tracking-tighter whitespace-nowrap", isStudying || isAway ? "text-white" : "text-primary")}>{`세션 ${timeInfo?.session}`}</span>
+                                <span className={cn("text-[8px] font-black tracking-tighter whitespace-nowrap", isStudying || isAway ? "text-white/90" : "text-primary/80")}>{`누적 ${timeInfo?.total}`}</span>
                               </div>
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center"><span className="text-[7px] font-black tracking-tighter opacity-100 uppercase">Empty</span>{isEditMode && <UserPlus className="h-2.5 w-2.5 mt-0.5 text-primary/40" />}</div>
+                            <div className="flex flex-col items-center"><span className="text-[7px] font-black tracking-tighter opacity-100 uppercase">빈좌석</span>{isEditMode && <UserPlus className="h-2.5 w-2.5 mt-0.5 text-primary/40" />}</div>
                           )}
                         </div>
                       );
@@ -1237,7 +1250,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex items-center gap-4">
                   <div className="h-11 w-11 rounded-2xl bg-emerald-50 flex flex-col items-center justify-center shrink-0">
                     <span className="text-[10px] font-black text-emerald-600 leading-none">{report.dateKey.split('-')[2]}</span>
-                    <span className="text-[7px] font-bold text-emerald-400 uppercase mt-0.5">{format(new Date(report.dateKey.replace(/-/g, '/')), 'MMM')}</span>
+                    <span className="text-[7px] font-bold text-emerald-400 mt-0.5 whitespace-nowrap">{format(new Date(report.dateKey.replace(/-/g, '/')), 'M월', { locale: ko })}</span>
                   </div>
                   <div className="grid leading-tight min-w-0">
                     <span className="font-black text-sm truncate">{report.studentName} 학생</span>
@@ -1304,8 +1317,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       <DialogHeader className="relative z-10">
                         <DialogTitle className="text-3xl sm:text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">SEAT {selectedSeat.seatNo}</Badge>
-                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.status}</Badge>
+                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">좌석 {selectedSeat.seatNo}</Badge>
+                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] whitespace-nowrap">{formatAttendanceStatus(selectedSeat.status)}</Badge>
                           {selectedSeat.seatZone && <Badge className="bg-white text-primary border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.seatZone}</Badge>}
                         </div>
                       </DialogHeader>
@@ -1325,12 +1338,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             {selectedSeat.studentId && (
                               <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
                                 <div className="flex-1 text-center">
-                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Live Session</p>
+                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">실시간 세션</p>
                                   <p className="text-xl sm:text-2xl font-black text-blue-600 tabular-nums">{timeInfo?.session}</p>
                                 </div>
                                 <div className="w-px h-10 bg-border/50 self-center" />
                                 <div className="flex-1 text-center">
-                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Today Total</p>
+                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">오늘 누적</p>
                                   <p className="text-xl sm:text-2xl font-black text-primary tabular-nums">{timeInfo?.total}</p>
                                 </div>
                               </div>
@@ -1340,15 +1353,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               <div className="grid gap-4">
                                 <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
                                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                                  <Select value={selectedSeat.seatZone || 'Flex'} onValueChange={handleUpdateZone}>
+                                  <Select value={selectedSeat.seatZone || '미정'} onValueChange={handleUpdateZone}>
                                     <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
                                       <SelectValue placeholder="구역 선택" />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-xl border-none shadow-2xl">
-                                      <SelectItem value="A존 (Focus)" className="font-bold">A존 (Focus)</SelectItem>
-                                      <SelectItem value="B존 (Standard)" className="font-bold">B존 (Standard)</SelectItem>
-                                      <SelectItem value="고정석 (Fixed)" className="font-bold">고정석 (Fixed)</SelectItem>
-                                      <SelectItem value="자유석 (Flex)" className="font-bold">자유석 (Flex)</SelectItem>
+                                      <SelectItem value="미정" className="font-bold">미정</SelectItem>
+                                      <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
+                                      <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
+                                      <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
+                                      <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -1380,7 +1394,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                           <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center"><Zap className="h-4 w-4 fill-current text-white" /></div>
                                           <div className="grid leading-tight">
                                             <span className="font-black text-xs">{format(selectedSeat.lastCheckInAt.toDate(), 'HH:mm:ss')} ~ 진행 중</span>
-                                            <span className="text-[8px] font-bold text-white/60 uppercase">Active Session</span>
+                                            <span className="text-[8px] font-bold text-white/60 uppercase">활성 세션</span>
                                           </div>
                                         </div>
                                         <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 h-6">
@@ -1396,7 +1410,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                         <div key={session.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
                                           <div className="flex items-center gap-3">
                                             <div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center"><Timer className="h-4 w-4 text-primary/40" /></div>
-                                            <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase">Captured</span></div>
+                                            <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase">기록됨</span></div>
                                           </div>
                                           <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[10px] px-2.5 h-6">{session.durationMinutes}분</Badge>
                                         </div>
@@ -1423,14 +1437,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   <div key={hLog.dateKey} className="p-4 rounded-2xl bg-white border shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-xs font-black text-primary">{format(new Date(hLog.dateKey.replace(/-/g, '/')), 'MM/dd (EEE)', {locale: ko})}</span>
-                                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Daily Log</span>
+                                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">일일 기록</span>
                                     </div>
                                     <div className="flex items-center gap-3">
                                       <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden shadow-inner">
                                         <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (hLog.totalMinutes / 480) * 100)}%` }} />
                                       </div>
                                       <div className="text-right min-w-[60px]">
-                                        <span className="dashboard-number text-sm text-slate-900">{Math.floor(hLog.totalMinutes / 60)}h {hLog.totalMinutes % 60}m</span>
+                                        <span className="dashboard-number text-sm text-slate-900">{Math.floor(hLog.totalMinutes / 60)}시간 {hLog.totalMinutes % 60}분</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1682,7 +1696,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-none rounded-none" : "sm:max-w-md")}>
           <div className="bg-primary p-8 text-white relative shrink-0">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
-            <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">GRID ID: {selectedSeat?.seatNo}</p></DialogHeader>
+            <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">좌석 번호: {selectedSeat?.seatNo}</p></DialogHeader>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-white space-y-6">
             {isEditMode && (
@@ -1692,16 +1706,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 {selectedSeat?.type !== 'aisle' && (
                   <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                    <Select value={selectedSeat?.seatZone || '자유석 (Flex)'} onValueChange={handleUpdateZone}>
+                    <Select value={selectedSeat?.seatZone || '자유석'} onValueChange={handleUpdateZone}>
                       <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
                         <SelectValue placeholder="구역 선택" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-2xl">
-                        <SelectItem value="A존 (Focus)" className="font-bold">A존 (Focus)</SelectItem>
-                        <SelectItem value="B존 (Standard)" className="font-bold">B존 (Standard)</SelectItem>
-                        <SelectItem value="고정석 (Fixed)" className="font-bold">고정석 (Fixed)</SelectItem>
-                        <SelectItem value="자유석 (Flex)" className="font-bold">자유석 (Flex)</SelectItem>
-                      </SelectContent>
+                                  <SelectContent className="rounded-xl border-none shadow-2xl">
+                                    <SelectItem value="미정" className="font-bold">미정</SelectItem>
+                                    <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
+                                    <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
+                                    <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
+                                    <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
+                                  </SelectContent>
                     </Select>
                   </div>
                 )}

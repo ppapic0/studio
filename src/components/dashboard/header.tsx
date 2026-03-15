@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
   PanelLeft,
   LogOut,
@@ -18,14 +17,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -255,20 +246,6 @@ export function DashboardHeader() {
         </Sheet>
       </div>
 
-      <Breadcrumb className="hidden md:flex">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard">대시보드</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>기본 대시보드</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
       <div className="relative ml-auto flex items-center gap-2">
         {!isParentMode && (
           <Button
@@ -435,7 +412,7 @@ export function DashboardHeader() {
               </h4>
               <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
                 <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  **[나의 학습 계획]** 메뉴에서 매일의 공부 To-do와 생활 루틴을 관리하세요.
+                  **[나의 학습 계획]** 메뉴에서 매일의 공부 할 일과 생활 루틴을 관리하세요.
                 </p>
               </div>
             </section>

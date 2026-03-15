@@ -125,31 +125,31 @@ export default function NotificationSettingsPage() {
           <BellRing className="h-7 w-7" /> 문자 알림 설정
         </h1>
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground/60">
-          Parent SMS Integration & Late Alert Rules
+          학부모 문자 연동 및 지각 알림 규칙
         </p>
       </header>
 
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight">
-            <PlugZap className="h-5 w-5" /> SMS API 연결
+            <PlugZap className="h-5 w-5" /> 문자 연동 설정
           </CardTitle>
           <CardDescription className="font-bold text-sm">
-            API는 나중에 연결해도 됩니다. 지금은 키/엔드포인트를 저장해두고, 큐(centers/{"{centerId}"}/smsQueue)를 통해 연동할 수 있습니다.
+            문자 연동은 나중에 연결해도 됩니다. 지금은 키와 주소를 저장해두고, 큐(centers/{"{centerId}"}/smsQueue)를 통해 연동할 수 있습니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 p-6">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
-              <Label className="text-[11px] font-black uppercase text-muted-foreground">Provider</Label>
+              <Label className="text-[11px] font-black uppercase text-muted-foreground whitespace-nowrap">연동 방식</Label>
               <Select value={form.smsProvider} onValueChange={(value) => updateField('smsProvider', value as 'none' | 'aligo' | 'custom')}>
                 <SelectTrigger className="h-11 rounded-xl border-2 font-bold">
                   <SelectValue placeholder="SMS 제공사 선택" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none" className="font-bold">연결 안함(준비중)</SelectItem>
-                  <SelectItem value="aligo" className="font-bold">Aligo</SelectItem>
-                  <SelectItem value="custom" className="font-bold">Custom Endpoint</SelectItem>
+                  <SelectItem value="aligo" className="font-bold">알리고</SelectItem>
+                  <SelectItem value="custom" className="font-bold">사용자 엔드포인트</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -173,25 +173,25 @@ export default function NotificationSettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-[11px] font-black uppercase text-muted-foreground">API User ID</Label>
+              <Label className="text-[11px] font-black uppercase text-muted-foreground whitespace-nowrap">연동 사용자 아이디</Label>
               <Input
                 value={form.smsUserId}
                 onChange={(e) => updateField('smsUserId', e.target.value)}
-                placeholder="provider user id"
+                placeholder="발신 계정 아이디"
                 className="h-11 rounded-xl border-2 font-bold"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label className="text-[11px] font-black uppercase text-muted-foreground">API Key</Label>
+              <Label className="text-[11px] font-black uppercase text-muted-foreground whitespace-nowrap">연동 키</Label>
               <Input
                 value={form.smsApiKey}
                 onChange={(e) => updateField('smsApiKey', e.target.value)}
-                placeholder="api key"
+                placeholder="연동 키"
                 className="h-11 rounded-xl border-2 font-bold"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label className="text-[11px] font-black uppercase text-muted-foreground">Custom Endpoint URL</Label>
+              <Label className="text-[11px] font-black uppercase text-muted-foreground whitespace-nowrap">연동 주소</Label>
               <Input
                 value={form.smsEndpointUrl}
                 onChange={(e) => updateField('smsEndpointUrl', e.target.value)}

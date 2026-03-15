@@ -297,13 +297,13 @@ export default function StudentAccountManagementPage() {
         <h1 className="font-black tracking-tighter flex items-center gap-2 text-primary text-4xl">
           <UserCog className="h-8 w-8" /> 학생 계정 관리 마스터
         </h1>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] ml-1">Full Lifecycle & Data Control</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] ml-1 whitespace-nowrap">전체 이력 및 데이터 관리</p>
       </header>
 
       <div className="relative group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
         <Input 
-          placeholder="학생 이름 또는 UID 검색..." 
+          placeholder="학생 이름 또는 사용자번호 검색..." 
           className="rounded-2xl border-2 pl-12 h-16 text-lg focus-visible:ring-primary/10 shadow-sm transition-all bg-white"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -321,7 +321,7 @@ export default function StudentAccountManagementPage() {
           {membersLoading ? (
             <div className="py-40 flex flex-col items-center justify-center gap-4">
               <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 italic">Syncing Master Database...</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 italic whitespace-nowrap">마스터 데이터 동기화 중...</p>
             </div>
           ) : filteredStudents.length === 0 ? (
             <div className="py-32 text-center opacity-20 italic font-black text-sm">
@@ -346,7 +346,7 @@ export default function StudentAccountManagementPage() {
                           )}>{member.status === 'active' ? '재원' : '퇴원'}</Badge>
                         </div>
                         <p className="text-[10px] font-bold text-muted-foreground truncate">{profile?.schoolName || '학교 정보 없음'} · {profile?.grade}</p>
-                        <p className="text-[8px] font-mono text-muted-foreground/40 mt-1 uppercase truncate">UID: {member.id}</p>
+                        <p className="text-[8px] font-mono text-muted-foreground/40 mt-1 uppercase truncate">사용자번호: {member.id}</p>
                       </div>
                     </div>
 
@@ -362,7 +362,7 @@ export default function StudentAccountManagementPage() {
                         <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
                           <AlertDialogHeader>
                             <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4"><AlertTriangle className="h-10 w-10 text-rose-600" /></div>
-                            <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">영구 강제 삭제 (Recursive)</AlertDialogTitle>
+                            <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter">영구 강제 삭제</AlertDialogTitle>
                             <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed">
                               [{member.displayName}] 학생의 모든 데이터와 하위 기록(로그, 계획 등)을 뿌리까지 찾아내어 삭제합니다. 절대 복구할 수 없습니다.
                             </AlertDialogDescription>
@@ -427,7 +427,7 @@ export default function StudentAccountManagementPage() {
                   <Input
                     inputMode="numeric"
                     maxLength={6}
-                    placeholder="e.g. 123456"
+                    placeholder="예: 123456"
                     value={editForm.parentLinkCode}
                     onChange={e => setEditForm({...editForm, parentLinkCode: e.target.value.replace(/\D/g, '').slice(0, 6)})}
                     className="h-11 rounded-xl border-2 font-bold tracking-[0.2em]"
@@ -442,10 +442,10 @@ export default function StudentAccountManagementPage() {
             </section>
 
             <section className="space-y-6">
-              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-1 flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> 성장 지표 보정 (LP & 스킬)</h4>
+              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-1 flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> 성장 지표 보정 (포인트 & 역량)</h4>
               <Card className="rounded-[1.5rem] border-2 border-emerald-100 bg-white p-6 space-y-6 shadow-sm">
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase text-primary/60">Season Points (LP)</Label><Badge className="bg-emerald-500 text-white font-black">{editForm.seasonLp.toLocaleString()} LP</Badge></div>
+                  <div className="flex justify-between items-center"><Label className="text-[10px] font-black text-primary/60 whitespace-nowrap">시즌 포인트</Label><Badge className="bg-emerald-500 text-white font-black whitespace-nowrap">{editForm.seasonLp.toLocaleString()}점</Badge></div>
                   <Slider value={[editForm.seasonLp]} max={50000} step={100} onValueChange={([v]) => setEditForm({...editForm, seasonLp: v})} />
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-6">
@@ -464,15 +464,15 @@ export default function StudentAccountManagementPage() {
               <div className="flex items-center gap-4 p-5 rounded-2xl bg-blue-50/50 border-2 border-blue-100 shadow-sm">
                 <div className="bg-white p-3 rounded-xl shadow-md"><Clock className="h-5 w-5 text-blue-600" /></div>
                 <div className="flex-1 grid gap-1">
-                  <Label className="text-[10px] font-black text-blue-900/60 uppercase">Manual Time Override (Minutes)</Label>
+                  <Label className="text-[10px] font-black text-blue-900/60 uppercase whitespace-nowrap">수동 시간 보정(분)</Label>
                   <div className="flex items-center gap-2">
                     <Input type="number" value={editForm.todayStudyMinutes} onChange={e => setEditForm({...editForm, todayStudyMinutes: Number(e.target.value)})} className="h-10 rounded-xl border-blue-200 font-black text-xl text-blue-600 text-center" />
-                    <span className="text-sm font-black text-blue-900/40">min</span>
+                    <span className="text-sm font-black text-blue-900/40 whitespace-nowrap">분</span>
                   </div>
                 </div>
                 <div className="text-right leading-none">
-                  <span className="text-[10px] font-bold text-blue-900/40 block mb-1">Total Display</span>
-                  <span className="text-lg font-black text-blue-900/80">{Math.floor(editForm.todayStudyMinutes/60)}h {editForm.todayStudyMinutes%60}m</span>
+                  <span className="text-[10px] font-bold text-blue-900/40 block mb-1 whitespace-nowrap">표시 시간</span>
+                  <span className="text-lg font-black text-blue-900/80 whitespace-nowrap">{Math.floor(editForm.todayStudyMinutes/60)}시간 {editForm.todayStudyMinutes%60}분</span>
                 </div>
               </div>
             </section>

@@ -188,7 +188,7 @@ export default function AssignedStudentsPage() {
           </Button>
           <div className="grid">
             <h1 className="text-3xl font-black tracking-tighter text-primary">배정 재원생 수납 현황</h1>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Full Enrollment & Revenue Management</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">전체 등록 및 매출 관리</p>
           </div>
         </div>
         <div className="hidden sm:flex items-center gap-3 bg-blue-50 text-blue-700 px-4 py-2 rounded-2xl border border-blue-100 font-black text-xs">
@@ -237,7 +237,7 @@ export default function AssignedStudentsPage() {
           {isLoading ? (
             <div className="py-40 flex flex-col items-center justify-center gap-4 opacity-20">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="font-black uppercase tracking-widest text-xs italic">Compiling Revenue Matrix...</p>
+              <p className="font-black uppercase tracking-widest text-xs italic whitespace-nowrap">매출 데이터를 집계하는 중...</p>
             </div>
           ) : filteredAndSortedStudents.length === 0 ? (
             <div className="py-32 text-center flex flex-col items-center gap-6 opacity-30">
@@ -264,7 +264,7 @@ export default function AssignedStudentsPage() {
                       <div className="grid gap-1.5 min-w-0">
                         <div className="flex items-center gap-3">
                           <h3 className="text-3xl font-black tracking-tighter truncate">{student?.displayName || '학생'}</h3>
-                          <Badge variant="outline" className="font-black text-[10px] border-primary/20 text-primary/60 uppercase">{seat.seatZone || 'FLEX'}</Badge>
+                          <Badge variant="outline" className="font-black text-[10px] border-primary/20 text-primary/60 whitespace-nowrap">{seat.seatZone || '미정'}</Badge>
                           {statusKey === 'paid' && <Badge className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-lg">수납 완료</Badge>}
                           {statusKey === 'overdue' && <Badge className="bg-rose-600 text-white border-none font-black text-[10px] shadow-lg animate-bounce">연체 중</Badge>}
                           {statusKey === 'unpaid' && <Badge className="bg-amber-500 text-white border-none font-black text-[10px] shadow-lg">결제 대기</Badge>}
@@ -282,7 +282,7 @@ export default function AssignedStudentsPage() {
                       <div className="text-center sm:text-right space-y-1">
                         {latestInvoice ? (
                           <>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Next Payment Due</p>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 whitespace-nowrap">다음 결제 예정일</p>
                             <div className="flex items-center justify-center sm:justify-end gap-2">
                               <CalendarCheck className={cn("h-4 w-4", isOverdue ? "text-rose-600" : "text-blue-600")} />
                               <span className={cn("text-xl font-black tabular-nums tracking-tight", isOverdue ? "text-rose-600" : "text-primary")}>
@@ -347,7 +347,7 @@ export default function AssignedStudentsPage() {
 
       <footer className="pt-8 flex flex-col items-center gap-4 opacity-30">
         <div className="flex items-center gap-3 font-black text-[10px] uppercase tracking-[0.4em] text-primary">
-          Analytical Track Unified Billing Control
+          통합 수납 관리 트랙
         </div>
         <p className="text-[9px] font-bold text-center leading-relaxed">
           재원생의 좌석 배정 정보와 인보이스 상태를 대조하여 연체 리스크를 실시간으로 관리합니다.<br/>
