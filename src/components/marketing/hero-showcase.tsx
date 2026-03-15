@@ -10,6 +10,7 @@ const items = [
     desc: '입실부터 퇴실까지, 루틴과 데이터가 기록됩니다',
     stat: '매일 오전 8:30 시작',
     icon: Building2,
+    targetId: 'features',
     color: 'navy' as const,
   },
   {
@@ -18,6 +19,7 @@ const items = [
     desc: '센터만 이용하거나, 필요할 때 수업을 추가합니다',
     stat: '재학생 · N수생 모두 가능',
     icon: BookOpen,
+    targetId: 'korean-class',
     color: 'blue' as const,
   },
   {
@@ -26,12 +28,20 @@ const items = [
     desc: '학생과 학부모가 각자의 화면에서 흐름을 확인합니다',
     stat: '출결 · 공부시간 · 실행률 연결',
     icon: Smartphone,
+    targetId: 'app',
     color: 'orange' as const,
   },
 ];
 
 export function HeroShowcase() {
   const [active, setActive] = useState(0);
+
+  const handleItemClick = (index: number, targetId: string) => {
+    setActive(index);
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   useEffect(() => {
     const id = setInterval(() => setActive((p) => (p + 1) % items.length), 3800);
@@ -46,7 +56,7 @@ export function HeroShowcase() {
         return (
           <button
             key={item.label}
-            onClick={() => setActive(i)}
+            onClick={() => handleItemClick(i, item.targetId)}
             aria-label={item.title}
             className={`flex items-start gap-4 rounded-2xl border p-5 text-left transition-all duration-500 ${
               isActive
