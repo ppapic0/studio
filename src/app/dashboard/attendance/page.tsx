@@ -428,7 +428,7 @@ export default function AttendancePage() {
       <header className="flex justify-between items-center">
         <div className="grid gap-1">
           <h1 className="text-3xl font-black tracking-tighter text-primary">출결 및 신청 관리</h1>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Attendance & Request Management</p>
+          <p className="text-xs font-bold text-muted-foreground tracking-widest whitespace-nowrap">출결 및 요청 관리</p>
         </div>
       </header>
 
@@ -475,10 +475,10 @@ export default function AttendancePage() {
                 <Table>
                 <TableHeader className="bg-muted/10">
                   <TableRow className="border-none hover:bg-transparent h-12">
-                    <TableHead className="font-black text-[10px] pl-8">STUDENT</TableHead>
-                    <TableHead className="font-black text-[10px]">STATUS</TableHead>
+                    <TableHead className="font-black text-[10px] pl-8 whitespace-nowrap">학생</TableHead>
+                    <TableHead className="font-black text-[10px] whitespace-nowrap">상태</TableHead>
                     <TableHead className="hidden md:table-cell font-black text-[10px]">최근 방문 기록</TableHead>
-                    <TableHead className="text-right pr-8 font-black text-[10px]">ACTION</TableHead>
+                    <TableHead className="text-right pr-8 font-black text-[10px] whitespace-nowrap">처리</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -575,7 +575,7 @@ export default function AttendancePage() {
                       <div className="flex items-start gap-5">
                         <div className={cn("h-14 w-14 rounded-2xl flex flex-col items-center justify-center shrink-0 border-2", req.type === 'late' ? "bg-amber-50 border-amber-100 text-amber-600" : "bg-rose-50 border-rose-100 text-rose-600")}>
                           {req.type === 'late' ? <Clock className="h-6 w-6" /> : <CalendarX className="h-6 w-6" />}
-                          <span className="text-[8px] font-black uppercase mt-1">{req.type === 'late' ? 'Late' : 'Absent'}</span>
+                          <span className="text-[8px] font-black uppercase mt-1">{req.type === 'late' ? '지각' : '결석'}</span>
                         </div>
                         <div className="grid gap-1.5 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">

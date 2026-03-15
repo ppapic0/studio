@@ -594,14 +594,14 @@ export default function StudyPlanPage() {
           <div className="flex flex-col">
             <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-xl" : "text-4xl")}>계획트랙</h1>
             <p className={cn("font-bold text-muted-foreground mt-1", isMobile ? "text-[8px] uppercase tracking-widest" : "text-sm")}>
-              {isPast ? 'Archive View' : 'Daily Study Matrix & Routine'}
+              {isPast ? '과거 기록 보기' : '일일 학습 매트릭스 · 루틴'}
             </p>
           </div>
           {isPast ? (
-            <Badge variant="destructive" className={cn("rounded-full font-black px-3 py-1 shadow-lg", isMobile ? "text-[8px] h-6" : "text-[10px]")}>History Mode</Badge>
+            <Badge variant="destructive" className={cn("rounded-full font-black px-3 py-1 shadow-lg", isMobile ? "text-[8px] h-6" : "text-[10px]")}>기록 모드</Badge>
           ) : (
             <Badge className={cn("rounded-full font-black gap-2 border-none text-white shadow-lg bg-gradient-to-r", isMobile ? "text-[8px] h-7 px-3" : "text-[10px] h-9 px-4", currentTier.gradient)}>
-              {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} /> : <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />} {currentTier.name} Tier Active
+              {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} /> : <Zap className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />} {currentTier.name} 티어 활성
             </Badge>
           )}
         </div>
@@ -681,7 +681,7 @@ export default function StudyPlanPage() {
               <CardTitle className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-base" : "text-2xl")}>
                 <CalendarClock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-7 w-7")} /> {isToday ? '오늘의 출석 정보 (수정 불가)' : '출석 설정'}
               </CardTitle>
-              {isToday ? <Lock className="h-4 w-4 text-muted-foreground/40" /> : <Badge className={cn("bg-white text-primary border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>Step 1</Badge>}
+              {isToday ? <Lock className="h-4 w-4 text-muted-foreground/40" /> : <Badge className={cn("bg-white text-primary border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>1단계</Badge>}
             </div>
           </CardHeader>
           <CardContent className={cn(isMobile ? "p-4" : "p-8 sm:p-10")}>
@@ -749,18 +749,18 @@ export default function StudyPlanPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="bg-primary/5 p-1.5 rounded-lg"><BarChart3 className={cn("text-primary", isMobile ? "h-4 w-4" : "h-5 w-5")} /></div>
-              <CardTitle className={cn("font-black uppercase tracking-widest text-primary/60", isMobile ? "text-[8px]" : "text-sm")}>Learning Balance Matrix</CardTitle>
+              <CardTitle className={cn("font-black uppercase tracking-widest text-primary/60", isMobile ? "text-[8px]" : "text-sm")}>학습 균형 매트릭스</CardTitle>
             </div>
-            {isToday && <Badge variant="outline" className="text-[8px] font-black border-dashed">PLAN LOCKED FOR TODAY</Badge>}
+            {isToday && <Badge variant="outline" className="text-[8px] font-black border-dashed">오늘 계획 잠금</Badge>}
           </div>
         </CardHeader>
         <CardContent className={cn(isMobile ? "p-4 pt-1" : "p-8 pt-2")}>
           <div className={cn("flex flex-col", isMobile ? "gap-4" : "gap-8")}>
             <div className="flex items-baseline gap-2">
               <span className={cn("font-black tracking-tighter drop-shadow-sm text-primary", isMobile ? "text-3xl" : "text-6xl")}>
-                {Math.floor(studyTimeSummary.total / 60)}<span className={cn("opacity-40 ml-0.5", isMobile ? "text-xs" : "text-xl")}>h</span> {studyTimeSummary.total % 60}<span className={cn("opacity-40 ml-0.5", isMobile ? "text-xs" : "text-xl")}>m</span>
+                {Math.floor(studyTimeSummary.total / 60)}<span className={cn("opacity-40 ml-0.5", isMobile ? "text-xs" : "text-xl")}>시간</span> {studyTimeSummary.total % 60}<span className={cn("opacity-40 ml-0.5", isMobile ? "text-xs" : "text-xl")}>분</span>
               </span>
-              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest opacity-60", isMobile ? "text-[7px]" : "text-[10px]")}>Target Depth</span>
+              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest opacity-60", isMobile ? "text-[7px]" : "text-[10px]")}>목표 학습량</span>
             </div>
             
             <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -770,7 +770,7 @@ export default function StudyPlanPage() {
                 return (
                   <div key={subj.id} className={cn("flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all shadow-sm", subj.light, subj.text, "border-transparent")}>
                     <div className={cn("w-1.5 h-1.5 rounded-full shadow-sm", subj.color)} />
-                    <span className={cn("font-black tracking-tight", isMobile ? "text-[9px]" : "text-[11px]")}>{subj.label} {Math.floor(plannedTime / 60)}h {plannedTime % 60}m</span>
+                    <span className={cn("font-black tracking-tight", isMobile ? "text-[9px]" : "text-[11px]")}>{subj.label} {Math.floor(plannedTime / 60)}시간 {plannedTime % 60}분</span>
                   </div>
                 );
               })}
@@ -791,7 +791,7 @@ export default function StudyPlanPage() {
             <Card className={cn("border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-black/[0.02]", isMobile ? "rounded-[1.5rem]" : "")}>
               <CardHeader className="p-0 border-b bg-muted/5">
                 <TabsList className={cn("w-full justify-start rounded-none bg-transparent p-0 gap-0", isMobile ? "h-12" : "h-16")}>
-                  <TabsTrigger value="study" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 font-black text-[10px] sm:text-sm uppercase tracking-widest">학습 To-do</TabsTrigger>
+                  <TabsTrigger value="study" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 font-black text-[10px] sm:text-sm uppercase tracking-widest">학습 할 일</TabsTrigger>
                   <TabsTrigger value="personal" className="flex-1 h-full data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 data-[state=active]:text-amber-600 font-black text-[10px] sm:text-sm uppercase tracking-widest">개인 일정</TabsTrigger>
                 </TabsList>
               </CardHeader>
@@ -806,7 +806,7 @@ export default function StudyPlanPage() {
                           <div className="flex-1 grid gap-1">
                             <div className="flex items-center gap-2">
                               <Badge className={cn("rounded-md font-black text-[8px] px-1.5 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
-                              {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}m Goal</span>}
+                              {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}분 목표</span>}
                             </div>
                             <Label htmlFor={task.id} className={cn("font-black tracking-tight transition-all leading-snug break-keep", isMobile ? "text-sm" : "text-lg", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
                           </div>
@@ -961,9 +961,9 @@ export default function StudyPlanPage() {
       
       <footer className={cn("py-8 text-center opacity-30", isMobile ? "hidden" : "px-4 py-12")}>
         <div className="flex items-center justify-center gap-6 text-[10px] font-black uppercase tracking-[0.4em] text-primary">
-           <div className="flex items-center gap-2"><Activity className="h-4 w-4" /><span>Ready for Deep Work</span></div>
+           <div className="flex items-center gap-2"><Activity className="h-4 w-4" /><span>깊은 몰입 준비 완료</span></div>
            <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
-           <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" /><span>AI Sync Active</span></div>
+           <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" /><span>인공지능 동기화 활성</span></div>
         </div>
       </footer>
     </div>

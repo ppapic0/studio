@@ -487,7 +487,7 @@ export function MarketingConsultingCRM({
               disabled={filteredLeads.length === 0}
             >
               <Download className="mr-2 h-4 w-4" />
-              엑셀 다운로드 (CSV)
+              엑셀 다운로드
             </Button>
           </div>
         </CardHeader>
@@ -618,7 +618,7 @@ export function MarketingConsultingCRM({
           </div>
 
           <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-            <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-500">홍보 채널 TOP</p>
+            <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">홍보 채널 상위</p>
             <div className="flex flex-wrap gap-2">
               {summary.channels.length === 0 ? (
                 <span className="text-xs font-semibold text-slate-400">아직 입력된 리드가 없습니다.</span>

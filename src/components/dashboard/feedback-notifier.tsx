@@ -98,8 +98,8 @@ export function FeedbackNotifier() {
           <Sparkles className="absolute right-4 top-4 h-24 w-24 opacity-10" />
           <DialogHeader className="relative z-10">
             <div className="mb-3 flex items-center gap-2">
-              <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase">
-                One Line Feedback
+              <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase whitespace-nowrap">
+                한 줄 피드백
               </Badge>
             </div>
             <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">

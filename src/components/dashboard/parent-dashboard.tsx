@@ -269,15 +269,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
   }, [searchParams, pathname, router]);
 
-  const activeCenterMembership = useMemo(() => {
+  const active센터Membership = useMemo(() => {
     if (activeMembership) {
       return memberships.find((membership) => membership.id === activeMembership.id) || activeMembership;
     }
     return memberships.find((membership) => membership.status === 'active') || memberships[0] || null;
   }, [activeMembership, memberships]);
 
-  const centerId = activeCenterMembership?.id;
-  const studentId = activeCenterMembership?.linkedStudentIds?.[0];
+  const centerId = active센터Membership?.id;
+  const studentId = active센터Membership?.linkedStudentIds?.[0];
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
@@ -397,11 +397,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, studentId, user?.uid]);
   const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user });
 
-  const attendanceRequestsQuery = useMemoFirebase(() => {
+  const attendance요청Query = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(30));
+    return query(collection(firestore, 'centers', centerId, 'attendance요청'), where('studentId', '==', studentId), limit(30));
   }, [firestore, centerId, studentId]);
-  const { data: attendanceRequests } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: isActive && !!studentId });
+  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: isActive && !!studentId });
 
   const penaltyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
@@ -538,13 +538,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const subjectTotalMinutes = subjectsData.reduce((sum, subject) => sum + subject.minutes, 0);
 
   const recentPenaltyReasons = useMemo(() => {
-    const sortedRequests = [...(attendanceRequests || [])].sort((a, b) => {
+    const sorted요청 = [...(attendance요청 || [])].sort((a, b) => {
       const aDate = toDateSafe((a as any).createdAt)?.getTime() ?? 0;
       const bDate = toDateSafe((b as any).createdAt)?.getTime() ?? 0;
       return bDate - aDate;
     });
 
-    return sortedRequests
+    return sorted요청
       .filter((request) => request.penaltyApplied)
       .slice(0, 5)
       .map((request) => ({
@@ -553,7 +553,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         points: request.type === 'absence' ? REQUEST_PENALTY_POINTS.absence : REQUEST_PENALTY_POINTS.late,
         dateLabel: formatDateLabel(request.date, (request as any).createdAt),
       }));
-  }, [attendanceRequests]);
+  }, [attendance요청]);
 
   const penaltyRecovery = useMemo(() => {
     const basePoints = Math.max(0, Math.round(Number(growth?.penaltyPoints || 0)));
@@ -592,7 +592,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         insights.push(`이번 주 누적 학습은 ${toHm(weeklyTotalStudyMinutes)}으로 목표 대비 ${progressRate}%입니다.`);
       }
     } else {
-      insights.push('학습 로그가 쌓이면 AI 인사이트가 자동으로 정교해집니다.');
+      insights.push('학습 로그가 쌓이면 인공지능 인사이트가 자동으로 정교해집니다.');
     }
 
     insights.push(
@@ -763,8 +763,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const selectedDatePlanRate = selectedDatePlanTotal > 0 ? Math.round((selectedDatePlanDone / selectedDatePlanTotal) * 100) : 0;
   const selectedDateLp = Number(growth?.dailyLpStatus?.[selectedDateKey]?.dailyLpAmount || 0);
   const selectedDateRequest = useMemo(
-    () => (attendanceRequests || []).find((request) => request.date === selectedDateKey),
-    [attendanceRequests, selectedDateKey]
+    () => (attendance요청 || []).find((request) => request.date === selectedDateKey),
+    [attendance요청, selectedDateKey]
   );
 
   const readNotification = async (notification: ParentNotificationItem) => {
@@ -893,7 +893,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   {report?.viewedAt && <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[8px] h-4 px-1.5">읽음</Badge>}
                 </div>
                 <p className="text-sm font-bold text-slate-700 leading-relaxed break-keep relative z-10 line-clamp-2">
-                  {report?.content || '선생님과 AI가 어제의 학습 데이터를 분석 중입니다.'}
+                  {report?.content || '선생님과 인공지능이 어제의 학습 데이터를 분석 중입니다.'}
                 </p>
               </Card>
 
@@ -970,13 +970,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button className="w-full h-14 rounded-2xl bg-[#14295F] text-white hover:bg-[#14295F]/90 font-black gap-2 text-base shadow-xl active:scale-[0.98] transition-all">
-                      <TrendingUp className="h-5 w-5" /> AI 학습 인사이트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
+                      <TrendingUp className="h-5 w-5" /> 인공지능 학습 인사이트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
                     <div className="bg-[#14295F] p-10 text-white relative">
                       <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
-                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">AI 학습 인사이트</DialogTitle>
+                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
                       <DialogDescription className="text-white/70 font-bold mt-1 text-xs">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
                     </div>
                     <div className="p-6 space-y-3 bg-[#fafafa]">
@@ -1011,7 +1011,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="flex items-center justify-between px-1">
                 <div className="flex flex-col">
                   <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Study Consistency Map</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">학습 일관성 맵</p>
                 </div>
                 <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -1025,7 +1025,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   "grid grid-cols-7 border-b-2 border-[#14295F]/10",
                   isMobile ? "bg-slate-50" : "bg-gradient-to-r from-slate-50 via-white to-slate-50"
                 )}>
-                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, i) => (
+                  {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
                       isMobile ? "py-3 text-[9px]" : "py-4 text-[11px]",
                       "text-center font-black uppercase tracking-widest",
@@ -1100,12 +1100,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                   <div className="h-full rounded-full bg-[#14295F]/80" style={{ width: progressPercent + '%' }} />
                                 </div>
                                 <div className="flex items-center justify-between text-[10px] font-black text-[#14295F]/70">
-                                  <span>{progressPercent}% FOCUS</span>
-                                  <span>{hour}h {minuteRemainder.toString().padStart(2, '0')}m</span>
+                                  <span>{progressPercent}% 집중도</span>
+                                  <span>{hour}시간 {minuteRemainder.toString().padStart(2, '0')}분</span>
                                 </div>
                               </>
                             ) : (
-                              <span className="mt-auto text-[11px] font-bold text-slate-400">No record</span>
+                              <span className="mt-auto text-[11px] font-bold text-slate-400">기록 없음</span>
                             )}
                           </div>
                         )}
@@ -1144,7 +1144,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <Card className="rounded-[1.5rem] border-none shadow-sm bg-[#14295F] p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
                       <BarChart3 className="h-6 w-6 text-white/40" />
                       <div className="grid gap-0.5 text-white">
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Weekly Detail</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">주간 상세</span>
                         <span className="text-xs font-black">성과 상세 분석</span>
                       </div>
                     </Card>
@@ -1535,8 +1535,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <p className="dashboard-number mt-1 text-xl text-[#FF7A16]">{selectedDatePlanRate}%</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">획득 LP</p>
-                <p className="dashboard-number mt-1 text-xl text-emerald-600">{selectedDateLp.toLocaleString()} LP</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">획득 포인트</p>
+                <p className="dashboard-number mt-1 text-xl text-emerald-600">{selectedDateLp.toLocaleString()}점</p>
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">출결 요청</p>

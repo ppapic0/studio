@@ -371,8 +371,8 @@ export function OperationalIntelligence() {
     return (
       <div className="py-40 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-          Building Operational Intelligence...
+        <p className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 whitespace-nowrap">
+          운영 지표 데이터를 불러오는 중입니다...
         </p>
       </div>
     );
@@ -463,7 +463,7 @@ export function OperationalIntelligence() {
               <Armchair className="h-6 w-6 text-blue-600" /> 시간대별 좌석 점유율
             </CardTitle>
             <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
-              Today / 09:00-23:00
+              오늘 / 09:00-23:00
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">
@@ -497,7 +497,7 @@ export function OperationalIntelligence() {
               <BarChart3 className="h-6 w-6 text-emerald-600" /> 시간대별 매출 상황
             </CardTitle>
             <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
-              Recent 30 days / payment logs
+              최근 30일 / 결제 기록
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">
@@ -532,7 +532,7 @@ export function OperationalIntelligence() {
               <Activity className="h-6 w-6 text-violet-600" /> 평균 공부시간 비율 추세
             </CardTitle>
             <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
-              Last 14 days / target achievement
+              최근 14일 / 목표 달성률
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">

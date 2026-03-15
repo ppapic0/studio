@@ -135,7 +135,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-              <p className="font-black text-[10px] text-muted-foreground/40 uppercase tracking-widest italic">Authenticating Champions...</p>
+              <p className="font-black text-[10px] text-muted-foreground/40 tracking-widest italic whitespace-nowrap">랭킹 데이터를 불러오는 중...</p>
             </div>
           ) : filteredEntries.length === 0 ? (
             <div className="text-center py-32 flex flex-col items-center gap-6">
@@ -158,7 +158,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                       <div className={cn("flex items-center relative z-10 min-w-0", isMobile ? "gap-4" : "gap-12")}>
                         <div className="w-10 shrink-0 flex flex-col items-center justify-center gap-2">
                           {getRankBadge(idx)}
-                          <span className="text-[8px] font-black opacity-20 uppercase tracking-widest">Rank</span>
+                          <span className="text-[8px] font-black opacity-20 tracking-widest whitespace-nowrap">순위</span>
                         </div>
                         <div className="relative shrink-0">
                           <Avatar className={cn(
@@ -172,7 +172,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                         <div className="grid gap-0.5 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-4xl")}>{formatName(entry.displayNameSnapshot)}</span>
-                            <Badge className="bg-white/80 text-primary border-none shadow-sm font-black text-[8px] uppercase h-4 px-1.5">Verified</Badge>
+                            <Badge className="bg-white/80 text-primary border-none shadow-sm font-black text-[8px] h-4 px-1.5 whitespace-nowrap">재원생</Badge>
                           </div>
                           <div className="flex items-center gap-1.5 text-muted-foreground font-bold">
                             <History className="h-3 w-3 opacity-40" />
@@ -181,7 +181,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                         </div>
                       </div>
                       <div className="text-right shrink-0 relative z-10">
-                        <div className={cn("font-black tabular-nums tracking-tighter leading-none text-primary", isMobile ? "text-xl" : "text-6xl", idx === 0 && "text-amber-600")}>{(entry.value || 0).toLocaleString()}<span className={cn("opacity-30 uppercase font-bold", isMobile ? "text-[10px] ml-1" : "text-2xl ml-1.5")}>lp</span></div>
+                        <div className={cn("font-black tabular-nums tracking-tighter leading-none text-primary", isMobile ? "text-xl" : "text-6xl", idx === 0 && "text-amber-600")}>{(entry.value || 0).toLocaleString()}<span className={cn("opacity-30 font-bold whitespace-nowrap", isMobile ? "text-[10px] ml-1" : "text-2xl ml-1.5")}>점</span></div>
                       </div>
                     </div>
                   );
@@ -200,7 +200,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{entry.displayNameSnapshot?.charAt(0) || "S"}</AvatarFallback></Avatar>
                             <div className="grid"><span className="font-black text-sm">{formatName(entry.displayNameSnapshot)}</span><span className="text-[10px] font-bold text-muted-foreground/60">{profile?.schoolName || entry.classNameSnapshot || '센터'}</span></div>
                           </div>
-                          <div className="text-right"><span className="text-base font-black text-primary/80 tabular-nums">{(entry.value || 0).toLocaleString()}</span><span className="text-[8px] font-bold text-muted-foreground/40 ml-1 uppercase">lp</span></div>
+                          <div className="text-right"><span className="text-base font-black text-primary/80 tabular-nums">{(entry.value || 0).toLocaleString()}</span><span className="text-[8px] font-bold text-muted-foreground/40 ml-1 whitespace-nowrap">점</span></div>
                         </div>
                       );
                     })}
@@ -378,7 +378,7 @@ export default function LeaderboardsPage() {
       <header className={cn("flex flex-col gap-4 items-center text-center", isMobile ? "px-2" : "")}>
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 shadow-sm">
           <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-primary/60">Season Hall of Fame</span>
+          <span className="text-[9px] font-black tracking-[0.25em] text-primary/60 whitespace-nowrap">실시간 시즌 랭킹</span>
           <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
         </div>
         <h1 className={cn("font-black tracking-tight", isMobile ? "text-3xl" : "text-6xl")}>랭킹트랙</h1>
@@ -388,7 +388,7 @@ export default function LeaderboardsPage() {
         </div>
         <p className={cn("font-bold text-muted-foreground leading-relaxed", isMobile ? "text-xs max-w-xs" : "text-xl max-w-2xl")}>
           {format(targetDate, 'yyyy년 M월')} 시즌 실시간 랭킹입니다. <br/>
-          퇴원생을 제외한 재원생 중 누적 LP를 통해 여러분의 성장을 증명하세요.
+          퇴원생을 제외한 재원생 중 누적 포인트를 통해 여러분의 성장을 증명하세요.
         </p>
       </header>
 
@@ -403,7 +403,7 @@ export default function LeaderboardsPage() {
               <Filter className="h-4 w-4 text-primary opacity-40 ml-2" />
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger className="h-10 w-[220px] border-none bg-transparent font-black text-sm focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl border-none shadow-2xl">{availableClasses.map(c => <SelectItem key={c} value={c} className="font-black">{c === 'all' ? 'All classes' : c}</SelectItem>)}</SelectContent>
+                <SelectContent className="rounded-xl border-none shadow-2xl">{availableClasses.map(c => <SelectItem key={c} value={c} className="font-black">{c === 'all' ? '전체 반' : c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           )}

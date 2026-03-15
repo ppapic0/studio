@@ -90,11 +90,11 @@ export default function StudentReportsPage() {
             </div>
             <div className="grid">
               <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>나의 분석 리포트</h1>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">Learning Intelligence Archive</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">학습 인사이트 아카이브</p>
             </div>
           </div>
           <Badge className={cn("rounded-full font-black border-none text-white shadow-lg bg-gradient-to-r", isMobile ? "hidden" : "h-9 px-4 text-xs", currentTier.gradient)}>
-            <Sparkles className="h-4 w-4 mr-2" /> {currentTier.name} Tier Analysis
+            <Sparkles className="h-4 w-4 mr-2" /> {currentTier.name} 티어 분석
           </Badge>
         </div>
       </header>
@@ -112,7 +112,7 @@ export default function StudentReportsPage() {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-          <p className="font-black text-muted-foreground/40 uppercase tracking-widest italic">Decoding Study Patterns...</p>
+          <p className="font-black text-muted-foreground/40 uppercase tracking-widest italic">학습 패턴 분석 중...</p>
         </div>
       ) : filteredReports.length === 0 ? (
         <div className="py-32 text-center bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50 flex flex-col items-center gap-6">
@@ -121,7 +121,7 @@ export default function StudentReportsPage() {
           </div>
           <div className="grid gap-1">
             <p className="font-black text-muted-foreground/40 text-lg">아직 받은 리포트가 없습니다.</p>
-            <p className="text-[10px] font-bold text-muted-foreground/20 uppercase tracking-widest">Reports arrive after teacher verification</p>
+            <p className="text-[10px] font-bold text-muted-foreground/20 uppercase tracking-widest">선생님 검토 후 리포트가 도착합니다.</p>
           </div>
         </div>
       ) : (
@@ -145,7 +145,7 @@ export default function StudentReportsPage() {
                           "border-none font-black text-[8px] px-1.5 h-4 flex-shrink-0",
                           report.viewedAt ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
                         )}>
-                          {report.viewedAt ? '읽음' : 'NEW'}
+                          {report.viewedAt ? '읽음' : '신규'}
                         </Badge>
                       </div>
                       <h3 className="text-base sm:text-xl font-black tracking-tighter text-primary truncate">데일리 정밀 분석 리포트</h3>
@@ -180,11 +180,11 @@ export default function StudentReportsPage() {
                 </div>
                 <DialogHeader className="relative z-10 text-left">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">Premium AI Analysis</Badge>
+                    <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">프리미엄 인공지능 분석</Badge>
                     <span className="text-white/60 font-black text-[10px] tracking-widest">{selectedReport.dateKey}</span>
                   </div>
                   <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-5xl")}>정밀 분석 리포트</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1 text-xs sm:text-sm">성장 데이터를 바탕으로 AI와 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
+                  <DialogDescription className="text-white/70 font-bold mt-1 text-xs sm:text-sm">성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
                 </DialogHeader>
               </div>
 

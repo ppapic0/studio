@@ -174,11 +174,11 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
           <div className="flex items-center gap-3">
             <div className="bg-primary p-2 rounded-xl text-white shadow-lg"><Settings2 className="h-5 w-5" /></div>
             <div>
-              <CardTitle className="text-xl font-black tracking-tighter">Jacob's Dev Stat Controller</CardTitle>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">Rank & Tier Simulator</p>
+              <CardTitle className="text-xl font-black tracking-tighter">개발 지표 컨트롤러</CardTitle>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">랭크·티어 시뮬레이터</p>
             </div>
           </div>
-          <Badge className="bg-rose-500 text-white font-black px-3 py-1 rounded-full shadow-lg">TEST ACCOUNT ONLY</Badge>
+          <Badge className="bg-rose-500 text-white font-black px-3 py-1 rounded-full shadow-lg">테스트 계정 전용</Badge>
         </div>
       </CardHeader>
       
@@ -186,8 +186,8 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         <div className="flex-1 space-y-8">
           <div className="space-y-4">
             <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="h-3 w-3" /> 시즌 누적 LP</span>
-              <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()} LP</span>
+              <span className="text-[10px] font-black uppercase text-primary flex items-center gap-2 whitespace-nowrap"><Zap className="h-3 w-3" /> 시즌 누적 포인트</span>
+              <span className="text-sm font-black text-primary bg-white/80 px-3 py-1 rounded-lg shadow-sm border">{lp.toLocaleString()}점</span>
             </div>
             <Slider value={[lp]} max={45000} step={500} onValueChange={([val]) => setLp(val)} />
           </div>
@@ -236,14 +236,14 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           isMobile ? "rounded-[1.25rem]" : ""
         )}>
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>시즌 러닝 포인트 (LP)</CardTitle>
+            <CardTitle className={cn("font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[9px]" : "text-[10px]")}>시즌 러닝 포인트</CardTitle>
             <div className={cn("bg-amber-50 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-md", isMobile ? "p-2" : "p-2.5")}>
               <Zap className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
           <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-6" : "")}>
             <div className={cn("dashboard-number text-amber-600 drop-shadow-sm", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
-              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>lp</span>
+              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>점</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
                 <Badge
@@ -263,12 +263,12 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
           <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>LP 획득 히스토리</DialogTitle>
+            <DialogTitle className={cn("font-black tracking-tighter whitespace-nowrap", isMobile ? "text-xl" : "text-3xl")}>포인트 획득 기록</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 러닝 포인트 내역입니다.</DialogDescription>
           </DialogHeader>
         </div>
         <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "p-4" : "")}>
-          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
+          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 포인트가 없습니다.</div>) : (
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
                 const discreteLp = (data.attendance ? 100 : 0) + (data.plan ? 100 : 0) + (data.routine ? 100 : 0);
@@ -288,7 +288,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                     </div>
                     <div className="text-right">
                       <span className="dashboard-number text-sm text-primary">{(data.dailyLpAmount || 0).toLocaleString()}</span>
-                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40">LP</span>
+                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40 whitespace-nowrap">점</span>
                     </div>
                   </div>
                 );
@@ -373,7 +373,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
                     </div>
                     <div className="grid leading-tight">
                       <span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Captured</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter whitespace-nowrap">기록됨</span>
                     </div>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 border-none font-black text-[10px] px-2.5">{session.durationMinutes}분</Badge>
@@ -575,7 +575,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
             dailyStatusUpdate.attendance = true;
-            toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 LP \uD68D\uB4DD' });
+            toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 \uD3EC\uC778\uD2B8 \uD68D\uB4DD' });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
@@ -837,19 +837,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         if (startCommitError) {
           toast({
             variant: 'destructive',
-            title: 'Track start failed',
-            description: 'Please check Firestore write permissions for student data.',
+            title: '트랙 시작 실패',
+            description: '학생 데이터 저장 권한을 확인해 주세요.',
           });
         } else if (!seatDoc && !fallbackSeatRef) {
           toast({
             variant: 'destructive',
-            title: 'Track started (seat sync pending)',
-            description: 'Seat is not assigned yet. Ask your teacher/admin to assign a seat.',
+            title: '트랙 시작됨 (좌석 연동 대기)',
+            description: '좌석이 아직 배정되지 않았습니다. 선생님/관리자에게 좌석 배정을 요청해 주세요.',
           });
         } else if (usedStartFallback) {
           toast({
-            title: 'Track started',
-            description: 'Core study-day sync succeeded. Optional attendance sync was skipped.',
+            title: '트랙 시작됨',
+            description: '핵심 학습 데이터 저장은 완료되었고, 출결 연동은 건너뛰었습니다.',
           });
         }
       }
@@ -931,7 +931,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         dayStatusUpdate.dailyLpAmount = increment(planLp);
         shouldCommitProgress = true;
         shouldSyncRank = true;
-        toast({ title: "모든 계획 완료! 계획 보너스 LP 획득 🎉" });
+        toast({ title: "모든 계획 완료! 계획 보너스 포인트 획득 🎉" });
       }
 
       if (Object.keys(statsUpdate).length > 0) {
@@ -1074,7 +1074,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</span>
             <span className="text-xs font-black text-[#14295F]">{dateKey}</span>
           </div>
-          <Badge variant="outline" className="h-5 px-2 font-black text-[9px] border-primary/20">{studyTasks.filter(t => t.done).length}/{studyTasks.length} DONE</Badge>
+          <Badge variant="outline" className="h-5 px-2 font-black text-[9px] border-primary/20">{studyTasks.filter(t => t.done).length}/{studyTasks.length} 완료</Badge>
         </div>
         
         <div className="flex-1 space-y-2.5">
@@ -1091,7 +1091,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 className="h-5 w-5 rounded-md border-2" 
               />
               <Label className={cn(
-                "flex-1 text-sm font-black tracking-tight leading-tight truncate break-all",
+                "flex-1 text-sm font-black tracking-tight leading-tight whitespace-nowrap truncate break-keep",
                 task.done ? "line-through text-slate-400 italic" : "text-slate-800"
               )}>
                 {task.title}
@@ -1136,20 +1136,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <div className={cn("relative z-10 flex flex-col gap-4", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
           <div className={isMobile ? "space-y-2" : "space-y-4"}>
             <div className="flex flex-col gap-1">
-              <Badge className={cn("w-fit bg-white/20 text-white border border-white/20 font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}>{currentTier.name} Tier Active</Badge>
+              <Badge className={cn("w-fit bg-white/20 text-white border border-white/20 font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}>{currentTier.name} 티어 활성</Badge>
               <h2 className={cn("font-body font-extrabold leading-[1.18] whitespace-pre-line", isMobile ? "text-[1.9rem] tracking-[-0.018em]" : "text-6xl tracking-[-0.02em]")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
             <div className={cn("flex items-center gap-1.5 bg-white/10 w-fit px-3 py-1 rounded-full border border-white/20", isMobile ? "mx-auto" : "md:mx-0")}>
               <span className="relative flex h-1.5 w-1.5"><span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isTimerActive ? "bg-accent" : "bg-white")}></span><span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", isTimerActive ? "bg-accent" : "bg-white")}></span></span>
-              <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>Performance Engine Active</span>
+              <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>성과 엔진 활성</span>
             </div>
           </div>
           <div className={cn("flex items-center gap-3", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
               <div className={cn("flex flex-col items-center bg-black/25 rounded-2xl border border-white/20 shadow-lg px-6 py-3", isMobile ? "w-full" : "")}>
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">Live Session</span>
+                <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">실시간 세션</span>
                 <span className={cn("dashboard-number text-white", isMobile ? "text-3xl" : "text-7xl")}>
                   {formatTimer(localSeconds)}
                 </span>
@@ -1193,7 +1193,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <div className="text-center space-y-1">
                       <p className="font-black text-primary text-xl tracking-tight">{user?.displayName}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Attendance Authentication</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">출입 인증용</p>
                     </div>
                   </div>
                   <DialogFooter className="p-6 bg-muted/30">
@@ -1219,14 +1219,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="grid">
               <CardTitle className="font-black text-2xl tracking-tighter text-slate-900 leading-none">계획트랙</CardTitle>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Study Matrix Logic</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">학습 매트릭스</p>
             </div>
           </div>
           {isMobile ? (
-            <Badge variant="secondary" className="bg-[#eaf2ff] text-primary border border-[#dbe8ff] font-black h-6 px-3">{fetchedPlans?.filter(p => p.dateKey === todayKey && p.done).length || 0} DONE</Badge>
+            <Badge variant="secondary" className="bg-[#eaf2ff] text-primary border border-[#dbe8ff] font-black h-6 px-3">{fetchedPlans?.filter(p => p.dateKey === todayKey && p.done).length || 0} 완료</Badge>
           ) : (
             <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border shadow-sm">
-              <span className="text-[11px] font-black text-primary uppercase tracking-widest">3-Day Archive View</span>
+              <span className="text-[11px] font-black text-primary uppercase tracking-widest whitespace-nowrap">3일 아카이브 보기</span>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
           )}
@@ -1266,8 +1266,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <FileText className="h-6 w-6 text-primary group-hover:text-white" />
                   </div>
                   <div className="grid min-w-0">
-                    <span className="font-black tracking-tighter truncate text-sm">선생님 리포트</span>
-                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]">Teacher Reports</span>
+                    <span className="font-black tracking-tighter whitespace-nowrap truncate text-sm">선생님 리포트</span>
+                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px] whitespace-nowrap">선생님 리포트</span>
                   </div>
                   <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
                 </Card>
@@ -1313,7 +1313,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                               "font-black text-[8px] border-none px-2 h-4",
                               report.viewedAt ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
                             )}>
-                              {report.viewedAt ? '읽음' : 'NEW'}
+                              {report.viewedAt ? '읽음' : '미확인'}
                             </Badge>
                           </div>
                           <p className="text-[11px] font-bold text-muted-foreground line-clamp-1 mt-1">
@@ -1352,8 +1352,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <FileText className="h-8 w-8" />
               </div>
               <div className="grid text-left min-w-0">
-                <span className="font-black tracking-tighter truncate text-xl">선생님 리포트</span>
-                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">Teacher Reports</span>
+                <span className="font-black tracking-tighter whitespace-nowrap truncate text-xl">선생님 리포트</span>
+                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px] whitespace-nowrap">선생님 리포트</span>
               </div>
               <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
             </Card>
@@ -1371,8 +1371,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <ClipboardPen className={cn("text-amber-600 group-hover:text-white", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
                 <div className="grid min-w-0">
-                  <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
-                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>Quick Requests</span>
+                  <span className={cn("font-black tracking-tighter whitespace-nowrap truncate", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
+                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px] whitespace-nowrap")}>빠른 요청</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
               </Card>
@@ -1395,8 +1395,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
                         <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="late">지각 (Late)</SelectItem>
-                          <SelectItem value="absence">결석 (Absence)</SelectItem>
+                          <SelectItem value="late">지각</SelectItem>
+                          <SelectItem value="absence">결석</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1444,8 +1444,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <AlertOctagon className={cn("text-rose-600 group-hover:text-white", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
                 <div className="grid min-w-0">
-                  <span className={cn("font-black tracking-tighter truncate", isMobile ? "text-sm" : "text-xl")}>벌점 현황</span>
-                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>Growth Guard</span>
+                  <span className={cn("font-black tracking-tighter whitespace-nowrap truncate", isMobile ? "text-sm" : "text-xl")}>벌점 현황</span>
+                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px] whitespace-nowrap")}>벌점 가이드</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
               </Card>
@@ -1462,7 +1462,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
               <div className={cn("p-10 text-center space-y-6", isMobile ? "p-5" : "")}>
                 <div className="inline-flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Penalty Score</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">벌점 점수</span>
                   <h3 className={cn("dashboard-number text-8xl", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
                 </div>
                 <Progress value={penaltyPoints * 3.3} className="h-3 bg-muted" />
@@ -1482,14 +1482,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">누적 시 적용되는 규정</p>
                     <div className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700">
-                      <div className="flex items-center justify-between"><span>0~4점</span><span>LP 감점 없음 (100%)</span></div>
-                      <div className="flex items-center justify-between"><span>5~9점</span><span>LP 3% 감소 (97%)</span></div>
-                      <div className="flex items-center justify-between"><span>10~19점</span><span>LP 6% 감소 (94%)</span></div>
-                      <div className="flex items-center justify-between"><span>20~29점</span><span>LP 10% 감소 (90%)</span></div>
-                      <div className="flex items-center justify-between"><span>30점 이상</span><span>LP 15% 감소 (85%)</span></div>
+                      <div className="flex items-center justify-between"><span>0~4점</span><span>포인트 감점 없음 (100%)</span></div>
+                      <div className="flex items-center justify-between"><span>5~9점</span><span>포인트 3% 감소 (97%)</span></div>
+                      <div className="flex items-center justify-between"><span>10~19점</span><span>포인트 6% 감소 (94%)</span></div>
+                      <div className="flex items-center justify-between"><span>20~29점</span><span>포인트 10% 감소 (90%)</span></div>
+                      <div className="flex items-center justify-between"><span>30점 이상</span><span>포인트 15% 감소 (85%)</span></div>
                     </div>
                     <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
-                      현재 {penaltyPoints}점 → 이번 LP 배율 {penaltyMultiplierPercent}% 적용
+                      현재 {penaltyPoints}점 → 이번 포인트 배율 {penaltyMultiplierPercent}% 적용
                     </div>
                   </div>
                 </div>

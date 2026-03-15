@@ -16,18 +16,18 @@ export function VisualReportViewer({ content }: { content: string }) {
   const getSectionIcon = (text: string) => {
     if (text.includes('출결')) return <Clock className="h-5 w-5 text-blue-600" />;
     if (text.includes('계획 완수율')) return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
-    if (text.includes('AI 분석')) return <TrendingUp className="h-5 w-5 text-purple-600" />;
+    if (text.includes('인공지능 분석') || text.includes('AI 분석')) return <TrendingUp className="h-5 w-5 text-purple-600" />;
     if (text.includes('코멘트')) return <MessageCircle className="h-5 w-5 text-amber-600" />;
-    if (text.includes('AI 종합 피드백')) return <BrainCircuit className="h-5 w-5 text-rose-600" />;
+    if (text.includes('인공지능 종합 피드백') || text.includes('AI 종합 피드백')) return <BrainCircuit className="h-5 w-5 text-rose-600" />;
     return <Sparkles className="h-5 w-5 text-primary" />;
   };
 
   const getSectionColor = (text: string) => {
     if (text.includes('출결')) return "bg-blue-50/50 border-blue-100";
     if (text.includes('계획 완수율')) return "bg-emerald-50/50 border-emerald-100";
-    if (text.includes('AI 분석')) return "bg-purple-50/50 border-purple-100";
+    if (text.includes('인공지능 분석') || text.includes('AI 분석')) return "bg-purple-50/50 border-purple-100";
     if (text.includes('코멘트')) return "bg-amber-50/50 border-amber-100";
-    if (text.includes('AI 종합 피드백')) return "bg-rose-50/50 border-rose-100";
+    if (text.includes('인공지능 종합 피드백') || text.includes('AI 종합 피드백')) return "bg-rose-50/50 border-rose-100";
     return "bg-muted/30 border-border";
   };
 

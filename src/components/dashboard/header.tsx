@@ -412,7 +412,7 @@ export function DashboardHeader() {
               </h4>
               <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
                 <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  **[나의 학습 계획]** 메뉴에서 매일의 공부 To-do와 생활 루틴을 관리하세요.
+                  **[나의 학습 계획]** 메뉴에서 매일의 공부 할 일과 생활 루틴을 관리하세요.
                 </p>
               </div>
             </section>

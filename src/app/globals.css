@@ -206,6 +206,43 @@
     line-height: 1.08;
   }
 
+  .dashboard-shell {
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .dashboard-shell [data-slot="badge"],
+  .dashboard-shell button,
+  .dashboard-shell .dashboard-number,
+  .dashboard-shell .stat-number,
+  .dashboard-shell .tabular-nums {
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
+  .dashboard-shell h1,
+  .dashboard-shell h2,
+  .dashboard-shell h3,
+  .dashboard-shell h4,
+  .dashboard-shell [data-slot="card-title"],
+  .dashboard-shell [role="tab"] {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .dashboard-shell .allow-wrap,
+  .dashboard-shell .break-keep,
+  .dashboard-shell .whitespace-pre-wrap {
+    white-space: normal;
+  }
+
+  .dashboard-shell th,
+  .dashboard-shell .tracking-widest {
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
   button,
   input,
   textarea,

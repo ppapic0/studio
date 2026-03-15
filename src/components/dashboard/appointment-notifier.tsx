@@ -81,7 +81,7 @@ export function AppointmentNotifier() {
               <div className="bg-white/20 p-1.5 rounded-lg">
                 <Bell className="h-4 w-4 text-white animate-bounce" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Counseling Update</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 whitespace-nowrap">상담 상태 알림</span>
             </div>
             <DialogTitle className="text-3xl font-black tracking-tighter">
               {isCanceled ? '상담이 취소되었습니다' : '상담 예약 확정!'}
@@ -99,7 +99,7 @@ export function AppointmentNotifier() {
           )}>
             <div className="h-14 w-14 rounded-2xl bg-white flex flex-col items-center justify-center shadow-sm shrink-0 border-2 border-primary/5">
               <span className={cn("text-[8px] font-black uppercase leading-none", isCanceled ? "text-rose-400" : "text-primary/40")}>
-                {notification.scheduledAt ? format(notification.scheduledAt.toDate(), 'MMM') : ''}
+                {notification.scheduledAt ? format(notification.scheduledAt.toDate(), 'M월') : ''}
               </span>
               <span className={cn("text-xl font-black", isCanceled ? "text-rose-600" : "text-primary")}>
                 {notification.scheduledAt ? format(notification.scheduledAt.toDate(), 'd') : ''}
@@ -117,8 +117,8 @@ export function AppointmentNotifier() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-primary/60 ml-1">
                 {isCanceled ? <AlertCircle className="h-3.5 w-3.5 text-rose-500" /> : <MessageSquare className="h-3.5 w-3.5" />}
-                <span className="text-[10px] font-black uppercase tracking-widest">
-                  {isCanceled ? "취소 사유 / 메모" : "Teacher's Note"}
+                <span className="text-[10px] font-black tracking-widest whitespace-nowrap">
+                  {isCanceled ? "취소 사유 / 메모" : "선생님 메모"}
                 </span>
               </div>
               <div className={cn(

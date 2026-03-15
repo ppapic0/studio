@@ -13,7 +13,8 @@
         ".next_old_*",
         ".playwright-cli_old_*",
         "output_old_*"
-      ]
+      ],
+      "alwaysDeployFromSource": true
     }
   ],
   "functions": [

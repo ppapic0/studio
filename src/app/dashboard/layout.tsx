@@ -20,7 +20,7 @@ export default function DashboardLayout({
   return (
     <div
       className={cn(
-        'min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
+        'dashboard-shell min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
         isMobileView
           ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-3 pb-6'
           : 'bg-[#f2f4f8] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'

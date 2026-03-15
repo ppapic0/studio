@@ -175,8 +175,8 @@ export default function InviteCodesPage() {
         <CardHeader className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between p-8 sm:p-10 bg-muted/5 border-b gap-6")}>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black tracking-tighter">초대 코드 관리</CardTitle>
-            <CardDescription className="font-bold text-xs uppercase tracking-widest opacity-60">
-              Center Access Codes & Invitations
+            <CardDescription className="font-bold text-xs tracking-widest opacity-60 whitespace-nowrap">
+              역할별 가입 코드를 생성하고 관리합니다
             </CardDescription>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -206,19 +206,19 @@ export default function InviteCodesPage() {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center p-40 gap-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 italic">Syncing Access Keys...</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 italic whitespace-nowrap">초대 코드 동기화 중...</p>
             </div>
           ) : (
             <div className="overflow-x-auto custom-scrollbar">
               <Table>
                 <TableHeader className="bg-muted/10">
                   <TableRow className="hover:bg-transparent border-none h-16">
-                    <TableHead className="font-black text-[10px] uppercase pl-10">CODE</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase">ROLE / CLASS</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase">USAGE</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase">EXPIRES</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase">STATUS</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase text-right pr-10">ACTIVE</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase pl-10 whitespace-nowrap">코드</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">권한 / 반</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">사용량</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">만료일</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">상태</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase text-right pr-10 whitespace-nowrap">활성</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -231,7 +231,7 @@ export default function InviteCodesPage() {
                           </div>
                           <div className="space-y-1">
                             <p className="font-black text-xl tracking-tight">표시할 코드가 없습니다.</p>
-                            <p className="text-xs font-bold uppercase">No matching invite codes found</p>
+                            <p className="text-xs font-bold uppercase whitespace-nowrap">조건에 맞는 초대 코드가 없습니다</p>
                           </div>
                           {hiddenCount > 0 && !showInactive && (
                             <Button variant="link" onClick={() => setShowInactive(true)} className="font-black text-primary underline">
@@ -258,7 +258,7 @@ export default function InviteCodesPage() {
                               )}>
                                 {invite.id}
                               </code>
-                              <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest ml-1">Unique Key</span>
+                              <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest ml-1 whitespace-nowrap">고유 키</span>
                             </div>
                           </TableCell>
                           <TableCell>

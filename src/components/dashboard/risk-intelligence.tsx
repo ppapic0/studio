@@ -154,8 +154,8 @@ export function RiskIntelligence() {
           const weight = 30;
           score += weight;
           detailedReasons.push({
-            label: 'Study time dropped sharply',
-            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% down`,
+            label: '공부시간이 급감했습니다',
+            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% 감소`,
             score: weight,
             icon: TrendingDown,
             color: 'text-rose-600',
@@ -164,8 +164,8 @@ export function RiskIntelligence() {
           const weight = 15;
           score += weight;
           detailedReasons.push({
-            label: 'Study time slightly declined',
-            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% down`,
+            label: '공부시간이 감소 추세입니다',
+            value: `${Math.round(Math.abs(stats.studyTimeGrowthRate) * 100)}% 감소`,
             score: weight,
             icon: History,
             color: 'text-amber-600',
@@ -178,8 +178,8 @@ export function RiskIntelligence() {
         const weight = 40;
         score += weight;
         detailedReasons.push({
-          label: 'Penalty points >= 10',
-          value: `${penalty} pts`,
+          label: '벌점이 10점 이상입니다',
+            value: `${penalty}점`,
           score: weight,
           icon: ShieldAlert,
           color: 'text-rose-600',
@@ -190,7 +190,7 @@ export function RiskIntelligence() {
         const weight = 20;
         score += weight;
         detailedReasons.push({
-          label: 'Plan completion below 50%',
+          label: '계획 달성률이 50% 미만입니다',
           value: `Completion ${stats.todayPlanCompletionRate}%`,
           score: weight,
           icon: Target,
@@ -214,8 +214,8 @@ export function RiskIntelligence() {
         const weight = Math.min(45, 20 + lowStudyStreak * 5);
         score += weight;
         detailedReasons.push({
-          label: 'Under 3h study streak',
-          value: `${lowStudyStreak} days in a row (<3h)`,
+          label: '3시간 미만 학습이 연속됩니다',
+          value: `${lowStudyStreak}일 연속 (3시간 미만)`,
           score: weight,
           icon: Clock,
           color: 'text-rose-600',
@@ -254,7 +254,7 @@ export function RiskIntelligence() {
     return (
       <div className="py-40 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-rose-500 opacity-20" />
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 italic">Scanning Core Indicators...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 italic whitespace-nowrap">핵심 지표 분석 중...</p>
       </div>
     );
   }
@@ -294,7 +294,7 @@ export function RiskIntelligence() {
               <div className="flex justify-between items-center">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-3"><TrendingDown className="h-6 w-6 text-rose-600" /> 학생별 이탈 위험도 랭킹</CardTitle>
-                  <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Composite churn risk analysis (Actual Firestore Data)</CardDescription>
+                  <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">종합 이탈 위험 분석 (실제 Firestore 데이터)</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -321,13 +321,13 @@ export function RiskIntelligence() {
                             {risk.detailedReasons.slice(0, 2).map((r: any, i: number) => (
                               <Badge key={i} className={cn("border-none font-black text-[8px] px-2 bg-muted/50", r.color)}>{r.label}</Badge>
                             ))}
-                            {risk.detailedReasons.length > 2 && <span className="text-[8px] font-bold text-muted-foreground/40">+{risk.detailedReasons.length - 2} more</span>}
+                            {risk.detailedReasons.length > 2 && <span className="text-[8px] font-bold text-muted-foreground/40 whitespace-nowrap">+{risk.detailedReasons.length - 2}개 더</span>}
                             {risk.detailedReasons.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">특이 징후 없음</span>}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors">Analyze</span>
+                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover:text-primary transition-colors whitespace-nowrap">분석 보기</span>
                         <ChevronRight className="h-5 w-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
                       </div>
                     </div>
@@ -344,7 +344,7 @@ export function RiskIntelligence() {
             <div className="relative z-10 space-y-6">
               <div className="flex items-center gap-2">
                 <BrainCircuit className="h-5 w-5 text-accent" />
-                <h4 className="text-sm font-black uppercase tracking-widest">AI 점수 산정 가이드</h4>
+                <h4 className="text-sm font-black uppercase tracking-widest">인공지능 점수 산정 가이드</h4>
               </div>
               <div className="space-y-4">
                 {[
@@ -414,7 +414,7 @@ export function RiskIntelligence() {
                 </div>
                 <DialogHeader className="relative z-10">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest">AI Risk Diagnostic</Badge>
+                    <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest whitespace-nowrap">인공지능 위험 진단</Badge>
                   </div>
                   <DialogTitle className="text-4xl font-black tracking-tighter">
                     {selectedRiskStudent.name} 학생 분석
@@ -428,7 +428,7 @@ export function RiskIntelligence() {
               <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-8 sm:p-10 space-y-10">
                 <div className="text-center space-y-4">
                   <div className="inline-flex flex-col items-center gap-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Composite Risk Score</span>
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] whitespace-nowrap">종합 위험 점수</span>
                     <h3 className={cn(
                       "text-8xl font-black tracking-tighter leading-none",
                       selectedRiskStudent.score >= 70 ? "text-rose-600" : selectedRiskStudent.score >= 40 ? "text-amber-600" : "text-primary"
@@ -460,7 +460,7 @@ export function RiskIntelligence() {
                               <span className={cn("text-xs font-bold", reason.color)}>{reason.value}</span>
                             </div>
                           </div>
-                          <Badge variant="outline" className="font-black text-[10px] border-none bg-muted/30">+{reason.score}pts</Badge>
+                          <Badge variant="outline" className="font-black text-[10px] border-none bg-muted/30 whitespace-nowrap">+{reason.score}점</Badge>
                         </div>
                       ))
                     )}
@@ -470,7 +470,7 @@ export function RiskIntelligence() {
                 <Card className="rounded-[2rem] border-none shadow-xl bg-white p-8 space-y-4 ring-1 ring-black/5">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-amber-500 fill-current" />
-                    <h4 className="text-sm font-black tracking-tight">운영자 권장 조치 (Intervention)</h4>
+                    <h4 className="text-sm font-black tracking-tight whitespace-nowrap">운영자 권장 조치</h4>
                   </div>
                   <p className="text-xs font-bold leading-relaxed text-foreground/70">
                     {selectedRiskStudent.score >= 70 ? (

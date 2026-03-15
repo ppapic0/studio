@@ -582,7 +582,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-        <p className="font-black text-muted-foreground/40 uppercase tracking-widest italic">Synchronizing Operational Command...</p>
+        <p className="font-black text-muted-foreground/40 uppercase tracking-widest italic">운영 현황 동기화 중...</p>
       </div>
     );
   }
@@ -593,10 +593,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-primary/60">
             <Sparkles className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Management Intelligence</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">운영 인텔리전스</span>
           </div>
           <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-3xl" : "text-5xl")}>
-            운영 핵심 지표 (KPI)
+            운영 핵심 지표
           </h1>
           <p className="text-sm font-bold text-muted-foreground/70 mt-2">센터의 실시간 활성도와 리스크를 통합 관리합니다.</p>
         </div>
@@ -626,7 +626,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center gap-2 px-1">
               <Activity className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-black tracking-tighter">실시간 현황 분석</h2>
-              <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">LIVE TRACKING</Badge>
+              <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">실시간 추적</Badge>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="rounded-[2.5rem] border border-[#2A4E97]/40 bg-[linear-gradient(145deg,#12275A_0%,#1C4285_58%,#244B90_100%)] p-10 text-white shadow-[0_28px_60px_rgba(20,41,95,0.28),0_10px_20px_rgba(20,41,95,0.12),inset_0_1px_0_rgba(255,255,255,0.12)] overflow-hidden relative group">
@@ -635,13 +635,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <Flame className="h-48 w-48" />
                 </div>
                 <div className="space-y-1 relative z-10">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/72">오늘의 트랙 총량 (Accrued)</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/72">오늘의 트랙 총량 (누적)</p>
                   <div className="flex items-baseline gap-1">
-                    <h3 className="dashboard-number text-6xl text-white drop-shadow-[0_10px_24px_rgba(7,16,40,0.35)]">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="ml-1 text-2xl text-white/52">h</span></h3>
+                    <h3 className="dashboard-number text-6xl text-white drop-shadow-[0_10px_24px_rgba(7,16,40,0.35)]">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="ml-1 text-2xl text-white/52">시간</span></h3>
                   </div>
                   <div className="pt-8 space-y-3">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/68">
-                      <span>일일 활성 목표 (Avg 6h)</span>
+                      <span>일일 활성 목표 (평균 6시간)</span>
                       <span>{Math.min(100, Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100))}%</span>
                     </div>
                     <div className="h-2.5 w-full rounded-full bg-white/14 overflow-hidden shadow-[inset_0_2px_4px_rgba(6,15,38,0.32)]">
@@ -704,10 +704,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex justify-between items-center">
                   <div className="space-y-1">
                     <CardTitle className="text-2xl font-black tracking-tighter">부모님 신뢰 및 관리 지표</CardTitle>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">Parental Trust & Service Quality Index</p>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-60">학부모 신뢰·서비스 품질 지수</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg">TRUST KPI</Badge>
+                    <Badge className="bg-primary text-white border-none font-black text-[10px] px-3 py-1 shadow-lg whitespace-nowrap">신뢰 지표</Badge>
                     <Button
                       variant="outline"
                       size="sm"
@@ -825,7 +825,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <Input
                     value={teacherSearch}
                     onChange={(event) => setTeacherSearch(event.target.value)}
-                    placeholder="선생님 이름/전화번호/UID 검색"
+                    placeholder="선생님 이름/전화번호/사용자번호 검색"
                     className="h-11 rounded-xl border-2 font-bold"
                   />
                 </div>
@@ -888,7 +888,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-4xl">
           <div className="bg-primary p-6 text-primary-foreground">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">부모님별 신뢰 KPI 상세</DialogTitle>
+              <DialogTitle className="text-2xl font-black tracking-tight">부모님별 신뢰 지표 상세</DialogTitle>
               <DialogDescription className="text-primary-foreground/80 font-bold">
                 방문/리포트 열람/상담 신청을 합산해 우선 연락 대상을 추천합니다.
               </DialogDescription>
@@ -999,7 +999,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
                   <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">계정 정보</p>
                   <div className="mt-2 grid gap-1 text-sm font-bold text-slate-700">
-                    <p>UID: {selectedTeacher.id}</p>
+                    <p>사용자번호: {selectedTeacher.id}</p>
                     <p>전화번호: {selectedTeacher.phoneNumber || '미등록'}</p>
                     <p>상태: {selectedTeacher.status}</p>
                   </div>

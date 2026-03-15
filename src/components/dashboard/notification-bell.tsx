@@ -190,8 +190,8 @@ export function NotificationBell() {
         >
           <DropdownMenuLabel className="font-black text-xs uppercase tracking-[0.2em] opacity-50 px-2 py-2 flex items-center justify-between">
             <span>최근 알림</span>
-            <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[8px]">
-              TRACK UPDATES
+            <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[8px] whitespace-nowrap">
+              알림 업데이트
             </Badge>
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="my-2" />
@@ -200,7 +200,7 @@ export function NotificationBell() {
             {feedItems.length === 0 ? (
               <div className="py-10 text-center opacity-20 italic flex flex-col items-center gap-2">
                 <Sparkles className="h-8 w-8" />
-                <p className="text-[10px] font-black uppercase">No Alerts Yet</p>
+                <p className="text-[10px] font-black uppercase">새 알림이 없습니다</p>
               </div>
             ) : (
               feedItems.map((item) => (
@@ -222,10 +222,10 @@ export function NotificationBell() {
                       </div>
                       <div className="grid gap-1 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-black tracking-tight truncate">{item.title}</p>
+                          <p className="text-sm font-black tracking-tight whitespace-nowrap truncate">{item.title}</p>
                           {item.unread && (
                             <Badge className="border-none bg-emerald-100 text-emerald-700 font-black text-[8px] px-1.5 h-4">
-                              NEW
+                              신규
                             </Badge>
                           )}
                         </div>
@@ -243,10 +243,10 @@ export function NotificationBell() {
                       </div>
                       <div className="grid gap-1 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-black tracking-tight truncate">{item.title}</p>
+                          <p className="text-sm font-black tracking-tight whitespace-nowrap truncate">{item.title}</p>
                           {item.unread && (
                             <Badge className="border-none bg-rose-100 text-rose-700 font-black text-[8px] px-1.5 h-4">
-                              NEW
+                              신규
                             </Badge>
                           )}
                         </div>
@@ -284,8 +284,8 @@ export function NotificationBell() {
           <div className="bg-gradient-to-br from-[#14295F] via-[#17326f] to-[#0f214d] px-7 py-6 text-white">
             <DialogHeader>
               <div className="mb-3 flex items-center gap-2">
-                <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase">
-                  Teacher Feedback
+                <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase whitespace-nowrap">
+                  선생님 피드백
                 </Badge>
               </div>
               <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
