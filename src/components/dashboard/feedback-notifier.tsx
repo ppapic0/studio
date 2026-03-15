@@ -108,7 +108,7 @@ export function FeedbackNotifier() {
               </div>
               새 피드백이 도착했어요
             </DialogTitle>
-            <DialogDescription className="text-sm font-semibold text-white/72">
+            <DialogDescription className="text-sm font-semibold text-white/70">
               선생님이 오늘 학습 흐름에 맞춰 짧고 중요한 코멘트를 남겼습니다.
             </DialogDescription>
           </DialogHeader>

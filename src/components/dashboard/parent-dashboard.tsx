@@ -1151,7 +1151,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <Dialog>
                   <DialogTrigger asChild>
                     <Card className="rounded-[1.5rem] border-none shadow-sm bg-[#14295F] p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
-                      <BarChart3 className="h-6 w-6 text-white/40" />
+                      <BarChart3 className="h-6 w-6 text-white/60" />
                       <div className="grid gap-0.5 text-white">
                         <span className="text-[10px] font-black uppercase tracking-widest text-white/80">주간 상세</span>
                         <span className="text-xs font-black">성과 상세 분석</span>
