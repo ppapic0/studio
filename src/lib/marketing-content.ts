@@ -137,11 +137,9 @@ export const marketingContent: MarketingContent = {
     heroBackground: '',
   },
   nav: [
-    { label: '관리형 스터디센터', href: '#study-cafe' },
-    { label: '웹앱 시스템', href: '#app-system' },
-    { label: 'LP 시스템', href: '#lp-system' },
-    { label: '합격 실적', href: '#outcome' },
-    { label: '왜 트랙인가', href: '#why-track' },
+    { label: '운영 방식', href: '#features' },
+    { label: '앱 시스템', href: '#app' },
+    { label: '합격 실적', href: '#results' },
     { label: '상담 문의', href: '#consult' },
   ],
   heroStats: [

@@ -36,7 +36,7 @@ export function ClassSystemSection({ classSystem }: ClassSystemSectionProps) {
                 <h3 className="break-keep text-[1.2rem] font-extrabold text-[#14295F]">
                   {step.title}
                 </h3>
-                <p className="mt-2 break-keep text-[15px] font-medium leading-[1.8] text-slate-600">
+                <p className="mt-2 break-keep text-[15px] font-semibold leading-[1.8] text-slate-600">
                   {step.description}
                 </p>
               </div>

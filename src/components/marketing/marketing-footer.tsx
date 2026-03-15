@@ -28,7 +28,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
               />
               <p className="font-brand text-base text-white">{brand.name}</p>
             </div>
-            <p className="mt-4 max-w-md break-keep text-sm font-medium leading-[1.82] text-white/55">
+            <p className="mt-4 max-w-md break-keep text-sm font-semibold leading-[1.82] text-white/55">
               {footer.line}
             </p>
             <div className="mt-6 flex flex-wrap gap-2.5">
@@ -58,7 +58,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
         </div>
 
         <div
-          className="mt-10 pt-6 text-[12px] font-medium text-white/28"
+          className="mt-10 pt-6 text-[12px] font-semibold text-white/28"
           style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
         >
           © {new Date().getFullYear()} {brand.name}. All rights reserved.

@@ -98,7 +98,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                       <Icon className="h-[1.1rem] w-[1.1rem]" />
                     </div>
                   </div>
-                  <p className="mt-3 break-keep text-sm font-medium leading-[1.74] text-slate-600">{block.body}</p>
+                  <p className="mt-3 break-keep text-sm font-semibold leading-[1.74] text-slate-600">{block.body}</p>
                   {block.note ? (
                     <p className="mt-2 text-[11px] font-black text-[#B85A00]/72">{block.note}</p>
                   ) : null}
@@ -116,7 +116,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
                 <h3 className="mt-3 break-keep text-[1.3rem] font-extrabold text-[#14295F]">
                   {item.title}
                 </h3>
-                <p className="mt-2 break-keep text-sm font-medium leading-[1.74] text-slate-600">{item.description}</p>
+                <p className="mt-2 break-keep text-sm font-semibold leading-[1.74] text-slate-600">{item.description}</p>
               </article>
             ))}
           </div>
@@ -136,7 +136,7 @@ export function StudyCafeSection({ studyCafe }: StudyCafeSectionProps) {
               {studyCafe.seatTypes.map((seat) => (
                 <article key={seat.title} className="marketing-card-soft p-4">
                   <h4 className="text-[1.05rem] font-extrabold text-[#14295F]">{seat.title}</h4>
-                  <p className="mt-1.5 break-keep text-sm font-medium leading-[1.72] text-slate-600">{seat.description}</p>
+                  <p className="mt-1.5 break-keep text-sm font-semibold leading-[1.72] text-slate-600">{seat.description}</p>
                 </article>
               ))}
             </div>

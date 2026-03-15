@@ -2,7 +2,7 @@ import { ArrowRight, LogIn, Smartphone, Users } from 'lucide-react';
 
 export function EntryGatewaySection() {
   return (
-    <section className="bg-white pb-10 pt-3 sm:pb-14">
+    <section id="intro" className="bg-white pb-10 pt-3 sm:pb-14">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="marketing-card overflow-hidden p-5 sm:p-6">
           {/* Top accent line */}
@@ -14,7 +14,7 @@ export function EntryGatewaySection() {
               <h2 className="font-brand mt-3 break-keep text-[1.85rem] leading-[1.10] text-[#14295F] sm:text-[2.2rem]">
                 기존 재원생 입구와 체험 입구를 분리했습니다
               </h2>
-              <p className="mt-3 max-w-3xl break-keep text-[14.5px] font-medium leading-[1.82] text-slate-600">
+              <p className="mt-3 max-w-3xl break-keep text-[14.5px] font-semibold leading-[1.82] text-slate-600">
                 바로 로그인하려는 재원생과, 학생·학부모 체험을 먼저 보려는 신규 방문자를
                 분리해 운영 흐름과 방문 데이터를 더 정확하게 확인합니다.
               </p>
@@ -43,7 +43,7 @@ export function EntryGatewaySection() {
               <p className="mt-5 text-[1.4rem] font-extrabold leading-[1.18] tracking-[-0.03em] text-[#14295F]">
                 기존 재원생은 바로 로그인
               </p>
-              <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
+              <p className="mt-3 break-keep text-sm font-semibold leading-[1.78] text-slate-600">
                 학생, 학부모, 선생님 모두 기존 계정으로 바로 웹앱에 들어갈 수 있도록
                 가장 빠른 입구를 따로 두었습니다.
               </p>
@@ -74,7 +74,7 @@ export function EntryGatewaySection() {
               <p className="mt-5 text-[1.4rem] font-extrabold leading-[1.18] tracking-[-0.03em] text-[#14295F]">
                 처음 방문했다면 체험부터 확인
               </p>
-              <p className="mt-3 break-keep text-sm font-medium leading-[1.78] text-slate-600">
+              <p className="mt-3 break-keep text-sm font-semibold leading-[1.78] text-slate-600">
                 학생 모드와 학부모 모드를 실제 앱처럼 확인하고, 그래프·기록·수납·알림
                 흐름까지 한 번에 체험할 수 있습니다.
               </p>
