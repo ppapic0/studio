@@ -253,6 +253,23 @@ export default function ClassPage() {
       </section>
 
       {/* ══════════════════════════════════════════
+          1.5 TAGLINE QUOTE
+      ══════════════════════════════════════════ */}
+      <ScrollReveal>
+        <section className="py-16 sm:py-20 bg-white">
+          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
+            <div className="border-l-[5px] border-[#14295F] pl-6 py-1">
+              <p className="break-keep text-[clamp(1.55rem,3.2vw,2.15rem)] font-black leading-[1.45] text-[#14295F]">
+                공부는 방향이 중요합니다.
+                <br />
+                성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
+              </p>
+            </div>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ══════════════════════════════════════════
           2. INTRO
       ══════════════════════════════════════════ */}
       <ScrollReveal>
@@ -323,10 +340,10 @@ export default function ClassPage() {
                 {marketingContent.director.highlights.map((highlight) => (
                   <div
                     key={highlight}
-                    className="flex items-start gap-4 rounded-2xl border border-[rgba(20,41,95,0.09)] bg-[#f8faff] px-5 py-4"
+                    className="flex items-start gap-4 rounded-2xl border border-[rgba(20,41,95,0.18)] bg-[#14295F] px-5 py-4"
                   >
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#FF7A16]" />
-                    <p className="break-keep text-[14.5px] font-semibold leading-[1.72] text-[#14295F]">
+                    <p className="break-keep text-[14.5px] font-semibold leading-[1.72] text-white">
                       {highlight}
                     </p>
                   </div>

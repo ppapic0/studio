@@ -14,6 +14,7 @@ import {
   Smartphone,
   Target,
   Trophy,
+  Users,
 } from 'lucide-react';
 
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
@@ -782,6 +783,12 @@ export default function ExperiencePage() {
             label="학생 모드"
             active={mode === 'student'}
             icon={<Trophy className="h-3.5 w-3.5" />}
+          />
+          <ModeTab
+            href="/experience?mode=parent"
+            label="학부모 모드"
+            active={mode === 'parent'}
+            icon={<Users className="h-3.5 w-3.5" />}
           />
         </div>
 
