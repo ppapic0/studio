@@ -1,6 +1,14 @@
 ﻿{
   "indexes": [
     {
+      "collectionGroup": "attendanceCurrent",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "lastCheckInAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "parentNotifications",
       "queryScope": "COLLECTION",
       "fields": [
