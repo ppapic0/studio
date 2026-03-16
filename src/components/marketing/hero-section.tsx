@@ -67,7 +67,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
 
           {/* Headline — 어그로체 */}
           <div className="space-y-5">
-            <h1 className="font-aggro-display break-keep text-[clamp(2.8rem,5.6vw,4.5rem)] font-black leading-[1.06] text-white">
+            <h1 className="font-aggro-display break-keep text-[clamp(2rem,3.6vw,3rem)] font-black leading-[1.15] text-white">
               공부는 방향이 중요합니다.
               <br />
               성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
