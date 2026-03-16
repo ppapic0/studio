@@ -323,10 +323,10 @@ export default function ClassPage() {
                 {marketingContent.director.highlights.map((highlight) => (
                   <div
                     key={highlight}
-                    className="flex items-start gap-4 rounded-2xl border border-[rgba(20,41,95,0.09)] bg-[#f8faff] px-5 py-4"
+                    className="flex items-start gap-4 rounded-2xl border border-[rgba(20,41,95,0.18)] bg-[#14295F] px-5 py-4"
                   >
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#FF7A16]" />
-                    <p className="break-keep text-[14.5px] font-semibold leading-[1.72] text-[#14295F]">
+                    <p className="break-keep text-[14.5px] font-semibold leading-[1.72] text-white">
                       {highlight}
                     </p>
                   </div>
