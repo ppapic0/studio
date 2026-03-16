@@ -24,6 +24,7 @@ import { marketingContent } from '@/lib/marketing-content';
 
 const career = [
   { label: '관리형 독서실 원장', detail: '분당·판교 관리형 스터디센터 운영 경험' },
+  { label: '국어 과외 40명+', detail: '수능 국어 개인 지도 경험' },
   { label: '원장 본인 국어 백분위 99', detail: '2024학년도 수능 실전 기록' },
 ];
 
