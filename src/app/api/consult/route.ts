@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { adminDb } from "@/lib/firebase-admin";
+import { resolveMarketingCenterId } from "@/lib/marketing-center";
 
 const WEBSITE_CONSULT_SOURCE = "website";
 const WEBSITE_CONSULT_LABEL = "웹사이트 상담폼";
@@ -25,13 +26,6 @@ function getKoreaDateKey() {
   }).format(new Date());
 }
 
-async function resolveMarketingCenterId() {
-  const envCenterId = process.env.MARKETING_CENTER_ID || process.env.NEXT_PUBLIC_MARKETING_CENTER_ID;
-  if (envCenterId) return envCenterId;
-
-  const snapshot = await adminDb.collection("centers").limit(1).get();
-  return snapshot.empty ? null : snapshot.docs[0]?.id ?? null;
-}
 
 export async function POST(request: Request) {
   try {

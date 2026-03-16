@@ -155,7 +155,7 @@ export function MarketingConsultingCRM({
     return query(
       collection(firestore, 'centers', centerId, 'consultingLeads'),
       orderBy('createdAt', 'desc'),
-      limit(500)
+      limit(1000)
     );
   }, [firestore, centerId]);
   const { data: leadsRaw, isLoading } = useCollection<ConsultingLead>(leadsQuery, {
@@ -167,7 +167,7 @@ export function MarketingConsultingCRM({
     return query(
       collection(firestore, 'centers', centerId, 'websiteConsultRequests'),
       orderBy('createdAt', 'desc'),
-      limit(200)
+      limit(500)
     );
   }, [firestore, centerId]);
   const { data: websiteRequestsRaw, isLoading: websiteRequestsLoading } = useCollection<WebsiteConsultRequest>(
