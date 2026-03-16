@@ -68,9 +68,9 @@ export function HeroSection({ brand }: HeroSectionProps) {
           {/* Headline — 어그로체 */}
           <div className="space-y-5">
             <h1 className="font-aggro-display break-keep text-[clamp(2.8rem,5.6vw,4.5rem)] font-black leading-[1.06] text-white">
-              관리의 중심은
+              공부는 방향이 중요합니다.
               <br />
-              <span className="text-[#FF7A16]">스터디센터</span>입니다
+              성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
             </h1>
             <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-white/85">
               루틴을 먼저 세우고, 데이터로 확인합니다.
