@@ -68,7 +68,7 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
     return query(
       collection(firestore, 'centers', centerId, 'websiteEntryEvents'),
       orderBy('createdAt', 'desc'),
-      limit(300),
+      limit(2000),
     );
   }, [firestore, centerId]);
 
@@ -119,8 +119,11 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    const totalEntryClicks = events.filter((event) => event.eventType === 'entry_click').length;
+
     return {
       totalEvents: events.length,
+      totalEntryClicks,
       landingViews: landingViews.length,
       experienceViews: experienceViews.length,
       loginClickCount: loginClickEvents.length,
@@ -256,7 +259,7 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
                           'h-2.5 rounded-full bg-[linear-gradient(90deg,#FFB16D_0%,#FF7A16_100%)]',
                         )}
                         style={{
-                          width: `${summary.totalEvents > 0 ? Math.max(12, (item.count / summary.totalEvents) * 100) : 0}%`,
+                          width: `${summary.totalEntryClicks > 0 ? Math.max(12, (item.count / summary.totalEntryClicks) * 100) : 0}%`,
                         }}
                       />
                     </div>

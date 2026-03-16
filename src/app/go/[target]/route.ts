@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 
 import { adminDb } from '@/lib/firebase-admin';
+import { resolveMarketingCenterId } from '@/lib/marketing-center';
 
 const TARGET_PATHS: Record<string, string> = {
   login: '/login',
@@ -20,13 +21,6 @@ function resolvePublicOrigin(request: NextRequest) {
   return request.nextUrl.origin;
 }
 
-async function resolveMarketingCenterId() {
-  const envCenterId = process.env.MARKETING_CENTER_ID || process.env.NEXT_PUBLIC_MARKETING_CENTER_ID;
-  if (envCenterId) return envCenterId;
-
-  const snapshot = await adminDb.collection('centers').limit(1).get();
-  return snapshot.empty ? null : snapshot.docs[0]?.id ?? null;
-}
 
 export async function GET(
   request: NextRequest,

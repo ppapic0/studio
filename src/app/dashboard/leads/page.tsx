@@ -42,7 +42,7 @@ export default function LeadsPage() {
             상담 입력 리드와 웹사이트 상담·입구 클릭 데이터를 한 화면에서 보고, 상태 관리와 다운로드까지 처리합니다.
           </p>
         </div>
-        <Badge className="rounded-full border-none bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+        <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
           교사/관리자 공용
         </Badge>
       </div>

@@ -1887,3 +1887,119 @@ export const sendScheduledLateArrivalAlerts = functions
     });
     return null;
   });
+
+/**
+ * 공부 세션이 6시간을 초과하면 자동 종료합니다.
+ * 실수로 퇴실 처리를 안 한 경우를 대비해 세션 시작 후 정확히 6시간(360분)까지만 기록합니다.
+ */
+export const autoCloseStuckStudySessions = functions
+  .region(region)
+  .pubsub.schedule("every 10 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const MAX_SESSION_MINUTES = 360; // 6시간
+    const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(
+      Date.now() - MAX_SESSION_MINUTES * 60 * 1000
+    );
+
+    const centersSnap = await db.collection("centers").get();
+    let totalClosed = 0;
+
+    for (const centerDoc of centersSnap.docs) {
+      const centerId = centerDoc.id;
+
+      // 6시간 이상 공부 상태인 좌석 조회
+      const stuckSeatsSnap = await db
+        .collection("centers")
+        .doc(centerId)
+        .collection("attendanceCurrent")
+        .where("status", "==", "studying")
+        .where("lastCheckInAt", "<=", cutoffTimestamp)
+        .get();
+
+      if (stuckSeatsSnap.empty) continue;
+
+      for (const seatDoc of stuckSeatsSnap.docs) {
+        const seat = seatDoc.data();
+        const studentId = seat.studentId as string | undefined;
+        if (!studentId) continue;
+
+        const lastCheckInAt = seat.lastCheckInAt as admin.firestore.Timestamp;
+
+        // 세션 시작일(KST 기준)을 dateKey로 사용
+        const startKst = toKstDate(lastCheckInAt.toDate());
+        const sessionDateKey = toDateKey(startKst);
+
+        // 세션 종료 시각 = 시작 시각 + 6시간
+        const autoEndTime = admin.firestore.Timestamp.fromMillis(
+          lastCheckInAt.toMillis() + MAX_SESSION_MINUTES * 60 * 1000
+        );
+
+        const batch = db.batch();
+
+        // 1. 좌석 상태를 absent(퇴실)로 변경
+        batch.update(seatDoc.ref, {
+          status: "absent",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // 2. 일별 공부 로그에 6시간 누적
+        const logRef = db
+          .collection("centers").doc(centerId)
+          .collection("studyLogs").doc(studentId)
+          .collection("days").doc(sessionDateKey);
+
+        batch.set(logRef, {
+          totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+          studentId,
+          centerId,
+          dateKey: sessionDateKey,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        // 3. 개별 세션 기록 (자동 종료 표시 포함)
+        const sessionRef = db
+          .collection("centers").doc(centerId)
+          .collection("studyLogs").doc(studentId)
+          .collection("days").doc(sessionDateKey)
+          .collection("sessions").doc();
+
+        batch.set(sessionRef, {
+          startTime: lastCheckInAt,
+          endTime: autoEndTime,
+          durationMinutes: MAX_SESSION_MINUTES,
+          autoClosedAt: admin.firestore.FieldValue.serverTimestamp(),
+          closedReason: "auto_6h_limit",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // 4. 성장 지표 반영
+        const progressRef = db
+          .collection("centers").doc(centerId)
+          .collection("growthProgress").doc(studentId);
+
+        batch.set(progressRef, {
+          seasonLp: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+          "stats.focus": admin.firestore.FieldValue.increment(0.1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        await batch.commit();
+        totalClosed++;
+
+        console.log("[auto-close-session] 6시간 초과 세션 자동 종료", {
+          centerId,
+          studentId,
+          sessionDateKey,
+          lastCheckInAt: lastCheckInAt.toDate().toISOString(),
+          autoEndTime: autoEndTime.toDate().toISOString(),
+        });
+      }
+    }
+
+    if (totalClosed > 0) {
+      console.log("[auto-close-session] 자동 종료 완료:", totalClosed, "건");
+    }
+    return null;
+  });
