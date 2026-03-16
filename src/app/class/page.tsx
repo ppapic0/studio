@@ -24,7 +24,6 @@ import { marketingContent } from '@/lib/marketing-content';
 
 const career = [
   { label: '관리형 독서실 원장', detail: '분당·판교 관리형 스터디센터 운영 경험' },
-  { label: '국어 개인과외 40명+', detail: '직접 지도 학생 70% 이상 인서울 달성' },
   { label: '원장 본인 국어 백분위 99', detail: '2024학년도 수능 실전 기록' },
 ];
 
@@ -105,12 +104,6 @@ const scoreProofCards = [
 ];
 
 const kakaoFeedbackCards = [
-  {
-    label: '성적 확인 직후',
-    summary: '국어 93점 후기',
-    image: '/marketing/reviews/kakao-feedback-2-redacted.jpg',
-    showFull: false,
-  },
   {
     label: '백분위 97 사례',
     summary: '시험 직후 피드백',
