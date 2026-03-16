@@ -81,6 +81,17 @@ interface WebsiteConsultRequest {
   linkedLeadId?: string;
 }
 
+interface WebsiteEntryEvent {
+  id: string;
+  eventType?: 'entry_click' | 'page_view' | 'login_success';
+  pageType?: 'landing' | 'experience' | 'login';
+  target?: 'login' | 'experience';
+  placement?: string | null;
+  sessionId?: string | null;
+  visitorId?: string | null;
+  createdAt?: any;
+}
+
 const STATUS_META: Record<LeadStatus, { label: string; className: string }> = {
   new: { label: '신규', className: 'bg-blue-100 text-blue-700 border-blue-200' },
   contacted: { label: '연락완료', className: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -177,6 +188,18 @@ export function MarketingConsultingCRM({
     }
   );
 
+  const entryEventsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'websiteEntryEvents'),
+      orderBy('createdAt', 'desc'),
+      limit(300)
+    );
+  }, [firestore, centerId]);
+  const { data: entryEventsRaw } = useCollection<WebsiteEntryEvent>(entryEventsQuery, {
+    enabled: !!centerId,
+  });
+
   const leads = useMemo(() => {
     return [...(leadsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt));
   }, [leadsRaw]);
@@ -247,6 +270,20 @@ export function MarketingConsultingCRM({
     const contactedCount = websiteRequests.filter((request) => request.status === 'contacted').length;
     return { total, newCount, contactedCount };
   }, [websiteRequests]);
+
+  const visitSummary = useMemo(() => {
+    const events = entryEventsRaw || [];
+    const landingViews = events.filter((e) => e.eventType === 'page_view' && e.pageType === 'landing').length;
+    const experienceViews = events.filter((e) => e.eventType === 'page_view' && e.pageType === 'experience').length;
+    const entryClicks = events.filter((e) => e.eventType === 'entry_click').length;
+    const loginSuccesses = events.filter((e) => e.eventType === 'login_success').length;
+    const uniqueVisitors = new Set(
+      events.map((e) => e.visitorId).filter((v): v is string => !!v)
+    ).size;
+    const formConversionRate =
+      landingViews > 0 ? ((websiteRequests.length / landingViews) * 100).toFixed(1) : null;
+    return { landingViews, experienceViews, entryClicks, loginSuccesses, uniqueVisitors, formConversionRate };
+  }, [entryEventsRaw, websiteRequests]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM());
@@ -514,6 +551,31 @@ export function MarketingConsultingCRM({
                 <Badge className="border-none bg-white text-amber-700 shadow-sm">
                   연락중 {websiteSummary.contactedCount}건
                 </Badge>
+              </div>
+            </div>
+
+            <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+              <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">랜딩 방문</p>
+                <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.landingViews}</p>
+                <p className="text-[10px] font-semibold text-slate-400">체험 {visitSummary.experienceViews}회 포함</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">고유 방문자</p>
+                <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.uniqueVisitors}</p>
+                <p className="text-[10px] font-semibold text-slate-400">중복 제거</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">버튼 클릭</p>
+                <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.entryClicks}</p>
+                <p className="text-[10px] font-semibold text-slate-400">로그인 성공 {visitSummary.loginSuccesses}회</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">상담폼 전환율</p>
+                <p className="mt-0.5 text-xl font-black text-slate-800">
+                  {visitSummary.formConversionRate !== null ? `${visitSummary.formConversionRate}%` : '-'}
+                </p>
+                <p className="text-[10px] font-semibold text-slate-400">방문 대비 문의</p>
               </div>
             </div>
 
