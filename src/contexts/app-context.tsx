@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, collectionGroup, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -166,6 +166,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
     const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
 
+    // Track whether the one-time fallback has already been fetched
+    let fallbackFetched = false;
+
+    const fetchFallbackOnce = async () => {
+      if (fallbackFetched) return;
+      fallbackFetched = true;
+      try {
+        const snapshot = await getDocs(fallbackMembersQuery);
+        memberFallbackMemberships = snapshot.docs
+          .map((docSnap) => {
+            const raw = docSnap.data() as any;
+            const centerId = docSnap.ref.parent.parent?.id;
+            if (!centerId) return null;
+            return {
+              id: centerId,
+              role: normalizeRole(raw.role),
+              status: raw.status || 'active',
+              joinedAt: raw.joinedAt,
+              displayName: raw.displayName,
+              linkedStudentIds: raw.linkedStudentIds,
+              className: raw.className,
+            } as CenterMembership;
+          })
+          .filter((membership): membership is CenterMembership => !!membership);
+        applyMembershipState();
+      } catch (error) {
+        console.warn('Membership fallback fetch warning:', error);
+        setMembershipsLoading(false);
+      }
+    };
+
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
       (snapshot) => {
@@ -182,7 +213,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as CenterMembership;
         });
 
-        applyMembershipState();
+        // Only fetch from collectionGroup fallback if the primary source has no data
+        if (userCenterMemberships.length === 0) {
+          fetchFallbackOnce();
+        } else {
+          applyMembershipState();
+        }
       },
       (error) => {
         console.error('Membership sync error:', error);
@@ -190,38 +226,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    const unsubscribeFallback = onSnapshot(
-      fallbackMembersQuery,
-      (snapshot) => {
-        memberFallbackMemberships = snapshot.docs
-          .map((docSnap) => {
-            const raw = docSnap.data() as any;
-            const centerId = docSnap.ref.parent.parent?.id;
-            if (!centerId) return null;
-
-            return {
-              id: centerId,
-              role: normalizeRole(raw.role),
-              status: raw.status || 'active',
-              joinedAt: raw.joinedAt,
-              displayName: raw.displayName,
-              linkedStudentIds: raw.linkedStudentIds,
-              className: raw.className,
-            } as CenterMembership;
-          })
-          .filter((membership): membership is CenterMembership => !!membership);
-
-        applyMembershipState();
-      },
-      (error) => {
-        console.warn('Membership fallback sync warning:', error);
-        setMembershipsLoading(false);
-      }
-    );
-
     return () => {
       unsubscribeUserCenters();
-      unsubscribeFallback();
     };
   }, [user, firestore]);
 

@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, orderBy, where, limit } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
 import { LeaderboardEntry, WithId, StudentProfile, CenterMembership, AttendanceCurrent } from '@/lib/types';
 import { 
@@ -60,6 +60,8 @@ function isSyntheticStudentId(studentId: unknown): boolean {
   return normalized.startsWith('test-') || normalized.startsWith('seed-') || normalized.startsWith('mock-') || normalized.includes('dummy');
 }
 
+const PAGE_SIZE = 50;
+
 type LeaderboardTabProps = {
   title: string;
   description: string;
@@ -72,22 +74,31 @@ type LeaderboardTabProps = {
 };
 
 function LeaderboardTab({ title, description, entries, isLoading, isMobile, studentsMap, classNameFilter }: LeaderboardTabProps) {
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     // 1. 랭킹 항목 기준 목록
     let list = entries;
-    
+
     // 2. 반 필터링
     if (classNameFilter) {
       list = list.filter(entry => entry.classNameSnapshot === classNameFilter);
     }
-    
+
     // 3. 값 기준 정렬
     return list.sort((a, b) => b.value - a.value);
   }, [entries, classNameFilter]);
 
+  // Reset pagination when filter/entries change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [classNameFilter, entries]);
+
   const topThree = useMemo(() => filteredEntries.slice(0, 3), [filteredEntries]);
-  const others = useMemo(() => filteredEntries.slice(3), [filteredEntries]);
+  const allOthers = useMemo(() => filteredEntries.slice(3), [filteredEntries]);
+  const others = useMemo(() => allOthers.slice(0, Math.max(0, visibleCount - 3)), [allOthers, visibleCount]);
+  const hasMore = allOthers.length > others.length;
 
   const getRankBadge = (idx: number) => {
     switch(idx) {
@@ -205,6 +216,17 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                       );
                     })}
                   </div>
+                  {hasMore && (
+                    <div className="mt-6 flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                        className="rounded-2xl font-black border-2 px-8 h-12 gap-2"
+                      >
+                        더 보기 <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -301,7 +323,8 @@ export default function LeaderboardsPage() {
     if (!firestore || !activeMembership) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
-      orderBy('value', 'desc')
+      orderBy('value', 'desc'),
+      limit(100)
     );
   }, [firestore, activeMembership, periodKey]);
   const { data: allLpEntries, isLoading: lpLoading } = useCollection<LeaderboardEntry>(lpQuery, { enabled: isMember });

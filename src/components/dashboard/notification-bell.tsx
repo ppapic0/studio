@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Bell, ChevronRight, Clock, FileText, MessageSquareMore, Sparkles } from 'lucide-react';
 
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
+import { useNotifications } from '@/contexts/notifications-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,14 +28,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StudentNotification } from '@/lib/types';
-
-type ReportItem = {
-  id: string;
-  dateKey?: string;
-  viewedAt?: { toDate?: () => Date };
-  updatedAt?: { toDate?: () => Date };
-  createdAt?: { toDate?: () => Date };
-};
 
 type NotificationFeedItem =
   | {
@@ -64,57 +57,11 @@ function toMillis(value?: { toDate?: () => Date } | null) {
 }
 
 export function NotificationBell() {
-  const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
+  const { reports, feedbacks } = useNotifications();
 
-  const [reports, setReports] = useState<ReportItem[]>([]);
-  const [feedbacks, setFeedbacks] = useState<StudentNotification[]>([]);
   const [selectedFeedback, setSelectedFeedback] = useState<StudentNotification | null>(null);
-
-  useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
-
-    const centerId = activeMembership.id;
-    const q = query(
-      collection(firestore, 'centers', centerId, 'dailyReports'),
-      where('studentId', '==', user.uid),
-      where('status', '==', 'sent')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedReports = snapshot.docs
-        .map((reportDoc) => ({ id: reportDoc.id, ...reportDoc.data() } as ReportItem))
-        .sort((a, b) => Math.max(toMillis(b.updatedAt), toMillis(b.createdAt)) - Math.max(toMillis(a.updatedAt), toMillis(a.createdAt)))
-        .slice(0, 10);
-
-      setReports(fetchedReports);
-    });
-
-    return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
-
-  useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
-
-    const centerId = activeMembership.id;
-    const q = query(
-      collection(firestore, 'centers', centerId, 'studentNotifications'),
-      where('studentId', '==', user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedFeedbacks = snapshot.docs
-        .map((feedbackDoc) => ({ id: feedbackDoc.id, ...feedbackDoc.data() } as StudentNotification))
-        .filter((item) => item.type === 'one_line_feedback')
-        .sort((a, b) => Math.max(toMillis(b.updatedAt), toMillis(b.createdAt)) - Math.max(toMillis(a.updatedAt), toMillis(a.createdAt)))
-        .slice(0, 10);
-
-      setFeedbacks(fetchedFeedbacks);
-    });
-
-    return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
 
   const markFeedbackAsRead = async (feedback: StudentNotification | null) => {
     if (!firestore || !activeMembership || !feedback || feedback.readAt) return;

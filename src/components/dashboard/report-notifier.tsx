@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useFirestore, useUser } from '@/firebase';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { useNotifications, ReportItem } from '@/contexts/notifications-context';
 import {
   Dialog,
   DialogContent,
@@ -13,57 +12,25 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
-import { FileText, Sparkles, X, Wand2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { FileText, Sparkles, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VisualReportViewer } from './visual-report-viewer';
 import { Badge } from '@/components/ui/badge';
 
 export function ReportNotifier() {
-  const { user } = useUser();
-  const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { viewMode } = useAppContext();
+  const { latestReport, clearLatestReport } = useNotifications();
   const isMobile = viewMode === 'mobile';
 
-  const [notification, setNotification] = useState<any>(null);
+  const [notification, setNotification] = useState<ReportItem | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const isInitialLoad = useRef(true);
 
   useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
-
-    const centerId = activeMembership.id;
-    // 복합 색인 요구를 피하기 위해 orderBy와 limit을 제거하고 클라이언트 측에서 필터링합니다.
-    const q = query(
-      collection(firestore, 'centers', centerId, 'dailyReports'),
-      where('studentId', '==', user.uid),
-      where('status', '==', 'sent')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (isInitialLoad.current) {
-        isInitialLoad.current = false;
-        return;
-      }
-
-      // 변경된 문서 중 가장 최신의 발송된 리포트 하나를 찾습니다.
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added' || change.type === 'modified') {
-          const data = change.doc.data();
-          const updatedAt = data.updatedAt?.toMillis() || 0;
-          const now = Date.now();
-          
-          // 최근 20초 이내에 선생님이 발송한 경우만 팝업 실행
-          if (now - updatedAt < 20000) {
-            setNotification({ id: change.doc.id, ...data });
-            setIsOpen(true);
-          }
-        }
-      });
-    });
-
-    return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
+    if (!latestReport) return;
+    setNotification(latestReport);
+    setIsOpen(true);
+    clearLatestReport();
+  }, [latestReport, clearLatestReport]);
 
   if (!notification) return null;
 

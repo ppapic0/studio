@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { MessageSquareMore, Sparkles } from 'lucide-react';
 
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
+import { useNotifications } from '@/contexts/notifications-context';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,14 +21,13 @@ import { cn } from '@/lib/utils';
 import { StudentNotification } from '@/lib/types';
 
 export function FeedbackNotifier() {
-  const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
+  const { latestFeedback, clearLatestFeedback } = useNotifications();
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
 
   const [notification, setNotification] = useState<StudentNotification | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const isInitialLoad = useRef(true);
 
   const markAsRead = async (item: StudentNotification | null) => {
     if (!firestore || !activeMembership || !item || item.readAt) return;
@@ -46,36 +46,11 @@ export function FeedbackNotifier() {
   };
 
   useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
-
-    const centerId = activeMembership.id;
-    const q = query(
-      collection(firestore, 'centers', centerId, 'studentNotifications'),
-      where('studentId', '==', user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (isInitialLoad.current) {
-        isInitialLoad.current = false;
-        return;
-      }
-
-      snapshot.docChanges().forEach((change) => {
-        if (change.type !== 'added' && change.type !== 'modified') return;
-
-        const data = { id: change.doc.id, ...change.doc.data() } as StudentNotification;
-        if (data.type !== 'one_line_feedback') return;
-
-        const updatedAt = data.updatedAt?.toDate?.().getTime?.() || data.createdAt?.toDate?.().getTime?.() || 0;
-        if (Date.now() - updatedAt > 20000) return;
-
-        setNotification(data);
-        setIsOpen(true);
-      });
-    });
-
-    return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
+    if (!latestFeedback) return;
+    setNotification(latestFeedback);
+    setIsOpen(true);
+    clearLatestFeedback();
+  }, [latestFeedback, clearLatestFeedback]);
 
   return (
     <Dialog
