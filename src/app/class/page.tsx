@@ -253,6 +253,23 @@ export default function ClassPage() {
       </section>
 
       {/* ══════════════════════════════════════════
+          1.5 TAGLINE QUOTE
+      ══════════════════════════════════════════ */}
+      <ScrollReveal>
+        <section className="py-16 sm:py-20 bg-white">
+          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
+            <div className="border-l-[5px] border-[#14295F] pl-6 py-1">
+              <p className="break-keep text-[clamp(1.55rem,3.2vw,2.15rem)] font-black leading-[1.45] text-[#14295F]">
+                관리의 중심은
+                <br />
+                <span className="text-[#FF7A16]">스터디 센터</span>입니다
+              </p>
+            </div>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ══════════════════════════════════════════
           2. INTRO
       ══════════════════════════════════════════ */}
       <ScrollReveal>
