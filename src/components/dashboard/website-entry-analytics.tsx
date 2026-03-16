@@ -1,38 +1,29 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, LogIn, MousePointerClick, Smartphone } from 'lucide-react';
-import { collection, limit, orderBy, query } from 'firebase/firestore';
 import { format } from 'date-fns';
 
-import { useCollection, useFirestore } from '@/firebase';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { useAuth } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 type WebsiteEntryEvent = {
   id: string;
-  eventType?: 'entry_click' | 'page_view' | 'login_success';
-  pageType?: 'landing' | 'experience' | 'login';
-  target?: 'login' | 'experience';
+  eventType?: 'entry_click' | 'page_view' | 'login_success' | null;
+  pageType?: 'landing' | 'experience' | 'login' | null;
+  target?: 'login' | 'experience' | null;
   placement?: string | null;
   mode?: string | null;
   view?: string | null;
   sessionId?: string | null;
   visitorId?: string | null;
-  createdAt?: unknown;
+  createdAt?: string | null; // ISO string from API
 };
 
 function toDateMs(value: unknown): number {
   if (!value) return 0;
-  if (typeof (value as { toDate?: () => Date }).toDate === 'function') {
-    const parsed = (value as { toDate: () => Date }).toDate();
-    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
-  }
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? 0 : value.getTime();
-  }
   const parsed = new Date(String(value));
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
@@ -61,25 +52,45 @@ function placementLabel(value?: string | null) {
 }
 
 export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
-  const firestore = useFirestore();
+  const auth = useAuth();
+  const [events, setEvents] = useState<WebsiteEntryEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const eventsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'websiteEntryEvents'),
-      orderBy('createdAt', 'desc'),
-      limit(2000),
-    );
-  }, [firestore, centerId]);
+  useEffect(() => {
+    if (!centerId || !auth) return;
 
-  const { data: rawEvents, isLoading } = useCollection<WebsiteEntryEvent>(eventsQuery, {
-    enabled: !!centerId,
-  });
+    let cancelled = false;
+    setIsLoading(true);
 
-  const events = useMemo(
-    () => [...(rawEvents || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
-    [rawEvents],
-  );
+    const fetchEvents = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+        const token = await currentUser.getIdToken();
+
+        const res = await fetch('/api/website-analytics', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json() as { events: WebsiteEntryEvent[] };
+
+        if (!cancelled) {
+          const sorted = json.events.sort(
+            (a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt),
+          );
+          setEvents(sorted);
+        }
+      } catch (error) {
+        console.error('[website-analytics] fetch failed', error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    void fetchEvents();
+    return () => { cancelled = true; };
+  }, [centerId, auth]);
 
   const summary = useMemo(() => {
     const pageViewEvents = events.filter((event) => event.eventType === 'page_view');

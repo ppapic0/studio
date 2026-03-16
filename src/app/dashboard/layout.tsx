@@ -7,6 +7,7 @@ import { AppointmentNotifier } from '@/components/dashboard/appointment-notifier
 import { FeedbackNotifier } from '@/components/dashboard/feedback-notifier';
 import { ReportNotifier } from '@/components/dashboard/report-notifier';
 import { useAppContext } from '@/contexts/app-context';
+import { NotificationsProvider } from '@/contexts/notifications-context';
 import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   const isMobileView = activeMembership?.role === 'parent' || viewMode === 'mobile';
 
   return (
+    <NotificationsProvider>
     <div
       className={cn(
         'dashboard-shell min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
@@ -87,5 +89,6 @@ export default function DashboardLayout({
         )}
       </div>
     </div>
+    </NotificationsProvider>
   );
 }

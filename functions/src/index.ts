@@ -373,7 +373,8 @@ async function queueParentSmsNotification(
 async function runLateArrivalCheckForCenter(
   db: admin.firestore.Firestore,
   centerId: string,
-  nowKst: Date
+  nowKst: Date,
+  attendanceSnap: admin.firestore.QuerySnapshot
 ): Promise<number> {
   const settings = await loadNotificationSettings(db, centerId);
   if (settings.lateAlertEnabled === false) return 0;
@@ -393,7 +394,6 @@ async function runLateArrivalCheckForCenter(
 
   if (membersSnap.empty) return 0;
 
-  const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
   const checkedInStudentIds = new Set<string>();
   attendanceSnap.forEach((seatDoc) => {
     const seatData = seatDoc.data();
@@ -1857,7 +1857,8 @@ export const runLateArrivalCheck = functions.region(region).https.onCall(async (
   }
 
   const nowKst = toKstDate();
-  const alertsTriggered = await runLateArrivalCheckForCenter(db, centerId, nowKst);
+  const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+  const alertsTriggered = await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
   return {
     ok: true,
     centerId,
@@ -1866,85 +1867,61 @@ export const runLateArrivalCheck = functions.region(region).https.onCall(async (
   };
 });
 
-export const sendScheduledLateArrivalAlerts = functions
-  .region(region)
-  .pubsub.schedule("every 10 minutes")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const db = admin.firestore();
-    const centersSnap = await db.collection("centers").get();
-    const nowKst = toKstDate();
-
-    let totalTriggered = 0;
-    for (const centerDoc of centersSnap.docs) {
-      totalTriggered += await runLateArrivalCheckForCenter(db, centerDoc.id, nowKst);
-    }
-
-    console.log("[late-arrival] run complete", {
-      centerCount: centersSnap.size,
-      totalTriggered,
-      atKst: nowKst.toISOString(),
-    });
-    return null;
-  });
-
 /**
- * 공부 세션이 6시간을 초과하면 자동 종료합니다.
- * 실수로 퇴실 처리를 안 한 경우를 대비해 세션 시작 후 정확히 6시간(360분)까지만 기록합니다.
+ * 10분마다 실행되는 통합 출석 점검 함수.
+ * 센터별로 attendanceCurrent를 한 번만 읽어 두 가지 작업을 처리합니다:
+ * 1. 지각 알림 발송 (sendScheduledLateArrivalAlerts 로직)
+ * 2. 6시간 초과 세션 자동 종료 (autoCloseStuckStudySessions 로직)
  */
-export const autoCloseStuckStudySessions = functions
+export const scheduledAttendanceCheck = functions
   .region(region)
   .pubsub.schedule("every 10 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
+    const nowKst = toKstDate();
     const MAX_SESSION_MINUTES = 360; // 6시간
     const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(
       Date.now() - MAX_SESSION_MINUTES * 60 * 1000
     );
 
     const centersSnap = await db.collection("centers").get();
+    let totalLateAlerts = 0;
     let totalClosed = 0;
 
     for (const centerDoc of centersSnap.docs) {
       const centerId = centerDoc.id;
 
-      // 6시간 이상 공부 상태인 좌석 조회
-      const stuckSeatsSnap = await db
-        .collection("centers")
-        .doc(centerId)
-        .collection("attendanceCurrent")
-        .where("status", "==", "studying")
-        .where("lastCheckInAt", "<=", cutoffTimestamp)
-        .get();
+      // attendanceCurrent 한 번만 읽어 두 작업에 공유
+      const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
 
-      if (stuckSeatsSnap.empty) continue;
+      // ── 1. 지각 알림 ──────────────────────────────────────
+      totalLateAlerts += await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
 
-      for (const seatDoc of stuckSeatsSnap.docs) {
+      // ── 2. 6시간 초과 세션 자동 종료 ──────────────────────
+      for (const seatDoc of attendanceSnap.docs) {
         const seat = seatDoc.data();
+        if (seat.status !== "studying") continue;
+
+        const lastCheckInAt = seat.lastCheckInAt as admin.firestore.Timestamp | undefined;
+        if (!lastCheckInAt || lastCheckInAt > cutoffTimestamp) continue;
+
         const studentId = seat.studentId as string | undefined;
         if (!studentId) continue;
 
-        const lastCheckInAt = seat.lastCheckInAt as admin.firestore.Timestamp;
-
-        // 세션 시작일(KST 기준)을 dateKey로 사용
         const startKst = toKstDate(lastCheckInAt.toDate());
         const sessionDateKey = toDateKey(startKst);
-
-        // 세션 종료 시각 = 시작 시각 + 6시간
         const autoEndTime = admin.firestore.Timestamp.fromMillis(
           lastCheckInAt.toMillis() + MAX_SESSION_MINUTES * 60 * 1000
         );
 
         const batch = db.batch();
 
-        // 1. 좌석 상태를 absent(퇴실)로 변경
         batch.update(seatDoc.ref, {
           status: "absent",
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // 2. 일별 공부 로그에 6시간 누적
         const logRef = db
           .collection("centers").doc(centerId)
           .collection("studyLogs").doc(studentId)
@@ -1958,13 +1935,7 @@ export const autoCloseStuckStudySessions = functions
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
-        // 3. 개별 세션 기록 (자동 종료 표시 포함)
-        const sessionRef = db
-          .collection("centers").doc(centerId)
-          .collection("studyLogs").doc(studentId)
-          .collection("days").doc(sessionDateKey)
-          .collection("sessions").doc();
-
+        const sessionRef = logRef.collection("sessions").doc();
         batch.set(sessionRef, {
           startTime: lastCheckInAt,
           endTime: autoEndTime,
@@ -1974,7 +1945,6 @@ export const autoCloseStuckStudySessions = functions
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // 4. 성장 지표 반영
         const progressRef = db
           .collection("centers").doc(centerId)
           .collection("growthProgress").doc(studentId);
@@ -1998,8 +1968,67 @@ export const autoCloseStuckStudySessions = functions
       }
     }
 
-    if (totalClosed > 0) {
-      console.log("[auto-close-session] 자동 종료 완료:", totalClosed, "건");
+    console.log("[attendance-check] run complete", {
+      centerCount: centersSnap.size,
+      totalLateAlerts,
+      totalClosed,
+      atKst: nowKst.toISOString(),
+    });
+    return null;
+  });
+
+/**
+ * 매일 새벽 3시(KST)에 오래된 임시 문서를 삭제합니다.
+ * - smsQueue, smsLogs, lateAlerts: 7일 초과 삭제
+ * - parentNotifications: 30일 초과 삭제
+ * 삭제는 센터별로 최대 500건씩 처리합니다.
+ */
+export const cleanupOldDocuments = functions
+  .region(region)
+  .pubsub.schedule("0 3 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = Date.now();
+    const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(now - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = admin.firestore.Timestamp.fromMillis(now - 30 * 24 * 60 * 60 * 1000);
+
+    const centersSnap = await db.collection("centers").get();
+    let totalDeleted = 0;
+
+    const deleteOldDocs = async (
+      colPath: string,
+      cutoff: admin.firestore.Timestamp,
+      maxDocs = 500
+    ): Promise<number> => {
+      const snap = await db
+        .collection(colPath)
+        .where("createdAt", "<", cutoff)
+        .limit(maxDocs)
+        .get();
+      if (snap.empty) return 0;
+
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return snap.size;
+    };
+
+    for (const centerDoc of centersSnap.docs) {
+      const cid = centerDoc.id;
+      const [sq, sl, la, pn] = await Promise.all([
+        deleteOldDocs(`centers/${cid}/smsQueue`, sevenDaysAgo),
+        deleteOldDocs(`centers/${cid}/smsLogs`, sevenDaysAgo),
+        deleteOldDocs(`centers/${cid}/lateAlerts`, sevenDaysAgo),
+        deleteOldDocs(`centers/${cid}/parentNotifications`, thirtyDaysAgo),
+      ]);
+      const centerTotal = sq + sl + la + pn;
+      if (centerTotal > 0) {
+        console.log(`[cleanup] center=${cid} deleted=${centerTotal} (smsQueue=${sq} smsLogs=${sl} lateAlerts=${la} parentNotifications=${pn})`);
+      }
+      totalDeleted += centerTotal;
     }
+
+    console.log("[cleanup] run complete", { centerCount: centersSnap.size, totalDeleted });
     return null;
   });
