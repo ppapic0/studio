@@ -764,7 +764,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         level="H"
                         includeMargin={false}
                         imageSettings={{
-                          src: "/track-logo-mark.svg",
+                          src: "/track-logo-mark.png",
                           x: undefined,
                           y: undefined,
                           height: 40,

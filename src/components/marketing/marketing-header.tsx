@@ -22,11 +22,11 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
       <div className="mx-auto flex h-[4.25rem] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="inline-flex items-center gap-3 transition-opacity hover:opacity-85">
           <Image
-            src="/track-logo-mark.svg"
+            src="/track-logo-mark.png"
             alt={`${brand.name} 로고`}
-            width={36}
+            width={54}
             height={36}
-            className="h-9 w-9 object-contain"
+            className="h-9 w-auto object-contain"
           />
           <div className="grid gap-0.5">
             <span className="text-[1rem] font-bold text-white sm:text-[1.05rem]">
