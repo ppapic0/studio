@@ -697,7 +697,7 @@ export default function ClassPage() {
                 <br />
                 함께 확인해보세요
               </h2>
-              <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.88] text-white/72">
+              <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.88]" style={{ color: 'rgba(255,255,255,0.72)' }}>
                 학생의 현재 상태와 필요한 방향을 먼저 확인한 뒤,
                 수업이 맞는지, 어떤 방식이 필요한지 상담을 통해 안내합니다.
               </p>
