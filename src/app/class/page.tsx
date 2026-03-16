@@ -260,9 +260,9 @@ export default function ClassPage() {
           <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
             <div className="border-l-[5px] border-[#14295F] pl-6 py-1">
               <p className="break-keep text-[clamp(1.55rem,3.2vw,2.15rem)] font-black leading-[1.45] text-[#14295F]">
-                관리의 중심은
+                공부는 방향이 중요합니다.
                 <br />
-                <span className="text-[#FF7A16]">스터디 센터</span>입니다
+                성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
               </p>
             </div>
           </div>
