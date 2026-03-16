@@ -75,7 +75,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
             <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-white/85">
               루틴을 먼저 세우고, 데이터로 확인합니다.
               <br />
-              수능 국어 수업은 필요할 때 별도로 선택합니다.
+              수능, 내신 국어 수업은 별도로 선택합니다.
             </p>
           </div>
 
