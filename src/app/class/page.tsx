@@ -106,8 +106,9 @@ const scoreProofCards = [
 
 const kakaoFeedbackCards = [
   {
-    label: '백분위 97 사례',
-    summary: '시험 직후 피드백',
+    label: '국영수 합산 전교 1등 사례',
+    summary: '2025 고2 6월 · 동백고',
+    detail: '전과목 밸런스 코칭',
     image: '/marketing/reviews/kakao-feedback-1-redacted.jpg',
     showFull: false,
   },
@@ -466,6 +467,9 @@ export default function ClassPage() {
                       <figcaption className="space-y-1 border-t border-[#14295F]/8 px-3.5 py-3">
                         <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#FF7A16]">{card.label}</p>
                         <p className="text-[13px] font-black text-[#14295F]">{card.summary}</p>
+                        {'detail' in card && card.detail && (
+                          <p className="text-[11.5px] font-semibold text-[#4B6380]">{card.detail}</p>
+                        )}
                       </figcaption>
                     </figure>
                   ))}
@@ -693,7 +697,7 @@ export default function ClassPage() {
                 <br />
                 함께 확인해보세요
               </h2>
-              <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.88] text-white/72">
+              <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.88]" style={{ color: 'rgba(255,255,255,0.72)' }}>
                 학생의 현재 상태와 필요한 방향을 먼저 확인한 뒤,
                 수업이 맞는지, 어떤 방식이 필요한지 상담을 통해 안내합니다.
               </p>
