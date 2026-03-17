@@ -78,14 +78,16 @@ export async function POST(request: Request) {
       createdAt,
     };
 
-    await adminDb.collection("marketingConsultRequests").add(payload);
+    const docRef = adminDb.collection("marketingConsultRequests").doc();
+    const receiptId = docRef.id.slice(0, 8).toUpperCase();
+    await docRef.set({ ...payload, receiptId });
 
     if (centerId) {
       await adminDb
         .collection("centers")
         .doc(centerId)
         .collection("websiteConsultRequests")
-        .add({ ...payload, updatedAt: createdAt });
+        .add({ ...payload, receiptId, updatedAt: createdAt });
     }
 
     const successMessage =
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
         ? "입학 대기 신청이 접수되었습니다."
         : "상담 신청이 접수되었습니다.";
 
-    return NextResponse.json({ ok: true, message: successMessage });
+    return NextResponse.json({ ok: true, message: successMessage, receiptId, createdAt, requestTypeLabel });
   } catch (error) {
     console.error("[consult][POST] failed", error);
     return NextResponse.json(

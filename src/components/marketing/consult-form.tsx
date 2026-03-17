@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 type ServiceType = "korean_academy" | "study_center";
 type StudyCenterRequestType = "consult" | "waitlist";
@@ -16,6 +16,17 @@ type FormState = {
   studyCenterRequestType: StudyCenterRequestType;
 };
 
+type ReceiptInfo = {
+  receiptId: string;
+  createdAt: string;
+  studentName: string;
+  school: string;
+  grade: string;
+  gender: string;
+  consultPhone: string;
+  requestTypeLabel: string;
+};
+
 const INITIAL_FORM: FormState = {
   studentName: "",
   school: "",
@@ -28,10 +39,80 @@ const INITIAL_FORM: FormState = {
 
 const GRADE_OPTIONS = ["중1", "중2", "중3", "고1", "고2", "고3"];
 
+function formatKoreaTime(isoString: string) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(isoString));
+}
+
+function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () => void }) {
+  return (
+    <div id="consult-form" className="marketing-card p-5">
+      <div className="flex items-center gap-2">
+        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+        <p className="text-xs font-black tracking-[0.14em] text-emerald-600">접수 완료</p>
+      </div>
+      <h3 className="mt-2 text-xl font-black text-[#14295F]">신청이 접수되었습니다</h3>
+      <p className="mt-1 text-sm text-[#14295F]/60">
+        아래 내용을 스크린샷으로 저장하시면 나중에 접수 확인에 사용할 수 있습니다.
+      </p>
+
+      <div
+        className="mt-5 rounded-xl border-2 border-dashed border-[#14295F]/20 bg-[#14295F]/[0.03] p-4"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/40">접수 확인 번호</p>
+          <p className="font-black tracking-widest text-[#FF7A16]">{receipt.receiptId}</p>
+        </div>
+
+        <div className="space-y-2.5 border-t border-[#14295F]/10 pt-3">
+          {[
+            { label: "신청 유형", value: receipt.requestTypeLabel },
+            { label: "학생 이름", value: receipt.studentName },
+            { label: "학교 / 학년", value: `${receipt.school} ${receipt.grade}` },
+            { label: "성별", value: receipt.gender },
+            { label: "연락처", value: receipt.consultPhone },
+            { label: "접수 일시", value: formatKoreaTime(receipt.createdAt) },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex justify-between gap-4 text-sm">
+              <span className="font-bold text-[#14295F]/50">{label}</span>
+              <span className="text-right font-black text-[#14295F]">{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-xs font-bold leading-relaxed text-amber-700">
+        📞 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다.
+        <br />
+        접수 확인 번호로{" "}
+        <a href="/consult/check" className="underline underline-offset-2">
+          접수 내역 조회
+        </a>
+        도 가능합니다.
+      </p>
+
+      <button
+        type="button"
+        onClick={onReset}
+        className="mt-4 h-10 w-full rounded-lg border border-[#14295F]/20 text-sm font-bold text-[#14295F]/60 transition hover:border-[#14295F]/40 hover:text-[#14295F]"
+      >
+        새로운 신청 작성하기
+      </button>
+    </div>
+  );
+}
+
 export function ConsultForm() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptInfo | null>(null);
 
   const isDisabled = useMemo(() => {
     return (
@@ -46,13 +127,13 @@ export function ConsultForm() {
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    setResult(null);
+    setError(null);
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
-    setResult(null);
+    setError(null);
 
     try {
       const response = await fetch("/api/consult", {
@@ -60,20 +141,40 @@ export function ConsultForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = (await response.json()) as { ok: boolean; message?: string };
+      const data = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        receiptId?: string;
+        createdAt?: string;
+        requestTypeLabel?: string;
+      };
+
       if (!response.ok || !data.ok) {
-        setResult({ type: "error", message: data.message ?? "접수 중 오류가 발생했습니다." });
+        setError(data.message ?? "접수 중 오류가 발생했습니다.");
         return;
       }
 
-      setResult({ type: "success", message: data.message ?? "신청이 접수되었습니다." });
+      setReceipt({
+        receiptId: data.receiptId ?? "--------",
+        createdAt: data.createdAt ?? new Date().toISOString(),
+        studentName: form.studentName,
+        school: form.school,
+        grade: form.grade,
+        gender: form.gender,
+        consultPhone: form.consultPhone,
+        requestTypeLabel: data.requestTypeLabel ?? "상담 신청",
+      });
       setForm(INITIAL_FORM);
-    } catch (error) {
-      console.error("[consult-form] submit error", error);
-      setResult({ type: "error", message: "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요." });
+    } catch (err) {
+      console.error("[consult-form] submit error", err);
+      setError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (receipt) {
+    return <ReceiptCard receipt={receipt} onReset={() => setReceipt(null)} />;
   }
 
   return (
@@ -235,14 +336,8 @@ export function ConsultForm() {
         </div>
       </div>
 
-      {result ? (
-        <p
-          className={`mt-4 rounded-lg px-3 py-2 text-sm font-bold ${
-            result.type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-          }`}
-        >
-          {result.message}
-        </p>
+      {error ? (
+        <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{error}</p>
       ) : null}
 
       <button
