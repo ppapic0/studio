@@ -103,7 +103,15 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && resource.data.centerId != null
         && isCenterAdmin(resource.data.centerId);
-      allow write: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.centerId != null
+        && isCenterAdmin(request.resource.data.centerId);
+      allow update: if isSignedIn()
+        && resource.data.centerId != null
+        && isCenterAdmin(resource.data.centerId);
+      allow delete: if isSignedIn()
+        && resource.data.centerId != null
+        && isCenterAdmin(resource.data.centerId);
     }
 
     match /userCenters/{userId}/centers/{centerId} {
@@ -301,6 +309,14 @@ service cloud.firestore {
       }
 
       match /consultingLeads/{leadId} {
+        allow read, write: if isTeacherOrAdmin(centerId);
+      }
+
+      match /admissionWaitlist/{entryId} {
+        allow read, write: if isTeacherOrAdmin(centerId);
+      }
+
+      match /websiteConsultRequests/{reqId} {
         allow read, write: if isTeacherOrAdmin(centerId);
       }
 

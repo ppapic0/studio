@@ -17,11 +17,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Loader2, RefreshCw, LayoutGrid, Eye, EyeOff, Filter } from 'lucide-react';
+import { PlusCircle, Loader2, LayoutGrid, Eye, EyeOff, Filter, Trash2 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, doc, setDoc, serverTimestamp, query, where, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, query, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { InviteCode } from '@/lib/types';
 import { format } from 'date-fns';
 import {
@@ -55,7 +55,9 @@ export default function InviteCodesPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [showInactive, setShowInactive] = useState(false); // 비활성 코드 노출 여부
+  const [showInactive, setShowInactive] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   const [newCode, setNewCode] = useState({
     code: '',
@@ -157,9 +159,9 @@ export default function InviteCodesPage() {
     const nextState = invite.isActive === false ? true : false;
     const codeRef = doc(firestore, 'inviteCodes', invite.id);
 
-    updateDoc(codeRef, { 
+    updateDoc(codeRef, {
       isActive: nextState,
-      updatedAt: serverTimestamp() 
+      updatedAt: serverTimestamp()
     }).catch(async (serverError) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: codeRef.path,
@@ -167,6 +169,25 @@ export default function InviteCodesPage() {
         requestResourceData: { isActive: nextState },
       }));
     });
+  };
+
+  const handleDeleteCode = async (inviteId: string) => {
+    if (!firestore) return;
+    setDeletingId(inviteId);
+    const codeRef = doc(firestore, 'inviteCodes', inviteId);
+    try {
+      await deleteDoc(codeRef);
+      toast({ title: '초대 코드가 삭제되었습니다.' });
+    } catch (error) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: codeRef.path,
+        operation: 'delete',
+        requestResourceData: {},
+      }));
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
   };
 
   return (
@@ -218,13 +239,14 @@ export default function InviteCodesPage() {
                     <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">사용량</TableHead>
                     <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">만료일</TableHead>
                     <TableHead className="font-black text-[10px] uppercase whitespace-nowrap">상태</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase text-right pr-10 whitespace-nowrap">활성</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase text-right whitespace-nowrap">활성</TableHead>
+                    <TableHead className="font-black text-[10px] uppercase text-right pr-10 whitespace-nowrap">삭제</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {inviteCodes?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-80 text-center">
+                      <TableCell colSpan={7} className="h-80 text-center">
                         <div className="flex flex-col items-center gap-6 opacity-20">
                           <div className="p-6 bg-muted rounded-full">
                             <Filter className="h-16 w-16" />
@@ -298,12 +320,48 @@ export default function InviteCodesPage() {
                               {status.text}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right pr-10">
-                            <Switch 
-                              checked={invite.isActive !== false} 
+                          <TableCell className="text-right">
+                            <Switch
+                              checked={invite.isActive !== false}
                               onCheckedChange={() => handleToggleActive(invite)}
                               className="data-[state=checked]:bg-primary ml-auto shadow-sm"
                             />
+                          </TableCell>
+                          <TableCell className="text-right pr-10">
+                            {confirmDeleteId === invite.id ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 rounded-lg px-2 text-xs font-black text-slate-500"
+                                  onClick={() => setConfirmDeleteId(null)}
+                                >
+                                  취소
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="h-8 rounded-lg px-3 text-xs font-black"
+                                  disabled={deletingId === invite.id}
+                                  onClick={() => handleDeleteCode(invite.id)}
+                                >
+                                  {deletingId === invite.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    '삭제 확인'
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 rounded-lg p-0 text-slate-400 hover:bg-rose-50 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity ml-auto"
+                                onClick={() => setConfirmDeleteId(invite.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
