@@ -10,11 +10,15 @@ const WEBSITE_CONSULT_LABEL = "웹사이트 상담폼";
 const consultSchema = z.object({
   studentName: z.string().trim().min(1, "학생 이름을 입력해주세요.").max(40, "학생 이름이 너무 깁니다."),
   school: z.string().trim().min(1, "학교명을 입력해주세요.").max(80, "학교명이 너무 깁니다."),
+  grade: z.string().trim().min(1, "학년을 선택해주세요.").max(10, "학년 형식이 올바르지 않습니다."),
+  gender: z.enum(["남", "여"], { errorMap: () => ({ message: "성별을 선택해주세요." }) }),
   consultPhone: z
     .string()
     .trim()
     .min(8, "연락처를 입력해주세요.")
     .max(30, "연락처 형식이 올바르지 않습니다."),
+  serviceType: z.enum(["korean_academy", "study_center"]),
+  studyCenterRequestType: z.enum(["consult", "waitlist"]).optional(),
 });
 
 function getKoreaDateKey() {
@@ -26,6 +30,18 @@ function getKoreaDateKey() {
   }).format(new Date());
 }
 
+function resolveRequestType(
+  serviceType: "korean_academy" | "study_center",
+  studyCenterRequestType?: "consult" | "waitlist",
+): { requestType: string; requestTypeLabel: string } {
+  if (serviceType === "korean_academy") {
+    return { requestType: "korean_academy_consult", requestTypeLabel: "국어 학원 상담" };
+  }
+  if (studyCenterRequestType === "waitlist") {
+    return { requestType: "study_center_waitlist", requestTypeLabel: "관리형 스터디센터 입학 대기" };
+  }
+  return { requestType: "study_center_consult", requestTypeLabel: "관리형 스터디센터 상담" };
+}
 
 export async function POST(request: Request) {
   try {
@@ -42,35 +58,44 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = parsed.data;
+    const { serviceType, studyCenterRequestType, ...fields } = parsed.data;
+    const { requestType, requestTypeLabel } = resolveRequestType(serviceType, studyCenterRequestType);
+
     const centerId = await resolveMarketingCenterId();
     const createdAt = new Date().toISOString();
     const consultationDate = getKoreaDateKey();
 
-    await adminDb.collection("marketingConsultRequests").add({
-      ...payload,
+    const payload = {
+      ...fields,
+      serviceType,
+      requestType,
+      requestTypeLabel,
       centerId,
       consultationDate,
       source: WEBSITE_CONSULT_SOURCE,
       sourceLabel: WEBSITE_CONSULT_LABEL,
       status: "new",
       createdAt,
-    });
+    };
+
+    const docRef = adminDb.collection("marketingConsultRequests").doc();
+    const receiptId = docRef.id.slice(0, 8).toUpperCase();
+    await docRef.set({ ...payload, receiptId });
 
     if (centerId) {
-      await adminDb.collection("centers").doc(centerId).collection("websiteConsultRequests").add({
-        ...payload,
-        centerId,
-        consultationDate,
-        source: WEBSITE_CONSULT_SOURCE,
-        sourceLabel: WEBSITE_CONSULT_LABEL,
-        status: "new",
-        createdAt,
-        updatedAt: createdAt,
-      });
+      await adminDb
+        .collection("centers")
+        .doc(centerId)
+        .collection("websiteConsultRequests")
+        .add({ ...payload, receiptId, updatedAt: createdAt });
     }
 
-    return NextResponse.json({ ok: true, message: "상담 신청이 접수되었습니다." });
+    const successMessage =
+      requestType === "study_center_waitlist"
+        ? "입학 대기 신청이 접수되었습니다."
+        : "상담 신청이 접수되었습니다.";
+
+    return NextResponse.json({ ok: true, message: successMessage, receiptId, createdAt, requestTypeLabel });
   } catch (error) {
     console.error("[consult][POST] failed", error);
     return NextResponse.json(
