@@ -68,6 +68,7 @@ interface ConsultingLead {
   referrerName?: string;
   consultationDate: string;
   status: LeadStatus;
+  serviceType?: ServiceType;
   memo?: string;
   createdAt?: any;
   updatedAt?: any;
@@ -84,6 +85,7 @@ interface LeadFormState {
   referrerName: string;
   consultationDate: string;
   status: LeadStatus;
+  serviceType: ServiceType | '';
   memo: string;
 }
 
@@ -96,6 +98,8 @@ interface WebsiteConsultRequest {
   status: LeadStatus;
   source?: string;
   sourceLabel?: string;
+  serviceType?: ServiceType;
+  requestTypeLabel?: string;
   createdAt?: any;
   updatedAt?: any;
   linkedLeadId?: string;
@@ -174,6 +178,7 @@ const INITIAL_FORM = (): LeadFormState => ({
   referrerName: '',
   consultationDate: format(new Date(), 'yyyy-MM-dd'),
   status: 'new',
+  serviceType: '',
   memo: '',
 });
 
@@ -234,6 +239,7 @@ export function MarketingConsultingCRM({
   const [promotingWebsiteId, setPromotingWebsiteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | LeadStatus>('all');
+  const [leadsPage, setLeadsPage] = useState(0);
 
   // Waitlist states
   const [waitlistModal, setWaitlistModal] = useState<WaitlistModal>(INITIAL_WAITLIST_MODAL);
@@ -306,7 +312,10 @@ export function MarketingConsultingCRM({
     [waitlistRaw]
   );
 
+  const LEADS_PER_PAGE = 5;
+
   const filteredLeads = useMemo(() => {
+    setLeadsPage(0);
     const keyword = searchTerm.trim().toLowerCase();
     return leads.filter((lead) => {
       if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
@@ -319,9 +328,16 @@ export function MarketingConsultingCRM({
     });
   }, [leads, searchTerm, statusFilter]);
 
+  const pagedLeads = useMemo(
+    () => filteredLeads.slice(leadsPage * LEADS_PER_PAGE, (leadsPage + 1) * LEADS_PER_PAGE),
+    [filteredLeads, leadsPage]
+  );
+  const totalLeadsPages = Math.ceil(filteredLeads.length / LEADS_PER_PAGE);
+
   const filteredWebsiteRequests = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
     return websiteRequests.filter((req) => {
+      if (req.linkedLeadId) return false; // 리드 DB로 이동된 건은 숨김
       if (statusFilter !== 'all' && req.status !== statusFilter) return false;
       if (!keyword) return true;
       return [req.studentName, req.school, req.consultPhone, req.sourceLabel]
@@ -409,6 +425,7 @@ export function MarketingConsultingCRM({
       referrerName: lead.referrerName || '',
       consultationDate: lead.consultationDate || format(new Date(), 'yyyy-MM-dd'),
       status: lead.status || 'new',
+      serviceType: lead.serviceType || '',
       memo: lead.memo || '',
     });
   };
@@ -435,6 +452,7 @@ export function MarketingConsultingCRM({
         referrerName: form.referralRoute === '추천' ? form.referrerName.trim() : '',
         consultationDate: form.consultationDate,
         status: form.status,
+        serviceType: form.serviceType || null,
         memo: form.memo.trim(),
         updatedAt: serverTimestamp(),
       };
@@ -779,12 +797,14 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
                               {STATUS_META[request.status || 'new'].label}
                             </Badge>
+                            {request.serviceType && (
+                              <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[request.serviceType].color)}>
+                                {request.requestTypeLabel || SERVICE_TYPE_META[request.serviceType].label}
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-[10px] font-black">
                               {request.sourceLabel || '웹사이트'}
                             </Badge>
-                            {request.linkedLeadId && (
-                              <Badge className="border-none bg-emerald-100 text-[10px] font-black text-emerald-700">리드 이동 완료</Badge>
-                            )}
                           </div>
                           <p className="text-xs font-semibold text-slate-600">
                             학교: {request.school || '-'} · 연락처: {request.consultPhone || '-'}
@@ -965,6 +985,23 @@ export function MarketingConsultingCRM({
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-black">상담 유형</Label>
+                  <Select
+                    value={form.serviceType}
+                    onValueChange={(value) => setForm((p) => ({ ...p, serviceType: value as ServiceType | '' }))}
+                  >
+                    <SelectTrigger className="h-10 rounded-lg font-bold">
+                      <SelectValue placeholder="선택 안함" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="" className="font-semibold text-slate-400">선택 안함</SelectItem>
+                      {(Object.entries(SERVICE_TYPE_META) as [ServiceType, { label: string; color: string }][]).map(([value, meta]) => (
+                        <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid gap-1.5 md:col-span-2">
                   <Label className="text-xs font-black">메모</Label>
                   <Textarea
@@ -1024,7 +1061,7 @@ export function MarketingConsultingCRM({
                   조건에 맞는 상담 리드가 없습니다.
                 </div>
               ) : (
-                filteredLeads.map((lead) => (
+                pagedLeads.map((lead) => (
                   <Card key={lead.id} className="rounded-xl border-none shadow-sm ring-1 ring-border/60">
                     <CardContent className={cn('space-y-3', isMobile ? 'p-4' : 'p-5')}>
                       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
@@ -1034,6 +1071,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[lead.status || 'new'].className)}>
                               {STATUS_META[lead.status || 'new'].label}
                             </Badge>
+                            {lead.serviceType && (
+                              <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[lead.serviceType].color)}>
+                                {SERVICE_TYPE_META[lead.serviceType].label}
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-[10px] font-black">
                               {lead.referralRoute || lead.marketingChannel || '기타'}
                               {lead.referrerName ? ` · ${lead.referrerName}` : ''}
@@ -1115,6 +1157,49 @@ export function MarketingConsultingCRM({
                 ))
               )}
             </div>
+
+            {/* ── 페이지네이션 ── */}
+            {totalLeadsPages > 1 && (
+              <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
+                <p className="text-xs font-bold text-slate-500">
+                  {leadsPage * LEADS_PER_PAGE + 1}–{Math.min((leadsPage + 1) * LEADS_PER_PAGE, filteredLeads.length)} / 전체 {filteredLeads.length}건
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg px-3 text-xs font-black"
+                    disabled={leadsPage === 0}
+                    onClick={() => setLeadsPage((p) => p - 1)}
+                  >
+                    이전
+                  </Button>
+                  {Array.from({ length: totalLeadsPages }, (_, i) => (
+                    <Button
+                      key={i}
+                      type="button"
+                      variant={leadsPage === i ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 w-8 rounded-lg p-0 text-xs font-black"
+                      onClick={() => setLeadsPage(i)}
+                    >
+                      {i + 1}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg px-3 text-xs font-black"
+                    disabled={leadsPage >= totalLeadsPages - 1}
+                    onClick={() => setLeadsPage((p) => p + 1)}
+                  >
+                    다음
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

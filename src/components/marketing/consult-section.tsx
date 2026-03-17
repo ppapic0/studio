@@ -1,4 +1,6 @@
 import type { MarketingContent } from '@/lib/marketing-content';
+import { adminDb } from '@/lib/firebase-admin';
+import { resolveMarketingCenterId } from '@/lib/marketing-center';
 
 import { ConsultForm } from './consult-form';
 import { SectionHeading } from './section-heading';
@@ -7,7 +9,26 @@ type ConsultSectionProps = {
   consult: MarketingContent['consult'];
 };
 
-export function ConsultSection({ consult }: ConsultSectionProps) {
+async function getWaitlistCount(): Promise<number> {
+  try {
+    const centerId = await resolveMarketingCenterId();
+    if (!centerId) return 0;
+    const snap = await adminDb
+      .collection('centers')
+      .doc(centerId)
+      .collection('admissionWaitlist')
+      .where('status', '==', 'waiting')
+      .count()
+      .get();
+    return snap.data().count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function ConsultSection({ consult }: ConsultSectionProps) {
+  const waitlistCount = await getWaitlistCount();
+
   return (
     <section
       id="consult"
@@ -30,6 +51,32 @@ export function ConsultSection({ consult }: ConsultSectionProps) {
             <ConsultForm />
 
             <div className="space-y-4">
+              {/* 입학 대기 인원 배너 */}
+              {waitlistCount > 0 && (
+                <article
+                  className="relative overflow-hidden rounded-2xl border p-5"
+                  style={{
+                    borderColor: 'rgba(255,122,22,0.45)',
+                    background: 'linear-gradient(135deg, rgba(255,122,22,0.18) 0%, rgba(255,122,22,0.08) 100%)',
+                  }}
+                >
+                  {/* 배경 장식 */}
+                  <div
+                    className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full opacity-20"
+                    style={{ background: 'radial-gradient(circle, #FF7A16 0%, transparent 70%)' }}
+                  />
+                  <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FF7A16]">WAITLIST</p>
+                  <div className="mt-2 flex items-end gap-2">
+                    <span className="text-4xl font-black leading-none text-white">{waitlistCount}</span>
+                    <span className="mb-0.5 text-lg font-black text-white/70">명</span>
+                  </div>
+                  <p className="mt-1.5 break-keep text-sm font-bold leading-relaxed text-white/80">
+                    현재 입학을 기다리고 있습니다.<br />
+                    <span className="text-[#FF7A16]">지금 신청하면 우선순위로 연락드립니다.</span>
+                  </p>
+                </article>
+              )}
+
               {[
                 { label: 'CONTACT', value: consult.contactLine },
                 { label: 'LOCATION', value: consult.locationLine },
