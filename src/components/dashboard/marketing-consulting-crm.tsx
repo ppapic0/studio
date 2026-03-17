@@ -142,7 +142,7 @@ interface WaitlistModal {
   studentPhone: string;
   referralRoute: ReferralRoute;
   referrerName: string;
-  serviceType: ServiceType;
+  serviceTypes: ServiceType[];
   memo: string;
 }
 
@@ -192,7 +192,7 @@ const INITIAL_WAITLIST_MODAL = (): WaitlistModal => ({
   studentPhone: '',
   referralRoute: '기타',
   referrerName: '',
-  serviceType: 'korean_academy',
+  serviceTypes: ['korean_academy'],
   memo: '',
 });
 
@@ -558,7 +558,7 @@ export function MarketingConsultingCRM({
       studentPhone: lead.studentPhone || '',
       referralRoute: (lead.referralRoute as ReferralRoute) || '기타',
       referrerName: lead.referrerName || '',
-      serviceType: 'korean_academy',
+      serviceTypes: lead.serviceType ? [lead.serviceType] : ['korean_academy'],
       memo: '',
     });
   };
@@ -571,11 +571,14 @@ export function MarketingConsultingCRM({
     }
     setIsSavingWaitlist(true);
     try {
-      const waitlistRef = await addDoc(collection(firestore, 'centers', centerId, 'admissionWaitlist'), {
+      const selectedServiceTypes = Array.from(new Set(waitlistModal.serviceTypes));
+      const createdWaitlistRefs = await Promise.all(
+        selectedServiceTypes.map((serviceType) =>
+          addDoc(collection(firestore, 'centers', centerId, 'admissionWaitlist'), {
         studentName: waitlistModal.studentName.trim(),
         parentPhone: waitlistModal.parentPhone.trim(),
         studentPhone: waitlistModal.studentPhone.trim(),
-        serviceType: waitlistModal.serviceType,
+        serviceType,
         referralRoute: waitlistModal.referralRoute,
         referrerName: waitlistModal.referralRoute === '추천' ? waitlistModal.referrerName.trim() : '',
         status: 'waiting' as WaitlistStatus,
@@ -584,16 +587,22 @@ export function MarketingConsultingCRM({
         sourceLeadId: waitlistModal.sourceLeadId || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+          })
+        )
+      );
 
       if (waitlistModal.sourceLeadId) {
         await updateDoc(doc(firestore, 'centers', centerId, 'consultingLeads', waitlistModal.sourceLeadId), {
-          addedToWaitlistId: waitlistRef.id,
+          addedToWaitlistId: createdWaitlistRefs[0]?.id || null,
+          addedToWaitlistIds: createdWaitlistRefs.map((ref) => ref.id),
           updatedAt: serverTimestamp(),
         });
       }
 
-      toast({ title: '입학 대기 등록 완료', description: `${SERVICE_TYPE_META[waitlistModal.serviceType].label} 대기 명단에 추가했습니다.` });
+      toast({
+        title: '입학 대기 등록 완료',
+        description: selectedServiceTypes.map((type) => SERVICE_TYPE_META[type].label).join(', ') + ' 대기 명단에 추가했습니다.',
+      });
       setWaitlistModal(INITIAL_WAITLIST_MODAL());
     } catch (error) {
       console.error(error);
@@ -1478,10 +1487,21 @@ export function MarketingConsultingCRM({
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setWaitlistModal((p) => ({ ...p, serviceType: key }))}
+                    onClick={() =>
+                      setWaitlistModal((p) => {
+                        const alreadySelected = p.serviceTypes.includes(key);
+                        if (alreadySelected && p.serviceTypes.length === 1) return p;
+                        return {
+                          ...p,
+                          serviceTypes: alreadySelected
+                            ? p.serviceTypes.filter((serviceType) => serviceType !== key)
+                            : [...p.serviceTypes, key],
+                        };
+                      })
+                    }
                     className={cn(
                       'rounded-lg border-2 px-3 py-2.5 text-xs font-black transition-all',
-                      waitlistModal.serviceType === key
+                      waitlistModal.serviceTypes.includes(key)
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                     )}
