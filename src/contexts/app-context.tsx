@@ -63,7 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const activeMembershipRef = useRef<string | null>(null);
 
   const normalizeRole = (role: CenterMembership['role'] | string | undefined): CenterMembership['role'] => {
-    if (role === 'owner') return 'centerAdmin';
+    if (role === 'owner' || role === 'centerManager' || role === 'admin') return 'centerAdmin';
     if (role === 'student' || role === 'teacher' || role === 'parent' || role === 'centerAdmin') return role;
     return 'student';
   };
