@@ -167,6 +167,8 @@ const SERVICE_TYPE_META: Record<ServiceType, { label: string; color: string }> =
   study_center: { label: '관리형 스터디센터', color: 'bg-sky-100 text-sky-700 border-sky-200' },
 };
 
+const SERVICE_TYPE_NONE = '__none__';
+
 const REFERRAL_ROUTES: ReferralRoute[] = ['추천', '네이버', '카페', '광고', '기타'];
 
 const INITIAL_FORM = (): LeadFormState => ({
@@ -989,13 +991,18 @@ export function MarketingConsultingCRM({
                   <Label className="text-xs font-black">상담 유형</Label>
                   <Select
                     value={form.serviceType}
-                    onValueChange={(value) => setForm((p) => ({ ...p, serviceType: value as ServiceType | '' }))}
+                    onValueChange={(value) =>
+                      setForm((p) => ({
+                        ...p,
+                        serviceType: value === SERVICE_TYPE_NONE ? '' : (value as ServiceType),
+                      }))
+                    }
                   >
                     <SelectTrigger className="h-10 rounded-lg font-bold">
                       <SelectValue placeholder="선택 안함" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="" className="font-semibold text-slate-400">선택 안함</SelectItem>
+                      <SelectItem value={SERVICE_TYPE_NONE} className="font-semibold text-slate-400">선택 안함</SelectItem>
                       {(Object.entries(SERVICE_TYPE_META) as [ServiceType, { label: string; color: string }][]).map(([value, meta]) => (
                         <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
                       ))}
