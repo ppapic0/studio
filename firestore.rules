@@ -47,7 +47,11 @@ service cloud.firestore {
     }
 
     function isRoleCenterAdmin(role) {
-      return role == 'centerAdmin' || role == 'owner';
+      return role == 'centerAdmin' || role == 'owner' || role == 'centerManager' || role == 'admin';
+    }
+
+    function isCenterAdminRole(role) {
+      return isRoleCenterAdmin(role);
     }
 
     function isCenterAdmin(centerId) {
@@ -55,7 +59,7 @@ service cloud.firestore {
     }
 
     function isRoleTeacherOrAdmin(role) {
-      return role == 'teacher' || role == 'centerAdmin' || role == 'owner';
+      return role == 'teacher' || isRoleCenterAdmin(role);
     }
 
     function isTeacherOrAdmin(centerId) {
