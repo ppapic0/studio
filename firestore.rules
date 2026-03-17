@@ -23,8 +23,12 @@ service cloud.firestore {
     }
 
     function getMemberRole(centerId) {
+      // members 문서가 존재하고 role 필드가 null이 아닌 경우에만 사용,
+      // 그렇지 않으면 userCenters 문서로 폴백 (클라이언트 우선순위와 일치)
       return hasMembership(centerId)
-        ? get(memberPath(centerId)).data.role
+        ? (get(memberPath(centerId)).data.role != null
+            ? get(memberPath(centerId)).data.role
+            : (hasUserCenter(centerId) ? get(userCenterPath(centerId)).data.role : null))
         : (hasUserCenter(centerId) ? get(userCenterPath(centerId)).data.role : null);
     }
 
@@ -42,12 +46,20 @@ service cloud.firestore {
       return isActiveStatus(getMemberStatus(centerId));
     }
 
+    function isRoleCenterAdmin(role) {
+      return role == 'centerAdmin' || role == 'owner';
+    }
+
     function isCenterAdmin(centerId) {
-      return getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner';
+      return isRoleCenterAdmin(getMemberRole(centerId));
+    }
+
+    function isRoleTeacherOrAdmin(role) {
+      return role == 'teacher' || role == 'centerAdmin' || role == 'owner';
     }
 
     function isTeacherOrAdmin(centerId) {
-      return getMemberRole(centerId) == 'teacher' || getMemberRole(centerId) == 'centerAdmin' || getMemberRole(centerId) == 'owner';
+      return isRoleTeacherOrAdmin(getMemberRole(centerId));
     }
 
     function isStudent(centerId) {
