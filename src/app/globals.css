@@ -513,7 +513,8 @@
   ─────────────────────────────────────────────── */
 
   .premium-cta {
-    @apply inline-flex items-center justify-center rounded-[0.9rem] border font-black tracking-[-0.025em] transition-all duration-150 ease-out active:scale-[0.97] active:opacity-90;
+    @apply inline-flex items-center justify-center rounded-[0.9rem] border font-extrabold tracking-[-0.01em] transition-all duration-150 ease-out active:scale-[0.97] active:opacity-90;
+    line-height: 1.1;
   }
 
   @media (hover: hover) {
@@ -527,6 +528,7 @@
     border-color: #e86800;
     color: #ffffff;
     background-color: #ff7a16;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
   }
 
   /* Navy CTA - 보조 행동 */

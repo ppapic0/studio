@@ -73,9 +73,9 @@ export function HeroSection({ brand }: HeroSectionProps) {
               성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
             </h1>
             <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-white/85">
-              루틴을 먼저 세우고, 데이터로 확인합니다.
+              빈틈없는 관리 시스템으로
               <br />
-              수능, 내신 국어 수업은 별도로 선택합니다.
+              스스로 공부하는 습관을 형성합니다.
             </p>
           </div>
 
@@ -95,10 +95,6 @@ export function HeroSection({ brand }: HeroSectionProps) {
             </a>
           </div>
 
-          {/* Trust signal */}
-          <p className="text-[12.5px] font-bold text-white/55">
-            2026학년도 · 고려대 2명 포함 주요 대학 합격
-          </p>
         </div>
 
         {/* RIGHT: Auto-rotating showcase */}

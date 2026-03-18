@@ -656,7 +656,7 @@ function WebAppLanding() {
             <p className="text-[1.05rem] font-black text-[#14295F]">학생 모드</p>
           </div>
           <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.7] text-slate-500">
-            루틴, 기록, 누적 흐름을 학생 화면에서 바로 확인합니다.
+            공부습관, 누적 흐름을 학생 화면에서 바로 확인합니다.
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-2">

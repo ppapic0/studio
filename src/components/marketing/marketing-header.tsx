@@ -54,7 +54,7 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
           <a href="/go/login?placement=header" className="premium-cta premium-cta-ghost h-9 px-4 text-xs">
             웹앱 로그인
           </a>
-          <a href="/go/experience?placement=header" className="premium-cta premium-cta-primary h-9 px-4 text-xs">
+          <a href="/go/experience?placement=header" className="premium-cta premium-cta-primary h-9 px-4 text-[13px] font-black tracking-[-0.01em]">
             웹앱 체험
           </a>
         </div>

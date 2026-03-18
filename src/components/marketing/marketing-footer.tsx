@@ -58,7 +58,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
         </div>
 
         <div
-          className="mt-10 pt-6 text-[12px] font-semibold text-white/28"
+          className="mt-10 pt-6 text-[12px] font-semibold text-white"
           style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
         >
           © {new Date().getFullYear()} {brand.name}. All rights reserved.

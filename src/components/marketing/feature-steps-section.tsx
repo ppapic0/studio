@@ -128,7 +128,7 @@ export function FeatureStepsSection() {
             구조에 있습니다
           </h2>
           <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-[#384f6a]">
-            공간을 제공하는 것이 아니라, 루틴을 설계하고 데이터로 관리합니다.
+            단순히 공간을 제공하는 것이 아니라, 공부습관을 설계하고 목표까지 가는 길을 함께 관리합니다.
           </p>
         </div>
 
@@ -153,7 +153,7 @@ export function FeatureStepsSection() {
               {'매일 같은 흐름으로\n공부 구조를 만듭니다'}
             </h3>
             <p className="mt-3 flex-1 break-keep text-[13.5px] font-semibold leading-[1.74] text-slate-500">
-              입실 시간, 공부 흐름, 쉬는 구간까지 구조화된 일과를 운영합니다. 좌석 제공이 아닌 루틴 완성이 목표입니다.
+              입실 시간, 공부 흐름, 쉬는 구간까지 구조화된 일과를 운영합니다. 좌석 제공이 아닌 공부습관 완성이 목표입니다.
             </p>
             <div className="mt-4 rounded-xl border border-[#14295F]/8 bg-[#14295F]/4 px-4 py-3 flex items-center justify-between">
               <div>
@@ -179,10 +179,10 @@ export function FeatureStepsSection() {
               수업 선택형 구조
             </p>
             <h3 className="mt-2 whitespace-pre-line break-keep text-[1.2rem] font-black leading-[1.28] text-white">
-              {'국어 수업은\n필요할 때 선택합니다'}
+              {'소수정예 국어 프로그램은\n트랙의 핵심 프로그램입니다'}
             </h3>
             <p className="mt-3 flex-1 break-keep text-[13.5px] font-semibold leading-[1.74] text-blue-100/80">
-              센터 이용과 수업은 분리되어 있습니다. 재학생·N수생 모두 등록 가능하며, 수능 국어 수업은 별도로 추가할 수 있습니다.
+              원장이 직접 강의하는 국어 소수정예 수업은 재학생, N수생 모두 등록 가능합니다.
             </p>
             <div className="mt-4 rounded-xl border border-white/15 bg-white/10 px-4 py-3 flex items-center justify-between">
               <div>
@@ -209,7 +209,7 @@ export function FeatureStepsSection() {
               </p>
               <h3 className="mt-1 text-[1.2rem] font-black text-[#14295F]">학생 모드</h3>
               <p className="mt-1.5 break-keep text-[13px] font-semibold leading-[1.68] text-slate-500">
-                루틴, 기록, 누적 흐름을 학생 화면에서 바로 확인합니다.
+                공부습관, 누적 흐름을 학생 화면에서 바로 확인합니다.
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {['오늘의 루틴', '누적 기록', '날짜별 캘린더'].map((chip) => (
