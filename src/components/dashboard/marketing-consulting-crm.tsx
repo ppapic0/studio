@@ -74,6 +74,7 @@ interface ConsultingLead {
   updatedAt?: any;
   createdByUid?: string;
   addedToWaitlistId?: string;
+  addedToWaitlistIds?: string[];
 }
 
 interface LeadFormState {
@@ -168,6 +169,7 @@ const SERVICE_TYPE_META: Record<ServiceType, { label: string; color: string }> =
 };
 
 const SERVICE_TYPE_NONE = '__none__';
+const ALL_SERVICE_TYPES: ServiceType[] = ['korean_academy', 'study_center'];
 
 const REFERRAL_ROUTES: ReferralRoute[] = ['추천', '네이버', '카페', '광고', '기타'];
 
@@ -313,6 +315,17 @@ export function MarketingConsultingCRM({
     () => [...(waitlistRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [waitlistRaw]
   );
+
+  const waitlistBySourceLeadId = useMemo(() => {
+    const grouped = new Map<string, WaitlistEntry[]>();
+    for (const entry of waitlist) {
+      if (!entry.sourceLeadId) continue;
+      const current = grouped.get(entry.sourceLeadId) || [];
+      current.push(entry);
+      grouped.set(entry.sourceLeadId, current);
+    }
+    return grouped;
+  }, [waitlist]);
 
   const LEADS_PER_PAGE = 5;
 
@@ -550,6 +563,25 @@ export function MarketingConsultingCRM({
   };
 
   const openWaitlistModal = (lead: ConsultingLead) => {
+    const existingEntries = waitlistBySourceLeadId.get(lead.id) || [];
+    const existingActiveServiceTypes = new Set<ServiceType>(
+      existingEntries.filter((entry) => entry.status !== 'cancelled').map((entry) => entry.serviceType)
+    );
+    const availableServiceTypes = ALL_SERVICE_TYPES.filter((serviceType) => !existingActiveServiceTypes.has(serviceType));
+    const preferredServiceTypes = lead.serviceType ? [lead.serviceType] : ALL_SERVICE_TYPES;
+    const preselectedServiceTypes = preferredServiceTypes.filter((serviceType) => availableServiceTypes.includes(serviceType));
+    const serviceTypes = (preselectedServiceTypes.length > 0 ? preselectedServiceTypes : availableServiceTypes).slice(
+      0,
+      ALL_SERVICE_TYPES.length
+    );
+
+    if (serviceTypes.length === 0) {
+      toast({
+        title: '이미 전체 대기 등록됨',
+        description: '해당 리드는 학원/관리형 센터 모두 대기 등록이 완료되어 있습니다.',
+      });
+      return;
+    }
     setWaitlistModal({
       open: true,
       sourceLeadId: lead.id,
@@ -558,7 +590,7 @@ export function MarketingConsultingCRM({
       studentPhone: lead.studentPhone || '',
       referralRoute: (lead.referralRoute as ReferralRoute) || '기타',
       referrerName: lead.referrerName || '',
-      serviceTypes: lead.serviceType ? [lead.serviceType] : ['korean_academy'],
+      serviceTypes,
       memo: '',
     });
   };
@@ -572,8 +604,31 @@ export function MarketingConsultingCRM({
     setIsSavingWaitlist(true);
     try {
       const selectedServiceTypes = Array.from(new Set(waitlistModal.serviceTypes));
+      if (selectedServiceTypes.length === 0) {
+        toast({ variant: 'destructive', title: '등록 실패', description: '서비스 유형을 최소 1개 선택해주세요.' });
+        return;
+      }
+
+      const existingEntries = waitlistModal.sourceLeadId
+        ? waitlistBySourceLeadId.get(waitlistModal.sourceLeadId) || []
+        : [];
+      const existingActiveServiceTypes = new Set<ServiceType>(
+        existingEntries.filter((entry) => entry.status !== 'cancelled').map((entry) => entry.serviceType)
+      );
+      const serviceTypesToCreate = selectedServiceTypes.filter(
+        (serviceType) => !existingActiveServiceTypes.has(serviceType)
+      );
+
+      if (serviceTypesToCreate.length === 0) {
+        toast({
+          title: '이미 등록됨',
+          description: '선택한 서비스 유형은 이미 대기 등록되어 있습니다.',
+        });
+        return;
+      }
+
       const createdWaitlistRefs = await Promise.all(
-        selectedServiceTypes.map((serviceType) =>
+        serviceTypesToCreate.map((serviceType) =>
           addDoc(collection(firestore, 'centers', centerId, 'admissionWaitlist'), {
         studentName: waitlistModal.studentName.trim(),
         parentPhone: waitlistModal.parentPhone.trim(),
@@ -592,16 +647,19 @@ export function MarketingConsultingCRM({
       );
 
       if (waitlistModal.sourceLeadId) {
+        const mergedWaitlistIds = Array.from(
+          new Set([...existingEntries.map((entry) => entry.id), ...createdWaitlistRefs.map((ref) => ref.id)])
+        );
         await updateDoc(doc(firestore, 'centers', centerId, 'consultingLeads', waitlistModal.sourceLeadId), {
-          addedToWaitlistId: createdWaitlistRefs[0]?.id || null,
-          addedToWaitlistIds: createdWaitlistRefs.map((ref) => ref.id),
+          addedToWaitlistId: mergedWaitlistIds[0] || null,
+          addedToWaitlistIds: mergedWaitlistIds,
           updatedAt: serverTimestamp(),
         });
       }
 
       toast({
         title: '입학 대기 등록 완료',
-        description: selectedServiceTypes.map((type) => SERVICE_TYPE_META[type].label).join(', ') + ' 대기 명단에 추가했습니다.',
+        description: serviceTypesToCreate.map((type) => SERVICE_TYPE_META[type].label).join(', ') + ' 대기 명단에 추가했습니다.',
       });
       setWaitlistModal(INITIAL_WAITLIST_MODAL());
     } catch (error) {
@@ -630,8 +688,12 @@ export function MarketingConsultingCRM({
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'admissionWaitlist', entryId));
       if (sourceLeadId) {
+        const remainingEntries = waitlist.filter(
+          (entry) => entry.sourceLeadId === sourceLeadId && entry.id !== entryId
+        );
         await updateDoc(doc(firestore, 'centers', centerId, 'consultingLeads', sourceLeadId), {
-          addedToWaitlistId: null,
+          addedToWaitlistId: remainingEntries[0]?.id || null,
+          addedToWaitlistIds: remainingEntries.map((entry) => entry.id),
           updatedAt: serverTimestamp(),
         }).catch(() => {});
       }
@@ -1077,7 +1139,23 @@ export function MarketingConsultingCRM({
                   조건에 맞는 상담 리드가 없습니다.
                 </div>
               ) : (
-                pagedLeads.map((lead) => (
+                pagedLeads.map((lead) => {
+                  const leadWaitlistEntries = waitlistBySourceLeadId.get(lead.id) || [];
+                  const leadActiveServiceTypes = Array.from(
+                    new Set(
+                      leadWaitlistEntries
+                        .filter((entry) => entry.status !== 'cancelled')
+                        .map((entry) => entry.serviceType)
+                    )
+                  );
+                  const isLeadFullyWaitlisted = leadActiveServiceTypes.length >= ALL_SERVICE_TYPES.length;
+                  const waitlistButtonLabel = isLeadFullyWaitlisted
+                    ? '학원/센터 대기등록됨'
+                    : leadActiveServiceTypes.length > 0
+                      ? '추가 대기 등록'
+                      : '입학 대기 등록';
+
+                  return (
                   <Card key={lead.id} className="rounded-xl border-none shadow-sm ring-1 ring-border/60">
                     <CardContent className={cn('space-y-3', isMobile ? 'p-4' : 'p-5')}>
                       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
@@ -1096,7 +1174,7 @@ export function MarketingConsultingCRM({
                               {lead.referralRoute || lead.marketingChannel || '기타'}
                               {lead.referrerName ? ` · ${lead.referrerName}` : ''}
                             </Badge>
-                            {lead.addedToWaitlistId && (
+                            {leadWaitlistEntries.length > 0 && (
                               <Badge className="border-none bg-orange-100 text-[10px] font-black text-orange-700">
                                 대기 등록됨
                               </Badge>
@@ -1146,15 +1224,15 @@ export function MarketingConsultingCRM({
                               variant="outline"
                               className={cn(
                                 'h-9 rounded-lg px-3 text-xs font-black',
-                                lead.addedToWaitlistId
+                                isLeadFullyWaitlisted
                                   ? 'border-orange-200 text-orange-500'
                                   : 'border-orange-300 text-orange-600 hover:bg-orange-50'
                               )}
-                              onClick={() => !lead.addedToWaitlistId && openWaitlistModal(lead)}
-                              disabled={!!lead.addedToWaitlistId}
+                              onClick={() => !isLeadFullyWaitlisted && openWaitlistModal(lead)}
+                              disabled={isLeadFullyWaitlisted}
                             >
                               <ListChecks className="mr-1 h-3.5 w-3.5" />
-                              {lead.addedToWaitlistId ? '대기 등록됨' : '입학 대기 등록'}
+                              {waitlistButtonLabel}
                             </Button>
                           )}
                           <Button
@@ -1170,7 +1248,8 @@ export function MarketingConsultingCRM({
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
 
