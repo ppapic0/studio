@@ -71,6 +71,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getTierTheme } from '@/lib/tier-theme';
 import {
   Dialog,
   DialogContent,
@@ -443,17 +444,7 @@ export default function StudyHistoryPage() {
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const isToday = selectedDateForPlan ? isSameDay(selectedDateForPlan, new Date()) : false;
-  const tierHeroGradient = useMemo(() => {
-    const tierTone = currentTier?.bg ?? '';
-    if (tierTone.includes('cyan')) return 'linear-gradient(145deg, #1A5CCF 0%, #143F9A 45%, #0B2358 100%)';
-    if (tierTone.includes('rose')) return 'linear-gradient(145deg, #E55185 0%, #B43663 45%, #611C40 100%)';
-    if (tierTone.includes('purple')) return 'linear-gradient(145deg, #7B3FC4 0%, #5A2F98 45%, #2E1952 100%)';
-    if (tierTone.includes('blue')) return 'linear-gradient(145deg, #2D61D8 0%, #2047A3 45%, #102557 100%)';
-    if (tierTone.includes('emerald')) return 'linear-gradient(145deg, #14A76D 0%, #0E7E54 45%, #0A4B33 100%)';
-    if (tierTone.includes('yellow')) return 'linear-gradient(145deg, #D79B1B 0%, #A77315 45%, #5E410E 100%)';
-    if (tierTone.includes('slate')) return 'linear-gradient(145deg, #607287 0%, #475A72 45%, #24374B 100%)';
-    return 'linear-gradient(145deg, #E56817 0%, #BE4D11 45%, #672D0E 100%)';
-  }, [currentTier?.bg]);
+  const tierTheme = getTierTheme(currentTier);
 
   if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
@@ -476,7 +467,7 @@ export default function StudyHistoryPage() {
           className={cn(
             "md:col-span-2 tier-hero-card border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 !text-white"
           )}
-          style={{ backgroundImage: tierHeroGradient }}
+          style={{ backgroundImage: tierTheme.heroGradient }}
         >
           <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
             {currentTier.name === '챌린저' ? <Crown className="h-48 w-48" /> : <Trophy className="h-48 w-48" />}

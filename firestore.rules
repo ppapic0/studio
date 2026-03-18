@@ -308,9 +308,18 @@ service cloud.firestore {
 
       match /parentCommunications/{commId} {
         allow read: if isTeacherOrAdmin(centerId)
-          || (isParent(centerId) && resource.data.parentUid == request.auth.uid);
-        allow create: if isLinkedParentFromRequest(centerId)
-          && request.resource.data.parentUid == request.auth.uid;
+          || (isParent(centerId) && resource.data.parentUid == request.auth.uid)
+          || (isStudent(centerId)
+              && resource.data.senderRole == 'student'
+              && resource.data.senderUid == request.auth.uid
+              && resource.data.studentId == request.auth.uid);
+        allow create: if (isLinkedParentFromRequest(centerId)
+            && request.resource.data.parentUid == request.auth.uid)
+          || (isStudent(centerId)
+              && request.resource.data.studentId == request.auth.uid
+              && request.resource.data.senderRole == 'student'
+              && request.resource.data.senderUid == request.auth.uid
+              && request.resource.data.type in ['request', 'suggestion']);
         allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }

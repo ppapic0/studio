@@ -525,10 +525,10 @@
 
   /* Orange CTA - 주 행동 유도 */
   .premium-cta-primary {
-    border-color: #e86800;
-    color: #ffffff;
-    background-color: #ff7a16;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+    border-color: rgba(20, 41, 95, 0.18);
+    color: #14295f;
+    background-color: #ffffff;
+    text-shadow: none;
   }
 
   /* Navy CTA - 보조 행동 */

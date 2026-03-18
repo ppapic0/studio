@@ -70,9 +70,13 @@ import Link from 'next/link';
 type ParentCommunicationRecord = {
   id: string;
   studentId: string;
-  parentUid: string;
+  parentUid?: string;
   parentName?: string;
+  senderRole?: 'parent' | 'student';
+  senderUid?: string;
+  senderName?: string;
   type: 'consultation' | 'request' | 'suggestion';
+  requestCategory?: 'question' | 'request' | 'suggestion';
   title?: string;
   body?: string;
   channel?: 'visit' | 'phone' | 'online' | null;
@@ -81,9 +85,13 @@ type ParentCommunicationRecord = {
   updatedAt?: Timestamp;
   handledByName?: string;
   handledByUid?: string;
+  replyBody?: string;
+  repliedAt?: Timestamp;
+  repliedByName?: string;
+  repliedByUid?: string;
 };
 
-type AppointmentTab = 'reservations' | 'logs' | 'parent';
+type AppointmentTab = 'reservations' | 'logs' | 'inquiries' | 'parent';
 
 type AppointmentsPageContentProps = {
   forceTab?: AppointmentTab;
@@ -120,6 +128,10 @@ export function AppointmentsPageContent({
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
   const [parentTypeFilter, setParentTypeFilter] = useState<'all' | 'consultation' | 'request' | 'suggestion'>('all');
   const [parentStatusFilter, setParentStatusFilter] = useState<'all' | 'requested' | 'in_progress' | 'in_review' | 'done'>('all');
+  const [inquiryType, setInquiryType] = useState<'question' | 'suggestion'>('question');
+  const [inquiryTitle, setInquiryTitle] = useState('');
+  const [inquiryBody, setInquiryBody] = useState('');
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setActiveTab(forceTab);
@@ -151,6 +163,7 @@ export function AppointmentsPageContent({
   const isParent = userRole === 'parent';
   const isStaff = userRole === 'teacher' || userRole === 'centerAdmin';
   const isAdmin = userRole === 'centerAdmin';
+  const canAccessCommunications = isStaff || isStudent;
 
   // 상담 희망 선생님 목록
   const teachersQuery = useMemoFirebase(() => {
@@ -212,10 +225,15 @@ export function AppointmentsPageContent({
   const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isStaff) return null;
-    return collection(firestore, 'centers', centerId, 'parentCommunications');
-  }, [firestore, centerId, isStaff]);
-  const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, { enabled: isStaff && !!centerId });
+    if (!firestore || !centerId || !studentUid || !canAccessCommunications) return null;
+    const baseRef = collection(firestore, 'centers', centerId, 'parentCommunications');
+
+    if (isStaff) return query(baseRef);
+    if (isStudent) return query(baseRef, where('senderUid', '==', studentUid));
+
+    return null;
+  }, [firestore, centerId, studentUid, canAccessCommunications, isStaff, isStudent]);
+  const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, { enabled: canAccessCommunications && !!centerId && !!studentUid });
 
   const reservations = useMemo(() => {
     if (!rawReservations) return [];
@@ -233,12 +251,18 @@ export function AppointmentsPageContent({
 
   const filteredParentCommunications = useMemo(() => {
     return parentCommunications.filter((item) => {
+      if (!isStaff) return true;
       const typeMatched = parentTypeFilter === 'all' || item.type === parentTypeFilter;
       const status = item.status || 'requested';
       const statusMatched = parentStatusFilter === 'all' || status === parentStatusFilter;
       return typeMatched && statusMatched;
     });
-  }, [parentCommunications, parentTypeFilter, parentStatusFilter]);
+  }, [parentCommunications, parentTypeFilter, parentStatusFilter, isStaff]);
+
+  const studentInquiries = useMemo(
+    () => parentCommunications.filter((item) => item.senderRole === 'student' || item.senderUid === studentUid),
+    [parentCommunications, studentUid]
+  );
 
   const availableSeasons = useMemo(() => {
     if (!rawLogs) return [];
@@ -273,6 +297,10 @@ export function AppointmentsPageContent({
   const visibleParentCommunications = useMemo(
     () => (showAll ? filteredParentCommunications : filteredParentCommunications.slice(0, PREVIEW_LIMIT)),
     [showAll, filteredParentCommunications]
+  );
+  const visibleStudentInquiries = useMemo(
+    () => (showAll ? studentInquiries : studentInquiries.slice(0, PREVIEW_LIMIT)),
+    [showAll, studentInquiries]
   );
 
   const handleRequestAppointment = async () => {
@@ -381,6 +409,40 @@ export function AppointmentsPageContent({
     }
   };
 
+  const handleSubmitInquiry = async () => {
+    if (!firestore || !centerId || !user || !isStudent) return;
+    if (!inquiryBody.trim()) {
+      toast({ variant: 'destructive', title: '문의 내용을 입력해 주세요.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const communicationType: ParentCommunicationRecord['type'] =
+        inquiryType === 'question' ? 'request' : 'suggestion';
+      await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
+        studentId: user.uid,
+        senderRole: 'student',
+        senderUid: user.uid,
+        senderName: user.displayName || '학생',
+        type: communicationType,
+        title: inquiryTitle.trim() || (inquiryType === 'question' ? '학생 질문' : '학생 건의사항'),
+        body: inquiryBody.trim(),
+        status: 'requested',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: '문의가 등록되었습니다.' });
+      setInquiryTitle('');
+      setInquiryBody('');
+      setInquiryType('question');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '문의 등록에 실패했습니다.', description: e?.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleParentCommunicationStatus = async (
     communicationId: string,
     status: 'in_progress' | 'in_review' | 'done'
@@ -401,6 +463,50 @@ export function AppointmentsPageContent({
       setIsSubmitting(false);
     }
   };
+
+  const handleSaveCommunicationReply = async (item: ParentCommunicationRecord) => {
+    if (!firestore || !centerId || !user) return;
+    const replyBody = (replyDrafts[item.id] ?? item.replyBody ?? '').trim();
+    if (!replyBody) {
+      toast({ variant: 'destructive', title: '답변 내용을 입력해 주세요.' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'parentCommunications', item.id), {
+        replyBody,
+        repliedAt: serverTimestamp(),
+        repliedByUid: user.uid,
+        repliedByName: user.displayName || '센터',
+        handledByUid: user.uid,
+        handledByName: user.displayName || '센터',
+        status: item.status === 'done' ? 'done' : 'in_review',
+        updatedAt: serverTimestamp(),
+      });
+      setReplyDrafts((prev) => ({ ...prev, [item.id]: replyBody }));
+      toast({ title: '답변이 저장되었습니다.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '답변 저장에 실패했습니다.', description: e?.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getCommunicationTypeBadge = (item: ParentCommunicationRecord) => {
+    if (item.type === 'consultation') return <Badge variant="outline" className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">상담요청</Badge>;
+    if (item.type === 'request' && item.senderRole === 'student') return <Badge variant="outline" className="border-none bg-sky-100 text-sky-700 font-black text-[10px]">학생 질문</Badge>;
+    if (item.type === 'request' && item.senderRole === 'parent' && item.requestCategory === 'question') return <Badge variant="outline" className="border-none bg-cyan-100 text-cyan-700 font-black text-[10px]">학부모 질의</Badge>;
+    if (item.type === 'request' && item.senderRole === 'parent' && item.requestCategory === 'request') return <Badge variant="outline" className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">학부모 요청</Badge>;
+    if (item.type === 'request') return <Badge variant="outline" className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">일반요청</Badge>;
+    return <Badge variant="outline" className="border-none bg-violet-100 text-violet-700 font-black text-[10px]">건의사항</Badge>;
+  };
+
+  const getCommunicationOwnerLabel = (item: ParentCommunicationRecord) => {
+    if (item.senderRole === 'student') return item.senderName || '학생';
+    return item.parentName || item.parentUid || item.senderName || '학부모';
+  };
+
+  const getReplyDraftValue = (item: ParentCommunicationRecord) => replyDrafts[item.id] ?? item.replyBody ?? '';
 
   const getParentTypeBadge = (type: ParentCommunicationRecord['type']) => {
     if (type === 'consultation') return <Badge variant="outline" className="border-none bg-blue-100 text-blue-700 font-black text-[10px]">상담요청</Badge>;
@@ -512,13 +618,18 @@ export function AppointmentsPageContent({
 
       <Tabs value={activeTab} onValueChange={(value) => !showAll && setActiveTab(value as AppointmentTab)} className="w-full flex flex-col items-center">
         {!showAll && (
-          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
+          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff || isStudent ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff || isStudent ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
             <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
               <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
             </TabsTrigger>
             <TabsTrigger value="logs" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
               <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
             </TabsTrigger>
+            {isStudent && (
+              <TabsTrigger value="inquiries" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+                <MessageSquare className="h-4 w-4" /> <span className="text-xs sm:text-sm">질문/건의</span>
+              </TabsTrigger>
+            )}
             {isStaff && (
               <TabsTrigger value="parent" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
                 <ClipboardCheck className="h-4 w-4" /> <span className="text-xs sm:text-sm">학부모 요청</span>
@@ -702,13 +813,107 @@ export function AppointmentsPageContent({
           </Card>
         </TabsContent>
 
+        {isStudent && (
+          <TabsContent value="inquiries" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
+            <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+              <CardHeader className={cn("bg-sky-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
+                <CardTitle className={cn("font-black text-sky-700 flex items-center gap-3 whitespace-nowrap", isMobile ? "text-lg" : "text-xl")}>
+                  <MessageSquare className="h-6 w-6 opacity-60" /> 질문/건의함
+                </CardTitle>
+                <CardDescription className="font-bold text-xs mt-1">궁금한 점이나 건의사항을 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className={cn("space-y-4 border-b bg-sky-50/20", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[150px_1fr]")}>
+                    <Select value={inquiryType} onValueChange={(value: 'question' | 'suggestion') => setInquiryType(value)}>
+                      <SelectTrigger className="h-11 rounded-xl border-2 font-bold text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="question">질문</SelectItem>
+                        <SelectItem value="suggestion">건의사항</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={inquiryTitle}
+                      onChange={(e) => setInquiryTitle(e.target.value)}
+                      placeholder={inquiryType === 'question' ? '질문 제목 (선택)' : '건의 제목 (선택)'}
+                      className="h-11 rounded-xl border-2 font-bold"
+                    />
+                  </div>
+                  <Textarea
+                    value={inquiryBody}
+                    onChange={(e) => setInquiryBody(e.target.value)}
+                    placeholder={inquiryType === 'question' ? '질문 내용을 입력해 주세요.' : '건의사항 내용을 입력해 주세요.'}
+                    className="rounded-xl min-h-[120px] resize-none text-sm font-bold border-2"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSubmitInquiry}
+                      disabled={isSubmitting || !inquiryBody.trim()}
+                      className={cn("rounded-xl font-black h-11 px-6 text-white", `bg-gradient-to-br ${currentTier.gradient}`)}
+                    >
+                      {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : '등록하기'}
+                    </Button>
+                  </div>
+                </div>
+                {parentCommsLoading ? (
+                  <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                ) : studentInquiries.length === 0 ? (
+                  <div className="py-24 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
+                    <MessageSquare className="h-16 w-16 opacity-10" />
+                    등록된 질문/건의가 없습니다.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-muted/10">
+                    {visibleStudentInquiries.map((item) => {
+                      const createdAtDate = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
+                      const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy.MM.dd HH:mm') : '-';
+                      const repliedAtDate = item.repliedAt?.toDate?.();
+                      const repliedAtLabel = repliedAtDate ? format(repliedAtDate, 'yyyy.MM.dd HH:mm') : '';
+                      return (
+                        <div key={item.id} className={cn("space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {getCommunicationTypeBadge(item)}
+                            {getParentStatusBadge(item.status)}
+                          </div>
+                          <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item.title || '질문/건의'}</h3>
+                          <p className="text-[10px] font-bold text-muted-foreground">{createdAtLabel}</p>
+                          <div className="rounded-2xl border bg-slate-50/40 p-4">
+                            <p className="whitespace-pre-wrap text-sm font-bold text-slate-700 leading-relaxed">{item.body?.trim() || '내용이 없습니다.'}</p>
+                          </div>
+                          {item.replyBody && (
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                              <p className="text-[10px] font-black text-emerald-700 mb-1">답변 {item.repliedByName ? `· ${item.repliedByName}` : ''} {repliedAtLabel ? `· ${repliedAtLabel}` : ''}</p>
+                              <p className="whitespace-pre-wrap text-sm font-bold text-emerald-900 leading-relaxed">{item.replyBody}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {!showAll && studentInquiries.length > PREVIEW_LIMIT && (
+                  <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
+                    <Button asChild variant="outline" className="rounded-xl font-black">
+                      <Link href="/dashboard/appointments/inquiries">
+                        질문/건의 더보기<ArrowRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
         {isStaff && (
           <TabsContent value="parent" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
             <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
               <CardHeader className={cn("bg-blue-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
                 <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-stretch" : "flex-row")}>
                   <CardTitle className={cn("font-black text-blue-700 flex items-center gap-3 whitespace-nowrap", isMobile ? "text-lg" : "text-xl")}>
-                    <ClipboardCheck className="h-6 w-6 opacity-60" /> 학부모 요청함
+                    <ClipboardCheck className="h-6 w-6 opacity-60" /> 상담 문의함
                   </CardTitle>
                   <div className={cn("flex items-center gap-2", isMobile ? "w-full flex-col" : "w-auto")}>
                     <Select value={parentTypeFilter} onValueChange={(value: any) => setParentTypeFilter(value)}>
@@ -736,7 +941,7 @@ export function AppointmentsPageContent({
                     </Select>
                   </div>
                 </div>
-                <CardDescription className="font-bold text-xs mt-1">상담 요청/일반 요청/건의사항을 이 탭에서 분리 확인하고 처리할 수 있습니다.</CardDescription>
+                <CardDescription className="font-bold text-xs mt-1">학생/학부모 요청을 확인하고 상태 변경 또는 답변을 남길 수 있습니다.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {parentCommsLoading ? (
@@ -744,7 +949,7 @@ export function AppointmentsPageContent({
                 ) : filteredParentCommunications.length === 0 ? (
                   <div className="py-24 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
                     <ClipboardCheck className="h-16 w-16 opacity-10" />
-                    학부모 요청 내역이 없습니다.
+                    확인할 문의가 없습니다.
                   </div>
                 ) : (
                   <div className="divide-y divide-muted/10">
@@ -759,12 +964,15 @@ export function AppointmentsPageContent({
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div className="space-y-2 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                {getParentTypeBadge(item.type)}
+                                {getCommunicationTypeBadge(item)}
                                 {getParentStatusBadge(item.status)}
+                                <Badge variant="outline" className="font-black text-[10px]">{item.senderRole === 'student' ? '작성: 학생' : '작성: 학부모'}</Badge>
                                 {channelLabel && <Badge variant="outline" className="font-black text-[10px]">채널: {channelLabel}</Badge>}
                               </div>
-                              <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item.title || '학부모 요청'}</h3>
-                              <p className="text-[10px] font-bold text-muted-foreground">학부모: {item.parentName || item.parentUid} · 학생: {studentName} · {createdAtLabel}</p>
+                              <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item.title || '문의'}</h3>
+                              <p className="text-[10px] font-bold text-muted-foreground">
+                                작성자: {getCommunicationOwnerLabel(item)} · 학생: {studentName} · {createdAtLabel}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
                               {item.status !== 'in_progress' && item.status !== 'done' && (
@@ -782,6 +990,28 @@ export function AppointmentsPageContent({
                           <div className="rounded-2xl border bg-slate-50/40 p-4">
                             <p className="whitespace-pre-wrap text-sm font-bold text-slate-700 leading-relaxed">{item.body?.trim() || '요청 내용이 비어 있습니다.'}</p>
                           </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">답변</p>
+                            <Textarea
+                              value={getReplyDraftValue(item)}
+                              onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              placeholder="학생/학부모에게 전달할 답변을 입력해 주세요."
+                              className="rounded-xl min-h-[92px] resize-none border"
+                            />
+                            <div className="flex justify-end">
+                              <Button size="sm" disabled={isSubmitting || !getReplyDraftValue(item).trim()} onClick={() => handleSaveCommunicationReply(item)} className="rounded-xl font-black h-9">
+                                답변 저장
+                              </Button>
+                            </div>
+                          </div>
+                          {item.replyBody && (
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                              <p className="text-[10px] font-black text-emerald-700 mb-1">
+                                최근 답변{item.repliedByName ? ` · ${item.repliedByName}` : ''}
+                              </p>
+                              <p className="whitespace-pre-wrap text-sm font-bold text-emerald-900 leading-relaxed">{item.replyBody}</p>
+                            </div>
+                          )}
                           {item.handledByName && (
                             <p className="text-[10px] font-bold text-emerald-700">담당자: {item.handledByName}</p>
                           )}

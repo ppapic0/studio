@@ -60,6 +60,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
+import { getTierTheme } from '@/lib/tier-theme';
 import {
   Dialog,
   DialogContent,
@@ -535,6 +536,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const { activeMembership, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode, currentTier } = useAppContext();
+  const tierTheme = getTierTheme(currentTier);
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
@@ -1354,28 +1356,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
       <section className={cn(
-        "relative overflow-hidden text-white border border-[#B84B1A] bg-[#CC541D] transition-colors duration-200",
+        "relative overflow-hidden text-white border transition-colors duration-200",
         isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-10"
-      )}>
+      )}
+      style={{
+        borderColor: tierTheme.heroBorder,
+        backgroundImage: tierTheme.heroGradient,
+      }}>
         <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-[0.08] rotate-12">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 flex flex-col gap-4", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
           <div className={isMobile ? "space-y-2" : "space-y-4"}>
             <div className="flex flex-col gap-1">
-              <Badge variant="outline" className={cn("w-fit bg-[#17356F] text-white border border-[#2A4A86] font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}>{currentTier.name} 티어 활성</Badge>
+              <Badge
+                variant="outline"
+                className={cn("w-fit text-white border font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}
+                style={{ backgroundColor: tierTheme.chipBg, borderColor: tierTheme.chipBorder }}
+              >
+                {currentTier.name} 티어 활성
+              </Badge>
               <h2 className={cn("font-aggro-display font-black whitespace-pre-line", isMobile ? "text-[1.75rem] leading-[1.2] tracking-[-0.01em]" : "text-[3.6rem] leading-[1.1] tracking-[-0.02em]")}>
                 {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
               </h2>
             </div>
-            <div className={cn("flex items-center gap-1.5 bg-[#B84B1A] w-fit px-3 py-1 rounded-full border border-[#D27A53]", isMobile ? "mx-auto" : "md:mx-0")}>
+            <div
+              className={cn("flex items-center gap-1.5 w-fit px-3 py-1 rounded-full border", isMobile ? "mx-auto" : "md:mx-0")}
+              style={{ backgroundColor: tierTheme.subtleBg, borderColor: tierTheme.subtleBorder }}
+            >
               <span className={cn("inline-flex h-1.5 w-1.5 rounded-full", isTimerActive ? "bg-[#FFD26C]" : "bg-white")} />
               <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>성과 엔진 활성</span>
             </div>
           </div>
           <div className={cn("flex items-center gap-3", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
-              <div className={cn("flex flex-col items-center bg-[#9E4219] rounded-2xl border border-[#D17A52] px-6 py-3", isMobile ? "w-full" : "")}>
+              <div
+                className={cn("flex flex-col items-center rounded-2xl border px-6 py-3", isMobile ? "w-full" : "")}
+                style={{ backgroundColor: tierTheme.sessionBg, borderColor: tierTheme.subtleBorder }}
+              >
                 <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">실시간 세션</span>
                 <span className={cn("dashboard-number text-white", isMobile ? "text-3xl" : "text-7xl")}>
                   {formatTimer(localSeconds)}
@@ -1403,7 +1421,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               
               <Dialog>
                 <DialogTrigger asChild>
-                  <button className="w-full h-12 rounded-2xl bg-[#B84B1A] border border-[#D27A53] text-white font-aggro-display font-black gap-2 flex items-center justify-center">
+                  <button
+                    className="w-full h-12 rounded-2xl border text-white font-aggro-display font-black gap-2 flex items-center justify-center"
+                    style={{ backgroundColor: tierTheme.subtleBg, borderColor: tierTheme.subtleBorder }}
+                  >
                     <QrCode className="h-4 w-4" /> 나의 출입 QR
                   </button>
                 </DialogTrigger>

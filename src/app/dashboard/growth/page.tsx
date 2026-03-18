@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { getTierTheme } from '@/lib/tier-theme';
 
 const STAT_CONFIG = {
   focus: { 
@@ -368,17 +369,7 @@ export default function GrowthPage() {
 
   const currentLp = progress?.seasonLp || 0;
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
-  const heroGradient = useMemo(() => {
-    const tierTone = currentTier?.bg ?? '';
-    if (tierTone.includes('cyan')) return 'linear-gradient(145deg, #1A5CCF 0%, #143F9A 45%, #0B2358 100%)';
-    if (tierTone.includes('rose')) return 'linear-gradient(145deg, #E55185 0%, #B43663 45%, #611C40 100%)';
-    if (tierTone.includes('purple')) return 'linear-gradient(145deg, #7B3FC4 0%, #5A2F98 45%, #2E1952 100%)';
-    if (tierTone.includes('blue')) return 'linear-gradient(145deg, #2D61D8 0%, #2047A3 45%, #102557 100%)';
-    if (tierTone.includes('emerald')) return 'linear-gradient(145deg, #14A76D 0%, #0E7E54 45%, #0A4B33 100%)';
-    if (tierTone.includes('yellow')) return 'linear-gradient(145deg, #D79B1B 0%, #A77315 45%, #5E410E 100%)';
-    if (tierTone.includes('slate')) return 'linear-gradient(145deg, #607287 0%, #475A72 45%, #24374B 100%)';
-    return 'linear-gradient(145deg, #E56817 0%, #BE4D11 45%, #672D0E 100%)';
-  }, [currentTier?.bg]);
+  const tierTheme = getTierTheme(currentTier);
 
   if (isLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
 
@@ -404,7 +395,7 @@ export default function GrowthPage() {
           "tier-hero-card border-none !text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
           isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
         )}
-        style={{ backgroundImage: heroGradient }}
+        style={{ backgroundImage: tierTheme.heroGradient }}
       >
         <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
