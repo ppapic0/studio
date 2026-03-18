@@ -85,7 +85,7 @@ function toPercent(value: number) {
 }
 
 function formatWon(value: number) {
-  return `${Math.round(value || 0).toLocaleString('ko-KR')}??;
+  return `${Math.round(value || 0).toLocaleString('ko-KR')}원`;
 }
 
 export function OperationalIntelligence() {
@@ -372,7 +372,7 @@ export function OperationalIntelligence() {
       <div className="py-40 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
         <p className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 whitespace-nowrap">
-          ?댁쁺 吏???곗씠?곕? 遺덈윭?ㅻ뒗 以묒엯?덈떎...
+          운영 지표 데이터를 불러오는 중입니다...
         </p>
       </div>
     );
@@ -383,16 +383,16 @@ export function OperationalIntelligence() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-blue-600 p-8 relative overflow-hidden">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-blue-600 text-white p-8 relative overflow-hidden">
           <Armchair className="absolute -right-4 -top-4 h-40 w-40 opacity-10" />
           <div className="relative z-10 space-y-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-sky-100">?꾩옱 醫뚯꽍 ?먯쑀??/p>
-            <h3 className="dashboard-number text-6xl text-amber-100">
+            <p className="text-[10px] font-black uppercase tracking-widest opacity-70">현재 좌석 점유율</p>
+            <h3 className="dashboard-number text-6xl text-white">
               {opsMetrics.currentOccupancyRate}
-              <span className="text-2xl text-sky-200/90 ml-1">%</span>
+              <span className="text-2xl opacity-60 ml-1">%</span>
             </h3>
-            <p className="text-xs font-bold text-sky-100/95">
-              ?ㅼ떆媛?李⑹꽍 {opsMetrics.occupiedSeats} / ?꾩껜 醫뚯꽍 {opsMetrics.totalSeats}
+            <p className="text-xs font-bold opacity-80">
+              실시간 착석 {opsMetrics.occupiedSeats} / 전체 좌석 {opsMetrics.totalSeats}
             </p>
           </div>
         </Card>
@@ -400,14 +400,14 @@ export function OperationalIntelligence() {
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-black/[0.03]">
           <div className="flex items-center gap-2 mb-4">
             <Clock3 className="h-5 w-5 text-amber-500" />
-            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">?쒓컙? ?쇳겕 ?먯쑀??/p>
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">시간대 피크 점유율</p>
           </div>
           <h4 className="dashboard-number text-4xl text-amber-600">
             {opsMetrics.peakOccupancySlot.occupancyRate}
             <span className="text-xl opacity-50 ml-1">%</span>
           </h4>
           <p className="text-xs font-bold text-muted-foreground mt-2">
-            理쒓퀬 ?먯쑀 ?쒓컙?: {opsMetrics.peakOccupancySlot.label}
+            최고 점유 시간대: {opsMetrics.peakOccupancySlot.label}
           </p>
           <Progress value={opsMetrics.peakOccupancySlot.occupancyRate} className="h-2 bg-amber-100 mt-4" />
         </Card>
@@ -415,21 +415,21 @@ export function OperationalIntelligence() {
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-black/[0.03]">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="h-5 w-5 text-emerald-500" />
-            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">?쒓컙? 留ㅼ텧 ?쇳겕</p>
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">시간대 매출 피크</p>
           </div>
           <h4 className="dashboard-number text-3xl text-emerald-600">{formatWon(opsMetrics.peakRevenueSlot.amount)}</h4>
           <p className="text-xs font-bold text-muted-foreground mt-2">
-            理쒓퀬 留ㅼ텧 ?쒓컙?: {opsMetrics.peakRevenueSlot.label} (理쒓렐 30??
+            최고 매출 시간대: {opsMetrics.peakRevenueSlot.label} (최근 30일)
           </p>
           <Badge variant="secondary" className="mt-4 bg-emerald-50 text-emerald-700 font-black text-[10px]">
-            ?꾩쟻 {formatWon(opsMetrics.totalRecentRevenue)}
+            누적 {formatWon(opsMetrics.totalRecentRevenue)}
           </Badge>
         </Card>
 
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-black/[0.03]">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="h-5 w-5 text-violet-500" />
-            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">?됯퇏 怨듬??쒓컙 ?ъ꽦瑜?/p>
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">평균 공부시간 달성률</p>
           </div>
           <h4 className="dashboard-number text-4xl text-violet-600">
             {opsMetrics.averageStudyRatio}
@@ -439,19 +439,19 @@ export function OperationalIntelligence() {
             {opsMetrics.studyTrendDelta > 0 ? (
               <>
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
-                <span className="text-emerald-600">?꾩씪 ?鍮?+{opsMetrics.studyTrendDelta}%p</span>
+                <span className="text-emerald-600">전일 대비 +{opsMetrics.studyTrendDelta}%p</span>
               </>
             ) : opsMetrics.studyTrendDelta < 0 ? (
               <>
                 <TrendingDown className="h-4 w-4 text-rose-500" />
-                <span className="text-rose-600">?꾩씪 ?鍮?{opsMetrics.studyTrendDelta}%p</span>
+                <span className="text-rose-600">전일 대비 {opsMetrics.studyTrendDelta}%p</span>
               </>
             ) : (
-              <span className="text-muted-foreground">?꾩씪 ?鍮?蹂???놁쓬</span>
+              <span className="text-muted-foreground">전일 대비 변동 없음</span>
             )}
           </div>
           <p className="text-[11px] font-bold text-muted-foreground mt-3">
-            ?됯퇏 {opsMetrics.averageDailyStudyMinutes}遺?/ 紐⑺몴 {opsMetrics.averageTargetMinutes}遺?
+            평균 {opsMetrics.averageDailyStudyMinutes}분 / 목표 {opsMetrics.averageTargetMinutes}분
           </p>
         </Card>
       </section>
@@ -460,10 +460,10 @@ export function OperationalIntelligence() {
         <Card className="md:col-span-7 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
           <CardHeader className="bg-muted/5 border-b p-8">
             <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
-              <Armchair className="h-6 w-6 text-blue-600" /> ?쒓컙?蹂?醫뚯꽍 ?먯쑀??
+              <Armchair className="h-6 w-6 text-blue-600" /> 시간대별 좌석 점유율
             </CardTitle>
             <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
-              ?ㅻ뒛 / 09:00-23:00
+              오늘 / 09:00-23:00
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">
@@ -480,7 +480,7 @@ export function OperationalIntelligence() {
                     tickLine={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => [`${value}%`, '醫뚯꽍 ?먯쑀??]}
+                    formatter={(value: number) => [`${value}%`, '좌석 점유율']}
                     labelFormatter={(label) => `${label}`}
                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
                   />
@@ -494,10 +494,10 @@ export function OperationalIntelligence() {
         <Card className="md:col-span-5 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
           <CardHeader className="bg-emerald-50/30 border-b p-8">
             <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
-              <BarChart3 className="h-6 w-6 text-emerald-600" /> ?쒓컙?蹂?留ㅼ텧 ?곹솴
+              <BarChart3 className="h-6 w-6 text-emerald-600" /> 시간대별 매출 상황
             </CardTitle>
             <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
-              理쒓렐 30??/ 寃곗젣 湲곕줉
+              최근 30일 / 결제 기록
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">
@@ -510,14 +510,14 @@ export function OperationalIntelligence() {
                     fontSize={11}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(value) => `${Math.round(value / 10000)}留?}
+                    tickFormatter={(value) => `${Math.round(value / 10000)}만`}
                   />
                   <Tooltip
-                    formatter={(value: number) => [formatWon(value), '留ㅼ텧']}
+                    formatter={(value: number) => [formatWon(value), '매출']}
                     labelFormatter={(label) => `${label}`}
                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
                   />
-                  <Bar dataKey="amount" name="留ㅼ텧" fill="#10b981" radius={[10, 10, 0, 0]} barSize={18} />
+                  <Bar dataKey="amount" name="매출" fill="#10b981" radius={[10, 10, 0, 0]} barSize={18} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -529,10 +529,10 @@ export function OperationalIntelligence() {
         <Card className="md:col-span-8 rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
           <CardHeader className="bg-violet-50/30 border-b p-8">
             <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
-              <Activity className="h-6 w-6 text-violet-600" /> ?됯퇏 怨듬??쒓컙 鍮꾩쑉 異붿꽭
+              <Activity className="h-6 w-6 text-violet-600" /> 평균 공부시간 비율 추세
             </CardTitle>
             <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
-              理쒓렐 14??/ 紐⑺몴 ?ъ꽦瑜?
+              최근 14일 / 목표 달성률
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">
@@ -549,7 +549,7 @@ export function OperationalIntelligence() {
                     tickLine={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => [`${value}%`, '?ъ꽦瑜?]}
+                    formatter={(value: number) => [`${value}%`, '달성률']}
                     labelFormatter={(label) => `${label}`}
                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
                   />
@@ -561,29 +561,29 @@ export function OperationalIntelligence() {
         </Card>
 
         <Card className="md:col-span-4 rounded-[3rem] border-none shadow-2xl bg-white p-8 ring-1 ring-black/[0.03]">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">?댁쁺 ?몄궗?댄듃</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">운영 인사이트</p>
           <div className="space-y-4">
             <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4">
-              <p className="text-xs font-black text-blue-700">醫뚯꽍 吏묒쨷 ?쒓컙</p>
+              <p className="text-xs font-black text-blue-700">좌석 집중 시간</p>
               <p className="text-sm font-bold text-blue-900 mt-1">
-                {opsMetrics.peakOccupancySlot.label}???먯쑀??{opsMetrics.peakOccupancySlot.occupancyRate}%
+                {opsMetrics.peakOccupancySlot.label}에 점유율 {opsMetrics.peakOccupancySlot.occupancyRate}%
               </p>
             </div>
             <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
-              <p className="text-xs font-black text-amber-700">?댁쁺 ?ъ쑀 ?쒓컙</p>
+              <p className="text-xs font-black text-amber-700">운영 여유 시간</p>
               <p className="text-sm font-bold text-amber-900 mt-1">
-                {opsMetrics.lowOccupancySlot.label} ?먯쑀??{opsMetrics.lowOccupancySlot.occupancyRate}% (?띾낫/?곷떞 吏묒쨷 沅뚯옣)
+                {opsMetrics.lowOccupancySlot.label} 점유율 {opsMetrics.lowOccupancySlot.occupancyRate}% (홍보/상담 집중 권장)
               </p>
             </div>
             <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
-              <p className="text-xs font-black text-emerald-700">?щТ 吏묒쨷 ?쒓컙</p>
+              <p className="text-xs font-black text-emerald-700">재무 집중 시간</p>
               <p className="text-sm font-bold text-emerald-900 mt-1">
-                {opsMetrics.peakRevenueSlot.label} 留ㅼ텧 {formatWon(opsMetrics.peakRevenueSlot.amount)}
+                {opsMetrics.peakRevenueSlot.label} 매출 {formatWon(opsMetrics.peakRevenueSlot.amount)}
               </p>
             </div>
             <div className="rounded-2xl bg-muted/40 border p-4">
-              <p className="text-xs font-black text-muted-foreground">?숈깮/援먯궗 鍮꾩쑉</p>
-              <p className="text-sm font-bold text-primary mt-1">?꾩옱 {opsMetrics.studentTeacherRatio}:1</p>
+              <p className="text-xs font-black text-muted-foreground">학생/교사 비율</p>
+              <p className="text-sm font-bold text-primary mt-1">현재 {opsMetrics.studentTeacherRatio}:1</p>
             </div>
           </div>
         </Card>
