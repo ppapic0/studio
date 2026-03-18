@@ -15,12 +15,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/firebase';
-import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuth, useFirestore } from '@/firebase';
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
 import { Loader2, Mail } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -47,10 +48,47 @@ const resetSchema = z.object({
 export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [isResetSending, setIsResetSending] = useState(false);
+
+  const normalizeMembershipStatus = (value: unknown): string => {
+    if (typeof value !== 'string') return '';
+    return value.trim().toLowerCase();
+  };
+
+  const validateStudentMembershipStatus = async (uid: string) => {
+    if (!firestore) return { allowed: true as const };
+
+    const centersSnap = await getDocs(collection(firestore, 'userCenters', uid, 'centers'));
+    if (centersSnap.empty) return { allowed: true as const };
+
+    const studentMemberships = centersSnap.docs
+      .map((docSnap) => docSnap.data() as { role?: string; status?: string })
+      .filter((membership) => membership.role === 'student');
+
+    if (studentMemberships.length === 0) return { allowed: true as const };
+
+    const hasActiveMembership = studentMemberships.some((membership) => {
+      const normalized = normalizeMembershipStatus(membership.status);
+      return !normalized || normalized === 'active';
+    });
+
+    if (hasActiveMembership) return { allowed: true as const };
+
+    const hasOnHold = studentMemberships.some((membership) => {
+      const normalized = normalizeMembershipStatus(membership.status);
+      return normalized === 'onhold' || normalized === 'on_hold' || normalized === 'pending';
+    });
+
+    const blockedLabel = hasOnHold ? '휴원' : '퇴원';
+    return {
+      allowed: false as const,
+      message: `${blockedLabel} 상태 계정은 로그인할 수 없습니다. 센터 관리자에게 문의해 주세요.`,
+    };
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -72,7 +110,17 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       const trimmedEmail = values.email.trim();
-      await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
+      const validation = await validateStudentMembershipStatus(userCredential.user.uid);
+      if (!validation.allowed) {
+        await signOut(auth);
+        toast({
+          variant: 'destructive',
+          title: '로그인 제한',
+          description: validation.message,
+        });
+        return;
+      }
       await trackMarketingClientEvent({
         eventType: 'login_success',
         pageType: 'login',

@@ -45,7 +45,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-import { addDoc, collection, doc, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { 
   format, 
   subDays, 
@@ -113,6 +113,13 @@ function toHm(minutes: number) {
   if (h === 0) return `${m}분`;
   if (m === 0) return `${h}시간`;
   return `${h}시간\u00A0${m}분`;
+}
+
+function toClockLabel(totalMinutes: number) {
+  const safe = Math.max(0, Math.min(24 * 60, Math.round(totalMinutes)));
+  const hours = Math.floor(safe / 60).toString().padStart(2, '0');
+  const minutes = (safe % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 function formatMinutes(minutes: number) {
@@ -242,6 +249,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
+  const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
   const visitLoggedRef = useRef(false);
   const reportReadLoggedRef = useRef<Record<string, boolean>>({});
 
@@ -356,6 +364,47 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, studentId]);
   const { data: attendanceCurrentDocs } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive && !!studentId });
   const attendanceCurrent = attendanceCurrentDocs?.[0];
+
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || !studentId || !today) {
+      setCheckInByDateKey({});
+      return;
+    }
+
+    let cancelled = false;
+    const targetDateKeys = Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      return format(day, 'yyyy-MM-dd');
+    });
+
+    const loadCheckInRecords = async () => {
+      try {
+        const pairs = await Promise.all(
+          targetDateKeys.map(async (dateKey) => {
+            const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
+            const snap = await getDoc(recordRef);
+            if (!snap.exists()) return [dateKey, null] as const;
+            const payload = snap.data() as Record<string, unknown>;
+            const checkInAt = toDateSafe((payload?.checkInAt as TimestampLike) || (payload?.updatedAt as TimestampLike));
+            return [dateKey, checkInAt] as const;
+          })
+        );
+
+        if (!cancelled) {
+          const next = Object.fromEntries(pairs) as Record<string, Date | null>;
+          setCheckInByDateKey(next);
+        }
+      } catch (error) {
+        console.warn('[parent-dashboard] failed to load check-in trend', error);
+        if (!cancelled) setCheckInByDateKey({});
+      }
+    };
+
+    void loadCheckInRecords();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, centerId, studentId, today]);
 
   const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
   const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
@@ -501,6 +550,47 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       };
     });
   }, [today, logMinutesByDateKey]);
+
+  const dailyRhythmTrend = useMemo(() => {
+    if (!today) return [] as { date: string; rhythmMinutes: number | null }[];
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const baseCheckIn = checkInByDateKey[dateKey];
+      const todayFallback =
+        dateKey === todayKey && attendanceCurrent?.lastCheckInAt
+          ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
+          : null;
+      const checkIn = baseCheckIn || todayFallback;
+
+      return {
+        date: format(day, 'MM/dd', { locale: ko }),
+        rhythmMinutes: checkIn ? checkIn.getHours() * 60 + checkIn.getMinutes() : null,
+      };
+    });
+  }, [today, checkInByDateKey, todayKey, attendanceCurrent?.lastCheckInAt]);
+
+  const hasRhythmTrend = useMemo(
+    () => dailyRhythmTrend.some((point) => typeof point.rhythmMinutes === 'number'),
+    [dailyRhythmTrend]
+  );
+
+  const rhythmYAxisDomain = useMemo(() => {
+    const values = dailyRhythmTrend
+      .map((point) => point.rhythmMinutes)
+      .filter((value): value is number => typeof value === 'number');
+
+    if (values.length === 0) return [420, 1320] as [number, number];
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max(30, Math.round((max - min) * 0.25));
+    const lower = Math.max(0, Math.floor((min - padding) / 30) * 30);
+    const upper = Math.min(24 * 60, Math.ceil((max + padding) / 30) * 30);
+    if (lower === upper) return [Math.max(0, lower - 60), Math.min(24 * 60, upper + 60)] as [number, number];
+    return [lower, upper] as [number, number];
+  }, [dailyRhythmTrend]);
 
   const weeklyTotalStudyMinutes = useMemo(
     () => dailyStudyTrend.reduce((sum, day) => sum + day.minutes, 0),
@@ -1221,15 +1311,42 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     학습 리듬 시간
                   </CardTitle>
                   <div className="h-40 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsLineChart data={dailyStudyTrend}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
-                        <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
-                        <YAxis fontSize={10} axisLine={false} tickLine={false} width={28} />
-                        <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }} />
-                        <Line type="monotone" dataKey="minutes" stroke="#14295F" strokeWidth={3} dot={{ r: 3, fill: '#FF7A16' }} />
-                      </RechartsLineChart>
-                    </ResponsiveContainer>
+                    {hasRhythmTrend ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsLineChart data={dailyRhythmTrend}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
+                          <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
+                          <YAxis
+                            fontSize={10}
+                            axisLine={false}
+                            tickLine={false}
+                            width={40}
+                            domain={rhythmYAxisDomain}
+                            tickFormatter={(value) => toClockLabel(Number(value))}
+                          />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
+                            formatter={(value) =>
+                              typeof value === 'number'
+                                ? [toClockLabel(value), '입실 시간']
+                                : ['기록 없음', '입실 시간']
+                            }
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="rhythmMinutes"
+                            stroke="#14295F"
+                            strokeWidth={3}
+                            dot={{ r: 3, fill: '#FF7A16' }}
+                            connectNulls={false}
+                          />
+                        </RechartsLineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-[11px] font-bold text-slate-400">
+                        최근 입실 시간 기록이 없습니다.
+                      </div>
+                    )}
                   </div>
                 </Card>
 

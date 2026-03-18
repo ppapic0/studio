@@ -607,7 +607,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">분석 대상</span>
           </div>
           <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-[160px] h-11 rounded-xl border-none bg-primary text-white font-black text-xs shadow-lg focus:ring-0">
+            <SelectTrigger className="w-[160px] h-11 rounded-xl border border-slate-200 bg-white text-black font-black text-xs shadow-lg focus:ring-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="rounded-xl border-none shadow-2xl">

@@ -820,9 +820,9 @@ export function MarketingConsultingCRM({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="border-none bg-white text-[#C25A00] shadow-sm">전체 {websiteSummary.total}건</Badge>
-                  <Badge className="border-none bg-white text-blue-700 shadow-sm">신규 {websiteSummary.newCount}건</Badge>
-                  <Badge className="border-none bg-white text-amber-700 shadow-sm">연락중 {websiteSummary.contactedCount}건</Badge>
+                  <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">전체 {websiteSummary.total}건</Badge>
+                  <Badge className="border-none bg-transparent text-blue-700 shadow-none">신규 {websiteSummary.newCount}건</Badge>
+                  <Badge className="border-none bg-transparent text-amber-700 shadow-none">연락중 {websiteSummary.contactedCount}건</Badge>
                 </div>
               </div>
 
@@ -920,10 +920,10 @@ export function MarketingConsultingCRM({
 
             {/* ── Summary cards ── */}
             <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-4')}>
-              <Card className="rounded-xl border-none bg-primary text-primary-foreground shadow-sm">
+              <Card className="rounded-xl border-none bg-primary shadow-sm">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold opacity-80">전체 리드</p>
-                  <p className="mt-1 text-2xl font-black">{summary.total}</p>
+                  <p className="text-[11px] font-bold text-black">전체 리드</p>
+                  <p className="mt-1 text-2xl font-black text-black">{summary.total}</p>
                 </CardContent>
               </Card>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">

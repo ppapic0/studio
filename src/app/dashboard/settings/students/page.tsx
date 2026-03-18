@@ -116,6 +116,22 @@ function normalizeParentLinkCode(value: unknown): string {
   return '';
 }
 
+type StudentMembershipStatus = 'active' | 'onHold' | 'withdrawn';
+
+function normalizeStudentMembershipStatus(value: unknown): StudentMembershipStatus {
+  if (typeof value !== 'string') return 'active';
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'onhold' || normalized === 'on_hold' || normalized === 'pending') return 'onHold';
+  if (normalized === 'withdrawn' || normalized === 'inactive') return 'withdrawn';
+  return 'active';
+}
+
+function studentStatusLabel(status: StudentMembershipStatus): string {
+  if (status === 'onHold') return '휴원';
+  if (status === 'withdrawn') return '퇴원';
+  return '재원';
+}
+
 export default function StudentAccountManagementPage() {
   const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
@@ -123,6 +139,7 @@ export default function StudentAccountManagementPage() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | StudentMembershipStatus>('all');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -135,6 +152,7 @@ export default function StudentAccountManagementPage() {
     grade: '',
     parentLinkCode: '',
     className: '',
+    memberStatus: 'active' as StudentMembershipStatus,
     seasonLp: 0,
     stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
     todayStudyMinutes: 0
@@ -181,12 +199,27 @@ export default function StudentAccountManagementPage() {
     if (!studentMembers) return [];
     const search = searchTerm.toLowerCase();
     return studentMembers
-      .filter(m => 
-        m.displayName?.toLowerCase().includes(search) || 
-        m.id.toLowerCase().includes(search)
-      )
+      .filter((m) => {
+        const normalizedStatus = normalizeStudentMembershipStatus(m.status);
+        const matchesStatus = statusFilter === 'all' || normalizedStatus === statusFilter;
+        const matchesSearch =
+          m.displayName?.toLowerCase().includes(search) ||
+          m.id.toLowerCase().includes(search);
+        return matchesStatus && matchesSearch;
+      })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-  }, [studentMembers, searchTerm]);
+  }, [studentMembers, searchTerm, statusFilter]);
+
+  const statusCounts = useMemo(() => {
+    const initial = { all: 0, active: 0, onHold: 0, withdrawn: 0 };
+    if (!studentMembers) return initial;
+    return studentMembers.reduce((acc, member) => {
+      const normalized = normalizeStudentMembershipStatus(member.status);
+      acc.all += 1;
+      acc[normalized] += 1;
+      return acc;
+    }, initial);
+  }, [studentMembers]);
 
   const handleOpenEditModal = async (member: CenterMembership) => {
     if (!firestore || !centerId) return;
@@ -211,6 +244,7 @@ export default function StudentAccountManagementPage() {
       grade: profile?.grade || '1학년',
       parentLinkCode: normalizeParentLinkCode(profile?.parentLinkCode),
       className: member.className || '',
+      memberStatus: normalizeStudentMembershipStatus(member.status),
       seasonLp: progress?.seasonLp || 0,
       stats: {
         focus: progress?.stats?.focus || 0,
@@ -248,6 +282,7 @@ export default function StudentAccountManagementPage() {
         grade: editForm.grade || undefined,
         parentLinkCode: normalizedParentLinkCode !== currentParentLinkCode ? (normalizedParentLinkCode || null) : undefined,
         className: editForm.className || null,
+        memberStatus: editForm.memberStatus,
         seasonLp: editForm.seasonLp,
         stats: editForm.stats,
         todayStudyMinutes: editForm.todayStudyMinutes,
@@ -310,10 +345,49 @@ export default function StudentAccountManagementPage() {
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/20 p-2 shadow-inner">
+        <Button
+          type="button"
+          size="sm"
+          variant={statusFilter === 'all' ? 'default' : 'ghost'}
+          className="rounded-xl font-black"
+          onClick={() => setStatusFilter('all')}
+        >
+          전체 {statusCounts.all}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={statusFilter === 'active' ? 'default' : 'ghost'}
+          className={cn('rounded-xl font-black', statusFilter !== 'active' && 'text-emerald-700 bg-emerald-50')}
+          onClick={() => setStatusFilter('active')}
+        >
+          재원생 {statusCounts.active}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={statusFilter === 'onHold' ? 'default' : 'ghost'}
+          className={cn('rounded-xl font-black', statusFilter !== 'onHold' && 'text-amber-700 bg-amber-50')}
+          onClick={() => setStatusFilter('onHold')}
+        >
+          휴원생 {statusCounts.onHold}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={statusFilter === 'withdrawn' ? 'default' : 'ghost'}
+          className={cn('rounded-xl font-black', statusFilter !== 'withdrawn' && 'text-slate-700 bg-slate-100')}
+          onClick={() => setStatusFilter('withdrawn')}
+        >
+          퇴원생 {statusCounts.withdrawn}
+        </Button>
+      </div>
+
       <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
         <CardHeader className="bg-muted/5 border-b p-8">
           <CardTitle className="text-xl font-black flex items-center gap-2">
-            <Users className="h-5 w-5 opacity-40" /> 센터 재원생 및 퇴원생 리스트
+            <Users className="h-5 w-5 opacity-40" /> 학생 관리 센터 (재원·휴원·퇴원)
           </CardTitle>
           <CardDescription className="font-bold text-sm">모든 학생의 계정 정보와 성장 지표를 정밀하게 조작하거나 영구히 삭제할 수 있습니다.</CardDescription>
         </CardHeader>
@@ -331,6 +405,7 @@ export default function StudentAccountManagementPage() {
             <div className="divide-y divide-muted/10">
               {filteredStudents.map((member) => {
                 const profile = studentsProfiles?.find(p => p.id === member.id);
+                const normalizedStatus = normalizeStudentMembershipStatus(member.status);
                 return (
                   <div key={member.id} className="p-8 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-muted/5 transition-all group gap-6">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -342,8 +417,12 @@ export default function StudentAccountManagementPage() {
                           <span className="font-black text-lg truncate tracking-tight">{member.displayName}</span>
                           <Badge variant="secondary" className={cn(
                             "font-black text-[8px] border-none h-4 px-1.5",
-                            member.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
-                          )}>{member.status === 'active' ? '재원' : '퇴원'}</Badge>
+                            normalizedStatus === 'active'
+                              ? "bg-emerald-50 text-emerald-600"
+                              : normalizedStatus === 'onHold'
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-slate-100 text-slate-700"
+                          )}>{studentStatusLabel(normalizedStatus)}</Badge>
                         </div>
                         <p className="text-[10px] font-bold text-muted-foreground truncate">{profile?.schoolName || '학교 정보 없음'} · {profile?.grade}</p>
                         <p className="text-[8px] font-mono text-muted-foreground/40 mt-1 uppercase truncate">사용자번호: {member.id}</p>
@@ -399,7 +478,7 @@ export default function StudentAccountManagementPage() {
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uC774\uB984'}</Label><Input value={editForm.displayName} onChange={e => setEditForm({...editForm, displayName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uBE44\uBC00\uBC88\uD638 (\uBCC0\uACBD \uC2DC\uC5D0\uB9CC)'}</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uD559\uAD50'}</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uD559\uB144'}</Label>
@@ -417,6 +496,17 @@ export default function StudentAccountManagementPage() {
                     <SelectContent className="rounded-xl">
                       <SelectItem value="none" className="font-bold">{'\uBBF8\uBC30\uC815'}</SelectItem>
                       {availableClasses.map(c => <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상태</Label>
+                  <Select value={editForm.memberStatus} onValueChange={(v: StudentMembershipStatus) => setEditForm({...editForm, memberStatus: v})}>
+                    <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="active" className="font-bold">재원생</SelectItem>
+                      <SelectItem value="onHold" className="font-bold">휴원생</SelectItem>
+                      <SelectItem value="withdrawn" className="font-bold">퇴원생</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 export type CenterMembership = {
   id: string; // centerId
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
-  status: 'active' | 'pending' | 'inactive';
+  status: 'active' | 'pending' | 'inactive' | 'onHold' | 'withdrawn';
   joinedAt: any;
   displayName?: string;
   linkedStudentIds?: string[];
@@ -119,7 +119,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const normalized = getNormalizedStatus(membership.status);
         return !normalized || normalized === 'active';
       });
-      const source = activeItems.length > 0 ? activeItems : items;
+      if (activeItems.length === 0) return null;
+      const source = activeItems;
 
       const parentWithLinkedStudent = source.find(
         (membership) => normalizeRole(membership.role) === 'parent' && hasLinkedStudents(membership)

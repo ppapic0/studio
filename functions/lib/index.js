@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendScheduledLateArrivalAlerts = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -56,6 +56,18 @@ function normalizeMembershipStatus(value) {
 function isActiveMembershipStatus(value) {
     const normalized = normalizeMembershipStatus(value);
     return !normalized || normalized === "active";
+}
+function normalizeStudentMembershipStatusForWrite(value) {
+    if (typeof value !== "string")
+        return null;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || normalized === "active")
+        return "active";
+    if (normalized === "onhold" || normalized === "on_hold" || normalized === "pending")
+        return "onHold";
+    if (normalized === "withdrawn" || normalized === "inactive")
+        return "withdrawn";
+    return null;
 }
 async function resolveCenterMembershipRole(db, centerId, uid) {
     const [memberSnap, userCenterSnap] = await Promise.all([
@@ -279,7 +291,7 @@ async function queueParentSmsNotification(db, params) {
     await batch.commit();
     return { queuedCount: recipients.length, recipientCount: recipients.length, message };
 }
-async function runLateArrivalCheckForCenter(db, centerId, nowKst) {
+async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap) {
     const settings = await loadNotificationSettings(db, centerId);
     if (settings.lateAlertEnabled === false)
         return 0;
@@ -296,7 +308,6 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst) {
         .get();
     if (membersSnap.empty)
         return 0;
-    const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
     const checkedInStudentIds = new Set();
     attendanceSnap.forEach((seatDoc) => {
         const seatData = seatDoc.data();
@@ -551,7 +562,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     var _a, _b;
     const db = admin.firestore();
     const auth = admin.auth();
-    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
+    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, memberStatus, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     if (!studentId || !centerId)
@@ -614,9 +625,23 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         : undefined;
     const parentLinkCodeProvided = parentLinkCode !== undefined;
     const normalizedParentLinkCode = parentLinkCode === null ? "" : normalizeParentLinkCodeValue(parentLinkCode);
+    const memberStatusProvided = memberStatus !== undefined;
+    const normalizedMemberStatus = memberStatusProvided
+        ? normalizeStudentMembershipStatusForWrite(memberStatus)
+        : null;
     const normalizedSeasonLp = parseFiniteNumber(seasonLp);
     const normalizedTodayStudyMinutes = parseFiniteNumber(todayStudyMinutes);
     const normalizedStats = normalizeStatsPayload(stats);
+    if (memberStatusProvided && !isAdminCaller) {
+        throw new functions.https.HttpsError("permission-denied", "Only admins can change membership status.", {
+            userMessage: "학생 상태 변경은 센터 관리자만 가능합니다.",
+        });
+    }
+    if (memberStatusProvided && !normalizedMemberStatus) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid member status.", {
+            userMessage: "상태 값이 올바르지 않습니다. 재원/휴원/퇴원 중에서 선택해 주세요.",
+        });
+    }
     if (parentLinkCodeProvided) {
         if (parentLinkCode !== null && typeof parentLinkCode !== "string" && typeof parentLinkCode !== "number") {
             throw new functions.https.HttpsError("invalid-argument", "Parent link code type is invalid.");
@@ -706,6 +731,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         const hasForbiddenUpdate = (typeof password === "string" && password.trim().length > 0) ||
             trimmedDisplayName.length > 0 ||
             hasClassName ||
+            memberStatusProvided ||
             seasonLp !== undefined ||
             stats !== undefined ||
             todayStudyMinutes !== undefined ||
@@ -768,6 +794,8 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             memberUpdate.displayName = trimmedDisplayName;
         if (hasClassName)
             memberUpdate.className = normalizedClassName;
+        if (isAdminCaller && memberStatusProvided)
+            memberUpdate.status = normalizedMemberStatus;
         if (canEditOtherStudent) {
             batch.set(memberRef, memberUpdate, { merge: true });
         }
@@ -776,7 +804,12 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             className: normalizedClassName,
             updatedAt: timestamp,
         };
+        if (isAdminCaller && memberStatusProvided)
+            userCenterUpdate.status = normalizedMemberStatus;
         if (canEditOtherStudent && hasClassName) {
+            batch.set(userCenterRef, userCenterUpdate, { merge: true });
+        }
+        else if (isAdminCaller && memberStatusProvided) {
             batch.set(userCenterRef, userCenterUpdate, { merge: true });
         }
         if (isAdminCaller) {
@@ -841,7 +874,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             if (canEditOtherStudent) {
                 coreWrites.push(memberRef.set(memberUpdate, { merge: true }));
             }
-            if (canEditOtherStudent && hasClassName) {
+            if (canEditOtherStudent && (hasClassName || (isAdminCaller && memberStatusProvided))) {
                 coreWrites.push(userCenterRef.set(userCenterUpdate, { merge: true }));
             }
             const coreResults = await Promise.allSettled(coreWrites);
@@ -1578,7 +1611,8 @@ exports.runLateArrivalCheck = functions.region(region).https.onCall(async (data,
         throw new functions.https.HttpsError("permission-denied", "Only teacher/admin can run late check.");
     }
     const nowKst = toKstDate();
-    const alertsTriggered = await runLateArrivalCheckForCenter(db, centerId, nowKst);
+    const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+    const alertsTriggered = await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
     return {
         ok: true,
         centerId,
@@ -1586,23 +1620,141 @@ exports.runLateArrivalCheck = functions.region(region).https.onCall(async (data,
         checkedAt: admin.firestore.Timestamp.now(),
     };
 });
-exports.sendScheduledLateArrivalAlerts = functions
+/**
+ * 10분마다 실행되는 통합 출석 점검 함수.
+ * 센터별로 attendanceCurrent를 한 번만 읽어 두 가지 작업을 처리합니다:
+ * 1. 지각 알림 발송 (sendScheduledLateArrivalAlerts 로직)
+ * 2. 6시간 초과 세션 자동 종료 (autoCloseStuckStudySessions 로직)
+ */
+exports.scheduledAttendanceCheck = functions
     .region(region)
     .pubsub.schedule("every 10 minutes")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
     const db = admin.firestore();
-    const centersSnap = await db.collection("centers").get();
     const nowKst = toKstDate();
-    let totalTriggered = 0;
+    const MAX_SESSION_MINUTES = 360; // 6시간
+    const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(Date.now() - MAX_SESSION_MINUTES * 60 * 1000);
+    const centersSnap = await db.collection("centers").get();
+    let totalLateAlerts = 0;
+    let totalClosed = 0;
     for (const centerDoc of centersSnap.docs) {
-        totalTriggered += await runLateArrivalCheckForCenter(db, centerDoc.id, nowKst);
+        const centerId = centerDoc.id;
+        // attendanceCurrent 한 번만 읽어 두 작업에 공유
+        const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+        // ── 1. 지각 알림 ──────────────────────────────────────
+        totalLateAlerts += await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
+        // ── 2. 6시간 초과 세션 자동 종료 ──────────────────────
+        for (const seatDoc of attendanceSnap.docs) {
+            const seat = seatDoc.data();
+            if (seat.status !== "studying")
+                continue;
+            const lastCheckInAt = seat.lastCheckInAt;
+            if (!lastCheckInAt || lastCheckInAt > cutoffTimestamp)
+                continue;
+            const studentId = seat.studentId;
+            if (!studentId)
+                continue;
+            const startKst = toKstDate(lastCheckInAt.toDate());
+            const sessionDateKey = toDateKey(startKst);
+            const autoEndTime = admin.firestore.Timestamp.fromMillis(lastCheckInAt.toMillis() + MAX_SESSION_MINUTES * 60 * 1000);
+            const batch = db.batch();
+            batch.update(seatDoc.ref, {
+                status: "absent",
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            const logRef = db
+                .collection("centers").doc(centerId)
+                .collection("studyLogs").doc(studentId)
+                .collection("days").doc(sessionDateKey);
+            batch.set(logRef, {
+                totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+                studentId,
+                centerId,
+                dateKey: sessionDateKey,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            const sessionRef = logRef.collection("sessions").doc();
+            batch.set(sessionRef, {
+                startTime: lastCheckInAt,
+                endTime: autoEndTime,
+                durationMinutes: MAX_SESSION_MINUTES,
+                autoClosedAt: admin.firestore.FieldValue.serverTimestamp(),
+                closedReason: "auto_6h_limit",
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            const progressRef = db
+                .collection("centers").doc(centerId)
+                .collection("growthProgress").doc(studentId);
+            batch.set(progressRef, {
+                seasonLp: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+                "stats.focus": admin.firestore.FieldValue.increment(0.1),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            await batch.commit();
+            totalClosed++;
+            console.log("[auto-close-session] 6시간 초과 세션 자동 종료", {
+                centerId,
+                studentId,
+                sessionDateKey,
+                lastCheckInAt: lastCheckInAt.toDate().toISOString(),
+                autoEndTime: autoEndTime.toDate().toISOString(),
+            });
+        }
     }
-    console.log("[late-arrival] run complete", {
+    console.log("[attendance-check] run complete", {
         centerCount: centersSnap.size,
-        totalTriggered,
+        totalLateAlerts,
+        totalClosed,
         atKst: nowKst.toISOString(),
     });
+    return null;
+});
+/**
+ * 매일 새벽 3시(KST)에 오래된 임시 문서를 삭제합니다.
+ * - smsQueue, smsLogs, lateAlerts: 7일 초과 삭제
+ * - parentNotifications: 30일 초과 삭제
+ * 삭제는 센터별로 최대 500건씩 처리합니다.
+ */
+exports.cleanupOldDocuments = functions
+    .region(region)
+    .pubsub.schedule("0 3 * * *")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    const db = admin.firestore();
+    const now = Date.now();
+    const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(now - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = admin.firestore.Timestamp.fromMillis(now - 30 * 24 * 60 * 60 * 1000);
+    const centersSnap = await db.collection("centers").get();
+    let totalDeleted = 0;
+    const deleteOldDocs = async (colPath, cutoff, maxDocs = 500) => {
+        const snap = await db
+            .collection(colPath)
+            .where("createdAt", "<", cutoff)
+            .limit(maxDocs)
+            .get();
+        if (snap.empty)
+            return 0;
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        return snap.size;
+    };
+    for (const centerDoc of centersSnap.docs) {
+        const cid = centerDoc.id;
+        const [sq, sl, la, pn] = await Promise.all([
+            deleteOldDocs(`centers/${cid}/smsQueue`, sevenDaysAgo),
+            deleteOldDocs(`centers/${cid}/smsLogs`, sevenDaysAgo),
+            deleteOldDocs(`centers/${cid}/lateAlerts`, sevenDaysAgo),
+            deleteOldDocs(`centers/${cid}/parentNotifications`, thirtyDaysAgo),
+        ]);
+        const centerTotal = sq + sl + la + pn;
+        if (centerTotal > 0) {
+            console.log(`[cleanup] center=${cid} deleted=${centerTotal} (smsQueue=${sq} smsLogs=${sl} lateAlerts=${la} parentNotifications=${pn})`);
+        }
+        totalDeleted += centerTotal;
+    }
+    console.log("[cleanup] run complete", { centerCount: centersSnap.size, totalDeleted });
     return null;
 });
 //# sourceMappingURL=index.js.map

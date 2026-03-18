@@ -94,6 +94,15 @@ function isActiveMembershipStatus(value: unknown): boolean {
   return !normalized || normalized === "active";
 }
 
+function normalizeStudentMembershipStatusForWrite(value: unknown): "active" | "onHold" | "withdrawn" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "active") return "active";
+  if (normalized === "onhold" || normalized === "on_hold" || normalized === "pending") return "onHold";
+  if (normalized === "withdrawn" || normalized === "inactive") return "withdrawn";
+  return null;
+}
+
 type CenterMembershipLookup = {
   role: string | null;
   status: unknown;
@@ -683,6 +692,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     grade,
     parentLinkCode,
     className,
+    memberStatus,
     seasonLp,
     stats,
     todayStudyMinutes,
@@ -758,9 +768,25 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
   const parentLinkCodeProvided = parentLinkCode !== undefined;
   const normalizedParentLinkCode = parentLinkCode === null ? "" : normalizeParentLinkCodeValue(parentLinkCode);
+  const memberStatusProvided = memberStatus !== undefined;
+  const normalizedMemberStatus = memberStatusProvided
+    ? normalizeStudentMembershipStatusForWrite(memberStatus)
+    : null;
   const normalizedSeasonLp = parseFiniteNumber(seasonLp);
   const normalizedTodayStudyMinutes = parseFiniteNumber(todayStudyMinutes);
   const normalizedStats = normalizeStatsPayload(stats);
+
+  if (memberStatusProvided && !isAdminCaller) {
+    throw new functions.https.HttpsError("permission-denied", "Only admins can change membership status.", {
+      userMessage: "학생 상태 변경은 센터 관리자만 가능합니다.",
+    });
+  }
+
+  if (memberStatusProvided && !normalizedMemberStatus) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid member status.", {
+      userMessage: "상태 값이 올바르지 않습니다. 재원/휴원/퇴원 중에서 선택해 주세요.",
+    });
+  }
 
   if (parentLinkCodeProvided) {
     if (parentLinkCode !== null && typeof parentLinkCode !== "string" && typeof parentLinkCode !== "number") {
@@ -863,6 +889,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       (typeof password === "string" && password.trim().length > 0) ||
       trimmedDisplayName.length > 0 ||
       hasClassName ||
+      memberStatusProvided ||
       seasonLp !== undefined ||
       stats !== undefined ||
       todayStudyMinutes !== undefined ||
@@ -923,16 +950,20 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const memberUpdate: any = { updatedAt: timestamp };
     if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
     if (hasClassName) memberUpdate.className = normalizedClassName;
+    if (isAdminCaller && memberStatusProvided) memberUpdate.status = normalizedMemberStatus;
     if (canEditOtherStudent) {
       batch.set(memberRef, memberUpdate, { merge: true });
     }
 
     const userCenterRef = db.doc("userCenters/" + studentId + "/centers/" + centerId);
-    const userCenterUpdate = {
+    const userCenterUpdate: any = {
       className: normalizedClassName,
       updatedAt: timestamp,
     };
+    if (isAdminCaller && memberStatusProvided) userCenterUpdate.status = normalizedMemberStatus;
     if (canEditOtherStudent && hasClassName) {
+      batch.set(userCenterRef, userCenterUpdate, { merge: true });
+    } else if (isAdminCaller && memberStatusProvided) {
       batch.set(userCenterRef, userCenterUpdate, { merge: true });
     }
 
@@ -1004,7 +1035,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       if (canEditOtherStudent) {
         coreWrites.push(memberRef.set(memberUpdate, { merge: true }));
       }
-      if (canEditOtherStudent && hasClassName) {
+      if (canEditOtherStudent && (hasClassName || (isAdminCaller && memberStatusProvided))) {
         coreWrites.push(userCenterRef.set(userCenterUpdate, { merge: true }));
       }
 
