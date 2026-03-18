@@ -1,6 +1,7 @@
 import type { MarketingContent } from '@/lib/marketing-content';
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
+import { unstable_noStore as noStore } from 'next/cache';
 
 import { ConsultForm } from './consult-form';
 import { SectionHeading } from './section-heading';
@@ -10,6 +11,7 @@ type ConsultSectionProps = {
 };
 
 async function getWaitlistCount(): Promise<number> {
+  noStore();
   try {
     const centerId = await resolveMarketingCenterId();
     if (!centerId) return 0;
