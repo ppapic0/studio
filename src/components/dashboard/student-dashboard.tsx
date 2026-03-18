@@ -736,7 +736,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       if (isTimerActive) {
         const nowTs = Date.now();
         const safeStartTs = startTime || nowTs;
+        const seatStatus = seatDoc?.data?.()?.status as AttendanceCurrent['status'] | undefined;
+        if (seatStatus !== undefined && seatStatus !== 'studying') {
+          setIsTimerActive(false);
+          setStartTime(null);
+          toast({
+            title: '이미 종료된 세션입니다.',
+            description: '중복 집계를 막기 위해 추가 합산을 건너뛰었습니다.',
+          });
+          return;
+        }
+
         const safeSeatStart = seatDoc?.data?.()?.lastCheckInAt || Timestamp.fromMillis(safeStartTs);
+        const sessionId = `session_${safeSeatStart.toMillis()}`;
         const sessionSeconds = Math.max(0, Math.floor((nowTs - safeStartTs) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
 
@@ -803,11 +815,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }, { merge: true });
           wroteSomething = true;
 
-          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, {
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions', sessionId);
+          batch.create(sessionRef, {
             startTime: safeSeatStart,
             endTime: Timestamp.fromMillis(nowTs),
             durationMinutes: sessionMinutes,
+            sessionId,
             createdAt: serverTimestamp(),
           });
           wroteSomething = true;
@@ -816,8 +829,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           wroteSomething = true;
         }
         const stopSeatRef = seatDoc?.ref || fallbackSeatRef;
+        let stopSeatPayload: Record<string, any> | null = null;
         if (stopSeatRef) {
-          const stopSeatPayload: Record<string, any> = {
+          stopSeatPayload = {
             studentId: user.uid,
             status: 'absent',
             updatedAt: serverTimestamp(),
@@ -839,15 +853,42 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         let stopCommitError: any = null;
         let usedStopFallback = false;
+        let stopRequestDeduped = false;
         try {
           await batch.commit();
         } catch (commitError: any) {
-          stopCommitError = commitError;
-          console.error('[student-track] stop commit failed', commitError);
+          const code = String(commitError?.code || '').toLowerCase();
+          const message = String(commitError?.message || '').toLowerCase();
+          const duplicateSession = code.includes('already-exists') || message.includes('already exists');
+          if (duplicateSession) {
+            stopCommitError = null;
+            stopRequestDeduped = true;
+            usedStopFallback = true;
+            earnedLpThisSession = false;
+            if (stopSeatRef && stopSeatPayload) {
+              await setDoc(stopSeatRef, stopSeatPayload, { merge: true });
+            }
+            console.warn('[student-track] duplicated stop request ignored', { centerId, userId: user.uid, sessionId });
+          } else {
+            stopCommitError = commitError;
+            console.error('[student-track] stop commit failed', commitError);
+          }
         }
 
         if (stopCommitError && studyLogRef) {
           try {
+            const fallbackSessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions', sessionId);
+            const existingSessionSnap = await getDoc(fallbackSessionRef);
+            if (existingSessionSnap.exists()) {
+              if (stopSeatRef && stopSeatPayload) {
+                await setDoc(stopSeatRef, stopSeatPayload, { merge: true });
+              }
+              stopRequestDeduped = true;
+              usedStopFallback = true;
+              earnedLpThisSession = false;
+              stopCommitError = null;
+              console.warn('[student-track] stop fallback skipped because session already existed');
+            } else {
             const fallbackStudyLogData: any = {
               studentId: user.uid,
               centerId: activeMembership.id,
@@ -865,11 +906,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             }
 
             if (sessionSeconds > 0) {
-              const fallbackSessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
               await setDoc(fallbackSessionRef, {
                 startTime: safeSeatStart,
                 endTime: Timestamp.fromMillis(nowTs),
                 durationMinutes: sessionMinutes,
+                sessionId,
                 createdAt: serverTimestamp(),
               });
             }
@@ -877,12 +918,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             usedStopFallback = true;
             stopCommitError = null;
             console.warn('[student-track] stop fallback saved core study logs while optional writes were skipped');
+            }
           } catch (fallbackError: any) {
             console.error('[student-track] stop fallback failed', fallbackError);
           }
         }
 
-        if (!stopCommitError && earnedLpThisSession) {
+        if (!stopCommitError && earnedLpThisSession && !stopRequestDeduped) {
           try {
             const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
             await setDoc(rankRef, {
@@ -897,7 +939,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
 
-        if (!stopCommitError) {
+        if (!stopCommitError && !stopRequestDeduped) {
           const checkInAtForAttendance = toDateSafeAttendance(safeSeatStart) || new Date(safeStartTs);
           void syncAutoAttendanceRecord({
             firestore,
@@ -912,10 +954,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           });
         }
 
-        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'exit' })
-          .catch((notifyError: any) => {
-            console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
-          });
+        if (!stopRequestDeduped) {
+          void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'exit' })
+            .catch((notifyError: any) => {
+              console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
+            });
+        }
 
         setIsTimerActive(false);
         setStartTime(null);

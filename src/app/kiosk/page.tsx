@@ -238,6 +238,7 @@ export default function KioskPage() {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id);
       const todayKey = format(new Date(), 'yyyy-MM-dd');
+      let stopSessionId: string | null = null;
 
       // 퇴실(absent) 처리 시 공부 시간 저장 로직
       if (nextStatus === 'absent' && prevStatus === 'studying' && seat.lastCheckInAt) {
@@ -254,11 +255,13 @@ export default function KioskPage() {
             updatedAt: serverTimestamp()
           }, { merge: true });
 
-          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, {
+          stopSessionId = `session_${seat.lastCheckInAt.toMillis()}`;
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions', stopSessionId);
+          batch.create(sessionRef, {
             startTime: seat.lastCheckInAt,
             endTime: serverTimestamp(),
             durationMinutes,
+            sessionId: stopSessionId,
             createdAt: serverTimestamp()
           });
 
