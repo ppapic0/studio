@@ -618,14 +618,14 @@ export function AppointmentsPageContent({
 
       <Tabs value={activeTab} onValueChange={(value) => !showAll && setActiveTab(value as AppointmentTab)} className="w-full flex flex-col items-center">
         {!showAll && (
-          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff || isStudent ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff || isStudent ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
+          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-4" : isStudent ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff ? "h-16 max-w-3xl mx-auto" : isStudent ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
             <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
               <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
             </TabsTrigger>
             <TabsTrigger value="logs" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
               <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
             </TabsTrigger>
-            {isStudent && (
+            {(isStudent || isStaff) && (
               <TabsTrigger value="inquiries" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
                 <MessageSquare className="h-4 w-4" /> <span className="text-xs sm:text-sm">질문/건의</span>
               </TabsTrigger>
@@ -813,7 +813,7 @@ export function AppointmentsPageContent({
           </Card>
         </TabsContent>
 
-        {isStudent && (
+        {(isStudent || isStaff) && (
           <TabsContent value="inquiries" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
             <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
               <CardHeader className={cn("bg-sky-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
@@ -823,6 +823,7 @@ export function AppointmentsPageContent({
                 <CardDescription className="font-bold text-xs mt-1">궁금한 점이나 건의사항을 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                {isStudent && (
                 <div className={cn("space-y-4 border-b bg-sky-50/20", isMobile ? "p-5" : "p-6 sm:p-8")}>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[150px_1fr]")}>
                     <Select value={inquiryType} onValueChange={(value: 'question' | 'suggestion') => setInquiryType(value)}>
@@ -857,6 +858,7 @@ export function AppointmentsPageContent({
                     </Button>
                   </div>
                 </div>
+                )}
                 {parentCommsLoading ? (
                   <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                 ) : studentInquiries.length === 0 ? (

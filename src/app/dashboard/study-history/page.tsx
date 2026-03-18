@@ -462,6 +462,26 @@ export default function StudyHistoryPage() {
         </div>
       </header>
 
+      {isMobile && (
+        <Link
+          href="/dashboard/analysis"
+          className="mx-1 rounded-[1.25rem] border border-primary/15 bg-white p-4 shadow-sm active:scale-[0.99] transition-all"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-9 w-9 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wider text-primary/60">나의 분석트랙</p>
+                <p className="text-xs font-bold text-primary truncate">모바일 맞춤 리포트로 보기</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-primary/50" />
+          </div>
+        </Link>
+      )}
+
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
         <Card
           className={cn(

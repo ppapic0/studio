@@ -73,7 +73,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
 };
 
 export function MainNav({ isMobile = false }: MainNavProps) {
-  const { activeMembership, currentTier, viewMode } = useAppContext();
+  const { activeMembership, currentTier } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -86,12 +86,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   }
 
   const userRole = activeMembership.role;
-  const userNavItems = (navItems[userRole] || []).filter((item) => {
-    if (userRole === 'student' && viewMode === 'mobile' && item.href === '/dashboard/analysis') {
-      return false;
-    }
-    return true;
-  });
+  const userNavItems = navItems[userRole] || [];
 
   const isStudent = userRole === 'student';
   const activeParentTab = searchParams.get('parentTab') || 'home';

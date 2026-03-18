@@ -225,10 +225,10 @@ export function RevenueAnalysis() {
       </Card>
 
       <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
-        <Card className="rounded-2xl border-none bg-primary text-primary-foreground shadow-md">
+        <Card className="rounded-2xl border-none bg-primary shadow-md">
           <CardContent className="p-5">
-            <p className="text-[11px] font-bold opacity-70">당월 청구금액</p>
-            <p className="dashboard-number mt-2 text-2xl">{formatWon(summary.billed)}</p>
+            <p className="text-[11px] font-bold text-amber-200">당월 청구금액</p>
+            <p className="dashboard-number mt-2 text-2xl text-yellow-100">{formatWon(summary.billed)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">

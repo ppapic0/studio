@@ -101,6 +101,15 @@ import { Badge } from '@/components/ui/badge';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: '월' },
+  { value: 2, label: '화' },
+  { value: 3, label: '수' },
+  { value: 4, label: '목' },
+  { value: 5, label: '금' },
+  { value: 6, label: '토' },
+  { value: 0, label: '일' },
+];
 
 const SUBJECTS = [
   { id: 'kor', label: '국어', color: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600' },
@@ -268,6 +277,12 @@ export default function StudyPlanPage() {
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [isTaskCopyDialogOpen, setIsTaskCopyDialogOpen] = useState(false);
+  const [isRoutineCopyDialogOpen, setIsRoutineCopyDialogOpen] = useState(false);
+  const [taskCopyWeeks, setTaskCopyWeeks] = useState('4');
+  const [routineCopyWeeks, setRoutineCopyWeeks] = useState('4');
+  const [taskCopyDays, setTaskCopyDays] = useState<number[]>([]);
+  const [routineCopyDays, setRoutineCopyDays] = useState<number[]>([]);
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
@@ -275,6 +290,13 @@ export default function StudyPlanPage() {
   useEffect(() => {
     setSelectedDate(new Date());
   }, []);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    const day = getDay(selectedDate);
+    setTaskCopyDays(prev => prev.length > 0 ? prev : [day]);
+    setRoutineCopyDays(prev => prev.length > 0 ? prev : [day]);
+  }, [selectedDate]);
 
   const isStudent = activeMembership?.role === 'student';
   const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
@@ -333,6 +355,8 @@ export default function StudyPlanPage() {
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
+  const hasCopyableTasks = useMemo(() => dailyPlans?.some(p => p.category !== 'schedule') ?? false, [dailyPlans]);
+  const hasCopyableRoutines = useMemo(() => dailyPlans?.some(p => p.category === 'schedule') ?? false, [dailyPlans]);
 
   const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
   const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
@@ -516,7 +540,7 @@ export default function StudyPlanPage() {
     toast({ title: "항목이 삭제되었습니다." });
   };
 
-  const handleApplyTasksToAllWeekdays = async () => {
+  const handleApplyTasksToAllWeekdaysLegacy = async () => {
     if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
     const tasksToCopy = dailyPlans.filter(p => p.category !== 'schedule');
     if (tasksToCopy.length === 0) {
@@ -549,7 +573,7 @@ export default function StudyPlanPage() {
     } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
   };
 
-  const handleApplyRoutineToAllWeekdays = async () => {
+  const handleApplyRoutineToAllWeekdaysLegacy = async () => {
     if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
     const routinesToCopy = dailyPlans.filter(p => p.category === 'schedule');
     if (routinesToCopy.length === 0) {
@@ -579,6 +603,120 @@ export default function StudyPlanPage() {
       await batch.commit();
       toast({ title: "루틴 복사 완료", description: `이번 달의 남은 ${format(selectedDate, 'EEEE', { locale: ko })}에 생활 루틴이 복사되었습니다.` });
     } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
+  };
+  void handleApplyTasksToAllWeekdaysLegacy;
+  void handleApplyRoutineToAllWeekdaysLegacy;
+
+  const toggleCopyDay = (target: 'task' | 'routine', day: number, checked: boolean) => {
+    if (target === 'task') {
+      setTaskCopyDays(prev => checked ? Array.from(new Set([...prev, day])) : prev.filter(d => d !== day));
+      return;
+    }
+    setRoutineCopyDays(prev => checked ? Array.from(new Set([...prev, day])) : prev.filter(d => d !== day));
+  };
+
+  const copyPlansWithOptions = async (
+    kind: 'task' | 'routine',
+    options: { weeks: number; weekdays: number[] }
+  ) => {
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return false;
+
+    const sourcePlans = kind === 'task'
+      ? dailyPlans.filter(p => p.category !== 'schedule')
+      : dailyPlans.filter(p => p.category === 'schedule');
+
+    if (sourcePlans.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: kind === 'task' ? '복사할 학습/개인 계획이 없습니다.' : '복사할 생활 루틴이 없습니다.',
+      });
+      return false;
+    }
+
+    if (options.weekdays.length === 0) {
+      toast({ variant: 'destructive', title: '복사할 요일을 하나 이상 선택해 주세요.' });
+      return false;
+    }
+
+    const normalizedWeeks = Number.isFinite(options.weeks) ? Math.max(1, Math.min(12, options.weeks)) : 1;
+    const intervalStart = addDays(startOfDay(selectedDate), 1);
+    const intervalEnd = addDays(startOfDay(selectedDate), normalizedWeeks * 7);
+    const weekdaySet = new Set(options.weekdays);
+    const todayStart = startOfDay(new Date());
+    const targetDates = eachDayOfInterval({ start: intervalStart, end: intervalEnd }).filter(targetDate => {
+      if (isBefore(startOfDay(targetDate), todayStart)) return false;
+      return weekdaySet.has(getDay(targetDate));
+    });
+
+    if (targetDates.length === 0) {
+      toast({ variant: 'destructive', title: '선택한 조건에 맞는 복사 대상 날짜가 없습니다.' });
+      return false;
+    }
+
+    setIsSubmitting(true);
+    const batch = writeBatch(firestore);
+
+    try {
+      for (const targetDate of targetDates) {
+        const targetDateKey = format(targetDate, 'yyyy-MM-dd');
+        const targetWeekKey = format(targetDate, "yyyy-'W'II");
+        const itemsCollectionRef = collection(
+          firestore,
+          'centers',
+          activeMembership.id,
+          'plans',
+          user.uid,
+          'weeks',
+          targetWeekKey,
+          'items'
+        );
+
+        sourcePlans.forEach(plan => {
+          batch.set(doc(itemsCollectionRef), {
+            title: plan.title,
+            done: false,
+            weight: kind === 'routine' ? 0 : plan.weight,
+            dateKey: targetDateKey,
+            category: kind === 'routine' ? 'schedule' : (plan.category || 'study'),
+            subject: kind === 'task' ? (plan.subject || null) : null,
+            targetMinutes: kind === 'task' ? (plan.targetMinutes || 0) : 0,
+            studyPlanWeekId: targetWeekKey,
+            centerId: activeMembership.id,
+            studentId: user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        });
+      }
+      await batch.commit();
+      toast({
+        title: kind === 'task' ? '계획 복사를 완료했어요.' : '루틴 복사를 완료했어요.',
+        description: `${normalizedWeeks}주 동안 선택한 요일로 복사했어요.`,
+      });
+      return true;
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: '복사 중 오류가 발생했습니다.' });
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApplyTasksToAllWeekdays = async () => {
+    const copied = await copyPlansWithOptions('task', {
+      weeks: Number(taskCopyWeeks),
+      weekdays: taskCopyDays,
+    });
+    if (copied) setIsTaskCopyDialogOpen(false);
+  };
+
+  const handleApplyRoutineToAllWeekdays = async () => {
+    const copied = await copyPlansWithOptions('routine', {
+      weeks: Number(routineCopyWeeks),
+      weekdays: routineCopyDays,
+    });
+    if (copied) setIsRoutineCopyDialogOpen(false);
   };
 
   if (!isStudent) {
@@ -891,7 +1029,7 @@ export default function StudyPlanPage() {
                 </div>
                 {!isPast && (
                   <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Button variant="outline" size="sm" className={cn("rounded-xl gap-2 font-black border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95", isMobile ? "h-10 text-[10px] w-full" : "h-12 px-8 text-xs")} onClick={handleApplyTasksToAllWeekdays} disabled={isSubmitting || !dailyPlans?.length}>
+                    <Button variant="outline" size="sm" className={cn("rounded-xl gap-2 font-black border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95", isMobile ? "h-10 text-[10px] w-full" : "h-12 px-8 text-xs")} onClick={() => setIsTaskCopyDialogOpen(true)} disabled={isSubmitting || !hasCopyableTasks}>
                       {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Copy className="h-3.5 w-3.5" />} 이 요일 반복 복사
                     </Button>
                   </div>
@@ -948,8 +1086,8 @@ export default function StudyPlanPage() {
                   variant="outline" 
                   size="sm" 
                   className={cn("rounded-xl gap-2 font-black border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all active:scale-95", isMobile ? "h-9 text-[9px] px-3" : "h-10 px-5 text-xs")} 
-                  onClick={handleApplyRoutineToAllWeekdays} 
-                  disabled={isSubmitting}
+                  onClick={() => setIsRoutineCopyDialogOpen(true)} 
+                  disabled={isSubmitting || !hasCopyableRoutines}
                 >
                   {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Copy className="h-3.5 w-3.5" />} 루틴 반복 복사
                 </Button>
@@ -958,6 +1096,88 @@ export default function StudyPlanPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isTaskCopyDialogOpen} onOpenChange={setIsTaskCopyDialogOpen}>
+        <DialogContent className={cn("border-none shadow-2xl", isMobile ? "w-[92vw] max-w-[360px] rounded-2xl p-5" : "sm:max-w-md rounded-3xl p-7")}>
+          <DialogHeader>
+            <DialogTitle className="font-black text-primary text-xl">계획 반복 복사</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-black text-muted-foreground">몇 주간 복사할까요?</Label>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={taskCopyWeeks}
+                onChange={(e) => setTaskCopyWeeks(e.target.value)}
+                className="h-11 rounded-xl border-2 font-black"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-black text-muted-foreground">복사할 요일</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {WEEKDAY_OPTIONS.map((option) => (
+                  <label key={`task-copy-day-${option.value}`} className="flex items-center gap-2 rounded-xl border p-2 cursor-pointer bg-muted/10">
+                    <Checkbox
+                      checked={taskCopyDays.includes(option.value)}
+                      onCheckedChange={(checked) => toggleCopyDay('task', option.value, checked === true)}
+                    />
+                    <span className="text-xs font-black">{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsTaskCopyDialogOpen(false)} className="rounded-xl border-2 font-black">취소</Button>
+            <Button onClick={handleApplyTasksToAllWeekdays} disabled={isSubmitting} className="rounded-xl font-black text-white">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '복사하기'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRoutineCopyDialogOpen} onOpenChange={setIsRoutineCopyDialogOpen}>
+        <DialogContent className={cn("border-none shadow-2xl", isMobile ? "w-[92vw] max-w-[360px] rounded-2xl p-5" : "sm:max-w-md rounded-3xl p-7")}>
+          <DialogHeader>
+            <DialogTitle className="font-black text-primary text-xl">루틴 반복 복사</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-black text-muted-foreground">몇 주간 복사할까요?</Label>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={routineCopyWeeks}
+                onChange={(e) => setRoutineCopyWeeks(e.target.value)}
+                className="h-11 rounded-xl border-2 font-black"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-black text-muted-foreground">복사할 요일</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {WEEKDAY_OPTIONS.map((option) => (
+                  <label key={`routine-copy-day-${option.value}`} className="flex items-center gap-2 rounded-xl border p-2 cursor-pointer bg-muted/10">
+                    <Checkbox
+                      checked={routineCopyDays.includes(option.value)}
+                      onCheckedChange={(checked) => toggleCopyDay('routine', option.value, checked === true)}
+                    />
+                    <span className="text-xs font-black">{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsRoutineCopyDialogOpen(false)} className="rounded-xl border-2 font-black">취소</Button>
+            <Button onClick={handleApplyRoutineToAllWeekdays} disabled={isSubmitting} className="rounded-xl font-black text-white">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '복사하기'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <footer className={cn("py-8 text-center opacity-30", isMobile ? "hidden" : "px-4 py-12")}>
         <div className="flex items-center justify-center gap-6 text-[10px] font-black uppercase tracking-[0.4em] text-primary">

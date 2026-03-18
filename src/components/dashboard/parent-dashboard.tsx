@@ -124,6 +124,16 @@ function toClockLabel(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
+function calculateRhythmScore(minutes: number[]): number {
+  if (!minutes.length) return 0;
+  const safeMinutes = minutes.map((value) => Math.max(0, Math.round(value)));
+  const avg = safeMinutes.reduce((acc, value) => acc + value, 0) / safeMinutes.length;
+  if (avg <= 0) return 0;
+  const variance = safeMinutes.reduce((acc, value) => acc + (value - avg) ** 2, 0) / safeMinutes.length;
+  const std = Math.sqrt(variance);
+  return Math.max(0, Math.min(100, Math.round(100 - (std / avg) * 100)));
+}
+
 type ParentCommunicationRecord = {
   id: string;
   studentId: string;
@@ -149,11 +159,17 @@ function RhythmTimeChartDialog({
   trend,
   hasTrend,
   yAxisDomain,
+  rhythmScoreTrend,
+  rhythmScore,
 }: {
   trend: Array<{ date: string; rhythmMinutes: number | null }>;
   hasTrend: boolean;
   yAxisDomain: [number, number];
+  rhythmScoreTrend: Array<{ date: string; score: number }>;
+  rhythmScore: number;
 }) {
+  const latestRhythm = trend.slice().reverse().find((item) => typeof item.rhythmMinutes === 'number');
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -165,43 +181,19 @@ function RhythmTimeChartDialog({
             </CardTitle>
             <Maximize2 className="h-4 w-4 text-slate-300" />
           </div>
-          <div className="h-40 w-full">
-            {hasTrend ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsLineChart data={trend}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
-                  <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
-                  <YAxis
-                    fontSize={10}
-                    axisLine={false}
-                    tickLine={false}
-                    width={40}
-                    domain={yAxisDomain}
-                    tickFormatter={(value) => toClockLabel(Number(value))}
-                  />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
-                    formatter={(value) =>
-                      typeof value === 'number'
-                        ? [toClockLabel(value), '학습 시작']
-                        : ['기록 없음', '학습 시작']
-                    }
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="rhythmMinutes"
-                    stroke="#14295F"
-                    strokeWidth={3}
-                    dot={{ r: 3, fill: '#FF7A16' }}
-                    connectNulls={false}
-                  />
-                </RechartsLineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-[11px] font-bold text-slate-400">
-                최근 학습 시작 기록이 없습니다.
-              </div>
-            )}
+          <div className="h-40 w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">상세 그래프 확인</p>
+            <p className="mt-2 text-2xl font-black text-[#14295F]">
+              {latestRhythm?.rhythmMinutes ? toClockLabel(latestRhythm.rhythmMinutes) : '--:--'}
+            </p>
+            <p className="mt-1 text-[11px] font-bold text-slate-500">
+              {latestRhythm?.date || '-'} 학습 시작
+            </p>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#14295F]/15 bg-white px-3 py-1">
+              <span className="text-[10px] font-black text-slate-400">리듬 점수</span>
+              <span className="text-sm font-black text-[#14295F]">{rhythmScore}점</span>
+            </div>
+            <p className="mt-3 text-[11px] font-black text-[#FF7A16]">카드를 클릭하면 팝업에서 그래프 표시</p>
           </div>
         </Card>
       </DialogTrigger>
@@ -254,6 +246,35 @@ function RhythmTimeChartDialog({
               </div>
             )}
           </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-[#14295F]">리듬 점수 그래프</h4>
+              <Badge variant="outline" className="font-black text-[10px]">
+                평균 {rhythmScore}점
+              </Badge>
+            </div>
+            <div className="h-[220px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsLineChart data={rhythmScoreTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                  <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis fontSize={11} axisLine={false} tickLine={false} width={30} domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
+                    formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#FF7A16"
+                    strokeWidth={3}
+                    dot={{ r: 3, fill: '#14295F' }}
+                    activeDot={{ r: 5, fill: '#14295F' }}
+                  />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {trend.map((point) => (
               <div key={point.date} className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
@@ -278,6 +299,7 @@ function SubjectStudyChartDialog({
   subjectTotalMinutes: number;
 }) {
   const previewData = subjects.slice(0, 5);
+  const topSubject = subjects[0];
 
   return (
     <Dialog>
@@ -290,22 +312,13 @@ function SubjectStudyChartDialog({
             </CardTitle>
             <Maximize2 className="h-4 w-4 text-slate-300" />
           </div>
-          <div className="h-40 w-full">
-            {previewData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={previewData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
-                  <XAxis dataKey="subject" fontSize={10} axisLine={false} tickLine={false} />
-                  <YAxis fontSize={10} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }} />
-                  <Bar dataKey="minutes" radius={[6, 6, 0, 0]} fill="#FF7A16" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-[11px] font-bold text-slate-400">
-                과목별 학습 계획이 없습니다.
-              </div>
-            )}
+          <div className="h-40 w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">상세 그래프 확인</p>
+            <p className="mt-2 text-2xl font-black text-[#14295F]">{toHm(subjectTotalMinutes)}</p>
+            <p className="mt-1 text-[11px] font-bold text-slate-500">
+              최다 비중: {topSubject?.subject || '-'}
+            </p>
+            <p className="mt-3 text-[11px] font-black text-[#FF7A16]">카드를 클릭하면 팝업에서 그래프 표시</p>
           </div>
         </Card>
       </DialogTrigger>
@@ -890,6 +903,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [dailyRhythmTrend]
   );
 
+  const rhythmScoreTrend = useMemo(() => {
+    const values = dailyRhythmTrend.map((point) => point.rhythmMinutes);
+    return dailyRhythmTrend.map((point, index) => {
+      const windowValues = values
+        .slice(0, index + 1)
+        .filter((value): value is number => typeof value === 'number');
+      const score = windowValues.length >= 2 ? calculateRhythmScore(windowValues) : windowValues.length === 1 ? 100 : 0;
+      return { date: point.date, score };
+    });
+  }, [dailyRhythmTrend]);
+
+  const rhythmScore = useMemo(() => {
+    const validScores = rhythmScoreTrend.filter((item) => item.score > 0);
+    if (!validScores.length) return 0;
+    return Math.round(validScores.reduce((sum, item) => sum + item.score, 0) / validScores.length);
+  }, [rhythmScoreTrend]);
+
   const rhythmYAxisDomain = useMemo(() => {
     const values = dailyRhythmTrend
       .map((point) => point.rhythmMinutes)
@@ -1340,23 +1370,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
             <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
               <div className="grid grid-cols-2 gap-3">
-                <Card className="rounded-2xl border border-[#d7e3fb] bg-[linear-gradient(135deg,#eef4ff_0%,#e7efff_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#c4d5ff] transition-all">
+                <Card className="rounded-2xl border border-[#cfdcf8] bg-[linear-gradient(135deg,#e8f1ff_0%,#f6f9ff_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#c4d5ff] transition-all">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
                   <p className="dashboard-number text-xl text-[#14295F] leading-tight whitespace-nowrap">{toHm(totalMinutes)}</p>
                 </Card>
-                <Card className="rounded-2xl border border-[#ffd1a8] bg-[linear-gradient(135deg,#fff4e8_0%,#ffe9d5_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#ffbf8a] transition-all">
+                <Card className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff2e4_0%,#fff9f2_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#ffbf8a] transition-all">
                   <span className="text-[10px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
                   <p className="dashboard-number text-2xl text-[#14295F] leading-tight">{planRate}%</p>
                 </Card>
                 <Card className={cn(
-                  "rounded-2xl border-none p-4 text-center space-y-1 shadow-sm border transition-all",
+                  "rounded-2xl border border-[#d7e3fb] bg-[linear-gradient(135deg,#eef4ff_0%,#ffffff_100%)] p-4 text-center space-y-1 shadow-sm transition-all",
                   attendanceStatus.color
                 )}>
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
                   <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
                 <Card
-                  className="rounded-2xl border border-[#ffd7b4] bg-[linear-gradient(135deg,#fff7ef_0%,#ffeedd_100%)] p-4 text-center space-y-1 shadow-sm transition-all hover:ring-1 hover:ring-[#ffc593] cursor-pointer"
+                  className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] p-4 text-center space-y-1 shadow-sm transition-all hover:ring-1 hover:ring-[#ffc593] cursor-pointer"
                   role="button"
                   onClick={() => setIsPenaltyGuideOpen(true)}
                 >
@@ -1388,7 +1418,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </p>
               </Card>
 
-              <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+              <Card className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#f7faff_0%,#ffffff_70%,#fff7ef_100%)] p-5 shadow-sm">
                 <div className="mb-1 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-[#14295F]" />
@@ -1710,6 +1740,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   trend={dailyRhythmTrend}
                   hasTrend={hasRhythmTrend}
                   yAxisDomain={rhythmYAxisDomain}
+                  rhythmScoreTrend={rhythmScoreTrend}
+                  rhythmScore={rhythmScore}
                 />
 
                 <SubjectStudyChartDialog
@@ -1777,7 +1809,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   학부모님이 남긴 내용을 선생님 또는 센터관리자가 확인하고 답변드립니다.
                 </CardDescription>
                 <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+                  <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[180px_minmax(0,1fr)]')}>
                     <div className="grid gap-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">유형 선택</Label>
                       <Select value={parentInquiryType} onValueChange={(value: 'question' | 'request' | 'suggestion') => setParentInquiryType(value)}>
@@ -1791,10 +1823,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid gap-2">
+                    <div className="grid min-w-0 gap-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">제목</Label>
                       <Input
-                        className="h-12 rounded-xl border-2 font-bold text-sm shadow-sm"
+                        className="h-12 w-full rounded-xl border-2 font-bold text-sm shadow-sm"
                         value={parentInquiryTitle}
                         onChange={(e) => setParentInquiryTitle(e.target.value)}
                         placeholder={

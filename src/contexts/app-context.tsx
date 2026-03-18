@@ -16,14 +16,14 @@ export type CenterMembership = {
 };
 
 export const TIERS = [
-  { name: '브론즈', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-orange-600 via-orange-700 to-orange-900' },
-  { name: '실버', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-slate-400 via-slate-500 to-slate-700' },
-  { name: '골드', min: 10000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-amber-400 via-yellow-500 to-yellow-700' },
-  { name: '플래티넘', min: 15000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-emerald-400 via-teal-500 to-teal-700' },
-  { name: '다이아몬드', min: 20000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-blue-400 via-indigo-500 to-indigo-700' },
-  { name: '마스터', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-purple-500 via-violet-600 to-violet-800' },
-  { name: '그랜드마스터', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-rose-500 via-pink-600 to-rose-800' },
-  { name: '챌린저', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
+  { name: '\uBE0C\uB860\uC988', min: 0, color: 'text-orange-700', bg: 'bg-orange-700', border: 'border-orange-200', gradient: 'from-[#D88134] via-[#B35F24] to-[#4A220F]' },
+  { name: '\uC2E4\uBC84', min: 5000, color: 'text-slate-300', bg: 'bg-slate-300', border: 'border-slate-100', gradient: 'from-[#99A6B6] via-[#758398] to-[#2F394A]' },
+  { name: '\uACE8\uB4DC', min: 10000, color: 'text-yellow-500', bg: 'bg-yellow-500', border: 'border-yellow-200', gradient: 'from-[#E3BC4C] via-[#C5962A] to-[#614112]' },
+  { name: '\uD50C\uB798\uD2F0\uB118', min: 15000, color: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-200', gradient: 'from-[#47C6A3] via-[#2D9B80] to-[#103F34]' },
+  { name: '\uB2E4\uC774\uC544\uBAAC\uB4DC', min: 20000, color: 'text-blue-400', bg: 'bg-blue-400', border: 'border-blue-200', gradient: 'from-[#5A87EC] via-[#3965CB] to-[#142750]' },
+  { name: '\uB9C8\uC2A4\uD130', min: 25000, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200', gradient: 'from-[#9A5FE0] via-[#7546BE] to-[#2C184D]' },
+  { name: '\uADF8\uB79C\uB4DC\uB9C8\uC2A4\uD130', min: 25000, color: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-200', gradient: 'from-[#F06D98] via-[#CD4D78] to-[#5A1B36]' },
+  { name: '\uCC4C\uB9B0\uC800', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-[#4EB8EE] via-[#2E8FCD] to-[#153E73]' },
 ];
 
 interface AppContextType {
@@ -281,9 +281,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const updateTierState = () => {
       if (latestLp >= 25000) {
-        if (latestRank === 1) setCurrentTier(TIERS.find((t) => t.name === '챌린저')!);
-        else if (latestRank === 2 || latestRank === 3) setCurrentTier(TIERS.find((t) => t.name === '그랜드마스터')!);
-        else setCurrentTier(TIERS.find((t) => t.name === '마스터')!);
+        if (latestRank === 1) setCurrentTier(TIERS.find((t) => t.name === '\uCC4C\uB9B0\uC800')!);
+        else if (latestRank === 2 || latestRank === 3) setCurrentTier(TIERS.find((t) => t.name === '\uADF8\uB79C\uB4DC\uB9C8\uC2A4\uD130')!);
+        else setCurrentTier(TIERS.find((t) => t.name === '\uB9C8\uC2A4\uD130')!);
       } else {
         const lowerTiers = TIERS.slice(0, 5);
         const found = [...lowerTiers].reverse().find((t) => latestLp >= t.min) || TIERS[0];

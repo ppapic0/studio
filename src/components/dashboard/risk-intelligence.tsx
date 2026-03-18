@@ -339,7 +339,7 @@ export function RiskIntelligence() {
         </div>
 
         <div className="md:col-span-4 space-y-6">
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-sky-100 p-8 overflow-hidden relative">
             <div className="absolute -right-4 -top-4 opacity-10"><Info className="h-32 w-32" /></div>
             <div className="relative z-10 space-y-6">
               <div className="flex items-center gap-2">
@@ -356,13 +356,13 @@ export function RiskIntelligence() {
                   <div key={item.label} className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
                     <div className="flex items-center gap-3">
                       <item.icon className={cn("h-4 w-4", item.color)} />
-                      <span className="text-xs font-bold">{item.label}</span>
+                      <span className="text-xs font-bold text-sky-100">{item.label}</span>
                     </div>
-                    <span className="font-black text-xs text-white">{item.pts}</span>
+                    <span className="font-black text-xs text-amber-200">{item.pts}</span>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] font-bold text-white/60 leading-relaxed italic pt-2">
+              <p className="text-[10px] font-bold text-sky-200/90 leading-relaxed italic pt-2">
                 ※ 총점 100점 만점 기준이며, 실제 Firestore 데이터를 실시간 가공하여 산출됩니다.
               </p>
             </div>

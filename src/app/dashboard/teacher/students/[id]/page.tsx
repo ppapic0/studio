@@ -238,7 +238,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isSessionSaving, setIsSessionSaving] = useState(false);
 
   const hasInitializedForm = useRef(false);
-  const [editForm, setEditForm] = useState({ name: '', schoolName: '', grade: '', password: '', parentLinkCode: '', className: '' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    schoolName: '',
+    grade: '',
+    password: '',
+    parentLinkCode: '',
+    className: '',
+    memberStatus: 'active' as 'active' | 'onHold' | 'withdrawn',
+  });
 
   const [dailyStatsMap, setDailyStatsMap] = useState<Record<string, DailyStatSnapshot>>({});
   const [statsLoading, setStatsLoading] = useState(false);
@@ -288,6 +296,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Array.from(classes).sort();
   }, [centerStudents, student?.className]);
 
+  const currentStudentMemberStatus = useMemo<'active' | 'onHold' | 'withdrawn'>(() => {
+    const raw = centerStudents?.find((member) => member.id === studentId)?.status;
+    if (raw === 'onHold') return 'onHold';
+    if (raw === 'withdrawn') return 'withdrawn';
+    return 'active';
+  }, [centerStudents, studentId]);
+
   useEffect(() => {
     if (progress) {
       setEditLp(progress.seasonLp || 0);
@@ -305,10 +320,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         password: '',
         parentLinkCode: normalizeParentLinkCode(student.parentLinkCode),
         className: student.className || '',
+        memberStatus: currentStudentMemberStatus,
       });
       hasInitializedForm.current = true;
     }
-  }, [student]);
+  }, [student, currentStudentMemberStatus]);
 
   useEffect(() => {
     if (isEditStats) return;
@@ -648,6 +664,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         grade: editForm.grade.trim(),
         className: editForm.className || null,
       };
+
+      if (isAdmin) {
+        payload.memberStatus = editForm.memberStatus;
+      }
 
       if (normalizedParentLinkCode !== existingParentLinkCode) {
         payload.parentLinkCode = normalizedParentLinkCode || null;
@@ -1499,6 +1519,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">소속 반</Label><Select value={editForm.className || 'none'} onValueChange={(value) => setEditForm({ ...editForm, className: value === 'none' ? '' : value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="none" className="font-bold">미배정</SelectItem>{availableClasses.map((className) => <SelectItem key={className} value={className} className="font-bold">{className}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학교</Label><Input value={editForm.schoolName} onChange={(event) => setEditForm({ ...editForm, schoolName: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학년</Label><Select value={editForm.grade} onValueChange={(value) => setEditForm({ ...editForm, grade: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
+            {isAdmin && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학생 상태</Label><Select value={editForm.memberStatus} onValueChange={(value: 'active' | 'onHold' | 'withdrawn') => setEditForm({ ...editForm, memberStatus: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">재원생</SelectItem><SelectItem value="onHold">휴원생</SelectItem><SelectItem value="withdrawn">퇴원생</SelectItem></SelectContent></Select></div>}
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">부모 연동코드 (6자리)</Label><Input value={editForm.parentLinkCode} onChange={(event) => setEditForm({ ...editForm, parentLinkCode: event.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" maxLength={6} className="rounded-xl h-12 border-2 font-bold tracking-[0.2em]" placeholder="123456" /></div>
             {isAdmin && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={(event) => setEditForm({ ...editForm, password: event.target.value })} className="rounded-xl h-12 border-2 font-bold" placeholder="6자 이상 입력 시 변경" /></div>}
           </div>

@@ -285,7 +285,7 @@ export function LoginForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-14 rounded-2xl font-black text-lg shadow-xl mt-2 transition-all active:scale-95" disabled={isLoading}>
+          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white hover:text-white h-14 rounded-2xl font-black text-lg shadow-xl mt-2 transition-all active:scale-95" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
