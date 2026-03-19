@@ -199,19 +199,10 @@ function RhythmTimeChartDialog({
             </CardTitle>
             <Maximize2 className="h-4 w-4 text-slate-300" />
           </div>
-          <div className="h-40 w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">상세 그래프 확인</p>
-            <p className="mt-2 text-2xl font-black text-[#14295F]">
-              {latestRhythm?.rhythmMinutes ? toClockLabel(latestRhythm.rhythmMinutes) : '--:--'}
-            </p>
-            <p className="mt-1 text-[11px] font-bold text-slate-500">
-              {latestRhythm?.date || '-'} 학습 시작
-            </p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#14295F]/15 bg-white px-3 py-1">
-              <span className="text-[10px] font-black text-slate-400">리듬 점수</span>
-              <span className="text-sm font-black text-[#14295F]">{rhythmScore}점</span>
-            </div>
-            <p className="mt-3 text-[11px] font-black text-[#FF7A16]">카드를 클릭하면 팝업에서 그래프 표시</p>
+          <div className="w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+            <p className="text-xs font-black text-[#14295F]">오늘 학습 리듬 점수</p>
+            <p className="mt-2 text-3xl font-black text-[#14295F]">{rhythmScore}점</p>
+            <p className="mt-3 text-[11px] font-bold text-slate-500">카드를 누르면 상세 그래프를 확인할 수 있어요.</p>
           </div>
         </Card>
       </DialogTrigger>
@@ -330,13 +321,14 @@ function SubjectStudyChartDialog({
             </CardTitle>
             <Maximize2 className="h-4 w-4 text-slate-300" />
           </div>
-          <div className="h-40 w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">상세 그래프 확인</p>
-            <p className="mt-2 text-2xl font-black text-[#14295F]">{toHm(subjectTotalMinutes)}</p>
-            <p className="mt-1 text-[11px] font-bold text-slate-500">
-              최다 비중: {topSubject?.subject || '-'}
+          <div className="w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+            <p className="text-xs font-black text-[#14295F]">집중 KPI</p>
+            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-600">
+              카드를 누르면 과목별 학습 그래프를 확인할 수 있어요.
             </p>
-            <p className="mt-3 text-[11px] font-black text-[#FF7A16]">카드를 클릭하면 팝업에서 그래프 표시</p>
+            <p className="mt-3 text-[11px] font-black text-[#14295F]">
+              현재 1위 과목: {topSubject?.subject || '-'}
+            </p>
           </div>
         </Card>
       </DialogTrigger>
