@@ -721,7 +721,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         completion: Math.round(studentStat?.todayPlanCompletionRate || 0),
         studyMinutes: Math.round(studentStat?.totalStudyMinutes || 0),
       };
-    }).sort((a, b) => b.score - a.score);
+    }).sort((a, b) => b.studyMinutes - a.studyMinutes);
 
     const focusTop10 = focusRows.slice(0, 10);
     const focusBottom10 = [...focusRows].reverse().slice(0, 10);
@@ -1227,106 +1227,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
           <section className="space-y-4 px-1">
             <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">집중도 KPI 분석</h2>
-              <Badge className="bg-[#14295F] text-white border-none font-black text-[10px] rounded-full px-2.5">센터관리자</Badge>
-            </div>
-
-            <Card className="rounded-[2.5rem] border-none bg-white p-6 shadow-xl ring-1 ring-black/[0.04] sm:p-8">
-              <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[260px_1fr]')}>
-                <div className="rounded-2xl border border-[#14295F]/15 bg-[linear-gradient(145deg,#eef4ff_0%,#ffffff_85%)] p-5">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]/60">센터 평균 집중도</p>
-                  <div className="mt-2 flex items-end gap-2">
-                    <p className="dashboard-number text-5xl text-[#14295F]">{metrics.focusKpi.score}</p>
-                    <span className="text-sm font-black text-[#14295F]/55 pb-1">/100</span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-xs font-black', metrics.focusKpi.levelBadgeClass)}>
-                      {metrics.focusKpi.levelLabel}
-                    </Badge>
-                    <span className={cn('text-xs font-black', metrics.focusKpi.delta >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                      전일 대비 {metrics.focusKpi.delta >= 0 ? '+' : ''}{metrics.focusKpi.delta}
-                    </span>
-                  </div>
-                </div>
-
-                <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">평균 완료율</p>
-                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{metrics.focusKpi.completion}%</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">평균 학습시간</p>
-                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{Math.floor(metrics.focusKpi.avgStudyMinutes / 60)}h {metrics.focusKpi.avgStudyMinutes % 60}m</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출 평균시간</p>
-                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{metrics.focusKpi.avgAwayMinutes}분</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 성장률</p>
-                    <p className={cn('dashboard-number mt-1 text-2xl', metrics.focusKpi.avgGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                      {metrics.focusKpi.avgGrowthRate >= 0 ? '+' : ''}{Math.round(metrics.focusKpi.avgGrowthRate * 100)}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">잘한 점</p>
-                  {metrics.focusKpi.strengths.length === 0 ? (
-                    <p className="mt-2 text-xs font-bold text-emerald-700">오늘은 기준선 수준으로 유지되었습니다.</p>
-                  ) : (
-                    <div className="mt-2 space-y-1.5">
-                      {metrics.focusKpi.strengths.map((item, index) => (
-                        <p key={index} className="text-xs font-bold text-emerald-700">{item}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">감점 요인</p>
-                  {metrics.focusKpi.risks.length === 0 ? (
-                    <p className="mt-2 text-xs font-bold text-rose-700">현재 큰 감점 요인은 없습니다.</p>
-                  ) : (
-                    <div className="mt-2 space-y-1.5">
-                      {metrics.focusKpi.risks.map((item, index) => (
-                        <p key={index} className="text-xs font-bold text-rose-700">{item}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">내일 개선 제안</p>
-                  <div className="mt-2 space-y-1.5">
-                    {metrics.focusKpi.actions.map((item, index) => (
-                      <p key={index} className="text-xs font-bold text-amber-700">{item}</p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </section>
-
-          <section className="space-y-4 px-1">
-            <div className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">집중도 학생 랭킹</h2>
+              <h2 className="text-xl font-black tracking-tighter">{'\uC8FC\uAC04 \uD559\uC2B5\uC2DC\uAC04 \uB7AD\uD0B9'}</h2>
               <Badge className="bg-[#14295F] text-white border-none font-black text-[10px] rounded-full px-2.5">Top / Bottom 10</Badge>
             </div>
-
+          
             <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
               <Card className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-black text-emerald-700">?? 10?</p>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">?? ??</span>
+                  <p className="text-sm font-black text-emerald-700">{'\uC0C1\uC704 10\uBA85'}</p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{'\uD559\uC2B5\uC2DC\uAC04 \uC0C1\uC704'}</span>
                 </div>
                 <div className="space-y-2">
                   {metrics.focusTop10.length === 0 ? (
-                    <p className="text-xs font-bold text-slate-500">집계된 학생 데이터가 없습니다.</p>
+                    <p className="text-xs font-bold text-slate-500">{'\uC9D1\uACC4\uD560 \uD559\uC0DD \uB370\uC774\uD130\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.'}</p>
                   ) : (
                     metrics.focusTop10.map((row, index) => (
                       <button
@@ -1338,9 +1252,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <span className="text-xs font-black text-emerald-700">{index + 1}</span>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
-                          <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
+                          <p className="text-[10px] font-bold text-slate-500">{row.className}{' \u00B7 \uC644\uB8CC\uC728 '}{row.completion}%</p>
                         </div>
-                        <Badge className="h-6 rounded-full border-none bg-emerald-100 px-2.5 text-[10px] font-black text-emerald-700">???</Badge>
+                        <Badge className="h-6 rounded-full border-none bg-emerald-100 px-2.5 text-[10px] font-black text-emerald-700">
+                          {Math.floor(row.studyMinutes / 60)}h {row.studyMinutes % 60}m
+                        </Badge>
                       </button>
                     ))
                   )}
@@ -1349,12 +1265,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
               <Card className="rounded-[2rem] border border-rose-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-black text-rose-700">?? 10?</p>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">?? ??</span>
+                  <p className="text-sm font-black text-rose-700">{'\uD558\uC704 10\uBA85'}</p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">{'\uD559\uC2B5\uC2DC\uAC04 \uD558\uC704'}</span>
                 </div>
                 <div className="space-y-2">
                   {metrics.focusBottom10.length === 0 ? (
-                    <p className="text-xs font-bold text-slate-500">집계된 학생 데이터가 없습니다.</p>
+                    <p className="text-xs font-bold text-slate-500">{'\uC9D1\uACC4\uD560 \uD559\uC0DD \uB370\uC774\uD130\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.'}</p>
                   ) : (
                     metrics.focusBottom10.map((row, index) => (
                       <button
@@ -1366,9 +1282,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <span className="text-xs font-black text-rose-700">{index + 1}</span>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
-                          <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
+                          <p className="text-[10px] font-bold text-slate-500">{row.className}{' \u00B7 \uC644\uB8CC\uC728 '}{row.completion}%</p>
                         </div>
-                        <Badge className="h-6 rounded-full border-none bg-rose-100 px-2.5 text-[10px] font-black text-rose-700">????</Badge>
+                        <Badge className="h-6 rounded-full border-none bg-rose-100 px-2.5 text-[10px] font-black text-rose-700">
+                          {Math.floor(row.studyMinutes / 60)}h {row.studyMinutes % 60}m
+                        </Badge>
                       </button>
                     ))
                   )}
@@ -1376,7 +1294,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </Card>
             </div>
           </section>
-
           <section className="pb-10 px-1">
             <Card
               className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03] cursor-pointer"
@@ -1839,11 +1756,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
 
-                {/* 3. ?? ?? ?? ?? */}
+                {/* 3. 학습 시간 분포 리듬 */}
                 <div className="rounded-xl border border-slate-100 bg-white p-4">
                                     <div className="mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">?? ?? ?? ??</p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">?? ????? ??? ????? ??? ?????</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 시간 분포 리듬</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">최근 7일 기준 첫 공부 시작시간과 마지막 공부 종료시간</p>
                   </div>
                   {trendLoading ? (
                     <div className="h-[130px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
@@ -1865,8 +1782,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </ResponsiveContainer>
                   )}
                   <div className="mt-2 flex items-center gap-4 justify-end">
-                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-sky-500" /><p className="text-[9px] font-bold text-slate-400">? ????</p></div>
-                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-violet-500" /><p className="text-[9px] font-bold text-slate-400">??? ????</p></div>
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-sky-500" /><p className="text-[9px] font-bold text-slate-400">첫 시작시간</p></div>
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-violet-500" /><p className="text-[9px] font-bold text-slate-400">마지막 종료시간</p></div>
                   </div>
                 </div>
 
