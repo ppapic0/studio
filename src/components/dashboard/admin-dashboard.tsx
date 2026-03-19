@@ -74,7 +74,7 @@ import {
 import { useFirestore, useCollection, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, collectionGroup, Timestamp, doc, limit, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, Timestamp, doc, limit, getDocs, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog } from '@/lib/types';
 import { format, subDays } from 'date-fns';
@@ -166,17 +166,49 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, yesterdayKey]);
   const { data: yesterdayStats } = useCollection<DailyStudentStat>(yesterdayStatsQuery, { enabled: isActive });
 
-  const focusStudentTrendQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedFocusStudentId) return null;
-    return query(
-      collectionGroup(firestore, 'students'),
-      where('studentId', '==', selectedFocusStudentId),
-      limit(90),
-    );
-  }, [firestore, selectedFocusStudentId]);
-  const { data: focusStudentTrendRaw, isLoading: trendLoading } = useCollection<DailyStudentStat>(focusStudentTrendQuery, {
-    enabled: isActive && !!selectedFocusStudentId,
-  });
+  const [focusStudentTrendRaw, setFocusStudentTrendRaw] = useState<DailyStudentStat[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
+
+  useEffect(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !today || !isActive) {
+      setFocusStudentTrendRaw([]);
+      setTrendLoading(false);
+      return;
+    }
+
+    let disposed = false;
+    const loadTrendData = async () => {
+      setTrendLoading(true);
+      try {
+        const dateKeys = Array.from({ length: 90 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd'));
+        const rows = await Promise.all(
+          dateKeys.map(async (dateKey) => {
+            try {
+              const studentsRef = collection(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students');
+              const snap = await getDocs(query(studentsRef, where('studentId', '==', selectedFocusStudentId), limit(1)));
+              if (snap.empty) return null;
+              return snap.docs[0].data() as DailyStudentStat;
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        if (!disposed) {
+          setFocusStudentTrendRaw(rows.filter((row): row is DailyStudentStat => !!row));
+        }
+      } catch {
+        if (!disposed) setFocusStudentTrendRaw([]);
+      } finally {
+        if (!disposed) setTrendLoading(false);
+      }
+    };
+
+    void loadTrendData();
+    return () => {
+      disposed = true;
+    };
+  }, [firestore, centerId, selectedFocusStudentId, today, isActive]);
 
   // 5. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
@@ -641,7 +673,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (lowCompletionCount > 0) focusRisks.push(`완료율 60% 미만 학생이 ${lowCompletionCount}명입니다.`);
     if (highPenaltyCount > 0) focusRisks.push(`벌점 10점 이상 학생이 ${highPenaltyCount}명입니다.`);
     if (avgGrowthRate <= -0.1) focusRisks.push('학습 성장률이 하락 구간입니다.');
-    if (avgFocusScore < 60) focusRisks.push('센터 평균 집중도 점수가 관리 구간으로 내려갔습니다.');
+    if (avgFocusScore < 60) focusRisks.push('센터 평균 집중도가 관리 구간으로 내려갔습니다.');
 
     if (lowCompletionCount > 0) focusActions.push('내일 계획 수를 3~4개 핵심 과제로 축소해 완료율을 먼저 회복하세요.');
     if (highPenaltyCount > 0) focusActions.push('벌점 누적 학생은 첫 90분 밀착 체크로 이탈을 줄이세요.');
@@ -933,10 +965,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     // 7일 평균 (학습 데이터 있는 날만)
     const activeDays = trend.filter((d) => d.score > 0);
-    const weekAvgScore = activeDays.length > 0
-      ? Math.round(activeDays.reduce((sum, d) => sum + d.score, 0) / activeDays.length)
-      : 0;
-
     // 주간 성장률: 주 초반(0~2일) vs 주 후반(4~6일)
     const firstHalf = trend.slice(0, 3).filter((d) => d.score > 0);
     const lastHalf = trend.slice(4).filter((d) => d.score > 0);
@@ -983,15 +1011,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const riskAlerts: string[] = [];
     if (growthRate <= -0.2) riskAlerts.push(`학습 성장률 ${Math.round(growthRate * 100)}%로 급감했습니다. 즉각 면담이 필요합니다.`);
     else if (growthRate <= -0.1) riskAlerts.push(`학습 성장률 ${Math.round(growthRate * 100)}% 하락 중입니다. 원인 파악이 필요합니다.`);
-    if (todayScore < 60) riskAlerts.push('오늘 집중도 60점 미만 — 집중 관리 구간입니다.');
+    if (todayScore < 60) riskAlerts.push('오늘 학습 흐름이 불안정합니다. 집중 관리 구간입니다.');
     if (penaltyPoints >= 10) riskAlerts.push(`벌점 ${penaltyPoints}점으로 기준치(10점) 초과. 규정 점검이 필요합니다.`);
     if (selectedFocusStudent.completion < 50) riskAlerts.push(`계획 완료율 ${selectedFocusStudent.completion}% — 목표 수 조정을 권장합니다.`);
     if (trendDirection === 'down' && activeDays.length >= 3) riskAlerts.push('최근 3일 집중도 지속 하락 추세입니다.');
 
     // 관리자 인사이트
     const insights: string[] = [];
-    if (trendDirection === 'up') insights.push(`집중도 상승 추세 (최근 3일 평균 ${Math.round(recent3Avg)}점). 현재 패턴을 격려해주세요.`);
-    else if (trendDirection === 'down') insights.push(`집중도 하락 추세 (최근 3일 평균 ${Math.round(recent3Avg)}점). 오늘 면담을 권장합니다.`);
+    if (trendDirection === 'up') insights.push('집중 흐름이 상승 추세입니다. 현재 패턴을 유지하도록 격려해주세요.');
+    else if (trendDirection === 'down') insights.push('집중 흐름이 하락 추세입니다. 오늘 면담을 권장합니다.');
 
     if (weekGrowthRate > 5) insights.push(`주간 성장률 +${weekGrowthRate}%. 주 중반 이후 집중도가 개선되고 있습니다.`);
     else if (weekGrowthRate < -5) insights.push(`주간 성장률 ${weekGrowthRate}%. 주 중반 이후 집중도가 낮아지고 있습니다.`);
@@ -1005,17 +1033,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       insights.push(`7일 평균 학습시간 ${Math.floor(avgMinutes / 60)}h ${avgMinutes % 60}m. 최장 ${Math.floor(maxMinutes / 60)}h ${maxMinutes % 60}m 기록.`);
 
     if (bestDay && worstDay && bestDay.date !== worstDay.date)
-      insights.push(`최고 집중일 ${bestDay.date}(${bestDay.score}점) / 최저 집중일 ${worstDay.date}(${worstDay.score}점) — 차이 ${bestDay.score - worstDay.score}점.`);
+      insights.push(`학습 리듬 최고일 ${bestDay.date} / 최저일 ${worstDay.date} — 리듬 편차가 있습니다.`);
 
     if (consistencyStat >= 70) insights.push(`꾸준함 스탯 ${Math.round(consistencyStat)}점으로 규칙적인 학습 습관이 형성되어 있습니다.`);
     else if (consistencyStat < 40 && consistencyStat > 0) insights.push(`꾸준함 스탯 ${Math.round(consistencyStat)}점 — 불규칙 패턴. 매일 트랙 시작을 독려해 주세요.`);
 
-    if (penaltyPoints > 0 && penaltyPoints < 10) insights.push(`현재 벌점 ${penaltyPoints}점. 10점 초과 시 집중도 점수에 큰 감점이 발생합니다.`);
+    if (penaltyPoints > 0 && penaltyPoints < 10) insights.push(`현재 벌점 ${penaltyPoints}점. 10점 초과 시 학습 지표에 큰 감점이 발생합니다.`);
 
     if (insights.length === 0) insights.push('현재 안정적인 상태입니다. 정기 모니터링을 유지하세요.');
 
     return {
-      weekAvgScore,
       weekGrowthRate,
       bestDay,
       worstDay,
