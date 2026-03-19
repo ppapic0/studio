@@ -5,17 +5,15 @@ import { useMemo } from 'react';
 
 import { useAppContext } from '@/contexts/app-context';
 import { useUser } from '@/firebase';
-import StudentReportsPage from '../student-reports/page';
+import { cn } from '@/lib/utils';
+import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
 import StudentDetailPage from '../teacher/students/[id]/page';
 
 export default function AnalysisTrackPage() {
   const { viewMode } = useAppContext();
   const { user } = useUser();
   const selfParams = useMemo(() => Promise.resolve({ id: user?.uid ?? '' }), [user?.uid]);
-
-  if (viewMode === 'mobile') {
-    return <StudentReportsPage />;
-  }
+  const isMobile = viewMode === 'mobile';
 
   if (!user) {
     return (
@@ -25,5 +23,10 @@ export default function AnalysisTrackPage() {
     );
   }
 
-  return <StudentDetailPage params={selfParams} />;
+  return (
+    <div className={cn(isMobile && 'flex flex-col gap-3')}>
+      {isMobile && <StudentTrackSubnav />}
+      <StudentDetailPage params={selfParams} />
+    </div>
+  );
 }

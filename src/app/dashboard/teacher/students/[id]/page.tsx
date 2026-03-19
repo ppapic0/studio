@@ -563,6 +563,35 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Math.round((values.reduce((acc, value) => acc + value, 0) / values.length) * 100);
   }, [dailyStatsMap]);
 
+  const focusKpi = useMemo(() => {
+    const todayRow = fullSeries.find((item) => item.dateKey === todayKey);
+    const todayMinutes = Math.max(0, Math.round(todayRow?.studyMinutes || 0));
+    const previous7Rows = fullSeries.filter((item) => item.dateKey < todayKey).slice(-7);
+    const previous7AvgMinutes = previous7Rows.length
+      ? Math.round(previous7Rows.reduce((sum, item) => sum + Math.max(0, Math.round(item.studyMinutes || 0)), 0) / previous7Rows.length)
+      : 0;
+    const recent7Rows = fullSeries.slice(-7);
+    const recent7AvgMinutes = recent7Rows.length
+      ? Math.round(recent7Rows.reduce((sum, item) => sum + Math.max(0, Math.round(item.studyMinutes || 0)), 0) / recent7Rows.length)
+      : 0;
+
+    const todayGrowthPercent =
+      previous7AvgMinutes > 0
+        ? Math.round(((todayMinutes - previous7AvgMinutes) / previous7AvgMinutes) * 100)
+        : todayMinutes > 0
+          ? 100
+          : 0;
+
+    return {
+      todayMinutes,
+      previous7AvgMinutes,
+      recent7AvgMinutes,
+      todayGrowthPercent,
+      completionRate: avgCompletionRate,
+      rhythmScore,
+    };
+  }, [fullSeries, todayKey, avgCompletionRate, rhythmScore]);
+
   const studyStreakDays = useMemo(() => {
     const seriesMinutesMap = Object.fromEntries(fullSeries.map((item) => [item.dateKey, item.studyMinutes]));
     let streak = 0;
@@ -1043,6 +1072,40 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
+          <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-black tracking-tight">개인 집중도 KPI</CardTitle>
+              <CardDescription className="font-bold text-[11px]">학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 학습 성장률</p>
+                <p className={cn('mt-1 text-xl font-black tabular-nums', focusKpi.todayGrowthPercent >= 0 ? 'text-emerald-700' : 'text-rose-600')}>
+                  {focusKpi.todayGrowthPercent >= 0 ? '+' : ''}{focusKpi.todayGrowthPercent}%
+                </p>
+                <p className="text-[10px] font-semibold text-emerald-700/80">최근 7일 평균 대비</p>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">최근 7일 평균</p>
+                <p className="mt-1 text-xl font-black text-blue-700">{minutesToLabel(focusKpi.recent7AvgMinutes)}</p>
+                <p className="text-[10px] font-semibold text-blue-700/80">일 평균 공부시간</p>
+              </div>
+
+              <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">계획 완수율</p>
+                <p className="mt-1 text-xl font-black text-amber-700 tabular-nums">{focusKpi.completionRate}%</p>
+                <p className="text-[10px] font-semibold text-amber-700/80">최근 기간 평균</p>
+              </div>
+
+              <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">학습 리듬 점수</p>
+                <p className="mt-1 text-xl font-black text-violet-700 tabular-nums">{focusKpi.rhythmScore}점</p>
+                <p className="text-[10px] font-semibold text-violet-700/80">공부시간 분산 기반</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {isMobile ? (
             <>
               <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
