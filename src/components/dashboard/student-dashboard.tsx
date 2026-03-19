@@ -77,7 +77,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -115,6 +115,13 @@ const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
 const REQUEST_TYPE_LABEL: Record<'late' | 'absence', string> = {
   late: '지각',
   absence: '결석',
+};
+
+const PENALTY_SOURCE_LABEL: Record<PenaltyLog['source'], string> = {
+  attendance_request: '지각/결석 신청',
+  manual: '관리자 수동 부여',
+  reset: '초기화',
+  routine_missing: '루틴 미실행',
 };
 
 type ExamCountdownSetting = {
@@ -678,6 +685,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
       .slice(0, 5);
   }, [myRequestsRaw]);
+
+  const myPenaltyLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership, user]);
+  const { data: myPenaltyLogsRaw } = useCollection<PenaltyLog>(myPenaltyLogsQuery, { enabled: isActive });
+
+  const myPenaltyLogs = useMemo(() => {
+    if (!myPenaltyLogsRaw) return [];
+    return [...myPenaltyLogsRaw].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+  }, [myPenaltyLogsRaw]);
 
   // 4. 선생님 리포트 조회 (학생 본인 발송 완료본)
   const reportsQuery = useMemoFirebase(() => {
@@ -2070,6 +2091,34 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
                       현재 {penaltyPoints}점 → 이번 포인트 배율 {penaltyMultiplierPercent}% 적용
                     </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-rose-100 bg-white p-4">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점 부여 사유 내역</p>
+                    {myPenaltyLogs.length === 0 ? (
+                      <p className="mt-2 text-xs font-semibold text-slate-500">현재 기록된 벌점 사유가 없습니다.</p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {myPenaltyLogs.map((log) => {
+                          const createdAtDate = log.createdAt?.toDate?.();
+                          const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy-MM-dd HH:mm') : '시간 미기록';
+                          const sourceLabel = PENALTY_SOURCE_LABEL[log.source] ?? '기타';
+                          return (
+                            <div key={log.id} className="rounded-xl border border-rose-100 bg-rose-50/40 px-3 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-black text-slate-800">{log.reason || '사유 미입력'}</p>
+                                <Badge variant="outline" className="shrink-0 border-rose-200 bg-white text-rose-700 text-[10px] font-black">
+                                  +{log.pointsDelta}점
+                                </Badge>
+                              </div>
+                              <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                                {createdAtLabel} · {sourceLabel}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
