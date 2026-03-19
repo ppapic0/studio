@@ -31,8 +31,10 @@ import {
 } from '@/components/ui/dialog';
 import {
   ResponsiveContainer,
+  ComposedChart,
   LineChart,
   Line,
+  Bar,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -66,7 +68,8 @@ import {
   UserCog,
   UserX,
   Mail,
-  Phone
+  Phone,
+  TrendingDown,
 } from 'lucide-react';
 import { useFirestore, useCollection, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -807,6 +810,115 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [focusStudentTrendRaw, progressList, selectedFocusStudentId, today]);
 
+  // ── 선택 학생 통합 KPI 계산 ──
+  const selectedFocusKpi = useMemo(() => {
+    if (!selectedFocusStudent) return null;
+
+    const trend = focusStudentTrend;
+    const todayScore = selectedFocusStudent.score;
+    const growthRate = selectedFocusStat?.studyTimeGrowthRate ?? 0;
+    const penaltyPoints = selectedFocusProgress?.penaltyPoints ?? 0;
+    const consistencyStat = selectedFocusProgress?.stats?.consistency ?? 0;
+
+    // 7일 평균 (학습 데이터 있는 날만)
+    const activeDays = trend.filter((d) => d.score > 0);
+    const weekAvgScore = activeDays.length > 0
+      ? Math.round(activeDays.reduce((sum, d) => sum + d.score, 0) / activeDays.length)
+      : 0;
+
+    // 주간 성장률: 주 초반(0~2일) vs 주 후반(4~6일)
+    const firstHalf = trend.slice(0, 3).filter((d) => d.score > 0);
+    const lastHalf = trend.slice(4).filter((d) => d.score > 0);
+    const firstHalfAvg = firstHalf.length > 0
+      ? firstHalf.reduce((sum, d) => sum + d.score, 0) / firstHalf.length : 0;
+    const lastHalfAvg = lastHalf.length > 0
+      ? lastHalf.reduce((sum, d) => sum + d.score, 0) / lastHalf.length : 0;
+    const weekGrowthRate = firstHalfAvg > 0
+      ? Math.round(((lastHalfAvg - firstHalfAvg) / firstHalfAvg) * 100) : 0;
+
+    // 최고/최저 집중일
+    const bestDay = activeDays.length > 0
+      ? activeDays.reduce((best, d) => d.score > best.score ? d : best)
+      : null;
+    const worstDay = activeDays.length > 0
+      ? activeDays.reduce((worst, d) => d.score < worst.score ? d : worst)
+      : null;
+
+    // 학습시간 통계
+    const activeMins = trend.filter((d) => d.minutes > 0);
+    const avgMinutes = activeMins.length > 0
+      ? Math.round(activeMins.reduce((sum, d) => sum + d.minutes, 0) / activeMins.length)
+      : 0;
+    const maxMinutes = activeMins.length > 0 ? Math.max(...activeMins.map((d) => d.minutes)) : 0;
+
+    // 트렌드 방향: 최근 3일 vs 첫 3일
+    const recent3 = trend.slice(-3).filter((d) => d.score > 0).map((d) => d.score);
+    const older3 = trend.slice(0, 3).filter((d) => d.score > 0).map((d) => d.score);
+    const recent3Avg = recent3.length > 0 ? recent3.reduce((s, v) => s + v, 0) / recent3.length : 0;
+    const older3Avg = older3.length > 0 ? older3.reduce((s, v) => s + v, 0) / older3.length : 0;
+    const trendDirection: 'up' | 'down' | 'stable' =
+      recent3Avg > older3Avg + 5 ? 'up' : recent3Avg < older3Avg - 5 ? 'down' : 'stable';
+
+    // 위험도 판정
+    const isHighRisk = todayScore < 60 || growthRate <= -0.2 || penaltyPoints >= 10;
+    const isMediumRisk = !isHighRisk && (todayScore < 75 || growthRate <= -0.1 || selectedFocusStudent.completion < 60);
+    const riskStatus = isHighRisk
+      ? { label: '위험', badgeClass: 'bg-rose-500 text-white border-none' }
+      : isMediumRisk
+        ? { label: '주의', badgeClass: 'bg-amber-400 text-white border-none' }
+        : { label: '안정', badgeClass: 'bg-emerald-500 text-white border-none' };
+
+    // 위험 신호
+    const riskAlerts: string[] = [];
+    if (growthRate <= -0.2) riskAlerts.push(`학습 성장률 ${Math.round(growthRate * 100)}%로 급감했습니다. 즉각 면담이 필요합니다.`);
+    else if (growthRate <= -0.1) riskAlerts.push(`학습 성장률 ${Math.round(growthRate * 100)}% 하락 중입니다. 원인 파악이 필요합니다.`);
+    if (todayScore < 60) riskAlerts.push('오늘 집중도 60점 미만 — 집중 관리 구간입니다.');
+    if (penaltyPoints >= 10) riskAlerts.push(`벌점 ${penaltyPoints}점으로 기준치(10점) 초과. 규정 점검이 필요합니다.`);
+    if (selectedFocusStudent.completion < 50) riskAlerts.push(`계획 완료율 ${selectedFocusStudent.completion}% — 목표 수 조정을 권장합니다.`);
+    if (trendDirection === 'down' && activeDays.length >= 3) riskAlerts.push('최근 3일 집중도 지속 하락 추세입니다.');
+
+    // 관리자 인사이트
+    const insights: string[] = [];
+    if (trendDirection === 'up') insights.push(`집중도 상승 추세 (최근 3일 평균 ${Math.round(recent3Avg)}점). 현재 패턴을 격려해주세요.`);
+    else if (trendDirection === 'down') insights.push(`집중도 하락 추세 (최근 3일 평균 ${Math.round(recent3Avg)}점). 오늘 면담을 권장합니다.`);
+
+    if (weekGrowthRate > 5) insights.push(`주간 성장률 +${weekGrowthRate}%. 주 중반 이후 집중도가 개선되고 있습니다.`);
+    else if (weekGrowthRate < -5) insights.push(`주간 성장률 ${weekGrowthRate}%. 주 중반 이후 집중도가 낮아지고 있습니다.`);
+
+    if (selectedFocusStudent.completion >= 80)
+      insights.push(`계획 완료율 ${selectedFocusStudent.completion}%로 실행력이 우수합니다. 목표 난이도를 높여볼 수 있습니다.`);
+    else if (selectedFocusStudent.completion < 60)
+      insights.push(`계획 완료율 ${selectedFocusStudent.completion}%. 오늘 과제를 3~4개로 줄여 성공 경험을 쌓아주세요.`);
+
+    if (avgMinutes > 0)
+      insights.push(`7일 평균 학습시간 ${Math.floor(avgMinutes / 60)}h ${avgMinutes % 60}m. 최장 ${Math.floor(maxMinutes / 60)}h ${maxMinutes % 60}m 기록.`);
+
+    if (bestDay && worstDay && bestDay.date !== worstDay.date)
+      insights.push(`최고 집중일 ${bestDay.date}(${bestDay.score}점) / 최저 집중일 ${worstDay.date}(${worstDay.score}점) — 차이 ${bestDay.score - worstDay.score}점.`);
+
+    if (consistencyStat >= 70) insights.push(`꾸준함 스탯 ${Math.round(consistencyStat)}점으로 규칙적인 학습 습관이 형성되어 있습니다.`);
+    else if (consistencyStat < 40 && consistencyStat > 0) insights.push(`꾸준함 스탯 ${Math.round(consistencyStat)}점 — 불규칙 패턴. 매일 트랙 시작을 독려해 주세요.`);
+
+    if (penaltyPoints > 0 && penaltyPoints < 10) insights.push(`현재 벌점 ${penaltyPoints}점. 10점 초과 시 집중도 점수에 큰 감점이 발생합니다.`);
+
+    if (insights.length === 0) insights.push('현재 안정적인 상태입니다. 정기 모니터링을 유지하세요.');
+
+    return {
+      weekAvgScore,
+      weekGrowthRate,
+      bestDay,
+      worstDay,
+      avgMinutes,
+      maxMinutes,
+      trendDirection,
+      riskStatus,
+      riskAlerts,
+      insights,
+      activeDaysCount: activeDays.length,
+      consistencyStat,
+    };
+  }, [selectedFocusStudent, focusStudentTrend, selectedFocusStat, selectedFocusProgress]);
+
   if (!isActive) return null;
 
   if (membersLoading || !isMounted) {
@@ -1267,91 +1379,395 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </div>
       )}
       <Dialog open={!!selectedFocusStudentId} onOpenChange={(open) => !open && setSelectedFocusStudentId(null)}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
-          <div className="bg-[#14295F] p-6 text-white">
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl max-h-[92vh] flex flex-col">
+
+          {/* ── HEADER ── */}
+          <div className="bg-[#14295F] p-6 text-white flex-shrink-0">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">학생 집중도 KPI</DialogTitle>
-              <DialogDescription className="text-white/80 font-bold">
-                {selectedFocusStudent ? `${selectedFocusStudent.name} · ${selectedFocusStudent.className}` : '학생별 집중도 추이를 확인합니다.'}
-              </DialogDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <DialogTitle className="text-2xl font-black tracking-tight">학생 집중도 KPI</DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold mt-0.5">
+                    {selectedFocusStudent
+                      ? `${selectedFocusStudent.name} · ${selectedFocusStudent.className}`
+                      : '학생별 집중도 추이를 확인합니다.'}
+                  </DialogDescription>
+                </div>
+                {selectedFocusKpi && (
+                  <Badge className={cn('mt-1 flex-shrink-0 h-7 px-3 text-xs font-black rounded-full', selectedFocusKpi.riskStatus.badgeClass)}>
+                    {selectedFocusKpi.riskStatus.label}
+                  </Badge>
+                )}
+              </div>
+              {/* 핵심 3대 지표 헤더 요약 */}
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-white/10 p-3">
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">오늘 집중도</p>
+                  <p className="dashboard-number text-2xl text-white mt-0.5">{selectedFocusStudent?.score ?? 0}점</p>
+                </div>
+                <div className="rounded-xl bg-white/10 p-3">
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">7일 평균</p>
+                  <p className="dashboard-number text-2xl text-white mt-0.5">{selectedFocusKpi?.weekAvgScore ?? 0}점</p>
+                </div>
+                <div className="rounded-xl bg-white/10 p-3">
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">주간 성장률</p>
+                  <p className={cn('dashboard-number text-2xl mt-0.5', (selectedFocusKpi?.weekGrowthRate ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                    {(selectedFocusKpi?.weekGrowthRate ?? 0) >= 0 ? '+' : ''}{selectedFocusKpi?.weekGrowthRate ?? 0}%
+                  </p>
+                </div>
+              </div>
             </DialogHeader>
           </div>
-          <div className="bg-white p-5 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 집중도</p>
-                <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{selectedFocusStudent?.score ?? 0}점</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 완료율</p>
-                <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{selectedFocusStudent?.completion ?? 0}%</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 학습시간</p>
-                <p className="dashboard-number mt-1 text-2xl text-[#14295F]">
-                  {Math.floor((selectedFocusStudent?.studyMinutes ?? 0) / 60)}h {(selectedFocusStudent?.studyMinutes ?? 0) % 60}m
-                </p>
-              </div>
-            </div>
 
-            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">점수 환산 기준</p>
-              <p className="mt-1 text-xs font-bold text-slate-700">
-                총점 = 집중스탯(30%) + 계획 완료율(25%) + 학습시간(20%) + 성장률(15%) + 벌점 보정(10%)
-              </p>
+          {/* ── SCROLLABLE BODY ── */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="bg-white p-5 space-y-5">
+
+              {/* ── 위험 신호 알림 (조건부) ── */}
+              {selectedFocusKpi && selectedFocusKpi.riskAlerts.length > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">위험 신호 감지</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {selectedFocusKpi.riskAlerts.map((alert, idx) => (
+                      <p key={idx} className="text-xs font-bold text-rose-700">• {alert}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── 핵심 지표 카드 (3×2) ── */}
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">핵심 지표</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* 오늘 학습시간 */}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Clock className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">오늘 학습시간</p>
+                    </div>
+                    <p className="dashboard-number text-lg text-[#14295F]">
+                      {Math.floor((selectedFocusStudent?.studyMinutes ?? 0) / 60)}h {(selectedFocusStudent?.studyMinutes ?? 0) % 60}m
+                    </p>
+                    {selectedFocusKpi && selectedFocusKpi.avgMinutes > 0 && (
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                        7일 평균 {Math.floor(selectedFocusKpi.avgMinutes / 60)}h {selectedFocusKpi.avgMinutes % 60}m
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 계획 완료율 */}
+                  <div className={cn('rounded-xl border p-3',
+                    (selectedFocusStudent?.completion ?? 0) >= 80 ? 'border-emerald-100 bg-emerald-50/60'
+                    : (selectedFocusStudent?.completion ?? 0) >= 60 ? 'border-amber-100 bg-amber-50/60'
+                    : 'border-rose-100 bg-rose-50/60'
+                  )}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <CheckCircle2 className={cn('h-3 w-3 flex-shrink-0',
+                        (selectedFocusStudent?.completion ?? 0) >= 80 ? 'text-emerald-500'
+                        : (selectedFocusStudent?.completion ?? 0) >= 60 ? 'text-amber-500'
+                        : 'text-rose-500'
+                      )} />
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">계획 완료율</p>
+                    </div>
+                    <p className={cn('dashboard-number text-lg',
+                      (selectedFocusStudent?.completion ?? 0) >= 80 ? 'text-emerald-700'
+                      : (selectedFocusStudent?.completion ?? 0) >= 60 ? 'text-amber-700'
+                      : 'text-rose-700'
+                    )}>
+                      {selectedFocusStudent?.completion ?? 0}%
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                      {(selectedFocusStudent?.completion ?? 0) >= 80 ? '목표 달성' : (selectedFocusStudent?.completion ?? 0) >= 60 ? '부분 달성' : '미달성'}
+                    </p>
+                  </div>
+
+                  {/* 집중 스탯 */}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Zap className="h-3 w-3 text-violet-500 flex-shrink-0" />
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">집중 스탯</p>
+                    </div>
+                    <p className="dashboard-number text-lg text-[#14295F]">
+                      {Math.round(selectedFocusProgress?.stats?.focus ?? 0)}
+                      <span className="text-xs text-slate-400 font-bold">/100</span>
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">몰입 시간 누적</p>
+                  </div>
+
+                  {/* 학습 성장률 */}
+                  <div className={cn('rounded-xl border p-3',
+                    (selectedFocusStat?.studyTimeGrowthRate ?? 0) >= 0.05 ? 'border-emerald-100 bg-emerald-50/60'
+                    : (selectedFocusStat?.studyTimeGrowthRate ?? 0) <= -0.1 ? 'border-rose-100 bg-rose-50/60'
+                    : 'border-slate-100 bg-slate-50/70'
+                  )}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      {(selectedFocusStat?.studyTimeGrowthRate ?? 0) >= 0
+                        ? <ArrowUpRight className="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                        : <ArrowDownRight className="h-3 w-3 text-rose-500 flex-shrink-0" />
+                      }
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">학습 성장률</p>
+                    </div>
+                    <p className={cn('dashboard-number text-lg',
+                      (selectedFocusStat?.studyTimeGrowthRate ?? 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                    )}>
+                      {(selectedFocusStat?.studyTimeGrowthRate ?? 0) >= 0 ? '+' : ''}
+                      {Math.round((selectedFocusStat?.studyTimeGrowthRate ?? 0) * 100)}%
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">전일 대비</p>
+                  </div>
+
+                  {/* 벌점 현황 */}
+                  <div className={cn('rounded-xl border p-3',
+                    (selectedFocusProgress?.penaltyPoints ?? 0) >= 10 ? 'border-rose-200 bg-rose-50'
+                    : (selectedFocusProgress?.penaltyPoints ?? 0) >= 5 ? 'border-amber-100 bg-amber-50/60'
+                    : 'border-slate-100 bg-slate-50/70'
+                  )}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <ShieldAlert className={cn('h-3 w-3 flex-shrink-0',
+                        (selectedFocusProgress?.penaltyPoints ?? 0) >= 10 ? 'text-rose-500'
+                        : (selectedFocusProgress?.penaltyPoints ?? 0) >= 5 ? 'text-amber-500'
+                        : 'text-slate-400'
+                      )} />
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">벌점 현황</p>
+                    </div>
+                    <p className={cn('dashboard-number text-lg',
+                      (selectedFocusProgress?.penaltyPoints ?? 0) >= 10 ? 'text-rose-700'
+                      : (selectedFocusProgress?.penaltyPoints ?? 0) >= 5 ? 'text-amber-700'
+                      : 'text-[#14295F]'
+                    )}>
+                      {selectedFocusProgress?.penaltyPoints ?? 0}점
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                      {(selectedFocusProgress?.penaltyPoints ?? 0) >= 10 ? '즉시 점검 필요'
+                        : (selectedFocusProgress?.penaltyPoints ?? 0) >= 5 ? '주의 구간'
+                        : '정상 범위'}
+                    </p>
+                  </div>
+
+                  {/* 꾸준함 스탯 */}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Activity className="h-3 w-3 text-teal-500 flex-shrink-0" />
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">꾸준함 스탯</p>
+                    </div>
+                    <p className="dashboard-number text-lg text-[#14295F]">
+                      {Math.round(selectedFocusProgress?.stats?.consistency ?? 0)}
+                      <span className="text-xs text-slate-400 font-bold">/100</span>
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">학습 규칙성</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 점수 구성 분석 ── */}
               {selectedFocusBreakdown && (
-                <div className="mt-3 grid gap-2 sm:grid-cols-5">
-                  <div className="rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black text-slate-500">집중스탯</p>
-                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.focusStat}점 / {selectedFocusBreakdown.weighted.focus}점</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black text-slate-500">완료율</p>
-                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.completionRate}점 / {selectedFocusBreakdown.weighted.completion}점</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black text-slate-500">학습시간</p>
-                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.studyScore}점 / {selectedFocusBreakdown.weighted.study}점</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black text-slate-500">성장률</p>
-                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.growthScore}점 / {selectedFocusBreakdown.weighted.growth}점</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black text-slate-500">벌점 보정</p>
-                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.penaltyScore}점 / {selectedFocusBreakdown.weighted.penalty}점</p>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">점수 구성 분석</p>
+                  <p className="text-[10px] font-bold text-slate-400 mb-3">
+                    집중스탯 30% · 완료율 25% · 학습시간 20% · 성장률 15% · 벌점보정 10%
+                  </p>
+                  <div className="space-y-2.5">
+                    {[
+                      { label: '집중 스탯', raw: selectedFocusBreakdown.focusStat, weighted: selectedFocusBreakdown.weighted.focus, max: 30, color: 'bg-blue-500' },
+                      { label: '계획 완료율', raw: selectedFocusBreakdown.completionRate, weighted: selectedFocusBreakdown.weighted.completion, max: 25, color: 'bg-emerald-500' },
+                      { label: '학습시간', raw: selectedFocusBreakdown.studyScore, weighted: selectedFocusBreakdown.weighted.study, max: 20, color: 'bg-violet-500' },
+                      { label: '성장률', raw: selectedFocusBreakdown.growthScore, weighted: selectedFocusBreakdown.weighted.growth, max: 15, color: 'bg-amber-500' },
+                      { label: '벌점 보정', raw: selectedFocusBreakdown.penaltyScore, weighted: selectedFocusBreakdown.weighted.penalty, max: 10, color: 'bg-rose-400' },
+                    ].map((item) => (
+                      <div key={item.label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] font-black text-slate-600">{item.label}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400">원점수 {Math.round(item.raw)}점</span>
+                            <span className="text-[10px] font-black text-slate-700">→ {item.weighted} / {item.max}점</span>
+                          </div>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className={cn('h-full rounded-full transition-all', item.color)}
+                            style={{ width: `${Math.min(100, (item.weighted / item.max) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
-            </div>
 
-            <div className="w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
-              <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">최근 7일 추이 그래프</p>
-              {focusStudentTrend.length === 0 ? (
-                <div className="flex h-[232px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-sm font-bold text-slate-400">
-                  추이 데이터가 없어 그래프를 표시하지 못했습니다.
+              {/* ── 최근 7일 추이 그래프 ── */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 7일 추이</p>
+                  {selectedFocusKpi && (
+                    <div className="flex items-center gap-1">
+                      {selectedFocusKpi.trendDirection === 'up' && (
+                        <span className="text-[10px] font-black text-emerald-600 flex items-center gap-0.5">
+                          <TrendingUp className="h-3 w-3" /> 상승 중
+                        </span>
+                      )}
+                      {selectedFocusKpi.trendDirection === 'down' && (
+                        <span className="text-[10px] font-black text-rose-600 flex items-center gap-0.5">
+                          <TrendingDown className="h-3 w-3" /> 하락 중
+                        </span>
+                      )}
+                      {selectedFocusKpi.trendDirection === 'stable' && (
+                        <span className="text-[10px] font-black text-slate-500">안정적</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={232}>
-                  <LineChart data={focusStudentTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} width={28} />
-                    <Tooltip
-                      formatter={(value: number, name: string) => {
-                        if (name === 'score') return [`${value}\uC810`, '\uC9D1\uC911\uB3C4'];
-                        if (name === 'completion') return [`${value}%`, '\uC644\uB8CC\uC728'];
-                        return [`${value}\uBD84`, '\uD559\uC2B5\uC2DC\uAC04'];
-                      }}
-                    />
-                    <Line type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 3 }} name="score" />
-                    <Line type="monotone" dataKey="completion" stroke="#FF7A16" strokeWidth={2} dot={{ r: 2.5 }} name="completion" />
-                  </LineChart>
-                </ResponsiveContainer>
+                {focusStudentTrend.every((d) => d.score === 0) ? (
+                  <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-sm font-bold text-slate-400">
+                    추이 데이터가 없습니다.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={focusStudentTrend} margin={{ top: 10, right: 36, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                      <YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={24} />
+                      <YAxis yAxisId="minutes" orientation="right" tick={{ fontSize: 10, fontWeight: 700, fill: '#a78bfa' }} tickLine={false} axisLine={false} width={32} />
+                      <Tooltip
+                        formatter={(value: number, name: string) => {
+                          if (name === 'score') return [`${value}점`, '집중도'];
+                          if (name === 'completion') return [`${value}%`, '완료율'];
+                          return [`${value}분`, '학습시간'];
+                        }}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.10)', fontSize: '11px', fontWeight: 700 }}
+                      />
+                      <Bar yAxisId="minutes" dataKey="minutes" fill="#ede9fe" radius={[4, 4, 0, 0]} name="minutes" />
+                      <Line yAxisId="score" type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 3, fill: '#14295F' }} name="score" />
+                      <Line yAxisId="score" type="monotone" dataKey="completion" stroke="#FF7A16" strokeWidth={2} dot={{ r: 2.5, fill: '#FF7A16' }} strokeDasharray="5 3" name="completion" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
+                <div className="mt-2 flex items-center gap-4 justify-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#14295F]" />
+                    <p className="text-[10px] font-bold text-slate-500">집중도</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
+                    <p className="text-[10px] font-bold text-slate-500">완료율</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2.5 w-2.5 rounded bg-violet-200" />
+                    <p className="text-[10px] font-bold text-slate-500">학습시간(분)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 행동 패턴 분석 ── */}
+              {selectedFocusKpi && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">행동 패턴 분석</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* 집중도 추세 */}
+                    <div className={cn('rounded-xl border p-3',
+                      selectedFocusKpi.trendDirection === 'up' ? 'border-emerald-100 bg-emerald-50/60'
+                      : selectedFocusKpi.trendDirection === 'down' ? 'border-rose-100 bg-rose-50/60'
+                      : 'border-slate-100 bg-slate-50/70'
+                    )}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        {selectedFocusKpi.trendDirection === 'up'
+                          ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                          : selectedFocusKpi.trendDirection === 'down'
+                            ? <TrendingDown className="h-3.5 w-3.5 text-rose-500 flex-shrink-0" />
+                            : <Activity className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        }
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">집중도 추세</p>
+                      </div>
+                      <p className={cn('text-base font-black',
+                        selectedFocusKpi.trendDirection === 'up' ? 'text-emerald-700'
+                        : selectedFocusKpi.trendDirection === 'down' ? 'text-rose-700'
+                        : 'text-slate-700'
+                      )}>
+                        {selectedFocusKpi.trendDirection === 'up' ? '상승 중' : selectedFocusKpi.trendDirection === 'down' ? '하락 중' : '안정적'}
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">최근 3일 기준</p>
+                    </div>
+
+                    {/* 주간 성장률 */}
+                    <div className={cn('rounded-xl border p-3',
+                      selectedFocusKpi.weekGrowthRate > 5 ? 'border-blue-100 bg-blue-50/60'
+                      : selectedFocusKpi.weekGrowthRate < -5 ? 'border-amber-100 bg-amber-50/60'
+                      : 'border-slate-100 bg-slate-50/70'
+                    )}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">주간 성장률</p>
+                      </div>
+                      <p className={cn('text-base font-black',
+                        selectedFocusKpi.weekGrowthRate > 5 ? 'text-blue-700'
+                        : selectedFocusKpi.weekGrowthRate < -5 ? 'text-amber-700'
+                        : 'text-slate-700'
+                      )}>
+                        {selectedFocusKpi.weekGrowthRate >= 0 ? '+' : ''}{selectedFocusKpi.weekGrowthRate}%
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">주 초반 vs 후반 비교</p>
+                    </div>
+
+                    {/* 최고 집중일 */}
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Trophy className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">최고 집중일</p>
+                      </div>
+                      <p className="text-base font-black text-[#14295F]">
+                        {selectedFocusKpi.bestDay?.date ?? '-'}
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                        {selectedFocusKpi.bestDay ? `${selectedFocusKpi.bestDay.score}점 기록` : '데이터 없음'}
+                      </p>
+                    </div>
+
+                    {/* 평균 학습 지속시간 */}
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Flame className="h-3.5 w-3.5 text-orange-400 flex-shrink-0" />
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">평균 학습 지속</p>
+                      </div>
+                      <p className="text-base font-black text-[#14295F]">
+                        {selectedFocusKpi.avgMinutes > 0
+                          ? `${Math.floor(selectedFocusKpi.avgMinutes / 60)}h ${selectedFocusKpi.avgMinutes % 60}m`
+                          : '-'}
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                        {selectedFocusKpi.maxMinutes > 0
+                          ? `최장 ${Math.floor(selectedFocusKpi.maxMinutes / 60)}h ${selectedFocusKpi.maxMinutes % 60}m`
+                          : '데이터 없음'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
+
+              {/* ── 관리자 인사이트 ── */}
+              {selectedFocusKpi && selectedFocusKpi.insights.length > 0 && (
+                <div className="rounded-xl border border-[#14295F]/15 bg-[linear-gradient(145deg,#eef4ff_0%,#f8faff_100%)] p-4">
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <Sparkles className="h-4 w-4 text-[#14295F]/50 flex-shrink-0" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]/60">관리자 인사이트</p>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedFocusKpi.insights.map((insight, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#14295F]/40 flex-shrink-0" />
+                        <p className="text-xs font-bold text-[#14295F]/80 leading-relaxed">{insight}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
-          <DialogFooter className="border-t bg-white p-4">
+
+          {/* ── FOOTER ── */}
+          <DialogFooter className="border-t bg-white p-4 flex-shrink-0">
             <DialogClose asChild>
               <Button className="h-10 rounded-xl font-black">닫기</Button>
             </DialogClose>
