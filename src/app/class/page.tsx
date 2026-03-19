@@ -22,12 +22,6 @@ import { marketingContent } from '@/lib/marketing-content';
    to keep this page self-contained and maintainable
 ───────────────────────────────────────────────── */
 
-const career = [
-  { label: '관리형 독서실 원장', detail: '분당·판교 관리형 스터디센터 운영 경험' },
-  { label: '국어 수업 다수 경력', detail: '수능 국어 개인 지도 경험' },
-  { label: '원장 본인 국어 백분위 99', detail: '2024학년도 수능 실전 기록' },
-];
-
 const results = [
   { school: '고려대학교', count: '2명', year: '26' },
   { school: '서강대학교', count: '1명', year: '26' },
@@ -82,43 +76,6 @@ const materialPreviews = [
 
 const koreanMaterialPdfPath = '/materials/2026-korean-nonfiction-2passages-commentary.pdf';
 const koreanMaterialPreviewImagePath = '/materials/2026-korean-nonfiction-2passages-commentary-page1.png';
-
-const scoreProofCards = [
-  {
-    phase: '6월 모의평가',
-    result: '국어 3등급',
-    detail: '백분위 82',
-    image: '/marketing/proof/june-mock-redacted.jpg',
-  },
-  {
-    phase: '9월 모의평가',
-    result: '국어 1등급',
-    detail: '백분위 96',
-    image: '/marketing/proof/september-mock-redacted.jpg',
-  },
-  {
-    phase: '수능 본시험',
-    result: '국어 백분위 99',
-    detail: '실제 성적표 기반',
-    image: '/marketing/proof/csat-score-redacted.jpg',
-  },
-];
-
-const kakaoFeedbackCards = [
-  {
-    label: '국영수 합산 전교 1등 사례',
-    summary: '2025 고2 6월 · 동백고',
-    detail: '전과목 밸런스 코칭',
-    image: '/marketing/reviews/kakao-feedback-1-redacted.jpg',
-    showFull: false,
-  },
-  {
-    label: '문항 질의응답',
-    summary: '시험 후 해설 대화',
-    image: '/marketing/reviews/kakao-feedback-3-redacted.jpg',
-    showFull: true,
-  },
-];
 
 const studentFits = [
   {
@@ -345,142 +302,6 @@ export default function ClassPage() {
                 ))}
               </div>
             </div>
-          </div>
-        </section>
-      </ScrollReveal>
-
-      {/* ══════════════════════════════════════════
-          4. CAREER
-      ══════════════════════════════════════════ */}
-      <ScrollReveal>
-        <section className="py-20 sm:py-28" style={{ background: 'linear-gradient(180deg, #f4f7ff 0%, #ffffff 100%)' }}>
-          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <span className="eyebrow-badge">경력 · 실적</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-                경력은 수업의 기준을 만듭니다
-              </h2>
-              <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.88] text-[#334e6a]">
-                학생을 오래 봐온 경험은
-                어떤 지점에서 성적이 멈추고, 어디서부터 다시 올라가는지를
-                더 정확하게 판단하게 합니다.
-              </p>
-            </div>
-
-            <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Career items */}
-              {career.map((c) => (
-                <article
-                  key={c.label}
-                  className="rounded-[1.4rem] border border-[rgba(20,41,95,0.10)] bg-white px-6 py-7"
-                  style={{ boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06), 0 8px 24px -4px rgba(20,41,95,0.07)' }}
-                >
-                  <p className="text-[1.5rem] font-black leading-none text-[#14295F]">{c.label}</p>
-                  <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.7] text-[#445f7e]">{c.detail}</p>
-                </article>
-              ))}
-
-              {/* 2026 results merged into one card */}
-              <article
-                className="rounded-[1.4rem] border border-[rgba(20,41,95,0.10)] bg-white px-6 py-7 sm:col-span-2 lg:col-span-3"
-                style={{ boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06), 0 8px 24px -4px rgba(20,41,95,0.07)' }}
-              >
-                <p className="mb-5 text-[10.5px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">
-                  2026학년도 합격
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex lg:flex-wrap lg:gap-4">
-                  {results.map((r) => (
-                    <div key={r.school} className="flex items-baseline gap-2">
-                      <span className="text-[1.35rem] font-black text-[#14295F]">{r.count}</span>
-                      <span className="text-[13px] font-semibold text-[#445f7e]">{r.school}</span>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            </div>
-
-            <article
-              className="mt-8 rounded-[1.4rem] border border-[rgba(20,41,95,0.10)] bg-white px-6 py-7"
-              style={{ boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06), 0 8px 24px -4px rgba(20,41,95,0.07)' }}
-            >
-              <p className="text-[10.5px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">
-                성적 상승 사례
-              </p>
-              <h3 className="mt-3 break-keep text-[1.35rem] font-black leading-[1.3] text-[#14295F]">
-                6월 3등급에서 수능 백분위 99까지
-              </h3>
-              <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.74] text-[#445f7e]">
-                동일 학생의 6월 모의평가, 9월 모의평가, 수능 성적표를 기준으로 한 실제 상승 흐름입니다.
-                개인정보 보호를 위해 이름과 학교 정보는 가림 처리했습니다.
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {['6월 3등급', '9월 1등급', '수능 백분위 99'].map((chip) => (
-                  <span
-                    key={chip}
-                    className="rounded-full border border-[#14295F]/10 bg-[#F3F7FF] px-3 py-1.5 text-[12px] font-black text-[#14295F]"
-                  >
-                    {chip}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {scoreProofCards.map((card) => (
-                  <figure
-                    key={card.phase}
-                    className="overflow-hidden rounded-[1.1rem] border border-[rgba(20,41,95,0.12)] bg-[#F8FAFF]"
-                  >
-                    <img
-                      src={card.image}
-                      alt={`${card.phase} score proof (redacted)`}
-                      className="h-[340px] w-full object-cover object-top"
-                    />
-                    <figcaption className="space-y-1 border-t border-[rgba(20,41,95,0.08)] bg-white px-4 py-3.5">
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FF7A16]">{card.phase}</p>
-                      <p className="text-[15px] font-black text-[#14295F]">{card.result}</p>
-                      <p className="text-[12px] font-semibold text-[#4B6380]">{card.detail}</p>
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
-              <div className="mt-8 rounded-[1.1rem] border border-[rgba(20,41,95,0.10)] bg-[#f8fbff] p-4 sm:p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[12px] font-black uppercase tracking-[0.14em] text-[#FF7A16]">
-                    성적 공개 이후 카카오톡 후기
-                  </p>
-                  <span className="rounded-full border border-[#14295F]/12 bg-white px-2.5 py-1 text-[11px] font-black text-[#14295F]/75">
-                    이름 익명 처리
-                  </span>
-                </div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {kakaoFeedbackCards.map((card) => (
-                    <figure
-                      key={card.label}
-                      className="overflow-hidden rounded-[0.95rem] border border-[#14295F]/10 bg-white"
-                    >
-                      <img
-                        src={card.image}
-                        alt={`${card.label} kakao feedback (redacted)`}
-                        className={card.showFull ? 'block h-auto w-full' : 'h-[200px] w-full object-cover object-top'}
-                      />
-                      <figcaption className="space-y-1 border-t border-[#14295F]/8 px-3.5 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#FF7A16]">{card.label}</p>
-                        <p className="text-[13px] font-black text-[#14295F]">{card.summary}</p>
-                        {'detail' in card && card.detail && (
-                          <p className="text-[11.5px] font-semibold text-[#4B6380]">{card.detail}</p>
-                        )}
-                      </figcaption>
-                    </figure>
-                  ))}
-                </div>
-              </div>
-            </article>
-
-            <p className="mx-auto mt-12 max-w-xl text-center break-keep text-[15px] font-semibold leading-[1.88] text-[#334e6a]">
-              결과는 한 번의 운이 아니라,<br />
-              누적된 수업 경험과 정확한 피드백 구조에서 나옵니다.
-            </p>
           </div>
         </section>
       </ScrollReveal>
