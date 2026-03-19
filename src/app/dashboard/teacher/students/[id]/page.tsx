@@ -8,7 +8,7 @@ import { addDays, format, isBefore, startOfDay, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar, ComposedChart, Line, LineChart as RechartsLineChart } from 'recharts';
 import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -36,7 +36,14 @@ const STAT_CONFIG = {
 
 const RANGE_MAP = { today: 7, weekly: 14, monthly: 28 } as const;
 type ChartRangeKey = keyof typeof RANGE_MAP;
-type DailyStatSnapshot = { totalStudyMinutes: number; todayPlanCompletionRate?: number; studyTimeGrowthRate?: number };
+type DailyStatSnapshot = {
+  totalStudyMinutes: number;
+  todayPlanCompletionRate?: number;
+  studyTimeGrowthRate?: number;
+  startHour?: number;
+  endHour?: number;
+  awayMinutes?: number;
+};
 type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
 type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
 
@@ -98,6 +105,11 @@ function normalizeRhythmMinutes(series: Array<{ studyMinutes: number; hasActualS
     if (index === 0) return roundedMinutes;
     return previousKnownMinutes;
   });
+}
+
+function hourTickFormatter(value: number): string {
+  if (!Number.isFinite(value)) return '0h';
+  return `${Math.max(0, Math.round(value))}h`;
 }
 
 function toTime(value?: Timestamp): number {
@@ -217,6 +229,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isQuickFeedbackModalOpen, setIsQuickFeedbackModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [mobileInsightDialog, setMobileInsightDialog] = useState<MobileInsightView | null>(null);
+  const [mobileGraphPanel, setMobileGraphPanel] = useState<'weekly' | 'daily' | 'rhythm' | 'away' | null>(null);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
   const [logContent, setLogContent] = useState('');
@@ -238,6 +251,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [editTodayMinutes, setEditTodayMinutes] = useState(0);
   const [sessionAdjustments, setSessionAdjustments] = useState<Record<string, number>>({});
   const [isSessionSaving, setIsSessionSaving] = useState(false);
+  const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
 
   const hasInitializedForm = useRef(false);
   const [editForm, setEditForm] = useState({
@@ -342,17 +356,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }
       setStatsLoading(true);
       try {
-        const keys = Array.from({ length: 28 }, (_, idx) => format(subDays(today, idx), 'yyyy-MM-dd'));
+        const keys = Array.from({ length: 42 }, (_, idx) => format(subDays(today, idx), 'yyyy-MM-dd'));
         const snapshots = await Promise.all(keys.map((dateKey) => getDoc(doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId))));
         if (cancelled) return;
         const next: Record<string, DailyStatSnapshot> = {};
         snapshots.forEach((snap, index) => {
           if (!snap.exists()) return;
-          const data = snap.data() as Partial<DailyStatSnapshot>;
+          const data = snap.data() as Record<string, unknown>;
+          const startHourRaw = data.startHour ?? data.firstStudyHour;
+          const endHourRaw = data.endHour ?? data.lastStudyHour;
+          const awayMinutesRaw = data.awayMinutes ?? data.breakMinutes;
           next[keys[index]] = {
             totalStudyMinutes: Number(data.totalStudyMinutes || 0),
             todayPlanCompletionRate: typeof data.todayPlanCompletionRate === 'number' ? data.todayPlanCompletionRate : undefined,
             studyTimeGrowthRate: typeof data.studyTimeGrowthRate === 'number' ? data.studyTimeGrowthRate : undefined,
+            startHour: typeof startHourRaw === 'number' ? startHourRaw : undefined,
+            endHour: typeof endHourRaw === 'number' ? endHourRaw : undefined,
+            awayMinutes: typeof awayMinutesRaw === 'number' ? awayMinutesRaw : undefined,
           };
         });
         setDailyStatsMap(next);
@@ -592,6 +612,133 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     };
   }, [fullSeries, todayKey, avgCompletionRate, rhythmScore]);
 
+  const studentTrend42 = useMemo(() => {
+    return Array.from({ length: 42 }, (_, idx) => {
+      const day = subDays(today, 41 - idx);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const logMinutes = Number(studyLogMap[dateKey]?.totalMinutes || 0);
+      const statMinutes = Number(dailyStatsMap[dateKey]?.totalStudyMinutes || 0);
+      const inProgressMinutes = dateKey === todayKey ? activeSessionMinutes : 0;
+      const minutes = Math.max(0, Math.round((logMinutes > 0 ? logMinutes : statMinutes) + inProgressMinutes));
+      return {
+        dateKey,
+        dateLabel: format(day, 'M/d', { locale: ko }),
+        minutes,
+      };
+    });
+  }, [todayKey, activeSessionMinutes, studyLogMap, dailyStatsMap]);
+
+  const weeklyGrowthData = useMemo(() => {
+    const buckets = Array.from({ length: 6 }, (_, idx) => {
+      const chunk = studentTrend42.slice(idx * 7, idx * 7 + 7);
+      const totalMinutes = chunk.reduce((sum, item) => sum + item.minutes, 0);
+      return {
+        label: `${chunk[0]?.dateLabel || ''}~`,
+        totalMinutes,
+      };
+    });
+    return buckets.map((bucket, idx, arr) => {
+      if (idx === 0) return { ...bucket, growth: 0 };
+      const prev = arr[idx - 1].totalMinutes;
+      const growth = prev > 0 ? Math.round(((bucket.totalMinutes - prev) / prev) * 100) : 0;
+      return { ...bucket, growth };
+    });
+  }, [studentTrend42]);
+
+  const dailyGrowthData = useMemo(() => {
+    return studentTrend42.map((item, idx, arr) => {
+      if (idx === 0) return { ...item, growth: 0 };
+      const prev = arr[idx - 1].minutes;
+      const growth = prev > 0 ? Math.round(((item.minutes - prev) / prev) * 100) : 0;
+      return { ...item, growth };
+    });
+  }, [studentTrend42]);
+
+  const dailyGrowthWindowCount = Math.max(1, Math.ceil(dailyGrowthData.length / 7));
+  const boundedDailyGrowthWindowIndex = Math.min(Math.max(0, dailyGrowthWindowIndex), dailyGrowthWindowCount - 1);
+  const dailyGrowthWindowData = useMemo(() => {
+    if (dailyGrowthData.length === 0) return [];
+    const end = dailyGrowthData.length - boundedDailyGrowthWindowIndex * 7;
+    const start = Math.max(0, end - 7);
+    return dailyGrowthData.slice(start, end);
+  }, [dailyGrowthData, boundedDailyGrowthWindowIndex]);
+
+  const rhythmDistributionData = useMemo(() => {
+    const DOW = ['월', '화', '수', '목', '금', '토', '일'];
+    const buckets = Array.from({ length: 7 }, (_, idx) => ({
+      label: DOW[idx],
+      startTotal: 0,
+      startCount: 0,
+      endTotal: 0,
+      endCount: 0,
+    }));
+
+    Array.from({ length: 14 }, (_, idx) => format(subDays(today, idx), 'yyyy-MM-dd')).forEach((dateKey) => {
+      const dayData = dailyStatsMap[dateKey];
+      if (!dayData) return;
+      const dow = (new Date(`${dateKey}T12:00:00`).getDay() + 6) % 7;
+      if (typeof dayData.startHour === 'number') {
+        buckets[dow].startTotal += dayData.startHour;
+        buckets[dow].startCount += 1;
+      }
+      if (typeof dayData.endHour === 'number') {
+        buckets[dow].endTotal += dayData.endHour;
+        buckets[dow].endCount += 1;
+      }
+    });
+
+    return buckets.map((bucket) => ({
+      label: bucket.label,
+      startHour: bucket.startCount > 0 ? Number((bucket.startTotal / bucket.startCount).toFixed(1)) : 0,
+      endHour: bucket.endCount > 0 ? Number((bucket.endTotal / bucket.endCount).toFixed(1)) : 0,
+    }));
+  }, [dailyStatsMap]);
+
+  const rhythmScoreOnlyTrend = useMemo(() => {
+    const dailyRhythm = Array.from({ length: 14 }, (_, idx) => {
+      const day = subDays(today, 13 - idx);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const startHour = dailyStatsMap[dateKey]?.startHour;
+      return {
+        dateLabel: format(day, 'M/d', { locale: ko }),
+        rhythmMinutes: typeof startHour === 'number' ? Math.round(startHour * 60) : null as number | null,
+      };
+    });
+
+    return dailyRhythm.map((point, index) => {
+      const values = dailyRhythm
+        .slice(Math.max(0, index - 2), index + 1)
+        .map((item) => item.rhythmMinutes)
+        .filter((item): item is number => typeof item === 'number');
+      const score = values.length >= 2 ? calculateRhythmScore(values) : values.length === 1 ? 100 : 0;
+      return { dateLabel: point.dateLabel, score };
+    });
+  }, [dailyStatsMap]);
+
+  const averageRhythmScore = useMemo(() => {
+    const valid = rhythmScoreOnlyTrend.filter((item) => item.score > 0);
+    if (!valid.length) return 0;
+    return Math.round(valid.reduce((sum, item) => sum + item.score, 0) / valid.length);
+  }, [rhythmScoreOnlyTrend]);
+
+  const awayTimeData = useMemo(() => {
+    return Array.from({ length: 14 }, (_, idx) => {
+      const day = subDays(today, 13 - idx);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return {
+        dateLabel: format(day, 'M/d', { locale: ko }),
+        awayMinutes: Math.max(0, Math.round(Number(dailyStatsMap[dateKey]?.awayMinutes || 0))),
+      };
+    });
+  }, [dailyStatsMap]);
+
+  const latestWeeklyLearningGrowthPercent = weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0;
+  const latestDailyLearningGrowthPercent = dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0;
+  const hasWeeklyGrowthData = weeklyGrowthData.some((week) => week.totalMinutes > 0);
+  const hasDailyGrowthData = dailyGrowthData.some((day) => day.minutes > 0);
+  const hasAwayTimeData = awayTimeData.some((day) => day.awayMinutes > 0);
+  const hasRhythmScoreOnlyTrend = rhythmScoreOnlyTrend.some((day) => day.score > 0);
+
   const studyStreakDays = useMemo(() => {
     const seriesMinutesMap = Object.fromEntries(fullSeries.map((item) => [item.dateKey, item.studyMinutes]));
     let streak = 0;
@@ -639,6 +786,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       return Math.max(0, Math.round(adjusted)) !== session.minutes;
     });
   }, [recentStudySessions, sessionAdjustments]);
+
+  useEffect(() => {
+    setDailyGrowthWindowIndex(0);
+  }, [studentId]);
 
   useEffect(() => {
     if (!isAvgStudyModalOpen) return;
@@ -981,7 +1132,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const isDataLoading = statsLoading || plansLoading || studyLogLoading;
 
   return (
-    <div className={cn('flex flex-col gap-6 max-w-7xl mx-auto pb-24 px-4')}>
+    <div className={cn('flex flex-col max-w-7xl mx-auto px-4', isMobile ? 'gap-4 pb-32' : 'gap-6 pb-24')}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-4 min-w-0">
           {!isStudentSelfView && (
@@ -1106,52 +1257,244 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
 
+          {!isMobile && (
+          <div className="grid gap-4">
+            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-black tracking-tight">주간 학습시간 성장률</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">막대: 주간 누적 학습시간 · 선: 전주 대비 성장률</CardDescription>
+                  </div>
+                  <span className={cn("text-sm font-black", latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                    이번 주 {latestWeeklyLearningGrowthPercent >= 0 ? '+' : ''}{latestWeeklyLearningGrowthPercent}%
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {hasWeeklyGrowthData ? (
+                  <div className="h-[260px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={weeklyGrowthData} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                        <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={40} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                        <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={38} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === 'totalMinutes') return [minutesToLabel(Number(value || 0)), '누적 학습시간'];
+                            return [`${Number(value || 0)}%`, '성장률'];
+                          }}
+                        />
+                        <Bar yAxisId="mins" dataKey="totalMinutes" fill="#c7d2fe" radius={[8, 8, 0, 0]} barSize={34} />
+                        <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#10b981" strokeWidth={3} dot={{ r: 3.5, fill: '#10b981' }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">최근 주간 학습 데이터가 없습니다.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-black tracking-tight">일자별 학습시간 성장률</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">최근 42일 중 7일 단위로 확인합니다.</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("text-sm font-black", latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                      최근 7일 {latestDailyLearningGrowthPercent >= 0 ? '+' : ''}{latestDailyLearningGrowthPercent}%
+                    </span>
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {hasDailyGrowthData ? (
+                  <div className="h-[260px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={dailyGrowthWindowData} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                        <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                        <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={40} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                        <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={38} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === 'minutes') return [minutesToLabel(Number(value || 0)), '평균 공부시간'];
+                            return [`${Number(value || 0)}%`, '전일 대비 성장률'];
+                          }}
+                        />
+                        <Bar yAxisId="mins" dataKey="minutes" fill="#bae6fd" radius={[8, 8, 0, 0]} barSize={22} />
+                        <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#f59e0b" strokeWidth={3} dot={{ r: 3.5, fill: '#f59e0b' }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">일자별 학습 데이터가 없습니다.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-black tracking-tight">리듬 점수 그래프</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">학부모 모드와 동일한 리듬 점수 단일 추이 그래프</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="font-black text-[10px]">
+                    평균 {averageRhythmScore}점
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {hasRhythmScoreOnlyTrend ? (
+                  <div className="h-[260px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                        <XAxis dataKey="dateLabel" fontSize={11} axisLine={false} tickLine={false} />
+                        <YAxis fontSize={11} axisLine={false} tickLine={false} width={30} domain={[0, 100]} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
+                          formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="score"
+                          stroke="#10b981"
+                          strokeWidth={3}
+                          dot={{ r: 3, fill: '#0f172a' }}
+                          activeDot={{ r: 5, fill: '#0f172a' }}
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">리듬 점수 산출 데이터가 없습니다.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-black tracking-tight">학습 중간 외출시간 추이</CardTitle>
+                <CardDescription className="font-bold text-[11px]">외출시간이 늘어나면 집중도가 떨어집니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {hasAwayTimeData ? (
+                  <div className="h-[240px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={awayTimeData} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                        <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                        <YAxis tickLine={false} axisLine={false} width={36} tickFormatter={(value) => `${value}m`} />
+                        <Tooltip formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
+                        <Bar dataKey="awayMinutes" fill="#fecaca" radius={[8, 8, 0, 0]} barSize={18} />
+                        <Line type="monotone" dataKey="awayMinutes" stroke="#ef4444" strokeWidth={3} dot={{ r: 3, fill: '#ef4444' }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">외출시간 데이터가 없습니다.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          )}
+
           {isMobile ? (
             <>
               <div className="grid gap-4">
-                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white overflow-hidden">
-                  <CardHeader className="pb-3 flex flex-col gap-3">
-                    <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> 공부시간 추이</CardTitle>
-                    <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
-                      {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
-                        <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className="h-8 px-3 rounded-lg text-[10px] font-black" onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
-                      ))}
-                    </div>
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-black tracking-tight">그래프 보기</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">앱 화면에 맞게 버튼을 눌러 그래프를 확인하세요.</CardDescription>
                   </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[220px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="studyMinutesGradientMobileInline" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} /></linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
-                          <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={34} />
-                          <Tooltip content={<CustomTooltip unit="분" />} />
-                          <Area type="monotone" dataKey="studyMinutes" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#studyMinutesGradientMobileInline)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                  <CardContent className="pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant={mobileGraphPanel === 'weekly' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'weekly' ? null : 'weekly'))}>주간 성장률</Button>
+                      <Button variant={mobileGraphPanel === 'daily' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'daily' ? null : 'daily'))}>일자별 성장률</Button>
+                      <Button variant={mobileGraphPanel === 'rhythm' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'rhythm' ? null : 'rhythm'))}>리듬 점수</Button>
+                      <Button variant={mobileGraphPanel === 'away' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'away' ? null : 'away'))}>외출시간</Button>
                     </div>
-                  </CardContent>
-                </Card>
 
-                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white overflow-hidden">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500" /> 계획 완수율</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[220px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
-                          <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
-                          <Tooltip content={<CustomTooltip unit="%" />} />
-                          <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {mobileGraphPanel === null && (
+                      <div className="rounded-xl border border-dashed px-3 py-6 text-center text-[11px] font-bold text-muted-foreground">
+                        위 버튼에서 그래프를 선택하면 표시됩니다.
+                      </div>
+                    )}
+
+                    {mobileGraphPanel === 'weekly' && (
+                      <div className="h-[200px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                            <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={32} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={30} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                            <Tooltip formatter={(value: number, name: string) => name === 'totalMinutes' ? [minutesToLabel(Number(value || 0)), '누적 학습시간'] : [`${Number(value || 0)}%`, '성장률']} />
+                            <Bar yAxisId="mins" dataKey="totalMinutes" fill="#c7d2fe" radius={[6, 6, 0, 0]} barSize={18} />
+                            <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#10b981' }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {mobileGraphPanel === 'daily' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                        </div>
+                        <div className="h-[200px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                              <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                              <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={32} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                              <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={30} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                              <Tooltip formatter={(value: number, name: string) => name === 'minutes' ? [minutesToLabel(Number(value || 0)), '평균 공부시간'] : [`${Number(value || 0)}%`, '전일 대비 성장률']} />
+                              <Bar yAxisId="mins" dataKey="minutes" fill="#bae6fd" radius={[6, 6, 0, 0]} barSize={14} />
+                              <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 2.5, fill: '#f59e0b' }} />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    {mobileGraphPanel === 'rhythm' && (
+                      <div className="h-[200px] w-full rounded-xl border border-slate-100 bg-slate-50/40 p-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsLineChart data={rhythmScoreOnlyTrend} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                            <XAxis dataKey="dateLabel" fontSize={10} axisLine={false} tickLine={false} />
+                            <YAxis fontSize={10} axisLine={false} tickLine={false} width={26} domain={[0, 100]} />
+                            <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
+                            <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#0f172a' }} activeDot={{ r: 4, fill: '#0f172a' }} />
+                          </RechartsLineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {mobileGraphPanel === 'away' && (
+                      <div className="h-[200px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={awayTimeData} margin={{ top: 8, right: 6, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                            <YAxis tickLine={false} axisLine={false} width={30} tickFormatter={(value) => `${value}m`} />
+                            <Tooltip formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
+                            <Bar dataKey="awayMinutes" fill="#fecaca" radius={[6, 6, 0, 0]} barSize={12} />
+                            <Line type="monotone" dataKey="awayMinutes" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2.5, fill: '#ef4444' }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
