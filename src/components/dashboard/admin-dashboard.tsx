@@ -97,7 +97,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
-  const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null }>>({});
+  const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
 
@@ -856,12 +856,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setDayDataLoading(true);
       try {
         const last14Days = Array.from({ length: 14 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd'));
-        const result: Record<string, { awayMinutes: number; startHour: number | null }> = {};
+        const result: Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }> = {};
         await Promise.all(last14Days.map(async (dateKey) => {
           try {
             const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedFocusStudentId, 'days', dateKey, 'sessions');
             const snap = await getDocs(query(sessionsRef, orderBy('startTime')));
-            if (snap.empty) { result[dateKey] = { awayMinutes: 0, startHour: null }; return; }
+            if (snap.empty) { result[dateKey] = { awayMinutes: 0, startHour: null, endHour: null }; return; }
             const sessions = snap.docs.map((d) => {
               const raw = d.data() as any;
               return {
@@ -869,14 +869,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 endTime: (raw.endTime as Timestamp).toDate(),
               };
             }).sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
-            const startHour = sessions[0].startTime.getHours();
+            const firstSession = sessions[0];
+            const lastSession = sessions[sessions.length - 1];
+            const startHour = firstSession.startTime.getHours() + (firstSession.startTime.getMinutes() / 60);
+            const endHour = lastSession.endTime.getHours() + (lastSession.endTime.getMinutes() / 60);
             let awayMinutes = 0;
             for (let i = 1; i < sessions.length; i++) {
               const gap = (sessions[i].startTime.getTime() - sessions[i - 1].endTime.getTime()) / 60000;
               if (gap > 0 && gap < 180) awayMinutes += Math.round(gap);
             }
-            result[dateKey] = { awayMinutes, startHour };
-          } catch { result[dateKey] = { awayMinutes: 0, startHour: null }; }
+            result[dateKey] = { awayMinutes, startHour, endHour };
+          } catch { result[dateKey] = { awayMinutes: 0, startHour: null, endHour: null }; }
         }));
         if (!disposed) setFocusDayData(result);
       } catch { if (!disposed) setFocusDayData({}); }
@@ -932,19 +935,37 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [focusStudentTrendRaw, today]);
 
-  // 3) 학습 시작시간 분포 리듬 (요일별 평균 학습시간)
+  // 3) 학습 시간 분포 리듬 (요일별 평균 시작/종료시각)
   const rhythmData = useMemo(() => {
-    if (!focusStudentTrendRaw) return [];
+    if (!today) return [];
     const DOW = ['월', '화', '수', '목', '금', '토', '일'];
-    const buckets = Array(7).fill(null).map((_, i) => ({ label: DOW[i], total: 0, count: 0 }));
-    focusStudentTrendRaw.forEach((r) => {
-      if (!r.dateKey) return;
-      const dow = (new Date(r.dateKey + 'T12:00:00').getDay() + 6) % 7; // 0=Mon
-      buckets[dow].total += r.totalStudyMinutes || 0;
-      buckets[dow].count += 1;
+    const buckets = Array(7).fill(null).map((_, i) => ({
+      label: DOW[i],
+      startTotal: 0,
+      startCount: 0,
+      endTotal: 0,
+      endCount: 0,
+    }));
+
+    Array.from({ length: 14 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd')).forEach((dateKey) => {
+      const dayData = focusDayData[dateKey];
+      if (!dayData) return;
+      const dow = (new Date(dateKey + 'T12:00:00').getDay() + 6) % 7; // 0=Mon
+      if (typeof dayData.startHour === 'number') {
+        buckets[dow].startTotal += dayData.startHour;
+        buckets[dow].startCount += 1;
+      }
+      if (typeof dayData.endHour === 'number') {
+        buckets[dow].endTotal += dayData.endHour;
+        buckets[dow].endCount += 1;
+      }
     });
-    return buckets.map((b) => ({ label: b.label, avgMinutes: b.count > 0 ? Math.round(b.total / b.count) : 0 }));
-  }, [focusStudentTrendRaw]);
+    return buckets.map((b) => ({
+      label: b.label,
+      startHour: b.startCount > 0 ? Number((b.startTotal / b.startCount).toFixed(1)) : 0,
+      endHour: b.endCount > 0 ? Number((b.endTotal / b.endCount).toFixed(1)) : 0,
+    }));
+  }, [focusDayData, today]);
 
   // 4) 학습 중간 외출시간 추이 (14일)
   const awayTimeData = useMemo(() => {
@@ -957,8 +978,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const hasWeeklyGrowthData = weeklyGrowthData.some((week) => (week.totalMinutes ?? 0) > 0);
   const hasDailyGrowthData = dailyGrowthData.some((day) => (day.minutes ?? 0) > 0);
-  const hasRhythmData = rhythmData.some((day) => (day.avgMinutes ?? 0) > 0);
-  const todayLearningGrowthPercent = Math.round((selectedFocusStat?.studyTimeGrowthRate ?? 0) * 100);
+  const hasRhythmData = rhythmData.some((day) => (day.startHour ?? 0) > 0 || (day.endHour ?? 0) > 0);
+  const previous7AvgStudyMinutes = useMemo(() => {
+    if (!today) return 0;
+    const prev7DateKeys = Array.from({ length: 7 }, (_, i) => format(subDays(today, i + 1), 'yyyy-MM-dd'));
+    const prev7Rows = (focusStudentTrendRaw || []).filter((row) => prev7DateKeys.includes(row.dateKey));
+    if (prev7Rows.length === 0) return 0;
+    return Math.round(prev7Rows.reduce((sum, row) => sum + (row.totalStudyMinutes || 0), 0) / prev7Rows.length);
+  }, [focusStudentTrendRaw, today]);
+  const todayStudyMinutes = Math.round(selectedFocusStat?.totalStudyMinutes ?? selectedFocusStudent?.studyMinutes ?? 0);
+  const todayLearningGrowthPercent = previous7AvgStudyMinutes > 0
+    ? Math.round(((todayStudyMinutes - previous7AvgStudyMinutes) / previous7AvgStudyMinutes) * 100)
+    : 0;
   const latestWeeklyLearningGrowthPercent = weeklyGrowthData.length > 0
     ? (weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0)
     : 0;
@@ -1128,7 +1159,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <section className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <Activity className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">실시간 현황 분석</h2>
+              <h2 className="text-xl font-black tracking-tighter">?? ?? ??</h2>
               <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">실시간 추적</Badge>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
@@ -1290,8 +1321,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
               <Card className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-black text-emerald-700">상위 10명</p>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">집중 우수</span>
+                  <p className="text-sm font-black text-emerald-700">?? 10?</p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">?? ??</span>
                 </div>
                 <div className="space-y-2">
                   {metrics.focusTop10.length === 0 ? (
@@ -1309,7 +1340,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
                           <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
                         </div>
-                        <span className="dashboard-number text-lg text-emerald-700">{row.score}</span>
+                        <Badge className="h-6 rounded-full border-none bg-emerald-100 px-2.5 text-[10px] font-black text-emerald-700">???</Badge>
                       </button>
                     ))
                   )}
@@ -1318,8 +1349,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
               <Card className="rounded-[2rem] border border-rose-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-black text-rose-700">하위 10명</p>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">집중 개입</span>
+                  <p className="text-sm font-black text-rose-700">?? 10?</p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">?? ??</span>
                 </div>
                 <div className="space-y-2">
                   {metrics.focusBottom10.length === 0 ? (
@@ -1337,7 +1368,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
                           <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
                         </div>
-                        <span className="dashboard-number text-lg text-rose-700">{row.score}</span>
+                        <Badge className="h-6 rounded-full border-none bg-rose-100 px-2.5 text-[10px] font-black text-rose-700">????</Badge>
                       </button>
                     ))
                   )}
@@ -1808,11 +1839,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
 
-                {/* 3. 학습 시작시간 분포 리듬 (요일별) */}
+                {/* 3. ?? ?? ?? ?? */}
                 <div className="rounded-xl border border-slate-100 bg-white p-4">
-                  <div className="mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 시작시간 분포 리듬</p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">요일별 평균 학습시간 — 균일할수록 루틴이 안정적입니다</p>
+                                    <div className="mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">?? ?? ?? ??</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">?? ????? ??? ????? ??? ?????</p>
                   </div>
                   {trendLoading ? (
                     <div className="h-[130px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
@@ -1823,19 +1854,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <ComposedChart data={rhythmData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 800, fill: '#475569' }} tickLine={false} axisLine={false} />
-                        <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
+                        <YAxis domain={[0, 24]} tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${v}h`} />
                         <Tooltip
-                          formatter={(v: number) => [`${Math.floor(v / 60)}h ${v % 60}m`, '평균 학습']}
+                          formatter={(v: number, name: string) => [`${Math.floor(v)}:${Math.round((v % 1) * 60).toString().padStart(2, '0')}`, name === 'startHour' ? '시작시간' : '종료시간']}
                           contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '11px', fontWeight: 700 }}
                         />
-                        <Bar dataKey="avgMinutes" radius={[5, 5, 0, 0]}
-                          fill="#a5f3fc"
-                          label={{ position: 'top', fontSize: 8, fontWeight: 700, fill: '#64748b', formatter: (v: number) => v > 0 ? `${Math.round(v / 60)}h` : '' }}
-                        />
-                        <Line type="monotone" dataKey="avgMinutes" stroke="#0891b2" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                        <Line type="monotone" dataKey="startHour" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3, fill: '#0ea5e9', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="endHour" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   )}
+                  <div className="mt-2 flex items-center gap-4 justify-end">
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-sky-500" /><p className="text-[9px] font-bold text-slate-400">? ????</p></div>
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-violet-500" /><p className="text-[9px] font-bold text-slate-400">??? ????</p></div>
+                  </div>
                 </div>
 
                 {/* 4. 학습 중간 외출시간 성장률 */}
