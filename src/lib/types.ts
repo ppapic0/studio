@@ -97,6 +97,11 @@ export interface StudentProfile {
     studentType: 'student' | 'n_student';
     cycleStartDate: Timestamp;
   };
+  examCountdowns?: Array<{
+    id: string;
+    title: string;
+    date: string; // yyyy-MM-dd
+  }>;
 }
 
 export interface AttendanceCurrent {

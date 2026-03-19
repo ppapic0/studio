@@ -38,6 +38,7 @@ const RANGE_MAP = { today: 7, weekly: 14, monthly: 28 } as const;
 type ChartRangeKey = keyof typeof RANGE_MAP;
 type DailyStatSnapshot = { totalStudyMinutes: number; todayPlanCompletionRate?: number; studyTimeGrowthRate?: number };
 type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
+type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
 
 const STATUS_LABEL: Record<CounselingReservation['status'], string> = {
   requested: '요청',
@@ -215,6 +216,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isQuickFeedbackModalOpen, setIsQuickFeedbackModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [mobileInsightDialog, setMobileInsightDialog] = useState<MobileInsightView | null>(null);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
   const [logContent, setLogContent] = useState('');
@@ -1041,97 +1043,239 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
-          <div className="grid gap-6 lg:grid-cols-12">
-            <Card className="lg:col-span-8 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
-              <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 공부시간 추이</CardTitle>
-                  <CardDescription className="font-bold text-[11px]">집중 시간을 시계열로 확인해 리듬 변화를 파악합니다.</CardDescription>
-                </div>
-                <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
-                  {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
-                    <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className="h-8 px-3 rounded-lg text-[10px] font-black" onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="h-[280px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} /></linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                      <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={38} />
-                      <Tooltip content={<CustomTooltip unit="분" />} />
-                      <Area type="monotone" dataKey="studyMinutes" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#studyMinutesGradient)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+          {isMobile ? (
+            <>
+              <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black tracking-tight">그래프 팝업 보기</CardTitle>
+                  <CardDescription className="font-bold text-[11px]">버튼을 눌러 그래프를 하나씩 크게 확인하세요.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" className="h-10 rounded-xl font-black text-[11px]" onClick={() => setMobileInsightDialog('studyTrend')}>
+                    공부시간 추이
+                  </Button>
+                  <Button variant="outline" className="h-10 rounded-xl font-black text-[11px]" onClick={() => setMobileInsightDialog('completion')}>
+                    계획 완수율
+                  </Button>
+                  <Button variant="outline" className="h-10 rounded-xl font-black text-[11px]" onClick={() => setMobileInsightDialog('rhythm')}>
+                    인지 리듬 지표
+                  </Button>
+                  <Button variant="outline" className="h-10 rounded-xl font-black text-[11px]" onClick={() => setMobileInsightDialog('coaching')}>
+                    코칭 포인트
+                  </Button>
+                  <Button variant="outline" className="h-10 rounded-xl font-black text-[11px] col-span-2" onClick={() => setMobileInsightDialog('risk')}>
+                    위험 신호
+                  </Button>
+                </CardContent>
+              </Card>
 
-            <Card className="lg:col-span-4 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
-                <CardDescription className="font-bold text-[11px]">일별 완료율로 실행력의 안정성을 점검합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="h-[280px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
-                      <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
-                      <Tooltip content={<CustomTooltip unit="%" />} />
-                      <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
-                <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
-                <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white md:col-span-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Target className="h-4 w-4 text-blue-500" /> 인지과학 코칭 포인트</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {coachingHighlights.map((message, index) => (
-                  <div key={message} className="flex items-start gap-2 rounded-xl border border-primary/10 bg-primary/5 px-3 py-2.5">
-                    <Badge className="h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-black">{index + 1}</Badge>
-                    <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
+              <Dialog open={mobileInsightDialog !== null} onOpenChange={(open) => !open && setMobileInsightDialog(null)}>
+                <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[460px] max-h-[86vh] rounded-[2rem] p-0 overflow-hidden border border-slate-200 flex flex-col">
+                  <div className="bg-primary p-6 text-white shrink-0">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-black tracking-tight">
+                        {mobileInsightDialog === 'studyTrend' && '공부시간 추이'}
+                        {mobileInsightDialog === 'completion' && '계획 완수율'}
+                        {mobileInsightDialog === 'rhythm' && '인지 리듬 지표'}
+                        {mobileInsightDialog === 'coaching' && '인지과학 코칭 포인트'}
+                        {mobileInsightDialog === 'risk' && '위험 신호 및 지원 우선순위'}
+                      </DialogTitle>
+                      <DialogDescription className="text-white/75 text-xs font-bold">
+                        {mobileInsightDialog === 'studyTrend' && '집중 시간을 시계열로 확인해 리듬 변화를 파악합니다.'}
+                        {mobileInsightDialog === 'completion' && '일별 완료율로 실행력의 안정성을 점검합니다.'}
+                        {mobileInsightDialog === 'rhythm' && '학습 리듬 안정성과 성장 흐름을 확인합니다.'}
+                        {mobileInsightDialog === 'coaching' && '현재 데이터 기반 실천 포인트를 확인합니다.'}
+                        {mobileInsightDialog === 'risk' && '주의가 필요한 위험 신호를 빠르게 확인합니다.'}
+                      </DialogDescription>
+                    </DialogHeader>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
 
-          <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {riskSignals.length === 0 ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">{riskSignals.map((signal) => <Badge key={signal} variant="outline" className="font-black border-rose-200 text-rose-600 bg-rose-50">{signal}</Badge>)}</div>
-              )}
-            </CardContent>
-          </Card>
+                  <div className="flex-1 overflow-y-auto bg-[#fafafa] p-4 custom-scrollbar">
+                    {mobileInsightDialog === 'studyTrend' && (
+                      <Card className="rounded-2xl border-none shadow-sm bg-white">
+                        <CardHeader className="pb-2">
+                          <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
+                            {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
+                              <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className="h-8 px-3 rounded-lg text-[10px] font-black" onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
+                            ))}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="h-[260px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                                <defs>
+                                  <linearGradient id="studyMinutesGradientMobile" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} /></linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
+                                <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                                <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={36} />
+                                <Tooltip content={<CustomTooltip unit="분" />} />
+                                <Area type="monotone" dataKey="studyMinutes" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#studyMinutesGradientMobile)" />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {mobileInsightDialog === 'completion' && (
+                      <Card className="rounded-2xl border-none shadow-sm bg-white">
+                        <CardContent className="pt-4">
+                          <div className="h-[260px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
+                                <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                                <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
+                                <Tooltip content={<CustomTooltip unit="%" />} />
+                                <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {mobileInsightDialog === 'rhythm' && (
+                      <Card className="rounded-2xl border-none shadow-sm bg-white">
+                        <CardContent className="space-y-4 pt-5">
+                          <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
+                          <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
+                          <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {mobileInsightDialog === 'coaching' && (
+                      <Card className="rounded-2xl border-none shadow-sm bg-white">
+                        <CardContent className="space-y-3 pt-5">
+                          {coachingHighlights.map((message, index) => (
+                            <div key={message} className="flex items-start gap-2 rounded-xl border border-primary/10 bg-primary/5 px-3 py-2.5">
+                              <Badge className="h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-black">{index + 1}</Badge>
+                              <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {mobileInsightDialog === 'risk' && (
+                      <Card className="rounded-2xl border-none shadow-sm bg-white">
+                        <CardContent className="pt-5">
+                          {riskSignals.length === 0 ? (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">{riskSignals.map((signal) => <Badge key={signal} variant="outline" className="font-black border-rose-200 text-rose-600 bg-rose-50">{signal}</Badge>)}</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  <DialogFooter className="p-4 border-t bg-white shrink-0">
+                    <DialogClose asChild>
+                      <Button className="w-full h-11 rounded-xl font-black">닫기</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          ) : (
+            <>
+              <div className="grid gap-6 lg:grid-cols-12">
+                <Card className="lg:col-span-8 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+                  <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 공부시간 추이</CardTitle>
+                      <CardDescription className="font-bold text-[11px]">집중 시간을 시계열로 확인해 리듬 변화를 파악합니다.</CardDescription>
+                    </div>
+                    <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
+                      {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
+                        <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className="h-8 px-3 rounded-lg text-[10px] font-black" onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
+                      ))}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="h-[280px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} /></linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
+                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={38} />
+                          <Tooltip content={<CustomTooltip unit="분" />} />
+                          <Area type="monotone" dataKey="studyMinutes" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#studyMinutesGradient)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-4 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">일별 완료율로 실행력의 안정성을 점검합니다.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="h-[280px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
+                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
+                          <Tooltip content={<CustomTooltip unit="%" />} />
+                          <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-3">
+                <Card className="rounded-[2rem] border-none shadow-lg bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
+                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
+                    <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[2rem] border-none shadow-lg bg-white md:col-span-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Target className="h-4 w-4 text-blue-500" /> 인지과학 코칭 포인트</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {coachingHighlights.map((message, index) => (
+                      <div key={message} className="flex items-start gap-2 rounded-xl border border-primary/10 bg-primary/5 px-3 py-2.5">
+                        <Badge className="h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-black">{index + 1}</Badge>
+                        <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="rounded-[2rem] border-none shadow-lg bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {riskSignals.length === 0 ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">{riskSignals.map((signal) => <Badge key={signal} variant="outline" className="font-black border-rose-200 text-rose-600 bg-rose-50">{signal}</Badge>)}</div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="counseling" className="space-y-6 mt-0">
@@ -1208,7 +1352,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   studentCounselingLogs.slice(0, 10).map((log) => (
                     <div key={log.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <Badge className="font-black text-[10px] rounded-full bg-primary">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
+                        <Badge className="font-black text-[10px] rounded-full bg-primary text-white">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
                         <span className="text-xs font-bold text-muted-foreground">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}</span>
                         <span className="text-xs font-bold text-muted-foreground">· {log.teacherName || '담당 선생님'}</span>
                       </div>

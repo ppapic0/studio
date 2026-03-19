@@ -55,7 +55,7 @@ import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
@@ -365,6 +365,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const actionLockAtRef = useRef<number | null>(null);
   const isMobile = viewMode === 'mobile';
   
   // 지각/결석 신청서 상태
@@ -398,8 +399,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
 
   const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !progressRef || isProcessingAction) return;
+    if (!firestore || !user || !activeMembership || !progressRef) return;
+    if (isProcessingAction) {
+      const lockAgeMs = actionLockAtRef.current ? Date.now() - actionLockAtRef.current : 0;
+      if (lockAgeMs < 15000) return;
+      setIsProcessingAction(false);
+      actionLockAtRef.current = null;
+      toast({
+        variant: 'destructive',
+        title: '버튼 잠금 해제',
+        description: '처리가 지연되어 잠금을 해제했습니다. 다시 눌러주세요.',
+      });
+      return;
+    }
     
+    actionLockAtRef.current = Date.now();
     setIsProcessingAction(true);
     try {
       const centerId = activeMembership.id;
@@ -530,8 +544,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       toast({ variant: "destructive", title: "처리 중 오류 발생", description: "잠시 후 다시 시도해 주세요." });
     } finally {
       setIsProcessingAction(false);
+      actionLockAtRef.current = null;
     }
   }, [firestore, user, activeMembership, progressRef, isTimerActive, startTime, progress, todayStudyLog, todayKey, periodKey, setIsTimerActive, setStartTime, toast]);
+
+  useEffect(() => {
+    if (!isProcessingAction) return;
+    const timeout = setTimeout(() => {
+      if (!isProcessingAction) return;
+      setIsProcessingAction(false);
+      actionLockAtRef.current = null;
+      toast({
+        variant: 'destructive',
+        title: '버튼 잠금 해제',
+        description: '처리가 길어져 버튼 잠금을 자동 해제했습니다.',
+      });
+    }, 15000);
+
+    return () => clearTimeout(timeout);
+  }, [isProcessingAction, toast]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;

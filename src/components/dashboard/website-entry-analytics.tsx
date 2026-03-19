@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, LogIn, MousePointerClick, Smartphone } from 'lucide-react';
 import { format } from 'date-fns';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import { useAuth } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +29,12 @@ type WebsiteEntryEvent = {
   sessionId?: string | null;
   visitorId?: string | null;
   createdAt?: string | null; // ISO string from API
+};
+
+type VisitTrendPoint = {
+  dateKey: string;
+  label: string;
+  visits: number;
 };
 
 function toDateMs(value: unknown): number {
@@ -55,6 +70,7 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
   const auth = useAuth();
   const [events, setEvents] = useState<WebsiteEntryEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [visitPeriod, setVisitPeriod] = useState<1 | 7 | 30>(7);
 
   useEffect(() => {
     if (!centerId || !auth) return;
@@ -150,6 +166,47 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
     };
   }, [events]);
 
+  const visitTrends = useMemo(() => {
+    const pageViewEvents = events.filter(
+      (event) => event.eventType === 'page_view' && toDateMs(event.createdAt) > 0,
+    );
+    const dailyCountMap = new Map<string, number>();
+
+    pageViewEvents.forEach((event) => {
+      const dateKey = format(new Date(toDateMs(event.createdAt)), 'yyyy-MM-dd');
+      dailyCountMap.set(dateKey, (dailyCountMap.get(dateKey) || 0) + 1);
+    });
+
+    const buildTrend = (days: 1 | 7 | 30): VisitTrendPoint[] => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      return Array.from({ length: days }, (_, index) => {
+        const offset = days - 1 - index;
+        const date = new Date(today);
+        date.setDate(today.getDate() - offset);
+        const dateKey = format(date, 'yyyy-MM-dd');
+
+        return {
+          dateKey,
+          label: days === 1 ? '오늘' : format(date, 'MM.dd'),
+          visits: dailyCountMap.get(dateKey) || 0,
+        };
+      });
+    };
+
+    return {
+      daily: buildTrend(1),
+      weekly: buildTrend(7),
+      monthly: buildTrend(30),
+    };
+  }, [events]);
+
+  const selectedTrend =
+    visitPeriod === 1 ? visitTrends.daily : visitPeriod === 7 ? visitTrends.weekly : visitTrends.monthly;
+
+  const periodVisitTotal = selectedTrend.reduce((sum, item) => sum + item.visits, 0);
+
   if (!centerId) return null;
 
   return (
@@ -172,6 +229,90 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
       </CardHeader>
 
       <CardContent className="space-y-4 p-6 pt-2">
+        <div className="rounded-2xl border border-[#14295F]/10 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-[#14295F]">일자별 웹사이트 방문수</p>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                기간 내 날짜별 페이지 방문(`page_view`) 수를 보여줍니다.
+              </p>
+            </div>
+            <div className="inline-flex rounded-full bg-[#EEF2F8] p-1">
+              {([
+                { value: 1, label: '일간' },
+                { value: 7, label: '7일간' },
+                { value: 30, label: '한달간' },
+              ] as const).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setVisitPeriod(option.value)}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-black transition-colors',
+                    visitPeriod === option.value
+                      ? 'bg-[#14295F] text-white'
+                      : 'text-[#14295F]/65 hover:text-[#14295F]',
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-[#14295F]/10 bg-[#F7FAFF] p-3">
+              <p className="text-[11px] font-black tracking-[0.08em] text-[#14295F]/55">오늘 방문</p>
+              <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{visitTrends.daily[0]?.visits ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-[#14295F]/10 bg-[#F7FAFF] p-3">
+              <p className="text-[11px] font-black tracking-[0.08em] text-[#14295F]/55">최근 7일 방문</p>
+              <p className="dashboard-number mt-1 text-2xl text-[#14295F]">
+                {visitTrends.weekly.reduce((sum, item) => sum + item.visits, 0)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#14295F]/10 bg-[#F7FAFF] p-3">
+              <p className="text-[11px] font-black tracking-[0.08em] text-[#14295F]/55">최근 30일 방문</p>
+              <p className="dashboard-number mt-1 text-2xl text-[#14295F]">
+                {visitTrends.monthly.reduce((sum, item) => sum + item.visits, 0)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={selectedTrend} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="visitTrendGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#14295F" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#14295F" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} width={28} />
+                <Tooltip
+                  cursor={{ stroke: '#14295F33' }}
+                  formatter={(value: number) => [`${value}회`, '방문수']}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.dateKey || '-'}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="visits"
+                  stroke="#14295F"
+                  strokeWidth={2}
+                  fill="url(#visitTrendGradient)"
+                  dot={{ r: 3, fill: '#14295F', strokeWidth: 0 }}
+                  activeDot={{ r: 4, fill: '#FF7A16', strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+            선택 기간 합계: <span className="font-black text-[#14295F]">{periodVisitTotal}회</span>
+          </p>
+        </div>
+
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-[#14295F]/10 bg-[#F7FAFF] p-4 shadow-sm">
             <p className="text-xs font-black tracking-[0.12em] text-[#14295F]/50">랜딩 방문수</p>

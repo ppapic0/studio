@@ -1,23 +1,19 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { DailyReport } from '@/lib/types';
-import { format } from 'date-fns';
-import { 
-  Loader2, 
-  FileText, 
-  Sparkles, 
-  ChevronRight, 
-  Search, 
+import type { DailyReport } from '@/lib/types';
+import {
+  Loader2,
+  FileText,
+  Sparkles,
+  ChevronRight,
+  Search,
   Calendar,
-  Zap,
-  Wand2,
-  TrendingUp,
-  History
+  History,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,15 +28,22 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+
+function getReportPreviewText(content: string) {
+  return content
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 export default function StudentReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode, currentTier } = useAppContext();
   const isMobile = viewMode === 'mobile';
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
 
@@ -49,152 +52,164 @@ export default function StudentReportsPage() {
     return query(
       collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
       where('studentId', '==', user.uid),
-      where('status', '==', 'sent')
+      where('status', '==', 'sent'),
     );
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, user?.uid]);
 
   const { data: rawReports, isLoading } = useCollection<DailyReport>(reportsQuery);
 
   const filteredReports = useMemo(() => {
     if (!rawReports) return [];
-    
-    // 클라이언트 측 정렬 (최신순)
     const sorted = [...rawReports].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
-    
-    // 검색어 필터링
-    return sorted.filter(r => r.dateKey.includes(searchTerm));
+    const term = searchTerm.trim();
+    if (!term) return sorted;
+    return sorted.filter((item) => item.dateKey.includes(term));
   }, [rawReports, searchTerm]);
 
   const handleOpenReport = async (report: DailyReport) => {
     setSelectedReport(report);
-    
-    // 처음 열람하는 경우 viewedAt 업데이트
-    if (!report.viewedAt && firestore && activeMembership) {
-      const reportId = `${report.dateKey}_${report.studentId}`;
-      const reportRef = doc(firestore, 'centers', activeMembership.id, 'dailyReports', reportId);
-      
+
+    if (!report.viewedAt && firestore && activeMembership?.id && report.id) {
+      const reportRef = doc(firestore, 'centers', activeMembership.id, 'dailyReports', report.id);
       updateDoc(reportRef, {
         viewedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }).catch(err => console.error("Error updating report viewed state:", err));
+        updatedAt: serverTimestamp(),
+      }).catch((err) => console.error('Error updating report viewed state:', err));
     }
   };
 
   return (
-    <div className={cn("flex flex-col gap-6 w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-1" : "gap-10")}>
-      <header className={cn("flex flex-col gap-2", isMobile ? "px-2" : "")}>
+    <div className={cn('mx-auto flex w-full max-w-5xl flex-col pb-24', isMobile ? 'gap-4 px-1' : 'gap-10')}>
+      <header className={cn('flex flex-col gap-2', isMobile ? 'px-2' : '')}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-primary p-2.5 rounded-2xl shadow-lg text-white">
+            <div className="rounded-2xl bg-primary p-2.5 text-white shadow-lg">
               <FileText className="h-6 w-6" />
             </div>
             <div className="grid">
-              <h1 className={cn("font-black tracking-tighter", isMobile ? "text-2xl" : "text-4xl")}>나의 분석 리포트</h1>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1">학습 인사이트 아카이브</p>
+              <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-2xl' : 'text-4xl')}>나의 분석 리포트</h1>
+              <p className="ml-1 mt-0.5 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">학습 인사이트 아카이브</p>
             </div>
           </div>
-          <Badge className={cn("rounded-full font-black border-none text-white shadow-lg bg-gradient-to-r", isMobile ? "hidden" : "h-9 px-4 text-xs", currentTier.gradient)}>
-            <Sparkles className="h-4 w-4 mr-2" /> {currentTier.name} 티어 분석
+          <Badge className={cn('rounded-full border-none bg-gradient-to-r font-black text-white shadow-lg', isMobile ? 'hidden' : 'h-9 px-4 text-xs', currentTier.gradient)}>
+            <Sparkles className="mr-2 h-4 w-4" /> {currentTier.name} 티어 분석
           </Badge>
         </div>
       </header>
 
-      <div className={cn("relative group", isMobile ? "px-2" : "")}>
-        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-        <Input 
-          placeholder="날짜로 검색 (예: 2025-03)..." 
+      <div className={cn('group relative', isMobile ? 'px-2' : '')}>
+        <Search className="absolute left-6 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground/40 transition-colors group-focus-within:text-primary" />
+        <Input
+          placeholder="날짜로 검색 (예: 2026-03)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className={cn("rounded-[2rem] border-2 pl-14 focus-visible:ring-primary/10 shadow-sm transition-all bg-white", isMobile ? "h-14" : "h-16 text-lg")}
+          className={cn('rounded-[2rem] border-2 bg-white pl-14 shadow-sm transition-all focus-visible:ring-primary/10', isMobile ? 'h-14' : 'h-16 text-lg')}
         />
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-40 gap-4">
+        <div className="flex flex-col items-center justify-center gap-4 py-40">
           <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
-          <p className="font-black text-muted-foreground/40 uppercase tracking-widest italic">학습 패턴 분석 중...</p>
+          <p className="font-black italic uppercase tracking-widest text-muted-foreground/40">학습 흐름 분석 중...</p>
         </div>
       ) : filteredReports.length === 0 ? (
-        <div className="py-32 text-center bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50 flex flex-col items-center gap-6">
-          <div className="p-8 rounded-full bg-muted/20">
+        <div className="flex flex-col items-center gap-6 rounded-[3rem] border-2 border-dashed border-border/50 bg-white/50 py-32 text-center backdrop-blur-sm">
+          <div className="rounded-full bg-muted/20 p-8">
             <History className="h-16 w-16 text-muted-foreground/10" />
           </div>
           <div className="grid gap-1">
-            <p className="font-black text-muted-foreground/40 text-lg">아직 받은 리포트가 없습니다.</p>
-            <p className="text-[10px] font-bold text-muted-foreground/20 uppercase tracking-widest">선생님 검토 후 리포트가 도착합니다.</p>
+            <p className="text-lg font-black text-muted-foreground/40">아직 받은 리포트가 없습니다.</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/20">선생님이 발송하면 리포트가 이곳에 쌓입니다.</p>
           </div>
         </div>
       ) : (
         <div className="grid gap-4">
-          {filteredReports.map((report) => (
-            <Card 
-              key={report.id} 
-              onClick={() => handleOpenReport(report)}
-              className="rounded-[2.5rem] border-none shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 cursor-pointer group bg-white ring-1 ring-border/50 overflow-hidden"
-            >
-              <CardContent className="p-0">
-                <div className={cn("flex items-center justify-between p-6 sm:p-10", isMobile ? "p-5" : "")}>
-                  <div className="flex items-center gap-4 sm:gap-6 min-w-0 flex-1">
-                    <div className={cn("h-12 w-12 sm:h-16 sm:w-16 rounded-2xl sm:rounded-[1.5rem] bg-primary/5 flex flex-col items-center justify-center shrink-0 border-2 border-primary/10 group-hover:bg-primary group-hover:border-primary transition-all duration-500 shadow-inner")}>
-                      <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:text-white" />
+          {filteredReports.map((report) => {
+            const preview = getReportPreviewText(report.content).slice(0, 60);
+            return (
+              <Card
+                key={report.id}
+                onClick={() => handleOpenReport(report)}
+                className={cn(
+                  'cursor-pointer overflow-hidden border-none bg-white ring-1 ring-border/50 transition-all duration-300',
+                  isMobile ? 'rounded-[1.75rem] shadow-md active:scale-[0.995]' : 'rounded-[2.5rem] shadow-lg hover:-translate-y-1 hover:shadow-2xl',
+                )}
+              >
+                <CardContent className="p-0">
+                  <div className={cn('flex items-center', isMobile ? 'gap-3 p-4' : 'gap-6 p-6 sm:p-10')}>
+                    <div className={cn('flex shrink-0 items-center justify-center rounded-2xl border-2 border-primary/10 bg-primary/5', isMobile ? 'h-12 w-12' : 'h-16 w-16 rounded-[1.5rem]')}>
+                      <Calendar className={cn('text-primary', isMobile ? 'h-5 w-5' : 'h-6 w-6')} />
                     </div>
-                    <div className="grid gap-1 min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] sm:text-xs font-black text-primary/40 uppercase tracking-widest leading-none">{report.dateKey}</span>
-                        <Badge variant="secondary" className={cn(
-                          "border-none font-black text-[8px] px-1.5 h-4 flex-shrink-0",
-                          report.viewedAt ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
-                        )}>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-[10px] font-black uppercase tracking-widest leading-none text-primary/40 sm:text-xs">{report.dateKey}</span>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            'h-4 shrink-0 border-none px-1.5 text-[8px] font-black',
+                            report.viewedAt ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600',
+                          )}
+                        >
                           {report.viewedAt ? '읽음' : '신규'}
                         </Badge>
                       </div>
-                      <h3 className="text-base sm:text-xl font-black tracking-tighter text-primary truncate">데일리 정밀 분석 리포트</h3>
-                      <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/60 truncate whitespace-nowrap max-w-full">
-                        {report.content.replace(/[🕒✅📊💬🧠]/g, '').trim().substring(0, 50)}...
+
+                      <h3 className="truncate text-base font-black tracking-tighter text-primary sm:text-xl">데일리 정밀 분석 리포트</h3>
+                      <p className="line-clamp-1 text-[10px] font-bold text-muted-foreground/60 sm:text-[11px]">
+                        {preview || '리포트 내용을 확인해보세요.'}
                       </p>
                     </div>
+
+                    {isMobile ? (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/5 text-primary">
+                        <ChevronRight className="h-6 w-6" />
+                      </div>
+                    )}
                   </div>
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm shrink-0 ml-4">
-                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* 리포트 상세 다이얼로그 */}
       <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
-        <DialogContent className={cn(
-          "rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", 
-          isMobile 
-            ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2.5rem]" 
-            : "max-w-3xl max-h-[90vh]"
-        )}>
+        <DialogContent
+          className={cn(
+            'flex flex-col overflow-hidden border-none p-0 shadow-2xl transition-all duration-500',
+            isMobile
+              ? 'fixed left-1/2 top-1/2 h-[85vh] w-[95vw] max-w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-[2.5rem]'
+              : 'max-h-[90vh] max-w-3xl rounded-[3rem]',
+          )}
+        >
           {selectedReport && (
             <>
-              <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-8" : "p-12")}>
-                <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12">
-                  <Sparkles className={cn(isMobile ? "h-32 w-32" : "h-48 w-48")} />
+              <div className={cn('relative shrink-0 overflow-hidden bg-primary text-white', isMobile ? 'p-8' : 'p-12')}>
+                <div className="absolute right-0 top-0 rotate-12 p-8 opacity-10 sm:p-12">
+                  <Sparkles className={cn(isMobile ? 'h-32 w-32' : 'h-48 w-48')} />
                 </div>
                 <DialogHeader className="relative z-10 text-left">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-white/20 text-white border-none font-black text-[9px] tracking-[0.2em] uppercase px-3 py-1">프리미엄 인공지능 분석</Badge>
-                    <span className="text-white/60 font-black text-[10px] tracking-widest">{selectedReport.dateKey}</span>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Badge className="border-none bg-white/20 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white">프리미엄 인공지능 분석</Badge>
+                    <span className="text-[10px] font-black tracking-widest text-white/60">{selectedReport.dateKey}</span>
                   </div>
-                  <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-5xl")}>정밀 분석 리포트</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1 text-xs sm:text-sm">성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.</DialogDescription>
+                  <DialogTitle className={cn('font-black tracking-tighter', isMobile ? 'text-3xl' : 'text-5xl')}>정밀 분석 리포트</DialogTitle>
+                  <DialogDescription className="mt-1 text-xs font-bold text-white/70 sm:text-sm">
+                    성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 함께 제공됩니다.
+                  </DialogDescription>
                 </DialogHeader>
               </div>
 
-              <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6 sm:p-12">
+              <div className="custom-scrollbar flex-1 overflow-y-auto bg-[#fafafa] p-6 sm:p-12">
                 <VisualReportViewer content={selectedReport.content} />
               </div>
 
-              <DialogFooter className="p-6 sm:p-8 bg-white border-t shrink-0 flex justify-center">
+              <DialogFooter className="shrink-0 justify-center border-t bg-white p-6 sm:p-8">
                 <DialogClose asChild>
-                  <Button className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 active:scale-95 transition-all">분석 완료</Button>
+                  <Button className="h-14 w-full rounded-2xl text-lg font-black">분석 완료</Button>
                 </DialogClose>
               </DialogFooter>
             </>

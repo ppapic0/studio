@@ -44,7 +44,9 @@ import {
   UserCheck,
   CalendarX,
   UserMinus,
-  QrCode
+  QrCode,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -56,7 +58,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
@@ -115,6 +117,17 @@ const REQUEST_TYPE_LABEL: Record<'late' | 'absence', string> = {
   absence: '결석',
 };
 
+type ExamCountdownSetting = {
+  id: string;
+  title: string;
+  date: string;
+};
+
+const DEFAULT_EXAM_COUNTDOWNS: ExamCountdownSetting[] = [
+  { id: 'mock', title: '모의고사', date: '' },
+  { id: 'school', title: '내신', date: '' },
+];
+
 function formatTimer(totalSecs: number) {
   const mins = Math.floor(totalSecs / 60);
   const secs = totalSecs % 60;
@@ -129,6 +142,23 @@ function calculateRhythmScore(minutes: number[]): number {
   const variance = safeMinutes.reduce((acc, value) => acc + (value - avg) ** 2, 0) / safeMinutes.length;
   const std = Math.sqrt(variance);
   return Math.max(0, Math.min(100, Math.round(100 - (std / avg) * 100)));
+}
+
+function normalizeExamCountdowns(input: unknown): ExamCountdownSetting[] {
+  if (!Array.isArray(input)) return DEFAULT_EXAM_COUNTDOWNS;
+
+  const normalized = input
+    .map((item, index) => {
+      const row = item as Partial<ExamCountdownSetting>;
+      return {
+        id: typeof row.id === 'string' && row.id.length > 0 ? row.id : `exam_${index + 1}`,
+        title: typeof row.title === 'string' ? row.title.trim() : '',
+        date: typeof row.date === 'string' ? row.date.trim() : '',
+      };
+    })
+    .filter((item) => item.title.length > 0 || item.date.length > 0);
+
+  return normalized.length > 0 ? normalized : DEFAULT_EXAM_COUNTDOWNS;
 }
 
 function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: string): boolean {
@@ -541,6 +571,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const actionLockAtRef = useRef<number | null>(null);
   const isMobile = viewMode === 'mobile';
   
   // 지각/결석 신청서 상태
@@ -549,6 +580,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
   const [selectedTeacherReport, setSelectedTeacherReport] = useState<DailyReport | null>(null);
+  const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
+  const [isExamSaving, setIsExamSaving] = useState(false);
+  const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -564,6 +598,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
+
+  const studentProfileRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isActive });
+
+  useEffect(() => {
+    setExamDrafts(normalizeExamCountdowns(studentProfile?.examCountdowns));
+  }, [studentProfile?.examCountdowns]);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -591,6 +635,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, activeMembership, user, weekKey, targetDays]);
   const { data: fetchedPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
+
+  const weeklyPlansRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !weekKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
+    );
+  }, [firestore, activeMembership?.id, user?.uid, weekKey]);
+  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansRef, { enabled: isActive });
 
   const plansByDay = useMemo(() => {
     const map: Record<string, StudyPlanItem[]> = {};
@@ -681,6 +733,51 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return Math.round(nonZeroPoints.reduce((sum, point) => sum + point.score, 0) / nonZeroPoints.length);
   }, [rhythmTrend, stats.consistency]);
 
+  const examCountdowns = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayMs = todayStart.getTime();
+
+    return normalizeExamCountdowns(studentProfile?.examCountdowns)
+      .map((item) => {
+        const parsed = item.date ? new Date(`${item.date}T00:00:00`) : null;
+        const targetMs = parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : null;
+        if (!targetMs) return { ...item, dLabel: '날짜 미설정', daysLeft: null as number | null };
+
+        const diffDays = Math.ceil((targetMs - todayMs) / (1000 * 60 * 60 * 24));
+        const dLabel = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-Day' : `D+${Math.abs(diffDays)}`;
+        return { ...item, dLabel, daysLeft: diffDays };
+      })
+      .sort((a, b) => {
+        const aSort = a.daysLeft === null ? 9999 : Math.abs(a.daysLeft);
+        const bSort = b.daysLeft === null ? 9999 : Math.abs(b.daysLeft);
+        return aSort - bSort;
+      });
+  }, [studentProfile?.examCountdowns]);
+
+  const subjectProgress = useMemo(() => {
+    const bucket = new Map<string, { total: number; done: number }>();
+    (weeklyPlans || [])
+      .filter((item) => (item.category || 'study') === 'study')
+      .forEach((item) => {
+        const subject = item.subject?.trim() || '기타';
+        const current = bucket.get(subject) || { total: 0, done: 0 };
+        current.total += 1;
+        if (item.done) current.done += 1;
+        bucket.set(subject, current);
+      });
+
+    return Array.from(bucket.entries())
+      .map(([subject, values]) => ({
+        subject,
+        total: values.total,
+        done: values.done,
+        rate: values.total > 0 ? Math.round((values.done / values.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [weeklyPlans]);
+
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const penaltyPoints = progress?.penaltyPoints || 0;
   const penaltyRate = useMemo(() => {
@@ -694,8 +791,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const finalMultiplier = totalBoost * (1 - penaltyRate);
 
   const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !progressRef || !todayKey || !periodKey || isProcessingAction) return;
+    if (!firestore || !user || !activeMembership || !progressRef || !todayKey || !periodKey) return;
+    if (isProcessingAction) {
+      const lockAgeMs = actionLockAtRef.current ? Date.now() - actionLockAtRef.current : 0;
+      if (lockAgeMs < 15000) return;
+      console.warn('[student-track] action lock timed out; force unlock');
+      setIsProcessingAction(false);
+      actionLockAtRef.current = null;
+      toast({
+        variant: 'destructive',
+        title: '버튼 잠금 해제',
+        description: '처리가 지연되어 잠금을 해제했습니다. 한 번 더 눌러주세요.',
+      });
+      return;
+    }
 
+    actionLockAtRef.current = Date.now();
     setIsProcessingAction(true);
     try {
       const centerId = activeMembership.id;
@@ -1089,6 +1200,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       toast({ variant: 'destructive', title: '\uACF5\uBD80 \uC0C1\uD0DC \uBCC0\uACBD \uC2E4\uD328', description: detail });
     } finally {
       setIsProcessingAction(false);
+      actionLockAtRef.current = null;
     }
   }, [
     firestore,
@@ -1108,6 +1220,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     finalMultiplier,
     isProcessingAction,
   ]);
+
+  useEffect(() => {
+    if (!isProcessingAction) return;
+    const timeout = setTimeout(() => {
+      if (!isProcessingAction) return;
+      setIsProcessingAction(false);
+      actionLockAtRef.current = null;
+      toast({
+        variant: 'destructive',
+        title: '버튼 잠금 해제',
+        description: '처리가 길어져 버튼 잠금을 자동 해제했습니다.',
+      });
+    }, 15000);
+
+    return () => clearTimeout(timeout);
+  }, [isProcessingAction, toast]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -1291,6 +1419,69 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }).catch((err) => console.error('Error updating report viewed state:', err));
   };
 
+  const handleExamDraftChange = (id: string, field: 'title' | 'date', value: string) => {
+    setExamDrafts((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const handleAddExamDraft = () => {
+    if (examDrafts.length >= 6) return;
+    setExamDrafts((prev) => [
+      ...prev,
+      {
+        id: `exam_${Date.now()}`,
+        title: '',
+        date: '',
+      },
+    ]);
+  };
+
+  const handleRemoveExamDraft = (id: string) => {
+    setExamDrafts((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      return next.length > 0 ? next : DEFAULT_EXAM_COUNTDOWNS;
+    });
+  };
+
+  const handleSaveExamCountdowns = async () => {
+    if (!studentProfileRef) return;
+    setIsExamSaving(true);
+    try {
+      const payload = examDrafts
+        .map((item) => ({
+          id: item.id,
+          title: item.title.trim(),
+          date: item.date.trim(),
+        }))
+        .filter((item) => item.title.length > 0 && item.date.length > 0);
+
+      await setDoc(
+        studentProfileRef,
+        {
+          examCountdowns: payload,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      toast({
+        title: '시험 디데이 설정 완료',
+        description: '개인 시험 일정이 저장되었습니다.',
+      });
+      setIsExamDialogOpen(false);
+    } catch (error) {
+      console.error('[student-dashboard] save exam countdowns failed', error);
+      toast({
+        variant: 'destructive',
+        title: '시험 설정 저장 실패',
+        description: '잠시 후 다시 시도해주세요.',
+      });
+    } finally {
+      setIsExamSaving(false);
+    }
+  };
+
   const PlanColumn = ({ dateKey, label }: { dateKey: string, label: string }) => {
     const items = plansByDay[dateKey] || [];
     const studyTasks = items.filter(p => p.category === 'study' || !p.category);
@@ -1386,6 +1577,124 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             >
               <span className={cn("inline-flex h-1.5 w-1.5 rounded-full", isTimerActive ? "bg-[#FFD26C]" : "bg-white")} />
               <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>성과 엔진 활성</span>
+            </div>
+
+            <div
+              className={cn(
+                "rounded-2xl border bg-white/95 text-[#14295F] backdrop-blur-sm",
+                isMobile ? "p-3.5 mt-2" : "p-4 mt-1 max-w-[560px]",
+              )}
+              style={{ borderColor: tierTheme.subtleBorder }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]/55">시험 디데이 + 과목별 진도율</p>
+                  <p className="text-xs font-bold text-[#14295F]/70 mt-0.5">불안을 감각이 아닌 숫자로 확인해요.</p>
+                </div>
+                <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 rounded-xl border-[#14295F]/20 bg-white text-[#14295F] font-black">
+                      <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                      시험 설정
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className={cn("rounded-[2rem] border border-slate-200 p-0 overflow-hidden", isMobile ? "max-w-[94vw]" : "sm:max-w-lg")}>
+                    <div className={cn("bg-[#14295F] text-white", isMobile ? "p-5" : "p-7")}>
+                      <DialogHeader>
+                        <DialogTitle className={cn("font-black tracking-tight", isMobile ? "text-xl" : "text-2xl")}>시험 디데이 설정</DialogTitle>
+                        <DialogDescription className="text-white/70 text-xs font-bold">학생 본인 기준으로 시험명과 날짜를 저장합니다.</DialogDescription>
+                      </DialogHeader>
+                    </div>
+                    <div className={cn("bg-white space-y-3", isMobile ? "p-4" : "p-6")}>
+                      {examDrafts.map((item, index) => (
+                        <div key={item.id} className="grid grid-cols-[1fr_150px_auto] gap-2 items-center">
+                          <Input
+                            value={item.title}
+                            onChange={(e) => handleExamDraftChange(item.id, 'title', e.target.value)}
+                            placeholder={`시험명 ${index + 1}`}
+                            className="h-10 rounded-xl border-[#14295F]/15 font-bold"
+                          />
+                          <Input
+                            type="date"
+                            value={item.date}
+                            onChange={(e) => handleExamDraftChange(item.id, 'date', e.target.value)}
+                            className="h-10 rounded-xl border-[#14295F]/15 font-bold"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 rounded-xl text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                            onClick={() => handleRemoveExamDraft(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-xl font-black border-dashed"
+                        onClick={handleAddExamDraft}
+                        disabled={examDrafts.length >= 6}
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        시험 추가
+                      </Button>
+                    </div>
+                    <DialogFooter className={cn("border-t bg-white", isMobile ? "p-4" : "p-5")}>
+                      <DialogClose asChild>
+                        <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold">닫기</Button>
+                      </DialogClose>
+                      <Button
+                        type="button"
+                        onClick={handleSaveExamCountdowns}
+                        disabled={isExamSaving}
+                        className="h-10 rounded-xl font-black"
+                      >
+                        {isExamSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                        저장
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className={cn("mt-3 grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                {examCountdowns.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-[#14295F]/12 bg-[#F7FAFF] px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-black text-[#14295F] truncate">{item.title}</p>
+                      <Badge className="h-6 px-2.5 text-[10px] font-black border-none bg-[#14295F] text-white">{item.dLabel}</Badge>
+                    </div>
+                    <p className="mt-1 text-[11px] font-semibold text-[#14295F]/60">
+                      {item.date ? item.date : '날짜를 설정해 주세요'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 rounded-xl border border-[#14295F]/12 bg-white px-3 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#14295F]/55">과목별 진도율</p>
+                  <span className="text-[10px] font-bold text-[#14295F]/45">이번 주 기준</span>
+                </div>
+                <div className="mt-2.5 space-y-2">
+                  {subjectProgress.length === 0 ? (
+                    <p className="text-xs font-semibold text-[#14295F]/55">과목 정보가 있는 주간 계획이 아직 없어요.</p>
+                  ) : (
+                    subjectProgress.map((item) => (
+                      <div key={item.subject} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-[#14295F]">
+                          <span className="truncate">{item.subject}</span>
+                          <span>{item.done}/{item.total} · {item.rate}%</span>
+                        </div>
+                        <Progress value={item.rate} className="h-2 bg-[#E8EEF9]" />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           <div className={cn("flex items-center gap-3", isMobile ? "flex-col w-full" : "flex-row")}>

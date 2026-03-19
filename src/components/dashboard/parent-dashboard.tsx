@@ -1175,6 +1175,65 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [recentNotifications, readMap]
   );
 
+  const latestStudySnapshot = useMemo(() => {
+    const sorted = [...(allLogs || [])]
+      .filter((log) => (log.totalMinutes || 0) > 0)
+      .sort((a, b) => (b.dateKey || '').localeCompare(a.dateKey || ''));
+    const latest = sorted[0];
+    if (!latest) return null;
+
+    const parsed = parse(latest.dateKey, 'yyyy-MM-dd', new Date());
+    const studyDateLabel = Number.isNaN(parsed.getTime())
+      ? latest.dateKey
+      : format(parsed, 'MM/dd (EEE)', { locale: ko });
+    const studyStartAt = studyStartByDateKey[latest.dateKey] || null;
+    const studyStartLabel = studyStartAt ? format(studyStartAt, 'HH:mm') : '기록 없음';
+
+    return {
+      dateKey: latest.dateKey,
+      studyDateLabel,
+      studyStartLabel,
+    };
+  }, [allLogs, studyStartByDateKey]);
+
+  const latestAwayNotification = useMemo(
+    () => sortedNotifications.find((notification) => notification.type === 'away_long' || notification.type === 'unauthorized_exit') || null,
+    [sortedNotifications]
+  );
+
+  const latestCheckOutNotification = useMemo(
+    () => sortedNotifications.find((notification) => notification.type === 'check_out') || null,
+    [sortedNotifications]
+  );
+
+  const recentLifeAttendanceSummary = useMemo(() => {
+    const isAwayNow = attendanceCurrent?.status === 'away' || attendanceCurrent?.status === 'break';
+    const hasAwayRecord = isAwayNow || !!latestAwayNotification;
+    const hasCheckOutRecord =
+      !!latestCheckOutNotification ||
+      (attendanceCurrent?.status !== 'studying' && (todayLog?.totalMinutes || 0) > 0);
+
+    return {
+      recentStudyDate: latestStudySnapshot?.studyDateLabel || '기록 없음',
+      recentStudyStart: latestStudySnapshot?.studyStartLabel || '기록 없음',
+      awayStatus: isAwayNow
+        ? '현재 외출/휴식 중'
+        : hasAwayRecord
+          ? `최근 외출 기록 (${latestAwayNotification?.createdAtLabel || '확인됨'})`
+          : '외출 기록 없음',
+      checkOutStatus: hasCheckOutRecord
+        ? `퇴실 기록 있음 (${latestCheckOutNotification?.createdAtLabel || '확인됨'})`
+        : '퇴실 기록 없음',
+    };
+  }, [
+    attendanceCurrent?.status,
+    latestAwayNotification?.createdAtLabel,
+    latestCheckOutNotification?.createdAtLabel,
+    latestStudySnapshot?.studyDateLabel,
+    latestStudySnapshot?.studyStartLabel,
+    todayLog?.totalMinutes,
+  ]);
+
   const penaltyMeta = useMemo(() => {
     const points = penaltyRecovery.effectivePoints;
     if (points >= 20) return { label: '퇴원', badge: 'bg-rose-200 text-rose-800 border-rose-300' };
@@ -1755,8 +1814,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <Activity className="h-4 w-4 text-slate-400" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">최근 생활/출결 이슈</span>
                 </div>
+                <div className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">최근 공부일자</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.recentStudyDate}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">공부 시작 시각</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.recentStudyStart}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">외출 여부</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.awayStatus}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">퇴실 여부</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.checkOutStatus}</p>
+                  </div>
+                </div>
                 {recentPenaltyReasons.length === 0 ? (
-                  <div className="rounded-[2rem] border-2 border-dashed py-16 text-center text-xs font-black italic opacity-20">
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-center text-xs font-bold text-slate-400">
                     기록된 특이사항이 없습니다.
                   </div>
                 ) : (
