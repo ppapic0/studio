@@ -827,7 +827,7 @@ export default function RevenuePage() {
                             <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
                               <Button 
                                 onClick={() => handleRealPayment(inv.id)}
-                                className="flex-1 h-12 rounded-xl font-black text-sm gap-3 bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 active:scale-[0.98] transition-all"
+                                className="flex-1 h-12 rounded-xl font-black text-sm gap-3 text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 active:scale-[0.98] transition-all"
                               >
                                 <CreditCard className="h-5 w-5" /> 실제 카드 결제 진행 (토스 연동)
                               </Button>
@@ -982,7 +982,7 @@ export default function RevenuePage() {
               <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
               <div className="relative z-10 space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-60">당월 발생 매출</p>
-                <h3 className="text-4xl font-black tracking-tighter">{formatWon(metrics?.accrued || 0)}</h3>
+                <h3 className="text-4xl font-black tracking-tighter text-[#14295F]">{formatWon(metrics?.accrued || 0)}</h3>
                 <Badge className="bg-white/20 border-none text-[10px] px-3 text-emerald-400 whitespace-nowrap">발생 기준</Badge>
               </div>
             </Card>
@@ -990,7 +990,7 @@ export default function RevenuePage() {
               <Wallet className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
               <div className="relative z-10 space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-60">실제 수납 금액</p>
-                <h3 className="text-4xl font-black tracking-tighter">{formatWon(metrics?.collected || 0)}</h3>
+                <h3 className="text-4xl font-black tracking-tighter text-[#14295F]">{formatWon(metrics?.collected || 0)}</h3>
                 <Badge className="bg-white/20 border-none text-[10px] px-3 text-white whitespace-nowrap">수납 기준</Badge>
               </div>
             </Card>

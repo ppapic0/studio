@@ -262,13 +262,13 @@ export function RiskIntelligence() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <section className={cn("grid gap-6", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-rose-600 text-white p-10 relative overflow-hidden group">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 relative overflow-hidden group ring-1 ring-rose-200">
           <ShieldAlert className="absolute -right-4 -top-4 h-48 w-48 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-1000" />
           <div className="relative z-10 space-y-6">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60">조기 이탈 고위험군</p>
-            <h3 className="text-7xl font-black tracking-tighter">{clusters?.highRisk.length || 0}<span className="text-2xl opacity-40 ml-2">명</span></h3>
-            <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10">
-              <p className="text-xs font-bold leading-relaxed">위험 지수 70점 이상의 밀착 관리가 필요한 학생 수입니다.</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">조기 이탈 고위험군</p>
+            <h3 className="text-7xl font-black tracking-tighter text-rose-600">{clusters?.highRisk.length || 0}<span className="text-2xl text-rose-400 ml-2">명</span></h3>
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200">
+              <p className="text-xs font-bold leading-relaxed text-rose-700">위험 지수 70점 이상의 밀착 관리가 필요한 학생 수입니다.</p>
             </div>
           </div>
         </Card>
@@ -339,11 +339,11 @@ export function RiskIntelligence() {
         </div>
 
         <div className="md:col-span-4 space-y-6">
-          <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-sky-100 p-8 overflow-hidden relative">
+          <Card className="rounded-[2.5rem] border-none shadow-xl bg-white text-[#14295F] p-8 overflow-hidden relative ring-1 ring-[#14295F]/15">
             <div className="absolute -right-4 -top-4 opacity-10"><Info className="h-32 w-32" /></div>
             <div className="relative z-10 space-y-6">
               <div className="flex items-center gap-2">
-                <BrainCircuit className="h-5 w-5 text-accent" />
+                <BrainCircuit className="h-5 w-5 text-[#14295F]" />
                 <h4 className="text-sm font-black uppercase tracking-widest">인공지능 점수 산정 가이드</h4>
               </div>
               <div className="space-y-4">
@@ -353,16 +353,16 @@ export function RiskIntelligence() {
                   { label: '학습량 주의 (-10%↑)', pts: '+15', icon: History, color: 'text-amber-200' },
                   { label: '완수율 저조 (50%↓)', pts: '+20', icon: Target, color: 'text-emerald-300' }
                 ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/10">
+                  <div key={item.label} className="flex items-center justify-between bg-[#F7FAFF] p-3 rounded-xl border border-[#14295F]/15">
                     <div className="flex items-center gap-3">
                       <item.icon className={cn("h-4 w-4", item.color)} />
-                      <span className="text-xs font-bold text-sky-100">{item.label}</span>
+                      <span className="text-xs font-bold text-[#14295F]">{item.label}</span>
                     </div>
-                    <span className="font-black text-xs text-amber-200">{item.pts}</span>
+                    <span className="font-black text-xs text-[#14295F]">{item.pts}</span>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] font-bold text-sky-200/90 leading-relaxed italic pt-2">
+              <p className="text-[10px] font-bold text-[#14295F]/70 leading-relaxed italic pt-2">
                 ※ 총점 100점 만점 기준이며, 실제 Firestore 데이터를 실시간 가공하여 산출됩니다.
               </p>
             </div>

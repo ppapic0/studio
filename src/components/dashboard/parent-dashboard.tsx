@@ -134,6 +134,24 @@ function calculateRhythmScore(minutes: number[]): number {
   return Math.max(0, Math.min(100, Math.round(100 - (std / avg) * 100)));
 }
 
+function toKoreanSubjectLabel(raw: string): string {
+  const source = (raw || '').trim();
+  if (!source) return '기타';
+  const key = source.toLowerCase();
+
+  if (key === 'math' || key.includes('수학')) return '수학';
+  if (key === 'english' || key.includes('영어')) return '영어';
+  if (key === 'korean' || key.includes('국어')) return '국어';
+  if (key === 'science' || key.includes('과학')) return '과학';
+  if (key === 'social' || key.includes('사회')) return '사회';
+  if (key === 'history' || key.includes('한국사') || key.includes('역사')) return '한국사';
+  if (key === 'essay' || key.includes('논술')) return '논술';
+  if (key === 'coding' || key.includes('코딩')) return '코딩';
+  if (key === 'etc' || key.includes('기타')) return '기타';
+
+  return source;
+}
+
 type ParentCommunicationRecord = {
   id: string;
   studentId: string;
@@ -522,6 +540,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
+  const [isReportArchiveOpen, setIsReportArchiveOpen] = useState(false);
+  const [selectedChildReport, setSelectedChildReport] = useState<DailyReport | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
@@ -751,6 +771,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [isActive, firestore, centerId, studentId, report, yesterdayKey]);
 
+  const reportsArchiveQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'dailyReports'),
+      where('studentId', '==', studentId),
+      where('status', '==', 'sent'),
+      limit(50),
+    );
+  }, [firestore, centerId, studentId]);
+  const { data: rawReportsArchive } = useCollection<DailyReport>(reportsArchiveQuery, { enabled: isActive && !!studentId });
+  const reportsArchive = useMemo(
+    () => [...(rawReportsArchive || [])].sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
+    [rawReportsArchive]
+  );
+
   const growthRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'growthProgress', studentId)), [firestore, centerId, studentId]);
   const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId });
 
@@ -962,7 +997,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
     return Array.from(minutesBySubject.entries())
       .map(([subject, minutes], index) => ({
-        subject,
+        subject: toKoreanSubjectLabel(subject),
         minutes,
         color: SUBJECT_COLORS[index % SUBJECT_COLORS.length],
       }))
@@ -1288,6 +1323,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     void logParentActivity('app_visit', { source: 'tab_change', tab: nextTab });
   };
 
+  const handleOpenReportsArchive = () => {
+    setSelectedChildReport(reportsArchive[0] || null);
+    setIsReportArchiveOpen(true);
+  };
+
+  const handleSelectChildReport = async (target: DailyReport) => {
+    setSelectedChildReport(target);
+    if (!firestore || !centerId || !target?.id || target.viewedAt) return;
+    updateDoc(doc(firestore, 'centers', centerId, 'dailyReports', target.id), {
+      viewedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }).catch((error) => {
+      console.warn('[parent-dashboard] report viewed update failed', error);
+    });
+  };
+
   async function submit(type: 'consultation' | 'request' | 'suggestion') {
     if (!firestore || !centerId || !studentId || !user) return;
     let title = '';
@@ -1461,7 +1512,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <Card className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#eef4ff_0%,#f5f9ff_55%,#fff4e8_100%)] p-6 ring-1 ring-[#d7e3fb]/70 relative overflow-hidden group shadow-sm">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={handleOpenReportsArchive}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleOpenReportsArchive();
+                  }
+                }}
+                className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#eef4ff_0%,#f5f9ff_55%,#fff4e8_100%)] p-6 ring-1 ring-[#d7e3fb]/70 relative overflow-hidden group shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
+              >
                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:rotate-12 transition-transform duration-700">
                   <MessageCircle className="h-20 w-20 text-[#14295F]" />
                 </div>
@@ -1473,7 +1535,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   {report?.viewedAt && <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] h-4 px-1.5">읽음</Badge>}
                 </div>
                 <p className="text-sm font-bold text-slate-800 leading-relaxed break-keep relative z-10 line-clamp-2">
-                  {report?.content || '선생님과 인공지능이 어제의 학습 데이터를 분석 중입니다.'}
+                  {report?.content || '선생님이 어제의 학습 데이터를 분석 중입니다.'}
                 </p>
               </Card>
 
@@ -1568,7 +1630,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       ))}
                     </div>
                     <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">확인했습니다</Button></DialogClose>
+                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F] text-white">확인했습니다</Button></DialogClose>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -1716,15 +1778,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
                   </CardTitle>
                   <div className="space-y-4">
-                    {subjectsData.slice(0, 3).map((s, i) => (
-                      <div key={s.subject} className="space-y-1.5">
-                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-700">
-                          <span>{s.subject}</span>
-                          <span className="font-black">{s.minutes}분</span>
+                    {subjectsData.slice(0, 2).map((s) => {
+                      const ratio = Math.min(100, Math.round((s.minutes / (subjectTotalMinutes || 1)) * 100));
+                      return (
+                        <div key={s.subject} className="space-y-1.5">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-700">
+                            <span>{s.subject}</span>
+                            <span className="font-black">{ratio}%</span>
+                          </div>
+                          <Progress value={ratio} className="h-1 bg-slate-100" />
                         </div>
-                        <Progress value={Math.min(100, Math.round((s.minutes / (subjectTotalMinutes || 1)) * 100))} className="h-1 bg-slate-100" />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </Card>
 
@@ -1764,7 +1829,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     </div>
                     <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F]">확인 완료</Button></DialogClose>
+                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F] text-white">확인 완료</Button></DialogClose>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -2143,6 +2208,61 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={isReportArchiveOpen} onOpenChange={setIsReportArchiveOpen}>
+        <DialogContent className={cn("overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl", isMobile ? "max-w-[95vw]" : "sm:max-w-4xl")}>
+          <div className="bg-[#14295F] p-6 text-white">
+            <DialogTitle className="text-xl font-black tracking-tight">우리 아이 학습 리포트</DialogTitle>
+            <DialogDescription className="mt-1 text-xs font-bold text-white/70">받은 리포트를 날짜별로 확인할 수 있어요.</DialogDescription>
+          </div>
+          <div className={cn("bg-white", isMobile ? "space-y-3 p-4" : "grid grid-cols-[260px_1fr] gap-4 p-6")}>
+            <div className={cn("space-y-2", isMobile ? "max-h-[220px] overflow-y-auto" : "max-h-[62vh] overflow-y-auto pr-1")}>
+              {reportsArchive.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs font-bold text-slate-400">
+                  아직 받은 리포트가 없습니다.
+                </div>
+              ) : (
+                reportsArchive.map((item) => {
+                  const isActiveItem = selectedChildReport?.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => void handleSelectChildReport(item)}
+                      className={cn(
+                        "w-full rounded-xl border px-3 py-2.5 text-left transition-all",
+                        isActiveItem ? "border-[#14295F] bg-[#EEF4FF]" : "border-slate-200 bg-white hover:bg-slate-50"
+                      )}
+                    >
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{item.dateKey || '-'}</p>
+                      <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-700">{item.content || '리포트 내용 없음'}</p>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            <div className={cn("rounded-xl border border-slate-200 bg-slate-50", isMobile ? "max-h-[42vh] overflow-y-auto p-4" : "max-h-[62vh] overflow-y-auto p-5")}>
+              {selectedChildReport ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase tracking-widest text-[#14295F]/60">{selectedChildReport.dateKey}</p>
+                    <Badge variant="outline" className="h-5 border-slate-200 bg-white px-2 text-[10px] font-black text-slate-600">
+                      {selectedChildReport.viewedAt ? '읽음' : '새 리포트'}
+                    </Badge>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
+                    {selectedChildReport.content || '리포트 내용이 없습니다.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex h-full min-h-[180px] items-center justify-center text-center text-sm font-bold text-slate-400">
+                  왼쪽에서 리포트를 선택해 주세요.
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
         <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">

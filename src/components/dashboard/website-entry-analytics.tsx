@@ -60,6 +60,10 @@ function placementLabel(value?: string | null) {
     footer: '푸터',
     consult_section: '상담 섹션',
     experience_page: '체험 페이지',
+    feature_card: '\uAE30\uB2A5 \uCE74\uB4DC',
+    experience_header: '\uCCB4\uD5D8 \uD398\uC774\uC9C0 \uD5E4\uB354',
+    experience_hero_student: '\uCCB4\uD5D8 \uD788\uC5B4\uB85C(\uD559\uC0DD)',
+    data_preview_cta: '\uB370\uC774\uD130 \uBBF8\uB9AC\uBCF4\uAE30 \uBC84\uD2BC',
   };
 
   if (!value) return '기타';

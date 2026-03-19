@@ -383,15 +383,15 @@ export function OperationalIntelligence() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-blue-600 text-white p-8 relative overflow-hidden">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white text-[#14295F] p-8 relative overflow-hidden ring-1 ring-[#14295F]/15">
           <Armchair className="absolute -right-4 -top-4 h-40 w-40 opacity-10" />
           <div className="relative z-10 space-y-3">
             <p className="text-[10px] font-black uppercase tracking-widest opacity-70">현재 좌석 점유율</p>
-            <h3 className="dashboard-number text-6xl text-white">
+            <h3 className="dashboard-number text-6xl text-[#14295F]">
               {opsMetrics.currentOccupancyRate}
-              <span className="text-2xl opacity-60 ml-1">%</span>
+              <span className="text-2xl text-[#14295F]/60 ml-1">%</span>
             </h3>
-            <p className="text-xs font-bold opacity-80">
+            <p className="text-xs font-bold text-[#14295F]/80">
               실시간 착석 {opsMetrics.occupiedSeats} / 전체 좌석 {opsMetrics.totalSeats}
             </p>
           </div>
