@@ -74,7 +74,7 @@ import {
 import { useFirestore, useCollection, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, collectionGroup, Timestamp, doc, limit } from 'firebase/firestore';
+import { collection, query, where, collectionGroup, Timestamp, doc, limit, getDocs, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog } from '@/lib/types';
 import { format, subDays } from 'date-fns';
@@ -97,6 +97,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null }>>({});
+  const [dayDataLoading, setDayDataLoading] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -172,7 +174,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       limit(90),
     );
   }, [firestore, selectedFocusStudentId]);
-  const { data: focusStudentTrendRaw } = useCollection<DailyStudentStat>(focusStudentTrendQuery, {
+  const { data: focusStudentTrendRaw, isLoading: trendLoading } = useCollection<DailyStudentStat>(focusStudentTrendQuery, {
     enabled: isActive && !!selectedFocusStudentId,
   });
 
@@ -810,6 +812,107 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [focusStudentTrendRaw, progressList, selectedFocusStudentId, today]);
 
+  // ── 선택 학생 세션 데이터 로드 (시작시간 분포·외출시간 산출용) ──
+  useEffect(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !today) {
+      setFocusDayData({});
+      return;
+    }
+    let disposed = false;
+    const loadDayData = async () => {
+      setDayDataLoading(true);
+      try {
+        const last14Days = Array.from({ length: 14 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd'));
+        const result: Record<string, { awayMinutes: number; startHour: number | null }> = {};
+        await Promise.all(last14Days.map(async (dateKey) => {
+          try {
+            const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedFocusStudentId, 'days', dateKey, 'sessions');
+            const snap = await getDocs(query(sessionsRef, orderBy('startTime')));
+            if (snap.empty) { result[dateKey] = { awayMinutes: 0, startHour: null }; return; }
+            const sessions = snap.docs.map((d) => {
+              const raw = d.data() as any;
+              return {
+                startTime: (raw.startTime as Timestamp).toDate(),
+                endTime: (raw.endTime as Timestamp).toDate(),
+              };
+            }).sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+            const startHour = sessions[0].startTime.getHours();
+            let awayMinutes = 0;
+            for (let i = 1; i < sessions.length; i++) {
+              const gap = (sessions[i].startTime.getTime() - sessions[i - 1].endTime.getTime()) / 60000;
+              if (gap > 0 && gap < 180) awayMinutes += Math.round(gap);
+            }
+            result[dateKey] = { awayMinutes, startHour };
+          } catch { result[dateKey] = { awayMinutes: 0, startHour: null }; }
+        }));
+        if (!disposed) setFocusDayData(result);
+      } catch { if (!disposed) setFocusDayData({}); }
+      finally { if (!disposed) setDayDataLoading(false); }
+    };
+    loadDayData();
+    return () => { disposed = true; };
+  }, [firestore, centerId, selectedFocusStudentId, today]);
+
+  // ── 4 KPI 그래프 데이터 계산 ──
+
+  // 1) 주간 학습시간 성장률 (최근 6주)
+  const weeklyGrowthData = useMemo(() => {
+    if (!focusStudentTrendRaw || !today) return [];
+    const weeks = Array.from({ length: 6 }, (_, weekIdx) => {
+      const weekEnd = subDays(today, weekIdx * 7);
+      const weekDays = Array.from({ length: 7 }, (_, d) => format(subDays(weekEnd, d), 'yyyy-MM-dd'));
+      const weekData = focusStudentTrendRaw.filter((r) => weekDays.includes(r.dateKey));
+      const totalMinutes = weekData.reduce((sum, r) => sum + (r.totalStudyMinutes || 0), 0);
+      return { label: `${format(subDays(today, (weekIdx + 1) * 7), 'M/d')}~`, totalMinutes };
+    }).reverse();
+    return weeks.map((week, i, arr) => {
+      const growth = i > 0 && arr[i - 1].totalMinutes > 0
+        ? Math.round((week.totalMinutes - arr[i - 1].totalMinutes) / arr[i - 1].totalMinutes * 100) : 0;
+      return { ...week, growth };
+    });
+  }, [focusStudentTrendRaw, today]);
+
+  // 2) 매달 학습시간 성장률 (최근 3개월)
+  const monthlyGrowthData = useMemo(() => {
+    if (!focusStudentTrendRaw || !today) return [];
+    const months = [2, 1, 0].map((offset) => {
+      const monthDate = new Date(today.getFullYear(), today.getMonth() - offset, 1);
+      const monthKey = format(monthDate, 'yyyy-MM');
+      const monthData = focusStudentTrendRaw.filter((r) => r.dateKey.startsWith(monthKey));
+      const avgMinutes = monthData.length > 0
+        ? Math.round(monthData.reduce((s, r) => s + (r.totalStudyMinutes || 0), 0) / monthData.length) : 0;
+      return { label: format(monthDate, 'M월'), avgMinutes, days: monthData.length };
+    });
+    return months.map((m, i, arr) => ({
+      ...m,
+      growth: i > 0 && arr[i - 1].avgMinutes > 0
+        ? Math.round((m.avgMinutes - arr[i - 1].avgMinutes) / arr[i - 1].avgMinutes * 100) : 0,
+    }));
+  }, [focusStudentTrendRaw, today]);
+
+  // 3) 학습 시작시간 분포 리듬 (요일별 평균 학습시간)
+  const rhythmData = useMemo(() => {
+    if (!focusStudentTrendRaw) return [];
+    const DOW = ['월', '화', '수', '목', '금', '토', '일'];
+    const buckets = Array(7).fill(null).map((_, i) => ({ label: DOW[i], total: 0, count: 0 }));
+    focusStudentTrendRaw.forEach((r) => {
+      if (!r.dateKey) return;
+      const dow = (new Date(r.dateKey + 'T12:00:00').getDay() + 6) % 7; // 0=Mon
+      buckets[dow].total += r.totalStudyMinutes || 0;
+      buckets[dow].count += 1;
+    });
+    return buckets.map((b) => ({ label: b.label, avgMinutes: b.count > 0 ? Math.round(b.total / b.count) : 0 }));
+  }, [focusStudentTrendRaw]);
+
+  // 4) 학습 중간 외출시간 추이 (14일)
+  const awayTimeData = useMemo(() => {
+    if (!today) return [];
+    return Array.from({ length: 14 }, (_, i) => {
+      const dateKey = format(subDays(today, 13 - i), 'yyyy-MM-dd');
+      return { date: format(subDays(today, 13 - i), 'M/d'), awayMinutes: focusDayData[dateKey]?.awayMinutes ?? 0 };
+    });
+  }, [focusDayData, today]);
+
   // ── 선택 학생 통합 KPI 계산 ──
   const selectedFocusKpi = useMemo(() => {
     if (!selectedFocusStudent) return null;
@@ -1438,17 +1541,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               )}
 
-              {/* ── 핵심 지표 카드 (3×2) ── */}
+              {/* ── 핵심 지표 카드 (2×2) ── */}
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">핵심 지표</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {/* 오늘 학습시간 */}
                   <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Clock className="h-3 w-3 text-blue-500 flex-shrink-0" />
                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">오늘 학습시간</p>
                     </div>
-                    <p className="dashboard-number text-lg text-[#14295F]">
+                    <p className="dashboard-number text-xl text-[#14295F]">
                       {Math.floor((selectedFocusStudent?.studyMinutes ?? 0) / 60)}h {(selectedFocusStudent?.studyMinutes ?? 0) % 60}m
                     </p>
                     {selectedFocusKpi && selectedFocusKpi.avgMinutes > 0 && (
@@ -1472,7 +1575,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       )} />
                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">계획 완료율</p>
                     </div>
-                    <p className={cn('dashboard-number text-lg',
+                    <p className={cn('dashboard-number text-xl',
                       (selectedFocusStudent?.completion ?? 0) >= 80 ? 'text-emerald-700'
                       : (selectedFocusStudent?.completion ?? 0) >= 60 ? 'text-amber-700'
                       : 'text-rose-700'
@@ -1482,19 +1585,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <p className="text-[9px] font-bold text-slate-400 mt-0.5">
                       {(selectedFocusStudent?.completion ?? 0) >= 80 ? '목표 달성' : (selectedFocusStudent?.completion ?? 0) >= 60 ? '부분 달성' : '미달성'}
                     </p>
-                  </div>
-
-                  {/* 집중 스탯 */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Zap className="h-3 w-3 text-violet-500 flex-shrink-0" />
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">집중 스탯</p>
-                    </div>
-                    <p className="dashboard-number text-lg text-[#14295F]">
-                      {Math.round(selectedFocusProgress?.stats?.focus ?? 0)}
-                      <span className="text-xs text-slate-400 font-bold">/100</span>
-                    </p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">몰입 시간 누적</p>
                   </div>
 
                   {/* 학습 성장률 */}
@@ -1508,9 +1598,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         ? <ArrowUpRight className="h-3 w-3 text-emerald-500 flex-shrink-0" />
                         : <ArrowDownRight className="h-3 w-3 text-rose-500 flex-shrink-0" />
                       }
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">학습 성장률</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">오늘 학습 성장률</p>
                     </div>
-                    <p className={cn('dashboard-number text-lg',
+                    <p className={cn('dashboard-number text-xl',
                       (selectedFocusStat?.studyTimeGrowthRate ?? 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'
                     )}>
                       {(selectedFocusStat?.studyTimeGrowthRate ?? 0) >= 0 ? '+' : ''}
@@ -1533,7 +1623,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       )} />
                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">벌점 현황</p>
                     </div>
-                    <p className={cn('dashboard-number text-lg',
+                    <p className={cn('dashboard-number text-xl',
                       (selectedFocusProgress?.penaltyPoints ?? 0) >= 10 ? 'text-rose-700'
                       : (selectedFocusProgress?.penaltyPoints ?? 0) >= 5 ? 'text-amber-700'
                       : 'text-[#14295F]'
@@ -1546,204 +1636,156 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         : '정상 범위'}
                     </p>
                   </div>
-
-                  {/* 꾸준함 스탯 */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Activity className="h-3 w-3 text-teal-500 flex-shrink-0" />
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">꾸준함 스탯</p>
-                    </div>
-                    <p className="dashboard-number text-lg text-[#14295F]">
-                      {Math.round(selectedFocusProgress?.stats?.consistency ?? 0)}
-                      <span className="text-xs text-slate-400 font-bold">/100</span>
-                    </p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">학습 규칙성</p>
-                  </div>
                 </div>
               </div>
 
-              {/* ── 점수 구성 분석 ── */}
-              {selectedFocusBreakdown && (
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">점수 구성 분석</p>
-                  <p className="text-[10px] font-bold text-slate-400 mb-3">
-                    집중스탯 30% · 완료율 25% · 학습시간 20% · 성장률 15% · 벌점보정 10%
-                  </p>
-                  <div className="space-y-2.5">
-                    {[
-                      { label: '집중 스탯', raw: selectedFocusBreakdown.focusStat, weighted: selectedFocusBreakdown.weighted.focus, max: 30, color: 'bg-blue-500' },
-                      { label: '계획 완료율', raw: selectedFocusBreakdown.completionRate, weighted: selectedFocusBreakdown.weighted.completion, max: 25, color: 'bg-emerald-500' },
-                      { label: '학습시간', raw: selectedFocusBreakdown.studyScore, weighted: selectedFocusBreakdown.weighted.study, max: 20, color: 'bg-violet-500' },
-                      { label: '성장률', raw: selectedFocusBreakdown.growthScore, weighted: selectedFocusBreakdown.weighted.growth, max: 15, color: 'bg-amber-500' },
-                      { label: '벌점 보정', raw: selectedFocusBreakdown.penaltyScore, weighted: selectedFocusBreakdown.weighted.penalty, max: 10, color: 'bg-rose-400' },
-                    ].map((item) => (
-                      <div key={item.label}>
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-[10px] font-black text-slate-600">{item.label}</p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-slate-400">원점수 {Math.round(item.raw)}점</span>
-                            <span className="text-[10px] font-black text-slate-700">→ {item.weighted} / {item.max}점</span>
-                          </div>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className={cn('h-full rounded-full transition-all', item.color)}
-                            style={{ width: `${Math.min(100, (item.weighted / item.max) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+              {/* ── 4 KPI 그래프 ── */}
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">집중도 KPI 그래프</p>
+
+                {/* 1. 주간 학습시간 성장률 */}
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간 성장률</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">막대: 주간 누적 학습분 · 선: 전주 대비 성장률</p>
+                    </div>
+                    {weeklyGrowthData.length > 0 && (
+                      <span className={cn('text-xs font-black',
+                        (weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                      )}>
+                        이번 주 {(weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0}%
+                      </span>
+                    )}
+                  </div>
+                  {trendLoading ? (
+                    <div className="h-[160px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
+                  ) : weeklyGrowthData.every((w) => w.totalMinutes === 0) ? (
+                    <div className="h-[160px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={160}>
+                      <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 36, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#10b981' }} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => name === 'totalMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '주간 학습'] : [`${v >= 0 ? '+' : ''}${v}%`, '성장률']}
+                          contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '11px', fontWeight: 700 }}
+                        />
+                        <Bar yAxisId="min" dataKey="totalMinutes" fill="#c7d2fe" radius={[5, 5, 0, 0]} />
+                        <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
+                  <div className="mt-2 flex items-center gap-4 justify-end">
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded bg-indigo-200" /><p className="text-[9px] font-bold text-slate-400">누적 학습시간</p></div>
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /><p className="text-[9px] font-bold text-slate-400">성장률</p></div>
                   </div>
                 </div>
-              )}
 
-              {/* ── 최근 7일 추이 그래프 ── */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 7일 추이</p>
-                  {selectedFocusKpi && (
-                    <div className="flex items-center gap-1">
-                      {selectedFocusKpi.trendDirection === 'up' && (
-                        <span className="text-[10px] font-black text-emerald-600 flex items-center gap-0.5">
-                          <TrendingUp className="h-3 w-3" /> 상승 중
-                        </span>
-                      )}
-                      {selectedFocusKpi.trendDirection === 'down' && (
-                        <span className="text-[10px] font-black text-rose-600 flex items-center gap-0.5">
-                          <TrendingDown className="h-3 w-3" /> 하락 중
-                        </span>
-                      )}
-                      {selectedFocusKpi.trendDirection === 'stable' && (
-                        <span className="text-[10px] font-black text-slate-500">안정적</span>
-                      )}
+                {/* 2. 매달 학습시간 성장률 */}
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">매달 학습시간 성장률</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">막대: 월 평균 일일 학습분 · 선: 전월 대비 성장률</p>
                     </div>
+                    {monthlyGrowthData.length > 0 && (
+                      <span className={cn('text-xs font-black',
+                        (monthlyGrowthData[monthlyGrowthData.length - 1]?.growth ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                      )}>
+                        이번 달 {(monthlyGrowthData[monthlyGrowthData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{monthlyGrowthData[monthlyGrowthData.length - 1]?.growth ?? 0}%
+                      </span>
+                    )}
+                  </div>
+                  {trendLoading ? (
+                    <div className="h-[140px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
+                  ) : monthlyGrowthData.every((m) => m.avgMinutes === 0) ? (
+                    <div className="h-[140px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={140}>
+                      <ComposedChart data={monthlyGrowthData} margin={{ top: 8, right: 36, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#f59e0b' }} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => name === 'avgMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '일 평균'] : [`${v >= 0 ? '+' : ''}${v}%`, '전월 대비']}
+                          contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '11px', fontWeight: 700 }}
+                        />
+                        <Bar yAxisId="min" dataKey="avgMinutes" fill="#bae6fd" radius={[5, 5, 0, 0]} barSize={40} />
+                        <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
+                  <div className="mt-2 flex items-center gap-4 justify-end">
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded bg-sky-200" /><p className="text-[9px] font-bold text-slate-400">일 평균 학습시간</p></div>
+                    <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-amber-400" /><p className="text-[9px] font-bold text-slate-400">전월 대비 성장률</p></div>
+                  </div>
+                </div>
+
+                {/* 3. 학습 시작시간 분포 리듬 (요일별) */}
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <div className="mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 시작시간 분포 리듬</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">요일별 평균 학습시간 — 균일할수록 루틴이 안정적입니다</p>
+                  </div>
+                  {trendLoading ? (
+                    <div className="h-[130px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
+                  ) : rhythmData.every((d) => d.avgMinutes === 0) ? (
+                    <div className="h-[130px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={130}>
+                      <ComposedChart data={rhythmData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 800, fill: '#475569' }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
+                        <Tooltip
+                          formatter={(v: number) => [`${Math.floor(v / 60)}h ${v % 60}m`, '평균 학습']}
+                          contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '11px', fontWeight: 700 }}
+                        />
+                        <Bar dataKey="avgMinutes" radius={[5, 5, 0, 0]}
+                          fill="#a5f3fc"
+                          label={{ position: 'top', fontSize: 8, fontWeight: 700, fill: '#64748b', formatter: (v: number) => v > 0 ? `${Math.round(v / 60)}h` : '' }}
+                        />
+                        <Line type="monotone" dataKey="avgMinutes" stroke="#0891b2" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                      </ComposedChart>
+                    </ResponsiveContainer>
                   )}
                 </div>
-                {focusStudentTrend.every((d) => d.score === 0) ? (
-                  <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-sm font-bold text-slate-400">
-                    추이 데이터가 없습니다.
+
+                {/* 4. 학습 중간 외출시간 성장률 */}
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 중간 외출시간 추이</p>
+                      <p className="text-[9px] font-bold text-rose-400 mt-0.5">외출시간이 늘어날수록 집중도가 떨어집니다 ↑ 주의</p>
+                    </div>
+                    {dayDataLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />}
                   </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={focusStudentTrend} margin={{ top: 10, right: 36, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                      <YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={24} />
-                      <YAxis yAxisId="minutes" orientation="right" tick={{ fontSize: 10, fontWeight: 700, fill: '#a78bfa' }} tickLine={false} axisLine={false} width={32} />
-                      <Tooltip
-                        formatter={(value: number, name: string) => {
-                          if (name === 'score') return [`${value}점`, '집중도'];
-                          if (name === 'completion') return [`${value}%`, '완료율'];
-                          return [`${value}분`, '학습시간'];
-                        }}
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.10)', fontSize: '11px', fontWeight: 700 }}
-                      />
-                      <Bar yAxisId="minutes" dataKey="minutes" fill="#ede9fe" radius={[4, 4, 0, 0]} name="minutes" />
-                      <Line yAxisId="score" type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 3, fill: '#14295F' }} name="score" />
-                      <Line yAxisId="score" type="monotone" dataKey="completion" stroke="#FF7A16" strokeWidth={2} dot={{ r: 2.5, fill: '#FF7A16' }} strokeDasharray="5 3" name="completion" />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                )}
-                <div className="mt-2 flex items-center gap-4 justify-center">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-[#14295F]" />
-                    <p className="text-[10px] font-bold text-slate-500">집중도</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
-                    <p className="text-[10px] font-bold text-slate-500">완료율</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded bg-violet-200" />
-                    <p className="text-[10px] font-bold text-slate-500">학습시간(분)</p>
-                  </div>
+                  {awayTimeData.every((d) => d.awayMinutes === 0) ? (
+                    <div className="h-[130px] flex flex-col items-center justify-center gap-1 text-xs font-bold text-slate-400">
+                      <p>세션 기록이 없습니다.</p>
+                      <p className="text-[9px] font-bold text-slate-300">6시간 이상 연속 학습 세션부터 외출 데이터가 수집됩니다.</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={130}>
+                      <ComposedChart data={awayTimeData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}m`} />
+                        <Tooltip
+                          formatter={(v: number) => [`${v}분`, '외출시간']}
+                          contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '11px', fontWeight: 700 }}
+                        />
+                        <Bar dataKey="awayMinutes" fill="#fca5a5" radius={[4, 4, 0, 0]} />
+                        <Line type="monotone" dataKey="awayMinutes" stroke="#ef4444" strokeWidth={2} dot={{ r: 3, fill: '#ef4444', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
-
-              {/* ── 행동 패턴 분석 ── */}
-              {selectedFocusKpi && (
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">행동 패턴 분석</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* 집중도 추세 */}
-                    <div className={cn('rounded-xl border p-3',
-                      selectedFocusKpi.trendDirection === 'up' ? 'border-emerald-100 bg-emerald-50/60'
-                      : selectedFocusKpi.trendDirection === 'down' ? 'border-rose-100 bg-rose-50/60'
-                      : 'border-slate-100 bg-slate-50/70'
-                    )}>
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        {selectedFocusKpi.trendDirection === 'up'
-                          ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                          : selectedFocusKpi.trendDirection === 'down'
-                            ? <TrendingDown className="h-3.5 w-3.5 text-rose-500 flex-shrink-0" />
-                            : <Activity className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                        }
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">집중도 추세</p>
-                      </div>
-                      <p className={cn('text-base font-black',
-                        selectedFocusKpi.trendDirection === 'up' ? 'text-emerald-700'
-                        : selectedFocusKpi.trendDirection === 'down' ? 'text-rose-700'
-                        : 'text-slate-700'
-                      )}>
-                        {selectedFocusKpi.trendDirection === 'up' ? '상승 중' : selectedFocusKpi.trendDirection === 'down' ? '하락 중' : '안정적'}
-                      </p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">최근 3일 기준</p>
-                    </div>
-
-                    {/* 주간 성장률 */}
-                    <div className={cn('rounded-xl border p-3',
-                      selectedFocusKpi.weekGrowthRate > 5 ? 'border-blue-100 bg-blue-50/60'
-                      : selectedFocusKpi.weekGrowthRate < -5 ? 'border-amber-100 bg-amber-50/60'
-                      : 'border-slate-100 bg-slate-50/70'
-                    )}>
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">주간 성장률</p>
-                      </div>
-                      <p className={cn('text-base font-black',
-                        selectedFocusKpi.weekGrowthRate > 5 ? 'text-blue-700'
-                        : selectedFocusKpi.weekGrowthRate < -5 ? 'text-amber-700'
-                        : 'text-slate-700'
-                      )}>
-                        {selectedFocusKpi.weekGrowthRate >= 0 ? '+' : ''}{selectedFocusKpi.weekGrowthRate}%
-                      </p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">주 초반 vs 후반 비교</p>
-                    </div>
-
-                    {/* 최고 집중일 */}
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Trophy className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">최고 집중일</p>
-                      </div>
-                      <p className="text-base font-black text-[#14295F]">
-                        {selectedFocusKpi.bestDay?.date ?? '-'}
-                      </p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">
-                        {selectedFocusKpi.bestDay ? `${selectedFocusKpi.bestDay.score}점 기록` : '데이터 없음'}
-                      </p>
-                    </div>
-
-                    {/* 평균 학습 지속시간 */}
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Flame className="h-3.5 w-3.5 text-orange-400 flex-shrink-0" />
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">평균 학습 지속</p>
-                      </div>
-                      <p className="text-base font-black text-[#14295F]">
-                        {selectedFocusKpi.avgMinutes > 0
-                          ? `${Math.floor(selectedFocusKpi.avgMinutes / 60)}h ${selectedFocusKpi.avgMinutes % 60}m`
-                          : '-'}
-                      </p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">
-                        {selectedFocusKpi.maxMinutes > 0
-                          ? `최장 ${Math.floor(selectedFocusKpi.maxMinutes / 60)}h ${selectedFocusKpi.maxMinutes % 60}m`
-                          : '데이터 없음'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* ── 관리자 인사이트 ── */}
               {selectedFocusKpi && selectedFocusKpi.insights.length > 0 && (
