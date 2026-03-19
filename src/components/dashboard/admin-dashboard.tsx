@@ -29,6 +29,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from 'recharts';
 import { 
   Users, 
   TrendingUp, 
@@ -84,6 +93,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
+  const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -150,6 +160,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', yesterdayKey, 'students');
   }, [firestore, centerId, yesterdayKey]);
   const { data: yesterdayStats } = useCollection<DailyStudentStat>(yesterdayStatsQuery, { enabled: isActive });
+
+  const focusStudentTrendQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId) return null;
+    return query(
+      collectionGroup(firestore, 'students'),
+      where('centerId', '==', centerId),
+      where('studentId', '==', selectedFocusStudentId),
+      limit(21),
+    );
+  }, [firestore, centerId, selectedFocusStudentId]);
+  const { data: focusStudentTrendRaw } = useCollection<DailyStudentStat>(focusStudentTrendQuery, {
+    enabled: isActive && !!selectedFocusStudentId,
+  });
 
   // 5. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
@@ -590,11 +613,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const avgGrowthRate = filteredTodayStats.length > 0
       ? Number((filteredTodayStats.reduce((sum, item) => sum + (item.studyTimeGrowthRate || 0), 0) / filteredTodayStats.length).toFixed(2))
       : 0;
-    const avgFocusStat = filteredStudentMembers.length > 0
-      ? Math.round(filteredStudentMembers.reduce((sum, member) => {
-          const progress = progressList.find((p) => p.id === member.id);
-          return sum + (progress?.stats?.focus || 0);
-        }, 0) / filteredStudentMembers.length)
+    const awayDurations = attendanceList
+      .filter((seat) => seat.studentId && targetMemberIds.has(seat.studentId) && (seat.status === 'away' || seat.status === 'break') && !!seat.lastCheckInAt)
+      .map((seat) => Math.max(0, Math.floor((now - seat.lastCheckInAt!.toMillis()) / 60000)));
+    const avgAwayMinutes = awayDurations.length > 0
+      ? Math.round(awayDurations.reduce((sum, value) => sum + value, 0) / awayDurations.length)
       : 0;
     const highPenaltyCount = filteredStudentMembers.filter((member) => {
       const progress = progressList.find((p) => p.id === member.id);
@@ -607,7 +630,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const focusActions: string[] = [];
 
     if (avgCompletion >= 80) focusStrengths.push(`평균 계획 완료율 ${avgCompletion}%로 실행력이 좋습니다.`);
-    if (avgFocusStat >= 75) focusStrengths.push(`집중 스탯 평균 ${avgFocusStat}점으로 몰입 기반이 안정적입니다.`);
+    if (avgAwayMinutes <= 15) focusStrengths.push(`외출 평균시간 ${avgAwayMinutes}분으로 학습 흐름 이탈이 낮습니다.`);
     if (avgGrowthRate >= 0.05) focusStrengths.push('전일 대비 학습 성장률이 상승 흐름입니다.');
     if (avgStudyMinutes < 120 && avgFocusScore >= 75) focusStrengths.push('학습시간이 길지 않아도 집중 품질이 유지되고 있습니다.');
 
@@ -691,7 +714,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         delta: focusDelta,
         completion: avgCompletion,
         avgStudyMinutes,
-        avgFocusStat,
+        avgAwayMinutes,
         avgGrowthRate,
         highPenaltyCount,
         lowCompletionCount,
@@ -703,6 +726,34 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusBottom10,
     };
   }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted]);
+
+  const selectedFocusStudent = useMemo(() => {
+    if (!selectedFocusStudentId || !metrics) return null;
+    return (
+      metrics.focusTop10.find((row) => row.studentId === selectedFocusStudentId)
+      || metrics.focusBottom10.find((row) => row.studentId === selectedFocusStudentId)
+      || null
+    );
+  }, [metrics, selectedFocusStudentId]);
+
+  const focusStudentTrend = useMemo(() => {
+    if (!focusStudentTrendRaw || focusStudentTrendRaw.length === 0) return [];
+    const sorted = [...focusStudentTrendRaw]
+      .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+      .slice(-10);
+
+    return sorted.map((row) => {
+      const progress = progressList?.find((p) => p.id === row.studentId);
+      const score = calculateStudentFocusScore(row, progress);
+      return {
+        date: row.dateKey.slice(5),
+        score,
+        completion: Math.round(row.todayPlanCompletionRate || 0),
+        minutes: Math.round(row.totalStudyMinutes || 0),
+      };
+    });
+  }, [focusStudentTrendRaw, progressList]);
 
   if (!isActive) return null;
 
@@ -854,8 +905,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{Math.floor(metrics.focusKpi.avgStudyMinutes / 60)}h {metrics.focusKpi.avgStudyMinutes % 60}m</p>
                   </div>
                   <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">평균 집중 스탯</p>
-                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{metrics.focusKpi.avgFocusStat}점</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출 평균시간</p>
+                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{metrics.focusKpi.avgAwayMinutes}분</p>
                   </div>
                   <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 성장률</p>
@@ -923,14 +974,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <p className="text-xs font-bold text-slate-500">집계된 학생 데이터가 없습니다.</p>
                   ) : (
                     metrics.focusTop10.map((row, index) => (
-                      <div key={row.studentId} className="grid grid-cols-[30px_1fr_auto] items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-2">
+                      <button
+                        key={row.studentId}
+                        type="button"
+                        onClick={() => setSelectedFocusStudentId(row.studentId)}
+                        className="grid w-full grid-cols-[30px_1fr_auto] items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-2 text-left transition-all hover:border-emerald-300"
+                      >
                         <span className="text-xs font-black text-emerald-700">{index + 1}</span>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
                           <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
                         </div>
                         <span className="dashboard-number text-lg text-emerald-700">{row.score}</span>
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
@@ -946,14 +1002,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <p className="text-xs font-bold text-slate-500">집계된 학생 데이터가 없습니다.</p>
                   ) : (
                     metrics.focusBottom10.map((row, index) => (
-                      <div key={row.studentId} className="grid grid-cols-[30px_1fr_auto] items-center gap-2 rounded-xl border border-rose-100 bg-rose-50/40 px-3 py-2">
+                      <button
+                        key={row.studentId}
+                        type="button"
+                        onClick={() => setSelectedFocusStudentId(row.studentId)}
+                        className="grid w-full grid-cols-[30px_1fr_auto] items-center gap-2 rounded-xl border border-rose-100 bg-rose-50/40 px-3 py-2 text-left transition-all hover:border-rose-300"
+                      >
                         <span className="text-xs font-black text-rose-700">{index + 1}</span>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
                           <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
                         </div>
                         <span className="dashboard-number text-lg text-rose-700">{row.score}</span>
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
@@ -1153,6 +1214,61 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <p className="font-black text-xl tracking-tighter">분석 데이터를 집계하고 있습니다...</p>
         </div>
       )}
+
+      <Dialog open={!!selectedFocusStudentId} onOpenChange={(open) => !open && setSelectedFocusStudentId(null)}>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
+          <div className="bg-[#14295F] p-6 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight">학생 집중도 KPI</DialogTitle>
+              <DialogDescription className="text-white/80 font-bold">
+                {selectedFocusStudent ? `${selectedFocusStudent.name} · ${selectedFocusStudent.className}` : '학생별 집중도 추이를 확인합니다.'}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="bg-white p-5 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 집중도</p>
+                <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{selectedFocusStudent?.score ?? 0}점</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 완료율</p>
+                <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{selectedFocusStudent?.completion ?? 0}%</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 학습시간</p>
+                <p className="dashboard-number mt-1 text-2xl text-[#14295F]">
+                  {Math.floor((selectedFocusStudent?.studyMinutes ?? 0) / 60)}h {(selectedFocusStudent?.studyMinutes ?? 0) % 60}m
+                </p>
+              </div>
+            </div>
+
+            <div className="h-[280px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={focusStudentTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} width={28} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => {
+                      if (name === 'score') return [`${value}점`, '집중도'];
+                      if (name === 'completion') return [`${value}%`, '완료율'];
+                      return [`${value}분`, '학습시간'];
+                    }}
+                  />
+                  <Line type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 3 }} name="score" />
+                  <Line type="monotone" dataKey="completion" stroke="#FF7A16" strokeWidth={2} dot={{ r: 2.5 }} name="completion" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <DialogFooter className="border-t bg-white p-4">
+            <DialogClose asChild>
+              <Button className="h-10 rounded-xl font-black">닫기</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isParentTrustDialogOpen} onOpenChange={setIsParentTrustDialogOpen}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-4xl">
