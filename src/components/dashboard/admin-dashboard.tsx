@@ -913,6 +913,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [focusDayData, today]);
 
+  const hasWeeklyGrowthData = weeklyGrowthData.some((week) => (week.totalMinutes ?? 0) > 0);
+  const hasMonthlyGrowthData = monthlyGrowthData.some((month) => (month.avgMinutes ?? 0) > 0);
+  const hasRhythmData = rhythmData.some((day) => (day.avgMinutes ?? 0) > 0);
+  const todayLearningGrowthPercent = Math.round((selectedFocusStat?.studyTimeGrowthRate ?? 0) * 100);
+  const latestWeeklyLearningGrowthPercent = weeklyGrowthData.length > 0
+    ? (weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0)
+    : 0;
+
   // ── 선택 학생 통합 KPI 계산 ──
   const selectedFocusKpi = useMemo(() => {
     if (!selectedFocusStudent) return null;
@@ -1505,17 +1513,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               {/* 핵심 3대 지표 헤더 요약 */}
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <div className="rounded-xl bg-white/10 p-3">
-                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">오늘 집중도</p>
-                  <p className="dashboard-number text-2xl text-white mt-0.5">{selectedFocusStudent?.score ?? 0}점</p>
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">오늘의 학습 성장도</p>
+                  <p className={cn('dashboard-number text-2xl mt-0.5', todayLearningGrowthPercent >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                    {todayLearningGrowthPercent >= 0 ? '+' : ''}{todayLearningGrowthPercent}%
+                  </p>
                 </div>
                 <div className="rounded-xl bg-white/10 p-3">
-                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">7일 평균</p>
-                  <p className="dashboard-number text-2xl text-white mt-0.5">{selectedFocusKpi?.weekAvgScore ?? 0}점</p>
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">7일 평균 학습시간</p>
+                  <p className="dashboard-number text-2xl text-white mt-0.5">
+                    {Math.floor((selectedFocusKpi?.avgMinutes ?? 0) / 60)}h {(selectedFocusKpi?.avgMinutes ?? 0) % 60}m
+                  </p>
                 </div>
                 <div className="rounded-xl bg-white/10 p-3">
-                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">주간 성장률</p>
-                  <p className={cn('dashboard-number text-2xl mt-0.5', (selectedFocusKpi?.weekGrowthRate ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
-                    {(selectedFocusKpi?.weekGrowthRate ?? 0) >= 0 ? '+' : ''}{selectedFocusKpi?.weekGrowthRate ?? 0}%
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">주간 학습 성장도</p>
+                  <p className={cn('dashboard-number text-2xl mt-0.5', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                    {latestWeeklyLearningGrowthPercent >= 0 ? '+' : ''}{latestWeeklyLearningGrowthPercent}%
                   </p>
                 </div>
               </div>
@@ -1660,7 +1672,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   {trendLoading ? (
                     <div className="h-[160px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
-                  ) : weeklyGrowthData.every((w) => w.totalMinutes === 0) ? (
+                  ) : !hasWeeklyGrowthData ? (
                     <div className="h-[160px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={160}>
@@ -1701,7 +1713,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   {trendLoading ? (
                     <div className="h-[140px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
-                  ) : monthlyGrowthData.every((m) => m.avgMinutes === 0) ? (
+                  ) : !hasMonthlyGrowthData ? (
                     <div className="h-[140px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={140}>
@@ -1733,7 +1745,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   {trendLoading ? (
                     <div className="h-[130px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
-                  ) : rhythmData.every((d) => d.avgMinutes === 0) ? (
+                  ) : !hasRhythmData ? (
                     <div className="h-[130px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={130}>
