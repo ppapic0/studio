@@ -17,15 +17,15 @@ import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
 import { marketingContent } from '@/lib/marketing-content';
 
-/* ─────────────────────────────────────────────────
-   Static data — defined here, not in marketing-content
+/* ?????????????????????????????????????????????????
+   Static data ??defined here, not in marketing-content
    to keep this page self-contained and maintainable
-───────────────────────────────────────────────── */
+????????????????????????????????????????????????? */
 
 const career = [
-  { label: '관리형 독서실 원장', detail: '분당·판교 관리형 스터디센터 운영 경험' },
-  { label: '국어 수업 다수 경력', detail: '수능 국어 개인 지도 경험' },
-  { label: '원장 본인 국어 백분위 99', detail: '2024학년도 수능 실전 기록' },
+  { label: '愿由ы삎 ?낆꽌???먯옣', detail: '遺꾨떦쨌?먭탳 愿由ы삎 ?ㅽ꽣?붿꽱???댁쁺 寃쏀뿕' },
+  { label: '援?뼱 ?섏뾽 ?ㅼ닔 寃쎈젰', detail: '?섎뒫 援?뼱 媛쒖씤 吏??寃쏀뿕' },
+  { label: '?먯옣 蹂몄씤 援?뼱 諛깅텇??99', detail: '2024?숇뀈???섎뒫 ?ㅼ쟾 湲곕줉' },
 ];
 
 const results = [
@@ -39,44 +39,44 @@ const results = [
 const methods = [
   {
     icon: BookOpen,
-    title: '읽는 방식 정리',
-    body: '지문 구조를 빠르게 잡고 핵심 개념만 남기도록 읽는 기준을 세웁니다.',
+    title: '?쎈뒗 諛⑹떇 ?뺣━',
+    body: '吏臾?援ъ“瑜?鍮좊Ⅴ寃??↔퀬 ?듭떖 媛쒕뀗留??④린?꾨줉 ?쎈뒗 湲곗????몄썎?덈떎.',
   },
   {
     icon: Target,
-    title: '선지 판단 기준 정리',
-    body: '정답 근거와 오답 함정을 분리해 선지 판단 속도와 정확도를 올립니다.',
+    title: '?좎? ?먮떒 湲곗? ?뺣━',
+    body: '?뺣떟 洹쇨굅? ?ㅻ떟 ?⑥젙??遺꾨━???좎? ?먮떒 ?띾룄? ?뺥솗?꾨? ?щ┰?덈떎.',
   },
   {
     icon: Users,
-    title: '학생별 약점 보완',
-    body: '학생마다 다른 약점을 진단해 필요한 포인트만 집중 보완합니다.',
+    title: '?숈깮蹂??쎌젏 蹂댁셿',
+    body: '?숈깮留덈떎 ?ㅻⅨ ?쎌젏??吏꾨떒???꾩슂???ъ씤?몃쭔 吏묒쨷 蹂댁셿?⑸땲??',
   },
   {
     icon: Layers,
-    title: '자료 기반 수업',
-    body: '원장 제작 자료로 수업과 복습 기준을 하나로 맞춥니다.',
+    title: '?먮즺 湲곕컲 ?섏뾽',
+    body: '?먯옣 ?쒖옉 ?먮즺濡??섏뾽怨?蹂듭뒿 湲곗????섎굹濡?留욎땅?덈떎.',
   },
 ];
 
 const materialPreviews = [
   {
-    label: '독서 지문 분석 자료',
-    tag: '지문 구조 해설',
-    desc: '단락별 핵심 정보와 연결 구조를 정리한 해설 자료입니다.',
-    focus: '구조와 출제 포인트를 한 장에서 확인',
+    label: '?낆꽌 吏臾?遺꾩꽍 ?먮즺',
+    tag: '吏臾?援ъ“ ?댁꽕',
+    desc: '?⑤씫蹂??듭떖 ?뺣낫? ?곌껐 援ъ“瑜??뺣━???댁꽕 ?먮즺?낅땲??',
+    focus: '援ъ“? 異쒖젣 ?ъ씤?몃? ???μ뿉???뺤씤',
   },
   {
-    label: '당해년도 수능 선별 기출집',
-    tag: '수능 기출 선별',
-    desc: '당해년도 수능 경향에 맞춰 선별한 기출 문항 해설 자료입니다.',
-    focus: '핵심 기출만 압축해 실전 기준 정리',
+    label: '?뱁빐?꾨룄 ?섎뒫 ?좊퀎 湲곗텧吏?,
+    tag: '?섎뒫 湲곗텧 ?좊퀎',
+    desc: '?뱁빐?꾨룄 ?섎뒫 寃쏀뼢??留욎떠 ?좊퀎??湲곗텧 臾명빆 ?댁꽕 ?먮즺?낅땲??',
+    focus: '?듭떖 湲곗텧留??뺤텞???ㅼ쟾 湲곗? ?뺣━',
   },
   {
-    label: '사설 모의고사 해설자료',
-    tag: '사설 모의 해설',
-    desc: '주요 사설 모의고사 문항의 사고 과정과 오답 포인트를 정리합니다.',
-    focus: '실전 감각과 시간 운영까지 함께 점검',
+    label: '?ъ꽕 紐⑥쓽怨좎궗 ?댁꽕?먮즺',
+    tag: '?ъ꽕 紐⑥쓽 ?댁꽕',
+    desc: '二쇱슂 ?ъ꽕 紐⑥쓽怨좎궗 臾명빆???ш퀬 怨쇱젙怨??ㅻ떟 ?ъ씤?몃? ?뺣━?⑸땲??',
+    focus: '?ㅼ쟾 媛먭컖怨??쒓컙 ?댁쁺源뚯? ?④퍡 ?먭?',
   },
 ];
 
@@ -85,36 +85,36 @@ const koreanMaterialPreviewImagePath = '/materials/2026-korean-nonfiction-2passa
 
 const scoreProofCards = [
   {
-    phase: '6월 모의평가',
-    result: '국어 3등급',
-    detail: '백분위 82',
+    phase: '6??紐⑥쓽?됯?',
+    result: '援?뼱 3?깃툒',
+    detail: '諛깅텇??82',
     image: '/marketing/proof/june-mock-redacted.jpg',
   },
   {
-    phase: '9월 모의평가',
-    result: '국어 1등급',
-    detail: '백분위 96',
+    phase: '9??紐⑥쓽?됯?',
+    result: '援?뼱 1?깃툒',
+    detail: '諛깅텇??96',
     image: '/marketing/proof/september-mock-redacted.jpg',
   },
   {
-    phase: '수능 본시험',
-    result: '국어 백분위 99',
-    detail: '실제 성적표 기반',
+    phase: '?섎뒫 蹂몄떆??,
+    result: '援?뼱 諛깅텇??99',
+    detail: '?ㅼ젣 ?깆쟻??湲곕컲',
     image: '/marketing/proof/csat-score-redacted.jpg',
   },
 ];
 
 const kakaoFeedbackCards = [
   {
-    label: '국영수 합산 전교 1등 사례',
-    summary: '2025 고2 6월 · 동백고',
-    detail: '전과목 밸런스 코칭',
+    label: '援?쁺???⑹궛 ?꾧탳 1???щ?',
+    summary: '2025 怨? 6??쨌 ?숇갚怨?,
+    detail: '?꾧낵紐?諛몃윴??肄붿묶',
     image: '/marketing/reviews/kakao-feedback-1-redacted.jpg',
     showFull: false,
   },
   {
-    label: '문항 질의응답',
-    summary: '시험 후 해설 대화',
+    label: '臾명빆 吏덉쓽?묐떟',
+    summary: '?쒗뿕 ???댁꽕 ???,
     image: '/marketing/reviews/kakao-feedback-3-redacted.jpg',
     showFull: true,
   },
@@ -122,20 +122,20 @@ const kakaoFeedbackCards = [
 
 const studentFits = [
   {
-    title: '문제를 많이 풀어도 성적이 잘 안 오르는 학생',
-    body: '풀이량보다 먼저, 읽는 방식과 판단 기준을 점검해야 하는 경우가 많습니다.',
+    title: '臾몄젣瑜?留롮씠 ??대룄 ?깆쟻???????ㅻⅤ???숈깮',
+    body: '??대웾蹂대떎 癒쇱?, ?쎈뒗 諛⑹떇怨??먮떒 湲곗????먭??댁빞 ?섎뒗 寃쎌슦媛 留롮뒿?덈떎.',
   },
   {
-    title: '국어를 감으로 풀고 있는 학생',
-    body: '맞고 틀리고의 이유를 분명하게 설명할 수 있어야 성적이 안정됩니다.',
+    title: '援?뼱瑜?媛먯쑝濡??怨??덈뒗 ?숈깮',
+    body: '留욊퀬 ?由ш퀬???댁쑀瑜?遺꾨챸?섍쾶 ?ㅻ챸?????덉뼱???깆쟻???덉젙?⑸땲??',
   },
   {
-    title: '재학생 · N수생 모두',
-    body: '현재 위치에 따라 필요한 방식은 달라집니다. 학생 상황에 맞게 수업 방향을 잡습니다.',
+    title: '?ы븰??쨌 N?섏깮 紐⑤몢',
+    body: '?꾩옱 ?꾩튂???곕씪 ?꾩슂??諛⑹떇? ?щ씪吏묐땲?? ?숈깮 ?곹솴??留욊쾶 ?섏뾽 諛⑺뼢???≪뒿?덈떎.',
   },
   {
-    title: '관리와 수업을 함께 가져가고 싶은 학생',
-    body: '스터디센터 운영과 함께 연결해 더 안정적인 학습 흐름을 만들 수 있습니다.',
+    title: '愿由ъ? ?섏뾽???④퍡 媛?멸?怨??띠? ?숈깮',
+    body: '?ㅽ꽣?붿꽱???댁쁺怨??④퍡 ?곌껐?????덉젙?곸씤 ?숈뒿 ?먮쫫??留뚮뱾 ???덉뒿?덈떎.',
   },
 ];
 
@@ -145,18 +145,18 @@ const contactItems = [
   { label: 'HOURS', value: marketingContent.consult.hoursLine },
 ];
 
-/* ─────────────────────────────────────────────────
+/* ?????????????????????????????????????????????????
    Page
-───────────────────────────────────────────────── */
+????????????????????????????????????????????????? */
 
 export default function ClassPage() {
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           1. HERO
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <section
         className="on-dark relative flex min-h-[92svh] items-center overflow-hidden"
         style={{ background: 'linear-gradient(145deg, #080f28 0%, #0d1d47 50%, #0b1631 100%)' }}
@@ -170,38 +170,38 @@ export default function ClassPage() {
         <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_0.82fr] lg:items-center lg:gap-16 lg:px-8 lg:py-24">
           {/* Left */}
           <div className="space-y-8">
-            <span className="eyebrow-badge-light">원장 직강 · 수능 국어</span>
+            <span className="eyebrow-badge-light">?먯옣 吏곴컯 쨌 ?섎뒫 援?뼱</span>
 
             <div className="space-y-6">
               <h1 className="font-aggro-display break-keep text-[clamp(2.6rem,5.2vw,4.2rem)] font-black leading-[1.06] text-white">
-                국어는 감이 아니라,
+                援?뼱??媛먯씠 ?꾨땲??
                 <br />
-                <span className="text-[#FF7A16]">근거와 구조</span>로
+                <span className="text-[#FF7A16]">洹쇨굅? 援ъ“</span>濡?
                 <br />
-                쌓입니다
+                ?볦엯?덈떎
               </h1>
               <p className="max-w-[440px] break-keep text-[15.5px] font-semibold leading-[1.82] text-white/85">
-                원장 직강으로 진행합니다.
-                직접 만든 해설 자료와 수업 자료를 바탕으로
-                읽는 방식, 선지 판단 기준, 적용 흐름까지 함께 잡아갑니다.
+                ?먯옣 吏곴컯?쇰줈 吏꾪뻾?⑸땲??
+                吏곸젒 留뚮뱺 ?댁꽕 ?먮즺? ?섏뾽 ?먮즺瑜?諛뷀깢?쇰줈
+                ?쎈뒗 諛⑹떇, ?좎? ?먮떒 湲곗?, ?곸슜 ?먮쫫源뚯? ?④퍡 ?≪븘媛묐땲??
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <a href="#class-consult" className="premium-cta premium-cta-primary h-12 px-7 text-[14px]">
-                수업 상담 신청
+                ?섏뾽 ?곷떞 ?좎껌
               </a>
               <a href="#materials" className="premium-cta premium-cta-ghost h-12 px-7 text-[14px]">
-                수업자료 미리보기
+                ?섏뾽?먮즺 誘몃━蹂닿린
               </a>
             </div>
 
             <p className="text-[12.5px] font-bold text-white/50">
-              2026학년도 · 고려대 2명 포함 주요 대학 합격
+              2026?숇뀈??쨌 怨좊젮? 2紐??ы븿 二쇱슂 ????⑷꺽
             </p>
           </div>
 
-          {/* Right — credential card */}
+          {/* Right ??credential card */}
           <div className="hidden lg:block">
             <div
               className="rounded-[1.6rem] border p-8 space-y-6"
@@ -213,7 +213,7 @@ export default function ClassPage() {
               }}
             >
               <p className="text-[10.5px] font-black tracking-[0.22em] text-[#FFB273] uppercase">
-                2026 성과 · 수업 신뢰도
+                2026 ?깃낵 쨌 ?섏뾽 ?좊ː??
               </p>
 
               {/* result grid */}
@@ -229,13 +229,13 @@ export default function ClassPage() {
                 ))}
                 <div className="rounded-xl border border-[#FF7A16]/22 bg-[#FF7A16]/8 px-4 py-3">
                   <p className="text-[1.4rem] font-black leading-none text-[#FF9848]">99</p>
-                  <p className="mt-1.5 text-[11.5px] font-semibold text-[#FF9848]/70">원장 국어 백분위</p>
+                  <p className="mt-1.5 text-[11.5px] font-semibold text-[#FF9848]/70">?먯옣 援?뼱 諛깅텇??/p>
                 </div>
               </div>
 
               {/* highlights */}
               <div className="space-y-2.5 border-t border-white/8 pt-5">
-                {['원장 직강', '직접 제작 해설 자료', '학생별 맞춤 보완'].map((item) => (
+                {['?먯옣 吏곴컯', '吏곸젒 ?쒖옉 ?댁꽕 ?먮즺', '?숈깮蹂?留욎땄 蹂댁셿'].map((item) => (
                   <div key={item} className="flex items-center gap-2.5">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-[#FF9848]" />
                     <span className="text-[13.5px] font-semibold text-white/90">{item}</span>
@@ -247,43 +247,43 @@ export default function ClassPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           1.5 TAGLINE QUOTE
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section className="py-16 sm:py-20 bg-white">
           <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
             <div className="border-l-[5px] border-[#14295F] pl-6 py-1">
               <p className="break-keep text-[clamp(1.55rem,3.2vw,2.15rem)] font-black leading-[1.45] text-[#14295F]">
-                공부는 방향이 중요합니다.
+                怨듬???諛⑺뼢??以묒슂?⑸땲??
                 <br />
-                성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
+                ?깆옣??湲? <span className="text-[#FF7A16]">?몃옓</span>?먯꽌 ?쒖옉?⑸땲??
               </p>
             </div>
           </div>
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           2. INTRO
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section className="py-20 sm:py-28" style={{ background: '#f4f7ff' }}>
           <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-            <span className="eyebrow-badge">수업 소개</span>
+            <span className="eyebrow-badge">?섏뾽 ?뚭컻</span>
             <h2 className="mt-5 break-keep text-[clamp(1.75rem,3.6vw,2.4rem)] font-black leading-[1.12] text-[#14295F]">
-              국어 수업은 이렇게 진행됩니다
+              援?뼱 ?섏뾽? ?대젃寃?吏꾪뻾?⑸땲??
             </h2>
             <p className="mx-auto mt-6 max-w-[560px] break-keep text-[15.5px] font-semibold leading-[1.88] text-[#334e6a]">
-              단순 반복이 아니라 기준을 세우는 수업입니다.
-              읽기 구조, 선지 판단, 약점 보완을 짧고 명확하게 훈련합니다.
+              ?⑥닚 諛섎났???꾨땲??湲곗????몄슦???섏뾽?낅땲??
+              ?쎄린 援ъ“, ?좎? ?먮떒, ?쎌젏 蹂댁셿??吏㏐퀬 紐낇솗?섍쾶 ?덈젴?⑸땲??
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               {[
-                { icon: BookOpen, text: '읽기 구조 확립' },
-                { icon: Target, text: '판단 기준 정리' },
-                { icon: GraduationCap, text: '학생별 보완' },
+                { icon: BookOpen, text: '?쎄린 援ъ“ ?뺣┰' },
+                { icon: Target, text: '?먮떒 湲곗? ?뺣━' },
+                { icon: GraduationCap, text: '?숈깮蹂?蹂댁셿' },
               ].map(({ icon: Icon, text }) => (
                 <div
                   key={text}
@@ -298,28 +298,27 @@ export default function ClassPage() {
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           3. DIRECTOR
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section className="py-20 sm:py-28 bg-white">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20">
               {/* Left */}
               <div>
-                <span className="eyebrow-badge">원장 직강</span>
-                <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-                  원장이 직접 가르칩니다
+                <span className="eyebrow-badge">?먯옣 吏곴컯</span>
+                <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">원장이 직접 수업합니다
                 </h2>
                 <p className="mt-5 break-keep text-[15.5px] font-semibold leading-[1.9] text-[#334e6a]">
-                  수업의 방향, 자료의 밀도, 학생 피드백의 흐름까지
-                  모두 원장이 직접 설계하고 진행합니다.
-                  겉으로만 많은 설명이 아니라, 실제 성적 변화로 이어질 수 있도록
-                  수업의 기준을 분명하게 세웁니다.
+                  ?섏뾽??諛⑺뼢, ?먮즺??諛?? ?숈깮 ?쇰뱶諛깆쓽 ?먮쫫源뚯?
+                  紐⑤몢 ?먯옣??吏곸젒 ?ㅺ퀎?섍퀬 吏꾪뻾?⑸땲??
+                  寃됱쑝濡쒕쭔 留롮? ?ㅻ챸???꾨땲?? ?ㅼ젣 ?깆쟻 蹂?붾줈 ?댁뼱吏????덈룄濡?
+                  ?섏뾽??湲곗???遺꾨챸?섍쾶 ?몄썎?덈떎.
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-2">
-                  {['직강', '직접 제작 자료', '학생별 보완'].map((tag) => (
+                  {['吏곴컯', '吏곸젒 ?쒖옉 ?먮즺', '?숈깮蹂?蹂댁셿'].map((tag) => (
                     <span
                       key={tag}
                       className="rounded-full border border-[#14295F]/14 bg-[#14295F]/5 px-4 py-1.5 text-[12.5px] font-black text-[#14295F]"
@@ -330,7 +329,7 @@ export default function ClassPage() {
                 </div>
               </div>
 
-              {/* Right — highlights */}
+              {/* Right ??highlights */}
               <div className="space-y-3">
                 {marketingContent.director.highlights.map((highlight) => (
                   <div
@@ -349,21 +348,20 @@ export default function ClassPage() {
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           4. CAREER
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section className="py-20 sm:py-28" style={{ background: 'linear-gradient(180deg, #f4f7ff 0%, #ffffff 100%)' }}>
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
-              <span className="eyebrow-badge">경력 · 실적</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-                경력은 수업의 기준을 만듭니다
+              <span className="eyebrow-badge">寃쎈젰 쨌 ?ㅼ쟻</span>
+              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">원장이 직접 수업합니다
               </h2>
               <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.88] text-[#334e6a]">
-                학생을 오래 봐온 경험은
-                어떤 지점에서 성적이 멈추고, 어디서부터 다시 올라가는지를
-                더 정확하게 판단하게 합니다.
+                ?숈깮???ㅻ옒 遊먯삩 寃쏀뿕?
+                ?대뼡 吏?먯뿉???깆쟻??硫덉텛怨? ?대뵒?쒕????ㅼ떆 ?щ씪媛?붿?瑜?
+                ???뺥솗?섍쾶 ?먮떒?섍쾶 ?⑸땲??
               </p>
             </div>
 
@@ -386,7 +384,7 @@ export default function ClassPage() {
                 style={{ boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06), 0 8px 24px -4px rgba(20,41,95,0.07)' }}
               >
                 <p className="mb-5 text-[10.5px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">
-                  2026학년도 합격
+                  2026?숇뀈???⑷꺽
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex lg:flex-wrap lg:gap-4">
                   {results.map((r) => (
@@ -404,18 +402,18 @@ export default function ClassPage() {
               style={{ boxShadow: '0 2px 8px -2px rgba(20,41,95,0.06), 0 8px 24px -4px rgba(20,41,95,0.07)' }}
             >
               <p className="text-[10.5px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">
-                성적 상승 사례
+                ?깆쟻 ?곸듅 ?щ?
               </p>
               <h3 className="mt-3 break-keep text-[1.35rem] font-black leading-[1.3] text-[#14295F]">
-                6월 3등급에서 수능 백분위 99까지
+                6??3?깃툒?먯꽌 ?섎뒫 諛깅텇??99源뚯?
               </h3>
               <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.74] text-[#445f7e]">
-                동일 학생의 6월 모의평가, 9월 모의평가, 수능 성적표를 기준으로 한 실제 상승 흐름입니다.
-                개인정보 보호를 위해 이름과 학교 정보는 가림 처리했습니다.
+                ?숈씪 ?숈깮??6??紐⑥쓽?됯?, 9??紐⑥쓽?됯?, ?섎뒫 ?깆쟻?쒕? 湲곗??쇰줈 ???ㅼ젣 ?곸듅 ?먮쫫?낅땲??
+                媛쒖씤?뺣낫 蹂댄샇瑜??꾪빐 ?대쫫怨??숆탳 ?뺣낫??媛由?泥섎━?덉뒿?덈떎.
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {['6월 3등급', '9월 1등급', '수능 백분위 99'].map((chip) => (
+                {['6??3?깃툒', '9??1?깃툒', '?섎뒫 諛깅텇??99'].map((chip) => (
                   <span
                     key={chip}
                     className="rounded-full border border-[#14295F]/10 bg-[#F3F7FF] px-3 py-1.5 text-[12px] font-black text-[#14295F]"
@@ -447,10 +445,10 @@ export default function ClassPage() {
               <div className="mt-8 rounded-[1.1rem] border border-[rgba(20,41,95,0.10)] bg-[#f8fbff] p-4 sm:p-5">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-[12px] font-black uppercase tracking-[0.14em] text-[#FF7A16]">
-                    성적 공개 이후 카카오톡 후기
+                    ?깆쟻 怨듦컻 ?댄썑 移댁뭅?ㅽ넚 ?꾧린
                   </p>
                   <span className="rounded-full border border-[#14295F]/12 bg-white px-2.5 py-1 text-[11px] font-black text-[#14295F]/75">
-                    이름 익명 처리
+                    ?대쫫 ?듬챸 泥섎━
                   </span>
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
@@ -478,25 +476,22 @@ export default function ClassPage() {
             </article>
 
             <p className="mx-auto mt-12 max-w-xl text-center break-keep text-[15px] font-semibold leading-[1.88] text-[#334e6a]">
-              결과는 한 번의 운이 아니라,<br />
-              누적된 수업 경험과 정확한 피드백 구조에서 나옵니다.
+              寃곌낵????踰덉쓽 ?댁씠 ?꾨땲??<br />
+              ?꾩쟻???섏뾽 寃쏀뿕怨??뺥솗???쇰뱶諛?援ъ“?먯꽌 ?섏샃?덈떎.
             </p>
           </div>
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           5. TEACHING METHOD
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section className="py-20 sm:py-28 bg-white">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-xl text-center">
-              <span className="eyebrow-badge">수업 방식</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-                시험장에서 바로 쓰는
-                <br />
-                핵심 기준 4가지
+              <span className="eyebrow-badge">?섏뾽 諛⑹떇</span>
+              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">원장이 직접 수업합니다
               </h2>
             </div>
 
@@ -525,9 +520,9 @@ export default function ClassPage() {
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           6. MATERIALS
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section
           id="materials"
@@ -536,15 +531,15 @@ export default function ClassPage() {
         >
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-xl text-center">
-              <span className="eyebrow-badge-light">수업 자료</span>
+              <span className="eyebrow-badge-light">?섏뾽 ?먮즺</span>
               <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-white">
-                자료의 밀도는
+                ?먮즺??諛?꾨뒗
                 <br />
-                수업의 밀도와 연결됩니다
+                ?섏뾽??諛?꾩? ?곌껐?⑸땲??
               </h2>
               <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.88] text-white/80">
-                트랙의 국어 수업은 직접 제작한 해설 자료와 수업 자료를 바탕으로 진행합니다.
-                설명이 많은 자료보다, 학생이 실제로 이해하고 다시 적용할 수 있는 자료를 지향합니다.
+                ?몃옓??援?뼱 ?섏뾽? 吏곸젒 ?쒖옉???댁꽕 ?먮즺? ?섏뾽 ?먮즺瑜?諛뷀깢?쇰줈 吏꾪뻾?⑸땲??
+                ?ㅻ챸??留롮? ?먮즺蹂대떎, ?숈깮???ㅼ젣濡??댄빐?섍퀬 ?ㅼ떆 ?곸슜?????덈뒗 ?먮즺瑜?吏?ν빀?덈떎.
               </p>
             </div>
 
@@ -577,19 +572,19 @@ export default function ClassPage() {
 
             <div className="mt-12 text-center">
               <p className="mb-6 break-keep text-[14.5px] font-semibold text-white/75">
-                자료를 통해 수업의 기준, 설명의 밀도, 정리 방식까지 미리 확인해보세요.
+                ?먮즺瑜??듯빐 ?섏뾽??湲곗?, ?ㅻ챸??諛?? ?뺣━ 諛⑹떇源뚯? 誘몃━ ?뺤씤?대낫?몄슂.
               </p>
               <div className="mx-auto mb-6 max-w-3xl overflow-hidden rounded-[1.2rem] border border-white/18 bg-white">
                 <div className="flex items-center justify-between border-b border-[#14295F]/10 px-4 py-2.5">
-                  <p className="text-[12px] font-black text-[#14295F]">PDF 1페이지 미리보기</p>
+                  <p className="text-[12px] font-black text-[#14295F]">PDF 1?섏씠吏 誘몃━蹂닿린</p>
                   <a href={koreanMaterialPdfPath} download className="text-[11.5px] font-black text-[#14295F]/70 hover:text-[#14295F]">
-                    다운로드
+                    ?ㅼ슫濡쒕뱶
                   </a>
                 </div>
                 <a href={koreanMaterialPdfPath} target="_blank" rel="noreferrer" className="block bg-white">
                   <img
                     src={koreanMaterialPreviewImagePath}
-                    alt="수업자료 PDF 1페이지 미리보기"
+                    alt="?섏뾽?먮즺 PDF 1?섏씠吏 誘몃━蹂닿린"
                     className="h-[360px] w-full object-contain"
                   />
                 </a>
@@ -601,10 +596,10 @@ export default function ClassPage() {
                   className="premium-cta premium-cta-primary inline-flex h-12 px-8 text-[14px]"
                 >
                   <Download className="h-4 w-4" />
-                  수업자료 PDF 다운로드
+                  ?섏뾽?먮즺 PDF ?ㅼ슫濡쒕뱶
                 </a>
                 <a href="#class-consult" className="premium-cta premium-cta-ghost inline-flex h-12 px-8 text-[14px]">
-                  수업 상담 요청
+                  ?섏뾽 ?곷떞 ?붿껌
                 </a>
               </div>
             </div>
@@ -612,16 +607,15 @@ export default function ClassPage() {
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           7. STUDENT FIT
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section className="py-20 sm:py-28" style={{ background: '#f4f7ff' }}>
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-xl text-center">
-              <span className="eyebrow-badge">수업 대상</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-                이런 학생에게 맞습니다
+              <span className="eyebrow-badge">?섏뾽 ???/span>
+              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">원장이 직접 수업합니다
               </h2>
             </div>
 
@@ -645,9 +639,9 @@ export default function ClassPage() {
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           8. PHILOSOPHY
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <ScrollReveal>
         <section
           className="on-dark py-24 sm:py-36"
@@ -655,25 +649,25 @@ export default function ClassPage() {
         >
           <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
             <p className="text-[10.5px] font-black tracking-[0.26em] text-[#FFB273] uppercase">
-              수업 철학
+              ?섏뾽 泥좏븰
             </p>
             <h2 className="mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.22] text-white">
-              국어는 결국,<br />
-              설명 가능한 실력이 되어야 합니다
+              援?뼱??寃곌뎅,<br />
+              ?ㅻ챸 媛?ν븳 ?ㅻ젰???섏뼱???⑸땲??
             </h2>
             <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-white/80">
-              잘 읽었다고 느끼는 것과
-              실제로 다시 설명할 수 있는 것은 다릅니다.
-              트랙의 국어 수업은 학생이 스스로 판단 기준을 세우고,
-              문제를 풀어낸 이유를 설명할 수 있는 상태까지 가는 것을 목표로 합니다.
+              ???쎌뿀?ㅺ퀬 ?먮겮??寃껉낵
+              ?ㅼ젣濡??ㅼ떆 ?ㅻ챸?????덈뒗 寃껋? ?ㅻ쫭?덈떎.
+              ?몃옓??援?뼱 ?섏뾽? ?숈깮???ㅼ뒪濡??먮떒 湲곗????몄슦怨?
+              臾몄젣瑜???대궦 ?댁쑀瑜??ㅻ챸?????덈뒗 ?곹깭源뚯? 媛??寃껋쓣 紐⑺몴濡??⑸땲??
             </p>
           </div>
         </section>
       </ScrollReveal>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           9. CONSULT CTA
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <section
         id="class-consult"
         className="on-dark scroll-mt-24 py-20 sm:py-28"
@@ -691,15 +685,15 @@ export default function ClassPage() {
           >
             {/* heading */}
             <div className="max-w-xl">
-              <span className="eyebrow-badge-light">수업 상담</span>
+              <span className="eyebrow-badge-light">?섏뾽 ?곷떞</span>
               <h2 className="mt-5 break-keep text-[clamp(1.75rem,3.6vw,2.4rem)] font-black leading-[1.1] text-white">
-                수업이 필요한 지점부터
+                ?섏뾽???꾩슂??吏?먮???
                 <br />
-                함께 확인해보세요
+                ?④퍡 ?뺤씤?대낫?몄슂
               </h2>
               <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.88]" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                학생의 현재 상태와 필요한 방향을 먼저 확인한 뒤,
-                수업이 맞는지, 어떤 방식이 필요한지 상담을 통해 안내합니다.
+                ?숈깮???꾩옱 ?곹깭? ?꾩슂??諛⑺뼢??癒쇱? ?뺤씤????
+                ?섏뾽??留욌뒗吏, ?대뼡 諛⑹떇???꾩슂?쒖? ?곷떞???듯빐 ?덈궡?⑸땲??
               </p>
             </div>
 
@@ -729,10 +723,10 @@ export default function ClassPage() {
 
                 <div className="flex flex-wrap gap-3 pt-1">
                   <a href="#class-consult" className="premium-cta premium-cta-primary h-12 px-6 text-sm">
-                    상담 폼 작성하기
+                    ?곷떞 ???묒꽦?섍린
                   </a>
                   <a href="/" className="premium-cta premium-cta-ghost h-12 px-6 text-sm">
-                    메인으로 돌아가기
+                    硫붿씤?쇰줈 ?뚯븘媛湲?
                   </a>
                 </div>
               </div>
@@ -741,9 +735,9 @@ export default function ClassPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
+      {/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
           10. FOOTER
-      ══════════════════════════════════════════ */}
+      ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */}
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
 
       {/* Floating CTA */}
@@ -751,3 +745,6 @@ export default function ClassPage() {
     </main>
   );
 }
+
+
+

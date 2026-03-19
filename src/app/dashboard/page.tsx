@@ -37,8 +37,8 @@ type ExamCountdownSetting = {
 };
 
 const DEFAULT_EXAM_COUNTDOWNS: ExamCountdownSetting[] = [
-  { id: 'mock', title: '紐⑥쓽怨좎궗', date: '' },
-  { id: 'school', title: '?댁떊', date: '' },
+  { id: 'mock', title: '\uBAA8\uC758\uACE0\uC0AC', date: '' },
+  { id: 'school', title: '\uB0B4\uC2E0', date: '' },
 ];
 
 function normalizeExamCountdowns(input: unknown): ExamCountdownSetting[] {
@@ -143,16 +143,24 @@ export default function DashboardPage() {
   }, [firestore, activeMembership, user]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
 
+  const studentGrowthRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
+  }, [firestore, activeMembership, user]);
+  const { data: studentGrowth } = useDoc<any>(studentGrowthRef, { enabled: isStudentRole });
+
+  const examCountdownSource = studentGrowth?.examCountdowns ?? studentProfile?.examCountdowns;
+
   useEffect(() => {
-    setExamDrafts(normalizeExamCountdowns(studentProfile?.examCountdowns));
-  }, [studentProfile?.examCountdowns]);
+    setExamDrafts(normalizeExamCountdowns(examCountdownSource));
+  }, [examCountdownSource]);
 
   const examCountdowns = useMemo(() => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayMs = todayStart.getTime();
 
-    return normalizeExamCountdowns(studentProfile?.examCountdowns)
+    return normalizeExamCountdowns(examCountdownSource)
       .map((item) => {
         const parsed = item.date ? new Date(`${item.date}T00:00:00`) : null;
         const targetMs = parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : null;
@@ -167,7 +175,7 @@ export default function DashboardPage() {
         const bSort = b.daysLeft === null ? 9999 : Math.abs(b.daysLeft);
         return aSort - bSort;
       });
-  }, [studentProfile?.examCountdowns]);
+  }, [examCountdownSource]);
 
   const primaryExam = examCountdowns[0];
 
@@ -288,21 +296,18 @@ export default function DashboardPage() {
 
     setIsExamSaving(true);
     try {
-      await setDoc(
-        doc(firestore, 'centers', activeMembership.id, 'students', user.uid),
-        { examCountdowns: payload, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+      await setDoc(doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid), { examCountdowns: payload, updatedAt: serverTimestamp() }, { merge: true });
       setIsExamDialogOpen(false);
       toast({
         title: '\uC2DC\uD5D8 \uB514\uB370\uC774 \uC800\uC7A5 \uC644\uB8CC',
         description: '\uD559\uC0DD \uACC4\uC815\uC5D0 \uC2DC\uD5D8 \uC77C\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.',
       });
-    } catch (error) {
+    } catch (error: any) {
+      const detail = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
       toast({
         variant: 'destructive',
         title: '\uC2DC\uD5D8 \uC124\uC815 \uC800\uC7A5 \uC2E4\uD328',
-        description: '\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.',
+        description: detail || '\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.',
       });
     } finally {
       setIsExamSaving(false);
@@ -339,7 +344,7 @@ export default function DashboardPage() {
       <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
         <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
           <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-xl' : 'text-4xl')}>
-            {userRole === 'parent' ? `${user?.displayName} ?숇?紐⑤떂` : `${user?.displayName}?? 諛섍??뚯슂!`}
+            {userRole === 'parent' ? `${user?.displayName}\uB2D8, \uD559\uBD80\uBAA8` : `${user?.displayName}\uB2D8, \uBC18\uAC00\uC6CC\uC694!`}
           </h1>
           <Badge
             variant="secondary"
@@ -376,8 +381,8 @@ export default function DashboardPage() {
               <DialogContent className={cn('flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0', isMobile ? '' : 'sm:w-full sm:max-w-lg')}>
                 <div className="bg-primary p-5 text-white">
                   <DialogHeader>
-                    <DialogTitle className="text-xl font-black tracking-tight">?쒗뿕 ?붾뜲???ㅼ젙</DialogTitle>
-                    <DialogDescription className="text-white/80">?쒗뿕 ?쇱젙? ?숈깮蹂꾨줈 ?곕줈 ??λ뤌??</DialogDescription>
+                    <DialogTitle className="text-xl font-black tracking-tight">{'\uC2DC\uD5D8 \uB514\uB370\uC774 \uC124\uC815'}</DialogTitle>
+                    <DialogDescription className="text-white/80">{'\uC2DC\uD5D8 \uC77C\uC815\uC740 \uD559\uC0DD\uBCC4\uB85C \uB530\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4.'}</DialogDescription>
                   </DialogHeader>
                 </div>
                 <div className="space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
@@ -386,7 +391,7 @@ export default function DashboardPage() {
                       <Input
                         value={item.title}
                         onChange={(e) => handleExamDraftChange(item.id, 'title', e.target.value)}
-                        placeholder={`?쒗뿕紐?${index + 1}`}
+                        placeholder={`\uC2DC\uD5D8\uBA85 ${index + 1}`}
                         className="h-10 rounded-xl border-primary/15 font-bold"
                       />
                       <Input
@@ -414,16 +419,17 @@ export default function DashboardPage() {
                     disabled={examDrafts.length >= 6}
                   >
                     <Plus className="mr-1.5 h-4 w-4" />
-                    ?쒗뿕 異붽?
+                    {'\uC2DC\uD5D8 \uCD94\uAC00'}
                   </Button>
                 </div>
                 <DialogFooter className="border-t bg-white p-4 sm:p-5">
                   <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold" onClick={() => setIsExamDialogOpen(false)}>
-                    ?リ린
+                    {'\uB2EB\uAE30'}
                   </Button>
                   <Button type="button" className="h-10 rounded-xl font-black" onClick={handleSaveExamCountdowns} disabled={isExamSaving}>
                     {isExamSaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1.5 h-4 w-4" />}
-                    ???                  </Button>
+                    {'\uC800\uC7A5'}
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

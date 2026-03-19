@@ -162,14 +162,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const { data: yesterdayStats } = useCollection<DailyStudentStat>(yesterdayStatsQuery, { enabled: isActive });
 
   const focusStudentTrendQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !selectedFocusStudentId) return null;
+    if (!firestore || !selectedFocusStudentId) return null;
     return query(
       collectionGroup(firestore, 'students'),
-      where('centerId', '==', centerId),
       where('studentId', '==', selectedFocusStudentId),
-      limit(21),
+      limit(90),
     );
-  }, [firestore, centerId, selectedFocusStudentId]);
+  }, [firestore, selectedFocusStudentId]);
   const { data: focusStudentTrendRaw } = useCollection<DailyStudentStat>(focusStudentTrendQuery, {
     enabled: isActive && !!selectedFocusStudentId,
   });
@@ -736,24 +735,77 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [metrics, selectedFocusStudentId]);
 
+  const selectedFocusStat = useMemo(
+    () => (selectedFocusStudentId ? (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null : null),
+    [todayStats, selectedFocusStudentId]
+  );
+
+  const selectedFocusProgress = useMemo(
+    () => (selectedFocusStudentId ? (progressList || []).find((row) => row.id === selectedFocusStudentId) || null : null),
+    [progressList, selectedFocusStudentId]
+  );
+
+  const selectedFocusBreakdown = useMemo(() => {
+    if (!selectedFocusStudent) return null;
+    const completionRate = clampScore(selectedFocusStat?.todayPlanCompletionRate || 0);
+    const studyMinutes = Math.max(0, selectedFocusStat?.totalStudyMinutes || selectedFocusStudent.studyMinutes || 0);
+    const growthRate = Number(selectedFocusStat?.studyTimeGrowthRate || 0);
+    const focusStat = clampScore(selectedFocusProgress?.stats?.focus || 0);
+    const penaltyPoints = Math.max(0, selectedFocusProgress?.penaltyPoints || 0);
+
+    const studyScore = clampScore((studyMinutes / 180) * 100);
+    const growthScore = clampScore(70 + growthRate * 120);
+    const penaltyScore = clampScore(100 - penaltyPoints * 2);
+
+    const weighted = {
+      focus: Math.round(focusStat * 0.3),
+      completion: Math.round(completionRate * 0.25),
+      study: Math.round(studyScore * 0.2),
+      growth: Math.round(growthScore * 0.15),
+      penalty: Math.round(penaltyScore * 0.1),
+    };
+
+    return {
+      focusStat,
+      completionRate,
+      studyScore,
+      growthScore,
+      penaltyScore,
+      weighted,
+    };
+  }, [selectedFocusStudent, selectedFocusStat, selectedFocusProgress]);
+
   const focusStudentTrend = useMemo(() => {
-    if (!focusStudentTrendRaw || focusStudentTrendRaw.length === 0) return [];
-    const sorted = [...focusStudentTrendRaw]
+    const sorted = [...(focusStudentTrendRaw || [])]
       .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
       .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-      .slice(-10);
+      .slice(-45);
 
-    return sorted.map((row) => {
-      const progress = progressList?.find((p) => p.id === row.studentId);
-      const score = calculateStudentFocusScore(row, progress);
+    const progress = progressList?.find((p) => p.id === selectedFocusStudentId);
+    const scoreByDateKey = new Map(
+      sorted.map((row) => [
+        row.dateKey,
+        {
+          score: calculateStudentFocusScore(row, progress),
+          completion: Math.round(row.todayPlanCompletionRate || 0),
+          minutes: Math.round(row.totalStudyMinutes || 0),
+        },
+      ])
+    );
+
+    const baseDate = today || new Date();
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(baseDate, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const found = scoreByDateKey.get(dateKey);
       return {
-        date: row.dateKey.slice(5),
-        score,
-        completion: Math.round(row.todayPlanCompletionRate || 0),
-        minutes: Math.round(row.totalStudyMinutes || 0),
+        date: format(day, 'MM/dd'),
+        score: found?.score ?? 0,
+        completion: found?.completion ?? 0,
+        minutes: found?.minutes ?? 0,
       };
     });
-  }, [focusStudentTrendRaw, progressList]);
+  }, [focusStudentTrendRaw, progressList, selectedFocusStudentId, today]);
 
   if (!isActive) return null;
 
@@ -1214,7 +1266,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <p className="font-black text-xl tracking-tighter">분석 데이터를 집계하고 있습니다...</p>
         </div>
       )}
-
       <Dialog open={!!selectedFocusStudentId} onOpenChange={(open) => !open && setSelectedFocusStudentId(null)}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
           <div className="bg-[#14295F] p-6 text-white">
@@ -1243,23 +1294,61 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
 
-            <div className="h-[280px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={focusStudentTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip
-                    formatter={(value: number, name: string) => {
-                      if (name === 'score') return [`${value}점`, '집중도'];
-                      if (name === 'completion') return [`${value}%`, '완료율'];
-                      return [`${value}분`, '학습시간'];
-                    }}
-                  />
-                  <Line type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 3 }} name="score" />
-                  <Line type="monotone" dataKey="completion" stroke="#FF7A16" strokeWidth={2} dot={{ r: 2.5 }} name="completion" />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">점수 환산 기준</p>
+              <p className="mt-1 text-xs font-bold text-slate-700">
+                총점 = 집중스탯(30%) + 계획 완료율(25%) + 학습시간(20%) + 성장률(15%) + 벌점 보정(10%)
+              </p>
+              {selectedFocusBreakdown && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-5">
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="text-[10px] font-black text-slate-500">집중스탯</p>
+                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.focusStat}점 / {selectedFocusBreakdown.weighted.focus}점</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="text-[10px] font-black text-slate-500">완료율</p>
+                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.completionRate}점 / {selectedFocusBreakdown.weighted.completion}점</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="text-[10px] font-black text-slate-500">학습시간</p>
+                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.studyScore}점 / {selectedFocusBreakdown.weighted.study}점</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="text-[10px] font-black text-slate-500">성장률</p>
+                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.growthScore}점 / {selectedFocusBreakdown.weighted.growth}점</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="text-[10px] font-black text-slate-500">벌점 보정</p>
+                    <p className="text-sm font-black text-[#14295F]">{selectedFocusBreakdown.penaltyScore}점 / {selectedFocusBreakdown.weighted.penalty}점</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">최근 7일 추이 그래프</p>
+              {focusStudentTrend.length === 0 ? (
+                <div className="flex h-[232px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-sm font-bold text-slate-400">
+                  추이 데이터가 없어 그래프를 표시하지 못했습니다.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={232}>
+                  <LineChart data={focusStudentTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF2" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 700, fill: '#667085' }} tickLine={false} axisLine={false} width={28} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => {
+                        if (name === 'score') return [`${value}\uC810`, '\uC9D1\uC911\uB3C4'];
+                        if (name === 'completion') return [`${value}%`, '\uC644\uB8CC\uC728'];
+                        return [`${value}\uBD84`, '\uD559\uC2B5\uC2DC\uAC04'];
+                      }}
+                    />
+                    <Line type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 3 }} name="score" />
+                    <Line type="monotone" dataKey="completion" stroke="#FF7A16" strokeWidth={2} dot={{ r: 2.5 }} name="completion" />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
           <DialogFooter className="border-t bg-white p-4">
