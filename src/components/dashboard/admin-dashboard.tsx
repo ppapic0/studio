@@ -99,6 +99,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
+  const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
 
   useEffect(() => {
     setIsMounted(true);
@@ -904,22 +905,31 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [focusStudentTrendRaw, today]);
 
-  // 2) 매달 학습시간 성장률 (최근 3개월)
-  const monthlyGrowthData = useMemo(() => {
-    if (!focusStudentTrendRaw || !today) return [];
-    const months = [2, 1, 0].map((offset) => {
-      const monthDate = new Date(today.getFullYear(), today.getMonth() - offset, 1);
-      const monthKey = format(monthDate, 'yyyy-MM');
-      const monthData = focusStudentTrendRaw.filter((r) => r.dateKey.startsWith(monthKey));
-      const avgMinutes = monthData.length > 0
-        ? Math.round(monthData.reduce((s, r) => s + (r.totalStudyMinutes || 0), 0) / monthData.length) : 0;
-      return { label: format(monthDate, 'M월'), avgMinutes, days: monthData.length };
+  // 2) 일자별 학습시간 성장률 (최근 6주, 7일 단위로 조회)
+  const dailyGrowthData = useMemo(() => {
+    if (!today) return [];
+    const minutesByDateKey = new Map(
+      (focusStudentTrendRaw || []).map((row) => [row.dateKey, Math.round(row.totalStudyMinutes || 0)])
+    );
+
+    const series = Array.from({ length: 42 }, (_, idx) => {
+      const day = subDays(today, 41 - idx);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const minutes = minutesByDateKey.get(dateKey) ?? 0;
+      return {
+        dateKey,
+        label: format(day, 'M/d'),
+        minutes,
+        avgMinutes: minutes,
+      };
     });
-    return months.map((m, i, arr) => ({
-      ...m,
-      growth: i > 0 && arr[i - 1].avgMinutes > 0
-        ? Math.round((m.avgMinutes - arr[i - 1].avgMinutes) / arr[i - 1].avgMinutes * 100) : 0,
-    }));
+
+    return series.map((item, index) => {
+      if (index === 0) return { ...item, growth: 0 };
+      const prev = series[index - 1].minutes;
+      const growth = prev > 0 ? Math.round(((item.minutes - prev) / prev) * 100) : 0;
+      return { ...item, growth };
+    });
   }, [focusStudentTrendRaw, today]);
 
   // 3) 학습 시작시간 분포 리듬 (요일별 평균 학습시간)
@@ -946,12 +956,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [focusDayData, today]);
 
   const hasWeeklyGrowthData = weeklyGrowthData.some((week) => (week.totalMinutes ?? 0) > 0);
-  const hasMonthlyGrowthData = monthlyGrowthData.some((month) => (month.avgMinutes ?? 0) > 0);
+  const hasDailyGrowthData = dailyGrowthData.some((day) => (day.minutes ?? 0) > 0);
   const hasRhythmData = rhythmData.some((day) => (day.avgMinutes ?? 0) > 0);
   const todayLearningGrowthPercent = Math.round((selectedFocusStat?.studyTimeGrowthRate ?? 0) * 100);
   const latestWeeklyLearningGrowthPercent = weeklyGrowthData.length > 0
     ? (weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0)
     : 0;
+  const dailyGrowthWindowCount = Math.max(1, Math.ceil(dailyGrowthData.length / 7));
+  const boundedDailyGrowthWindowIndex = Math.min(Math.max(0, dailyGrowthWindowIndex), dailyGrowthWindowCount - 1);
+  const dailyGrowthWindowData = useMemo(() => {
+    if (dailyGrowthData.length === 0) return [];
+    const end = dailyGrowthData.length - (boundedDailyGrowthWindowIndex * 7);
+    const start = Math.max(0, end - 7);
+    return dailyGrowthData.slice(start, end);
+  }, [dailyGrowthData, boundedDailyGrowthWindowIndex]);
+
+  useEffect(() => {
+    setDailyGrowthWindowIndex(0);
+  }, [selectedFocusStudentId]);
 
   // ── 선택 학생 통합 KPI 계산 ──
   const selectedFocusKpi = useMemo(() => {
@@ -1723,28 +1745,50 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
 
-                {/* 2. 매달 학습시간 성장률 */}
+                {/* 2. 일자별 학습시간 성장률 (7일 단위) */}
                 <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">매달 학습시간 성장률</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">막대: 월 평균 일일 학습분 · 선: 전월 대비 성장률</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">일자별 학습시간 성장률</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">최근 42일 중 7일 단위로 확인합니다.</p>
                     </div>
-                    {monthlyGrowthData.length > 0 && (
-                      <span className={cn('text-xs font-black',
-                        (monthlyGrowthData[monthlyGrowthData.length - 1]?.growth ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                      )}>
-                        이번 달 {(monthlyGrowthData[monthlyGrowthData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{monthlyGrowthData[monthlyGrowthData.length - 1]?.growth ?? 0}%
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {dailyGrowthWindowData.length > 0 && (
+                        <span className={cn('text-xs font-black',
+                          (dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        )}>
+                          최근 7일 {(dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0}%
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[10px] font-black"
+                        onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(prev + 1, dailyGrowthWindowCount - 1))}
+                        disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}
+                      >
+                        이전 7일
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[10px] font-black"
+                        onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(prev - 1, 0))}
+                        disabled={boundedDailyGrowthWindowIndex <= 0}
+                      >
+                        다음 7일
+                      </Button>
+                    </div>
                   </div>
                   {trendLoading ? (
                     <div className="h-[140px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
-                  ) : !hasMonthlyGrowthData ? (
+                  ) : !hasDailyGrowthData ? (
                     <div className="h-[140px] flex items-center justify-center text-xs font-bold text-slate-400">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={140}>
-                      <ComposedChart data={monthlyGrowthData} margin={{ top: 8, right: 36, left: -8, bottom: 0 }}>
+                      <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 36, left: -8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }} tickLine={false} axisLine={false} />
                         <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
