@@ -268,13 +268,28 @@ export default function DashboardPage() {
   const handleSaveExamCountdowns = async () => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return;
 
+    const hasPartialRow = examDrafts.some((item) => {
+      const title = item.title.trim();
+      const date = item.date.trim();
+      return (title.length > 0 && date.length === 0) || (title.length === 0 && date.length > 0);
+    });
+
+    if (hasPartialRow) {
+      toast({
+        variant: 'destructive',
+        title: '?쒗뿕 ?ㅼ젙 ????ㅽ뙣',
+        description: '?쒗뿕紐낃낵 ?좎쭨瑜?紐⑤몢 ?낅젰?댁＜?몄슂.',
+      });
+      return;
+    }
+
     const payload = examDrafts
       .map((item) => ({
         id: item.id || `exam_${Date.now()}`,
         title: item.title.trim(),
         date: item.date.trim(),
       }))
-      .filter((item) => item.title.length > 0 || item.date.length > 0);
+      .filter((item) => item.title.length > 0 && item.date.length > 0);
 
     if (!payload.length) {
       toast({
@@ -369,16 +384,16 @@ export default function DashboardPage() {
                   </span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className={cn('overflow-hidden rounded-2xl border-slate-200 p-0', isMobile ? 'max-w-[94vw]' : 'sm:max-w-lg')}>
+              <DialogContent className={cn('flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0', isMobile ? '' : 'sm:w-full sm:max-w-lg')}>
                 <div className="bg-primary p-5 text-white">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 설정</DialogTitle>
                     <DialogDescription className="text-white/80">시험 일정은 학생별로 따로 저장돼요.</DialogDescription>
                   </DialogHeader>
                 </div>
-                <div className="space-y-3 bg-white p-4 sm:p-5">
+                <div className="space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
                   {examDrafts.map((item, index) => (
-                    <div key={item.id} className="grid grid-cols-[1fr_132px_auto] items-center gap-2">
+                    <div key={item.id} className={cn('grid items-center gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-[1fr_132px_auto]')}>
                       <Input
                         value={item.title}
                         onChange={(e) => handleExamDraftChange(item.id, 'title', e.target.value)}
@@ -395,7 +410,7 @@ export default function DashboardPage() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-10 w-10 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                        className={cn('h-10 w-10 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700', isMobile ? 'justify-self-end' : '')}
                         onClick={() => handleRemoveExamDraft(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />

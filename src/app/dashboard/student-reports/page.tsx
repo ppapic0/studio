@@ -155,7 +155,7 @@ export default function StudentReportsPage() {
                         </Badge>
                       </div>
 
-                      <h3 className="truncate text-base font-black tracking-tighter text-primary sm:text-xl">데일리 정밀 분석 리포트</h3>
+                      <h3 className="truncate text-base font-black tracking-tighter text-primary sm:text-xl">분석 리포트</h3>
                       <p className="line-clamp-1 text-[10px] font-bold text-muted-foreground/60 sm:text-[11px]">
                         {preview || '리포트 내용을 확인해보세요.'}
                       </p>

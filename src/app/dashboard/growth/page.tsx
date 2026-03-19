@@ -383,7 +383,7 @@ export default function GrowthPage() {
             </div>
             <h1 className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-4xl")}>성장트랙</h1>
           </div>
-          <Badge variant="secondary" className={cn("rounded-full font-black gap-1.5 bg-accent/10 text-accent border-none", isMobile ? "h-7 px-3 text-[8px]" : "h-9 px-4 text-xs")}>
+          <Badge variant="secondary" className={cn("rounded-full font-black gap-1.5 bg-accent/10 text-[#14295F] border-none", isMobile ? "h-7 px-3 text-[8px]" : "h-9 px-4 text-xs")}>
             <Sparkles className="h-3 w-3 sm:h-4 w-4" /> 포인트 부스트 x{totalBoost.toFixed(2)}
           </Badge>
         </div>

@@ -981,7 +981,7 @@ export default function RevenuePage() {
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
               <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
               <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">당월 발생 매출</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]">당월 발생 매출</p>
                 <h3 className="text-4xl font-black tracking-tighter text-[#14295F]">{formatWon(metrics?.accrued || 0)}</h3>
                 <Badge className="bg-white/20 border-none text-[10px] px-3 text-emerald-400 whitespace-nowrap">발생 기준</Badge>
               </div>
@@ -989,7 +989,7 @@ export default function RevenuePage() {
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-emerald-600 text-white p-8 overflow-hidden relative">
               <Wallet className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
               <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">실제 수납 금액</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]">실제 수납 금액</p>
                 <h3 className="text-4xl font-black tracking-tighter text-[#14295F]">{formatWon(metrics?.collected || 0)}</h3>
                 <Badge className="bg-white/20 border-none text-[10px] px-3 text-white whitespace-nowrap">수납 기준</Badge>
               </div>

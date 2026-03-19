@@ -99,6 +99,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
+  const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
 
   // 1. 센터 모든 재원생
   const membersQuery = useMemoFirebase(() => {
@@ -143,6 +144,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
   }, [firestore, centerId, todayKey]);
   const { data: todayStats, isLoading: statsLoading } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
+
+  const yesterdayStatsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !yesterdayKey) return null;
+    return collection(firestore, 'centers', centerId, 'dailyStudentStats', yesterdayKey, 'students');
+  }, [firestore, centerId, yesterdayKey]);
+  const { data: yesterdayStats } = useCollection<DailyStudentStat>(yesterdayStatsQuery, { enabled: isActive });
 
   // 5. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
@@ -485,6 +492,36 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   // --- 실시간 KPI 엔진 ---
+  const clampScore = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
+
+  const calculateStudentFocusScore = (stat?: DailyStudentStat | null, progress?: GrowthProgress | null) => {
+    const studyMinutes = Math.max(0, stat?.totalStudyMinutes || 0);
+    const completionRate = clampScore(stat?.todayPlanCompletionRate || 0);
+    const growthRate = Number(stat?.studyTimeGrowthRate || 0);
+    const focusStat = clampScore(progress?.stats?.focus || 0);
+    const penaltyPoints = Math.max(0, progress?.penaltyPoints || 0);
+
+    const studyScore = clampScore((studyMinutes / 180) * 100);
+    const growthScore = clampScore(70 + growthRate * 120);
+    const penaltyScore = clampScore(100 - penaltyPoints * 2);
+
+    const raw =
+      focusStat * 0.30 +
+      completionRate * 0.25 +
+      studyScore * 0.20 +
+      growthScore * 0.15 +
+      penaltyScore * 0.10;
+
+    return Math.round(clampScore(raw));
+  };
+
+  const focusLevelMeta = (score: number) => {
+    if (score >= 90) return { label: '매우 좋음', badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    if (score >= 75) return { label: '안정적', badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' };
+    if (score >= 60) return { label: '흔들림 있음', badgeClass: 'bg-amber-100 text-amber-700 border-amber-200' };
+    return { label: '집중 관리 필요', badgeClass: 'bg-rose-100 text-rose-700 border-rose-200' };
+  };
+
   const metrics = useMemo(() => {
     if (!activeMembers || !attendanceList || !isMounted || !progressList) return null;
 
@@ -526,6 +563,64 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       ? Math.round(filteredTodayStats.reduce((acc, s) => acc + (s.todayPlanCompletionRate || 0), 0) / filteredTodayStats.length) 
       : 0;
 
+    const filteredYesterdayStats = yesterdayStats?.filter((s) => targetMemberIds.has(s.studentId)) || [];
+    const todayFocusScores = filteredStudentMembers.map((member) => {
+      const studentStat = filteredTodayStats.find((s) => s.studentId === member.id);
+      const studentProgress = progressList.find((p) => p.id === member.id);
+      return calculateStudentFocusScore(studentStat, studentProgress);
+    });
+    const yesterdayFocusScores = filteredStudentMembers.map((member) => {
+      const studentStat = filteredYesterdayStats.find((s) => s.studentId === member.id);
+      const studentProgress = progressList.find((p) => p.id === member.id);
+      return calculateStudentFocusScore(studentStat, studentProgress);
+    });
+
+    const avgFocusScore = todayFocusScores.length > 0
+      ? Math.round(todayFocusScores.reduce((sum, score) => sum + score, 0) / todayFocusScores.length)
+      : 0;
+    const prevAvgFocusScore = yesterdayFocusScores.length > 0
+      ? Math.round(yesterdayFocusScores.reduce((sum, score) => sum + score, 0) / yesterdayFocusScores.length)
+      : 0;
+    const focusDelta = avgFocusScore - prevAvgFocusScore;
+    const focusLevel = focusLevelMeta(avgFocusScore);
+
+    const avgStudyMinutes = filteredTodayStats.length > 0
+      ? Math.round(filteredTodayStats.reduce((sum, item) => sum + (item.totalStudyMinutes || 0), 0) / filteredTodayStats.length)
+      : 0;
+    const avgGrowthRate = filteredTodayStats.length > 0
+      ? Number((filteredTodayStats.reduce((sum, item) => sum + (item.studyTimeGrowthRate || 0), 0) / filteredTodayStats.length).toFixed(2))
+      : 0;
+    const avgFocusStat = filteredStudentMembers.length > 0
+      ? Math.round(filteredStudentMembers.reduce((sum, member) => {
+          const progress = progressList.find((p) => p.id === member.id);
+          return sum + (progress?.stats?.focus || 0);
+        }, 0) / filteredStudentMembers.length)
+      : 0;
+    const highPenaltyCount = filteredStudentMembers.filter((member) => {
+      const progress = progressList.find((p) => p.id === member.id);
+      return (progress?.penaltyPoints || 0) >= 10;
+    }).length;
+    const lowCompletionCount = filteredTodayStats.filter((item) => (item.todayPlanCompletionRate || 0) < 60).length;
+
+    const focusStrengths: string[] = [];
+    const focusRisks: string[] = [];
+    const focusActions: string[] = [];
+
+    if (avgCompletion >= 80) focusStrengths.push(`평균 계획 완료율 ${avgCompletion}%로 실행력이 좋습니다.`);
+    if (avgFocusStat >= 75) focusStrengths.push(`집중 스탯 평균 ${avgFocusStat}점으로 몰입 기반이 안정적입니다.`);
+    if (avgGrowthRate >= 0.05) focusStrengths.push('전일 대비 학습 성장률이 상승 흐름입니다.');
+    if (avgStudyMinutes < 120 && avgFocusScore >= 75) focusStrengths.push('학습시간이 길지 않아도 집중 품질이 유지되고 있습니다.');
+
+    if (lowCompletionCount > 0) focusRisks.push(`완료율 60% 미만 학생이 ${lowCompletionCount}명입니다.`);
+    if (highPenaltyCount > 0) focusRisks.push(`벌점 10점 이상 학생이 ${highPenaltyCount}명입니다.`);
+    if (avgGrowthRate <= -0.1) focusRisks.push('학습 성장률이 하락 구간입니다.');
+    if (avgFocusScore < 60) focusRisks.push('센터 평균 집중도 점수가 관리 구간으로 내려갔습니다.');
+
+    if (lowCompletionCount > 0) focusActions.push('내일 계획 수를 3~4개 핵심 과제로 축소해 완료율을 먼저 회복하세요.');
+    if (highPenaltyCount > 0) focusActions.push('벌점 누적 학생은 첫 90분 밀착 체크로 이탈을 줄이세요.');
+    if (avgGrowthRate <= -0.1) focusActions.push('초반 60분 단일 과목 고정 운영으로 첫 이탈 시간을 늘려보세요.');
+    if (focusActions.length === 0) focusActions.push('현재 리듬을 유지하면서 오답 복습 루틴 점검만 추가하세요.');
+
     const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
     const sentReports = filteredReports.filter(r => r.status === 'sent');
 
@@ -554,6 +649,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const consultationRequestCount30d = Math.max(consultationEventCount30d, consultationDocCount30d);
 
     const reportReadCount30d = recentParentEvents.filter((event) => event.eventType === 'report_read').length;
+    const focusRows = filteredStudentMembers.map((member) => {
+      const studentStat = filteredTodayStats.find((s) => s.studentId === member.id);
+      const studentProgress = progressList.find((p) => p.id === member.id);
+      const score = calculateStudentFocusScore(studentStat, studentProgress);
+      return {
+        studentId: member.id,
+        name: member.displayName || member.id,
+        className: member.className || '-',
+        score,
+        completion: Math.round(studentStat?.todayPlanCompletionRate || 0),
+        studyMinutes: Math.round(studentStat?.totalStudyMinutes || 0),
+      };
+    }).sort((a, b) => b.score - a.score);
+
+    const focusTop10 = focusRows.slice(0, 10);
+    const focusBottom10 = [...focusRows].reverse().slice(0, 10);
 
     return {
       totalTodayMins,
@@ -573,8 +684,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         ? Math.min(100, Math.round((consultationRequestCount30d / activeParentCount30d) * 100))
         : 0,
       reportReadCount30d,
+      focusKpi: {
+        score: avgFocusScore,
+        levelLabel: focusLevel.label,
+        levelBadgeClass: focusLevel.badgeClass,
+        delta: focusDelta,
+        completion: avgCompletion,
+        avgStudyMinutes,
+        avgFocusStat,
+        avgGrowthRate,
+        highPenaltyCount,
+        lowCompletionCount,
+        strengths: focusStrengths.slice(0, 2),
+        risks: focusRisks.slice(0, 2),
+        actions: focusActions.slice(0, 2),
+      },
+      focusTop10,
+      focusBottom10,
     };
-  }, [activeMembers, attendanceList, todayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted]);
+  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted]);
 
   if (!isActive) return null;
 
@@ -686,6 +814,148 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <p className="text-[9px] font-bold text-muted-foreground leading-relaxed italic">
                     "위험 점수 70점 이상의 즉시 개입이 필요한 학생 수입니다."
                   </p>
+                </div>
+              </Card>
+            </div>
+          </section>
+
+          <section className="space-y-4 px-1">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">집중도 KPI 분석</h2>
+              <Badge className="bg-[#14295F] text-white border-none font-black text-[10px] rounded-full px-2.5">센터관리자</Badge>
+            </div>
+
+            <Card className="rounded-[2.5rem] border-none bg-white p-6 shadow-xl ring-1 ring-black/[0.04] sm:p-8">
+              <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[260px_1fr]')}>
+                <div className="rounded-2xl border border-[#14295F]/15 bg-[linear-gradient(145deg,#eef4ff_0%,#ffffff_85%)] p-5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]/60">센터 평균 집중도</p>
+                  <div className="mt-2 flex items-end gap-2">
+                    <p className="dashboard-number text-5xl text-[#14295F]">{metrics.focusKpi.score}</p>
+                    <span className="text-sm font-black text-[#14295F]/55 pb-1">/100</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-xs font-black', metrics.focusKpi.levelBadgeClass)}>
+                      {metrics.focusKpi.levelLabel}
+                    </Badge>
+                    <span className={cn('text-xs font-black', metrics.focusKpi.delta >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                      전일 대비 {metrics.focusKpi.delta >= 0 ? '+' : ''}{metrics.focusKpi.delta}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">평균 완료율</p>
+                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{metrics.focusKpi.completion}%</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">평균 학습시간</p>
+                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{Math.floor(metrics.focusKpi.avgStudyMinutes / 60)}h {metrics.focusKpi.avgStudyMinutes % 60}m</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">평균 집중 스탯</p>
+                    <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{metrics.focusKpi.avgFocusStat}점</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 성장률</p>
+                    <p className={cn('dashboard-number mt-1 text-2xl', metrics.focusKpi.avgGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                      {metrics.focusKpi.avgGrowthRate >= 0 ? '+' : ''}{Math.round(metrics.focusKpi.avgGrowthRate * 100)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">잘한 점</p>
+                  {metrics.focusKpi.strengths.length === 0 ? (
+                    <p className="mt-2 text-xs font-bold text-emerald-700">오늘은 기준선 수준으로 유지되었습니다.</p>
+                  ) : (
+                    <div className="mt-2 space-y-1.5">
+                      {metrics.focusKpi.strengths.map((item, index) => (
+                        <p key={index} className="text-xs font-bold text-emerald-700">{item}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">감점 요인</p>
+                  {metrics.focusKpi.risks.length === 0 ? (
+                    <p className="mt-2 text-xs font-bold text-rose-700">현재 큰 감점 요인은 없습니다.</p>
+                  ) : (
+                    <div className="mt-2 space-y-1.5">
+                      {metrics.focusKpi.risks.map((item, index) => (
+                        <p key={index} className="text-xs font-bold text-rose-700">{item}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">내일 개선 제안</p>
+                  <div className="mt-2 space-y-1.5">
+                    {metrics.focusKpi.actions.map((item, index) => (
+                      <p key={index} className="text-xs font-bold text-amber-700">{item}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          <section className="space-y-4 px-1">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">집중도 학생 랭킹</h2>
+              <Badge className="bg-[#14295F] text-white border-none font-black text-[10px] rounded-full px-2.5">Top / Bottom 10</Badge>
+            </div>
+
+            <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
+              <Card className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-black text-emerald-700">상위 10명</p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">집중 우수</span>
+                </div>
+                <div className="space-y-2">
+                  {metrics.focusTop10.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-500">집계된 학생 데이터가 없습니다.</p>
+                  ) : (
+                    metrics.focusTop10.map((row, index) => (
+                      <div key={row.studentId} className="grid grid-cols-[30px_1fr_auto] items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-2">
+                        <span className="text-xs font-black text-emerald-700">{index + 1}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
+                          <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
+                        </div>
+                        <span className="dashboard-number text-lg text-emerald-700">{row.score}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Card>
+
+              <Card className="rounded-[2rem] border border-rose-100 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-black text-rose-700">하위 10명</p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">집중 개입</span>
+                </div>
+                <div className="space-y-2">
+                  {metrics.focusBottom10.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-500">집계된 학생 데이터가 없습니다.</p>
+                  ) : (
+                    metrics.focusBottom10.map((row, index) => (
+                      <div key={row.studentId} className="grid grid-cols-[30px_1fr_auto] items-center gap-2 rounded-xl border border-rose-100 bg-rose-50/40 px-3 py-2">
+                        <span className="text-xs font-black text-rose-700">{index + 1}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-black text-slate-800">{row.name}</p>
+                          <p className="text-[10px] font-bold text-slate-500">{row.className} · 완료율 {row.completion}%</p>
+                        </div>
+                        <span className="dashboard-number text-lg text-rose-700">{row.score}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </Card>
             </div>

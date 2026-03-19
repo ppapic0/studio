@@ -580,6 +580,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
   const [selectedTeacherReport, setSelectedTeacherReport] = useState<DailyReport | null>(null);
+  const [isTeacherReportDialogOpen, setIsTeacherReportDialogOpen] = useState(false);
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
@@ -693,6 +694,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!teacherReportsRaw) return [];
     return [...teacherReportsRaw].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [teacherReportsRaw]);
+
+  useEffect(() => {
+    if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
+
+    const latestUnviewed = teacherReports.find((report) => !report.viewedAt);
+    if (!latestUnviewed) return;
+
+    const storageKey = `student-report-auto-open:${user.uid}`;
+    const lastOpenedReportId = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+    if (lastOpenedReportId === latestUnviewed.id) return;
+
+    setSelectedTeacherReport(latestUnviewed);
+    setIsTeacherReportDialogOpen(true);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(storageKey, latestUnviewed.id);
+    }
+  }, [isActive, isTeacherReportsLoading, teacherReports, user?.uid]);
 
   // 5. 스탯 계산
   const stats = useMemo(() => {
@@ -1810,7 +1828,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
         {isMobile ? (
-          <Dialog onOpenChange={(open) => { if (!open) setSelectedTeacherReport(null); }}>
+          <Dialog
+            open={isTeacherReportDialogOpen}
+            onOpenChange={(open) => {
+              setIsTeacherReportDialogOpen(open);
+              if (!open) setSelectedTeacherReport(null);
+            }}
+          >
             <DialogTrigger asChild>
               <button className="group text-left h-full w-full">
                 <Card className={cn(
