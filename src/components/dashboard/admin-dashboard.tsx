@@ -1159,7 +1159,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <section className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <Activity className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">?? ?? ??</h2>
+              <h2 className="text-xl font-black tracking-tighter">집중 학생 랭킹</h2>
               <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">실시간 추적</Badge>
             </div>
             <div className="grid gap-4 md:grid-cols-3">

@@ -58,11 +58,11 @@ function normalizeExamCountdowns(input: unknown): ExamCountdownSetting[] {
 }
 
 const inviteFormSchema = z.object({
-  inviteCode: z.string().trim().min(1, '珥덈? 肄붾뱶瑜??낅젰??二쇱꽭??'),
+  inviteCode: z.string().trim().min(1, '초대 코드를 입력해 주세요.'),
 });
 
 const parentLinkFormSchema = z.object({
-  studentLinkCode: z.string().trim().regex(/^\d{6}$/, '?숈깮 肄붾뱶(6?먮━ ?レ옄)瑜??낅젰??二쇱꽭??'),
+  studentLinkCode: z.string().trim().regex(/^\d{6}$/, '학생 코드(6자리 숫자)를 입력해 주세요.'),
   parentPhoneNumber: z.string().trim().optional(),
 });
 
@@ -111,13 +111,13 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
   if (!isInternal && normalizedRaw) return normalizedRaw;
 
   if (hasFailedPrecondition) {
-    return '媛??議곌굔??留뚯”?섏? 紐삵뻽?듬땲?? ?낅젰???숈깮 肄붾뱶 ?먮뒗 珥덈? 肄붾뱶瑜??ㅼ떆 ?뺤씤??二쇱꽭??';
+    return '사전 조건이 맞지 않습니다. 입력한 학생 코드 또는 초대 코드를 다시 확인해 주세요.';
   }
   if (hasInvalidArgument) {
-    return '?낅젰媛믪씠 ?щ컮瑜댁? ?딆뒿?덈떎. ?꾩닔 ??ぉ???ㅼ떆 ?뺤씤??二쇱꽭??';
+    return '입력값이 올바르지 않습니다. 필수 항목을 다시 확인해 주세요.';
   }
   if (hasAlreadyExists) {
-    return '?대? ?곌껐??怨꾩젙?낅땲?? ?좎떆 ???ㅼ떆 ?뺤씤??二쇱꽭??';
+    return '이미 연결된 계정입니다. 연동 상태를 다시 확인해 주세요.';
   }
 
   return fallback;
@@ -198,14 +198,14 @@ export default function DashboardPage() {
       const result: any = await redeemFn({ code: values.inviteCode.trim() });
 
       if (result.data?.ok) {
-        toast({ title: '媛???꾨즺', description: result.data.message || '?쇳꽣 媛?낆씠 ?꾨즺?섏뿀?듬땲??' });
+        toast({ title: '가입 완료', description: result.data.message || '센터 가입이 완료되었습니다.' });
         setTimeout(() => window.location.reload(), 250);
       }
     } catch (error: any) {
-      const message = resolveCallableErrorMessage(error, '珥덈? 肄붾뱶 媛??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
+      const message = resolveCallableErrorMessage(error, '초대 코드 가입 중 오류가 발생했습니다.');
       toast({
         variant: 'destructive',
-        title: '媛???ㅽ뙣',
+        title: '가입 실패',
         description: message,
       });
     } finally {
@@ -219,7 +219,7 @@ export default function DashboardPage() {
     const normalizedPhone = normalizePhone(values.parentPhoneNumber || '');
     if (normalizedPhone && !isValidKoreanMobilePhone(normalizedPhone)) {
       parentLinkForm.setError('parentPhoneNumber', {
-        message: '?대???踰덊샇瑜?01012345678 ?뺤떇?쇰줈 ?낅젰??二쇱꽭??',
+        message: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
       });
       return;
     }
@@ -234,11 +234,11 @@ export default function DashboardPage() {
       });
 
       if (result.data?.ok) {
-        toast({ title: '?곕룞 ?꾨즺', description: '?숇?紐?怨꾩젙???숈깮怨??곌껐?섏뿀?듬땲??' });
+        toast({ title: '연동 완료', description: '학부모 계정이 학생과 연결되었습니다.' });
         setTimeout(() => window.location.reload(), 250);
       }
     } catch (error: any) {
-      const message = resolveCallableErrorMessage(error, '?숈깮 肄붾뱶 ?곕룞 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
+      const message = resolveCallableErrorMessage(error, '학생 코드 연동 중 오류가 발생했습니다.');
       const lowered = message.toLowerCase();
       const isPhoneError = lowered.includes('phone') || lowered.includes('\uC804\uD654');
       if (isPhoneError) {
@@ -248,7 +248,7 @@ export default function DashboardPage() {
       }
       toast({
         variant: 'destructive',
-        title: '?곕룞 ?ㅽ뙣',
+        title: '연동 실패',
         description: message,
       });
     } finally {
@@ -322,8 +322,8 @@ export default function DashboardPage() {
           <Compass className="h-12 w-12 animate-pulse text-primary" />
         </div>
         <div className="space-y-2 text-center">
-          <p className="text-xl font-black tracking-tighter text-primary">?쇳꽣 ?뺣낫瑜??뺤씤?섍퀬 ?덉뒿?덈떎</p>
-          <p className="text-sm font-bold italic text-muted-foreground">媛??吏곹썑?먮뒗 ?곕룞??紐?珥??뺣룄 吏?곕맆 ???덉뒿?덈떎.</p>
+          <p className="text-xl font-black tracking-tighter text-primary">{'\uC13C\uD130 \uC815\uBCF4\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4'}</p>
+          <p className="text-sm font-bold italic text-muted-foreground">{'\uAC00\uC785 \uC9C1\uD6C4\uC5D0\uB294 \uC5F0\uB3D9\uC5D0 \uBA87 \uCD08 \uC815\uB3C4 \uC9C0\uC5F0\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</p>
         </div>
       </div>
     );
@@ -451,11 +451,11 @@ export default function DashboardPage() {
           <Sparkles className="h-12 w-12 animate-bounce text-primary" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tighter">?꾩쭅 ?뚯냽???쇳꽣媛 ?놁뒿?덈떎</h1>
+          <h1 className="text-4xl font-black tracking-tighter">{'\uC544\uC9C1 \uC18C\uC18D\uB41C \uC13C\uD130\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4'}</h1>
           <p className="mx-auto max-w-sm font-bold leading-relaxed text-muted-foreground">
-            媛??吏곹썑?먮뒗 ?뺣낫 ?숆린?붽? ??뼱吏????덉뒿?덈떎.
+            {'\uAC00\uC785 \uC9C1\uD6C4\uC5D0\uB294 \uC815\uBCF4 \uB3D9\uAE30\uD654\uAC00 \uB2A6\uC5B4\uC9C8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}
             <br />
-            ?ㅼ떆 ?뺤씤???꾨Ⅴ嫄곕굹 肄붾뱶瑜??ㅼ떆 ?낅젰??二쇱꽭??
+            {'\uB2E4\uC2DC \uD655\uC778\uC744 \uB204\uB974\uAC70\uB098 \uCF54\uB4DC\uB97C \uB2E4\uC2DC \uC785\uB825\uD574 \uC8FC\uC138\uC694.'}
           </p>
         </div>
       </div>
@@ -467,20 +467,20 @@ export default function DashboardPage() {
           className="h-14 rounded-2xl border-2 text-base font-black shadow-sm"
           onClick={() => window.location.reload()}
         >
-          <RefreshCw className="mr-2 h-5 w-5" /> ?ㅼ떆 ?뺤씤
+          <RefreshCw className="mr-2 h-5 w-5" /> {'\uB2E4\uC2DC \uD655\uC778'}
         </Button>
 
         <Dialog>
           <DialogTrigger asChild>
             <Button size="lg" className="h-14 rounded-2xl text-base font-black shadow-xl">
-              珥덈? 肄붾뱶濡?媛??
+              {'\uCD08\uB300 \uCF54\uB4DC\uB85C \uAC00\uC785'}
             </Button>
           </DialogTrigger>
           <DialogContent className="rounded-[2.5rem] border-none p-8 shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-3xl font-black tracking-tighter">珥덈? 肄붾뱶 ?낅젰</DialogTitle>
+              <DialogTitle className="text-3xl font-black tracking-tighter">{'\uCD08\uB300 \uCF54\uB4DC \uC785\uB825'}</DialogTitle>
               <DialogDescription className="pt-2 font-bold">
-                ?쇳꽣?먯꽌 諛쏆? 珥덈? 肄붾뱶濡?媛?낆쓣 ?꾨즺?⑸땲??
+                {'\uC13C\uD130\uC5D0\uC11C \uBC1B\uC740 \uCD08\uB300 \uCF54\uB4DC\uB85C \uAC00\uC785\uC744 \uC644\uB8CC\uD569\uB2C8\uB2E4.'}
               </DialogDescription>
             </DialogHeader>
             <Form {...inviteForm}>
@@ -491,11 +491,11 @@ export default function DashboardPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
-                        珥덈? 肄붾뱶
+                         {'\uCD08\uB300 \uCF54\uB4DC'}
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="?? 0313"
+                          placeholder={'\uC608: 0313'}
                           {...field}
                           className="h-14 rounded-xl border-2 text-xl font-black tracking-widest"
                         />
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                 />
                 <DialogFooter>
                   <Button type="submit" disabled={isInviteSubmitting} className="h-14 w-full rounded-2xl text-lg font-black shadow-lg">
-                    {isInviteSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '?쇳꽣 媛???꾨즺'}
+                    {isInviteSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '\uC13C\uD130 \uAC00\uC785 \uC644\uB8CC'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -517,14 +517,14 @@ export default function DashboardPage() {
         <Dialog>
           <DialogTrigger asChild>
             <Button size="lg" variant="secondary" className="h-14 rounded-2xl text-base font-black shadow-xl">
-              <Link2 className="mr-2 h-5 w-5" /> ?숇?紐?肄붾뱶 ?곕룞
+              <Link2 className="mr-2 h-5 w-5" /> 학부모 코드 연동
             </Button>
           </DialogTrigger>
           <DialogContent className="rounded-[2.5rem] border-none p-8 shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-3xl font-black tracking-tighter">?숇?紐??먮?肄붾뱶 ?곕룞</DialogTitle>
+              <DialogTitle className="text-3xl font-black tracking-tighter">학부모 자녀코드 연동</DialogTitle>
               <DialogDescription className="pt-2 font-bold">
-                ?숈깮???ㅼ젙??6?먮━ 肄붾뱶瑜??낅젰?섎㈃ ?숇?紐?怨꾩젙??利됱떆 ?곌껐?⑸땲??
+                학생 계정의 6자리 코드를 입력하면 학부모 계정과 즉시 연결됩니다.
               </DialogDescription>
             </DialogHeader>
             <Form {...parentLinkForm}>
@@ -535,7 +535,7 @@ export default function DashboardPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
-                        ?숈깮 肄붾뱶(6?먮━)
+                        학생 코드(6자리)
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -556,7 +556,7 @@ export default function DashboardPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
-                        ?숇?紐??꾪솕踰덊샇 (?좏깮)
+                        학부모 전화번호 (선택)
                       </FormLabel>
                       <FormControl>
                         <div className="relative">
@@ -570,7 +570,7 @@ export default function DashboardPage() {
                         </div>
                       </FormControl>
                       <p className="text-[10px] font-bold text-muted-foreground">
-                        理쒖큹 ?곕룞 怨꾩젙?대㈃ ?꾩닔?대ŉ, 湲곗〈 ?곕룞 怨꾩젙? 鍮꾩썙???⑸땲??
+                        최초 연동 계정이면 필수이며, 기존 연동 계정은 비워도 됩니다.
                       </p>
                       <FormMessage />
                     </FormItem>
@@ -579,7 +579,7 @@ export default function DashboardPage() {
 
                 <DialogFooter>
                   <Button type="submit" disabled={isParentLinkSubmitting} className="h-14 w-full rounded-2xl text-lg font-black shadow-lg">
-                    {isParentLinkSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '?숈깮怨??곕룞?섍린'}
+                    {isParentLinkSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '학생과 연동하기'}
                   </Button>
                 </DialogFooter>
               </form>

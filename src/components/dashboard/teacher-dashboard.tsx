@@ -813,18 +813,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedSeat.lastCheckInAt) {
         const nowTs = Date.now();
         const startTime = selectedSeat.lastCheckInAt.toMillis();
+        const sessionDateKey = format(selectedSeat.lastCheckInAt.toDate(), 'yyyy-MM-dd');
         const sessionSeconds = Math.max(0, Math.floor((nowTs - startTime) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
 
         if (sessionSeconds > 0) {
-          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
-          batch.set(logRef, { totalMinutes: increment(sessionMinutes), studentId, centerId, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
+          batch.set(logRef, { totalMinutes: increment(sessionMinutes), studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
 
-          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
           batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
 
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
-          batch.set(statRef, { totalStudyMinutes: increment(sessionMinutes), studentId, centerId, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
+          batch.set(statRef, { totalStudyMinutes: increment(sessionMinutes), studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
 
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
           const progressSnap = await getDoc(progressRef);
@@ -842,7 +843,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               focus: increment((sessionMinutes / 60) * 0.1),
             },
             dailyLpStatus: {
-              [todayKey]: {
+              [sessionDateKey]: {
                 dailyLpAmount: increment(studyLpEarned),
               },
             },

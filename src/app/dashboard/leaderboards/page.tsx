@@ -116,7 +116,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
 
   const formatAffiliation = (entry: WithId<LeaderboardEntry>, profile?: StudentProfile) => {
     const classLabel = profile?.className || entry.classNameSnapshot || '반 미지정';
-    const schoolLabel = profile?.schoolName || '학교 정보 없음';
+    const schoolLabel = profile?.schoolName || entry.schoolNameSnapshot || '학교 정보 없음';
     return `${classLabel} · ${schoolLabel}`;
   };
 

@@ -89,6 +89,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       studentId: sUid,
       displayNameSnapshot: sInfo.name,
       classNameSnapshot: sInfo.class,
+      schoolNameSnapshot: '트랙고등학교',
       value: sInfo.lp,
       rank: sInfo.rank,
       updatedAt: timestamp

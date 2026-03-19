@@ -164,16 +164,22 @@ export function AppointmentsPageContent({
   const isStaff = userRole === 'teacher' || userRole === 'centerAdmin';
   const isAdmin = userRole === 'centerAdmin';
   const canAccessCommunications = isStaff || isStudent;
+  const shouldLoadReservations = activeTab === 'reservations' || showAll;
+  const shouldLoadLogs = activeTab === 'logs' || showAll;
+  const shouldLoadCommunications = activeTab === 'inquiries' || activeTab === 'parent' || showAll;
+  const shouldLoadTeachers = isStaff || isRequestModalOpen;
 
   // 상담 희망 선생님 목록
   const teachersQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !shouldLoadTeachers) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'),
       where('role', '==', 'teacher')
     );
-  }, [firestore, centerId]);
-  const { data: allStaff } = useCollection<CenterMembership>(teachersQuery);
+  }, [firestore, centerId, shouldLoadTeachers]);
+  const { data: allStaff } = useCollection<CenterMembership>(teachersQuery, {
+    enabled: !!centerId && shouldLoadTeachers,
+  });
 
   const filteredTeachers = useMemo(() => {
     if (!allStaff) return [];
@@ -198,7 +204,7 @@ export function AppointmentsPageContent({
 
   // 예약 내역 쿼리
   const reservationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentUid || !userRole) return null;
+    if (!firestore || !centerId || !studentUid || !userRole || !shouldLoadReservations) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingReservations');
     
     if (isStaff) return query(baseRef);
@@ -206,13 +212,15 @@ export function AppointmentsPageContent({
     if (isParent && linkedStudentIds.length > 0) return query(baseRef, where('studentId', 'in', linkedStudentIds));
     
     return null;
-  }, [firestore, centerId, studentUid, userRole, isStaff, isStudent, isParent, linkedIdsKey]);
+  }, [firestore, centerId, studentUid, userRole, isStaff, isStudent, isParent, linkedIdsKey, shouldLoadReservations]);
 
-  const { data: rawReservations, isLoading: resLoading } = useCollection<CounselingReservation>(reservationsQuery);
+  const { data: rawReservations, isLoading: resLoading } = useCollection<CounselingReservation>(reservationsQuery, {
+    enabled: !!centerId && !!studentUid && !!userRole && shouldLoadReservations,
+  });
 
   // 상담 일지 쿼리
   const logsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentUid || !userRole) return null;
+    if (!firestore || !centerId || !studentUid || !userRole || !shouldLoadLogs) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'counselingLogs');
     
     if (isStaff) return query(baseRef);
@@ -220,20 +228,24 @@ export function AppointmentsPageContent({
     if (isParent && linkedStudentIds.length > 0) return query(baseRef, where('studentId', 'in', linkedStudentIds));
     
     return null;
-  }, [firestore, centerId, studentUid, userRole, isStaff, isStudent, isParent, linkedIdsKey]);
+  }, [firestore, centerId, studentUid, userRole, isStaff, isStudent, isParent, linkedIdsKey, shouldLoadLogs]);
 
-  const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery);
+  const { data: rawLogs, isLoading: logsLoading } = useCollection<CounselingLog>(logsQuery, {
+    enabled: !!centerId && !!studentUid && !!userRole && shouldLoadLogs,
+  });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentUid || !canAccessCommunications) return null;
+    if (!firestore || !centerId || !studentUid || !canAccessCommunications || !shouldLoadCommunications) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'parentCommunications');
 
     if (isStaff) return query(baseRef);
     if (isStudent) return query(baseRef, where('senderUid', '==', studentUid));
 
     return null;
-  }, [firestore, centerId, studentUid, canAccessCommunications, isStaff, isStudent]);
-  const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, { enabled: canAccessCommunications && !!centerId && !!studentUid });
+  }, [firestore, centerId, studentUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
+  const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
+    enabled: canAccessCommunications && !!centerId && !!studentUid && shouldLoadCommunications,
+  });
 
   const reservations = useMemo(() => {
     if (!rawReservations) return [];

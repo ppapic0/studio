@@ -141,6 +141,15 @@ function formatTimer(totalSecs: number) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
+function formatMinutesToKorean(minutes: number): string {
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const remain = safe % 60;
+  if (hours <= 0) return `${remain}분`;
+  if (remain === 0) return `${hours}시간`;
+  return `${hours}시간 ${remain}분`;
+}
+
 function calculateRhythmScore(minutes: number[]): number {
   if (!minutes.length) return 0;
   const safeMinutes = minutes.map((value) => Math.max(0, Math.round(value)));
@@ -181,7 +190,7 @@ function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: 
   }
 }
 
-function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string }) {
+function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className, schoolName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string, schoolName?: string }) {
   const [stats, setStats] = useState(currentStats);
   const [lp, setLp] = useState(currentLp);
   const [mockRank, setMockRank] = useState(999);
@@ -205,6 +214,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         studentId: userId, 
         displayNameSnapshot: displayName, 
         classNameSnapshot: className || null, 
+        schoolNameSnapshot: schoolName || null,
         value: lp, 
         rank: mockRank, 
         updatedAt: serverTimestamp() 
@@ -300,7 +310,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           </CardHeader>
           <CardContent className={cn("px-10 pb-10", isMobile ? "px-5 pb-6" : "")}>
             <div className={cn("dashboard-number text-amber-600", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
-              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>점</span>
+              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
                 <Badge
@@ -345,7 +355,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
                     </div>
                     <div className="text-right">
                       <span className="dashboard-number text-sm text-primary">{(data.dailyLpAmount || 0).toLocaleString()}</span>
-                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40 whitespace-nowrap">점</span>
+                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40 whitespace-nowrap">포인트</span>
                     </div>
                   </div>
                 );
@@ -449,19 +459,19 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
   );
 }
 
-function RhythmScoreDialog({
-  rhythmScore,
-  rhythmTrend,
+function StudyTimeTrendDialog({
+  studyTimeTrend,
   isMobile,
 }: {
-  rhythmScore: number;
-  rhythmTrend: Array<{ date: string; score: number; minutes: number }>;
+  studyTimeTrend: Array<{ date: string; minutes: number }>;
   isMobile: boolean;
 }) {
   const avgMinutes = useMemo(() => {
-    if (!rhythmTrend.length) return 0;
-    return Math.round(rhythmTrend.reduce((sum, item) => sum + item.minutes, 0) / rhythmTrend.length);
-  }, [rhythmTrend]);
+    if (!studyTimeTrend.length) return 0;
+    return Math.round(studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0) / studyTimeTrend.length);
+  }, [studyTimeTrend]);
+  const totalMinutes = useMemo(() => studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0), [studyTimeTrend]);
+  const latestMinutes = studyTimeTrend[studyTimeTrend.length - 1]?.minutes || 0;
 
   return (
     <Dialog>
@@ -472,29 +482,30 @@ function RhythmScoreDialog({
         )}>
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
             <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>
-              학습 리듬 점수
+              최근 7일 공부시간 추이
             </CardTitle>
-            <div className={cn("bg-emerald-50 rounded-xl text-emerald-600", isMobile ? "p-2" : "p-2.5")}>
-              <TrendingUp className={cn("text-emerald-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
+            <div className={cn("bg-sky-50 rounded-xl text-sky-600", isMobile ? "p-2" : "p-2.5")}>
+              <Clock className={cn("text-sky-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
           <CardContent className={cn("px-8 pb-6", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("dashboard-number text-emerald-600", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
-              {rhythmScore}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>점</span>
+            <div className={cn("dashboard-number text-sky-700", isMobile ? "text-2xl" : "text-4xl sm:text-5xl")}>
+              {formatMinutesToKorean(avgMinutes)}
             </div>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">최근 7일 평균 공부시간</p>
             <div className={cn("mt-3 h-20 w-full", isMobile ? "h-16" : "h-20")}>
               <ResponsiveContainer width="100%" height="100%">
-                <RechartsLineChart data={rhythmTrend}>
+                <RechartsLineChart data={studyTimeTrend}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} hide />
+                  <YAxis hide />
                   <Line
                     type="monotone"
-                    dataKey="score"
-                    stroke="#14295F"
+                    dataKey="minutes"
+                    stroke="#0ea5e9"
                     strokeWidth={2.5}
-                    dot={{ r: 2.5, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 1 }}
-                    activeDot={{ r: 4, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 1 }}
+                    dot={{ r: 2.5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1 }}
+                    activeDot={{ r: 4, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1 }}
                   />
                 </RechartsLineChart>
               </ResponsiveContainer>
@@ -507,9 +518,9 @@ function RhythmScoreDialog({
         <div className={cn("bg-[#14295F] text-white relative", isMobile ? "p-6" : "p-10")}>
           <Activity className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>최근 7일 학습 리듬 점수</DialogTitle>
+            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>최근 7일 공부시간 추이</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">
-              매일 공부시간 변동을 기반으로 계산한 리듬 안정성입니다.
+              일자별 실제 공부시간 흐름을 확인할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -517,41 +528,45 @@ function RhythmScoreDialog({
         <div className={cn("p-6 space-y-6 bg-white max-h-[60vh] overflow-y-auto custom-scrollbar", isMobile ? "p-4" : "")}>
           <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-3")}>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">현재 점수</p>
-              <p className="dashboard-number text-2xl text-[#14295F]">{rhythmScore}<span className="ml-1 text-sm opacity-40">점</span></p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">최근 7일 총 공부시간</p>
+              <p className="dashboard-number text-2xl text-[#14295F]">{formatMinutesToKorean(totalMinutes)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">평균 학습시간</p>
-              <p className="dashboard-number text-2xl text-[#14295F]">{avgMinutes}<span className="ml-1 text-sm opacity-40">분</span></p>
+              <p className="dashboard-number text-2xl text-[#14295F]">{formatMinutesToKorean(avgMinutes)}</p>
             </div>
             <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 p-3", isMobile ? "col-span-2" : "")}>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">분석 기준</p>
-              <p className="text-xs font-bold text-slate-700 mt-1">일자별 학습시간 표준편차 기반 리듬 안정성 점수</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">오늘 공부시간</p>
+              <p className="text-xs font-bold text-slate-700 mt-1">{formatMinutesToKorean(latestMinutes)}</p>
             </div>
           </div>
 
           <div className={cn("w-full", isMobile ? "h-56" : "h-64")}>
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsLineChart data={rhythmTrend} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+              <RechartsLineChart data={studyTimeTrend} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} width={30} />
+                <YAxis
+                  tick={{ fontSize: 11, fontWeight: 700 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                  tickFormatter={(value: number) => `${Math.round(value / 60)}h`}
+                />
                 <Tooltip
                   cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: 'none' }}
-                  formatter={(value: number, name: string, payload) => {
-                    if (name === 'score') return [`${value}점`, '리듬 점수'];
-                    const minutes = Number(payload?.payload?.minutes || 0);
-                    return [`${minutes}분`, '학습 시간'];
+                  formatter={(value: number) => {
+                    return [formatMinutesToKorean(Number(value || 0)), '공부시간'];
                   }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="score"
-                  stroke="#14295F"
+                  dataKey="minutes"
+                  stroke="#0ea5e9"
                   strokeWidth={3}
-                  dot={{ r: 3.5, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 1.5 }}
-                  activeDot={{ r: 5, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 2 }}
+                  dot={{ r: 3.5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1.5 }}
+                  activeDot={{ r: 5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 2 }}
                 />
               </RechartsLineChart>
             </ResponsiveContainer>
@@ -744,10 +759,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [progress?.stats]);
 
-  const rhythmTrend = useMemo(() => {
-    if (!today) return [] as Array<{ date: string; score: number; minutes: number }>;
-
-    const trendBase = Array.from({ length: 7 }, (_, index) => {
+  const studyTimeTrend = useMemo(() => {
+    if (!today) return [] as Array<{ date: string; minutes: number }>;
+    return Array.from({ length: 7 }, (_, index) => {
       const day = subDays(today, 6 - index);
       const dateKey = format(day, 'yyyy-MM-dd');
       return {
@@ -755,22 +769,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         minutes: logMinutesByDateKey.get(dateKey) || 0,
       };
     });
-
-    return trendBase.map((point, index) => {
-      const windowStart = Math.max(0, index - 2);
-      const windowMinutes = trendBase.slice(windowStart, index + 1).map((item) => item.minutes);
-      return {
-        ...point,
-        score: calculateRhythmScore(windowMinutes),
-      };
-    });
   }, [today, logMinutesByDateKey]);
-
-  const rhythmScore = useMemo(() => {
-    const nonZeroPoints = rhythmTrend.filter((point) => point.minutes > 0 || point.score > 0);
-    if (nonZeroPoints.length === 0) return Math.round(stats.consistency);
-    return Math.round(nonZeroPoints.reduce((sum, point) => sum + point.score, 0) / nonZeroPoints.length);
-  }, [rhythmTrend, stats.consistency]);
 
   const examCountdowns = useMemo(() => {
     const todayStart = new Date();
@@ -900,33 +899,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
 
         const safeSeatStart = seatDoc?.data?.()?.lastCheckInAt || Timestamp.fromMillis(safeStartTs);
+        const sessionStartAt = toDateSafeAttendance(safeSeatStart) || new Date(safeStartTs);
+        const sessionDateKey = format(sessionStartAt, 'yyyy-MM-dd');
+        const sessionStudyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey);
         const sessionId = `session_${safeSeatStart.toMillis()}`;
         const sessionSeconds = Math.max(0, Math.floor((nowTs - safeStartTs) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
 
         const batch = writeBatch(firestore);
         const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
-        const existingTodayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
-        const dailyStatusUpdate: Record<string, any> = { ...existingTodayStatus };
+        const existingSessionDayStatus = (progress?.dailyLpStatus?.[sessionDateKey] || {}) as Record<string, any>;
+        const dailyStatusUpdate: Record<string, any> = { ...existingSessionDayStatus };
         const statsUpdate: Record<string, any> = {};
         let finalNewLp = progress?.seasonLp || 0;
         let earnedLpThisSession = false;
         let wroteSomething = false;
 
         if (sessionSeconds > 0) {
+          const currentCumulativeMinutes = sessionDateKey === todayKey
+            ? Number(todayStudyLog?.totalMinutes || 0)
+            : 0;
+          let existingSessionDayMinutes = currentCumulativeMinutes;
+          if (sessionDateKey !== todayKey) {
+            const sessionDaySnap = await getDoc(sessionStudyLogRef);
+            existingSessionDayMinutes = Number(sessionDaySnap.data()?.totalMinutes || 0);
+          }
+
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
           statsUpdate.focus = increment((sessionMinutes / 60) * 0.1);
 
-          const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
-          const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
+          const totalMinutesAfterSession = existingSessionDayMinutes + sessionMinutes;
 
-          if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
+          if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[sessionDateKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
             dailyStatusUpdate.attendance = true;
             toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 \uD3EC\uC778\uD2B8 \uD68D\uB4DD' });
           }
 
-          if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
+          if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[sessionDateKey]?.bonus6h) {
             statsUpdate.resilience = increment(0.5);
             dailyStatusUpdate.bonus6h = true;
             toast({ title: '\u0036\uC2DC\uAC04 \uC5F0\uC18D \uD559\uC2B5! \uD68C\uBCF5\uB825 \uC2A4\uD0EF \uC0C1\uC2B9' });
@@ -942,32 +952,30 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
           if (Object.keys(dailyStatusUpdate).length > 0) {
             progressUpdate.dailyLpStatus = {
-              [todayKey]: dailyStatusUpdate,
+              [sessionDateKey]: dailyStatusUpdate,
             };
           }
 
-          if (studyLogRef) {
-            batch.set(studyLogRef, {
-              totalMinutes: increment(sessionMinutes),
-              studentId: user.uid,
-              centerId: activeMembership.id,
-              dateKey: todayKey,
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-            wroteSomething = true;
-          }
-
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
-          batch.set(statRef, {
-            totalStudyMinutes: increment(sessionMinutes),
+          batch.set(sessionStudyLogRef, {
+            totalMinutes: increment(sessionMinutes),
             studentId: user.uid,
-            centerId,
-            dateKey: todayKey,
+            centerId: activeMembership.id,
+            dateKey: sessionDateKey,
             updatedAt: serverTimestamp(),
           }, { merge: true });
           wroteSomething = true;
 
-          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions', sessionId);
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', user.uid);
+          batch.set(statRef, {
+            totalStudyMinutes: increment(sessionMinutes),
+            studentId: user.uid,
+            centerId,
+            dateKey: sessionDateKey,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+          wroteSomething = true;
+
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions', sessionId);
           batch.set(sessionRef, {
             startTime: safeSeatStart,
             endTime: Timestamp.fromMillis(nowTs),
@@ -1027,9 +1035,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
 
-        if (stopCommitError && studyLogRef) {
+        if (stopCommitError && sessionStudyLogRef) {
           try {
-            const fallbackSessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions', sessionId);
+            const fallbackSessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions', sessionId);
             const existingSessionSnap = await getDoc(fallbackSessionRef);
             if (existingSessionSnap.exists()) {
               if (stopSeatRef && stopSeatPayload) {
@@ -1044,7 +1052,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             const fallbackStudyLogData: any = {
               studentId: user.uid,
               centerId: activeMembership.id,
-              dateKey: todayKey,
+              dateKey: sessionDateKey,
               updatedAt: serverTimestamp(),
             };
 
@@ -1052,7 +1060,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               fallbackStudyLogData.totalMinutes = increment(sessionMinutes);
             }
 
-            await setDoc(studyLogRef, fallbackStudyLogData, { merge: true });
+            await setDoc(sessionStudyLogRef, fallbackStudyLogData, { merge: true });
             if (sessionSeconds > 0) {
               await setDoc(progressRef, progressUpdate, { merge: true });
             }
@@ -1083,6 +1091,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               studentId: user.uid,
               displayNameSnapshot: user.displayName || '학생',
               classNameSnapshot: activeMembership.className || null,
+              schoolNameSnapshot: studentProfile?.schoolName || null,
               value: finalNewLp,
               updatedAt: serverTimestamp(),
             }, { merge: true });
@@ -1352,6 +1361,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             studentId: user.uid,
             displayNameSnapshot: user.displayName || '학생',
             classNameSnapshot: activeMembership.className || null,
+            schoolNameSnapshot: studentProfile?.schoolName || null,
             value: finalNewLp,
             updatedAt: serverTimestamp(),
           }, { merge: true });
@@ -1801,7 +1811,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={hDisplay} m={mDisplay} isMobile={isMobile} />
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
         <div className={cn(isMobile ? "col-span-2" : "")}>
-          <RhythmScoreDialog rhythmScore={rhythmScore} rhythmTrend={rhythmTrend} isMobile={isMobile} />
+          <StudyTimeTrendDialog studyTimeTrend={studyTimeTrend} isMobile={isMobile} />
         </div>
       </div>
 
@@ -2128,7 +2138,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </Dialog>
       </section>
 
-      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} />}
+      {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} schoolName={studentProfile?.schoolName} />}
     </div>
   );
 }

@@ -209,6 +209,7 @@ export interface LeaderboardEntry {
   studentId: string;
   displayNameSnapshot: string;
   classNameSnapshot?: string;
+  schoolNameSnapshot?: string;
   value: number;
   rank: number;
 }

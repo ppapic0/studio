@@ -112,6 +112,7 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
         studentId: userId, 
         displayNameSnapshot: displayName, 
         classNameSnapshot: className || null, 
+        schoolNameSnapshot: null,
         value: lp, 
         rank: mockRank, 
         updatedAt: serverTimestamp() 
@@ -429,8 +430,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       if (isTimerActive) {
         const nowTs = Date.now();
-        const sessionSeconds = Math.max(0, Math.floor((nowTs - (startTime || nowTs)) / 1000));
+        const sessionStartTs = startTime || nowTs;
+        const sessionDateKey = format(new Date(sessionStartTs), 'yyyy-MM-dd');
+        const sessionSeconds = Math.max(0, Math.floor((nowTs - sessionStartTs) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+        const sessionStudyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey);
         
         const batch = writeBatch(firestore);
         const updateData: any = { updatedAt: serverTimestamp() };
@@ -446,38 +450,42 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
           updateData['stats.focus'] = increment((sessionMinutes / 60) * 0.1); 
 
-          const currentCumulativeMinutes = todayStudyLog?.totalMinutes || 0;
+          let currentCumulativeMinutes = sessionDateKey === todayKey ? (todayStudyLog?.totalMinutes || 0) : 0;
+          if (sessionDateKey !== todayKey) {
+            const sessionDaySnap = await getDoc(sessionStudyLogRef);
+            currentCumulativeMinutes = Number(sessionDaySnap.data()?.totalMinutes || 0);
+          }
           const totalMinutesAfterSession = currentCumulativeMinutes + sessionMinutes;
           
-          if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[todayKey]?.attendance) {
+          if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[sessionDateKey]?.attendance) {
             studyLpEarned += Math.round(100 * finalMultiplier);
-            updateData[`dailyLpStatus.${todayKey}.attendance`] = true;
+            updateData[`dailyLpStatus.${sessionDateKey}.attendance`] = true;
             toast({ title: "3시간 달성! 출석 보너스 포인트 획득 🎉" });
           }
 
-          if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[todayKey]?.bonus6h) {
+          if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[sessionDateKey]?.bonus6h) {
             updateData['stats.resilience'] = increment(0.5);
-            updateData[`dailyLpStatus.${todayKey}.bonus6h`] = true;
+            updateData[`dailyLpStatus.${sessionDateKey}.bonus6h`] = true;
             toast({ title: "6시간 몰입 달성! 회복력 스탯 상승 🎉" });
           }
 
           finalNewLp += studyLpEarned;
           updateData.seasonLp = increment(studyLpEarned);
-          updateData[`dailyLpStatus.${todayKey}.dailyLpAmount`] = increment(studyLpEarned);
+          updateData[`dailyLpStatus.${sessionDateKey}.dailyLpAmount`] = increment(studyLpEarned);
           
-          batch.set(studyLogRef!, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: todayKey, updatedAt: serverTimestamp() }, { merge: true });
+          batch.set(sessionStudyLogRef, { totalMinutes: increment(sessionMinutes), studentId: user.uid, centerId: activeMembership.id, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
           
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', user.uid);
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', user.uid);
           batch.set(statRef, { 
             totalStudyMinutes: increment(sessionMinutes), 
             studentId: user.uid, 
             centerId, 
-            dateKey: todayKey, 
+            dateKey: sessionDateKey, 
             updatedAt: serverTimestamp() 
           }, { merge: true });
 
-          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions'));
-          batch.set(sessionRef, { startTime: Timestamp.fromMillis(startTime!), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions'));
+          batch.set(sessionRef, { startTime: Timestamp.fromMillis(sessionStartTs), endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
           
           batch.update(progressRef, updateData);
 
@@ -487,6 +495,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             studentId: user.uid,
             displayNameSnapshot: user.displayName || '학생',
             classNameSnapshot: activeMembership.className || null,
+            schoolNameSnapshot: null,
             value: finalNewLp,
             updatedAt: serverTimestamp()
           }, { merge: true });
@@ -701,6 +710,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           studentId: user.uid,
           displayNameSnapshot: user.displayName || '학생',
           classNameSnapshot: activeMembership.className || null,
+          schoolNameSnapshot: null,
           value: finalNewLp,
           updatedAt: serverTimestamp()
         }, { merge: true });
