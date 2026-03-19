@@ -730,7 +730,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         currentTier.gradient, "shadow-primary/20",
         isMobile ? "rounded-[1.25rem] p-4" : "rounded-[3rem] p-12"
       )}>
-        <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+        <div className="pointer-events-none absolute top-0 right-0 p-8 sm:p-12 opacity-10 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 flex flex-col gap-3", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
@@ -757,6 +757,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             )}
             <div className="flex flex-col gap-2 w-full md:w-auto">
               <button 
+                type="button"
                 disabled={isProcessingAction}
                 className={cn(
                   "w-full rounded-xl font-black transition-all md:w-auto shadow-2xl active:scale-95 border-none flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",

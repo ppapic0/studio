@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
-import { useUser, useFunctions } from '@/firebase';
+import { useUser, useFunctions, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { Loader2, RefreshCw, Compass, Sparkles, Link2, Phone } from 'lucide-react';
+import { Loader2, RefreshCw, Compass, Sparkles, Link2, Phone, CalendarClock, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,7 +26,36 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { type StudentProfile } from '@/lib/types';
+
+type ExamCountdownSetting = {
+  id: string;
+  title: string;
+  date: string;
+};
+
+const DEFAULT_EXAM_COUNTDOWNS: ExamCountdownSetting[] = [
+  { id: 'mock', title: '모의고사', date: '' },
+  { id: 'school', title: '내신', date: '' },
+];
+
+function normalizeExamCountdowns(input: unknown): ExamCountdownSetting[] {
+  if (!Array.isArray(input)) return DEFAULT_EXAM_COUNTDOWNS;
+  const normalized = input
+    .map((item, index) => {
+      const row = item as Partial<ExamCountdownSetting>;
+      return {
+        id: typeof row.id === 'string' && row.id.length > 0 ? row.id : `exam_${index + 1}`,
+        title: typeof row.title === 'string' ? row.title.trim() : '',
+        date: typeof row.date === 'string' ? row.date.trim() : '',
+      };
+    })
+    .filter((item) => item.title.length > 0 || item.date.length > 0);
+
+  return normalized.length > 0 ? normalized : DEFAULT_EXAM_COUNTDOWNS;
+}
 
 const inviteFormSchema = z.object({
   inviteCode: z.string().trim().min(1, '초대 코드를 입력해 주세요.'),
@@ -96,12 +125,51 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
 
 export default function DashboardPage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const functions = useFunctions();
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const [isInviteSubmitting, setIsInviteSubmitting] = useState(false);
   const [isParentLinkSubmitting, setIsParentLinkSubmitting] = useState(false);
+  const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
+  const [isExamSaving, setIsExamSaving] = useState(false);
+  const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
+  const isStudentRole = activeMembership?.role === 'student';
+
+  const studentProfileRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
+  }, [firestore, activeMembership, user]);
+  const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
+
+  useEffect(() => {
+    setExamDrafts(normalizeExamCountdowns(studentProfile?.examCountdowns));
+  }, [studentProfile?.examCountdowns]);
+
+  const examCountdowns = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayMs = todayStart.getTime();
+
+    return normalizeExamCountdowns(studentProfile?.examCountdowns)
+      .map((item) => {
+        const parsed = item.date ? new Date(`${item.date}T00:00:00`) : null;
+        const targetMs = parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : null;
+        if (!targetMs) return { ...item, dLabel: '날짜 미설정', daysLeft: null as number | null };
+
+        const diffDays = Math.ceil((targetMs - todayMs) / (1000 * 60 * 60 * 24));
+        const dLabel = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-Day' : `D+${Math.abs(diffDays)}`;
+        return { ...item, dLabel, daysLeft: diffDays };
+      })
+      .sort((a, b) => {
+        const aSort = a.daysLeft === null ? 9999 : Math.abs(a.daysLeft);
+        const bSort = b.daysLeft === null ? 9999 : Math.abs(b.daysLeft);
+        return aSort - bSort;
+      });
+  }, [studentProfile?.examCountdowns]);
+
+  const primaryExam = examCountdowns[0];
 
   const inviteForm = useForm<z.infer<typeof inviteFormSchema>>({
     resolver: zodResolver(inviteFormSchema),
@@ -179,6 +247,64 @@ export default function DashboardPage() {
     }
   }
 
+  const handleAddExamDraft = () => {
+    setExamDrafts((prev) => {
+      if (prev.length >= 6) return prev;
+      return [...prev, { id: `exam_${Date.now()}`, title: '', date: '' }];
+    });
+  };
+
+  const handleRemoveExamDraft = (id: string) => {
+    setExamDrafts((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((item) => item.id !== id);
+    });
+  };
+
+  const handleExamDraftChange = (id: string, key: 'title' | 'date', value: string) => {
+    setExamDrafts((prev) => prev.map((item) => (item.id === id ? { ...item, [key]: value } : item)));
+  };
+
+  const handleSaveExamCountdowns = async () => {
+    if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return;
+
+    const payload = examDrafts
+      .map((item) => ({
+        id: item.id || `exam_${Date.now()}`,
+        title: item.title.trim(),
+        date: item.date.trim(),
+      }))
+      .filter((item) => item.title.length > 0 || item.date.length > 0);
+
+    if (!payload.length) {
+      toast({
+        variant: 'destructive',
+        title: '시험 설정 저장 실패',
+        description: '최소 1개 시험명 또는 날짜를 입력해 주세요.',
+      });
+      return;
+    }
+
+    setIsExamSaving(true);
+    try {
+      await setDoc(
+        doc(firestore, 'centers', activeMembership.id, 'students', user.uid),
+        { examCountdowns: payload, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      setIsExamDialogOpen(false);
+      toast({ title: '시험 디데이 설정 완료' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '시험 설정 저장 실패',
+        description: '잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setIsExamSaving(false);
+    }
+  };
+
   if (membershipsLoading) {
     return (
       <div className="flex h-[70vh] w-full flex-col items-center justify-center gap-6">
@@ -220,6 +346,85 @@ export default function DashboardPage() {
           >
             {userRole === 'parent' ? '학부모' : '학생'}
           </Badge>
+
+          {userRole === 'student' && (
+            <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'ml-auto h-auto min-h-10 rounded-xl border-primary/20 bg-white px-3 py-2 text-left shadow-sm',
+                    isMobile ? 'w-full justify-between' : 'min-w-[180px] justify-between'
+                  )}
+                >
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-primary/55">시험 디데이</p>
+                    <p className="text-sm font-black leading-none text-primary">
+                      {primaryExam?.title?.trim() ? primaryExam.title : '설정하기'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-white">
+                    {primaryExam?.dLabel ?? '미설정'}
+                  </span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className={cn('overflow-hidden rounded-2xl border-slate-200 p-0', isMobile ? 'max-w-[94vw]' : 'sm:max-w-lg')}>
+                <div className="bg-primary p-5 text-white">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 설정</DialogTitle>
+                    <DialogDescription className="text-white/80">시험 일정은 학생별로 따로 저장돼요.</DialogDescription>
+                  </DialogHeader>
+                </div>
+                <div className="space-y-3 bg-white p-4 sm:p-5">
+                  {examDrafts.map((item, index) => (
+                    <div key={item.id} className="grid grid-cols-[1fr_132px_auto] items-center gap-2">
+                      <Input
+                        value={item.title}
+                        onChange={(e) => handleExamDraftChange(item.id, 'title', e.target.value)}
+                        placeholder={`시험명 ${index + 1}`}
+                        className="h-10 rounded-xl border-primary/15 font-bold"
+                      />
+                      <Input
+                        type="date"
+                        value={item.date}
+                        onChange={(e) => handleExamDraftChange(item.id, 'date', e.target.value)}
+                        className="h-10 rounded-xl border-primary/15 font-bold"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                        onClick={() => handleRemoveExamDraft(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full rounded-xl border-dashed font-black"
+                    onClick={handleAddExamDraft}
+                    disabled={examDrafts.length >= 6}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    시험 추가
+                  </Button>
+                </div>
+                <DialogFooter className="border-t bg-white p-4 sm:p-5">
+                  <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold" onClick={() => setIsExamDialogOpen(false)}>
+                    닫기
+                  </Button>
+                  <Button type="button" className="h-10 rounded-xl font-black" onClick={handleSaveExamCountdowns} disabled={isExamSaving}>
+                    {isExamSaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1.5 h-4 w-4" />}
+                    저장
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>

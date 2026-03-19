@@ -929,7 +929,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           wroteSomething = true;
 
           const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', todayKey, 'sessions', sessionId);
-          batch.create(sessionRef, {
+          batch.set(sessionRef, {
             startTime: safeSeatStart,
             endTime: Timestamp.fromMillis(nowTs),
             durationMinutes: sessionMinutes,
@@ -1554,7 +1554,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         borderColor: tierTheme.heroBorder,
         backgroundImage: tierTheme.heroGradient,
       }}>
-        <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-[0.08] rotate-12">
+        <div className="pointer-events-none absolute top-0 right-0 p-8 sm:p-12 opacity-[0.08] rotate-12">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 flex flex-col gap-4", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
@@ -1579,13 +1579,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>성과 엔진 활성</span>
             </div>
 
-            <div
-              className={cn(
-                "rounded-2xl border bg-white/95 text-[#14295F] backdrop-blur-sm",
-                isMobile ? "p-3.5 mt-2" : "p-4 mt-1 max-w-[560px]",
-              )}
-              style={{ borderColor: tierTheme.subtleBorder }}
-            >
+            <div className="hidden">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]/55">시험 디데이 + 과목별 진도율</p>
@@ -1710,7 +1704,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             )}
             <div className="flex flex-col gap-2 w-full md:w-auto">
-              <button 
+              <button
+                type="button"
                 disabled={isProcessingAction}
                 className={cn(
                   "w-full rounded-2xl font-aggro-display font-black md:w-auto border flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",

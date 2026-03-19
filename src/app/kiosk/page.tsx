@@ -257,7 +257,7 @@ export default function KioskPage() {
 
           stopSessionId = `session_${seat.lastCheckInAt.toMillis()}`;
           const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions', stopSessionId);
-          batch.create(sessionRef, {
+          batch.set(sessionRef, {
             startTime: seat.lastCheckInAt,
             endTime: serverTimestamp(),
             durationMinutes,
