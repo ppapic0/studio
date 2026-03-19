@@ -1530,12 +1530,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-[#FF7A16] fill-current" />
-                    <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">어제의 분석 결과</span>
+                    <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">우리아이 리포트 확인하기</span>
                   </div>
                   {report?.viewedAt && <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] h-4 px-1.5">읽음</Badge>}
                 </div>
                 <p className="text-sm font-bold text-slate-800 leading-relaxed break-keep relative z-10 line-clamp-2">
-                  {report?.content || '선생님이 어제의 학습 데이터를 분석 중입니다.'}
+                    {report?.content || '카드를 누르면, 우리 아이가 받은 리포트를 확인할 수 있습니다.'}
                 </p>
               </Card>
 
