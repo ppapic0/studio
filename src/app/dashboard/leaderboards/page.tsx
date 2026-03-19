@@ -114,6 +114,12 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
     return name.length > 1 ? name.charAt(0) + "*O" : name; 
   };
 
+  const formatAffiliation = (entry: WithId<LeaderboardEntry>, profile?: StudentProfile) => {
+    const classLabel = profile?.className || entry.classNameSnapshot || '반 미지정';
+    const schoolLabel = profile?.schoolName || '학교 정보 없음';
+    return `${classLabel} · ${schoolLabel}`;
+  };
+
   return (
     <div className="space-y-6">
       <Card className={cn(
@@ -187,7 +193,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                           </div>
                           <div className="flex items-center gap-1.5 text-muted-foreground font-bold">
                             <History className="h-3 w-3 opacity-40" />
-                            <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{profile?.schoolName || entry.classNameSnapshot || "센터 소속"}</span>
+                            <span className={cn("truncate", isMobile ? "text-[10px]" : "text-lg")}>{formatAffiliation(entry, profile)}</span>
                           </div>
                         </div>
                       </div>
@@ -209,7 +215,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
                           <div className="flex items-center gap-4">
                             <div className="w-8 flex justify-center text-sm font-black text-muted-foreground/40">{rank}</div>
                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{entry.displayNameSnapshot?.charAt(0) || "S"}</AvatarFallback></Avatar>
-                            <div className="grid"><span className="font-black text-sm">{formatName(entry.displayNameSnapshot)}</span><span className="text-[10px] font-bold text-muted-foreground/60">{profile?.schoolName || entry.classNameSnapshot || '센터'}</span></div>
+                            <div className="grid"><span className="font-black text-sm">{formatName(entry.displayNameSnapshot)}</span><span className="text-[10px] font-bold text-muted-foreground/60">{formatAffiliation(entry, profile)}</span></div>
                           </div>
                           <div className="text-right"><span className="text-base font-black text-primary/80 tabular-nums">{(entry.value || 0).toLocaleString()}</span><span className="text-[8px] font-bold text-muted-foreground/40 ml-1 whitespace-nowrap">점</span></div>
                         </div>
