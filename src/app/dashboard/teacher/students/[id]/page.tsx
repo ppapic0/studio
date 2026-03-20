@@ -185,13 +185,13 @@ const CustomTooltip = ({ active, payload, label, unit = '분' }: any) => {
 
 function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMobile, onClick }: { title: string; value: string; subValue: string; icon: any; colorClass: string; isMobile: boolean; onClick?: () => void; }) {
   return (
-    <Card className={cn('border-none shadow-md overflow-hidden relative bg-white rounded-[1.5rem] sm:rounded-[2rem] transition-all', onClick && 'hover:shadow-xl active:scale-[0.98] cursor-pointer')} onClick={onClick}>
+    <Card className={cn('min-w-0 border-none shadow-md overflow-hidden relative bg-white rounded-[1.5rem] sm:rounded-[2rem] transition-all', onClick && 'hover:shadow-xl active:scale-[0.98] cursor-pointer')} onClick={onClick}>
       <div className={cn('absolute top-0 left-0 w-1 h-full', colorClass.replace('text-', 'bg-'))} />
       <CardHeader className={cn('pb-1 flex flex-row items-center justify-between', isMobile ? 'px-3 pt-3' : 'px-6 pt-6')}>
-        <CardTitle className={cn('font-black text-muted-foreground uppercase', isMobile ? 'text-[8px]' : 'text-[10px]')}>{title}</CardTitle>
+        <CardTitle className={cn('min-w-0 font-black text-muted-foreground uppercase break-keep', isMobile ? 'text-[8px] leading-tight' : 'text-[10px]')}>{title}</CardTitle>
         <div className={cn('rounded-lg bg-opacity-10', isMobile ? 'p-1.5' : 'p-2', colorClass.replace('text-', 'bg-'))}><Icon className={cn(isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4', colorClass)} /></div>
       </CardHeader>
-      <CardContent className={cn(isMobile ? 'px-3 pb-3' : 'px-6 pb-6')}><div className={cn('font-black tracking-tighter', isMobile ? 'text-lg leading-tight' : 'text-2xl')}>{value}</div><p className={cn('font-bold text-muted-foreground mt-0.5', isMobile ? 'text-[8px]' : 'text-[9px]')}>{subValue}</p></CardContent>
+      <CardContent className={cn(isMobile ? 'px-3 pb-3' : 'px-6 pb-6')}><div className={cn('font-black tracking-tighter break-keep', isMobile ? 'text-lg leading-tight' : 'text-2xl')}>{value}</div><p className={cn('font-bold text-muted-foreground mt-0.5 break-keep', isMobile ? 'text-[8px] leading-tight' : 'text-[9px]')}>{subValue}</p></CardContent>
     </Card>
   );
 }
@@ -1178,7 +1178,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <section className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
         <StatAnalysisCard
           title="평균 공부시간"
           value={minutesToLabel(avgStudyMinutes)}
@@ -1215,11 +1215,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         />
       </section>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6">
-        <TabsList className="rounded-2xl h-12 bg-muted/30 grid grid-cols-3 p-1">
-          <TabsTrigger value="overview" className="rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> 학습 분석</TabsTrigger>
-          <TabsTrigger value="counseling" className="rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> 상담 기록</TabsTrigger>
-          <TabsTrigger value="plans" className="rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5"><BookOpen className="h-3.5 w-3.5" /> 계획/루틴</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6 min-w-0">
+        <TabsList className={cn("rounded-2xl bg-muted/30 grid p-1 gap-1", isMobile ? "h-auto grid-cols-2" : "h-12 grid-cols-3")}>
+          <TabsTrigger value="overview" className="min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2"><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
+          <TabsTrigger value="counseling" className="min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2"><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
+          <TabsTrigger value="plans" className={cn("min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2", isMobile && "col-span-2")}><BookOpen className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">계획/루틴</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
@@ -1416,11 +1416,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className="font-bold text-[11px]">앱 화면에 맞게 버튼을 눌러 그래프를 확인하세요.</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-0 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant={mobileGraphPanel === 'weekly' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'weekly' ? null : 'weekly'))}>주간 성장률</Button>
-                      <Button variant={mobileGraphPanel === 'daily' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'daily' ? null : 'daily'))}>일자별 성장률</Button>
-                      <Button variant={mobileGraphPanel === 'rhythm' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'rhythm' ? null : 'rhythm'))}>리듬 점수</Button>
-                      <Button variant={mobileGraphPanel === 'away' ? 'default' : 'outline'} className="h-9 rounded-xl text-[11px] font-black" onClick={() => setMobileGraphPanel((prev) => (prev === 'away' ? null : 'away'))}>외출시간</Button>
+                    <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 min-w-0">
+                      <Button variant={mobileGraphPanel === 'weekly' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'weekly' ? null : 'weekly'))}>주간 성장률</Button>
+                      <Button variant={mobileGraphPanel === 'daily' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'daily' ? null : 'daily'))}>일자별 성장률</Button>
+                      <Button variant={mobileGraphPanel === 'rhythm' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'rhythm' ? null : 'rhythm'))}>리듬 점수</Button>
+                      <Button variant={mobileGraphPanel === 'away' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'away' ? null : 'away'))}>외출시간</Button>
                     </div>
 
                     {mobileGraphPanel === null && (
@@ -1447,9 +1447,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
                     {mobileGraphPanel === 'daily' && (
                       <div className="space-y-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                        <div className="flex items-center justify-end gap-1 flex-wrap">
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black min-w-0" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black min-w-0" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
                         </div>
                         <div className="h-[200px] w-full">
                           <ResponsiveContainer width="100%" height="100%">

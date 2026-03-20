@@ -187,7 +187,7 @@ export const marketingContent: MarketingContent = {
       '수능 국어 전문 지도와 개인 맞춤 피드백',
       '분당·판교 관리 운영 경험 기반 학습 동선 설계',
       '원장 본인 24학년도 국어 백분위 99 기록',
-      '학생·학부모 웹앱을 직접 기획하고 운영하는 구조',
+      '웹앱을 자체 개발하고 기획하여 운영하는 구조',
     ],
     materialSamples: [
       {
