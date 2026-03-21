@@ -104,6 +104,15 @@ const toSafeStudentName = (displayName?: string | null, memberId?: string): stri
   return '이름 미등록';
 };
 
+const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
+  if (!minutes.length) return 0;
+  const average = minutes.reduce((sum, value) => sum + value, 0) / minutes.length;
+  if (average <= 0) return 0;
+  const variance = minutes.reduce((sum, value) => sum + (value - average) ** 2, 0) / minutes.length;
+  const standardDeviation = Math.sqrt(variance);
+  return Math.max(0, Math.min(100, Math.round(100 - (standardDeviation / average) * 100)));
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -1116,8 +1125,35 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [focusDayData, today]);
 
+  const rhythmScoreTrendData = useMemo(() => {
+    if (!today) return [] as Array<{ date: string; score: number }>;
+    const dailyRhythm = Array.from({ length: 14 }, (_, i) => {
+      const day = subDays(today, 13 - i);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const startHour = focusDayData[dateKey]?.startHour;
+      return {
+        date: format(day, 'M/d'),
+        rhythmMinutes: typeof startHour === 'number' ? Math.round(startHour * 60) : null as number | null,
+      };
+    });
+    return dailyRhythm.map((point, index) => {
+      const values = dailyRhythm
+        .slice(Math.max(0, index - 2), index + 1)
+        .map((item) => item.rhythmMinutes)
+        .filter((value): value is number => typeof value === 'number');
+      const score = values.length >= 2 ? calculateRhythmScoreFromMinutes(values) : values.length === 1 ? 100 : 0;
+      return { date: point.date, score };
+    });
+  }, [focusDayData, today]);
+
   const hasWeeklyGrowthData = weeklyGrowthData.some((week) => (week.totalMinutes ?? 0) > 0);
   const hasDailyGrowthData = dailyGrowthData.some((day) => (day.minutes ?? 0) > 0);
+  const hasRhythmScoreChangeData = rhythmScoreTrendData.some((day) => (day.score ?? 0) > 0);
+  const averageRhythmScore = useMemo(() => {
+    const valid = rhythmScoreTrendData.filter((day) => day.score > 0);
+    if (!valid.length) return 0;
+    return Math.round(valid.reduce((sum, day) => sum + day.score, 0) / valid.length);
+  }, [rhythmScoreTrendData]);
   const hasRhythmData = rhythmData.some((day) => (day.startHour ?? 0) > 0 || (day.endHour ?? 0) > 0);
   const previous7AvgStudyMinutes = useMemo(() => {
     if (!today) return 0;
@@ -1969,7 +2005,38 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
 
-                {/* 3. 학습 시간 분포 리듬 */}
+                {/* 3. 리듬점수 변화 그래프 */}
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">리듬점수 변화 그래프</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">최근 14일 기준 리듬 점수 변화 추이</p>
+                    </div>
+                    <Badge variant="outline" className="h-6 px-2 text-[10px] font-black">
+                      평균 {averageRhythmScore}점
+                    </Badge>
+                  </div>
+                  {trendLoading ? (
+                    <div className="h-[130px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
+                  ) : !hasRhythmScoreChangeData ? (
+                    <div className="h-[130px] flex items-center justify-center text-xs font-bold text-slate-400">리듬 점수 데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={130}>
+                      <LineChart data={rhythmScoreTrendData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={28} />
+                        <Tooltip
+                          formatter={(v: number) => [`${Math.round(v)}점`, '리듬 점수']}
+                          contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '11px', fontWeight: 700 }}
+                        />
+                        <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                {/* 4. 학습 시간 분포 리듬 */}
                 <div className="rounded-xl border border-slate-100 bg-white p-4">
                                     <div className="mb-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 시간 분포 리듬</p>
@@ -2000,7 +2067,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
 
-                {/* 4. 학습 중간 외출시간 성장률 */}
+                {/* 5. 학습 중간 외출시간 성장률 */}
                 <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>

@@ -121,6 +121,21 @@ function hourToClockLabel(value: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+function hourNumberToDate(dateKey: string, hourValue: number | null): Date | null {
+  if (typeof hourValue !== 'number' || !Number.isFinite(hourValue)) return null;
+  const hours = Math.floor(hourValue);
+  const minutes = Math.round((hourValue - hours) * 60);
+  const target = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  target.setHours(hours, minutes, 0, 0);
+  return target;
+}
+
+function dateToHourNumber(date: Date | null): number {
+  if (!date) return 0;
+  return Number((date.getHours() + date.getMinutes() / 60).toFixed(2));
+}
+
 function toTime(value?: Timestamp): number {
   if (!value) return 0;
   try {
@@ -273,6 +288,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   });
 
   const [dailyStatsMap, setDailyStatsMap] = useState<Record<string, DailyStatSnapshot>>({});
+  const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
+  const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
+  const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
   const [statsLoading, setStatsLoading] = useState(false);
   const [planItems, setPlanItems] = useState<WithId<StudyPlanItem>[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
@@ -491,6 +509,109 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Math.ceil(elapsedMs / 60000);
   }, [attendanceCurrent]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRhythmTrends = async () => {
+      if (!firestore || !centerId || !studentId) {
+        setStudyStartByDateKey({});
+        setStudyEndByDateKey({});
+        setAwayMinutesByDateKey({});
+        return;
+      }
+
+      try {
+        const targetDateKeys = Array.from({ length: 14 }, (_, index) => format(subDays(today, 13 - index), 'yyyy-MM-dd'));
+        const pairs = await Promise.all(
+          targetDateKeys.map(async (dateKey) => {
+            try {
+              const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
+              const statSnap = await getDoc(statRef);
+              const statData = statSnap.exists() ? (statSnap.data() as Record<string, unknown>) : null;
+              const statStartHourRaw = statData?.startHour ?? statData?.firstStudyHour;
+              const statEndHourRaw = statData?.endHour ?? statData?.lastStudyHour;
+              const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
+              const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
+              const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
+              const statAwayMinutes =
+                typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw)
+                  ? Math.max(0, Math.round(statAwayMinutesRaw))
+                  : 0;
+
+              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              const sessions = sessionsSnap.docs
+                .map((docSnap) => docSnap.data() as { startTime?: Timestamp; endTime?: Timestamp })
+                .map((session) => ({
+                  startTime: session.startTime?.toDate() || null,
+                  endTime: session.endTime?.toDate() || null,
+                }))
+                .filter((session) => !!session.startTime)
+                .sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0));
+
+              const firstSession = sessions[0];
+              const lastSession = sessions[sessions.length - 1];
+              const sessionStart = firstSession?.startTime || null;
+              const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
+              let sessionAwayMinutes = 0;
+
+              for (let i = 1; i < sessions.length; i += 1) {
+                const prevEnd = sessions[i - 1].endTime;
+                const currStart = sessions[i].startTime;
+                if (!prevEnd || !currStart) continue;
+                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
+                if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
+              }
+
+              const todayFallback =
+                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+                  ? attendanceCurrent.lastCheckInAt.toDate()
+                  : null;
+
+              return [
+                dateKey,
+                {
+                  start: sessionStart || statStart || todayFallback,
+                  end: sessionEnd || statEnd || todayFallback,
+                  awayMinutes: sessionAwayMinutes > 0 ? sessionAwayMinutes : statAwayMinutes,
+                },
+              ] as const;
+            } catch {
+              const todayFallback =
+                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+                  ? attendanceCurrent.lastCheckInAt.toDate()
+                  : null;
+              return [dateKey, { start: todayFallback, end: todayFallback, awayMinutes: 0 }] as const;
+            }
+          })
+        );
+
+        if (cancelled) return;
+        const nextStart: Record<string, Date | null> = {};
+        const nextEnd: Record<string, Date | null> = {};
+        const nextAway: Record<string, number> = {};
+        pairs.forEach(([dateKey, value]) => {
+          nextStart[dateKey] = value.start || null;
+          nextEnd[dateKey] = value.end || null;
+          nextAway[dateKey] = Math.max(0, Math.round(value.awayMinutes || 0));
+        });
+        setStudyStartByDateKey(nextStart);
+        setStudyEndByDateKey(nextEnd);
+        setAwayMinutesByDateKey(nextAway);
+      } catch {
+        if (cancelled) return;
+        setStudyStartByDateKey({});
+        setStudyEndByDateKey({});
+        setAwayMinutesByDateKey({});
+      }
+    };
+
+    void loadRhythmTrends();
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore, centerId, studentId, todayKey, attendanceCurrent]);
+
   const planByDate = useMemo(() => {
     const map: Record<string, PlanBucket> = {};
     planItems.forEach((item) => {
@@ -683,23 +804,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Array.from({ length: 14 }, (_, idx) => {
       const day = subDays(today, 13 - idx);
       const dateKey = format(day, 'yyyy-MM-dd');
-      const dayData = dailyStatsMap[dateKey];
+      const startDate = studyStartByDateKey[dateKey] || null;
+      const endDate = studyEndByDateKey[dateKey] || null;
       return {
         dateLabel: format(day, 'M/d', { locale: ko }),
-        startHour: typeof dayData?.startHour === 'number' ? Number(dayData.startHour.toFixed(2)) : 0,
-        endHour: typeof dayData?.endHour === 'number' ? Number(dayData.endHour.toFixed(2)) : 0,
+        startHour: dateToHourNumber(startDate),
+        endHour: dateToHourNumber(endDate),
       };
     });
-  }, [dailyStatsMap]);
+  }, [studyStartByDateKey, studyEndByDateKey]);
 
   const rhythmScoreOnlyTrend = useMemo(() => {
     const dailyRhythm = Array.from({ length: 14 }, (_, idx) => {
       const day = subDays(today, 13 - idx);
       const dateKey = format(day, 'yyyy-MM-dd');
-      const startHour = dailyStatsMap[dateKey]?.startHour;
+      const startTime = studyStartByDateKey[dateKey];
       return {
         dateLabel: format(day, 'M/d', { locale: ko }),
-        rhythmMinutes: typeof startHour === 'number' ? Math.round(startHour * 60) : null as number | null,
+        rhythmMinutes: startTime ? startTime.getHours() * 60 + startTime.getMinutes() : null as number | null,
       };
     });
 
@@ -711,7 +833,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const score = values.length >= 2 ? calculateRhythmScore(values) : values.length === 1 ? 100 : 0;
       return { dateLabel: point.dateLabel, score };
     });
-  }, [dailyStatsMap]);
+  }, [studyStartByDateKey]);
 
   const averageRhythmScore = useMemo(() => {
     const valid = rhythmScoreOnlyTrend.filter((item) => item.score > 0);
@@ -725,10 +847,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const dateKey = format(day, 'yyyy-MM-dd');
       return {
         dateLabel: format(day, 'M/d', { locale: ko }),
-        awayMinutes: Math.max(0, Math.round(Number(dailyStatsMap[dateKey]?.awayMinutes || 0))),
+        awayMinutes: Math.max(0, Math.round(Number(awayMinutesByDateKey[dateKey] || dailyStatsMap[dateKey]?.awayMinutes || 0))),
       };
     });
-  }, [dailyStatsMap]);
+  }, [awayMinutesByDateKey, dailyStatsMap]);
 
   const latestWeeklyLearningGrowthPercent = weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0;
   const latestDailyLearningGrowthPercent = dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0;

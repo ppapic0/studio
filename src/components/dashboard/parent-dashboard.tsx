@@ -264,6 +264,12 @@ const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
 const SUBJECT_COLORS = ['#FF7A16', '#14295F', '#10B981', '#0EA5E9', '#A855F7'];
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = { late: 1, absence: 2 };
 const PENALTY_RECOVERY_INTERVAL_DAYS = 7;
+const PENALTY_SOURCE_LABEL: Record<string, string> = {
+  attendance_request: '지각/결석 신청 반영',
+  routine_missing: '루틴 미작성',
+  manual: '센터 수동 부여',
+  reset: '벌점 조정',
+};
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 
@@ -472,9 +478,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           targetDateKeys.map(async (dateKey) => {
             const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
             const snap = await getDoc(recordRef);
-            if (!snap.exists()) return [dateKey, null] as const;
+            if (!snap.exists()) {
+              const todayFallback =
+                dateKey === todayKey && attendanceCurrent?.lastCheckInAt
+                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
+                  : null;
+              return [dateKey, todayFallback] as const;
+            }
             const payload = snap.data() as Record<string, unknown>;
-            const checkInAt = toDateSafe((payload?.checkInAt as TimestampLike) || (payload?.updatedAt as TimestampLike));
+            const checkInAt = toDateSafe(
+              (payload?.checkInAt as TimestampLike)
+              || (payload?.firstCheckInAt as TimestampLike)
+              || (payload?.firstCheckIn as TimestampLike)
+              || (payload?.lastCheckInAt as TimestampLike)
+              || (payload?.updatedAt as TimestampLike)
+            );
             return [dateKey, checkInAt] as const;
           })
         );
@@ -493,7 +511,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, today]);
+  }, [isActive, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt]);
 
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !today) {
@@ -995,27 +1013,36 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [growth?.penaltyPoints, penaltyLogs]);
 
   const penaltyHistoryRows = useMemo(() => {
-    return [...(penaltyLogs || [])]
+    const fromLogs = [...(penaltyLogs || [])]
       .filter((log) => Number(log.pointsDelta || 0) > 0)
-      .sort((a, b) => {
-        const aMs = toDateSafe((a as any).createdAt)?.getTime() || 0;
-        const bMs = toDateSafe((b as any).createdAt)?.getTime() || 0;
-        return bMs - aMs;
-      })
-      .slice(0, 50)
       .map((log) => {
         const createdAt = toDateSafe((log as any).createdAt);
-        const dateLabel = createdAt ? format(createdAt, 'yyyy.MM.dd', { locale: ko }) : '-';
-        const reason = log.reason?.trim() || PENALTY_SOURCE_LABEL[log.source] || '벌점 반영';
-        const points = Math.max(0, Math.round(Number(log.pointsDelta || 0)));
+        const createdAtMs = createdAt?.getTime() || 0;
         return {
-          id: log.id,
-          dateLabel,
-          reason,
-          points,
+          id: `log-${log.id}`,
+          dateLabel: createdAt ? format(createdAt, 'yyyy.MM.dd', { locale: ko }) : '-',
+          reason: log.reason?.trim() || PENALTY_SOURCE_LABEL[String(log.source || '')] || '벌점 반영',
+          points: Math.max(0, Math.round(Number(log.pointsDelta || 0))),
+          createdAtMs,
         };
       });
-  }, [penaltyLogs]);
+
+    const fromRequests = (recentPenaltyReasons || []).map((item) => {
+      const parsed = item.dateLabel ? parse(item.dateLabel, 'MM/dd', new Date()) : null;
+      return {
+        id: `req-${item.id}`,
+        dateLabel: item.dateLabel || '-',
+        reason: item.reason?.trim() || '지각/결석 신청 처리',
+        points: Math.max(0, Math.round(Number(item.points || 0))),
+        createdAtMs: parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0,
+      };
+    });
+
+    return [...fromLogs, ...fromRequests]
+      .filter((row) => row.points > 0)
+      .sort((a, b) => b.createdAtMs - a.createdAtMs)
+      .slice(0, 50);
+  }, [penaltyLogs, recentPenaltyReasons]);
 
   const aiInsights = useMemo(() => {
     const insights: string[] = [];
@@ -1093,10 +1120,43 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const todayFirstCheckInLabel = useMemo(() => {
     if (!todayKey) return '최초 등원 -';
-    const checkInAt = checkInByDateKey[todayKey];
+    const checkInAt = checkInByDateKey[todayKey] || studyStartByDateKey[todayKey] || null;
     if (!checkInAt) return '최초 등원 -';
     return `최초 등원 ${format(checkInAt, 'HH:mm', { locale: ko })}`;
-  }, [todayKey, checkInByDateKey]);
+  }, [todayKey, checkInByDateKey, studyStartByDateKey]);
+
+  const todayRoutineSummary = useMemo(() => {
+    const routineItems = (todayPlans || []).filter((item) => item.category === 'schedule');
+    let arrivalTime: string | null = null;
+    let academyTime: string | null = null;
+
+    const pickTimes = (text: string) => text.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/g) || [];
+
+    routineItems.forEach((item) => {
+      const title = (item.title || '').trim();
+      if (!title) return;
+      const times = pickTimes(title);
+
+      if (!arrivalTime && /(등원|입실|출석)/.test(title) && times.length > 0) {
+        arrivalTime = times[0] || null;
+      }
+
+      if (!academyTime && /(학원|수업|강의|코칭|클리닉)/.test(title)) {
+        if (times.length >= 2) academyTime = `${times[0] || '-'}-${times[times.length - 1] || '-'}`;
+        else if (times.length === 1) academyTime = times[0] || null;
+      }
+    });
+
+    const fallbackCheckIn = checkInByDateKey[todayKey] || studyStartByDateKey[todayKey] || null;
+    if (!arrivalTime && fallbackCheckIn) {
+      arrivalTime = format(fallbackCheckIn, 'HH:mm', { locale: ko });
+    }
+
+    return {
+      arrivalTime: arrivalTime || '-',
+      academyTime: academyTime || '-',
+    };
+  }, [todayPlans, todayKey, checkInByDateKey, studyStartByDateKey]);
 
   // 캘린더 데이터 생성
   const calendarData = useMemo(() => {
@@ -1795,15 +1855,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
-                      <BarChart3 className="h-6 w-6 text-[#FF7A16]" />
-                      <div className="grid gap-0.5 text-[#14295F]">
+                    <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2">
+                      <Clock3 className="h-6 w-6 text-[#FF7A16]" />
+                      <div className="hidden grid gap-0.5 text-[#14295F]">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">주간 상세</span>
                         <span className="text-xs font-black">성과 상세 분석</span>
                       </div>
+                      <div className="grid gap-0.5 text-[#14295F]">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">오늘 루틴</span>
+                        <span className="text-xs font-black">등원 {todayRoutineSummary.arrivalTime} · 학원 {todayRoutineSummary.academyTime}</span>
+                      </div>
                     </Card>
                   </DialogTrigger>
-                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
+                  <DialogContent className="hidden">
                     <div className="bg-[#14295F] p-10 text-white relative">
                       <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
                       <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
@@ -1859,13 +1923,29 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
+              <Card className="rounded-[1.5rem] border border-sky-100 bg-sky-50/50 p-4 shadow-sm">
+                <div className="flex items-start gap-2.5">
+                  <Info className="mt-0.5 h-4 w-4 text-sky-600" />
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-sky-700">학부모님 안내</p>
+                    <p className="text-xs font-bold leading-relaxed text-slate-700">
+                      아래 카드는 요약만 표시됩니다. 카드를 누르면 팝업에서 그래프를 자세히 확인할 수 있어요.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 6주</Badge>
                   </div>
-                  <div className="relative h-[190px] w-full">
+                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
+                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  </div>
+                  <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyStudyTimeTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -1888,7 +1968,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">일간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="relative h-[190px] w-full">
+                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
+                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  </div>
+                  <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={dailyStudyTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -1913,7 +1997,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 리듬 점수</span>
                     <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScore}점</Badge>
                   </div>
-                  <div className="relative h-[190px] w-full">
+                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
+                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  </div>
+                  <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={rhythmScoreTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
@@ -1936,7 +2024,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">공부 시작/종료 시각</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="relative h-[190px] w-full">
+                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
+                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  </div>
+                  <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={startEndTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -1962,7 +2054,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출시간 그래프</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="relative h-[190px] w-full">
+                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
+                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  </div>
+                  <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={awayTimeTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -1985,7 +2081,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">과목별 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">{subjectsData.length}과목</Badge>
                   </div>
-                  <div className="relative h-[190px] w-full">
+                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
+                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  </div>
+                  <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={subjectsData.slice(0, 6)}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -2032,6 +2132,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <YAxis width={36} fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
                             <Tooltip formatter={(value) => [toHm(Number(value || 0)), '주간 누적']} />
                             <Bar dataKey="totalMinutes" fill="#14295F" radius={[8, 8, 0, 0]} />
+                            <Line
+                              type="monotone"
+                              dataKey="totalMinutes"
+                              stroke="#F97316"
+                              strokeWidth={2.5}
+                              dot={{ r: 3, fill: '#F97316', stroke: '#F97316' }}
+                              activeDot={{ r: 5 }}
+                            />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -2089,6 +2197,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <YAxis width={34} fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v || 0))}m`} />
                             <Tooltip formatter={(value) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
                             <Bar dataKey="awayMinutes" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                            <Line
+                              type="monotone"
+                              dataKey="awayMinutes"
+                              stroke="#f97316"
+                              strokeWidth={2.5}
+                              dot={{ r: 3, fill: '#f97316', stroke: '#f97316' }}
+                              activeDot={{ r: 5 }}
+                            />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -2616,28 +2732,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">벌점 이력 (일자/사유)</p>
-              {penaltyHistoryRows.length === 0 ? (
-                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-center text-xs font-bold text-slate-400">
-                  현재까지 반영된 벌점 이력이 없습니다.
-                </div>
-              ) : (
-                <div className="mt-2 max-h-56 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
-                  {penaltyHistoryRows.map((row) => (
-                    <div key={row.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-slate-800 truncate">{row.reason}</p>
-                        <p className="text-[10px] font-bold text-slate-400">{row.dateLabel}</p>
-                      </div>
-                      <Badge variant="outline" className="border-none bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700">
-                        +{row.points}점
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -2683,6 +2777,29 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">현재 조치 단계</p>
               <Badge variant="outline" className={cn('mt-2 h-7 rounded-full border px-3 text-xs font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">벌점 이력 (일자/사유)</p>
+              {penaltyHistoryRows.length === 0 ? (
+                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-center text-xs font-bold text-slate-400">
+                  현재까지 반영된 벌점 이력이 없습니다.
+                </div>
+              ) : (
+                <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+                  {penaltyHistoryRows.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-slate-800 truncate">{row.reason}</p>
+                        <p className="text-[10px] font-bold text-slate-400">{row.dateLabel}</p>
+                      </div>
+                      <Badge variant="outline" className="border-none bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                        +{row.points}점
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
