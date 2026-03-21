@@ -73,6 +73,20 @@ export default function DailyReportsPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [reportContent, setReportContent] = useState('');
   const [teacherNote, setTeacherNote] = useState('');
+  const [aiReportMeta, setAiReportMeta] = useState<null | {
+    teacherOneLiner: string;
+    strengths: string[];
+    improvements: string[];
+    metrics: {
+      growthRate: number;
+      deltaMinutesFromAvg: number;
+      avg7StudyMinutes: number;
+      isNewRecord: boolean;
+      alertLow: boolean;
+      streakBadge: boolean;
+      trendSummary: string;
+    };
+  }>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // 재원생(active)이면서 역할이 student인 멤버만 조회
@@ -103,7 +117,8 @@ export default function DailyReportsPage() {
     setSelectedStudent({ id: studentId, name: studentName });
     const existing = dailyReports?.find(r => r.studentId === studentId);
     setReportContent(existing?.content || '');
-    setTeacherNote('');
+    setTeacherNote(existing?.teacherNote || '');
+    setAiReportMeta(existing?.aiMeta || null);
     setIsWriteModalOpen(true);
   };
 
@@ -152,6 +167,12 @@ export default function DailyReportsPage() {
 
       const result = await generateDailyReport(aiInput);
       setReportContent(result.content);
+      setAiReportMeta({
+        teacherOneLiner: result.teacherOneLiner,
+        strengths: result.strengths,
+        improvements: result.improvements,
+        metrics: result.metrics,
+      });
       toast({ title: `인공지능 리포트 생성 완료 (진단: Lv.${result.level})` });
     } catch (e: any) {
       toast({ 
@@ -177,6 +198,8 @@ export default function DailyReportsPage() {
         teacherId: user.uid,
         dateKey,
         content: reportContent,
+        teacherNote: teacherNote.trim() || null,
+        aiMeta: aiReportMeta || null,
         status,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),

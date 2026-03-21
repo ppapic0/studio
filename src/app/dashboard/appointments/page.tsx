@@ -251,6 +251,14 @@ export function AppointmentsPageContent({
     if (!rawReservations) return [];
     return [...rawReservations].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
   }, [rawReservations]);
+  const reservationQuestionById = useMemo(() => {
+    const map = new Map<string, string>();
+    reservations.forEach((reservation) => {
+      const question = reservation.studentNote?.trim();
+      if (reservation.id && question) map.set(reservation.id, question);
+    });
+    return map;
+  }, [reservations]);
 
   const parentCommunications = useMemo(() => {
     if (!rawParentCommunications) return [];
@@ -402,6 +410,7 @@ export function AppointmentsPageContent({
         type: logType,
         content: logContent.trim(),
         improvement: logImprovement.trim(),
+        studentQuestion: selectedResForLog.studentNote?.trim() || '',
         createdAt: serverTimestamp(),
         reservationId: selectedResForLog.id
       };
@@ -769,7 +778,12 @@ export function AppointmentsPageContent({
                 </div>
               ) : (
                 <div className="divide-y divide-muted/10">
-                  {visibleLogs.map((log) => (
+                  {visibleLogs.map((log) => {
+                    const studentQuestion =
+                      log.studentQuestion?.trim() ||
+                      (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
+                      '';
+                    return (
                     <div key={log.id} className={cn("hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -794,6 +808,14 @@ export function AppointmentsPageContent({
                         </div>
                         
                         <div className="space-y-3">
+                          {studentQuestion && (
+                            <div className={cn("rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
+                              <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
+                              <p className={cn("font-bold leading-relaxed text-sky-900 whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base")}>
+                                {studentQuestion}
+                              </p>
+                            </div>
+                          )}
                           <div className={cn("rounded-[1.25rem] bg-[#fafafa] border shadow-inner", isMobile ? "p-4" : "p-5")}>
                             <p className={cn("font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base")}>{log.content}</p>
                           </div>
@@ -809,7 +831,8 @@ export function AppointmentsPageContent({
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               {!showAll && filteredLogs.length > PREVIEW_LIMIT && (

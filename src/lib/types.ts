@@ -163,6 +163,21 @@ export interface DailyReport {
   content: string;
   status: "draft" | "sent";
   studentName?: string;
+  teacherNote?: string | null;
+  aiMeta?: {
+    teacherOneLiner: string;
+    strengths: string[];
+    improvements: string[];
+    metrics: {
+      growthRate: number;
+      deltaMinutesFromAvg: number;
+      avg7StudyMinutes: number;
+      isNewRecord: boolean;
+      alertLow: boolean;
+      streakBadge: boolean;
+      trendSummary: string;
+    };
+  } | null;
   viewedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -191,6 +206,8 @@ export interface CounselingLog {
   type: "academic" | "life" | "career";
   content: string;
   improvement: string;
+  reservationId?: string;
+  studentQuestion?: string;
   createdAt: Timestamp;
 }
 

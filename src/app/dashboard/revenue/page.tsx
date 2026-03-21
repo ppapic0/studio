@@ -124,6 +124,7 @@ export default function RevenuePage() {
   const focusedStudentId = searchParams.get('studentId');
 
   const [activeTab, setActiveTab] = useState('payments'); 
+  const [showOpsRisk, setShowOpsRisk] = useState(false);
   const [paymentSubTab, setPaymentSubTab] = useState('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -240,6 +241,19 @@ export default function RevenuePage() {
   }, [allInvoices, focusedStudentId]);
 
   const focusedLatestInvoice = focusedStudentInvoices[0] || null;
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'payments' || tab === 'revenue' || tab === 'ops') {
+      setActiveTab(tab);
+    }
+
+    const showRisk = searchParams.get('showRisk');
+    if (showRisk === '1' || showRisk === 'true') {
+      setActiveTab('ops');
+      setShowOpsRisk(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!focusedStudentId) return;
@@ -477,14 +491,14 @@ export default function RevenuePage() {
       </header>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner h-16 max-w-3xl mb-8">
+        <TabsList className="grid grid-cols-3 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner h-16 max-w-3xl mb-8">
           <TabsTrigger value="payments" className="rounded-xl font-black gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
             <CreditCard className="h-4 w-4" /> 수납 및 미납 관리
           </TabsTrigger>
           <TabsTrigger value="revenue" className="rounded-xl font-black gap-2 data-[state=active]:bg-primary data-[state=active]:text-white">
             <TrendingUp className="h-4 w-4" /> 수익 분석
           </TabsTrigger>
-          <TabsTrigger value="risk" className="rounded-xl font-black gap-2 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
+          <TabsTrigger value="risk" className="hidden">
             <ShieldAlert className="h-4 w-4" /> 리스크 인텔리전스
           </TabsTrigger>
           <TabsTrigger value="ops" className="rounded-xl font-black gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -1009,12 +1023,29 @@ export default function RevenuePage() {
           <RevenueAnalysis />
         </TabsContent>
 
-        <TabsContent value="risk" className="animate-in fade-in duration-500">
-          <RiskIntelligence />
-        </TabsContent>
-
         <TabsContent value="ops" className="animate-in fade-in duration-500">
+          <Card className="mb-6 rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-border/50">
+            <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
+              <div className="space-y-1">
+                <p className="text-xs font-black tracking-widest text-muted-foreground">리스크 인텔리전스</p>
+                <p className="text-sm font-bold text-muted-foreground">운영실에서 필요할 때만 열어 4차원 리스크 분석을 확인합니다.</p>
+              </div>
+              <Button
+                type="button"
+                variant={showOpsRisk ? 'default' : 'outline'}
+                className="h-10 rounded-xl font-black"
+                onClick={() => setShowOpsRisk((prev) => !prev)}
+              >
+                {showOpsRisk ? '리스크 분석 닫기' : '리스크 분석 열기'}
+              </Button>
+            </div>
+          </Card>
           <OperationalIntelligence />
+          {showOpsRisk && (
+            <div className="pt-6">
+              <RiskIntelligence />
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

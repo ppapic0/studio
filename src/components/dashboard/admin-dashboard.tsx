@@ -84,6 +84,26 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
+const isLikelyUid = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  if (normalized.length < 12 || normalized.length > 64) return false;
+  if (/[가-힣\s]/.test(normalized)) return false;
+  return /^[A-Za-z0-9_-]+$/.test(normalized);
+};
+
+const toSafeStudentName = (displayName?: string | null, memberId?: string): string => {
+  const normalizedDisplayName = (displayName || '').trim();
+  if (normalizedDisplayName && !isLikelyUid(normalizedDisplayName)) {
+    return normalizedDisplayName;
+  }
+  const normalizedMemberId = (memberId || '').trim();
+  if (normalizedMemberId && !isLikelyUid(normalizedMemberId)) {
+    return normalizedMemberId;
+  }
+  return '이름 미등록';
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -106,6 +126,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [liveTickMs, setLiveTickMs] = useState<number>(Date.now());
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeBody, setNoticeBody] = useState('');
+  const [noticeAudience, setNoticeAudience] = useState<'parent' | 'student' | 'all'>('parent');
   const [isNoticeSubmitting, setIsNoticeSubmitting] = useState(false);
 
   useEffect(() => {
@@ -255,15 +276,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
 
-  const parentAnnouncementsQuery = useMemoFirebase(() => {
+  const centerAnnouncementsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
-      collection(firestore, 'centers', centerId, 'parentAnnouncements'),
+      collection(firestore, 'centers', centerId, 'centerAnnouncements'),
       orderBy('createdAt', 'desc'),
       limit(20),
     );
   }, [firestore, centerId]);
-  const { data: parentAnnouncements } = useCollection<any>(parentAnnouncementsQuery, { enabled: isActive });
+  const { data: centerAnnouncements } = useCollection<any>(centerAnnouncementsQuery, { enabled: isActive });
 
   const availableClasses = useMemo(() => {
     if (!activeMembers) return [];
@@ -333,7 +354,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const studentNameById = useMemo(() => {
     const map = new Map<string, string>();
     (activeMembers || []).forEach((member) => {
-      map.set(member.id, member.displayName || member.id);
+      map.set(member.id, toSafeStudentName(member.displayName, member.id));
     });
     return map;
   }, [activeMembers]);
@@ -573,7 +594,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       const linkedStudentNames = Array.from(bucket.studentIds)
         .filter((id) => targetMemberIds.has(id))
-        .map((id) => studentNameById.get(id) || id)
+        .map((id) => studentNameById.get(id) || toSafeStudentName(undefined, id))
         .sort((a, b) => a.localeCompare(b, 'ko'));
 
       const parentName = bucket.parentName || `학부모-${bucket.parentUid.slice(0, 6)}`;
@@ -623,7 +644,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [parentTrustRows]
   );
 
-  const handleCreateParentAnnouncement = async () => {
+  const handleCreateAnnouncement = async () => {
     if (!firestore || !centerId || !activeMembership) return;
     const title = noticeTitle.trim();
     const body = noticeBody.trim();
@@ -638,9 +659,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     setIsNoticeSubmitting(true);
     try {
-      await addDoc(collection(firestore, 'centers', centerId, 'parentAnnouncements'), {
+      await addDoc(collection(firestore, 'centers', centerId, 'centerAnnouncements'), {
         title,
         body,
+        audience: noticeAudience,
         status: 'published',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -832,7 +854,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const score = calculateStudentFocusScore(studentStat, studentProgress);
       return {
         studentId: member.id,
-        name: member.displayName || member.id,
+        name: toSafeStudentName(member.displayName, member.id),
         className: member.className || '-',
         score,
         completion: Math.round(studentStat?.todayPlanCompletionRate || 0),
@@ -1326,7 +1348,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
+              <Link href="/dashboard/revenue?tab=ops&showRisk=1" className="block">
+              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03] cursor-pointer">
                 <div className="flex justify-between items-start mb-6">
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">이탈 위험 고득점자</p>
@@ -1340,6 +1363,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </p>
                 </div>
               </Card>
+              </Link>
             </div>
           </section>
 
@@ -1426,6 +1450,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   placeholder="공지 제목"
                   className="h-11 rounded-xl border-slate-200 font-bold"
                 />
+                <Select value={noticeAudience} onValueChange={(value) => setNoticeAudience(value as 'parent' | 'student' | 'all')}>
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 font-bold">
+                    <SelectValue placeholder="공지 대상 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="parent">학부모 공지</SelectItem>
+                    <SelectItem value="student">학생 공지</SelectItem>
+                    <SelectItem value="all">학생 + 학부모 공지</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Textarea
                   value={noticeBody}
                   onChange={(event) => setNoticeBody(event.target.value)}
@@ -1435,7 +1469,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <Button
                   type="button"
                   className="h-11 rounded-xl bg-[#14295F] text-white font-black"
-                  onClick={handleCreateParentAnnouncement}
+                  onClick={handleCreateAnnouncement}
                   disabled={isNoticeSubmitting}
                 >
                   {isNoticeSubmitting ? '등록 중...' : '공지사항 등록'}
@@ -1444,17 +1478,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
               <div className="mt-5 space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 등록 공지</p>
-                {(parentAnnouncements || []).length === 0 ? (
+                {(centerAnnouncements || []).length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-xs font-bold text-slate-400">
                     등록된 공지사항이 없습니다.
                   </div>
                 ) : (
-                  (parentAnnouncements || []).slice(0, 5).map((item: any) => {
+                  (centerAnnouncements || []).slice(0, 5).map((item: any) => {
                     const createdAt = item.createdAt?.toDate?.();
                     return (
                       <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
                         <p className="text-sm font-black text-[#14295F]">{item.title || '제목 없음'}</p>
                         <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600">{item.body || '내용 없음'}</p>
+                        <p className="mt-1 text-[10px] font-black text-slate-500">
+                          대상: {item.audience === 'student' ? '학생' : item.audience === 'all' ? '전체' : '학부모'}
+                        </p>
                         <p className="mt-1 text-[10px] font-black text-slate-400">
                           {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '방금 전 등록'}
                         </p>

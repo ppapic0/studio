@@ -177,6 +177,7 @@ type ParentAnnouncementRecord = {
   id: string;
   title?: string;
   body?: string;
+  audience?: 'parent' | 'student' | 'all';
   status?: string;
   createdAt?: { toDate?: () => Date; toMillis?: () => number };
   updatedAt?: { toDate?: () => Date; toMillis?: () => number };
@@ -631,7 +632,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     enabled: isActive && !!centerId && !!user,
   });
 
-  const parentAnnouncementsQuery = useMemoFirebase(() => {
+  const centerAnnouncementsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'centerAnnouncements'),
+      orderBy('createdAt', 'desc'),
+      limit(30),
+    );
+  }, [firestore, centerId]);
+  const { data: rawCenterAnnouncements, isLoading: centerAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
+    centerAnnouncementsQuery,
+    { enabled: isActive && !!centerId }
+  );
+
+  const legacyParentAnnouncementsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'parentAnnouncements'),
@@ -639,8 +653,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       limit(30),
     );
   }, [firestore, centerId]);
-  const { data: rawParentAnnouncements, isLoading: parentAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
-    parentAnnouncementsQuery,
+  const { data: rawLegacyParentAnnouncements, isLoading: legacyParentAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
+    legacyParentAnnouncementsQuery,
     { enabled: isActive && !!centerId }
   );
 
@@ -1173,15 +1187,28 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [rawParentCommunications]);
 
   const parentAnnouncements = useMemo(() => {
-    if (!rawParentAnnouncements) return [];
-    return [...rawParentAnnouncements]
+    const centerItems = (rawCenterAnnouncements || []).filter((item) => {
+      const audience = item.audience || 'parent';
+      return audience === 'parent' || audience === 'all';
+    });
+    const legacyItems = rawLegacyParentAnnouncements || [];
+
+    const merged = [...centerItems, ...legacyItems];
+    const dedupedById = new Map<string, ParentAnnouncementRecord>();
+    merged.forEach((item) => {
+      if (item?.id) dedupedById.set(item.id, item);
+    });
+
+    return Array.from(dedupedById.values())
       .filter((item) => (item.status || 'published') === 'published')
       .sort((a, b) => {
         const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
         const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
         return bMs - aMs;
       });
-  }, [rawParentAnnouncements]);
+  }, [rawCenterAnnouncements, rawLegacyParentAnnouncements]);
+
+  const parentAnnouncementsLoading = centerAnnouncementsLoading || legacyParentAnnouncementsLoading;
 
   const selectedDateStudyPlans = useMemo(
     () => (selectedDatePlans || []).filter((item) => item.category === 'study' || !item.category),

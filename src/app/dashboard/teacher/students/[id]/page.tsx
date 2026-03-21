@@ -456,6 +456,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const studentReservations = useMemo(() => {
     return (reservationsRaw || []).filter((reservation) => reservation.studentId === studentId).sort((a, b) => toTime(b.scheduledAt) - toTime(a.scheduledAt));
   }, [reservationsRaw, studentId]);
+  const reservationQuestionById = useMemo(() => {
+    const map = new Map<string, string>();
+    studentReservations.forEach((reservation) => {
+      const question = reservation.studentNote?.trim();
+      if (reservation.id && question) map.set(reservation.id, question);
+    });
+    return map;
+  }, [studentReservations]);
 
   const studyLogMap = useMemo(() => {
     const map: Record<string, StudyLogDay> = {};
@@ -1698,17 +1706,29 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   ) : studentCounselingLogs.length === 0 ? (
                   <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">작성된 상담 일지가 없습니다.</div>
                 ) : (
-                  studentCounselingLogs.slice(0, 10).map((log) => (
+                  studentCounselingLogs.slice(0, 10).map((log) => {
+                    const studentQuestion =
+                      log.studentQuestion?.trim() ||
+                      (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
+                      '';
+                    return (
                     <div key={log.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge className="font-black text-[10px] rounded-full bg-primary text-white">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
                         <span className="text-xs font-bold text-muted-foreground">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}</span>
                         <span className="text-xs font-bold text-muted-foreground">· {log.teacherName || '담당 선생님'}</span>
                       </div>
+                      {studentQuestion && (
+                        <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2">
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
+                          <p className="text-sm font-bold leading-relaxed text-sky-900 whitespace-pre-wrap">{studentQuestion}</p>
+                        </div>
+                      )}
                       <p className="text-sm font-bold leading-relaxed text-slate-800">{log.content}</p>
                       {log.improvement && <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700">개선 포인트: {log.improvement}</div>}
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </CardContent>
             </Card>

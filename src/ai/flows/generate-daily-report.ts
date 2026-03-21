@@ -1,42 +1,48 @@
 'use server';
 /**
- * @fileOverview 학생의 학습 데이터를 분석하여 10단계 학습 시스템 기반의 학부모 리포트를 생성하는 AI 에이전트입니다.
+ * @fileOverview 학생 학습 데이터를 분석해 학부모 발송용 데일리 리포트를 생성합니다.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const DailyReportInputSchema = z.object({
-  studentName: z.string().describe('학생의 이름'),
+  studentName: z.string().describe('학생 이름'),
   date: z.string().describe('리포트 날짜 (YYYY-MM-DD)'),
-  totalStudyMinutes: z.number().describe('오늘의 총 학습 시간 (분)'),
-  completionRate: z.number().describe('오늘의 계획 완수율 (0-100)'),
+  totalStudyMinutes: z.number().describe('오늘 총 학습 시간(분)'),
+  completionRate: z.number().describe('오늘 계획 완료율(0-100)'),
   plans: z.array(z.object({
     title: z.string(),
     done: z.boolean(),
-  })).describe('오늘의 학습 계획 상세'),
+  })).describe('오늘 학습 계획 상세'),
   schedule: z.array(z.object({
     title: z.string(),
     time: z.string(),
-  })).describe('생활 시간표 (등/하원 등)'),
+  })).describe('생활 시간표(등원/학원 등)'),
   history7Days: z.array(z.object({
     date: z.string(),
     minutes: z.number(),
-  })).describe('최근 7일간의 학습 시간 기록'),
-  teacherNote: z.string().optional().describe('선생님이 직접 입력한 관찰 메모'),
+  })).describe('오늘 이전 최근 7일 학습 시간 기록'),
+  teacherNote: z.string().optional().describe('선생님 직접 관찰 메모'),
 });
 
 export type DailyReportInput = z.infer<typeof DailyReportInputSchema>;
 
 const DailyReportOutputSchema = z.object({
-  level: z.number().min(1).max(10).describe('10단계 시스템 중 오늘에 해당하는 단계'),
-  levelName: z.string().describe('해당 단계의 명칭 (예: 집중력 향상 단계)'),
-  content: z.string().describe('AI가 생성한 리포트 본문 전체 (템플릿 적용)'),
+  level: z.number().min(1).max(10).describe('10단계 시스템 기준 단계'),
+  levelName: z.string().describe('단계명'),
+  content: z.string().describe('발송용 리포트 본문'),
+  teacherOneLiner: z.string().describe('선생님 한 줄 코칭'),
+  strengths: z.array(z.string()).describe('오늘 잘한 점'),
+  improvements: z.array(z.string()).describe('보완할 점'),
   metrics: z.object({
-    growthRate: z.number().describe('최근 7일 평균 대비 증감률 (%)'),
-    isNewRecord: z.boolean().describe('최근 7일 중 최고 기록 갱신 여부'),
-    alertLow: z.boolean().describe('3일 연속 저조 경고 여부'),
-    streakBadge: z.boolean().describe('5일 연속 6단계 이상 유지 트로피 여부'),
+    growthRate: z.number().describe('최근 7일 평균 대비 증감률(%)'),
+    deltaMinutesFromAvg: z.number().describe('최근 7일 평균 대비 증감 분'),
+    avg7StudyMinutes: z.number().describe('최근 7일 평균 학습 분'),
+    isNewRecord: z.boolean().describe('최근 7일 기준 최고 기록 갱신'),
+    alertLow: z.boolean().describe('저학습 경고'),
+    streakBadge: z.boolean().describe('연속 고집중 여부'),
+    trendSummary: z.string().describe('그래프 변동 요약'),
   }),
 });
 
@@ -79,12 +85,12 @@ function completionToLevel(completionRate: number): number {
 
 function levelName(level: number): string {
   const names: Record<number, string> = {
-    1: '학습 동기 형성 단계',
+    1: '학습 습관 형성 단계',
     2: '적응 단계',
     3: '기본 루틴 형성 단계',
     4: '안정적 진입 단계',
     5: '자기주도 시작 단계',
-    6: '집중력 향상 단계',
+    6: '집중도 향상 단계',
     7: '상위권 루틴 단계',
     8: '고효율 학습 단계',
     9: '최상위 집중 단계',
@@ -93,7 +99,8 @@ function levelName(level: number): string {
   return names[level] ?? '학습 성장 단계';
 }
 
-function toHm(minutes: number): string {
+function toHm(totalMinutes: number): string {
+  const minutes = Math.max(0, Math.round(totalMinutes));
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m}분`;
@@ -106,6 +113,24 @@ function safePercent(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function getTrendSummary(history7: number[], todayMinutes: number): string {
+  const recent = [...history7].reverse().slice(-2);
+  const series = [...recent, todayMinutes];
+  if (series.length < 3) return '최근 데이터가 적어 추세를 단정하기 어렵습니다.';
+
+  const earliest = series[0];
+  const latest = series[2];
+  const diff3d = latest - earliest;
+  const maxVal = Math.max(...series);
+  const minVal = Math.min(...series);
+  const swing = maxVal - minVal;
+
+  if (diff3d >= 60) return `최근 3일 그래프가 상승세입니다(약 +${diff3d}분).`;
+  if (diff3d <= -60) return `최근 3일 그래프가 하락세입니다(약 ${diff3d}분).`;
+  if (swing >= 90) return `최근 3일 변동폭이 큽니다(최대 ${swing}분 차). 리듬 안정화가 필요합니다.`;
+  return '최근 3일 그래프가 비교적 안정적으로 유지되고 있습니다.';
+}
+
 function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutput {
   const minutes = Math.max(0, Number(input.totalStudyMinutes || 0));
   const completionRate = Math.max(0, Math.min(100, Number(input.completionRate || 0)));
@@ -114,15 +139,19 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
   const level = Math.max(1, Math.min(minuteLevel, completionLevel));
   const levelLabel = levelName(level);
 
-  const history = (input.history7Days || []).map((h) => Number(h.minutes || 0)).filter((m) => Number.isFinite(m));
+  const history = (input.history7Days || [])
+    .map((h) => Number(h.minutes || 0))
+    .filter((m) => Number.isFinite(m));
   const avg7 = history.length > 0 ? history.reduce((sum, m) => sum + m, 0) / history.length : 0;
   const growthRate = avg7 > 0 ? safePercent(((minutes - avg7) / avg7) * 100) : 0;
+  const deltaMinutesFromAvg = Math.round(minutes - avg7);
   const maxPrev = history.length > 0 ? Math.max(...history) : 0;
   const isNewRecord = history.length > 0 && minutes > maxPrev;
   const last3 = history.slice(0, 3);
   const alertLow = last3.length === 3 && last3.every((m) => m < 120) && minutes < 120;
   const streakSource = [...history.slice(0, 4), minutes];
   const streakBadge = streakSource.length >= 5 && streakSource.every((m) => m >= 300);
+  const trendSummary = getTrendSummary(history, minutes);
 
   const studyPlanCount = input.plans?.length ?? 0;
   const studyDoneCount = input.plans?.filter((p) => p.done).length ?? 0;
@@ -131,16 +160,29 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
 
   const teacherMemo = input.teacherNote?.trim()
     ? input.teacherNote.trim()
-    : '오늘은 기본 루틴 유지와 집중 시간 확보를 우선 목표로 삼았습니다.';
+    : '오늘은 기본 루틴 유지와 집중 시간 확보를 우선 목표로 지도했습니다.';
+  const teacherOneLiner = `${input.studentName} 학생은 오늘 ${toHm(minutes)} 학습, 7일 평균 대비 ${deltaMinutesFromAvg >= 0 ? '+' : ''}${deltaMinutesFromAvg}분(${growthRate >= 0 ? '+' : ''}${growthRate}%) ${deltaMinutesFromAvg >= 0 ? '상승' : '하락'}했습니다.`;
+
+  const strengths: string[] = [];
+  if (growthRate >= 10) strengths.push(`7일 평균 대비 학습시간 ${growthRate >= 0 ? '+' : ''}${growthRate}% 상승`);
+  if (completionRate >= 80) strengths.push(`계획 완료율 ${completionRate}%로 실행력이 안정적`);
+  if (isNewRecord) strengths.push('최근 7일 기준 최고 학습시간을 갱신');
+  if (strengths.length === 0) strengths.push('학습 루틴을 유지하며 기본 학습량을 확보');
+
+  const improvements: string[] = [];
+  if (growthRate <= -10) improvements.push(`7일 평균 대비 학습시간 ${growthRate}% 하락 구간 보완 필요`);
+  if (completionRate < 70) improvements.push(`계획 완료율 ${completionRate}%로 마무리 비율 개선 필요`);
+  if (alertLow) improvements.push('저학습 구간이 연속되어 등원 직후 집중 블록 강화 필요');
+  if (improvements.length === 0) improvements.push('과목 전환 간격을 줄여 집중 효율 추가 개선 가능');
 
   const phaseAdvice =
     level <= 3
-      ? '학습 루틴을 짧고 확실하게 지키는 습관부터 만들면 성장 속도가 빨라집니다.'
+      ? '학습 루틴을 작게라도 매일 고정하고, 등원 후 30분 집중 블록부터 확실히 지키는 것이 핵심입니다.'
       : level <= 6
-        ? '현재 루틴이 안정적입니다. 집중 시간 20~30분 추가 확보가 다음 단계의 핵심입니다.'
+        ? '현재 루틴은 안정적입니다. 집중 블록을 20~30분 늘리고 완료 체크를 당일 마감하면 다음 단계 진입이 가능합니다.'
         : level <= 8
-          ? '상위권 루틴에 진입했습니다. 과목별 난이도 편차를 줄이면 성과가 더 크게 올라옵니다.'
-          : '최상위권 패턴입니다. 고난도 문제 대응력과 실전 감각 유지에 집중해 주세요.';
+          ? '상위권 루틴으로 진입 중입니다. 과목 전환 손실을 줄이고 고난도 과목을 초반 집중 시간에 배치해 효율을 높이세요.'
+          : '최상위권 페이스입니다. 실전형 문제 비중과 오답 복기 정확도를 유지해 성과를 고정하는 전략이 필요합니다.';
 
   const growthText =
     avg7 > 0
@@ -149,8 +191,8 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
 
   const badgeText = [
     isNewRecord ? '오늘 최고 기록을 갱신했습니다.' : '',
-    streakBadge ? '5일 연속 고집중 학습 루틴을 유지했습니다.' : '',
-    alertLow ? '최근 학습 시간이 낮아 다음 3일 집중 관리가 필요합니다.' : '',
+    streakBadge ? '5일 연속 고집중 학습 루틴을 유지 중입니다.' : '',
+    alertLow ? '최근 학습시간이 낮아 다음 3일 집중 관리가 필요합니다.' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -167,15 +209,25 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
     '✅ 계획 수행률',
     `- ${completionRate}% 달성`,
     '',
-    '📊 AI 분석 결과',
-    `- 오늘은 **${level}단계 (${levelLabel})**에 해당합니다.`,
+    '🧠 AI 분석 결과',
+    `- 오늘은 **${level}단계 (${levelLabel})**입니다.`,
     `- ${growthText}`,
-    badgeText ? `- ${badgeText}` : '- 오늘 데이터 기준으로 안정적 학습 흐름이 확인됩니다.',
+    `- 최근 7일 평균: ${toHm(Math.round(avg7 || 0))} / 오늘: ${toHm(minutes)}`,
+    `- 증감: ${deltaMinutesFromAvg >= 0 ? '+' : ''}${deltaMinutesFromAvg}분 (${growthRate >= 0 ? '+' : ''}${growthRate}%)`,
+    `- 그래프 변동 해석: ${trendSummary}`,
+    badgeText ? `- ${badgeText}` : '- 오늘 데이터를 기준으로 안정적인 학습 흐름을 확인했습니다.',
     '',
-    '🧠 오늘의 교사 코멘트',
-    `- ${teacherMemo}`,
+    '🧑‍🏫 오늘의 교사 코멘트',
+    `- 선생님 메모: ${teacherMemo}`,
+    `- 한 줄 코칭: ${teacherOneLiner}`,
     '',
-    '🪬 AI 종합 피드백',
+    '✅ 오늘 잘한 점',
+    ...strengths.map((item) => `- ${item}`),
+    '',
+    '⚠️ 보완할 점',
+    ...improvements.map((item) => `- ${item}`),
+    '',
+    '🎯 AI 종합 피드백',
     `- ${phaseAdvice}`,
   ].join('\n');
 
@@ -183,11 +235,17 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
     level,
     levelName: levelLabel,
     content,
+    teacherOneLiner,
+    strengths,
+    improvements,
     metrics: {
       growthRate,
+      deltaMinutesFromAvg,
+      avg7StudyMinutes: Math.round(avg7 || 0),
       isNewRecord,
       alertLow,
       streakBadge,
+      trendSummary,
     },
   };
 }
@@ -196,69 +254,67 @@ const dailyReportPrompt = ai.definePrompt({
   name: 'dailyReportPrompt',
   input: { schema: DailyReportInputSchema },
   output: { schema: DailyReportOutputSchema },
-  prompt: `당신은 관리형 독서실의 베테랑 교육 코치입니다. 다음 데이터를 바탕으로 학부모님께 보낼 **[학습 AI 리포트]**를 생성하세요.
+  prompt: `당신은 관리형 독서실의 베테랑 교육 코치입니다.
+학부모님이 바로 이해할 수 있도록 "숫자 기반" 데일리 리포트를 작성하세요.
 
-### 📋 10단계 학습 단계 시스템 기준
-- 1단계: 1시간 미만 & 40% 미만 (학습 습관 형성 필요)
-- 2단계: 1~2시간 & 50% (적응 단계)
-- 3단계: 2~3시간 & 60% (기본 루틴 형성)
-- 4단계: 3~4시간 & 70% (안정적 진입)
-- 5단계: 4~5시간 & 75% (자기주도 시작)
-- 6단계: 5~6시간 & 80% (집중력 향상)
-- 7단계: 6~7시간 & 85% (상위권 루틴)
-- 8단계: 7~8시간 & 90% (고효율 학습)
-- 9단계: 8~9시간 & 95% (최상위 집중)
-- 10단계: 9시간 이상 & 95% 이상 (수능 상위권형)
-
-### 📊 입력 데이터
+### 입력 데이터
 - 학생명: {{{studentName}}}
 - 날짜: {{{date}}}
-- 오늘 학습: {{{totalStudyMinutes}}}분, 완수율 {{{completionRate}}}%
-- 계획 리스트:
+- 오늘 총 학습시간: {{{totalStudyMinutes}}}분
+- 계획 완료율: {{{completionRate}}}%
+- 계획 목록:
 {{#each plans}}- {{{title}}} ({{#if done}}완료{{else}}미완료{{/if}})
 {{/each}}
-- 시간표:
+- 일정:
 {{#each schedule}}- {{{title}}}: {{{time}}}
 {{/each}}
-- 최근 7일 기록: {{#each history7Days}}{{{minutes}}}분, {{/each}}
+- 최근 7일 기록: {{#each history7Days}}{{{minutes}}}분 {{/each}}
 - 선생님 메모: {{{teacherNote}}}
 
-### ✍️ 작성 가이드라인
-1. **단계 진단**: 데이터 기준에 따라 단계를 결정하고 리포트에 명시하세요.
-2. **비교 분석**: 최근 7일 평균 공부시간과 비교하여 증감률을 계산하고 언급하세요.
-3. **분기별 피드백**:
-   - 1~3단계: 습관 형성과 등원 후 즉시 시작 루틴 강조
-   - 4~6단계: 집중 지속 시간 증가와 실행력 안정 강조
-   - 7~8단계: 상위권 루틴 진입 및 실전 감각 유지 전략
-   - 9~10단계: 고난도 비중 확대 및 실전 최적화 제안
-4. **특수 알림**: 
-   - 최고 기록 갱신 시 "🔥 집중 최고 기록 갱신!" 포함
-   - 성적 저조 3일 지속 시 주의사항 포함
-   - 5일 연속 6단계 이상 시 "🏆 우수 학습자 트로피" 언급
-5. **톤앤매너**: 정중하고, 전문적이며, 학부모님이 신뢰할 수 있는 어조여야 합니다.
+### 필수 작성 규칙
+1. 오늘의 단계(1~10)를 데이터 기준으로 판단하고 level, levelName에 반영.
+2. 최근 7일 평균 대비 오늘 증감(분, %)을 반드시 숫자로 제시.
+3. 그래프 변동 해석(trendSummary)을 한 문장으로 작성:
+   - 상승 / 하락 / 변동성 중 하나로 명확하게 표현.
+4. strengths(2~3개): 오늘 잘한 점을 구체 수치 중심으로 작성.
+5. improvements(2~3개): 오늘 부족했던 점과 보완 포인트 작성.
+6. teacherOneLiner는 선생님 메모를 반영하되, 반드시 학습시간/증감률 숫자를 포함한 1문장.
+7. content는 아래 템플릿 구조를 유지하고, 학부모가 읽기 쉽게 간결하고 전문적으로 작성.
 
-### 📘 출력 리포트 템플릿 형식 (content 필드에 들어갈 내용)
+### content 템플릿
 📘 [학습 AI 리포트] - {{{date}}}
-🕒 출결 정보
-- 등원: (시간표 중 등원 시간)
-- 하원: (시간표 중 하원 시간)
-- 총 학습시간: (시간/분으로 변환)
-- 학습 계획: (완료수)/(전체수)
 
-✅ 계획 완수율
-- {{{completionRate}}}% 달성
+📍 출결 정보
+- 등원: ...
+- 하원: ...
+- 총 학습시간: ...
+- 학습 계획: .../... 완료
 
-📊 AI 분석 결과
-- 오늘은 **[AI가 판단한 단계]단계 ([AI가 판단한 명칭])**에 해당합니다.
-- (7일 평균 대비 비교 분석 문장)
-- (기록 갱신/알림/트로피 등 특이사항 문장)
+✅ 계획 수행률
+- ...% 달성
 
-💬 오늘의 교사 코멘트
-- (선생님 메모를 바탕으로 다듬은 전문적인 코멘트)
+🧠 AI 분석 결과
+- 오늘은 **...단계 (...단계명)**입니다.
+- 최근 7일 평균 대비 ...%
+- 최근 7일 평균: ... / 오늘: ...
+- 증감: ...분 (...%)
+- 그래프 변동 해석: ...
+- 특이사항: ...
 
-🧠 AI 종합 피드백
-- (단계별 분기에 따른 심층 조언 문장 2-3줄)
-`,
+🧑‍🏫 오늘의 교사 코멘트
+- 선생님 메모: ...
+- 한 줄 코칭: ...
+
+✅ 오늘 잘한 점
+- ...
+- ...
+
+⚠️ 보완할 점
+- ...
+- ...
+
+🎯 AI 종합 피드백
+- ...`,
 });
 
 const dailyReportFlow = ai.defineFlow(
@@ -273,3 +329,4 @@ const dailyReportFlow = ai.defineFlow(
     return output;
   }
 );
+
