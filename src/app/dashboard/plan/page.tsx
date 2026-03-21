@@ -63,7 +63,6 @@ import {
   Trophy,
   Crown,
   Info,
-  Lock
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -98,6 +97,8 @@ import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+
+const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
@@ -160,7 +161,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
   }, [timePart]);
 
   const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
-    if (isToday || isPast) return;
+    if (isPast) return;
     let nextSH = sHour, nextSM = sMin, nextSP = sPer;
     let nextEH = eHour, nextEM = eMin, nextEP = ePer;
 
@@ -189,9 +190,9 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
   const TimePicker = ({ type, h, m, p }: any) => (
     <div className={cn(
       "flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30",
-      (isToday || isPast) && "opacity-60 pointer-events-none"
+      isPast && "opacity-60 pointer-events-none"
     )}>
-      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)} disabled={isToday || isPast}>
+      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)} disabled={isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[48px] text-[10px]" : "w-[55px] text-xs")}>
           <SelectValue />
         </SelectTrigger>
@@ -201,14 +202,14 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
         </SelectContent>
       </Select>
       <div className="w-px h-2 bg-border/50 mx-0.5" />
-      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)} disabled={isToday || isPast}>
+      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)} disabled={isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{HOURS.map(hour => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}</SelectContent>
       </Select>
       <span className="text-[9px] font-black opacity-30 px-0.5">:</span>
-      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)} disabled={isToday || isPast}>
+      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)} disabled={isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
@@ -229,10 +230,10 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
           </div>
           <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         </div>
-        {!isPast && !isToday && (
+        {!isPast && (
           <Button 
             variant="ghost" 
-            size="icon" 
+            size="icon"
             className={cn(
               "h-7 w-7 rounded-full text-muted-foreground hover:text-destructive transition-all",
               isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -242,7 +243,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
-        {isToday && <Lock className="h-3 w-3 text-muted-foreground/30" />}
+        {isToday && <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black border-amber-200 text-amber-700">당일 수정 +1</Badge>}
       </div>
 
       <div className="flex items-center gap-1.5 w-full justify-start sm:justify-start">
@@ -374,6 +375,36 @@ export default function StudyPlanPage() {
     return { breakdown: summary, total };
   }, [studyTasks]);
 
+  const applySameDayRoutinePenalty = async (reason: string) => {
+    if (!firestore || !activeMembership || !user || !progressRef) return;
+
+    const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
+    const batch = writeBatch(firestore);
+
+    batch.set(
+      progressRef,
+      {
+        penaltyPoints: increment(SAME_DAY_ROUTINE_PENALTY_POINTS),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    batch.set(penaltyLogRef, {
+      centerId: activeMembership.id,
+      studentId: user.uid,
+      studentName: user.displayName || '학생',
+      pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
+      reason,
+      source: 'manual',
+      createdByUserId: user.uid,
+      createdByName: user.displayName || '학생',
+      createdAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+  };
+
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
@@ -385,12 +416,6 @@ export default function StudyPlanPage() {
 
   const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {
     if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) return;
-    
-    // 당일 루틴 수정 금지 정책
-    if (category === 'schedule' && isToday) {
-      toast({ variant: "destructive", title: "수정 불가", description: "당일 루틴은 변경할 수 없습니다. 항상 미리 설정해 주세요." });
-      return;
-    }
 
     setIsSubmitting(true);
     const itemsCollectionRef = collection(
@@ -426,6 +451,14 @@ export default function StudyPlanPage() {
       }
 
       await addDoc(itemsCollectionRef, data);
+
+      if (category === 'schedule' && isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 작성');
+        toast({
+          title: `당일 루틴 작성으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 작성/수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
       
       if (category === 'study') {
         setNewStudyTask('');
@@ -443,10 +476,7 @@ export default function StudyPlanPage() {
   };
 
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
-    if (isPast || isToday || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) {
-      if (isToday) toast({ variant: "destructive", title: "설정 불가", description: "오늘 출석 계획은 변경할 수 없습니다." });
-      return;
-    }
+    if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
     setIsSubmitting(true);
     
     const batch = writeBatch(firestore);
@@ -480,6 +510,13 @@ export default function StudyPlanPage() {
       }
 
       await batch.commit();
+      if (isToday) {
+        await applySameDayRoutinePenalty(type === 'attend' ? '당일 출석 루틴 수정(출석 설정)' : '당일 출석 루틴 수정(미등원 설정)');
+        toast({
+          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
       toast({ title: type === 'attend' ? "출석 일정이 등록되었습니다." : "미등원 처리가 완료되었습니다." });
     } catch (e) {
       console.error(e);
@@ -489,12 +526,19 @@ export default function StudyPlanPage() {
   };
 
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
-    if (isPast || isToday || !firestore || !user || !activeMembership || !weekKey) return;
+    if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
     const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
     const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
     const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
     const docRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', itemId);
     await updateDoc(docRef, { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
+    if (isToday) {
+      await applySameDayRoutinePenalty('당일 출석 루틴 시간 수정');
+      toast({
+        title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+        description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+      });
+    }
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
@@ -529,14 +573,15 @@ export default function StudyPlanPage() {
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
     if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
-    
-    // 당일 루틴 삭제 금지 정책
-    if (item.category === 'schedule' && isToday) {
-      toast({ variant: "destructive", title: "삭제 불가", description: "오늘의 루틴은 삭제할 수 없습니다." });
-      return;
-    }
 
     await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id));
+    if (item.category === 'schedule' && isToday) {
+      await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
+      toast({
+        title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+        description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+      });
+    }
     toast({ title: "항목이 삭제되었습니다." });
   };
 
@@ -817,9 +862,15 @@ export default function StudyPlanPage() {
           <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
             <div className="flex items-center justify-between">
               <CardTitle className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-base" : "text-2xl")}>
-                <CalendarClock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-7 w-7")} /> {isToday ? '오늘의 출석 정보 (수정 불가)' : '출석 설정'}
+                <CalendarClock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-7 w-7")} /> {isToday ? '오늘의 출석 정보' : '출석 설정'}
               </CardTitle>
-              {isToday ? <Lock className="h-4 w-4 text-muted-foreground/40" /> : <Badge className={cn("bg-white text-primary border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>1단계</Badge>}
+              {isToday ? (
+                <Badge className={cn("bg-amber-50 text-amber-700 border border-amber-200 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>
+                  당일 수정 시 벌점 +{SAME_DAY_ROUTINE_PENALTY_POINTS}
+                </Badge>
+              ) : (
+                <Badge className={cn("bg-white text-primary border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>1단계</Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent className={cn(isMobile ? "p-4" : "p-8 sm:p-10")}>
@@ -835,20 +886,20 @@ export default function StudyPlanPage() {
                       <div className="flex-1 grid grid-cols-2 gap-1 sm:gap-2 w-full">
                         <div className="space-y-1">
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
-                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} disabled={isToday} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
+                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
                         </div>
                         <div className="space-y-1">
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>하원 예정</span>
-                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} disabled={isToday} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
+                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
                         </div>
                       </div>
-                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting || isToday} className={cn("rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-10 text-xs" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
+                      <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-10 text-xs" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
                     </div>
                   </div>
                   
                   <div className={cn("flex flex-col justify-center items-center", isMobile ? "border-t border-dashed pt-4" : "border-l border-dashed pl-8")}>
                     <p className={cn("font-bold text-muted-foreground mb-3", isMobile ? "text-[10px]" : "text-xs")}>오늘은 공부를 쉬어갑니다.</p>
-                    <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting || isToday} className={cn("w-full rounded-xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-2 transition-all active:scale-95", isMobile ? "h-11 text-sm" : "h-14 text-lg")}>
+                    <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className={cn("w-full rounded-xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-2 transition-all active:scale-95", isMobile ? "h-11 text-sm" : "h-14 text-lg")}>
                       <XCircle className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} /> 이날 등원하지 않습니다
                     </Button>
                   </div>
@@ -866,15 +917,23 @@ export default function StudyPlanPage() {
                     {!isAbsentMode && <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>{inTime} ~ {outTime}</span>}
                   </div>
                 </div>
-                {!isToday && (
+                {!isPast && (
                   <button onClick={() => {
                     const batch = writeBatch(firestore!);
                     const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
                     scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다')).forEach(i => batch.delete(doc(colRef, i.id)));
-                    batch.commit().then(() => toast({ title: "설정을 재설정합니다." }));
+                    batch.commit().then(async () => {
+                      if (isToday) {
+                        await applySameDayRoutinePenalty('당일 출석 루틴 초기화');
+                        toast({
+                          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+                          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+                        });
+                      }
+                      toast({ title: "설정을 재설정합니다." });
+                    });
                   }} className={cn("font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10", isMobile ? "text-[8px]" : "text-[10px]")}>재설정</button>
                 )}
-                {isToday && <Lock className="h-4 w-4 text-muted-foreground/20" />}
               </div>
             )}
           </CardContent>
@@ -1047,7 +1106,7 @@ export default function StudyPlanPage() {
                 <div className="bg-primary/5 p-1.5 rounded-lg"><Clock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-6 w-6")} /></div>
                 생활 루틴
               </CardTitle>
-              {!isPast && !isToday && (
+              {!isPast && (
                 <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                   <DialogTrigger asChild><Button variant="ghost" size="icon" className={cn("rounded-full hover:bg-primary/10 transition-all", isMobile ? "h-8 w-8" : "h-10 w-10")}><PlusCircle className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /></Button></DialogTrigger>
                   <DialogContent className={cn("rounded-[2.5rem] border-none shadow-2xl p-8", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2rem]" : "sm:max-w-md")}>
@@ -1063,14 +1122,18 @@ export default function StudyPlanPage() {
                   </DialogContent>
                 </Dialog>
               )}
-              {isToday && <Lock className="h-4 w-4 text-muted-foreground/30" />}
+              {isToday && (
+                <Badge variant="outline" className="h-6 px-2 text-[9px] font-black border-amber-200 text-amber-700">
+                  당일 수정 시 벌점 +{SAME_DAY_ROUTINE_PENALTY_POINTS}
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent className={cn("bg-[#fafafa] flex flex-col gap-3", isMobile ? "p-4" : "p-8")}>
             {isToday && (
               <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-start gap-3 mb-2">
                 <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                <p className="text-[10px] font-bold text-amber-900 leading-relaxed">오늘의 루틴은 변경할 수 없습니다. 내일 이후의 계획을 미리 세워주세요.</p>
+                <p className="text-[10px] font-bold text-amber-900 leading-relaxed">당일 출석 루틴도 작성/수정할 수 있지만, 수정할 때마다 벌점 1점이 자동 반영됩니다.</p>
               </div>
             )}
             {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className={cn("py-12 text-center opacity-20 italic font-black border-2 border-dashed rounded-2xl", isMobile ? "text-xs" : "text-sm")}>등록된 루틴이 없습니다.</div> :
@@ -1189,3 +1252,4 @@ export default function StudyPlanPage() {
     </div>
   );
 }
+

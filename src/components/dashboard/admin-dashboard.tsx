@@ -1385,7 +1385,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               <Link
-                href="/dashboard/revenue?tab=ops&showRisk=1#risk-analysis"
+                href="/dashboard/teacher/students?showRisk=1#risk-analysis"
                 className="block"
                 target="_blank"
                 rel="noopener noreferrer"

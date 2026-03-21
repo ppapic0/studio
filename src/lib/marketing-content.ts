@@ -1,4 +1,4 @@
-export type MarketingNavItem = {
+﻿export type MarketingNavItem = {
   label: string;
   href: string;
 };
@@ -185,7 +185,7 @@ export const marketingContent: MarketingContent = {
     highlights: [
       '국어국문·교육학 전공 기반 수업 설계',
       '수능 국어 전문 지도와 개인 맞춤 피드백',
-      '분당·판교 관리 운영 경험 기반 학습 동선 설계',
+      '분당, 판교 관리형 독서실 운영 경험 기반 학습 동선 설계',
       '원장 본인 24학년도 국어 백분위 99 기록',
       '웹앱을 자체 개발하고 기획하여 운영하는 구조',
     ],
@@ -403,13 +403,14 @@ export const marketingContent: MarketingContent = {
     description:
       '관리형 스터디센터 이용부터 수능 국어 수업 선택 여부까지, 학생 상황에 맞는 시작 경로를 안내합니다.',
     contactLine: '상담 문의: 웹사이트 상담폼 접수 후 순차 연락',
-    locationLine: '위치: 경기 용인시 기흥구 동백중앙로 283 9층 B동 906호, 907호',
+    locationLine: '위치: 경기 용인시 기흥구 동백중앙로 283 B동 9층 906호, 907호',
     hoursLine: '학기중 오후 5:00 ~ 다음날 오전 1:00 · 방학중 오전 8:30 ~ 다음날 오전 1:00 · N수생 별도 운영시간 운영',
   },
   footer: {
     line: '트랙은 공간만 제공하지 않습니다. 학생의 현재를 데이터로 보고, 다음 전략까지 함께 설계합니다.',
     phone: '상담 문의: 웹사이트 상담폼 접수 후 순차 연락',
-    location: '경기 용인시 기흥구 동백중앙로 283 9층 B동 906호, 907호',
+    location: '경기 용인시 기흥구 동백중앙로 283 B동 9층 906호, 907호',
     hours: '운영 시간: 학기중 오후 5:00 ~ 다음날 오전 1:00 · 방학중 오전 8:30 ~ 다음날 오전 1:00 · N수생 별도 운영시간 운영',
   },
 };
+

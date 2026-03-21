@@ -262,7 +262,7 @@ export function RiskIntelligence() {
 
   const urgentList = useMemo(() => riskAnalysis.filter((r) => r.level === '긴급').slice(0, 5), [riskAnalysis]);
 
-  if (membersLoading || studyLogsLoading) {
+  if (membersLoading) {
     return (
       <div className="py-40 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-rose-500 opacity-20" />
@@ -275,6 +275,11 @@ export function RiskIntelligence() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {studyLogsLoading && (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-2.5 text-xs font-bold text-rose-700">
+          최근 학습 로그를 보강 분석 중입니다. 현재 점수는 먼저 표시됩니다.
+        </div>
+      )}
 
       {/* ── 요약 카드 4종 ─────────────────────────────────────────────────────── */}
       <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-4')}>

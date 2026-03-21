@@ -365,7 +365,7 @@ export function OperationalIntelligence() {
     };
   }, [allMembers, attendanceList, dailyStudyMinutesByDate, payments, studyMinutesByStudent, studentProfiles, todaySessionMinutesByHour]);
 
-  const isLoading = membersLoading || attendanceLoading || studentsLoading || paymentsLoading || analyticsLoading;
+  const isLoading = membersLoading || attendanceLoading || studentsLoading || paymentsLoading;
 
   if (isLoading) {
     return (
@@ -382,6 +382,11 @@ export function OperationalIntelligence() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {analyticsLoading && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-xs font-bold text-blue-700">
+          학습 세부 지표를 추가 계산 중입니다. 주요 운영 지표는 먼저 표시됩니다.
+        </div>
+      )}
       <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white text-[#14295F] p-8 relative overflow-hidden ring-1 ring-[#14295F]/15">
           <Armchair className="absolute -right-4 -top-4 h-40 w-40 opacity-10" />

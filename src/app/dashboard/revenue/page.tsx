@@ -32,7 +32,6 @@ import {
   Wallet,
   Building2,
   Activity,
-  ShieldAlert,
   CreditCard,
   Receipt,
   AlertCircle,
@@ -79,13 +78,25 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
-import { RiskIntelligence } from '@/components/dashboard/risk-intelligence';
-import { OperationalIntelligence } from '@/components/dashboard/operational-intelligence';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const OperationalIntelligencePanel = dynamic(
+  () => import('@/components/dashboard/operational-intelligence').then((mod) => mod.OperationalIntelligence),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="py-20 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
+        <p className="text-xs font-bold text-muted-foreground/60">운영 인텔리전스를 불러오는 중입니다...</p>
+      </div>
+    ),
+  }
+);
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 
@@ -124,7 +135,6 @@ export default function RevenuePage() {
   const focusedStudentId = searchParams.get('studentId');
 
   const [activeTab, setActiveTab] = useState('payments'); 
-  const [showOpsRisk, setShowOpsRisk] = useState(false);
   const [paymentSubTab, setPaymentSubTab] = useState('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -250,15 +260,9 @@ export default function RevenuePage() {
 
     const showRisk = searchParams.get('showRisk');
     if (showRisk === '1' || showRisk === 'true') {
-      setActiveTab('ops');
-      setShowOpsRisk(true);
-      setTimeout(() => {
-        if (typeof window === 'undefined') return;
-        const target = document.getElementById('risk-analysis');
-        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 80);
+      router.replace('/dashboard/teacher/students?showRisk=1#risk-analysis');
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (!focusedStudentId) return;
@@ -502,9 +506,6 @@ export default function RevenuePage() {
           </TabsTrigger>
           <TabsTrigger value="revenue" className="rounded-xl font-black gap-2 data-[state=active]:bg-primary data-[state=active]:text-white">
             <TrendingUp className="h-4 w-4" /> 수익 분석
-          </TabsTrigger>
-          <TabsTrigger value="risk" className="hidden">
-            <ShieldAlert className="h-4 w-4" /> 리스크 인텔리전스
           </TabsTrigger>
           <TabsTrigger value="ops" className="rounded-xl font-black gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Activity className="h-4 w-4" /> 운영 인텔리전스
@@ -1029,28 +1030,7 @@ export default function RevenuePage() {
         </TabsContent>
 
         <TabsContent value="ops" className="animate-in fade-in duration-500">
-          <Card className="mb-6 rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-border/50">
-            <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
-              <div className="space-y-1">
-                <p className="text-xs font-black tracking-widest text-muted-foreground">리스크 인텔리전스</p>
-                <p className="text-sm font-bold text-muted-foreground">운영실에서 필요할 때만 열어 4차원 리스크 분석을 확인합니다.</p>
-              </div>
-              <Button
-                type="button"
-                variant={showOpsRisk ? 'default' : 'outline'}
-                className="h-10 rounded-xl font-black"
-                onClick={() => setShowOpsRisk((prev) => !prev)}
-              >
-                {showOpsRisk ? '리스크 분석 닫기' : '리스크 분석 열기'}
-              </Button>
-            </div>
-          </Card>
-          <OperationalIntelligence />
-          {showOpsRisk && (
-            <div id="risk-analysis" className="pt-6">
-              <RiskIntelligence />
-            </div>
-          )}
+          {activeTab === 'ops' ? <OperationalIntelligencePanel /> : null}
         </TabsContent>
       </Tabs>
 

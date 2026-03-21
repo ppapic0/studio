@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy, Timestamp } from 'firebase/firestore';
@@ -316,9 +316,11 @@ export default function AttendancePage() {
       const routine = attendanceRoutineMap[student.id];
       const liveAttendance = attendanceCurrentMap.get(student.id);
       const studyLog = studyLogMap[student.id];
-      const accessCheckedAt = isTodaySelected
-        ? toDateSafe(liveAttendance?.updatedAt || liveAttendance?.lastCheckInAt)
-        : null;
+      const liveCheckInAt = isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null;
+      const accessCheckedAt =
+        liveCheckInAt && isSameDay(liveCheckInAt, selectedDate)
+          ? liveCheckInAt
+          : null;
       const derived = deriveAttendanceDisplayState({
         selectedDate,
         dateKey,
@@ -327,8 +329,8 @@ export default function AttendancePage() {
         recordStatus: record?.status,
         recordStatusSource: record?.statusSource,
         recordRoutineMissingAtCheckIn: Boolean(record?.routineMissingAtCheckIn),
-        recordCheckedAt: toDateSafe(record?.checkInAt || record?.updatedAt),
-        liveCheckedAt: isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null,
+        recordCheckedAt: toDateSafe(record?.checkInAt),
+        liveCheckedAt: accessCheckedAt,
         accessCheckedAt,
         studyCheckedAt: studyLog?.checkedAt || null,
         studyMinutes: studyLog?.studyMinutes || 0,
@@ -338,7 +340,12 @@ export default function AttendancePage() {
         isStudyLogLoading: studyLogLoading,
       });
 
-      mapped.set(student.id, derived);
+      const normalizedCheckedAt =
+        derived.checkedAt && isSameDay(derived.checkedAt, selectedDate)
+          ? derived.checkedAt
+          : null;
+
+      mapped.set(student.id, { ...derived, checkedAt: normalizedCheckedAt });
     });
 
     return mapped;

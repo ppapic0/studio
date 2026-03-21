@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   PanelLeft,
   LogOut,
@@ -56,6 +56,8 @@ import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast } from '@/hooks/use-toast';
 import { StudentProfile, User as UserType } from '@/lib/types';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 function resolveCallableErrorMessage(error: any): string {
   const errorCode = String(error?.code || '').toLowerCase();
@@ -130,6 +132,17 @@ export function DashboardHeader() {
       ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
       : null;
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
+  const linkedStudentId =
+    activeMembership?.role === 'parent'
+      ? activeMembership?.linkedStudentIds?.[0] || null
+      : user?.uid || null;
+  const linkedStudentRef =
+    firestore && activeMembership?.id && linkedStudentId
+      ? doc(firestore, 'centers', activeMembership.id, 'students', linkedStudentId)
+      : null;
+  const { data: linkedStudentProfile } = useDoc<StudentProfile>(linkedStudentRef as any);
+  const parentHeaderTodayLabel = useMemo(() => format(new Date(), 'yyyy. MM. dd (EEE)', { locale: ko }), []);
+  const parentHeaderStudentName = linkedStudentProfile?.name || '자녀';
 
   useEffect(() => {
     if (!isSettingsOpen) {
@@ -247,6 +260,14 @@ export function DashboardHeader() {
       </div>
 
       <div className="relative ml-auto flex items-center gap-2">
+        {isParentMode && (
+          <div className="flex items-center rounded-2xl border border-[#d6e2fb] bg-[linear-gradient(145deg,#f4f8ff_0%,#ffffff_100%)] px-3 py-1.5 shadow-sm">
+            <div className="grid gap-0.5">
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#14295F]/55">{parentHeaderTodayLabel}</p>
+              <p className="text-[11px] font-black text-[#14295F]">{parentHeaderStudentName} 학생 현황</p>
+            </div>
+          </div>
+        )}
         {!isParentMode && (
           <Button
             variant="ghost"

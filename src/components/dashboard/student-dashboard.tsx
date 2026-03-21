@@ -121,7 +121,7 @@ const REQUEST_TYPE_LABEL: Record<'late' | 'absence', string> = {
 
 const PENALTY_SOURCE_LABEL: Record<PenaltyLog['source'], string> = {
   attendance_request: '지각/결석 신청',
-  manual: '관리자 수동 부여',
+  manual: '수동/규정 부여',
   reset: '초기화',
   routine_missing: '루틴 미실행',
 };
@@ -2325,6 +2325,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <ul className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700 leading-relaxed">
                       <li>지각 신청 접수 시 `+1점`이 반영됩니다.</li>
                       <li>결석 신청 접수 시 `+2점`이 반영됩니다.</li>
+                      <li>당일 출석 루틴을 작성하거나 수정하면 `+1점`이 반영됩니다.</li>
                       <li>루틴이 없는 날은 +{ROUTINE_MISSING_PENALTY_POINTS}점이 자동 반영됩니다.</li>
                       <li>센터 관리자/선생님이 생활 기록 벌점을 부여하면 누적 점수에 추가됩니다.</li>
                     </ul>

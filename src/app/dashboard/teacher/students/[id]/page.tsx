@@ -1574,6 +1574,86 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3">
                       <div>
+                        <CardTitle className="text-base font-black tracking-tight">주간 학습시간 성장률</CardTitle>
+                        <CardDescription className="font-bold text-[11px]">막대: 주간 누적 학습시간 · 선: 전주 대비 성장률</CardDescription>
+                      </div>
+                      <span className={cn("text-sm font-black", latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                        이번 주 {latestWeeklyLearningGrowthPercent >= 0 ? '+' : ''}{latestWeeklyLearningGrowthPercent}%
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {hasWeeklyGrowthData ? (
+                      <div className="h-[240px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} />
+                            <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={36} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={32} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                            <Tooltip
+                              formatter={(value: number, name: string) => {
+                                if (name === 'totalMinutes') return [minutesToLabel(Number(value || 0)), '누적 학습시간'];
+                                return [`${Number(value || 0)}%`, '성장률'];
+                              }}
+                            />
+                            <Bar yAxisId="mins" dataKey="totalMinutes" fill="#c7d2fe" radius={[6, 6, 0, 0]} barSize={16} />
+                            <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#10b981' }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">최근 주간 학습 데이터가 없습니다.</div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base font-black tracking-tight">일자별 학습시간 성장률</CardTitle>
+                        <CardDescription className="font-bold text-[11px]">최근 42일 중 7일 단위로 확인합니다.</CardDescription>
+                      </div>
+                      <span className={cn("text-sm font-black", latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                        최근 7일 {latestDailyLearningGrowthPercent >= 0 ? '+' : ''}{latestDailyLearningGrowthPercent}%
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pt-0">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                    </div>
+                    {hasDailyGrowthData ? (
+                      <div className="h-[240px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} />
+                            <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={36} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={32} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                            <Tooltip
+                              formatter={(value: number, name: string) => {
+                                if (name === 'minutes') return [minutesToLabel(Number(value || 0)), '평균 공부시간'];
+                                return [`${Number(value || 0)}%`, '전일 대비 성장률'];
+                              }}
+                            />
+                            <Bar yAxisId="mins" dataKey="minutes" fill="#bae6fd" radius={[6, 6, 0, 0]} barSize={12} />
+                            <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 2.5, fill: '#f59e0b' }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">일자별 학습 데이터가 없습니다.</div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
                         <CardTitle className="text-base font-black tracking-tight">리듬 점수 그래프</CardTitle>
                         <CardDescription className="font-bold text-[11px]">학부모 모드와 동일한 리듬 점수 단일 추이 그래프</CardDescription>
                       </div>
