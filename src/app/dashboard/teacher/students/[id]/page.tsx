@@ -1352,8 +1352,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                {hasRhythmScoreOnlyTrend ? (
-                  <div className="h-[260px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+                <div className="relative h-[260px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+                  <div className="h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
@@ -1374,9 +1374,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </RechartsLineChart>
                     </ResponsiveContainer>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">리듬 점수 산출 데이터가 없습니다.</div>
-                )}
+                  {!hasRhythmScoreOnlyTrend && (
+                    <div className="pointer-events-none absolute inset-x-6 bottom-6 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-xs font-bold text-muted-foreground backdrop-blur-sm">
+                      리듬 점수 산출 데이터가 없어 기본 축으로 표시 중입니다.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -1386,8 +1389,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <CardDescription className="font-bold text-[11px]">외출시간이 늘어나면 집중도가 떨어집니다.</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
-                {hasAwayTimeData ? (
-                  <div className="h-[240px] w-full">
+                <div className="relative h-[240px] w-full">
+                  <div className="h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={awayTimeData} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -1399,9 +1402,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">외출시간 데이터가 없습니다.</div>
-                )}
+                  {!hasAwayTimeData && (
+                    <div className="pointer-events-none absolute inset-x-6 bottom-4 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-xs font-bold text-muted-foreground backdrop-blur-sm">
+                      외출시간 데이터가 없어 기본 축으로 표시 중입니다.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

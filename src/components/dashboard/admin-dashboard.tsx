@@ -100,6 +100,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
+  const [weeklyStudyMinutesByStudent, setWeeklyStudyMinutesByStudent] = useState<Record<string, number>>({});
+  const [liveTickMs, setLiveTickMs] = useState<number>(Date.now());
 
   useEffect(() => {
     setIsMounted(true);
@@ -110,6 +112,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }, 1000);
     
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const syncLiveTick = () => setLiveTickMs(Date.now());
+    syncLiveTick();
+    const tenMinuteTimer = setInterval(syncLiveTick, 10 * 60 * 1000);
+    return () => clearInterval(tenMinuteTimer);
   }, []);
 
   const isMobile = viewMode === 'mobile';
@@ -252,6 +261,54 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!activeMembers) return [];
     return activeMembers.filter((member) => selectedClass === 'all' || member.className === selectedClass);
   }, [activeMembers, selectedClass]);
+
+  useEffect(() => {
+    if (!firestore || !centerId || !today || !isActive) {
+      setWeeklyStudyMinutesByStudent({});
+      return;
+    }
+
+    const students = filteredStudentMembers.map((member) => member.id).filter(Boolean);
+    if (students.length === 0) {
+      setWeeklyStudyMinutesByStudent({});
+      return;
+    }
+
+    let disposed = false;
+    const loadWeeklyStudyMinutes = async () => {
+      const startKey = format(subDays(today, 6), 'yyyy-MM-dd');
+      const endKey = format(today, 'yyyy-MM-dd');
+
+      const rows = await Promise.all(
+        students.map(async (studentId) => {
+          try {
+            const daysRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
+            const snap = await getDocs(
+              query(daysRef, where('dateKey', '>=', startKey), where('dateKey', '<=', endKey))
+            );
+            const total = snap.docs.reduce((sum, d) => {
+              const day = d.data() as StudyLogDay;
+              return sum + Math.max(0, Math.round(day.totalMinutes || 0));
+            }, 0);
+            return [studentId, total] as const;
+          } catch {
+            return [studentId, 0] as const;
+          }
+        })
+      );
+
+      if (!disposed) {
+        setWeeklyStudyMinutesByStudent(Object.fromEntries(rows));
+      }
+    };
+
+    void loadWeeklyStudyMinutes();
+    const timer = setInterval(() => { void loadWeeklyStudyMinutes(); }, 10 * 60 * 1000);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+    };
+  }, [firestore, centerId, today, isActive, filteredStudentMembers]);
 
   const targetMemberIds = useMemo(
     () => new Set(filteredStudentMembers.map((member) => member.id)),
@@ -553,6 +610,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   // --- 실시간 KPI 엔진 ---
   const clampScore = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
+  const getLiveRoundedMinutes = (seat?: AttendanceCurrent | null) => {
+    if (seat?.status !== 'studying' || !seat.lastCheckInAt) return 0;
+    const elapsed = Math.max(0, Math.floor((liveTickMs - seat.lastCheckInAt.toMillis()) / 60000));
+    return Math.floor(elapsed / 10) * 10;
+  };
 
   const calculateStudentFocusScore = (stat?: DailyStudentStat | null, progress?: GrowthProgress | null) => {
     const studyMinutes = Math.max(0, stat?.totalStudyMinutes || 0);
@@ -586,22 +648,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!activeMembers || !attendanceList || !isMounted || !progressList) return null;
 
     let totalTodayMins = 0;
-    const studentLiveMinutes: number[] = [];
     let highRiskCount = 0;
 
     filteredStudentMembers.forEach(member => {
       const studentStat = todayStats?.find(s => s.studentId === member.id);
       const studentProgress = progressList.find(p => p.id === member.id);
-      let cumulative = studentStat?.totalStudyMinutes || 0;
-
       const seat = attendanceList.find(a => a.studentId === member.id);
-      if (seat?.status === 'studying' && seat.lastCheckInAt) {
-        const liveSession = Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000);
-        if (liveSession > 0) cumulative += liveSession;
-      }
+      const liveSession = getLiveRoundedMinutes(seat);
+      let cumulative = (studentStat?.totalStudyMinutes || 0) + liveSession;
 
       totalTodayMins += cumulative;
-      studentLiveMinutes.push(cumulative);
 
       // 리스크 점수 계산 (RiskIntelligence와 동일 로직 적용)
       let riskScore = 0;
@@ -712,6 +768,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const focusRows = filteredStudentMembers.map((member) => {
       const studentStat = filteredTodayStats.find((s) => s.studentId === member.id);
       const studentProgress = progressList.find((p) => p.id === member.id);
+      const seat = attendanceList.find((a) => a.studentId === member.id);
+      const liveSession = getLiveRoundedMinutes(seat);
+      const todayMinutes = Math.max(0, Math.round((studentStat?.totalStudyMinutes || 0) + liveSession));
+      const weeklyMinutes = Math.max(
+        0,
+        Math.round((weeklyStudyMinutesByStudent[member.id] || 0) + liveSession)
+      );
       const score = calculateStudentFocusScore(studentStat, studentProgress);
       return {
         studentId: member.id,
@@ -719,7 +782,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         className: member.className || '-',
         score,
         completion: Math.round(studentStat?.todayPlanCompletionRate || 0),
-        studyMinutes: Math.round(studentStat?.totalStudyMinutes || 0),
+        studyMinutes: weeklyMinutes,
+        todayMinutes,
       };
     }).sort((a, b) => b.studyMinutes - a.studyMinutes);
 
@@ -762,7 +826,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusTop10,
       focusBottom10,
     };
-  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted]);
+  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
 
   const selectedFocusStudent = useMemo(() => {
     if (!selectedFocusStudentId || !metrics) return null;
@@ -986,7 +1050,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (prev7Rows.length === 0) return 0;
     return Math.round(prev7Rows.reduce((sum, row) => sum + (row.totalStudyMinutes || 0), 0) / prev7Rows.length);
   }, [focusStudentTrendRaw, today]);
-  const todayStudyMinutes = Math.round(selectedFocusStat?.totalStudyMinutes ?? selectedFocusStudent?.studyMinutes ?? 0);
+  const todayStudyMinutes = Math.round(selectedFocusStudent?.todayMinutes ?? selectedFocusStat?.totalStudyMinutes ?? 0);
   const todayLearningGrowthPercent = previous7AvgStudyMinutes > 0
     ? Math.round(((todayStudyMinutes - previous7AvgStudyMinutes) / previous7AvgStudyMinutes) * 100)
     : 0;
@@ -1236,7 +1300,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <Card className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-black text-emerald-700">{'\uC0C1\uC704 10\uBA85'}</p>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{'\uD559\uC2B5\uC2DC\uAC04 \uC0C1\uC704'}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">7일 누적 상위</span>
                 </div>
                 <div className="space-y-2">
                   {metrics.focusTop10.length === 0 ? (
@@ -1266,7 +1330,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <Card className="rounded-[2rem] border border-rose-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-black text-rose-700">{'\uD558\uC704 10\uBA85'}</p>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">{'\uD559\uC2B5\uC2DC\uAC04 \uD558\uC704'}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">7일 누적 하위</span>
                 </div>
                 <div className="space-y-2">
                   {metrics.focusBottom10.length === 0 ? (
@@ -1561,7 +1625,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-tight">오늘 학습시간</p>
                     </div>
                     <p className="dashboard-number text-xl text-[#14295F]">
-                      {Math.floor((selectedFocusStudent?.studyMinutes ?? 0) / 60)}h {(selectedFocusStudent?.studyMinutes ?? 0) % 60}m
+                      {Math.floor(todayStudyMinutes / 60)}h {todayStudyMinutes % 60}m
                     </p>
                     {selectedFocusKpi && selectedFocusKpi.avgMinutes > 0 && (
                       <p className="text-[9px] font-bold text-slate-400 mt-0.5">

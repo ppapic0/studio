@@ -20,7 +20,7 @@ const items: ShowcaseItem[] = [
     label: 'STUDY CENTER',
     title: '관리형 스터디센터 중심',
     desc: '입실부터 퇴실까지, 루틴과 데이터가 기록됩니다.',
-    stat: '매일 오전 8:30 시작',
+    stat: '학기중 17:00 · 방학중 08:30 시작 N수생 별도 운영',
     icon: Building2,
     targetId: 'features',
     color: 'navy',

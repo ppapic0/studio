@@ -307,6 +307,32 @@ export default function ClassPage() {
       </ScrollReveal>
 
       {/* ══════════════════════════════════════════
+          PHILOSOPHY
+      ══════════════════════════════════════════ */}
+      <ScrollReveal>
+        <section
+          className="on-dark py-24 sm:py-36"
+          style={{ background: 'linear-gradient(155deg, #0a1330 0%, #111d3f 60%, #0d1840 100%)' }}
+        >
+          <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+            <p className="text-[10.5px] font-black tracking-[0.26em] text-[#FFB273] uppercase">
+              수업 철학
+            </p>
+            <h2 className="mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.22] text-white">
+              국어는 결국,<br />
+              설명 가능한 실력이 되어야 합니다
+            </h2>
+            <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-white/80">
+              잘 읽었다고 느끼는 것과
+              실제로 다시 설명할 수 있는 것은 다릅니다.
+              트랙의 국어 수업은 학생이 스스로 판단 기준을 세우고,
+              문제를 풀어낸 이유를 설명할 수 있는 상태까지 가는 것을 목표로 합니다.
+            </p>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ══════════════════════════════════════════
           5. TEACHING METHOD
       ══════════════════════════════════════════ */}
       <ScrollReveal>
@@ -462,32 +488,6 @@ export default function ClassPage() {
                 </article>
               ))}
             </StaggerChildren>
-          </div>
-        </section>
-      </ScrollReveal>
-
-      {/* ══════════════════════════════════════════
-          8. PHILOSOPHY
-      ══════════════════════════════════════════ */}
-      <ScrollReveal>
-        <section
-          className="on-dark py-24 sm:py-36"
-          style={{ background: 'linear-gradient(155deg, #0a1330 0%, #111d3f 60%, #0d1840 100%)' }}
-        >
-          <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-            <p className="text-[10.5px] font-black tracking-[0.26em] text-[#FFB273] uppercase">
-              수업 철학
-            </p>
-            <h2 className="mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.22] text-white">
-              국어는 결국,<br />
-              설명 가능한 실력이 되어야 합니다
-            </h2>
-            <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-white/80">
-              잘 읽었다고 느끼는 것과
-              실제로 다시 설명할 수 있는 것은 다릅니다.
-              트랙의 국어 수업은 학생이 스스로 판단 기준을 세우고,
-              문제를 풀어낸 이유를 설명할 수 있는 상태까지 가는 것을 목표로 합니다.
-            </p>
           </div>
         </section>
       </ScrollReveal>
