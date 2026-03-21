@@ -1387,8 +1387,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <Link
                 href="/dashboard/teacher/students?showRisk=1#risk-analysis"
                 className="block"
-                target="_blank"
-                rel="noopener noreferrer"
               >
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03] cursor-pointer">
                 <div className="flex justify-between items-start mb-6">

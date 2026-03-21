@@ -55,7 +55,7 @@ import { cn } from '@/lib/utils';
 import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast } from '@/hooks/use-toast';
-import { StudentProfile, User as UserType } from '@/lib/types';
+import { CenterMembership, StudentProfile, User as UserType } from '@/lib/types';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -141,8 +141,13 @@ export function DashboardHeader() {
       ? doc(firestore, 'centers', activeMembership.id, 'students', linkedStudentId)
       : null;
   const { data: linkedStudentProfile } = useDoc<StudentProfile>(linkedStudentRef as any);
+  const linkedStudentMemberRef =
+    firestore && activeMembership?.id && linkedStudentId
+      ? doc(firestore, 'centers', activeMembership.id, 'members', linkedStudentId)
+      : null;
+  const { data: linkedStudentMember } = useDoc<CenterMembership>(linkedStudentMemberRef as any);
   const parentHeaderTodayLabel = useMemo(() => format(new Date(), 'yyyy. MM. dd (EEE)', { locale: ko }), []);
-  const parentHeaderStudentName = linkedStudentProfile?.name || '자녀';
+  const parentHeaderStudentName = linkedStudentProfile?.name || linkedStudentMember?.displayName || '학생';
 
   useEffect(() => {
     if (!isSettingsOpen) {

@@ -26,6 +26,13 @@ import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import {
+  buildAwayTimeInsight,
+  buildDailyStudyInsight,
+  buildRhythmInsight,
+  buildStartEndInsight,
+  buildWeeklyStudyInsight,
+} from '@/lib/learning-insights';
 
 const STAT_CONFIG = {
   focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
@@ -859,6 +866,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const hasAwayTimeData = awayTimeData.some((day) => day.awayMinutes > 0);
   const hasRhythmScoreOnlyTrend = rhythmScoreOnlyTrend.some((day) => day.score > 0);
   const hasStartEndTimeData = startEndTimeTrendData.some((day) => day.startHour > 0 || day.endHour > 0);
+  const chartInsights = useMemo(
+    () => ({
+      weekly: buildWeeklyStudyInsight(weeklyGrowthData),
+      daily: buildDailyStudyInsight(dailyGrowthWindowData),
+      rhythm: buildRhythmInsight(rhythmScoreOnlyTrend),
+      startEnd: buildStartEndInsight(
+        startEndTimeTrendData.map((item) => ({
+          startMinutes: Math.round(Number(item.startHour || 0) * 60),
+          endMinutes: Math.round(Number(item.endHour || 0) * 60),
+        }))
+      ),
+      away: buildAwayTimeInsight(awayTimeData),
+    }),
+    [weeklyGrowthData, dailyGrowthWindowData, rhythmScoreOnlyTrend, startEndTimeTrendData, awayTimeData]
+  );
 
   const studyStreakDays = useMemo(() => {
     const seriesMinutesMap = Object.fromEntries(fullSeries.map((item) => [item.dateKey, item.studyMinutes]));
@@ -1159,6 +1181,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         type: logType,
         content: logContent.trim(),
         improvement: logImprovement.trim(),
+        readAt: null,
         createdAt: serverTimestamp(),
       });
       toast({ title: '상담 일지 저장 완료' });
@@ -1374,6 +1397,44 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">학습 리듬 점수</p>
                 <p className="mt-1 text-xl font-black text-violet-700 tabular-nums">{focusKpi.rhythmScore}점</p>
                 <p className="text-[10px] font-semibold text-violet-700/80">공부시간 분산 기반</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-black tracking-tight flex items-center gap-2 text-[#14295F]">
+                <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
+                AI 그래프 인사이트 요약
+              </CardTitle>
+              <CardDescription className="font-bold text-[11px] text-[#31456f]">
+                최근 그래프를 기반으로 성장 흐름과 보완 포인트를 자동 분석했습니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2.5 pt-0">
+              <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">주간 학습시간 성장률</p>
+                <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.weekly.trend}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.weekly.improve}</p>
+              </div>
+              <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">일자별 학습시간</p>
+                <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.daily.trend}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.daily.improve}</p>
+              </div>
+              <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">리듬 점수</p>
+                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.rhythm.trend}</p>
+                </div>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">시작/종료 시각</p>
+                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.startEnd.trend}</p>
+                </div>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">외출시간</p>
+                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.away.trend}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1917,6 +1978,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                               <Badge className="border-none bg-[#fff3e9] text-[#ff7a16] font-black text-[9px] h-5 px-2">
                                 한 줄 피드백
                               </Badge>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "font-black text-[9px] h-5 px-1.5",
+                                  feedback.readAt
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                )}
+                              >
+                                {feedback.readAt ? '읽음' : '미확인'}
+                              </Badge>
                               <span className="text-[10px] font-bold text-muted-foreground">
                                 {feedback.createdAt ? format(feedback.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}
                               </span>
@@ -1942,6 +2014,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <div key={log.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge className="font-black text-[10px] rounded-full bg-primary text-white">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-black text-[10px] h-5 px-1.5",
+                            log.readAt
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-amber-200 bg-amber-50 text-amber-700"
+                          )}
+                        >
+                          {log.readAt ? '읽음' : '미확인'}
+                        </Badge>
                         <span className="text-xs font-bold text-muted-foreground">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}</span>
                         <span className="text-xs font-bold text-muted-foreground">· {log.teacherName || '담당 선생님'}</span>
                       </div>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -136,6 +136,7 @@ export function AppointmentsPageContent({
   const [announcementAudience, setAnnouncementAudience] = useState<'student' | 'parent' | 'all'>('all');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementBody, setAnnouncementBody] = useState('');
+  const markedLogReadIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setActiveTab(forceTab);
@@ -359,6 +360,32 @@ export function AppointmentsPageContent({
     [showAll, staffAnnouncements]
   );
 
+  useEffect(() => {
+    if (!firestore || !centerId || !user || isStaff) return;
+    if (!showAll && activeTab !== 'logs') return;
+
+    const unreadLogs = visibleLogs.filter((log) => {
+      if (!log?.id || log.readAt) return false;
+      if (markedLogReadIdsRef.current.has(log.id)) return false;
+      return true;
+    });
+    if (!unreadLogs.length) return;
+
+    unreadLogs.forEach((log) => markedLogReadIdsRef.current.add(log.id));
+
+    void Promise.all(
+      unreadLogs.map((log) =>
+        updateDoc(doc(firestore, 'centers', centerId, 'counselingLogs', log.id), {
+          readAt: serverTimestamp(),
+          readByUid: user.uid,
+          readByRole: isParent ? 'parent' : 'student',
+        }).catch(() => {
+          markedLogReadIdsRef.current.delete(log.id);
+        })
+      )
+    );
+  }, [firestore, centerId, user, isStaff, showAll, activeTab, visibleLogs, isParent]);
+
   const handleRequestAppointment = async () => {
     if (!firestore || !centerId || !user) return;
     if (!aptDate) {
@@ -448,6 +475,7 @@ export function AppointmentsPageContent({
         improvement: logImprovement.trim(),
         studentQuestion: selectedResForLog.studentNote?.trim() || '',
         createdAt: serverTimestamp(),
+        readAt: null,
         reservationId: selectedResForLog.id
       };
 
@@ -979,6 +1007,19 @@ export function AppointmentsPageContent({
                             {!isStudent && (
                               <Badge variant="secondary" className="font-black text-[9px] gap-1 px-2 py-0.5">
                                 <GraduationCap className="h-2.5 w-2.5" /> {log.studentName}
+                              </Badge>
+                            )}
+                            {isStaff && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "font-black text-[9px] px-2 py-0.5",
+                                  log.readAt
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                )}
+                              >
+                                {log.readAt ? '읽음' : '미확인'}
                               </Badge>
                             )}
                           </div>

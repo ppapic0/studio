@@ -88,6 +88,15 @@ import {
   type StudentProfile,
 } from '@/lib/types';
 import { ROUTINE_MISSING_PENALTY_POINTS } from '@/lib/attendance-auto';
+import {
+  type ChartInsight,
+  buildAwayTimeInsight,
+  buildDailyStudyInsight,
+  buildRhythmInsight,
+  buildStartEndInsight,
+  buildSubjectInsight,
+  buildWeeklyStudyInsight,
+} from '@/lib/learning-insights';
 
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -215,6 +224,13 @@ function getFocusProgress(minutes: number) {
 function formatWon(value: number) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
   return `₩${safe.toLocaleString()}`;
+}
+
+function calcDeltaPercent(current: number, base: number) {
+  const safeCurrent = Number.isFinite(current) ? current : 0;
+  const safeBase = Number.isFinite(base) ? base : 0;
+  if (safeBase <= 0) return safeCurrent > 0 ? 100 : 0;
+  return Math.round(((safeCurrent - safeBase) / safeBase) * 100);
 }
 
 type InvoiceStatusMeta = {
@@ -969,6 +985,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const subjectTotalMinutes = subjectsData.reduce((sum, subject) => sum + subject.minutes, 0);
 
+  const chartInsights = useMemo<Record<ParentDataChartKey, ChartInsight>>(
+    () => ({
+      weeklyStudy: buildWeeklyStudyInsight(weeklyStudyTimeTrend),
+      dailyStudy: buildDailyStudyInsight(dailyStudyTrend),
+      rhythmScore: buildRhythmInsight(rhythmScoreTrend),
+      startEnd: buildStartEndInsight(startEndTrend),
+      awayTime: buildAwayTimeInsight(awayTimeTrend),
+      subjectTime: buildSubjectInsight(subjectsData),
+    }),
+    [weeklyStudyTimeTrend, dailyStudyTrend, rhythmScoreTrend, startEndTrend, awayTimeTrend, subjectsData]
+  );
+  const selectedChartInsight = selectedDataChart ? chartInsights[selectedDataChart] : null;
+
   const recentPenaltyReasons = useMemo(() => {
     const sorted요청 = [...(attendance요청 || [])].sort((a, b) => {
       const aDate = toDateSafe((a as any).createdAt)?.getTime() ?? 0;
@@ -1119,11 +1148,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [attendanceCurrent, todayLog, todayPlans]);
 
   const todayFirstCheckInLabel = useMemo(() => {
-    if (!todayKey) return '최초 등원 -';
+    if (!todayKey) return '입실 -';
     const checkInAt = checkInByDateKey[todayKey] || studyStartByDateKey[todayKey] || null;
-    if (!checkInAt) return '최초 등원 -';
-    return `최초 등원 ${format(checkInAt, 'HH:mm', { locale: ko })}`;
-  }, [todayKey, checkInByDateKey, studyStartByDateKey]);
+    const checkOutByStudy = studyEndByDateKey[todayKey] || null;
+    const status = attendanceCurrent?.status || '';
+    const isStudying = ['studying', 'away', 'break'].includes(status);
+    const hasTodayStudyRecord = (todayLog?.totalMinutes || 0) > 0;
+    const checkOutFallback =
+      !isStudying && hasTodayStudyRecord
+        ? toDateSafe((attendanceCurrent as any)?.updatedAt as TimestampLike)
+        : null;
+    const checkOutAt = checkOutByStudy || checkOutFallback;
+
+    if (checkInAt && checkOutAt) {
+      return `입실 ${format(checkInAt, 'HH:mm', { locale: ko })} · 퇴실 ${format(checkOutAt, 'HH:mm', { locale: ko })}`;
+    }
+    if (checkInAt) return `입실 ${format(checkInAt, 'HH:mm', { locale: ko })}`;
+    if (checkOutAt) return `퇴실 ${format(checkOutAt, 'HH:mm', { locale: ko })}`;
+    return '입실 -';
+  }, [todayKey, checkInByDateKey, studyStartByDateKey, studyEndByDateKey, attendanceCurrent, todayLog?.totalMinutes]);
 
   const todayRoutineSummary = useMemo(() => {
     const routineItems = (todayPlans || []).filter((item) => item.category === 'schedule');
@@ -1157,6 +1200,73 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       academyTime: academyTime || '-',
     };
   }, [todayPlans, todayKey, checkInByDateKey, studyStartByDateKey]);
+
+  const webAppInsightMetrics = useMemo(() => {
+    const todayStudyMinutes = dailyStudyTrend[dailyStudyTrend.length - 1]?.minutes || 0;
+    const yesterdayStudyMinutes = dailyStudyTrend[dailyStudyTrend.length - 2]?.minutes || 0;
+    const avg7StudyMinutes = Math.round(
+      dailyStudyTrend.reduce((sum, item) => sum + Math.max(0, item.minutes || 0), 0) /
+      Math.max(1, dailyStudyTrend.length)
+    );
+    const todayAwayMinutes = awayTimeTrend[awayTimeTrend.length - 1]?.awayMinutes || 0;
+    const todayRhythmScore = rhythmScoreTrend[rhythmScoreTrend.length - 1]?.score || 0;
+    const yesterdayRhythmScore = rhythmScoreTrend[rhythmScoreTrend.length - 2]?.score || 0;
+
+    const studyVsYesterday = calcDeltaPercent(todayStudyMinutes, yesterdayStudyMinutes);
+    const studyVsAvg7 = calcDeltaPercent(todayStudyMinutes, avg7StudyMinutes);
+    const rhythmVsYesterday = todayRhythmScore - yesterdayRhythmScore;
+
+    const checklist: Array<{ title: string; done: boolean; detail: string }> = [
+      {
+        title: '등원/출결 상태 확인',
+        done: ['studying', 'away', 'break'].includes(attendanceCurrent?.status || ''),
+        detail: attendanceStatus.label,
+      },
+      {
+        title: '오늘 학습계획 완료율 확인',
+        done: planTotal > 0 && planRate >= 70,
+        detail: planTotal > 0 ? `${planDone}/${planTotal} 완료 (${planRate}%)` : '오늘 학습계획이 아직 없습니다.',
+      },
+      {
+        title: '루틴 시간 점검',
+        done: todayRoutineSummary.arrivalTime !== '-' && todayRoutineSummary.academyTime !== '-',
+        detail: `등원 ${todayRoutineSummary.arrivalTime} · 학원 ${todayRoutineSummary.academyTime}`,
+      },
+      {
+        title: '중간 외출/집중 흐름 점검',
+        done: todayAwayMinutes <= 25,
+        detail: `오늘 외출시간 ${todayAwayMinutes}분`,
+      },
+    ];
+
+    const changes: string[] = [
+      `오늘 공부시간은 어제 대비 ${studyVsYesterday >= 0 ? '+' : ''}${studyVsYesterday}% ${studyVsYesterday >= 0 ? '증가' : '감소'}했습니다.`,
+      `오늘 공부시간은 최근 7일 평균 대비 ${studyVsAvg7 >= 0 ? '+' : ''}${studyVsAvg7}% ${studyVsAvg7 >= 0 ? '높습니다' : '낮습니다'}.`,
+      `오늘 리듬 점수는 어제 대비 ${rhythmVsYesterday >= 0 ? '+' : ''}${rhythmVsYesterday}점 ${rhythmVsYesterday >= 0 ? '개선' : '하락'}했습니다.`,
+    ];
+
+    return {
+      todayStudyMinutes,
+      yesterdayStudyMinutes,
+      avg7StudyMinutes,
+      todayAwayMinutes,
+      studyVsYesterday,
+      studyVsAvg7,
+      checklist,
+      changes,
+    };
+  }, [
+    dailyStudyTrend,
+    awayTimeTrend,
+    rhythmScoreTrend,
+    attendanceCurrent?.status,
+    attendanceStatus.label,
+    planTotal,
+    planRate,
+    planDone,
+    todayRoutineSummary.arrivalTime,
+    todayRoutineSummary.academyTime,
+  ]);
 
   // 캘린더 데이터 생성
   const calendarData = useMemo(() => {
@@ -1909,25 +2019,95 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[1.5rem] border border-sky-100 bg-sky-50/50 p-4 shadow-sm">
-                <div className="flex items-start gap-2.5">
-                  <Info className="mt-0.5 h-4 w-4 text-sky-600" />
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-black uppercase tracking-widest text-sky-700">학부모님 안내</p>
-                    <p className="text-xs font-bold leading-relaxed text-slate-700">
-                      아래 카드는 요약만 표시됩니다. 카드를 누르면 팝업에서 그래프를 자세히 확인할 수 있어요.
-                    </p>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Card className="rounded-[1.5rem] border border-sky-100 bg-sky-50/50 p-4 shadow-sm cursor-pointer transition-all hover:shadow-md">
+                    <div className="flex items-start gap-2.5">
+                      <Info className="mt-0.5 h-4 w-4 text-sky-600" />
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-black uppercase tracking-widest text-sky-700">웹앱 인사이트 보기</p>
+                        <p className="text-xs font-bold leading-relaxed text-slate-700">
+                          오늘 앱에서 확인해야 할 체크포인트와 어제/7일 평균 대비 변화율을 확인할 수 있어요.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                </DialogTrigger>
+                <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl">
+                  <div className="bg-[#14295F] p-7 text-white">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-black tracking-tight">웹앱 오늘 인사이트</DialogTitle>
+                      <DialogDescription className="text-white/75 font-bold text-xs">
+                        오늘 체크할 항목과 학습 변화 지표를 한 번에 확인하세요.
+                      </DialogDescription>
+                    </DialogHeader>
                   </div>
-                </div>
-              </Card>
+                  <div className="p-5 bg-white space-y-4 max-h-[68vh] overflow-y-auto custom-scrollbar">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 공부시간</p>
+                        <p className="mt-1 text-lg font-black text-[#14295F]">{toHm(webAppInsightMetrics.todayStudyMinutes)}</p>
+                        <p className="text-[11px] font-bold text-slate-500">
+                          어제 대비 {webAppInsightMetrics.studyVsYesterday >= 0 ? '+' : ''}{webAppInsightMetrics.studyVsYesterday}%
+                        </p>
+                      </Card>
+                      <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 7일 평균</p>
+                        <p className="mt-1 text-lg font-black text-[#14295F]">{toHm(webAppInsightMetrics.avg7StudyMinutes)}</p>
+                        <p className="text-[11px] font-bold text-slate-500">
+                          평균 대비 {webAppInsightMetrics.studyVsAvg7 >= 0 ? '+' : ''}{webAppInsightMetrics.studyVsAvg7}%
+                        </p>
+                      </Card>
+                      <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 외출시간</p>
+                        <p className="mt-1 text-lg font-black text-[#14295F]">{webAppInsightMetrics.todayAwayMinutes}분</p>
+                        <p className="text-[11px] font-bold text-slate-500">
+                          {webAppInsightMetrics.todayAwayMinutes > 25 ? '집중관리 필요' : '양호'}
+                        </p>
+                      </Card>
+                    </div>
+
+                    <Card className="rounded-xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-4 shadow-none">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">오늘 앱에서 체크할 항목</p>
+                      <div className="mt-2.5 grid gap-2">
+                        {webAppInsightMetrics.checklist.map((item) => (
+                          <div key={item.title} className="rounded-lg border border-white/80 bg-white/80 px-3 py-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-xs font-black text-slate-800">{item.title}</p>
+                              <Badge className={cn('h-5 px-2 text-[10px] font-black border-none', item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                                {item.done ? '확인됨' : '확인 필요'}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-[11px] font-bold text-slate-600">{item.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    <Card className="rounded-xl border border-slate-100 bg-white p-4 shadow-none">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 변화 포인트</p>
+                      <div className="mt-2 grid gap-1.5">
+                        {webAppInsightMetrics.changes.map((message) => (
+                          <p key={message} className="text-xs font-bold text-slate-700">{message}</p>
+                        ))}
+                      </div>
+                    </Card>
+                  </div>
+                  <DialogFooter className="border-t bg-white p-4">
+                    <DialogClose asChild>
+                      <Button className="h-11 rounded-xl font-black">확인 완료</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-blue-200 bg-[linear-gradient(145deg,#eff6ff_0%,#dbeafe_55%,#ffffff_100%)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#14295F]/20 bg-[linear-gradient(160deg,#ffffff_0%,#edf2ff_45%,#d9e4ff_100%)] p-4 shadow-[0_12px_30px_rgba(20,41,95,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 6주</Badge>
                   </div>
-                  <div className="mb-2 rounded-2xl border border-white/80 bg-white/75 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div className="hidden">
                     <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
@@ -1949,12 +2129,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-cyan-200 bg-[linear-gradient(145deg,#ecfeff_0%,#cffafe_60%,#ffffff_100%)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#fff9f3_0%,#ffe9d6_55%,#ffd9b8_100%)] p-4 shadow-[0_12px_30px_rgba(255,122,22,0.16)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(255,122,22,0.22)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">일간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="mb-2 rounded-2xl border border-white/80 bg-white/75 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div className="hidden">
                     <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
@@ -1978,12 +2158,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-emerald-200 bg-[linear-gradient(145deg,#ecfdf5_0%,#d1fae5_60%,#ffffff_100%)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#14295F]/20 bg-[linear-gradient(160deg,#f9fbff_0%,#e8efff_52%,#d8e4ff_100%)] p-4 shadow-[0_12px_30px_rgba(20,41,95,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 리듬 점수</span>
                     <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScore}점</Badge>
                   </div>
-                  <div className="mb-2 rounded-2xl border border-white/80 bg-white/75 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div className="hidden">
                     <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
@@ -2005,12 +2185,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-violet-200 bg-[linear-gradient(145deg,#f5f3ff_0%,#ede9fe_60%,#ffffff_100%)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#fff9f2_0%,#ffe7d2_52%,#ffd7b5_100%)] p-4 shadow-[0_12px_30px_rgba(255,122,22,0.16)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(255,122,22,0.22)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">공부 시작/종료 시각</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="mb-2 rounded-2xl border border-white/80 bg-white/75 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div className="hidden">
                     <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
@@ -2035,12 +2215,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-rose-200 bg-[linear-gradient(145deg,#fff1f2_0%,#ffe4e6_60%,#ffffff_100%)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#14295F]/20 bg-[linear-gradient(160deg,#f9fbff_0%,#e6eeff_50%,#d5e1ff_100%)] p-4 shadow-[0_12px_30px_rgba(20,41,95,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출시간 그래프</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="mb-2 rounded-2xl border border-white/80 bg-white/75 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div className="hidden">
                     <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
@@ -2062,12 +2242,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-amber-200 bg-[linear-gradient(145deg,#fffbeb_0%,#fef3c7_60%,#ffffff_100%)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#fffaf3_0%,#ffebd7_52%,#ffdcbd_100%)] p-4 shadow-[0_12px_30px_rgba(255,122,22,0.16)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(255,122,22,0.22)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">과목별 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">{subjectsData.length}과목</Badge>
                   </div>
-                  <div className="mb-2 rounded-2xl border border-white/80 bg-white/75 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div className="hidden">
                     <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
@@ -2208,6 +2388,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
+                    )}
+
+                    {selectedChartInsight && (
+                      <Card className="mt-4 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-4 shadow-none">
+                        <CardTitle className="flex items-center gap-2 text-sm font-black text-[#14295F]">
+                          <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
+                          AI 그래프 인사이트
+                        </CardTitle>
+                        <div className="mt-2.5 space-y-2 text-xs font-bold leading-relaxed text-slate-700">
+                          <p><span className="text-[#1f4fbf]">추세</span> {selectedChartInsight.trend}</p>
+                          <p><span className="text-[#1f4fbf]">성장 해석</span> {selectedChartInsight.growth}</p>
+                          <p><span className="text-[#1f4fbf]">개선 포인트</span> {selectedChartInsight.improve}</p>
+                        </div>
+                      </Card>
                     )}
                   </div>
 

@@ -208,6 +208,9 @@ export interface CounselingLog {
   improvement: string;
   reservationId?: string;
   studentQuestion?: string;
+  readAt?: Timestamp | null;
+  readByUid?: string;
+  readByRole?: 'student' | 'parent';
   createdAt: Timestamp;
 }
 
