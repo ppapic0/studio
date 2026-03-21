@@ -608,76 +608,11 @@ function StudyTimeTrendDialog({
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 p-4 shadow-none">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">리듬 점수 (7일)</p>
-                <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScoreAverage}점</Badge>
-              </div>
-              <div className="relative h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={rhythmScoreTrend}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
-                    <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
-                    <YAxis width={30} fontSize={10} axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
-                    <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#10b981' }} />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
-                {!hasRhythmScoreTrend && (
-                  <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-lg border border-dashed bg-white/80 px-2 py-1.5 text-center text-[10px] font-bold text-slate-400">
-                    리듬 점수 데이터 수집 중입니다.
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <Card className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 p-4 shadow-none">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">공부 시작/종료 (7일)</p>
-                <Badge variant="outline" className="text-[10px] font-black">시각 추이</Badge>
-              </div>
-              <div className="relative h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={startEndTrend}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
-                    <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
-                    <YAxis width={42} fontSize={10} axisLine={false} tickLine={false} domain={rhythmYAxisDomain} tickFormatter={(v) => toClockLabel(Number(v))} />
-                    <Tooltip formatter={(value: number, name: string) => [toClockLabel(Number(value || 0)), name === 'startMinutes' ? '시작시간' : '종료시간']} />
-                    <Line type="monotone" dataKey="startMinutes" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 2.5, fill: '#0ea5e9' }} />
-                    <Line type="monotone" dataKey="endMinutes" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 2.5, fill: '#8b5cf6' }} />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
-                {!hasStartEndTrend && (
-                  <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-lg border border-dashed bg-white/80 px-2 py-1.5 text-center text-[10px] font-bold text-slate-400">
-                    시작/종료 시각 데이터 수집 중입니다.
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          <Card className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 p-4 shadow-none">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">외출시간 그래프 (7일)</p>
-              <Badge variant="outline" className="text-[10px] font-black">중간 공백</Badge>
-            </div>
-            <div className="relative h-[180px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={awayTimeTrend}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                  <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
-                  <YAxis width={30} fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v || 0))}m`} />
-                  <Tooltip formatter={(value) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
-                  <Bar dataKey="awayMinutes" fill="#ef4444" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-              {!hasAwayTrend && (
-                <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-lg border border-dashed bg-white/80 px-2 py-1.5 text-center text-[10px] font-bold text-slate-400">
-                  외출시간 데이터 수집 중입니다.
-                </div>
-              )}
-            </div>
+          <Card className="rounded-[1.25rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-4 shadow-none">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">안내</p>
+            <p className="mt-1 text-xs font-bold leading-relaxed text-slate-700">
+              리듬 점수, 시작/종료 시각, 외출시간 그래프는 분석트랙에서 확인할 수 있습니다.
+            </p>
           </Card>
         </div>
 

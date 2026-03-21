@@ -1857,13 +1857,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <DialogTrigger asChild>
                     <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2">
                       <Clock3 className="h-6 w-6 text-[#FF7A16]" />
-                      <div className="hidden grid gap-0.5 text-[#14295F]">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">주간 상세</span>
-                        <span className="text-xs font-black">성과 상세 분석</span>
-                      </div>
                       <div className="grid gap-0.5 text-[#14295F]">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">오늘 루틴</span>
                         <span className="text-xs font-black">등원 {todayRoutineSummary.arrivalTime} · 학원 {todayRoutineSummary.academyTime}</span>
+                        <span className="text-[10px] font-bold text-slate-500">오늘 기준</span>
                       </div>
                     </Card>
                   </DialogTrigger>
@@ -1936,14 +1933,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 6주</Badge>
                   </div>
-                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
-                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  <div className="mb-2 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
                   <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1963,14 +1960,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">일간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
-                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  <div className="mb-2 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
                   <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1992,14 +1989,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 리듬 점수</span>
                     <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScore}점</Badge>
                   </div>
-                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
-                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  <div className="mb-2 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
                   <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2019,14 +2016,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">공부 시작/종료 시각</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
-                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  <div className="mb-2 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
                   <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2049,14 +2046,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출시간 그래프</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
-                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  <div className="mb-2 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
                   <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2076,14 +2073,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
+                <Card className="group cursor-pointer rounded-[1.5rem] border border-slate-200 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">과목별 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">{subjectsData.length}과목</Badge>
                   </div>
-                  <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <p className="text-[11px] font-bold text-slate-500">그래프는 카드 클릭 후 팝업에서 볼 수 있어요.</p>
-                    <p className="mt-1 text-[11px] font-black text-sky-700">카드를 눌러 그래프 보기</p>
+                  <div className="mb-2 rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
                   <div className="relative h-[190px] w-full hidden">
                     <ResponsiveContainer width="100%" height="100%">
