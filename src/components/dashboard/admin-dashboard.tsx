@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Select,
   SelectContent,
@@ -70,11 +71,12 @@ import {
   Mail,
   Phone,
   TrendingDown,
+  Megaphone,
 } from 'lucide-react';
 import { useFirestore, useCollection, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, Timestamp, doc, limit, getDocs, orderBy } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog } from '@/lib/types';
 import { format, subDays } from 'date-fns';
@@ -102,6 +104,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
   const [weeklyStudyMinutesByStudent, setWeeklyStudyMinutesByStudent] = useState<Record<string, number>>({});
   const [liveTickMs, setLiveTickMs] = useState<number>(Date.now());
+  const [noticeTitle, setNoticeTitle] = useState('');
+  const [noticeBody, setNoticeBody] = useState('');
+  const [isNoticeSubmitting, setIsNoticeSubmitting] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -249,6 +254,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'parentCommunications');
   }, [firestore, centerId]);
   const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
+
+  const parentAnnouncementsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'parentAnnouncements'),
+      orderBy('createdAt', 'desc'),
+      limit(20),
+    );
+  }, [firestore, centerId]);
+  const { data: parentAnnouncements } = useCollection<any>(parentAnnouncementsQuery, { enabled: isActive });
 
   const availableClasses = useMemo(() => {
     if (!activeMembers) return [];
@@ -607,6 +622,45 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => parentTrustRows.filter((row) => row.priority !== '안정').slice(0, 5),
     [parentTrustRows]
   );
+
+  const handleCreateParentAnnouncement = async () => {
+    if (!firestore || !centerId || !activeMembership) return;
+    const title = noticeTitle.trim();
+    const body = noticeBody.trim();
+    if (!title || !body) {
+      toast({
+        variant: 'destructive',
+        title: '입력 확인',
+        description: '공지 제목과 내용을 모두 입력해 주세요.',
+      });
+      return;
+    }
+
+    setIsNoticeSubmitting(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'parentAnnouncements'), {
+        title,
+        body,
+        status: 'published',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdByUid: activeMembership.id,
+        createdByRole: activeMembership.role,
+      });
+      setNoticeTitle('');
+      setNoticeBody('');
+      toast({ title: '공지사항 등록 완료', description: '학부모 소통창에 즉시 반영됩니다.' });
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: '공지사항 등록 실패',
+        description: '잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setIsNoticeSubmitting(false);
+    }
+  };
 
   // --- 실시간 KPI 엔진 ---
   const clampScore = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -1357,6 +1411,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
             </div>
+          </section>
+          <section className="space-y-4 px-1">
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">학부모 공지사항 관리</h2>
+            </div>
+
+            <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
+              <div className="grid gap-3">
+                <Input
+                  value={noticeTitle}
+                  onChange={(event) => setNoticeTitle(event.target.value)}
+                  placeholder="공지 제목"
+                  className="h-11 rounded-xl border-slate-200 font-bold"
+                />
+                <Textarea
+                  value={noticeBody}
+                  onChange={(event) => setNoticeBody(event.target.value)}
+                  placeholder="학부모에게 전달할 공지 내용을 입력하세요."
+                  className="min-h-[110px] rounded-xl border-slate-200 font-bold"
+                />
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl bg-[#14295F] text-white font-black"
+                  onClick={handleCreateParentAnnouncement}
+                  disabled={isNoticeSubmitting}
+                >
+                  {isNoticeSubmitting ? '등록 중...' : '공지사항 등록'}
+                </Button>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 등록 공지</p>
+                {(parentAnnouncements || []).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-xs font-bold text-slate-400">
+                    등록된 공지사항이 없습니다.
+                  </div>
+                ) : (
+                  (parentAnnouncements || []).slice(0, 5).map((item: any) => {
+                    const createdAt = item.createdAt?.toDate?.();
+                    return (
+                      <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
+                        <p className="text-sm font-black text-[#14295F]">{item.title || '제목 없음'}</p>
+                        <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600">{item.body || '내용 없음'}</p>
+                        <p className="mt-1 text-[10px] font-black text-slate-400">
+                          {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '방금 전 등록'}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </Card>
           </section>
           <section className="pb-10 px-1">
             <Card
