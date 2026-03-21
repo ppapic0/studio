@@ -81,6 +81,8 @@ import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, S
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Line,
   LineChart as RechartsLineChart,
@@ -148,6 +150,24 @@ function formatMinutesToKorean(minutes: number): string {
   if (hours <= 0) return `${remain}분`;
   if (remain === 0) return `${hours}시간`;
   return `${hours}시간 ${remain}분`;
+}
+
+function toClockLabel(totalMinutes: number): string {
+  const safe = Math.max(0, Math.min(24 * 60, Math.round(totalMinutes)));
+  const h = Math.floor(safe / 60).toString().padStart(2, '0');
+  const m = (safe % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function hourNumberToDate(dateKey: string, hourValue?: number | null): Date | null {
+  if (typeof hourValue !== 'number' || !Number.isFinite(hourValue)) return null;
+  const base = parse(dateKey, 'yyyy-MM-dd', new Date());
+  if (Number.isNaN(base.getTime())) return null;
+  const clamped = Math.max(0, Math.min(24, hourValue));
+  const h = Math.floor(clamped);
+  const m = Math.max(0, Math.min(59, Math.round((clamped - h) * 60)));
+  base.setHours(h, m, 0, 0);
+  return base;
 }
 
 function calculateRhythmScore(minutes: number[]): number {
@@ -461,9 +481,25 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
 
 function StudyTimeTrendDialog({
   studyTimeTrend,
+  rhythmScoreTrend,
+  rhythmScoreAverage,
+  startEndTrend,
+  awayTimeTrend,
+  hasRhythmScoreTrend,
+  hasStartEndTrend,
+  hasAwayTrend,
+  rhythmYAxisDomain,
   isMobile,
 }: {
   studyTimeTrend: Array<{ date: string; minutes: number }>;
+  rhythmScoreTrend: Array<{ date: string; score: number }>;
+  rhythmScoreAverage: number;
+  startEndTrend: Array<{ date: string; startMinutes: number; endMinutes: number }>;
+  awayTimeTrend: Array<{ date: string; awayMinutes: number }>;
+  hasRhythmScoreTrend: boolean;
+  hasStartEndTrend: boolean;
+  hasAwayTrend: boolean;
+  rhythmYAxisDomain: [number, number];
   isMobile: boolean;
 }) {
   const avgMinutes = useMemo(() => {
@@ -525,7 +561,7 @@ function StudyTimeTrendDialog({
           </DialogHeader>
         </div>
 
-        <div className={cn("p-6 space-y-6 bg-white max-h-[60vh] overflow-y-auto custom-scrollbar", isMobile ? "p-4" : "")}>
+        <div className={cn("p-6 space-y-6 bg-white max-h-[70vh] overflow-y-auto custom-scrollbar", isMobile ? "p-4" : "")}>
           <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-3")}>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">최근 7일 총 공부시간</p>
@@ -571,6 +607,78 @@ function StudyTimeTrendDialog({
               </RechartsLineChart>
             </ResponsiveContainer>
           </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Card className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 p-4 shadow-none">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">리듬 점수 (7일)</p>
+                <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScoreAverage}점</Badge>
+              </div>
+              <div className="relative h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsLineChart data={rhythmScoreTrend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                    <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
+                    <YAxis width={30} fontSize={10} axisLine={false} tickLine={false} domain={[0, 100]} />
+                    <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
+                    <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#10b981' }} />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+                {!hasRhythmScoreTrend && (
+                  <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-lg border border-dashed bg-white/80 px-2 py-1.5 text-center text-[10px] font-bold text-slate-400">
+                    리듬 점수 데이터 수집 중입니다.
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 p-4 shadow-none">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">공부 시작/종료 (7일)</p>
+                <Badge variant="outline" className="text-[10px] font-black">시각 추이</Badge>
+              </div>
+              <div className="relative h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsLineChart data={startEndTrend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                    <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
+                    <YAxis width={42} fontSize={10} axisLine={false} tickLine={false} domain={rhythmYAxisDomain} tickFormatter={(v) => toClockLabel(Number(v))} />
+                    <Tooltip formatter={(value: number, name: string) => [toClockLabel(Number(value || 0)), name === 'startMinutes' ? '시작시간' : '종료시간']} />
+                    <Line type="monotone" dataKey="startMinutes" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 2.5, fill: '#0ea5e9' }} />
+                    <Line type="monotone" dataKey="endMinutes" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 2.5, fill: '#8b5cf6' }} />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+                {!hasStartEndTrend && (
+                  <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-lg border border-dashed bg-white/80 px-2 py-1.5 text-center text-[10px] font-bold text-slate-400">
+                    시작/종료 시각 데이터 수집 중입니다.
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          <Card className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 p-4 shadow-none">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">외출시간 그래프 (7일)</p>
+              <Badge variant="outline" className="text-[10px] font-black">중간 공백</Badge>
+            </div>
+            <div className="relative h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={awayTimeTrend}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                  <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
+                  <YAxis width={30} fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v || 0))}m`} />
+                  <Tooltip formatter={(value) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
+                  <Bar dataKey="awayMinutes" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              {!hasAwayTrend && (
+                <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-lg border border-dashed bg-white/80 px-2 py-1.5 text-center text-[10px] font-bold text-slate-400">
+                  외출시간 데이터 수집 중입니다.
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
 
         <DialogFooter className={cn("bg-white border-t justify-center", isMobile ? "p-4" : "p-6")}>
@@ -606,6 +714,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
+  const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
+  const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
+  const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -683,6 +794,106 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     });
     return map;
   }, [recentLogs]);
+
+  useEffect(() => {
+    if (!isActive || !firestore || !activeMembership?.id || !user?.uid || !today) {
+      setStudyStartByDateKey({});
+      setStudyEndByDateKey({});
+      setAwayMinutesByDateKey({});
+      return;
+    }
+
+    let cancelled = false;
+    const centerId = activeMembership.id;
+    const studentId = user.uid;
+    const targetDateKeys = Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      return format(day, 'yyyy-MM-dd');
+    });
+
+    const loadRhythmTrends = async () => {
+      try {
+        const pairs = await Promise.all(
+          targetDateKeys.map(async (dateKey) => {
+            try {
+              const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
+              const statSnap = await getDoc(statRef);
+              const statData = statSnap.exists() ? (statSnap.data() as Record<string, unknown>) : null;
+              const statStartHourRaw = statData?.startHour ?? statData?.firstStudyHour;
+              const statEndHourRaw = statData?.endHour ?? statData?.lastStudyHour;
+              const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
+              const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
+              const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
+              const statAwayMinutes = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw)
+                ? Math.max(0, Math.round(statAwayMinutesRaw))
+                : 0;
+
+              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              const sessions = sessionsSnap.docs
+                .map((item) => item.data() as StudySession)
+                .filter((item) => !!item.startTime)
+                .map((item) => ({
+                  startTime: toDateSafeAttendance(item.startTime as any),
+                  endTime: toDateSafeAttendance(item.endTime as any),
+                }))
+                .filter((item) => item.startTime) as Array<{ startTime: Date; endTime: Date | null }>;
+
+              const firstSession = sessions[0] || null;
+              const lastSession = sessions[sessions.length - 1] || null;
+              const sessionStart = firstSession?.startTime || null;
+              const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
+              let sessionAwayMinutes = 0;
+              for (let i = 1; i < sessions.length; i += 1) {
+                const prevEnd = sessions[i - 1].endTime;
+                const currStart = sessions[i].startTime;
+                if (!prevEnd || !currStart) continue;
+                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
+                if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
+              }
+
+              return [
+                dateKey,
+                {
+                  start: sessionStart || statStart,
+                  end: sessionEnd || statEnd,
+                  awayMinutes: sessionAwayMinutes > 0 ? sessionAwayMinutes : statAwayMinutes,
+                },
+              ] as const;
+            } catch {
+              return [
+                dateKey,
+                { start: null, end: null, awayMinutes: 0 },
+              ] as const;
+            }
+          })
+        );
+
+        if (cancelled) return;
+        const nextStart: Record<string, Date | null> = {};
+        const nextEnd: Record<string, Date | null> = {};
+        const nextAway: Record<string, number> = {};
+        pairs.forEach(([dateKey, value]) => {
+          nextStart[dateKey] = value.start || null;
+          nextEnd[dateKey] = value.end || null;
+          nextAway[dateKey] = Math.max(0, Math.round(value.awayMinutes || 0));
+        });
+        setStudyStartByDateKey(nextStart);
+        setStudyEndByDateKey(nextEnd);
+        setAwayMinutesByDateKey(nextAway);
+      } catch {
+        if (cancelled) return;
+        setStudyStartByDateKey({});
+        setStudyEndByDateKey({});
+        setAwayMinutesByDateKey({});
+      }
+    };
+
+    void loadRhythmTrends();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, activeMembership?.id, user?.uid, today]);
 
   // 3. 나의 신청 내역 조회
   const myRequestsQuery = useMemoFirebase(() => {
@@ -770,6 +981,90 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       };
     });
   }, [today, logMinutesByDateKey]);
+
+  const dailyRhythmTrend = useMemo(() => {
+    if (!today) return [] as { date: string; rhythmMinutes: number | null }[];
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const studyStart = studyStartByDateKey[dateKey] || null;
+      return {
+        date: format(day, 'MM/dd', { locale: ko }),
+        rhythmMinutes: studyStart ? studyStart.getHours() * 60 + studyStart.getMinutes() : null,
+      };
+    });
+  }, [today, studyStartByDateKey]);
+
+  const rhythmScoreTrend = useMemo(() => {
+    const values = dailyRhythmTrend.map((point) => point.rhythmMinutes);
+    return dailyRhythmTrend.map((point, index) => {
+      const windowValues = values
+        .slice(0, index + 1)
+        .filter((value): value is number => typeof value === 'number');
+      const score = windowValues.length >= 2 ? calculateRhythmScore(windowValues) : windowValues.length === 1 ? 100 : 0;
+      return { date: point.date, score };
+    });
+  }, [dailyRhythmTrend]);
+
+  const rhythmScoreAverage = useMemo(() => {
+    const valid = rhythmScoreTrend.filter((item) => item.score > 0);
+    if (!valid.length) return 0;
+    return Math.round(valid.reduce((sum, item) => sum + item.score, 0) / valid.length);
+  }, [rhythmScoreTrend]);
+
+  const startEndTrend = useMemo(() => {
+    if (!today) return [] as Array<{ date: string; startMinutes: number; endMinutes: number }>;
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const start = studyStartByDateKey[dateKey];
+      const end = studyEndByDateKey[dateKey];
+      return {
+        date: format(day, 'MM/dd', { locale: ko }),
+        startMinutes: start ? start.getHours() * 60 + start.getMinutes() : 0,
+        endMinutes: end ? end.getHours() * 60 + end.getMinutes() : 0,
+      };
+    });
+  }, [today, studyStartByDateKey, studyEndByDateKey]);
+
+  const awayTimeTrend = useMemo(() => {
+    if (!today) return [] as Array<{ date: string; awayMinutes: number }>;
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return {
+        date: format(day, 'MM/dd', { locale: ko }),
+        awayMinutes: Math.max(0, awayMinutesByDateKey[dateKey] || 0),
+      };
+    });
+  }, [today, awayMinutesByDateKey]);
+
+  const hasRhythmScoreTrend = useMemo(
+    () => rhythmScoreTrend.some((item) => item.score > 0),
+    [rhythmScoreTrend]
+  );
+  const hasStartEndTrend = useMemo(
+    () => startEndTrend.some((item) => item.startMinutes > 0 || item.endMinutes > 0),
+    [startEndTrend]
+  );
+  const hasAwayTrend = useMemo(
+    () => awayTimeTrend.some((item) => item.awayMinutes > 0),
+    [awayTimeTrend]
+  );
+
+  const rhythmYAxisDomain = useMemo(() => {
+    const values = startEndTrend
+      .flatMap((point) => [point.startMinutes, point.endMinutes])
+      .filter((value) => value > 0);
+    if (values.length === 0) return [420, 1320] as [number, number];
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max(30, Math.round((max - min) * 0.25));
+    const lower = Math.max(0, Math.floor((min - padding) / 30) * 30);
+    const upper = Math.min(24 * 60, Math.ceil((max + padding) / 30) * 30);
+    if (lower === upper) return [Math.max(0, lower - 60), Math.min(24 * 60, upper + 60)] as [number, number];
+    return [lower, upper] as [number, number];
+  }, [startEndTrend]);
 
   const examCountdowns = useMemo(() => {
     const todayStart = new Date();
@@ -1811,7 +2106,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={hDisplay} m={mDisplay} isMobile={isMobile} />
         <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
         <div className={cn(isMobile ? "col-span-2" : "")}>
-          <StudyTimeTrendDialog studyTimeTrend={studyTimeTrend} isMobile={isMobile} />
+          <StudyTimeTrendDialog
+            studyTimeTrend={studyTimeTrend}
+            rhythmScoreTrend={rhythmScoreTrend}
+            rhythmScoreAverage={rhythmScoreAverage}
+            startEndTrend={startEndTrend}
+            awayTimeTrend={awayTimeTrend}
+            hasRhythmScoreTrend={hasRhythmScoreTrend}
+            hasStartEndTrend={hasStartEndTrend}
+            hasAwayTrend={hasAwayTrend}
+            rhythmYAxisDomain={rhythmYAxisDomain}
+            isMobile={isMobile}
+          />
         </div>
       </div>
 

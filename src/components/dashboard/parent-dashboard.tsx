@@ -124,6 +124,17 @@ function toClockLabel(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
+function hourNumberToDate(dateKey: string, hourValue?: number | null): Date | null {
+  if (typeof hourValue !== 'number' || !Number.isFinite(hourValue)) return null;
+  const base = parse(dateKey, 'yyyy-MM-dd', new Date());
+  if (Number.isNaN(base.getTime())) return null;
+  const clamped = Math.max(0, Math.min(24, hourValue));
+  const hours = Math.floor(clamped);
+  const minutes = Math.max(0, Math.min(59, Math.round((clamped - hours) * 60)));
+  base.setHours(hours, minutes, 0, 0);
+  return base;
+}
+
 function calculateRhythmScore(minutes: number[]): number {
   if (!minutes.length) return 0;
   const safeMinutes = minutes.map((value) => Math.max(0, Math.round(value)));
@@ -182,6 +193,14 @@ type ParentAnnouncementRecord = {
   createdAt?: { toDate?: () => Date; toMillis?: () => number };
   updatedAt?: { toDate?: () => Date; toMillis?: () => number };
 };
+
+type ParentDataChartKey =
+  | 'weeklyStudy'
+  | 'dailyStudy'
+  | 'rhythmScore'
+  | 'startEnd'
+  | 'awayTime'
+  | 'subjectTime';
 
 function formatMinutes(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -313,6 +332,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
   const [isReportArchiveOpen, setIsReportArchiveOpen] = useState(false);
   const [selectedChildReport, setSelectedChildReport] = useState<DailyReport | null>(null);
+  const [selectedDataChart, setSelectedDataChart] = useState<ParentDataChartKey | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
@@ -493,40 +513,70 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       try {
         const pairs = await Promise.all(
           targetDateKeys.map(async (dateKey) => {
-            const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
-            const snapshot = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
-            const sessions = snapshot.docs
-              .map((item) => item.data() as StudySession)
-              .filter((item) => !!item.startTime)
-              .map((item) => ({
-                startTime: toDateSafe(item.startTime as TimestampLike),
-                endTime: toDateSafe(item.endTime as TimestampLike),
-              }))
-              .filter((item) => item.startTime) as Array<{ startTime: Date; endTime: Date | null }>;
-            const firstSession = sessions[0] || null;
-            const lastSession = sessions[sessions.length - 1] || null;
-            const sessionStart = firstSession?.startTime || null;
-            const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
-            let awayMinutes = 0;
-            for (let i = 1; i < sessions.length; i += 1) {
-              const prevEnd = sessions[i - 1].endTime;
-              const currStart = sessions[i].startTime;
-              if (!prevEnd || !currStart) continue;
-              const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
-              if (gap > 0 && gap < 180) awayMinutes += gap;
+            try {
+              const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
+              const statSnap = await getDoc(statRef);
+              const statData = statSnap.exists() ? (statSnap.data() as Record<string, unknown>) : null;
+              const statStartHourRaw = statData?.startHour ?? statData?.firstStudyHour;
+              const statEndHourRaw = statData?.endHour ?? statData?.lastStudyHour;
+              const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
+              const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
+              const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
+              const statAwayMinutes = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw)
+                ? Math.max(0, Math.round(statAwayMinutesRaw))
+                : 0;
+
+              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+              const snapshot = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              const sessions = snapshot.docs
+                .map((item) => item.data() as StudySession)
+                .filter((item) => !!item.startTime)
+                .map((item) => ({
+                  startTime: toDateSafe(item.startTime as TimestampLike),
+                  endTime: toDateSafe(item.endTime as TimestampLike),
+                }))
+                .filter((item) => item.startTime) as Array<{ startTime: Date; endTime: Date | null }>;
+
+              const firstSession = sessions[0] || null;
+              const lastSession = sessions[sessions.length - 1] || null;
+              const sessionStart = firstSession?.startTime || null;
+              const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
+              let sessionAwayMinutes = 0;
+              for (let i = 1; i < sessions.length; i += 1) {
+                const prevEnd = sessions[i - 1].endTime;
+                const currStart = sessions[i].startTime;
+                if (!prevEnd || !currStart) continue;
+                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
+                if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
+              }
+
+              const todayFallback =
+                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
+                  : null;
+
+              return [
+                dateKey,
+                {
+                  start: sessionStart || statStart || todayFallback,
+                  end: sessionEnd || statEnd || todayFallback,
+                  awayMinutes: sessionAwayMinutes > 0 ? sessionAwayMinutes : statAwayMinutes,
+                },
+              ] as const;
+            } catch {
+              const todayFallback =
+                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
+                  : null;
+              return [
+                dateKey,
+                {
+                  start: todayFallback,
+                  end: todayFallback,
+                  awayMinutes: 0,
+                },
+              ] as const;
             }
-            const todayFallback =
-              dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
-                ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
-                : null;
-            return [
-              dateKey,
-              {
-                start: sessionStart || todayFallback,
-                end: sessionEnd || todayFallback,
-                awayMinutes,
-              },
-            ] as const;
           })
         );
 
@@ -944,6 +994,29 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [growth?.penaltyPoints, penaltyLogs]);
 
+  const penaltyHistoryRows = useMemo(() => {
+    return [...(penaltyLogs || [])]
+      .filter((log) => Number(log.pointsDelta || 0) > 0)
+      .sort((a, b) => {
+        const aMs = toDateSafe((a as any).createdAt)?.getTime() || 0;
+        const bMs = toDateSafe((b as any).createdAt)?.getTime() || 0;
+        return bMs - aMs;
+      })
+      .slice(0, 50)
+      .map((log) => {
+        const createdAt = toDateSafe((log as any).createdAt);
+        const dateLabel = createdAt ? format(createdAt, 'yyyy.MM.dd', { locale: ko }) : '-';
+        const reason = log.reason?.trim() || PENALTY_SOURCE_LABEL[log.source] || '벌점 반영';
+        const points = Math.max(0, Math.round(Number(log.pointsDelta || 0)));
+        return {
+          id: log.id,
+          dateLabel,
+          reason,
+          points,
+        };
+      });
+  }, [penaltyLogs]);
+
   const aiInsights = useMemo(() => {
     const insights: string[] = [];
     const targetWeeklyMinutes = (student?.targetDailyMinutes || 360) * 5;
@@ -1017,6 +1090,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
     return { label: '미입실 (입실 전)', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
   }, [attendanceCurrent, todayLog, todayPlans]);
+
+  const todayFirstCheckInLabel = useMemo(() => {
+    if (!todayKey) return '최초 등원 -';
+    const checkInAt = checkInByDateKey[todayKey];
+    if (!checkInAt) return '최초 등원 -';
+    return `최초 등원 ${format(checkInAt, 'HH:mm', { locale: ko })}`;
+  }, [todayKey, checkInByDateKey]);
 
   // 캘린더 데이터 생성
   const calendarData = useMemo(() => {
@@ -1413,6 +1493,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 )}>
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
                   <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
+                  <p className="text-[10px] font-bold text-slate-500">{todayFirstCheckInLabel}</p>
                 </Card>
                 <Card
                   className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] p-4 text-center space-y-1 shadow-sm transition-all hover:ring-1 hover:ring-[#ffc593] cursor-pointer"
@@ -1779,7 +1860,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 6주</Badge>
@@ -1802,7 +1883,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">일간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
@@ -1827,7 +1908,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 리듬 점수</span>
                     <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScore}점</Badge>
@@ -1850,7 +1931,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">공부 시작/종료 시각</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
@@ -1876,7 +1957,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출시간 그래프</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
@@ -1899,7 +1980,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">과목별 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">{subjectsData.length}과목</Badge>
@@ -1922,6 +2003,119 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
               </div>
+
+              <Dialog open={selectedDataChart !== null} onOpenChange={(open) => { if (!open) setSelectedDataChart(null); }}>
+                <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
+                  <div className="bg-[#14295F] p-6 text-white">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-black tracking-tight">
+                        {selectedDataChart === 'weeklyStudy' && '주간 학습시간 추이'}
+                        {selectedDataChart === 'dailyStudy' && '일간 학습시간 추이'}
+                        {selectedDataChart === 'rhythmScore' && '학습 리듬 점수'}
+                        {selectedDataChart === 'startEnd' && '공부 시작/종료 시각'}
+                        {selectedDataChart === 'awayTime' && '외출시간 그래프'}
+                        {selectedDataChart === 'subjectTime' && '과목별 학습시간'}
+                      </DialogTitle>
+                      <DialogDescription className="text-white/75 font-bold text-xs">
+                        선택한 그래프를 확대해서 상세 데이터를 확인할 수 있습니다.
+                      </DialogDescription>
+                    </DialogHeader>
+                  </div>
+
+                  <div className="p-5 bg-white max-h-[68vh] overflow-y-auto custom-scrollbar">
+                    {selectedDataChart === 'weeklyStudy' && (
+                      <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={weeklyStudyTimeTrend}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="label" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis width={36} fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
+                            <Tooltip formatter={(value) => [toHm(Number(value || 0)), '주간 누적']} />
+                            <Bar dataKey="totalMinutes" fill="#14295F" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {selectedDataChart === 'dailyStudy' && (
+                      <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsLineChart data={dailyStudyTrend}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis width={36} fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
+                            <Tooltip formatter={(value) => [toHm(Number(value || 0)), '일간 학습']} />
+                            <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={3} dot={{ r: 3, fill: '#FF7A16' }} />
+                          </RechartsLineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {selectedDataChart === 'rhythmScore' && (
+                      <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsLineChart data={rhythmScoreTrend}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                            <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis width={36} fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
+                            <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
+                            <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={3} dot={{ r: 3, fill: '#10b981' }} />
+                          </RechartsLineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {selectedDataChart === 'startEnd' && (
+                      <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsLineChart data={startEndTrend}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis width={44} fontSize={11} axisLine={false} tickLine={false} domain={rhythmYAxisDomain} tickFormatter={(v) => toClockLabel(Number(v))} />
+                            <Tooltip formatter={(value: number, name: string) => [toClockLabel(Number(value || 0)), name === 'startMinutes' ? '시작시간' : '종료시간']} />
+                            <Line type="monotone" dataKey="startMinutes" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3, fill: '#0ea5e9' }} />
+                            <Line type="monotone" dataKey="endMinutes" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} />
+                          </RechartsLineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {selectedDataChart === 'awayTime' && (
+                      <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={awayTimeTrend}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis width={34} fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v || 0))}m`} />
+                            <Tooltip formatter={(value) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
+                            <Bar dataKey="awayMinutes" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {selectedDataChart === 'subjectTime' && (
+                      <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={subjectsData.slice(0, 6)}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                            <XAxis dataKey="subject" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis width={34} fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
+                            <Tooltip formatter={(value) => [toHm(Number(value || 0)), '과목 학습']} />
+                            <Bar dataKey="minutes" fill="#14295F" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+
+                  <DialogFooter className="border-t bg-white p-4">
+                    <DialogClose asChild>
+                      <Button className="h-11 rounded-xl font-black">닫기</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <div className="space-y-3 px-1">
                 <div className="flex items-center gap-2">
@@ -2418,6 +2612,29 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               ) : (
                 <div className="flex h-full min-h-[180px] items-center justify-center text-center text-sm font-bold text-slate-400">
                   왼쪽에서 리포트를 선택해 주세요.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">벌점 이력 (일자/사유)</p>
+              {penaltyHistoryRows.length === 0 ? (
+                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-center text-xs font-bold text-slate-400">
+                  현재까지 반영된 벌점 이력이 없습니다.
+                </div>
+              ) : (
+                <div className="mt-2 max-h-56 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+                  {penaltyHistoryRows.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-slate-800 truncate">{row.reason}</p>
+                        <p className="text-[10px] font-bold text-slate-400">{row.dateLabel}</p>
+                      </div>
+                      <Badge variant="outline" className="border-none bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                        +{row.points}점
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

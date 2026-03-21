@@ -252,6 +252,11 @@ export default function RevenuePage() {
     if (showRisk === '1' || showRisk === 'true') {
       setActiveTab('ops');
       setShowOpsRisk(true);
+      setTimeout(() => {
+        if (typeof window === 'undefined') return;
+        const target = document.getElementById('risk-analysis');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
     }
   }, [searchParams]);
 
@@ -1042,7 +1047,7 @@ export default function RevenuePage() {
           </Card>
           <OperationalIntelligence />
           {showOpsRisk && (
-            <div className="pt-6">
+            <div id="risk-analysis" className="pt-6">
               <RiskIntelligence />
             </div>
           )}
