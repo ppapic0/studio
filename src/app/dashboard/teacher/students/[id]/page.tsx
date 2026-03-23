@@ -1805,7 +1805,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
+                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성 점수</span><span>{focusKpi.rhythmScore}점</span></div><Progress value={focusKpi.rhythmScore} className="h-2" /></div>
                     <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
                     <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
                   </CardContent>
@@ -1822,6 +1822,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
                       </div>
                     ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {riskSignals.length === 0 ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">{riskSignals.map((signal) => <Badge key={signal} variant="outline" className="font-black border-rose-200 text-rose-600 bg-rose-50">{signal}</Badge>)}</div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1867,13 +1880,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <CardContent className="pt-0">
                     <div className="h-[280px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
+                        <ComposedChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
                           <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
                           <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
                           <Tooltip content={<CustomTooltip unit="%" />} />
                           <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
-                        </BarChart>
+                          <Line type="monotone" dataKey="completionRate" stroke="#b45309" strokeWidth={2.5} dot={{ r: 3, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} />
+                        </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
@@ -1886,7 +1900,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
+                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성 점수</span><span>{focusKpi.rhythmScore}점</span></div><Progress value={focusKpi.rhythmScore} className="h-2" /></div>
                     <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
                     <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
                   </CardContent>

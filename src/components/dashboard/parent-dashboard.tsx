@@ -356,7 +356,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [selectedChildReport, setSelectedChildReport] = useState<DailyReport | null>(null);
   const [selectedDataChart, setSelectedDataChart] = useState<ParentDataChartKey | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+  const [selectedDatePlans, setSelectedDatePlans] = useState<StudyPlanItem[]>([]);
+  const [isSelectedDatePlansLoading, setIsSelectedDatePlansLoading] = useState(false);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
+  const [report, setReport] = useState<(DailyReport & { id: string }) | null>(null);
+  const [rawReportsArchive, setRawReportsArchive] = useState<DailyReport[]>([]);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
@@ -454,17 +458,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const selectedDateKey = selectedCalendarDate ? format(selectedCalendarDate, 'yyyy-MM-dd') : '';
   const selectedDateWeekKey = selectedCalendarDate ? format(selectedCalendarDate, "yyyy-'W'II") : '';
-  const selectedDatePlansQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentId || !selectedDateKey || !selectedDateWeekKey) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', selectedDateWeekKey, 'items'),
-      where('dateKey', '==', selectedDateKey),
-    );
-  }, [firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
-  const { data: selectedDatePlans, isLoading: isSelectedDatePlansLoading } = useCollection<StudyPlanItem>(selectedDatePlansQuery, {
-    enabled: isActive && !!studentId && !!selectedDateKey,
-  });
-
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(
@@ -475,6 +468,45 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, studentId]);
   const { data: attendanceCurrentDocs } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive && !!studentId });
   const attendanceCurrent = attendanceCurrentDocs?.[0];
+
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || !studentId || !selectedDateKey || !selectedDateWeekKey) {
+      setSelectedDatePlans([]);
+      setIsSelectedDatePlansLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadSelectedDatePlans = async () => {
+      setIsSelectedDatePlansLoading(true);
+      try {
+        const snap = await getDocs(
+          query(
+            collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', selectedDateWeekKey, 'items'),
+            where('dateKey', '==', selectedDateKey),
+          )
+        );
+        if (cancelled) return;
+        setSelectedDatePlans(
+          snap.docs.map((docSnap) => ({ ...(docSnap.data() as StudyPlanItem), id: docSnap.id }))
+        );
+      } catch (error) {
+        console.error('[parent-dashboard] failed to load selected date plans', error);
+        if (!cancelled) {
+          setSelectedDatePlans([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSelectedDatePlansLoading(false);
+        }
+      }
+    };
+
+    void loadSelectedDatePlans();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
 
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !today) {
@@ -517,8 +549,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           const next = Object.fromEntries(pairs) as Record<string, Date | null>;
           setCheckInByDateKey(next);
         }
-      } catch (error) {
-        console.warn('[parent-dashboard] failed to load check-in trend', error);
+      } catch (error: any) {
+        if (error?.code !== 'permission-denied') {
+          console.warn('[parent-dashboard] failed to load check-in trend', error);
+        }
         if (!cancelled) setCheckInByDateKey({});
       }
     };
@@ -627,8 +661,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           setStudyEndByDateKey(nextEnd);
           setAwayMinutesByDateKey(nextAway);
         }
-      } catch (error) {
-        console.warn('[parent-dashboard] failed to load study rhythm trend', error);
+      } catch (error: any) {
+        if (error?.code !== 'permission-denied') {
+          console.warn('[parent-dashboard] failed to load study rhythm trend', error);
+        }
         if (!cancelled) {
           setStudyStartByDateKey({});
           setStudyEndByDateKey({});
@@ -643,8 +679,37 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [isActive, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status]);
 
-  const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
-  const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || !studentId || !yesterdayKey) {
+      setReport(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadLatestReport = async () => {
+      try {
+        const reportDocId = `${yesterdayKey}_${studentId}`;
+        const snap = await getDoc(doc(firestore, 'centers', centerId, 'dailyReports', reportDocId));
+        if (cancelled) return;
+        if (!snap.exists()) {
+          setReport(null);
+          return;
+        }
+        setReport({ ...(snap.data() as DailyReport), id: snap.id });
+      } catch (error: any) {
+        if (error?.code !== 'permission-denied') {
+          console.warn('[parent-dashboard] failed to load latest report', error);
+        }
+        if (!cancelled) setReport(null);
+      }
+    };
+
+    void loadLatestReport();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, centerId, studentId, yesterdayKey]);
+
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !report?.content) return;
 
@@ -657,8 +722,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       updateDoc(targetRef, {
         viewedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      }).catch((error) => {
-        console.warn('[parent-report] viewedAt update failed', error);
+      }).catch((error: any) => {
+        if (error?.code !== 'permission-denied') {
+          console.warn('[parent-report] viewedAt update failed', error);
+        }
       });
     }
 
@@ -668,16 +735,38 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [isActive, firestore, centerId, studentId, report, yesterdayKey]);
 
-  const reportsArchiveQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'dailyReports'),
-      where('studentId', '==', studentId),
-      where('status', '==', 'sent'),
-      limit(50),
-    );
-  }, [firestore, centerId, studentId]);
-  const { data: rawReportsArchive } = useCollection<DailyReport>(reportsArchiveQuery, { enabled: isActive && !!studentId });
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || !studentId) {
+      setRawReportsArchive([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadReportsArchive = async () => {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(firestore, 'centers', centerId, 'dailyReports'),
+            where('studentId', '==', studentId),
+            where('status', '==', 'sent'),
+            limit(50),
+          )
+        );
+        if (cancelled) return;
+        setRawReportsArchive(snap.docs.map((docSnap) => ({ ...(docSnap.data() as DailyReport), id: docSnap.id })));
+      } catch (error: any) {
+        if (error?.code !== 'permission-denied') {
+          console.warn('[parent-dashboard] failed to load reports archive', error);
+        }
+        if (!cancelled) setRawReportsArchive([]);
+      }
+    };
+
+    void loadReportsArchive();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, centerId, studentId]);
   const reportsArchive = useMemo(
     () => [...(rawReportsArchive || [])].sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
     [rawReportsArchive]
@@ -2102,7 +2191,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Dialog>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#14295F]/20 bg-[linear-gradient(160deg,#ffffff_0%,#edf2ff_45%,#d9e4ff_100%)] p-4 shadow-[0_12px_30px_rgba(20,41,95,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
+                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#14295F]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95)_0%,rgba(237,242,255,0.96)_42%,rgba(210,224,255,0.92)_100%)] p-4 shadow-[0_18px_40px_rgba(20,41,95,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(20,41,95,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 6주</Badge>
@@ -2129,7 +2218,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#fff9f3_0%,#ffe9d6_55%,#ffd9b8_100%)] p-4 shadow-[0_12px_30px_rgba(255,122,22,0.16)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(255,122,22,0.22)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
+                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#FF7A16]/20 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95)_0%,rgba(255,240,224,0.96)_44%,rgba(255,220,184,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(255,122,22,0.16)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(255,122,22,0.24)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">일간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
@@ -2158,7 +2247,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#14295F]/20 bg-[linear-gradient(160deg,#f9fbff_0%,#e8efff_52%,#d8e4ff_100%)] p-4 shadow-[0_12px_30px_rgba(20,41,95,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
+                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#2563eb]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(234,243,255,0.96)_48%,rgba(215,234,255,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(37,99,235,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(37,99,235,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 리듬 점수</span>
                     <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScore}점</Badge>
@@ -2185,7 +2274,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#fff9f2_0%,#ffe7d2_52%,#ffd7b5_100%)] p-4 shadow-[0_12px_30px_rgba(255,122,22,0.16)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(255,122,22,0.22)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
+                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#f59e0b]/20 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(255,239,220,0.96)_46%,rgba(255,214,181,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(245,158,11,0.16)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(245,158,11,0.24)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">공부 시작/종료 시각</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
@@ -2215,7 +2304,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#14295F]/20 bg-[linear-gradient(160deg,#f9fbff_0%,#e6eeff_50%,#d5e1ff_100%)] p-4 shadow-[0_12px_30px_rgba(20,41,95,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
+                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#0ea5e9]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(232,245,255,0.96)_46%,rgba(210,231,255,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(14,165,233,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(14,165,233,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출시간 그래프</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
@@ -2242,7 +2331,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group cursor-pointer rounded-[1.5rem] border border-[#FF7A16]/25 bg-[linear-gradient(160deg,#fffaf3_0%,#ffebd7_52%,#ffdcbd_100%)] p-4 shadow-[0_12px_30px_rgba(255,122,22,0.16)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(255,122,22,0.22)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
+                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#f97316]/20 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(255,242,228,0.96)_46%,rgba(255,224,196,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(249,115,22,0.16)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(249,115,22,0.24)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">과목별 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">{subjectsData.length}과목</Badge>

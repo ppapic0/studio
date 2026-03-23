@@ -10,6 +10,7 @@ import {
   query, 
   where, 
   orderBy, 
+  getDocs,
   addDoc, 
   serverTimestamp, 
   doc, 
@@ -17,7 +18,8 @@ import {
   deleteDoc, 
   writeBatch,
   increment,
-  setDoc
+  setDoc,
+  limit,
 } from 'firebase/firestore';
 import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport } from '@/lib/types';
 import { 
@@ -342,7 +344,26 @@ export default function StudyHistoryPage() {
   }, [logs, currentDate]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
-    if (!firestore || !activeMembership || !user || !progressRef || !targetUid) return;
+    if (!firestore || !activeMembership || !user || !progressRef || !targetUid || !selectedDateKey) return false;
+
+    const penaltyKey = `same_day_routine:${selectedDateKey}`;
+    const existingPenaltySnap = await getDocs(
+      query(
+        collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
+        where('studentId', '==', targetUid),
+        where('source', '==', 'manual'),
+        limit(50)
+      )
+    );
+    const hasSameDayPenalty = existingPenaltySnap.docs.some((snap) => {
+      const data = snap.data() as any;
+      const createdAtDateKey = data?.createdAt?.toDate ? format(data.createdAt.toDate(), 'yyyy-MM-dd') : null;
+      const reasonText = String(data?.reason || '');
+      return data?.penaltyKey === penaltyKey || ((data?.penaltyDateKey === selectedDateKey || createdAtDateKey === selectedDateKey) && reasonText.includes('출석 루틴'));
+    });
+    if (hasSameDayPenalty) {
+      return false;
+    }
 
     const batch = writeBatch(firestore);
     const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
@@ -363,12 +384,15 @@ export default function StudyHistoryPage() {
       pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
       reason,
       source: 'manual',
+      penaltyKey,
+      penaltyDateKey: selectedDateKey,
       createdByUserId: user.uid,
       createdByName: user.displayName || '학생',
       createdAt: serverTimestamp(),
     });
 
     await batch.commit();
+    return true;
   };
 
   const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {
@@ -704,7 +728,7 @@ export default function StudyHistoryPage() {
                   {isToday && (
                     <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-start gap-3 mb-2">
                       <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                      <p className="text-[10px] font-bold text-amber-900 leading-relaxed">당일 출석 루틴도 작성/수정할 수 있지만, 수정할 때마다 벌점 1점이 자동 반영됩니다.</p>
+                      <p className="text-[10px] font-bold text-amber-900 leading-relaxed">당일 출석 루틴도 작성/수정할 수 있지만, 벌점은 하루 최대 1점만 자동 반영됩니다.</p>
                     </div>
                   )}
                   {!isActuallyPast && !isParent && (

@@ -50,7 +50,7 @@ export async function ConsultSection({ consult }: ConsultSectionProps) {
           <SectionHeading eyebrow="Consulting" title={consult.heading} description={consult.description} light />
 
           <div className="mt-7 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-            <ConsultForm />
+            <ConsultForm waitlistCount={waitlistCount} />
 
             <div className="space-y-4">
               {/* 입학 대기 인원 배너 */}

@@ -81,8 +81,6 @@ export function useDoc<T = any>(
           setError(contextualError)
           if (strictPermissionErrors) {
             errorEmitter.emit('permission-error', contextualError);
-          } else {
-            console.warn('[Firestore] permission denied (suppressed):', memoizedDocRef.path);
           }
         } else {
           // 기타 오류(시간 동기화 등)는 콘솔에만 출력합니다.

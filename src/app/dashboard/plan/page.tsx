@@ -71,6 +71,7 @@ import {
   collection, 
   query, 
   where, 
+  getDocs,
   addDoc, 
   updateDoc, 
   doc, 
@@ -78,7 +79,8 @@ import {
   serverTimestamp,
   writeBatch,
   setDoc,
-  increment
+  increment,
+  limit,
 } from 'firebase/firestore';
 import { 
   format, 
@@ -376,7 +378,26 @@ export default function StudyPlanPage() {
   }, [studyTasks]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
-    if (!firestore || !activeMembership || !user || !progressRef) return;
+    if (!firestore || !activeMembership || !user || !progressRef || !selectedDateKey) return false;
+
+    const penaltyKey = `same_day_routine:${selectedDateKey}`;
+    const existingPenaltySnap = await getDocs(
+      query(
+        collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
+        where('studentId', '==', user.uid),
+        where('source', '==', 'manual'),
+        limit(50)
+      )
+    );
+    const hasSameDayPenalty = existingPenaltySnap.docs.some((snap) => {
+      const data = snap.data() as any;
+      const createdAtDateKey = data?.createdAt?.toDate ? format(data.createdAt.toDate(), 'yyyy-MM-dd') : null;
+      const reasonText = String(data?.reason || '');
+      return data?.penaltyKey === penaltyKey || ((data?.penaltyDateKey === selectedDateKey || createdAtDateKey === selectedDateKey) && reasonText.includes('출석 루틴'));
+    });
+    if (hasSameDayPenalty) {
+      return false;
+    }
 
     const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
     const batch = writeBatch(firestore);
@@ -397,12 +418,15 @@ export default function StudyPlanPage() {
       pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
       reason,
       source: 'manual',
+      penaltyKey,
+      penaltyDateKey: selectedDateKey,
       createdByUserId: user.uid,
       createdByName: user.displayName || '학생',
       createdAt: serverTimestamp(),
     });
 
     await batch.commit();
+    return true;
   };
 
   const to24h = (time12h: string, period: '오전' | '오후') => {
@@ -1133,7 +1157,7 @@ export default function StudyPlanPage() {
             {isToday && (
               <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-start gap-3 mb-2">
                 <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                <p className="text-[10px] font-bold text-amber-900 leading-relaxed">당일 출석 루틴도 작성/수정할 수 있지만, 수정할 때마다 벌점 1점이 자동 반영됩니다.</p>
+                <p className="text-[10px] font-bold text-amber-900 leading-relaxed">당일 출석 루틴도 작성/수정할 수 있지만, 벌점은 하루 최대 1점만 자동 반영됩니다.</p>
               </div>
             )}
             {isLoading ? <div className="py-16 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : scheduleItems.length === 0 ? <div className={cn("py-12 text-center opacity-20 italic font-black border-2 border-dashed rounded-2xl", isMobile ? "text-xs" : "text-sm")}>등록된 루틴이 없습니다.</div> :

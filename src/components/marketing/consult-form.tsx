@@ -108,7 +108,11 @@ function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () =
   );
 }
 
-export function ConsultForm() {
+type ConsultFormProps = {
+  waitlistCount?: number;
+};
+
+export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +214,7 @@ export function ConsultForm() {
 
       {/* 관리형 스터디센터: 상담 vs 입학 대기 */}
       {form.serviceType === "study_center" && (
+        <>
         <div className="mt-3 flex gap-3">
           {(
             [
@@ -244,6 +249,19 @@ export function ConsultForm() {
             </label>
           ))}
         </div>
+          {waitlistCount > 0 ? (
+            <div className="mt-3 rounded-xl border border-[#FF7A16]/25 bg-[#FFF4EC] px-4 py-3">
+              <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">WAITLIST STATUS</p>
+              <div className="mt-1 flex items-end gap-1.5 text-[#14295F]">
+                <span className="text-2xl font-black leading-none">{waitlistCount}</span>
+                <span className="text-sm font-black">명 대기 중</span>
+              </div>
+              <p className="mt-1 text-xs font-bold leading-relaxed text-[#14295F]/70">
+                관리형 스터디센터는 접수 순서대로 안내하고 있습니다.
+              </p>
+            </div>
+          ) : null}
+        </>
       )}
 
       <div className="mt-5 space-y-4">
