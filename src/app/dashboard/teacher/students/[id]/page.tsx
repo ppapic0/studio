@@ -295,9 +295,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   });
 
   const [dailyStatsMap, setDailyStatsMap] = useState<Record<string, DailyStatSnapshot>>({});
-  const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
-  const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
-  const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
   const [statsLoading, setStatsLoading] = useState(false);
   const [planItems, setPlanItems] = useState<WithId<StudyPlanItem>[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
@@ -516,108 +513,32 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Math.ceil(elapsedMs / 60000);
   }, [attendanceCurrent]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const rhythmTrendMaps = useMemo(() => {
+    const nextStart: Record<string, Date | null> = {};
+    const nextEnd: Record<string, Date | null> = {};
+    const nextAway: Record<string, number> = {};
 
-    const loadRhythmTrends = async () => {
-      if (!firestore || !centerId || !studentId) {
-        setStudyStartByDateKey({});
-        setStudyEndByDateKey({});
-        setAwayMinutesByDateKey({});
-        return;
-      }
+    for (let index = 0; index < 14; index += 1) {
+      const dateKey = format(subDays(today, 13 - index), 'yyyy-MM-dd');
+      const stat = dailyStatsMap[dateKey];
+      const todayFallback =
+        dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+          ? attendanceCurrent.lastCheckInAt.toDate()
+          : null;
 
-      try {
-        const targetDateKeys = Array.from({ length: 14 }, (_, index) => format(subDays(today, 13 - index), 'yyyy-MM-dd'));
-        const pairs = await Promise.all(
-          targetDateKeys.map(async (dateKey) => {
-            try {
-              const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
-              const statSnap = await getDoc(statRef);
-              const statData = statSnap.exists() ? (statSnap.data() as Record<string, unknown>) : null;
-              const statStartHourRaw = statData?.startHour ?? statData?.firstStudyHour;
-              const statEndHourRaw = statData?.endHour ?? statData?.lastStudyHour;
-              const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
-              const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
-              const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
-              const statAwayMinutes =
-                typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw)
-                  ? Math.max(0, Math.round(statAwayMinutesRaw))
-                  : 0;
+      nextStart[dateKey] = hourNumberToDate(dateKey, stat?.startHour ?? null) || todayFallback;
+      nextEnd[dateKey] = hourNumberToDate(dateKey, stat?.endHour ?? null) || todayFallback;
+      nextAway[dateKey] = Math.max(0, Math.round(Number(stat?.awayMinutes || 0)));
+    }
 
-              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
-              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
-              const sessions = sessionsSnap.docs
-                .map((docSnap) => docSnap.data() as { startTime?: Timestamp; endTime?: Timestamp })
-                .map((session) => ({
-                  startTime: session.startTime?.toDate() || null,
-                  endTime: session.endTime?.toDate() || null,
-                }))
-                .filter((session) => !!session.startTime)
-                .sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0));
-
-              const firstSession = sessions[0];
-              const lastSession = sessions[sessions.length - 1];
-              const sessionStart = firstSession?.startTime || null;
-              const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
-              let sessionAwayMinutes = 0;
-
-              for (let i = 1; i < sessions.length; i += 1) {
-                const prevEnd = sessions[i - 1].endTime;
-                const currStart = sessions[i].startTime;
-                if (!prevEnd || !currStart) continue;
-                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
-                if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
-              }
-
-              const todayFallback =
-                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
-                  ? attendanceCurrent.lastCheckInAt.toDate()
-                  : null;
-
-              return [
-                dateKey,
-                {
-                  start: sessionStart || statStart || todayFallback,
-                  end: sessionEnd || statEnd || todayFallback,
-                  awayMinutes: sessionAwayMinutes > 0 ? sessionAwayMinutes : statAwayMinutes,
-                },
-              ] as const;
-            } catch {
-              const todayFallback =
-                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
-                  ? attendanceCurrent.lastCheckInAt.toDate()
-                  : null;
-              return [dateKey, { start: todayFallback, end: todayFallback, awayMinutes: 0 }] as const;
-            }
-          })
-        );
-
-        if (cancelled) return;
-        const nextStart: Record<string, Date | null> = {};
-        const nextEnd: Record<string, Date | null> = {};
-        const nextAway: Record<string, number> = {};
-        pairs.forEach(([dateKey, value]) => {
-          nextStart[dateKey] = value.start || null;
-          nextEnd[dateKey] = value.end || null;
-          nextAway[dateKey] = Math.max(0, Math.round(value.awayMinutes || 0));
-        });
-        setStudyStartByDateKey(nextStart);
-        setStudyEndByDateKey(nextEnd);
-        setAwayMinutesByDateKey(nextAway);
-      } catch {
-        if (cancelled) return;
-        setStudyStartByDateKey({});
-        setStudyEndByDateKey({});
-        setAwayMinutesByDateKey({});
-      }
+    return {
+      studyStartByDateKey: nextStart,
+      studyEndByDateKey: nextEnd,
+      awayMinutesByDateKey: nextAway,
     };
+  }, [dailyStatsMap, today, todayKey, attendanceCurrent]);
 
-    void loadRhythmTrends();
-    return () => {
-      cancelled = true;
-    };
-  }, [firestore, centerId, studentId, todayKey, attendanceCurrent]);
+  const { studyStartByDateKey, studyEndByDateKey, awayMinutesByDateKey } = rhythmTrendMaps;
 
   const planByDate = useMemo(() => {
     const map: Record<string, PlanBucket> = {};
@@ -2456,15 +2377,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </DialogContent>
         </Dialog>
 
+      {!isMobile && (
         <Card className="rounded-[2rem] border-none shadow-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white overflow-hidden">
-        <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
-            <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
-          </div>
-          <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
-        </CardContent>
-      </Card>
+          <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
+              <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
+            </div>
+            <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
