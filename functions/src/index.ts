@@ -2063,3 +2063,265 @@ export const cleanupOldDocuments = functions
     console.log("[cleanup] run complete", { centerCount: centersSnap.size, totalDeleted });
     return null;
   });
+
+/**
+ * 매주 일요일 오후 8시(KST) — 학부모에게 자녀의 주간 공부 리포트 SMS 발송
+ * 지난 7일(월~일) 합산 집중 시간을 dailyStudentStats에서 읽어 SMS로 전송합니다.
+ */
+export const scheduledWeeklyReport = functions
+  .region(region)
+  .pubsub.schedule("0 20 * * 0")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+
+    // 지난 7일 dateKey 생성
+    const dateKeys: string[] = [];
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(nowKst);
+      d.setDate(d.getDate() - i);
+      dateKeys.push(toDateKey(d));
+    }
+
+    const centersSnap = await db.collection("centers").get();
+    let totalSent = 0;
+
+    for (const centerDoc of centersSnap.docs) {
+      const centerId = centerDoc.id;
+      const settings = await loadNotificationSettings(db, centerId);
+      if (settings.smsEnabled === false || !settings.smsProvider || settings.smsProvider === "none") continue;
+
+      // 활성 학생 목록
+      const membersSnap = await db
+        .collection(`centers/${centerId}/members`)
+        .where("role", "==", "student")
+        .where("status", "==", "active")
+        .get();
+
+      for (const memberDoc of membersSnap.docs) {
+        const studentId = memberDoc.id;
+
+        // 7일 총 집중 시간 합산
+        let weeklyMinutes = 0;
+        await Promise.all(
+          dateKeys.map(async (dateKey) => {
+            const statSnap = await db
+              .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
+              .get();
+            if (statSnap.exists) {
+              weeklyMinutes += Number(statSnap.data()?.totalStudyMinutes ?? 0);
+            }
+          })
+        );
+
+        const studentData = (await db.doc(`centers/${centerId}/students/${studentId}`).get()).data() as any;
+        const studentName = typeof studentData?.name === "string" ? studentData.name : "학생";
+        const targetWeekly = (Number(studentData?.targetDailyMinutes ?? 0) * 5);
+
+        const weeklyHours = Math.floor(weeklyMinutes / 60);
+        const weeklyMins = weeklyMinutes % 60;
+        const timeLabel = weeklyHours > 0 ? `${weeklyHours}시간 ${weeklyMins}분` : `${weeklyMins}분`;
+        const achieveRate = targetWeekly > 0 ? Math.round((weeklyMinutes / targetWeekly) * 100) : null;
+        const achieveLabel = achieveRate !== null ? ` (목표 대비 ${achieveRate}%)` : "";
+
+        const message = `[주간 리포트] ${studentName} 학생이 이번 주 ${timeLabel} 공부했습니다${achieveLabel}.`;
+
+        const recipients = await collectParentRecipients(db, centerId, studentId);
+        if (recipients.length === 0) continue;
+
+        const ts = admin.firestore.Timestamp.now();
+        const batch = db.batch();
+        const provider = settings.smsProvider || "none";
+
+        recipients.forEach((recipient) => {
+          const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
+          batch.set(queueRef, {
+            centerId,
+            studentId,
+            parentUid: recipient.parentUid,
+            to: recipient.phoneNumber,
+            provider,
+            sender: settings.smsSender || null,
+            endpointUrl: settings.smsEndpointUrl || null,
+            message,
+            eventType: "weekly_report",
+            status: "queued",
+            createdAt: ts,
+            updatedAt: ts,
+          });
+        });
+        await batch.commit();
+        totalSent += recipients.length;
+      }
+    }
+
+    console.log("[weekly-report] run complete", { centerCount: centersSnap.size, totalSent });
+    return null;
+  });
+
+/**
+ * 세션 문서 생성 시 durationMinutes 유효성 검증 및 LP 서버 보정
+ * - 0분 이하 또는 360분 초과 세션은 경계값으로 클램프
+ * - closedReason이 있는 자동 종료 세션은 검증에서 제외
+ */
+export const onSessionCreated = functions
+  .region(region)
+  .firestore.document("centers/{centerId}/studyLogs/{studentId}/days/{dateKey}/sessions/{sessionId}")
+  .onCreate(async (snap, context) => {
+    const data = snap.data() as Record<string, any>;
+    const { centerId, studentId, dateKey } = context.params;
+
+    // 자동 종료 세션은 Cloud Function 자체가 생성했으므로 재검증 불필요
+    if (data.closedReason) return null;
+
+    const rawDuration = Number(data.durationMinutes ?? 0);
+    if (!Number.isFinite(rawDuration) || rawDuration < 0) {
+      console.warn("[session-validate] invalid durationMinutes", { centerId, studentId, sessionId: snap.id, rawDuration });
+      await snap.ref.update({ durationMinutes: 0, validationFlag: "clamped_negative" });
+      return null;
+    }
+
+    const MAX_MINUTES = 360;
+    if (rawDuration > MAX_MINUTES) {
+      const clamped = MAX_MINUTES;
+      const db = admin.firestore();
+      const batch = db.batch();
+
+      batch.update(snap.ref, { durationMinutes: clamped, validationFlag: "clamped_max" });
+
+      // dailyStudentStats 보정: 초과분 차감
+      const overageMinutes = rawDuration - clamped;
+      const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
+      batch.set(statRef, {
+        totalStudyMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      // studyLogs day 보정
+      const logRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+      batch.set(logRef, {
+        totalMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await batch.commit();
+      console.log("[session-validate] clamped max", { centerId, studentId, sessionId: snap.id, rawDuration, clamped });
+    }
+
+    return null;
+  });
+
+/**
+ * 매일 오후 9시(KST) — 최근 14일 집중 시간이 목표 대비 30% 미만인 학생을 위험군으로 분류
+ * - riskCache/{dateKey} 에 atRiskStudentIds 저장 (교사 대시보드 배지용)
+ * - 센터 관리자에게 위험군 학생 목록 SMS 발송
+ */
+export const scheduledDailyRiskAlert = functions
+  .region(region)
+  .pubsub.schedule("0 21 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+    const todayKey = toDateKey(nowKst);
+
+    const dateKeys: string[] = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(nowKst);
+      d.setDate(d.getDate() - i);
+      dateKeys.push(toDateKey(d));
+    }
+
+    const centersSnap = await db.collection("centers").get();
+    let totalAtRisk = 0;
+
+    for (const centerDoc of centersSnap.docs) {
+      const centerId = centerDoc.id;
+
+      const membersSnap = await db
+        .collection(`centers/${centerId}/members`)
+        .where("role", "==", "student")
+        .where("status", "==", "active")
+        .get();
+
+      const atRiskStudentIds: string[] = [];
+      const atRiskNames: string[] = [];
+
+      for (const memberDoc of membersSnap.docs) {
+        const studentId = memberDoc.id;
+        const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+        if (!studentSnap.exists) continue;
+        const studentData = studentSnap.data() as any;
+        const targetDailyMinutes = Number(studentData?.targetDailyMinutes ?? 0);
+        if (targetDailyMinutes <= 0) continue;
+
+        const target14Days = targetDailyMinutes * 14;
+        let actual14Minutes = 0;
+        await Promise.all(
+          dateKeys.map(async (dateKey) => {
+            const statSnap = await db
+              .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
+              .get();
+            if (statSnap.exists) {
+              actual14Minutes += Number(statSnap.data()?.totalStudyMinutes ?? 0);
+            }
+          })
+        );
+
+        const achieveRate = actual14Minutes / target14Days;
+        if (achieveRate < 0.3) {
+          atRiskStudentIds.push(studentId);
+          const name = typeof studentData.name === "string" ? studentData.name : studentId;
+          atRiskNames.push(name);
+        }
+      }
+
+      // riskCache 저장 (교사 대시보드 배지용)
+      await db.doc(`centers/${centerId}/riskCache/${todayKey}`).set({
+        atRiskStudentIds,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        dateKey: todayKey,
+      }, { merge: true });
+
+      // 위험군이 있으면 관리자에게 SMS
+      if (atRiskStudentIds.length > 0) {
+        const settings = await loadNotificationSettings(db, centerId);
+        if (settings.smsEnabled !== false && settings.smsProvider && settings.smsProvider !== "none") {
+          const adminSnap = await db
+            .collection(`centers/${centerId}/members`)
+            .where("role", "in", ["centerAdmin", "owner"])
+            .limit(5)
+            .get();
+
+          const message = `[위험군 알림] ${atRiskNames.slice(0, 5).join(", ")}${atRiskStudentIds.length > 5 ? ` 외 ${atRiskStudentIds.length - 5}명` : ""}의 14일 집중시간이 목표 대비 30% 미만입니다.`;
+          const ts = admin.firestore.Timestamp.now();
+          const batch = db.batch();
+
+          for (const adminDoc of adminSnap.docs) {
+            const adminData = adminDoc.data() as any;
+            const phone = normalizePhoneNumber(adminData?.phoneNumber);
+            if (!phone) continue;
+            const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
+            batch.set(queueRef, {
+              centerId,
+              to: phone,
+              provider: settings.smsProvider,
+              sender: settings.smsSender || null,
+              endpointUrl: settings.smsEndpointUrl || null,
+              message,
+              eventType: "risk_alert",
+              status: "queued",
+              createdAt: ts,
+              updatedAt: ts,
+            });
+          }
+          await batch.commit();
+        }
+        totalAtRisk += atRiskStudentIds.length;
+      }
+    }
+
+    console.log("[daily-risk-alert] run complete", { centerCount: centersSnap.size, totalAtRisk });
+    return null;
+  });

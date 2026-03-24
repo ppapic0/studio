@@ -513,9 +513,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           type: 'exit'
         });
 
-        setIsTimerActive(false); 
-        setStartTime(null); 
-        toast({ title: "트랙 종료됨" });
+        setIsTimerActive(false);
+        setStartTime(null);
+        const _newTotalMin = Number(todayStudyLog?.totalMinutes || 0) + sessionMinutes;
+        const _fmtMin = (m: number) => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 > 0 ? ` ${m % 60}분` : ''}` : `${m}분`;
+        toast({ title: '집중 종료됨', description: `이번 세션 ${_fmtMin(sessionMinutes)} · 오늘 총 ${_fmtMin(_newTotalMin)}` });
       } else {
         const nowTs = Date.now();
         const batch = writeBatch(firestore);
@@ -779,9 +781,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 {isProcessingAction ? (
                   <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-10 w-10")} />
                 ) : isTimerActive ? (
-                  <>트랙 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                  <>집중 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
                 ) : (
-                  <>트랙 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
+                  <>집중 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-8 w-8")} fill="currentColor" /></>
                 )}
               </button>
               

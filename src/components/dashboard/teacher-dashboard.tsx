@@ -320,6 +320,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
 
+  // 위험군 캐시 (Cloud Function이 매일 갱신)
+  const riskCacheRef = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return doc(firestore, 'centers', centerId, 'riskCache', todayKey);
+  }, [firestore, centerId, todayKey]);
+  const { data: riskCache } = useDoc<{ atRiskStudentIds: string[] }>(riskCacheRef, { enabled: isActive });
+  const atRiskStudentIds = new Set<string>(riskCache?.atRiskStudentIds ?? []);
+
   useEffect(() => {
     let disposed = false;
     if (!firestore || !centerId || !isActive || !studentMembers) {
@@ -1180,6 +1188,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 <span className={cn("text-[8px] font-black tracking-tighter whitespace-nowrap", isStudying || isAway ? "text-white/90" : "text-primary/80")}>{`누적 ${timeInfo?.total}`}</span>
                               </div>
                               {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
+                              {occupantId && atRiskStudentIds.has(occupantId) && (
+                                <ShieldAlert className={cn("h-2 w-2 mt-0.5", isStudying || isAway ? "text-amber-300" : "text-amber-500")} />
+                              )}
                             </div>
                           ) : (
                             <div className="flex flex-col items-center"><span className="text-[7px] font-black tracking-tighter opacity-100 uppercase">빈좌석</span>{isEditMode && <UserPlus className="h-2.5 w-2.5 mt-0.5 text-primary/40" />}</div>

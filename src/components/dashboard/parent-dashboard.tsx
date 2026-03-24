@@ -365,6 +365,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
   const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
+  const [selectedChildIdx, setSelectedChildIdx] = useState(0);
+  const [linkedStudentNames, setLinkedStudentNames] = useState<Record<string, string>>({});
   const visitLoggedRef = useRef(false);
   const reportReadLoggedRef = useRef<Record<string, boolean>>({});
 
@@ -400,7 +402,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [activeMembership, memberships]);
 
   const centerId = active센터Membership?.id;
-  const studentId = active센터Membership?.linkedStudentIds?.[0];
+  const linkedStudentIds = active센터Membership?.linkedStudentIds ?? [];
+  const studentId = linkedStudentIds[selectedChildIdx] ?? linkedStudentIds[0];
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
@@ -430,6 +433,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     visitLoggedRef.current = true;
     void logParentActivity('app_visit', { source: 'dashboard_open', tab });
   }, [isActive, centerId, studentId, user, tab]);
+
+  // 다자녀인 경우 각 학생 이름 미리 로드
+  useEffect(() => {
+    if (!firestore || !centerId || linkedStudentIds.length <= 1) return;
+    void (async () => {
+      const names: Record<string, string> = {};
+      await Promise.all(
+        linkedStudentIds.map(async (sid) => {
+          try {
+            const snap = await getDoc(doc(firestore, 'centers', centerId, 'students', sid));
+            if (snap.exists()) names[sid] = (snap.data() as { name?: string }).name || sid;
+          } catch {
+            names[sid] = sid;
+          }
+        })
+      );
+      setLinkedStudentNames(names);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firestore, centerId, linkedStudentIds.join(',')]);
 
   const studentRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'students', studentId)), [firestore, centerId, studentId]);
   const { data: student } = useDoc<StudentProfile>(studentRef, { enabled: isActive && !!studentId });
@@ -1726,6 +1749,47 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <CardContent className={cn('p-6 space-y-6')}>
           <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
             <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
+              {/* 다자녀 선택 */}
+              {linkedStudentIds.length > 1 && (
+                <div className="flex gap-2 flex-wrap">
+                  {linkedStudentIds.map((sid, idx) => (
+                    <button
+                      key={sid}
+                      type="button"
+                      onClick={() => setSelectedChildIdx(idx)}
+                      className={cn(
+                        'rounded-full px-4 py-1.5 text-[11px] font-black border transition-all',
+                        selectedChildIdx === idx
+                          ? 'bg-[#14295F] text-white border-[#14295F] shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-[#14295F]/40'
+                      )}
+                    >
+                      {linkedStudentNames[sid] || `자녀 ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* 지금 집중 중 배너 */}
+              {attendanceCurrent?.status === 'studying' && (
+                <Card className="rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#f0fdf4_100%)] p-4 shadow-sm ring-1 ring-emerald-100 flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow">
+                    <Zap className="h-4 w-4 text-white fill-current" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">지금 집중 중</p>
+                    <p className="text-sm font-black text-emerald-800 leading-tight">
+                      {student?.name ?? ''}이(가) 현재 공부하고 있어요
+                    </p>
+                    <p className="text-[10px] font-bold text-emerald-600/70 mt-0.5">{todayFirstCheckInLabel}</p>
+                  </div>
+                  <div className="ml-auto shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      실시간
+                    </span>
+                  </div>
+                </Card>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Card className="rounded-2xl border border-[#cfdcf8] bg-[linear-gradient(135deg,#e8f1ff_0%,#f6f9ff_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#c4d5ff] transition-all">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
