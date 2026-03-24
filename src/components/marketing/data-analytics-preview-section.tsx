@@ -203,13 +203,15 @@ export function DataAnalyticsPreviewSection() {
   return (
     <section id="data-approach" className="scroll-mt-28 bg-[#EEF2FA] py-16 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          eyebrow="Data Driven"
-          title="운영 데이터와 성장 증명이 함께 보이도록 설계했습니다"
-          description="공부시간, 목표 달성률, 루틴 안정성, 위험 신호, 시험 결과까지 같은 화면 문법으로 읽을 수 있어야 관리가 실제 행동으로 이어집니다."
-        />
+        <div className="mx-auto max-w-4xl text-center [&_.eyebrow-badge]:mx-auto [&>div]:max-w-none [&_p]:mx-auto">
+          <SectionHeading
+            eyebrow="Data Driven"
+            title="운영 데이터와 성장 증명이 함께 보이도록 설계했습니다"
+            description="공부시간, 목표 달성률, 루틴 안정성, 위험 신호, 시험 결과까지 같은 화면 문법으로 읽을 수 있어야 관리가 실제 행동으로 이어집니다."
+          />
+        </div>
 
-        <div className="mt-8 space-y-5">
+        <div className="mx-auto mt-8 max-w-[71rem] space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MiniStat label="주간 학습 시간" value="14h 23m" note="기록 캘린더 기준 누적" accent="blue" />
             <MiniStat label="평균 목표 달성률" value="83%" note="계획 대비 실행 비율" accent="green" />
