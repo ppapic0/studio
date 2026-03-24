@@ -233,6 +233,10 @@ function calcDeltaPercent(current: number, base: number) {
   return Math.round(((safeCurrent - safeBase) / safeBase) * 100);
 }
 
+function formatSignedMetric(value: number, suffix = '') {
+  return `${value >= 0 ? '+' : ''}${value}${suffix}`;
+}
+
 type InvoiceStatusMeta = {
   label: string;
   mobileLabel: string;
@@ -1106,6 +1110,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [studyPlans, weeklyStudyPlans, weeklyTotalStudyMinutes]);
 
   const subjectTotalMinutes = subjectsData.reduce((sum, subject) => sum + subject.minutes, 0);
+  const latestWeeklyStudyMinutes = weeklyStudyTimeTrend[weeklyStudyTimeTrend.length - 1]?.totalMinutes || 0;
+  const previousWeeklyStudyMinutes = weeklyStudyTimeTrend[weeklyStudyTimeTrend.length - 2]?.totalMinutes || 0;
+  const weeklyStudyDelta = calcDeltaPercent(latestWeeklyStudyMinutes, previousWeeklyStudyMinutes);
+  const awayAverageMinutes = Math.round(
+    awayTimeTrend.reduce((sum, item) => sum + Math.max(0, item.awayMinutes || 0), 0) /
+      Math.max(1, awayTimeTrend.length)
+  );
+  const latestStartPoint = startEndTrend[startEndTrend.length - 1];
+  const recentStartLabel = latestStartPoint?.startMinutes ? toClockLabel(latestStartPoint.startMinutes) : '기록 없음';
+  const recentEndLabel = latestStartPoint?.endMinutes ? toClockLabel(latestStartPoint.endMinutes) : '기록 없음';
+  const leadSubject = subjectsData[0] || null;
+  const leadSubjectShare = leadSubject && subjectTotalMinutes > 0
+    ? Math.round((leadSubject.minutes / subjectTotalMinutes) * 100)
+    : 0;
 
   const chartInsights = useMemo<Record<ParentDataChartKey, ChartInsight>>(
     () => ({
@@ -2159,13 +2177,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </TabsContent>
 
-            <TabsContent value="data" className="mt-0 space-y-4 animate-in fade-in duration-500">
+            <TabsContent value="data" className="mt-0 space-y-5 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1.05fr_1fr]">
               <Card
-                className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm cursor-pointer"
+                className="rounded-[2.15rem] border border-rose-200/80 bg-[linear-gradient(145deg,rgba(255,247,248,0.98)_0%,rgba(255,255,255,0.98)_58%,rgba(255,240,243,0.98)_100%)] p-6 shadow-[0_22px_48px_rgba(244,63,94,0.12)] cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_rgba(244,63,94,0.18)]"
                 role="button"
                 onClick={() => setIsPenaltyGuideOpen(true)}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="grid gap-1">
                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">누적 벌점 지수</span>
                     <h3 className="dashboard-number text-4xl text-rose-900">
@@ -2176,7 +2195,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       원점수 {penaltyRecovery.basePoints}점 · 회복 {penaltyRecovery.recoveredPoints}점
                     </p>
                   </div>
-                  <Badge variant="outline" className={cn('h-8 rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
+                  <Badge variant="outline" className={cn('h-9 rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
                     {penaltyMeta.label}
                   </Badge>
                 </div>
@@ -2184,9 +2203,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               <Dialog>
                 <DialogTrigger asChild>
-                  <Card className="rounded-[1.5rem] border border-sky-100 bg-sky-50/50 p-4 shadow-sm cursor-pointer transition-all hover:shadow-md">
+                  <Card className="h-full rounded-[2.15rem] border border-sky-200/80 bg-[linear-gradient(145deg,rgba(240,249,255,0.98)_0%,rgba(255,255,255,0.98)_55%,rgba(238,245,255,0.98)_100%)] p-5 shadow-[0_22px_48px_rgba(14,165,233,0.12)] cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_rgba(14,165,233,0.18)]">
                     <div className="flex items-start gap-2.5">
-                      <Info className="mt-0.5 h-4 w-4 text-sky-600" />
+                      <Info className="mt-0.5 h-5 w-5 text-sky-600" />
                       <div className="space-y-1">
                         <p className="text-[11px] font-black uppercase tracking-widest text-sky-700">웹앱 인사이트 보기</p>
                         <p className="text-xs font-bold leading-relaxed text-slate-700">
@@ -2263,18 +2282,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#14295F]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95)_0%,rgba(237,242,255,0.96)_42%,rgba(210,224,255,0.92)_100%)] p-4 shadow-[0_18px_40px_rgba(20,41,95,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(20,41,95,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Card className="group relative flex min-h-[330px] cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-[#14295F]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(238,243,255,0.98)_100%)] p-5 shadow-[0_18px_45px_rgba(20,41,95,0.12)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_rgba(20,41,95,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('weeklyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">주간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 6주</Badge>
                   </div>
-                  <div className="hidden">
-                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">최근 6주 누적 학습시간 흐름과 직전 주 대비 변화를 빠르게 볼 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">이번 주 {toHm(latestWeeklyStudyMinutes)} · {formatSignedMetric(weeklyStudyDelta, '%')} <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
-                  <div className="relative h-[190px] w-full hidden">
+                  <div className="relative mt-4 h-[156px] w-full overflow-hidden rounded-[1.45rem] border border-white/80 bg-white/80 p-2 shadow-inner">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyStudyTimeTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -2292,16 +2312,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#FF7A16]/20 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95)_0%,rgba(255,240,224,0.96)_44%,rgba(255,220,184,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(255,122,22,0.16)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(255,122,22,0.24)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
+                <Card className="group relative flex min-h-[330px] cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-[#FF7A16]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,244,235,0.98)_100%)] p-5 shadow-[0_18px_45px_rgba(255,122,22,0.14)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_rgba(255,122,22,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('dailyStudy')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">일간 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="hidden">
-                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">오늘 학습량이 평소 흐름보다 올라왔는지 바로 비교할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">오늘 {toHm(webAppInsightMetrics.todayStudyMinutes)} · 평균 대비 {formatSignedMetric(webAppInsightMetrics.studyVsAvg7, '%')} <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
-                  <div className="relative h-[190px] w-full hidden">
+                  <div className="relative mt-4 h-[156px] w-full overflow-hidden rounded-[1.45rem] border border-white/80 bg-white/80 p-2 shadow-inner">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={dailyStudyTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -2320,17 +2340,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#2563eb]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(234,243,255,0.96)_48%,rgba(215,234,255,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(37,99,235,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(37,99,235,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Card className="group relative flex min-h-[330px] cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-[#2563eb]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(236,245,255,0.98)_100%)] p-5 shadow-[0_18px_45px_rgba(37,99,235,0.12)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_rgba(37,99,235,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('rhythmScore')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 리듬 점수</span>
                     <Badge variant="outline" className="text-[10px] font-black">평균 {rhythmScore}점</Badge>
                   </div>
-                  <div className="hidden">
-                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">학습 시작 시간과 공부 길이가 얼마나 안정적인지 확인하는 카드예요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">평균 {rhythmScore}점 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
-                  <div className="relative h-[190px] w-full hidden">
+                  <div className="relative mt-4 h-[156px] w-full overflow-hidden rounded-[1.45rem] border border-white/80 bg-white/80 p-2 shadow-inner">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={rhythmScoreTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
@@ -2348,16 +2368,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#f59e0b]/20 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(255,239,220,0.96)_46%,rgba(255,214,181,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(245,158,11,0.16)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(245,158,11,0.24)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
+                <Card className="group relative flex min-h-[330px] cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-[#f59e0b]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,244,231,0.98)_100%)] p-5 shadow-[0_18px_45px_rgba(245,158,11,0.14)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_rgba(245,158,11,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('startEnd')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">공부 시작/종료 시각</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="hidden">
-                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">매일 공부가 시작되고 마무리되는 시간이 일정한지 살펴볼 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">{recentStartLabel} 시작 · {recentEndLabel} 종료 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
-                  <div className="relative h-[190px] w-full hidden">
+                  <div className="relative mt-4 h-[156px] w-full overflow-hidden rounded-[1.45rem] border border-white/80 bg-white/80 p-2 shadow-inner">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={startEndTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -2377,17 +2397,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#0ea5e9]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(232,245,255,0.96)_46%,rgba(210,231,255,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(14,165,233,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(14,165,233,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Card className="group relative flex min-h-[330px] cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-[#0ea5e9]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(238,249,255,0.98)_100%)] p-5 shadow-[0_18px_45px_rgba(14,165,233,0.12)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_rgba(14,165,233,0.18)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('awayTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">외출시간 그래프</span>
                     <Badge variant="outline" className="text-[10px] font-black">최근 7일</Badge>
                   </div>
-                  <div className="hidden">
-                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">짧은 이탈이 많아지는지, 휴식 관리가 안정적인지 보는 카드예요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">7일 평균 {awayAverageMinutes}분 <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
-                  <div className="relative h-[190px] w-full hidden">
+                  <div className="relative mt-4 h-[156px] w-full overflow-hidden rounded-[1.45rem] border border-white/80 bg-white/80 p-2 shadow-inner">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={awayTimeTrend}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -2405,16 +2425,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </Card>
 
-                <Card className="group relative cursor-pointer overflow-hidden rounded-[1.7rem] border border-[#f97316]/20 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96)_0%,rgba(255,242,228,0.96)_46%,rgba(255,224,196,0.94)_100%)] p-4 shadow-[0_18px_40px_rgba(249,115,22,0.16)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(249,115,22,0.24)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
+                <Card className="group relative flex min-h-[330px] cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-[#f97316]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,246,237,0.98)_100%)] p-5 shadow-[0_18px_45px_rgba(249,115,22,0.14)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_rgba(249,115,22,0.2)] active:scale-[0.99]" role="button" tabIndex={0} onClick={() => setSelectedDataChart('subjectTime')}>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">과목별 학습시간</span>
                     <Badge variant="outline" className="text-[10px] font-black">{subjectsData.length}과목</Badge>
                   </div>
-                  <div className="hidden">
-                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">요약 카드입니다. 자세한 그래프는 팝업에서 확인할 수 있어요.</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">카드 눌러 그래프 보기 <ChevronRight className="h-3.5 w-3.5" /></p>
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[11px] font-bold leading-relaxed text-slate-600">어느 과목에 시간이 몰리는지, 밸런스가 유지되는지 확인할 수 있어요.</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf] group-hover:text-[#14295F]">{leadSubject ? `${leadSubject.subject} ${leadSubjectShare}%` : '과목 데이터 대기'} <ChevronRight className="h-3.5 w-3.5" /></p>
                   </div>
-                  <div className="relative h-[190px] w-full hidden">
+                  <div className="relative mt-4 h-[156px] w-full overflow-hidden rounded-[1.45rem] border border-white/80 bg-white/80 p-2 shadow-inner">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={subjectsData.slice(0, 6)}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
