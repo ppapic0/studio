@@ -322,7 +322,7 @@ export function DataAnalyticsPreviewSection() {
                 </Link>
                 <Link
                   href="/go/experience?placement=data_preview_cta&mode=parent&view=desktop"
-                  className="premium-cta premium-cta-muted h-11 border-white/24 bg-white/12 px-5 text-sm text-white hover:bg-white/18"
+                  className="premium-cta premium-cta-muted h-11 border-white/24 bg-white px-5 text-sm text-[#14295F] hover:bg-white/92"
                 >
                   학부모 화면 보기
                 </Link>
