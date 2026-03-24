@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { getTierTheme } from '@/lib/tier-theme';
 import Link from 'next/link';
@@ -99,6 +99,35 @@ const SKILL_LABEL: Record<StatKey, string> = {
   resilience: '회복력',
 };
 
+
+const TIER_MILESTONES = [
+  { name: '브론즈', lp: 0 },
+  { name: '실버', lp: 5000 },
+  { name: '골드', lp: 10000 },
+  { name: '플래티넘', lp: 15000 },
+  { name: '다이아', lp: 20000 },
+  { name: '마스터', lp: 26000 },
+  { name: '그마', lp: 30000 },
+  { name: '챌린저', lp: 35000 },
+] as const;
+
+function getNextTierInfo(currentLp: number) {
+  const nextTier = TIER_MILESTONES.find((tier) => currentLp < tier.lp);
+  if (!nextTier) {
+    return { name: '챌린저 유지', remainingLp: 0 };
+  }
+  return {
+    name: nextTier.name,
+    remainingLp: Math.max(0, nextTier.lp - currentLp),
+  };
+}
+
+function formatMinutesCompact(minutes: number) {
+  if (minutes >= 60) {
+    return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
+  }
+  return `${minutes}분`;
+}
 
 function isActiveStudentStatus(status: unknown): boolean {
   if (typeof status !== 'string') return true;
@@ -371,6 +400,45 @@ export default function GrowthPage() {
   const currentLp = progress?.seasonLp || 0;
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const tierTheme = getTierTheme(currentTier);
+  const seasonPercentile = useMemo(() => {
+    if (isRankContextLoading || currentRank <= 0 || totalCount <= 0) return null;
+    return Math.max(1, Math.ceil((currentRank / totalCount) * 100));
+  }, [currentRank, totalCount, isRankContextLoading]);
+  const nextTierInfo = useMemo(() => getNextTierInfo(currentLp), [currentLp]);
+  const weeklyStudyMinutes = useMemo(() => {
+    const recentKeys = Array.from({ length: 7 }, (_, index) => format(subDays(new Date(), 6 - index), 'yyyy-MM-dd'));
+    const keySet = new Set(recentKeys);
+    return (seasonStudyLogs || [])
+      .filter((log) => keySet.has(log.dateKey))
+      .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
+  }, [seasonStudyLogs]);
+  const previousWeekStudyMinutes = useMemo(() => {
+    const recentKeys = Array.from({ length: 7 }, (_, index) => format(subDays(new Date(), 13 - index), 'yyyy-MM-dd'));
+    const keySet = new Set(recentKeys);
+    return (seasonStudyLogs || [])
+      .filter((log) => keySet.has(log.dateKey))
+      .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
+  }, [seasonStudyLogs]);
+  const weeklyDelta = weeklyStudyMinutes - previousWeekStudyMinutes;
+  const bestSeasonMinutes = useMemo(
+    () => (seasonStudyLogs || []).reduce((max, log) => Math.max(max, Math.max(0, Number(log.totalMinutes || 0))), 0),
+    [seasonStudyLogs]
+  );
+  const latestSkillMoment = useMemo(() => {
+    return (Object.entries(skillTrackHistory) as [StatKey, SkillTrackHistoryItem[]][])
+      .flatMap(([key, items]) => items.slice(0, 2).map((item) => ({ ...item, statKey: key })))
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))[0] || null;
+  }, [skillTrackHistory]);
+  const weakestStatKey = useMemo(() => {
+    return (Object.entries(stats) as [StatKey, number][])
+      .sort((a, b) => a[1] - b[1])[0]?.[0] || 'focus';
+  }, [stats]);
+  const nextActionCopy: Record<StatKey, string> = {
+    focus: '60분 이상 한 번에 몰입하는 시간을 한 번 더 만들면 집중력이 가장 빠르게 올라가요.',
+    consistency: '짧아도 좋으니 매일 첫 공부 시작 체크를 이어가면 꾸준함이 안정적으로 올라가요.',
+    achievement: '오늘 계획에서 학습 미션 3개를 끝내면 목표달성이 바로 반응하기 시작해요.',
+    resilience: '6시간 이상 공부한 날을 한 번 더 만들면 회복탄력이 크게 쌓여요.',
+  };
 
   if (isLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
 
@@ -458,6 +526,57 @@ export default function GrowthPage() {
           </div>
         </div>
       </Card>
+
+      <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
+          <CardContent className={cn("p-5", !isMobile && "p-6")}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">이번 주 오른 이유</span>
+              <TrendingUp className="h-4 w-4 text-sky-500" />
+            </div>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
+              {latestSkillMoment ? latestSkillMoment.reason : '이번 주 성장 로그를 쌓는 중이에요.'}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              {latestSkillMoment ? latestSkillMoment.detail : '공부 시간이 쌓이거나 계획을 완료하면 이곳에 성장 이유가 바로 보입니다.'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
+          <CardContent className={cn("p-5", !isMobile && "p-6")}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">다음 1점 올리기</span>
+              <BookOpen className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
+              {STAT_CONFIG[weakestStatKey].label}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              {nextActionCopy[weakestStatKey]}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
+          <CardContent className={cn("p-5", !isMobile && "p-6")}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">기록 갱신 흐름</span>
+              <Flame className="h-4 w-4 text-rose-400" />
+            </div>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
+              {seasonPercentile ? `상위 ${seasonPercentile}% 구간` : '이번 시즌 흐름 정리 중'}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              {weeklyDelta > 0
+                ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 더 공부했어요. 이번 시즌 최고는 ${formatMinutesCompact(bestSeasonMinutes)}입니다.`
+                : weeklyDelta < 0
+                  ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 적었어요. ${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점 남아 있어요.`
+                  : `이번 주 누적 ${formatMinutesCompact(weeklyStudyMinutes)}로 페이스를 안정적으로 유지하고 있어요.`}
+            </p>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* 4대 핵심 스킬트랙 */}
       <section className={isMobile ? "space-y-3" : "space-y-6"}>

@@ -99,6 +99,7 @@ import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -376,6 +377,56 @@ export default function StudyPlanPage() {
     });
     return { breakdown: summary, total };
   }, [studyTasks]);
+  const allMissionTasks = useMemo(() => [...studyTasks, ...personalTasks], [studyTasks, personalTasks]);
+  const completedMissionCount = useMemo(
+    () => allMissionTasks.filter((task) => task.done).length,
+    [allMissionTasks]
+  );
+  const remainingStudyTasks = useMemo(
+    () => studyTasks.filter((task) => !task.done),
+    [studyTasks]
+  );
+  const remainingPersonalTasks = useMemo(
+    () => personalTasks.filter((task) => !task.done),
+    [personalTasks]
+  );
+  const missionCompletionRate = useMemo(() => {
+    if (allMissionTasks.length === 0) return 0;
+    return Math.round((completedMissionCount / allMissionTasks.length) * 100);
+  }, [allMissionTasks.length, completedMissionCount]);
+  const planRewardMultiplier = useMemo(() => {
+    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+    return 1
+      + (Math.min(100, raw.focus || 0) / 100) * 0.05
+      + (Math.min(100, raw.consistency || 0) / 100) * 0.05
+      + (Math.min(100, raw.achievement || 0) / 100) * 0.05
+      + (Math.min(100, raw.resilience || 0) / 100) * 0.05;
+  }, [progress?.stats]);
+  const estimatedPlanReward = useMemo(() => {
+    const alreadyEarned = !!progress?.dailyLpStatus?.[selectedDateKey]?.plan;
+    if (alreadyEarned || studyTasks.length < 3) return 0;
+    return Math.round(100 * planRewardMultiplier);
+  }, [progress?.dailyLpStatus, selectedDateKey, studyTasks.length, planRewardMultiplier]);
+  const missionFocusItems = useMemo(() => {
+    const studyFocus = remainingStudyTasks.slice(0, 3);
+    if (studyFocus.length > 0) return studyFocus;
+    return remainingPersonalTasks.slice(0, 3);
+  }, [remainingStudyTasks, remainingPersonalTasks]);
+  const missionBoardTitle = isPast
+    ? '이날 계획 기록'
+    : isToday
+      ? '오늘 꼭 끝낼 3가지'
+      : `${selectedDate ? format(selectedDate, 'M월 d일', { locale: ko }) : '선택한 날'} 미션 보드`;
+  const missionBoardDescription = isPast
+    ? '이날 어떤 계획을 세웠고 얼마나 실행했는지 차분하게 돌아볼 수 있어요.'
+    : remainingStudyTasks.length > 0
+      ? `학습 미션 ${remainingStudyTasks.length}개와 개인 미션 ${remainingPersonalTasks.length}개가 남아 있어요. 가장 중요한 것부터 정리해 보세요.`
+      : allMissionTasks.length > 0
+        ? '오늘 미션을 거의 정리했어요. 남은 시간은 복습이나 내일 준비에 써도 좋아요.'
+        : '아직 등록된 미션이 없어요. 작게라도 한 가지 목표를 적어두면 시작이 더 쉬워져요.';
+  const missionWrapupLabel = hasOutPlan && outTime
+    ? `${outTime} 전까지 마무리 목표`
+    : '하원 예정 시간을 정하면 마감 리듬이 생겨요';
 
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!firestore || !activeMembership || !user || !progressRef || !selectedDateKey) return false;
@@ -874,6 +925,146 @@ export default function StudyPlanPage() {
           <ChevronRight className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </Button>
       </div>
+
+      <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
+        <Card className={cn(
+          "border-none bg-white shadow-xl ring-1 ring-black/[0.03] overflow-hidden",
+          isMobile ? "col-span-2 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
+        )}>
+          <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
+          <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+                  오늘의 미션 허브
+                </Badge>
+                <div>
+                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl leading-8" : "text-[2.35rem] leading-[1.1]")}>
+                    {missionBoardTitle}
+                  </h2>
+                  <p className={cn("font-semibold text-slate-600 break-keep mt-2", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-2xl")}>
+                    {missionBoardDescription}
+                  </p>
+                </div>
+              </div>
+              <div className={cn("rounded-2xl bg-primary/5 text-primary shrink-0", isMobile ? "p-2" : "p-3")}>
+                <ListTodo className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+                완료 {completedMissionCount}/{allMissionTasks.length}
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border-emerald-200 bg-emerald-50 px-3 text-[10px] font-black text-emerald-700">
+                학습 {remainingStudyTasks.length}개 남음
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border-amber-200 bg-amber-50 px-3 text-[10px] font-black text-amber-700">
+                개인 {remainingPersonalTasks.length}개 남음
+              </Badge>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-slate-900">오늘 목표 진행률</p>
+                  <p className="text-[11px] font-semibold text-slate-500">{missionCompletionRate}% 진행 중</p>
+                </div>
+                <span className="text-sm font-black text-primary">{missionCompletionRate}%</span>
+              </div>
+              <Progress value={missionCompletionRate} className="h-2.5 bg-slate-100" />
+            </div>
+
+            <div className="mt-5 grid gap-2">
+              {missionFocusItems.length > 0 ? missionFocusItems.map((task, index) => (
+                <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                  <div className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-black",
+                    index === 0 ? "bg-primary text-white" : "bg-white text-primary ring-1 ring-slate-200"
+                  )}>
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-900">{task.title}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      {task.category === 'personal' ? '선택 미션' : task.targetMinutes ? `${task.targetMinutes}분 목표` : '학습 미션'}
+                    </p>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4">
+                  <p className="text-sm font-black text-slate-800">미션을 거의 정리했어요.</p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">남은 시간에는 복습이나 내일 계획을 가볍게 추가해 보세요.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">진행도</span>
+                <Activity className="h-4 w-4 text-sky-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
+                  {missionCompletionRate}<span className="ml-1 text-xs font-bold text-slate-400">%</span>
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">오늘 미션 달성률</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">예상 보상</span>
+                <Sparkles className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                  {estimatedPlanReward > 0 ? `+${estimatedPlanReward} LP` : '보상 대기'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  {estimatedPlanReward > 0 ? '학습 미션 3개 완료 시 예상' : '오늘 계획 보너스를 이미 받았거나 준비 중'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">자기 경쟁</span>
+                <Trophy className="h-4 w-4 text-rose-400" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
+                  {Math.max(0, studyTasks.length - remainingStudyTasks.length)} / {studyTasks.length || 0}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">오늘 학습 미션 완료 수</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">마감 리듬</span>
+                <CalendarCheck className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
+                  {hasOutPlan && outTime ? outTime : '미정'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionWrapupLabel}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {!isPast && (
         <Card className={cn(

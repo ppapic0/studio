@@ -63,6 +63,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
 import { getTierTheme } from '@/lib/tier-theme';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -110,6 +111,37 @@ const TIER_PRESETS = [
 ];
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
+
+const TIER_MILESTONES = [
+  { name: '브론즈', lp: 0 },
+  { name: '실버', lp: 5000 },
+  { name: '골드', lp: 10000 },
+  { name: '플래티넘', lp: 15000 },
+  { name: '다이아', lp: 20000 },
+  { name: '마스터', lp: 26000 },
+  { name: '그마', lp: 30000 },
+  { name: '챌린저', lp: 35000 },
+] as const;
+
+function summarizeReportLine(content?: string | null) {
+  if (!content) return '오늘의 코칭이 도착하면 이곳에서 바로 확인할 수 있어요.';
+  return content
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 84);
+}
+
+function getNextTierInfo(currentLp: number) {
+  const nextTier = TIER_MILESTONES.find((tier) => currentLp < tier.lp);
+  if (!nextTier) {
+    return { name: '챌린저 유지', remainingLp: 0 };
+  }
+  return {
+    name: nextTier.name,
+    remainingLp: Math.max(0, nextTier.lp - currentLp),
+  };
+}
 
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
   late: 1,
@@ -663,6 +695,7 @@ function StudyTimeTrendDialog({
 export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
   const { activeMembership, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode, currentTier } = useAppContext();
   const tierTheme = getTierTheme(currentTier);
@@ -910,6 +943,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!teacherReportsRaw) return [];
     return [...teacherReportsRaw].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [teacherReportsRaw]);
+
+  const leaderboardQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !periodKey) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
+      orderBy('value', 'desc'),
+      limit(200)
+    );
+  }, [firestore, activeMembership?.id, periodKey]);
+  const { data: leaderboardEntries } = useCollection<LeaderboardEntry>(leaderboardQuery, { enabled: isActive });
+
+  const centerAnnouncementsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'centerAnnouncements'),
+      orderBy('createdAt', 'desc'),
+      limit(12)
+    );
+  }, [firestore, activeMembership?.id]);
+  const { data: centerAnnouncements } = useCollection<any>(centerAnnouncementsQuery, { enabled: isActive });
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -1894,6 +1947,162 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   // unread teacher reports
   const unreadReportCount = teacherReports.filter(r => !r.viewedAt).length;
+  const latestUnreadReport = teacherReports.find((report) => !report.viewedAt) || null;
+  const latestCoachReport = teacherReports[0] || null;
+
+  const weeklyStudyMinutes = useMemo(
+    () => studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0),
+    [studyTimeTrend]
+  );
+  const previousWeekStudyMinutes = useMemo(() => {
+    if (!today) return 0;
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 13 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return logMinutesByDateKey.get(dateKey) || 0;
+    }).reduce((sum, minutes) => sum + minutes, 0);
+  }, [today, logMinutesByDateKey]);
+  const weeklyStudyDelta = weeklyStudyMinutes - previousWeekStudyMinutes;
+  const weeklyBestMinutes = useMemo(
+    () => studyTimeTrend.reduce((max, item) => Math.max(max, item.minutes), 0),
+    [studyTimeTrend]
+  );
+  const monthlyBestMinutes = useMemo(
+    () => (recentLogs || []).reduce((max, item) => Math.max(max, Math.max(0, Number(item.totalMinutes || 0))), 0),
+    [recentLogs]
+  );
+  const currentStreakDays = useMemo(() => {
+    if (!today) return 0;
+    let streak = 0;
+    for (let offset = 0; offset < 30; offset += 1) {
+      const dateKey = format(subDays(today, offset), 'yyyy-MM-dd');
+      const minutes = logMinutesByDateKey.get(dateKey) || 0;
+      if (minutes > 0) {
+        streak += 1;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }, [today, logMinutesByDateKey]);
+  const recentFivePlanWins = useMemo(() => {
+    if (!today) return 0;
+    return Array.from({ length: 5 }, (_, index) => {
+      const dateKey = format(subDays(today, 4 - index), 'yyyy-MM-dd');
+      return progress?.dailyLpStatus?.[dateKey]?.plan ? 1 : 0;
+    }).reduce<number>((sum, count) => sum + count, 0);
+  }, [today, progress?.dailyLpStatus]);
+  const todayRemainingTasks = useMemo(
+    () => todayStudyTasks.filter((item) => !item.done),
+    [todayStudyTasks]
+  );
+  const todayMissionList = useMemo(
+    () => todayRemainingTasks.slice(0, 3),
+    [todayRemainingTasks]
+  );
+  const todayPotentialPlanBonus = useMemo(() => {
+    const alreadyEarnedPlanBonus = !!progress?.dailyLpStatus?.[todayKey]?.plan;
+    if (alreadyEarnedPlanBonus || todayStudyTasks.length < 3 || todayRemainingTasks.length === 0) return 0;
+    return Math.round(100 * finalMultiplier);
+  }, [progress?.dailyLpStatus, todayKey, todayStudyTasks.length, todayRemainingTasks.length, finalMultiplier]);
+  const seasonRank = useMemo(() => {
+    if (!user || !leaderboardEntries?.length) return 0;
+    const sorted = [...leaderboardEntries].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
+    return ownIndex >= 0 ? ownIndex + 1 : 0;
+  }, [leaderboardEntries, user?.uid]);
+  const seasonParticipantCount = leaderboardEntries?.length || 0;
+  const seasonPercentile = useMemo(() => {
+    if (!seasonRank || seasonParticipantCount <= 0) return null;
+    return Math.max(1, Math.ceil((seasonRank / seasonParticipantCount) * 100));
+  }, [seasonRank, seasonParticipantCount]);
+  const nextTierInfo = useMemo(
+    () => getNextTierInfo(progress?.seasonLp || 0),
+    [progress?.seasonLp]
+  );
+  const latestAnnouncement = useMemo(() => {
+    return (centerAnnouncements || []).find((item) => {
+      const status = item?.status || 'published';
+      const audience = item?.audience || 'student';
+      return status === 'published' && (audience === 'student' || audience === 'all');
+    }) || null;
+  }, [centerAnnouncements]);
+  const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
+    || latestCoachReport?.nextAction?.trim()
+    || summarizeReportLine(latestCoachReport?.content);
+  const missionAction = useMemo(() => {
+    if (isTimerActive) {
+      return {
+        title: '집중 흐름을 이어갈 시간',
+        description: `${formatTimer(localSeconds)} 동안 몰입 중이에요. 지금 리듬을 유지하면 오늘 목표에 가장 빨리 도달할 수 있어요.`,
+        cta: '집중 종료',
+        meta: '공부 중',
+        accent: `${todayDoneTaskCount}/${todayTaskCount || 0}개 완료`,
+        mode: 'timer' as const,
+      };
+    }
+    if (todayRemainingTasks.length > 0 && totalMinutesCount === 0) {
+      return {
+        title: '오늘의 첫 몰입을 시작해요',
+        description: `남은 미션 ${todayRemainingTasks.length}개가 기다리고 있어요. 첫 세션을 열면 오늘의 흐름이 바로 시작됩니다.`,
+        cta: '공부 시작',
+        meta: '공부 전',
+        accent: todayPotentialPlanBonus > 0 ? `완료 시 +${todayPotentialPlanBonus} LP 예상` : '오늘 목표부터 가볍게 시작',
+        mode: 'start' as const,
+      };
+    }
+    if (todayRemainingTasks.length > 0) {
+      return {
+        title: '남은 미션을 정리할 차례예요',
+        description: `지금 ${todayRemainingTasks.length}개만 더 끝내면 오늘 계획이 한층 선명해져요.`,
+        cta: '계획 보기',
+        meta: '공부 후반',
+        accent: todayPotentialPlanBonus > 0 ? `완료 시 +${todayPotentialPlanBonus} LP 예상` : '남은 목표를 마무리해요',
+        mode: 'plan' as const,
+      };
+    }
+    if (unreadReportCount > 0) {
+      return {
+        title: '오늘 성과를 선생님 코칭으로 마무리해요',
+        description: `읽지 않은 리포트 ${unreadReportCount}건이 있어요. 지금 보면 오늘의 흐름을 더 잘 정리할 수 있어요.`,
+        cta: '리포트 보기',
+        meta: '공부 후',
+        accent: coachSummary,
+        mode: 'report' as const,
+      };
+    }
+    return {
+      title: '오늘의 루틴을 잘 마무리했어요',
+      description: '이제 성과를 가볍게 돌아보고, 내일 목표를 준비해 두면 다음 집중이 더 쉬워집니다.',
+      cta: '계획트랙 열기',
+      meta: '마무리',
+      accent: `이번 주 ${formatMinutesToKorean(weeklyStudyMinutes)} 공부`,
+      mode: 'review' as const,
+    };
+  }, [
+    isTimerActive,
+    localSeconds,
+    todayDoneTaskCount,
+    todayTaskCount,
+    todayRemainingTasks.length,
+    totalMinutesCount,
+    todayPotentialPlanBonus,
+    unreadReportCount,
+    coachSummary,
+    weeklyStudyMinutes,
+  ]);
+
+  const handleMissionAction = useCallback(async () => {
+    if (missionAction.mode === 'timer' || missionAction.mode === 'start') {
+      await handleStudyStartStop();
+      return;
+    }
+    if (missionAction.mode === 'report') {
+      router.push('/dashboard/student-reports');
+      return;
+    }
+    router.push('/dashboard/plan');
+  }, [handleStudyStartStop, missionAction.mode, router]);
 
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
@@ -1972,6 +2181,197 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               )}
             </button>
           </div>
+        </div>
+      </section>
+
+      <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
+        <Card className={cn(
+          "relative overflow-hidden border-none bg-white shadow-xl ring-1 ring-black/[0.04]",
+          isMobile ? "col-span-2 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
+        )}>
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r" style={{ backgroundImage: tierTheme.heroGradient }} />
+          <CardContent className={cn("relative", isMobile ? "p-5 pt-6" : "p-8 pt-9")}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+                  {missionAction.meta}
+                </Badge>
+                <div>
+                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl leading-8" : "text-[2.5rem] leading-[1.1]")}>
+                    {missionAction.title}
+                  </h2>
+                  <p className={cn("mt-2 font-semibold text-slate-600 break-keep", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-2xl")}>
+                    {missionAction.description}
+                  </p>
+                </div>
+              </div>
+              <div className={cn("rounded-2xl bg-primary/5 text-primary shrink-0", isMobile ? "p-2" : "p-3")}>
+                {missionAction.mode === 'report' ? <FileText className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /> : missionAction.mode === 'plan' || missionAction.mode === 'review' ? <ListTodo className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /> : <Sparkles className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />}
+              </div>
+            </div>
+
+            <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-end")}>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+                    오늘 목표 {todayDoneTaskCount}/{todayTaskCount || 0}
+                  </Badge>
+                  <Badge variant="outline" className="h-7 rounded-full border-emerald-200 bg-emerald-50 px-3 text-[10px] font-black text-emerald-700">
+                    {missionAction.accent}
+                  </Badge>
+                  {weeklyStudyDelta !== 0 && (
+                    <Badge variant="outline" className={cn(
+                      "h-7 rounded-full px-3 text-[10px] font-black",
+                      weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
+                    )}>
+                      지난주 대비 {weeklyStudyDelta > 0 ? '+' : ''}{formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
+                    </Badge>
+                  )}
+                </div>
+                {todayMissionList.length > 0 ? (
+                  <div className="grid gap-2">
+                    {todayMissionList.map((task, index) => (
+                      <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                        <div className={cn(
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-black",
+                          index === 0 ? "bg-primary text-white" : "bg-white text-primary ring-1 ring-slate-200"
+                        )}>
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-slate-900">{task.title}</p>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            {task.targetMinutes ? `${task.targetMinutes}분 목표` : '오늘의 미션'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4">
+                    <p className="text-sm font-black text-slate-800">오늘의 미션을 거의 마무리했어요.</p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-500">지금 흐름을 유지하면 오늘 하루를 아주 깔끔하게 끝낼 수 있어요.</p>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => void handleMissionAction()}
+                disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
+                className={cn(
+                  "rounded-2xl font-black shadow-lg transition-all",
+                  isMobile ? "h-12 w-full text-sm" : "h-14 px-8 text-base"
+                )}
+              >
+                {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">연속 성장</span>
+                <RefreshCw className="h-4 w-4 text-rose-400" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
+                  {currentStreakDays}<span className="ml-1 text-xs font-bold text-slate-400">일</span>
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">최근 5일 목표 달성 {recentFivePlanWins}/5일</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">개인 최고</span>
+                <Trophy className="h-4 w-4 text-sky-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                  {formatMinutesToKorean(weeklyBestMinutes || monthlyBestMinutes)}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : '이번 달 최고 기록 준비 중'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Link href="/dashboard/leaderboards" className="block">
+            <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
+              <CardContent className={cn("p-4", !isMobile && "p-5")}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">시즌 구간</span>
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </div>
+                <div className="mt-3">
+                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
+                    {seasonPercentile ? `상위 ${seasonPercentile}%` : '기록 준비중'}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                    {nextTierInfo.remainingLp > 0 ? `${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점` : '지금 티어를 멋지게 유지 중'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {latestUnreadReport ? (
+            <Link href="/dashboard/student-reports" className="block">
+              <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
+                <CardContent className={cn("p-4", !isMobile && "p-5")}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">놓치면 아쉬운 것</span>
+                    <Badge className="h-5 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-sm font-black leading-6 text-slate-900">{latestUnreadReport.dateKey} 코칭 도착</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 line-clamp-3">{coachSummary}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ) : latestAnnouncement ? (
+            <Link href="/dashboard/appointments/inquiries" className="block">
+              <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
+                <CardContent className={cn("p-4", !isMobile && "p-5")}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">센터 공지</span>
+                    <BellRing className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-sm font-black leading-6 text-slate-900 line-clamp-2">{latestAnnouncement.title || '센터 공지사항'}</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 line-clamp-3">
+                      {summarizeReportLine(latestAnnouncement.body)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ) : (
+            <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+              <CardContent className={cn("p-4", !isMobile && "p-5")}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-violet-600">시험 디데이</span>
+                  <Calendar className="h-4 w-4 text-violet-500" />
+                </div>
+                <div className="mt-3">
+                  <p className="text-sm font-black leading-6 text-slate-900">
+                    {examCountdowns[0]?.title || '시험 일정 준비'}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                    {examCountdowns[0]?.dLabel || '날짜를 등록하면 홈에서 바로 보여드릴게요.'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </section>
 
