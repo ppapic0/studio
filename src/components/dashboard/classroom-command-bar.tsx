@@ -1,161 +1,197 @@
 'use client';
 
-import { type ReactNode } from 'react';
-import { AlertTriangle, ArrowUpRight, BellRing, BookOpen, Filter, Flame, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  AlertTriangle,
+  BellRing,
+  BookOpen,
+  Flame,
+  RefreshCw,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 
+import type { ClassroomQuickFilter, ClassroomSignalsSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
-export type ClassroomFocusFilter =
-  | 'all'
-  | 'students'
-  | 'risk'
-  | 'awayLong'
-  | 'lateOrAbsent'
-  | 'unreadReports'
-  | 'counselingPending';
-
-export interface ClassroomCommandSummary {
-  studying: number;
-  awayLong: number;
-  lateOrAbsent: number;
-  atRisk: number;
-  unreadReports: number;
-  counselingPending: number;
-  totalStudents: number;
-}
-
-export interface ClassroomCommandBarAction {
-  key: ClassroomFocusFilter;
+export type ClassroomCommandBarAction = {
+  key: ClassroomQuickFilter;
   label: string;
   value: number;
-  tone?: 'default' | 'warning' | 'danger' | 'accent';
-  icon?: ReactNode;
-}
-
-export interface ClassroomCommandBarProps {
-  summary: ClassroomCommandSummary;
-  activeFilter: ClassroomFocusFilter;
-  onFilterChange: (filter: ClassroomFocusFilter) => void;
-  onClearFilter?: () => void;
-  title?: string;
-  subtitle?: string;
-  actions?: ClassroomCommandBarAction[];
-  extraSlot?: ReactNode;
-}
-
-const defaultActions = (summary: ClassroomCommandSummary): ClassroomCommandBarAction[] => [
-  { key: 'students', label: '현재 재실', value: summary.studying, tone: 'accent', icon: <Users className="h-4 w-4" /> },
-  { key: 'risk', label: '리스크', value: summary.atRisk, tone: 'danger', icon: <Flame className="h-4 w-4" /> },
-  { key: 'awayLong', label: '장기 외출', value: summary.awayLong, tone: 'warning', icon: <BellRing className="h-4 w-4" /> },
-  { key: 'lateOrAbsent', label: '미입실/지각', value: summary.lateOrAbsent, tone: 'warning', icon: <AlertTriangle className="h-4 w-4" /> },
-  { key: 'unreadReports', label: '미열람 리포트', value: summary.unreadReports, tone: 'default', icon: <BookOpen className="h-4 w-4" /> },
-  { key: 'counselingPending', label: '상담 대기', value: summary.counselingPending, tone: 'default', icon: <ArrowUpRight className="h-4 w-4" /> },
-];
-
-const toneClasses: Record<NonNullable<ClassroomCommandBarAction['tone']>, string> = {
-  default: 'border-[rgba(20,41,95,0.12)] bg-white text-[#14295F] hover:border-[rgba(20,41,95,0.2)]',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300',
-  danger: 'border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300',
-  accent: 'border-[#cdd8ff] bg-[linear-gradient(180deg,#f8fbff,#eef4ff)] text-[#14295F] hover:border-[#a8baf5]',
+  description: string;
+  tone?: 'default' | 'accent' | 'warning' | 'danger';
+  icon?: LucideIcon;
 };
 
-function StatChip({
-  action,
-  active,
-  onClick,
-}: {
-  action: ClassroomCommandBarAction;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'group flex min-w-[11rem] items-center justify-between gap-4 rounded-[1.15rem] border px-4 py-3 text-left transition-all duration-150 active:scale-[0.98]',
-        active ? 'shadow-[0_12px_24px_-12px_rgba(20,41,95,0.35)] ring-2 ring-[#14295F]/8' : 'shadow-sm',
-        toneClasses[action.tone ?? 'default']
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/80 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]">
-          {action.icon ?? <Filter className="h-4 w-4" />}
-        </div>
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] opacity-70">{action.label}</p>
-          <p className="mt-1 text-2xl font-black tracking-[-0.04em] tabular-nums">{action.value}</p>
-        </div>
-      </div>
-      <Badge variant="outline" className="border-transparent bg-white/75 text-[10px] font-black uppercase tracking-[0.18em]">
-        필터
-      </Badge>
-    </button>
-  );
+export interface ClassroomCommandBarProps {
+  summary: ClassroomSignalsSummary;
+  totalStudents: number;
+  activeFilter: ClassroomQuickFilter;
+  onFilterChange: (filter: ClassroomQuickFilter) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+}
+
+const toneClasses: Record<NonNullable<ClassroomCommandBarAction['tone']>, string> = {
+  default: 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+  accent: 'border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300',
+  warning: 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300',
+  danger: 'border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300',
+};
+
+function buildActions(summary: ClassroomSignalsSummary): ClassroomCommandBarAction[] {
+  return [
+    {
+      key: 'studying',
+      label: '학습 중',
+      value: summary.studying,
+      description: '지금 좌석에서 학습을 이어가고 있는 학생 수입니다.',
+      tone: 'accent',
+      icon: UserCheck,
+    },
+    {
+      key: 'awayLong',
+      label: '장기 외출',
+      value: summary.awayLong,
+      description: '외출 또는 휴식 상태가 길어져 확인이 필요한 학생입니다.',
+      tone: 'warning',
+      icon: BellRing,
+    },
+    {
+      key: 'lateOrAbsent',
+      label: '미입실/지각',
+      value: summary.lateOrAbsent,
+      description: '입실 확인이 아직 되지 않아 바로 확인해야 하는 학생입니다.',
+      tone: 'warning',
+      icon: AlertTriangle,
+    },
+    {
+      key: 'atRisk',
+      label: '리스크',
+      value: summary.atRisk,
+      description: '리스크 신호가 높아 우선 개입이 필요한 학생입니다.',
+      tone: 'danger',
+      icon: Flame,
+    },
+    {
+      key: 'unreadReports',
+      label: '미열람 리포트',
+      value: summary.unreadReports,
+      description: '최근 발송한 리포트가 아직 확인되지 않은 학생입니다.',
+      tone: 'default',
+      icon: BookOpen,
+    },
+    {
+      key: 'counselingPending',
+      label: '상담 대기',
+      value: summary.counselingPending,
+      description: '오늘 상담 일정이 있거나 바로 연결이 필요한 학생입니다.',
+      tone: 'default',
+      icon: Users,
+    },
+  ];
 }
 
 export function ClassroomCommandBar({
   summary,
+  totalStudents,
   activeFilter,
   onFilterChange,
-  onClearFilter,
-  title = '실시간 관제 바',
-  subtitle = '지금 바로 확인해야 할 교실 신호를 한 줄로 정리합니다.',
-  actions,
-  extraSlot,
+  onRefresh,
+  isRefreshing = false,
 }: ClassroomCommandBarProps) {
-  const visibleActions = actions ?? defaultActions(summary);
-  const totalSignalCount =
-    summary.awayLong + summary.lateOrAbsent + summary.atRisk + summary.unreadReports + summary.counselingPending;
+  const actions = buildActions(summary);
+  const totalSignals =
+    summary.awayLong +
+    summary.lateOrAbsent +
+    summary.atRisk +
+    summary.unreadReports +
+    summary.counselingPending;
 
   return (
-    <Card className="rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.14),transparent_30%),linear-gradient(180deg,#ffffff 0%,#f8fbff 100%)] shadow-[0_16px_40px_-20px_rgba(20,41,95,0.25)]">
+    <Card className="rounded-[2.25rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_28%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_18px_42px_-24px_rgba(15,23,42,0.35)]">
       <CardContent className="space-y-5 p-5 sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border-none bg-[#14295F] text-white">교실 관제</Badge>
-              <Badge variant="outline" className="border-[rgba(20,41,95,0.14)] bg-white text-[#14295F]">
-                지금 알림 {totalSignalCount}
+              <Badge className="border-none bg-slate-900 text-white">실시간 관제</Badge>
+              <Badge variant="outline" className="border-slate-200 bg-white text-slate-700">
+                즉시 확인 {totalSignals}
+              </Badge>
+              <Badge variant="outline" className="border-slate-200 bg-white text-slate-700">
+                전체 학생 {totalStudents}
               </Badge>
             </div>
             <div>
-              <h2 className="text-xl font-black tracking-[-0.04em] text-[#14295F] sm:text-[1.55rem]">{title}</h2>
-              <p className="mt-1 text-sm font-medium leading-[1.7] text-[#5c6e88]">{subtitle}</p>
+              <h2 className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+                지금 먼저 봐야 할 학생과 상황
+              </h2>
+              <p className="mt-1 text-sm font-medium leading-6 text-slate-500">
+                교실 전체를 놓치지 않도록 우선순위 신호를 한 줄로 묶었습니다.
+              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant={activeFilter === 'all' ? 'secondary' : 'outline'}
+              variant={activeFilter === 'all' ? 'default' : 'outline'}
+              className="rounded-xl"
               onClick={() => onFilterChange('all')}
-              className="h-10 rounded-xl px-4"
             >
               전체 보기
             </Button>
-            {onClearFilter && activeFilter !== 'all' && (
-              <Button type="button" variant="ghost" onClick={onClearFilter} className="h-10 rounded-xl px-4">
-                필터 초기화
+            {onRefresh && (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
+                새로고침
               </Button>
             )}
-            {extraSlot}
           </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {visibleActions.map((action) => (
-            <StatChip
-              key={action.key}
-              action={action}
-              active={activeFilter === action.key}
-              onClick={() => onFilterChange(action.key)}
-            />
-          ))}
+          {actions.map((action) => {
+            const Icon = action.icon ?? Users;
+            const active = activeFilter === action.key;
+
+            return (
+              <button
+                key={action.key}
+                type="button"
+                onClick={() => onFilterChange(action.key)}
+                className={cn(
+                  'rounded-[1.35rem] border px-4 py-4 text-left transition-all active:scale-[0.99]',
+                  toneClasses[action.tone ?? 'default'],
+                  active && 'ring-2 ring-slate-900/10 shadow-sm',
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black tracking-wide">{action.label}</p>
+                      <p className="mt-1 text-2xl font-black tabular-nums">{action.value}</p>
+                    </div>
+                  </div>
+                  {active && <Badge className="border-none bg-slate-900 text-white">선택됨</Badge>}
+                </div>
+                <p className="mt-3 text-xs font-medium leading-5 opacity-80">{action.description}</p>
+              </button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

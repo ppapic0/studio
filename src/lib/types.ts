@@ -330,3 +330,76 @@ export interface StudentNotification {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
+
+export type ClassroomSignalRiskLevel = 'stable' | 'watch' | 'risk' | 'critical';
+export type ClassroomSignalPriority = 'low' | 'medium' | 'high' | 'critical';
+export type ClassroomOverlayMode = 'status' | 'risk' | 'penalty' | 'minutes' | 'counseling' | 'report';
+export type ClassroomIncidentType =
+  | 'away_long'
+  | 'late_or_absent'
+  | 'risk'
+  | 'unread_report'
+  | 'counseling_pending'
+  | 'penalty_threshold'
+  | 'check_in'
+  | 'check_out';
+export type ClassroomIncidentActionTarget = 'seat' | 'student' | 'report' | 'counseling';
+export type ClassroomQuickFilter =
+  | 'all'
+  | 'studying'
+  | 'awayLong'
+  | 'lateOrAbsent'
+  | 'atRisk'
+  | 'unreadReports'
+  | 'counselingPending';
+
+export interface ClassroomSignalsSummary {
+  studying: number;
+  awayLong: number;
+  lateOrAbsent: number;
+  atRisk: number;
+  unreadReports: number;
+  counselingPending: number;
+}
+
+export interface ClassroomSignalClassSummary {
+  className: string;
+  occupancyRate: number;
+  avgMinutes: number;
+  riskCount: number;
+  awayLongCount: number;
+  pendingCounselingCount: number;
+}
+
+export interface ClassroomSeatSignal {
+  studentId: string;
+  seatId: string;
+  overlayFlags: string[];
+  todayMinutes: number;
+  riskLevel: ClassroomSignalRiskLevel;
+  effectivePenaltyPoints: number;
+  hasUnreadReport: boolean;
+  hasCounselingToday: boolean;
+}
+
+export interface ClassroomSignalIncident {
+  type: ClassroomIncidentType;
+  priority: ClassroomSignalPriority;
+  studentId: string;
+  studentName: string;
+  seatId?: string;
+  className?: string;
+  reason: string;
+  occurredAt: Timestamp;
+  actionTarget: ClassroomIncidentActionTarget;
+}
+
+export interface ClassroomSignalsDocument {
+  id?: string;
+  updatedAt: Timestamp;
+  dateKey: string;
+  summary: ClassroomSignalsSummary;
+  classSummaries: ClassroomSignalClassSummary[];
+  seatSignals: ClassroomSeatSignal[];
+  incidents: ClassroomSignalIncident[];
+}

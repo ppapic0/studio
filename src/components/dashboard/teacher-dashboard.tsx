@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Armchair, 
   Loader2, 
@@ -71,7 +72,24 @@ import {
   increment,
   getDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog } from '@/lib/types';
+import {
+  StudentProfile,
+  AttendanceCurrent,
+  StudyLogDay,
+  CounselingReservation,
+  CenterMembership,
+  StudySession,
+  StudyPlanItem,
+  DailyReport,
+  DailyStudentStat,
+  GrowthProgress,
+  AttendanceRequest,
+  PenaltyLog,
+  ClassroomOverlayMode,
+  ClassroomQuickFilter,
+  ClassroomSignalIncident,
+  ClassroomSignalsSummary,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -104,6 +122,18 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
+import { ClassroomActivityRail } from '@/components/dashboard/classroom-activity-rail';
+import { ClassroomClassHealthStrip } from '@/components/dashboard/classroom-class-health-strip';
+import { ClassroomCommandBar } from '@/components/dashboard/classroom-command-bar';
+import { ClassroomSeatGrid } from '@/components/dashboard/classroom-seat-grid';
+import { ClassroomStudentInterventionPanel } from '@/components/dashboard/classroom-student-intervention-panel';
+import {
+  buildSeatLegend,
+  buildSeatOverlayState,
+  buildSeatSignalsFromLiveData,
+  buildStudentClassroomInsight,
+  useTeacherClassroomSignals,
+} from '@/lib/teacher-classroom-model';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -152,6 +182,7 @@ function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
 
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
+  const router = useRouter();
   const firestore = useFirestore();
   const functions = useFunctions();
   const { activeMembership, viewMode } = useAppContext();
@@ -184,9 +215,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const staleSeatCleanupInFlightRef = useRef(false);
   
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [overlayMode, setOverlayMode] = useState<ClassroomOverlayMode>('status');
+  const [activeQuickFilter, setActiveQuickFilter] = useState<ClassroomQuickFilter>('all');
+  const [activeIncidentKey, setActiveIncidentKey] = useState<string | null>(null);
+  const [highlightSeatId, setHighlightSeatId] = useState<string | null>(null);
+  const [isRefreshingSignals, setIsRefreshingSignals] = useState(false);
 
   const [gridRows, setGridRows] = useState(7);
   const [gridCols, setGridCols] = useState(10);
+  const requestedInitialSignalsRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -327,6 +364,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, todayKey]);
   const { data: riskCache } = useDoc<{ atRiskStudentIds: string[] }>(riskCacheRef, { enabled: isActive });
   const atRiskStudentIds = new Set<string>(riskCache?.atRiskStudentIds ?? []);
+  const {
+    signals: classroomSignals,
+    incidentsBySeatId,
+    incidentsByStudentId,
+    seatSignalBySeatId: signalSeatMap,
+  } = useTeacherClassroomSignals(centerId, todayKey);
+
+  const refreshClassroomSignalsNow = async () => {
+    if (!functions || !centerId) return;
+    setIsRefreshingSignals(true);
+    try {
+      const refreshFn = httpsCallable(functions, 'refreshClassroomSignals');
+      await refreshFn({ centerId });
+    } catch (error) {
+      console.warn('[teacher-dashboard] classroom signals refresh failed', error);
+    } finally {
+      setIsRefreshingSignals(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!functions || !centerId || classroomSignals || requestedInitialSignalsRef.current) return;
+    requestedInitialSignalsRef.current = true;
+    void refreshClassroomSignalsNow();
+  }, [functions, centerId, classroomSignals]);
 
   useEffect(() => {
     let disposed = false;
@@ -518,6 +580,181 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { data: rawAppointments, isLoading: aptLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
 
   const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.createdAt?.toMillis()||0)) : [], [rawAppointments]);
+  const unreadReportStudentIds = useMemo(() => {
+    const cutoff = subDays(new Date(), 7).getTime();
+    return new Set(
+      (rawRecentReports || [])
+        .filter((report) => !report.viewedAt && (report.updatedAt?.toMillis?.() || report.createdAt?.toMillis?.() || 0) >= cutoff)
+        .map((report) => report.studentId)
+        .filter(Boolean)
+    );
+  }, [rawRecentReports]);
+
+  const counselingPendingStudentIds = useMemo(() => {
+    return new Set(
+      appointments
+        .filter((appointment) => appointment.status === 'requested' || appointment.status === 'confirmed')
+        .map((appointment) => appointment.studentId)
+        .filter(Boolean)
+    );
+  }, [appointments]);
+
+  const memberById = useMemo(
+    () => new Map((studentMembers || []).map((member) => [member.id, member])),
+    [studentMembers],
+  );
+  const studentById = useMemo(
+    () => new Map((students || []).map((student) => [student.id, student])),
+    [students],
+  );
+
+  const fallbackSeatSignals = useMemo(
+    () =>
+      buildSeatSignalsFromLiveData({
+        attendanceList,
+        studentMembers,
+        todayStats,
+        riskStudentIds: atRiskStudentIds,
+        unreadReportStudentIds,
+        counselingTodayStudentIds: counselingPendingStudentIds,
+      }),
+    [attendanceList, studentMembers, todayStats, atRiskStudentIds, unreadReportStudentIds, counselingPendingStudentIds],
+  );
+
+  const seatSignals = useMemo(
+    () => (classroomSignals?.seatSignals?.length ? classroomSignals.seatSignals : fallbackSeatSignals),
+    [classroomSignals, fallbackSeatSignals],
+  );
+
+  const seatSignalBySeatId = useMemo(
+    () => (classroomSignals?.seatSignals?.length ? signalSeatMap : new Map(seatSignals.map((item) => [item.seatId, item]))),
+    [classroomSignals, signalSeatMap, seatSignals],
+  );
+
+  const activeMembers = useMemo(
+    () =>
+      (studentMembers || []).filter(
+        (member) => member.status === 'active' && (selectedClass === 'all' || member.className === selectedClass),
+      ),
+    [studentMembers, selectedClass],
+  );
+
+  const activeMemberIds = useMemo(() => new Set(activeMembers.map((member) => member.id)), [activeMembers]);
+
+  const classroomSummary = useMemo<ClassroomSignalsSummary>(() => {
+    const relevantSeats = (attendanceList || []).filter((seat) => {
+      if (!seat.studentId) return false;
+      return activeMemberIds.has(seat.studentId);
+    });
+    const relevantSignals = seatSignals.filter((item) => activeMemberIds.has(item.studentId));
+
+    return {
+      studying: relevantSeats.filter((seat) => seat.status === 'studying').length,
+      awayLong: relevantSignals.filter((item) => item.overlayFlags.includes('away_long')).length,
+      lateOrAbsent: relevantSignals.filter((item) => item.overlayFlags.includes('late_or_absent')).length,
+      atRisk: relevantSignals.filter((item) => item.riskLevel === 'risk' || item.riskLevel === 'critical').length,
+      unreadReports: relevantSignals.filter((item) => item.hasUnreadReport).length,
+      counselingPending: relevantSignals.filter((item) => item.hasCounselingToday).length,
+    };
+  }, [attendanceList, activeMemberIds, seatSignals]);
+
+  const classHealthSummaries = useMemo(() => {
+    if (classroomSignals?.classSummaries?.length) return classroomSignals.classSummaries;
+
+    const grouped = new Map<string, { memberIds: string[]; studying: number; minutes: number; risk: number; awayLong: number; counseling: number }>();
+    activeMembers.forEach((member) => {
+      const key = member.className || '미분류';
+      const current = grouped.get(key) || { memberIds: [], studying: 0, minutes: 0, risk: 0, awayLong: 0, counseling: 0 };
+      const seat = (attendanceList || []).find((item) => item.studentId === member.id);
+      const signal = seatSignals.find((item) => item.studentId === member.id);
+      current.memberIds.push(member.id);
+      if (seat?.status === 'studying') current.studying += 1;
+      current.minutes += signal?.todayMinutes || 0;
+      if (signal?.riskLevel === 'risk' || signal?.riskLevel === 'critical') current.risk += 1;
+      if (signal?.overlayFlags.includes('away_long')) current.awayLong += 1;
+      if (signal?.hasCounselingToday) current.counseling += 1;
+      grouped.set(key, current);
+    });
+
+    return [...grouped.entries()].map(([className, value]) => ({
+      className,
+      occupancyRate: value.memberIds.length > 0 ? Math.round((value.studying / value.memberIds.length) * 100) : 0,
+      avgMinutes: value.memberIds.length > 0 ? Math.round(value.minutes / value.memberIds.length) : 0,
+      riskCount: value.risk,
+      awayLongCount: value.awayLong,
+      pendingCounselingCount: value.counseling,
+    }));
+  }, [classroomSignals, activeMembers, attendanceList, seatSignals]);
+
+  const classroomIncidents = useMemo(() => {
+    const incidents = classroomSignals?.incidents || [];
+    return incidents
+      .filter((incident) => selectedClass === 'all' || incident.className === selectedClass)
+      .sort((a, b) => (b.occurredAt?.toMillis?.() || 0) - (a.occurredAt?.toMillis?.() || 0))
+      .slice(0, 20);
+  }, [classroomSignals, selectedClass]);
+
+  const classroomFilters = useMemo(
+    () => [
+      { key: 'all' as ClassroomQuickFilter, label: '전체', count: activeMembers.length },
+      { key: 'studying' as ClassroomQuickFilter, label: '학습 중', count: classroomSummary.studying },
+      { key: 'awayLong' as ClassroomQuickFilter, label: '장기 외출', count: classroomSummary.awayLong },
+      { key: 'lateOrAbsent' as ClassroomQuickFilter, label: '미입실/지각', count: classroomSummary.lateOrAbsent },
+      { key: 'atRisk' as ClassroomQuickFilter, label: '리스크', count: classroomSummary.atRisk },
+      { key: 'unreadReports' as ClassroomQuickFilter, label: '미열람 리포트', count: classroomSummary.unreadReports },
+      { key: 'counselingPending' as ClassroomQuickFilter, label: '상담 대기', count: classroomSummary.counselingPending },
+    ],
+    [activeMembers.length, classroomSummary],
+  );
+
+  const classroomLegend = useMemo(() => buildSeatLegend(overlayMode), [overlayMode]);
+
+  const classroomGridSeats = useMemo(() => {
+    return (attendanceList || []).map((seat) => {
+      const signal = seatSignalBySeatId.get(seat.id);
+      const member = seat.studentId ? memberById.get(seat.studentId) : undefined;
+      const student = seat.studentId ? studentById.get(seat.studentId) : undefined;
+      const overlayState = buildSeatOverlayState({
+        seat,
+        seatSignal: signal,
+        activeFilter: activeQuickFilter,
+        overlayMode,
+        incidentsBySeatId,
+      });
+      const dimmedByClass =
+        selectedClass !== 'all' &&
+        seat.studentId &&
+        member?.className !== selectedClass;
+      const timeInfo = seat.studentId ? getStudentStudyTimes(seat.studentId, seat.status, seat.lastCheckInAt) : null;
+
+      return {
+        seat,
+        seatSignal: signal,
+        studentName: student?.name || member?.displayName,
+        className: member?.className,
+        seatZone: seat.seatZone,
+        sessionText: timeInfo ? `세션 ${timeInfo.session}` : undefined,
+        totalText: timeInfo ? `누적 ${timeInfo.total}` : undefined,
+        highlighted: highlightSeatId === seat.id,
+        overlayState: {
+          ...overlayState,
+          dimmed: overlayState.dimmed || Boolean(dimmedByClass),
+        },
+      };
+    });
+  }, [
+    attendanceList,
+    seatSignalBySeatId,
+    memberById,
+    studentById,
+    activeQuickFilter,
+    overlayMode,
+    incidentsBySeatId,
+    selectedClass,
+    highlightSeatId,
+    now,
+    todayStats,
+  ]);
 
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
@@ -551,6 +788,65 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       latestPositiveLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd HH:mm') : '-',
     };
   }, [selectedStudentPenaltyPoints, selectedStudentPenaltyLogs]);
+
+  const selectedSeatSignal = useMemo(
+    () => (selectedSeat ? seatSignalBySeatId.get(selectedSeat.id) : undefined),
+    [selectedSeat, seatSignalBySeatId],
+  );
+
+  const selectedStudentIncidents = useMemo<ClassroomSignalIncident[]>(
+    () => (selectedSeat?.studentId ? incidentsByStudentId.get(selectedSeat.studentId) || [] : []),
+    [selectedSeat, incidentsByStudentId],
+  );
+
+  const selectedRecentThreeDayMinutes = useMemo(
+    () => selectedStudentHistory.slice(0, 3).map((item) => Math.round(Number(item.totalMinutes || 0))).reverse(),
+    [selectedStudentHistory],
+  );
+
+  const selectedRiskLabel = useMemo(() => {
+    switch (selectedSeatSignal?.riskLevel) {
+      case 'critical':
+        return '긴급';
+      case 'risk':
+        return '위험';
+      case 'watch':
+        return '주의';
+      case 'stable':
+        return '안정';
+      default:
+        return undefined;
+    }
+  }, [selectedSeatSignal]);
+
+  const selectedStudentInsight = useMemo(
+    () =>
+      buildStudentClassroomInsight({
+        seat: selectedSeat,
+        student: selectedSeat?.studentId ? studentById.get(selectedSeat.studentId) || null : null,
+        membership: selectedSeat?.studentId ? memberById.get(selectedSeat.studentId) || null : null,
+        todayStat: selectedSeat?.studentId ? todayStats?.find((item) => item.studentId === selectedSeat.studentId) || null : null,
+        seatSignal: selectedSeatSignal || null,
+        incidents: selectedStudentIncidents,
+        recentHistoryMinutes: selectedRecentThreeDayMinutes,
+        penaltyPoints: selectedPenaltyRecovery.effectivePoints,
+        hasRecentReport: selectedStudentReports.length > 0,
+        hasUnreadReport: Boolean(selectedStudentReports[0] && !selectedStudentReports[0].viewedAt),
+        hasCounselingToday: Boolean(selectedSeat?.studentId && counselingPendingStudentIds.has(selectedSeat.studentId)),
+      }),
+    [
+      selectedSeat,
+      studentById,
+      memberById,
+      todayStats,
+      selectedSeatSignal,
+      selectedStudentIncidents,
+      selectedRecentThreeDayMinutes,
+      selectedPenaltyRecovery.effectivePoints,
+      selectedStudentReports,
+      counselingPendingStudentIds,
+    ],
+  );
 
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;
@@ -631,6 +927,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const handleSeatClick = (seat: AttendanceCurrent) => {
     setSelectedSeat(seat);
+    setHighlightSeatId(seat.id);
     if (isEditMode) {
       if (seat.studentId) {
         setIsManaging(true);
@@ -643,6 +940,29 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         fetchStudentDetails(seat.studentId);
       }
     }
+  };
+
+  const openSeatById = (seatId?: string | null) => {
+    if (!seatId) return;
+    const seat = attendanceList?.find((item) => item.id === seatId);
+    if (!seat) return;
+    handleSeatClick(seat);
+  };
+
+  const openStudentById = (studentId?: string | null) => {
+    if (!studentId) return;
+    const seat = attendanceList?.find((item) => item.studentId === studentId);
+    if (seat) {
+      handleSeatClick(seat);
+      return;
+    }
+    router.push(`/dashboard/teacher/students/${studentId}`);
+  };
+
+  const handleIncidentSelect = (incident: ClassroomSignalIncident) => {
+    const key = `${incident.studentId}:${incident.type}:${incident.occurredAt?.toMillis?.() || 0}`;
+    setActiveIncidentKey(key);
+    if (incident.seatId) setHighlightSeatId(incident.seatId);
   };
 
   const appendPenaltyLogLocally = (log: PenaltyLog) => {
@@ -1054,6 +1374,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </header>
 
       <section className="px-4">
+        <ClassroomCommandBar
+          summary={classroomSummary}
+          totalStudents={activeMembers.length}
+          activeFilter={activeQuickFilter}
+          onFilterChange={setActiveQuickFilter}
+          onRefresh={refreshClassroomSignalsNow}
+          isRefreshing={isRefreshingSignals}
+        />
+      </section>
+
+      <section className="px-4">
         <Card className="rounded-[2.5rem] border-none shadow-sm bg-white p-6 sm:p-8 overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform duration-1000"><TrendingUp className="h-32 w-32" /></div>
           <CardHeader className="p-0 mb-6">
@@ -1133,7 +1464,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       <Card className={cn(
         "rounded-[3rem] border-none shadow-xl bg-white mx-4 overflow-hidden transition-all duration-500",
-        isEditMode ? "ring-4 ring-primary/20" : ""
+        isEditMode ? "ring-4 ring-primary/20" : "",
+        "hidden"
       )}>
         <CardHeader className={cn("bg-muted/5 border-b px-6 py-4 sm:px-10 sm:py-6")}>
           <div className="flex justify-between items-center">
@@ -1207,6 +1539,33 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </CardContent>
       </Card>
 
+      <section className="px-4">
+        <ClassroomClassHealthStrip
+          classSummaries={classHealthSummaries}
+          activeClassName={selectedClass === 'all' ? null : selectedClass}
+          onClassSelect={(className) => setSelectedClass(className || 'all')}
+          activeFilter={activeQuickFilter}
+          totalSummary={classroomSummary}
+        />
+      </section>
+
+      <section className="px-4">
+        <ClassroomSeatGrid
+          title={isEditMode ? '좌석 관제 오버레이' : '실시간 좌석 히트맵'}
+          rows={gridRows}
+          cols={gridCols}
+          seats={classroomGridSeats}
+          overlayMode={overlayMode}
+          onOverlayModeChange={setOverlayMode}
+          activeFilter={activeQuickFilter}
+          filters={classroomFilters}
+          onFilterChange={setActiveQuickFilter}
+          legend={classroomLegend}
+          selectedSeatId={selectedSeat?.id || highlightSeatId}
+          onSeatSelect={openSeatById}
+        />
+      </section>
+
       <div className={cn("grid gap-6 px-4", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between px-2">
@@ -1241,6 +1600,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
 
         <div className="lg:col-span-5 space-y-4">
+          <ClassroomActivityRail
+            incidents={classroomIncidents}
+            activeIncidentKey={activeIncidentKey}
+            onIncidentSelect={handleIncidentSelect}
+            onStudentSelect={openStudentById}
+            onSeatSelect={(seatId) => {
+              setHighlightSeatId(seatId);
+              openSeatById(seatId);
+            }}
+          />
+
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
               <FileSearch className="h-6 w-6 text-emerald-600" />
@@ -1359,6 +1729,26 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   <p className="text-xl sm:text-2xl font-black text-primary tabular-nums">{timeInfo?.total}</p>
                                 </div>
                               </div>
+                            )}
+
+                            {selectedSeat.studentId && (
+                              <ClassroomStudentInterventionPanel
+                                studentName={selectedStudentName}
+                                className={memberById.get(selectedSeat.studentId || '')?.className}
+                                schoolName={studentById.get(selectedSeat.studentId || '')?.schoolName}
+                                seatLabel={`좌석 ${selectedSeat.seatNo}`}
+                                riskLabel={selectedRiskLabel}
+                                recentThreeDayMinutes={selectedRecentThreeDayMinutes}
+                                penaltyPoints={selectedPenaltyRecovery.effectivePoints}
+                                insight={selectedStudentInsight}
+                                studentDetailLink={`/dashboard/teacher/students/${selectedSeat.studentId}`}
+                                reportLink={selectedStudentReports[0]?.id}
+                                onOpenCounseling={() => router.push('/dashboard/appointments')}
+                                onOpenStatusPanel={() => setSelectedSeat(selectedSeat)}
+                                onOpenReport={() => {
+                                  if (selectedStudentReports[0]) setSelectedReportPreview(selectedStudentReports[0]);
+                                }}
+                              />
                             )}
 
                             {isEditMode ? (
