@@ -1,4 +1,4 @@
-export type ParentPortalTab = 'home' | 'studyDetail' | 'data' | 'communication' | 'reports' | 'billing';
+export type ParentPortalTab = 'home' | 'studyDetail' | 'data' | 'communication' | 'reports' | 'billing' | 'notifications';
 
 export type ParentQuickRequestKey =
   | 'math_support'
@@ -26,6 +26,11 @@ export interface ParentNotificationItem {
   createdAtMs?: number;
   isRead: boolean;
   isImportant: boolean;
+  category?: 'important' | 'billing' | 'life' | 'reports' | 'general';
+  priority?: 'normal' | 'high' | 'critical';
+  deepLink?: string;
+  nextAction?: string;
+  readAt?: Date | string | null;
 }
 
 export interface ParentWeeklyReportSnapshot {

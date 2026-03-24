@@ -52,6 +52,13 @@ export interface Invoice {
   paymentKey?: string; // Toss Payments
   orderId?: string;    // Toss Payments
   trackCategory?: 'studyRoom' | 'academy';
+  isActionRequired?: boolean;
+  dueLabel?: string;
+  paymentMethodSummary?: string;
+  receiptUrl?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
+  readAt?: Timestamp;
 }
 
 export interface PaymentRecord {
@@ -181,6 +188,9 @@ export interface DailyReport {
   viewedAt?: Timestamp;
   viewedByUid?: string;
   viewedByName?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
+  readAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -254,6 +264,12 @@ export interface AttendanceRequest {
   status: 'requested' | 'approved' | 'rejected';
   penaltyApplied: boolean;
   penaltyPointsDelta?: number;
+  statusUpdatedAt?: Timestamp;
+  slaDueAt?: Timestamp;
+  owner?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
+  readAt?: Timestamp;
   updatedAt?: Timestamp;
   updatedByUserId?: string;
   createdAt: Timestamp;

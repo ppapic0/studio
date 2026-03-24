@@ -175,6 +175,7 @@ function toKoreanSubjectLabel(raw: string): string {
 type ParentCommunicationRecord = {
   id: string;
   studentId: string;
+  studentName?: string;
   parentUid?: string;
   parentName?: string;
   senderRole?: 'parent' | 'student';
@@ -186,6 +187,11 @@ type ParentCommunicationRecord = {
   body?: string;
   channel?: 'visit' | 'phone' | 'online' | null;
   status?: string;
+  statusUpdatedAt?: { toDate?: () => Date; toMillis?: () => number };
+  slaDueAt?: { toDate?: () => Date; toMillis?: () => number } | Date | string | null;
+  owner?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
   createdAt?: { toDate?: () => Date; toMillis?: () => number };
   updatedAt?: { toDate?: () => Date; toMillis?: () => number };
   replyBody?: string;
@@ -210,6 +216,8 @@ type ParentDataChartKey =
   | 'startEnd'
   | 'awayTime'
   | 'subjectTime';
+
+type ParentNotificationFilter = 'all' | 'important' | 'unread' | 'billing' | 'life' | 'reports';
 
 function formatMinutes(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -334,6 +342,122 @@ function formatDateLabel(dateText?: string, fallbackTimestamp?: TimestampLike) {
   }
   return '최근';
 }
+function getPaymentMethodSummary(method?: Invoice['paymentMethod'], customSummary?: string) {
+  if (customSummary?.trim()) return customSummary.trim();
+  if (method === 'card') return '등록 카드로 바로 결제 가능';
+  if (method === 'transfer') return '계좌이체 안내 예정';
+  if (method === 'cash') return '센터 수납 확인 필요';
+  return '결제 수단 확인 필요';
+}
+
+function getInvoiceDueLabel(invoice: Invoice) {
+  if (invoice.dueLabel?.trim()) return invoice.dueLabel.trim();
+  const dueDate = toDateSafe((invoice as any).cycleEndDate);
+  if (!dueDate) return '납부 일정을 확인해 주세요.';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const normalizedDueDate = new Date(dueDate);
+  normalizedDueDate.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((normalizedDueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (invoice.status === 'paid') {
+    return `납부 완료 · ${format(dueDate, 'M월 d일', { locale: ko })}`;
+  }
+  if (diffDays > 0) return `납부 예정 D-${diffDays}`;
+  if (diffDays === 0) return '오늘까지 납부 필요';
+  return `${Math.abs(diffDays)}일 연체`;
+}
+
+function getCommunicationStageMeta(item: ParentCommunicationRecord) {
+  const dueAt = toDateSafe(item.slaDueAt as TimestampLike);
+  const dueLabel = dueAt ? format(dueAt, 'M/d HH:mm', { locale: ko }) : null;
+
+  if (item.status === 'done') {
+    return {
+      tone: 'emerald' as const,
+      timelineLabel: '답변 완료',
+      etaLabel: '답변을 확인해 주세요.',
+      nextAction: item.nextAction?.trim() || '답변 내용을 확인하고 추가 문의가 있으면 이어서 남겨 주세요.',
+      owner: item.repliedByName || item.owner || '담당 선생님',
+    };
+  }
+  if (item.status === 'consultation_needed') {
+    return {
+      tone: 'rose' as const,
+      timelineLabel: '상담 예약 필요',
+      etaLabel: dueLabel ? `${dueLabel} 전 상담 일정 안내` : '상담 가능한 시간을 확인 중이에요.',
+      nextAction: item.nextAction?.trim() || '가능한 상담 시간을 남겨 주시면 빠르게 조율해 드릴게요.',
+      owner: item.owner || '상담 담당자',
+    };
+  }
+  if (item.status === 'needs_info') {
+    return {
+      tone: 'amber' as const,
+      timelineLabel: '추가 정보 필요',
+      etaLabel: dueLabel ? `${dueLabel} 전 추가 안내 예정` : '추가 확인이 필요한 상태예요.',
+      nextAction: item.nextAction?.trim() || '세부 상황을 한 줄 더 남겨 주시면 처리 속도가 빨라져요.',
+      owner: item.owner || '담당 선생님',
+    };
+  }
+  if (item.status === 'in_progress') {
+    return {
+      tone: 'blue' as const,
+      timelineLabel: '처리 중',
+      etaLabel: dueLabel ? `${dueLabel} 전 1차 답변 예정` : '영업일 기준 24시간 안에 1차 답변드려요.',
+      nextAction: item.nextAction?.trim() || '확인 중인 내용은 앱 알림으로 바로 전달드릴게요.',
+      owner: item.owner || '담당 선생님',
+    };
+  }
+  if (item.status === 'in_review') {
+    return {
+      tone: 'amber' as const,
+      timelineLabel: '검토 중',
+      etaLabel: dueLabel ? `${dueLabel} 전 안내 예정` : '센터 검토가 끝나는 대로 안내드려요.',
+      nextAction: item.nextAction?.trim() || '조금 더 정확한 답변을 위해 내부 확인 중이에요.',
+      owner: item.owner || '센터 관리자',
+    };
+  }
+  return {
+    tone: 'slate' as const,
+    timelineLabel: '접수됨',
+    etaLabel: dueLabel ? `${dueLabel} 전 1차 답변 예정` : '영업일 기준 24시간 안에 먼저 답변드려요.',
+    nextAction: item.nextAction?.trim() || '확인 후 앱에서 바로 안내드릴게요.',
+    owner: item.owner || '담당 선생님',
+  };
+}
+
+function getNotificationCategory(notification: ParentNotificationItem): Exclude<ParentNotificationFilter, 'all' | 'unread'> | 'general' {
+  if (notification.category) return notification.category;
+
+  const text = `${notification.title} ${notification.body} ${notification.nextAction || ''}`.toLowerCase();
+  if (notification.type === 'weekly_report' || notification.type === 'monthly_report') return 'reports';
+  if (
+    notification.type === 'check_in'
+    || notification.type === 'check_out'
+    || notification.type === 'late'
+    || notification.type === 'away_long'
+    || notification.type === 'unauthorized_exit'
+    || notification.type === 'penalty'
+    || text.includes('출결')
+    || text.includes('벌점')
+    || text.includes('외출')
+  ) {
+    return 'life';
+  }
+  if (
+    text.includes('결제')
+    || text.includes('청구')
+    || text.includes('납부')
+    || text.includes('미납')
+    || text.includes('영수증')
+  ) {
+    return 'billing';
+  }
+  if (notification.isImportant) return 'important';
+  return 'general';
+}
+
 export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -355,6 +479,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [submitting, setSubmitting] = useState(false);
 
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
+  const [notificationFilter, setNotificationFilter] = useState<ParentNotificationFilter>('all');
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
   const [isReportArchiveOpen, setIsReportArchiveOpen] = useState(false);
   const [selectedChildReport, setSelectedChildReport] = useState<DailyReport | null>(null);
@@ -414,6 +539,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+
+  useEffect(() => {
+    setNotificationFilter('all');
+  }, [studentId]);
+
   const logParentActivity = async (
     eventType: ParentActivityEvent['eventType'],
     metadata?: Record<string, any>
@@ -902,7 +1032,28 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     () => sortedInvoices.filter((invoice) => invoice.status !== 'void' && invoice.status !== 'refunded'),
     [sortedInvoices]
   );
-  const latestInvoice = displayInvoices[0];
+  const normalizedInvoices = useMemo(
+    () =>
+      displayInvoices.map((invoice) => ({
+        ...invoice,
+        isActionRequired: invoice.isActionRequired ?? (invoice.status === 'issued' || invoice.status === 'overdue'),
+        dueLabel: getInvoiceDueLabel(invoice),
+        paymentMethodSummary: getPaymentMethodSummary(invoice.paymentMethod, invoice.paymentMethodSummary),
+        nextAction:
+          invoice.nextAction
+          || (invoice.status === 'paid'
+            ? '영수증과 결제 내역을 확인해 주세요.'
+            : invoice.status === 'overdue'
+              ? '미납 금액을 바로 결제하거나 센터 상담으로 연결해 주세요.'
+              : '납부 예정일 전에 결제를 마무리해 주세요.'),
+      })),
+    [displayInvoices]
+  );
+  const latestInvoice = normalizedInvoices[0];
+  const actionRequiredInvoices = useMemo(
+    () => normalizedInvoices.filter((invoice) => invoice.isActionRequired),
+    [normalizedInvoices]
+  );
 
   const billingSummary = useMemo(() => {
     return displayInvoices.reduce(
@@ -1469,6 +1620,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: toDateSafe(item.createdAt)?.getTime() || 0,
         isRead: !!item.isRead,
         isImportant: !!item.isImportant,
+        priority: item.priority || (item.isImportant ? 'high' : 'normal'),
+        deepLink: item.deepLink,
+        nextAction: item.nextAction,
+        readAt: item.readAt,
       }));
     }
 
@@ -1484,6 +1639,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: toDateSafe((attendanceCurrent as any).updatedAt)?.getTime() || 0,
         isRead: false,
         isImportant: attendanceCurrent.status !== 'studying',
+        category: 'life',
+        priority: attendanceCurrent.status === 'studying' ? 'normal' : 'high',
+        nextAction: attendanceCurrent.status === 'studying' ? '실시간 상태를 확인해 주세요.' : '출결 변동 사유가 있으면 문의 탭에서 바로 남겨 주세요.',
       });
     }
 
@@ -1497,6 +1655,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: toDateSafe((report as any).updatedAt || (report as any).createdAt)?.getTime() || 0,
         isRead: !!report.viewedAt,
         isImportant: true,
+        category: 'reports',
+        priority: 'high',
+        nextAction: '리포트를 열어 지난주 대비 변화와 부모가 도와줄 한 가지를 확인해 주세요.',
       });
     }
 
@@ -1511,21 +1672,65 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: 0,
         isRead: false,
         isImportant: true,
+        category: 'life',
+        priority: 'critical',
+        nextAction: '생활 관리 포인트를 확인하고 필요한 경우 상담을 요청해 주세요.',
+      });
+    }
+
+    if (actionRequiredInvoices.length > 0) {
+      const invoice = actionRequiredInvoices[0];
+      fallback.push({
+        id: `invoice-${invoice.id}`,
+        type: 'monthly_report',
+        title: invoice.status === 'overdue' ? '미납 결제 확인이 필요해요.' : '청구서가 발행되었어요.',
+        body: `${invoice.studentName || student?.name || '학생'} · ${invoice.dueLabel}`,
+        createdAtLabel: toRelativeLabel((invoice as any).updatedAt || (invoice as any).issuedAt),
+        createdAtMs: toDateSafe((invoice as any).updatedAt || (invoice as any).issuedAt)?.getTime() || 0,
+        isRead: false,
+        isImportant: true,
+        category: 'billing',
+        priority: invoice.status === 'overdue' ? 'critical' : 'high',
+        nextAction: invoice.nextAction,
       });
     }
 
     return fallback;
-  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, studentId, yesterdayKey]);
+  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, actionRequiredInvoices, student?.name, studentId, yesterdayKey]);
 
   const sortedNotifications = useMemo(() => {
     return [...notifications].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
   }, [notifications]);
 
+  const unreadNotificationCount = useMemo(
+    () => sortedNotifications.filter((notification) => !(notification.isRead || !!readMap[notification.id])).length,
+    [sortedNotifications, readMap]
+  );
   const recentNotifications = useMemo(() => sortedNotifications.slice(0, 3), [sortedNotifications]);
   const unreadRecentCount = useMemo(
     () => recentNotifications.filter((notification) => !(notification.isRead || !!readMap[notification.id])).length,
     [recentNotifications, readMap]
   );
+  const notificationFilterOptions = useMemo(
+    () => [
+      { key: 'all' as const, label: '전체', count: sortedNotifications.length },
+      { key: 'important' as const, label: '중요', count: sortedNotifications.filter((notification) => notification.isImportant).length },
+      { key: 'unread' as const, label: '미읽음', count: unreadNotificationCount },
+      { key: 'billing' as const, label: '청구', count: sortedNotifications.filter((notification) => getNotificationCategory(notification) === 'billing').length },
+      { key: 'life' as const, label: '생활', count: sortedNotifications.filter((notification) => getNotificationCategory(notification) === 'life').length },
+      { key: 'reports' as const, label: '리포트', count: sortedNotifications.filter((notification) => getNotificationCategory(notification) === 'reports').length },
+    ],
+    [sortedNotifications, unreadNotificationCount]
+  );
+  const filteredNotifications = useMemo(() => {
+    return sortedNotifications.filter((notification) => {
+      const isUnread = !(notification.isRead || !!readMap[notification.id]);
+      if (notificationFilter === 'all') return true;
+      if (notificationFilter === 'important') return notification.isImportant;
+      if (notificationFilter === 'unread') return isUnread;
+      return getNotificationCategory(notification) === notificationFilter;
+    });
+  }, [sortedNotifications, notificationFilter, readMap]);
 
   const latestStudySnapshot = useMemo(() => {
     const sorted = [...(allLogs || [])]
@@ -1632,6 +1837,143 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const parentAnnouncementsLoading = centerAnnouncementsLoading || legacyParentAnnouncementsLoading;
 
+  const communicationOverview = useMemo(() => {
+    const activeItems = parentCommunications.filter((item) => item.status !== 'done');
+    const consultationNeededCount = parentCommunications.filter((item) => item.status === 'consultation_needed').length;
+    const latestItem = parentCommunications[0] || null;
+    const latestStage = latestItem ? getCommunicationStageMeta(latestItem) : null;
+
+    return {
+      total: parentCommunications.length,
+      activeCount: activeItems.length,
+      completedCount: parentCommunications.filter((item) => item.status === 'done').length,
+      consultationNeededCount,
+      latestItem,
+      latestEtaLabel: latestStage?.etaLabel || '영업일 기준 24시간 안에 1차 답변드려요.',
+    };
+  }, [parentCommunications]);
+
+  const billingHubSummary = useMemo(() => {
+    const latestActionInvoice = actionRequiredInvoices[0] || latestInvoice || null;
+    const nextAction =
+      latestActionInvoice?.nextAction
+      || (displayInvoices.length === 0
+        ? '발행 예정 청구서가 생기면 여기에서 바로 확인할 수 있어요.'
+        : '최근 결제 내역과 영수증을 확인해 주세요.');
+
+    return {
+      latestActionInvoice,
+      dueLabel: latestActionInvoice?.dueLabel || '청구서 없음',
+      paymentMethodSummary: latestActionInvoice?.paymentMethodSummary || '결제 수단 확인 필요',
+      nextAction,
+      badgeLabel:
+        latestActionInvoice?.status === 'overdue'
+          ? '미납'
+          : latestActionInvoice?.isActionRequired
+            ? '납부 필요'
+            : '정상',
+      badgeClassName:
+        latestActionInvoice?.status === 'overdue'
+          ? 'bg-rose-100 text-rose-700 border-rose-200'
+          : latestActionInvoice?.isActionRequired
+            ? 'bg-amber-100 text-amber-700 border-amber-200'
+            : 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    };
+  }, [actionRequiredInvoices, latestInvoice, displayInvoices.length]);
+
+  const parentOverviewSnapshot = useMemo(() => {
+    const statusTitle = ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '')
+      ? '실시간 상태'
+      : '오늘 상태';
+    const statusDescription = ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '')
+      ? `${attendanceStatus.label} · 오늘 ${toHm(totalMinutes)}`
+      : `${attendanceStatus.label} · 첫 기록 ${todayFirstCheckInLabel || '대기 중'}`;
+
+    let nextAction: {
+      title: string;
+      description: string;
+      cta: string;
+      targetTab: ParentPortalTab;
+      action: 'tab' | 'report';
+      tone: 'rose' | 'amber' | 'blue' | 'slate' | 'emerald';
+    } = {
+      title: '바로 해야 할 한 가지',
+      description: '오늘은 특별한 이슈가 없어요. 알림과 리포트만 가볍게 확인해 주세요.',
+      cta: '알림 보기',
+      targetTab: 'notifications' as ParentPortalTab,
+      action: 'tab' as const,
+      tone: 'emerald',
+    };
+
+    if (billingHubSummary.latestActionInvoice?.isActionRequired) {
+      nextAction = {
+        title: billingHubSummary.latestActionInvoice.status === 'overdue' ? '미납 결제를 먼저 확인해 주세요.' : '이번 청구서를 확인해 주세요.',
+        description: `${billingHubSummary.dueLabel} · ${billingHubSummary.nextAction}`,
+        cta: '결제 허브 보기',
+        targetTab: 'billing',
+        action: 'tab',
+        tone: billingHubSummary.latestActionInvoice.status === 'overdue' ? 'rose' : 'amber',
+      };
+    } else if (report?.content && !report.viewedAt) {
+      nextAction = {
+        title: '새 리포트를 확인해 주세요.',
+        description: '지난주 대비 변화와 부모가 도와줄 한 가지를 바로 볼 수 있어요.',
+        cta: '리포트 열기',
+        targetTab: 'studyDetail',
+        action: 'report',
+        tone: 'blue',
+      };
+    } else if (communicationOverview.activeCount > 0) {
+      nextAction = {
+        title: '진행 중 문의를 확인해 주세요.',
+        description: communicationOverview.latestEtaLabel,
+        cta: '문의 현황 보기',
+        targetTab: 'communication',
+        action: 'tab',
+        tone: 'slate',
+      };
+    } else if (unreadNotificationCount > 0) {
+      nextAction = {
+        title: '미확인 알림이 있어요.',
+        description: `${unreadNotificationCount}개의 알림이 아직 확인 전입니다.`,
+        cta: '알림 보기',
+        targetTab: 'notifications',
+        action: 'tab',
+        tone: 'blue',
+      };
+    }
+
+    return {
+      status: {
+        title: statusTitle,
+        description: statusDescription,
+        metric: totalMinutes > 0 ? toHm(totalMinutes) : attendanceStatus.label,
+        helper: todayFirstCheckInLabel || '출결 기록이 들어오면 여기에 반영돼요.',
+      },
+      weekly: {
+        title: '이번 주 변화',
+        description: `${toHm(weeklyTotalStudyMinutes)} · 계획 ${weeklyPlanCompletionRate}% · ${formatSignedMetric(weeklyStudyDelta, '%')}`,
+        metric: `${weeklyPlanCompletionRate}%`,
+        helper: leadSubject ? `가장 많이 공부한 과목은 ${leadSubject.subject} (${leadSubjectShare}%)` : '과목별 학습 비중이 집계되면 보여드릴게요.',
+      },
+      nextAction,
+    };
+  }, [
+    attendanceCurrent?.status,
+    attendanceStatus.label,
+    totalMinutes,
+    todayFirstCheckInLabel,
+    billingHubSummary,
+    report,
+    communicationOverview,
+    unreadNotificationCount,
+    weeklyTotalStudyMinutes,
+    weeklyPlanCompletionRate,
+    weeklyStudyDelta,
+    leadSubject,
+    leadSubjectShare,
+  ]);
+
   const selectedDateStudyPlans = useMemo(
     () => (selectedDatePlans || []).filter((item) => item.category === 'study' || !item.category),
     [selectedDatePlans]
@@ -1705,7 +2047,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         senderRole: 'parent', senderUid: user.uid, senderName: user.displayName || '학부모',
         type, title, body, channel: type === 'consultation' ? channel : null,
         requestCategory: type === 'suggestion' ? 'suggestion' : 'request',
-        status: 'requested', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        status: 'received',
+        statusUpdatedAt: serverTimestamp(),
+        slaDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        owner: type === 'consultation' ? '상담 담당자' : '담당 선생님',
+        nextAction: type === 'consultation' ? '센터에서 상담 가능 시간을 확인한 뒤 연락드릴게요.' : '담당 선생님이 확인 후 앱에서 답변드릴게요.',
+        priority: type === 'consultation' ? 'high' : 'normal',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       const eventType: ParentActivityEvent['eventType'] =
@@ -1754,7 +2103,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         requestCategory: parentInquiryType,
         title: parentInquiryTitle.trim() || fallbackTitle,
         body,
-        status: 'requested',
+        status: 'received',
+        statusUpdatedAt: serverTimestamp(),
+        slaDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        owner: parentInquiryType === 'question' ? '담당 선생님' : '센터 관리자',
+        nextAction:
+          parentInquiryType === 'suggestion'
+            ? '센터에서 검토 후 반영 여부를 안내드릴게요.'
+            : parentInquiryType === 'request'
+              ? '요청 가능 여부를 확인한 뒤 앱에서 안내드릴게요.'
+              : '질문 내용을 확인한 뒤 순서대로 답변드릴게요.',
+        priority: parentInquiryType === 'request' ? 'high' : 'normal',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -1830,6 +2189,99 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               )}
               {/* 히어로 상태 카드 */}
+              {linkedStudentIds.length > 1 && (
+                <Card className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(145deg,#ffffff_0%,#f8fbff_58%,#fff7ef_100%)] p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#14295F]/55">Family Overview</p>
+                      <h3 className="text-lg font-black tracking-tight text-[#14295F]">연결된 자녀 상태를 빠르게 전환해 보세요.</h3>
+                      <p className="text-sm font-bold leading-relaxed text-slate-600">현재 선택한 자녀 기준으로 새 알림, 벌점, 결제 상태가 함께 반영됩니다.</p>
+                    </div>
+                    <Badge variant="outline" className="h-7 rounded-full border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600">
+                      {linkedStudentIds.length}명 연결
+                    </Badge>
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                    {linkedStudentIds.map((sid, idx) => {
+                      const isSelectedChild = selectedChildIdx === idx;
+                      return (
+                        <button
+                          key={`family-overview-${sid}`}
+                          type="button"
+                          onClick={() => setSelectedChildIdx(idx)}
+                          className={cn(
+                            'rounded-[1.4rem] border px-4 py-3 text-left transition-all',
+                            isSelectedChild
+                              ? 'border-[#14295F] bg-[#14295F] text-white shadow-lg shadow-[#14295F]/15'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-[#14295F]/30 hover:bg-[#f8fbff]'
+                          )}
+                        >
+                          <p className="text-sm font-black">{linkedStudentNames[sid] || `자녀 ${idx + 1}`}</p>
+                          <p className={cn('mt-1 text-[11px] font-bold', isSelectedChild ? 'text-white/75' : 'text-slate-500')}>
+                            {isSelectedChild
+                              ? `새 알림 ${unreadNotificationCount} · 미납 ${actionRequiredInvoices.length} · 벌점 ${penaltyRecovery.effectivePoints}`
+                              : '눌러서 현재 상태 보기'}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Card className="rounded-[2rem] border border-[#dbe7ff] bg-[linear-gradient(145deg,#f6f9ff_0%,#ffffff_100%)] p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1f4fbf]">{parentOverviewSnapshot.status.title}</p>
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <p className="text-2xl font-black tracking-tight text-[#14295F]">{parentOverviewSnapshot.status.metric}</p>
+                      <p className="text-sm font-bold leading-relaxed text-slate-700">{parentOverviewSnapshot.status.description}</p>
+                    </div>
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#14295F] text-white shadow-sm">
+                      <Activity className="h-4 w-4" />
+                    </span>
+                  </div>
+                  <p className="mt-3 text-[11px] font-bold text-slate-500">{parentOverviewSnapshot.status.helper}</p>
+                </Card>
+                <Card className="rounded-[2rem] border border-emerald-200 bg-[linear-gradient(145deg,#f4fff9_0%,#ffffff_100%)] p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">{parentOverviewSnapshot.weekly.title}</p>
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <p className="text-2xl font-black tracking-tight text-slate-900">{parentOverviewSnapshot.weekly.metric}</p>
+                      <p className="text-sm font-bold leading-relaxed text-slate-700">{parentOverviewSnapshot.weekly.description}</p>
+                    </div>
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
+                      <TrendingUp className="h-4 w-4" />
+                    </span>
+                  </div>
+                  <p className="mt-3 text-[11px] font-bold text-slate-500">{parentOverviewSnapshot.weekly.helper}</p>
+                </Card>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (parentOverviewSnapshot.nextAction.action === 'report') {
+                      handleOpenReportsArchive();
+                      return;
+                    }
+                    handleTabChange(parentOverviewSnapshot.nextAction.targetTab);
+                  }}
+                  className={cn(
+                    'rounded-[2rem] border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5',
+                    parentOverviewSnapshot.nextAction.tone === 'rose' && 'border-rose-200 bg-[linear-gradient(145deg,#fff5f6_0%,#ffffff_100%)]',
+                    parentOverviewSnapshot.nextAction.tone === 'amber' && 'border-amber-200 bg-[linear-gradient(145deg,#fff8ef_0%,#ffffff_100%)]',
+                    parentOverviewSnapshot.nextAction.tone === 'blue' && 'border-sky-200 bg-[linear-gradient(145deg,#f3faff_0%,#ffffff_100%)]',
+                    parentOverviewSnapshot.nextAction.tone === 'slate' && 'border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#ffffff_100%)]',
+                    parentOverviewSnapshot.nextAction.tone === 'emerald' && 'border-emerald-200 bg-[linear-gradient(145deg,#f3fff8_0%,#ffffff_100%)]'
+                  )}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">다음 행동</p>
+                  <p className="mt-3 text-xl font-black tracking-tight text-[#14295F]">{parentOverviewSnapshot.nextAction.title}</p>
+                  <p className="mt-2 text-sm font-bold leading-relaxed text-slate-700">{parentOverviewSnapshot.nextAction.description}</p>
+                  <div className="mt-4 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-black text-[#14295F] shadow-sm">
+                    {parentOverviewSnapshot.nextAction.cta}
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </div>
+                </button>
+              </div>
               <Card className={cn(
                 "rounded-[2rem] p-5 shadow-sm transition-all",
                 heroStyles[heroMessage.tone].bg,
@@ -2642,6 +3094,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="communication" className="mt-0 space-y-4 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Card className="rounded-[2rem] border border-[#dbe7ff] bg-[linear-gradient(145deg,#f6f9ff_0%,#ffffff_100%)] p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1f4fbf]">처리 중 문의</p>
+                  <p className="mt-3 text-3xl font-black tracking-tight text-[#14295F]">{communicationOverview.activeCount}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-600">답변 대기, 확인 중, 추가 정보 요청 건을 한 번에 보여줘요.</p>
+                </Card>
+                <Card className="rounded-[2rem] border border-emerald-200 bg-[linear-gradient(145deg,#f3fff8_0%,#ffffff_100%)] p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">답변 완료</p>
+                  <p className="mt-3 text-3xl font-black tracking-tight text-emerald-700">{communicationOverview.completedCount}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-600">확인된 답변은 기록으로 남고, 이후 추가 문의도 이어서 보낼 수 있어요.</p>
+                </Card>
+                <Card className="rounded-[2rem] border border-amber-200 bg-[linear-gradient(145deg,#fff8ef_0%,#ffffff_100%)] p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">다음 안내 예상</p>
+                  <p className="mt-3 text-xl font-black tracking-tight text-slate-900">{communicationOverview.latestEtaLabel}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-600">상담 예약이 필요한 문의는 별도로 표시해 놓았어요.</p>
+                </Card>
+              </div>
               <Dialog>
                 <DialogTrigger asChild>
                   <Card
@@ -2860,6 +3329,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         {parentCommunications.map((item) => {
                           const createdAt = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
                           const repliedAt = item.repliedAt?.toDate?.();
+                          const stageMeta = getCommunicationStageMeta(item);
                           return (
                             <div key={item.id} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/50 p-5 shadow-sm">
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2879,6 +3349,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
                                   {item.body?.trim() || '내용이 없습니다.'}
                                 </p>
+                              </div>
+
+                              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">처리 단계</p>
+                                  <p className="mt-1 text-sm font-black text-slate-800">{stageMeta.timelineLabel}</p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">예상 안내</p>
+                                  <p className="mt-1 text-sm font-black text-slate-800">{stageMeta.etaLabel}</p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">다음 안내</p>
+                                  <p className="mt-1 text-sm font-black text-slate-800">{stageMeta.nextAction}</p>
+                                </div>
                               </div>
 
                               {item.replyBody ? (
@@ -2906,6 +3391,41 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="billing" className="mt-0 space-y-4 animate-in fade-in duration-500">
+              <Card className="rounded-[2.4rem] border border-slate-200 bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_52%,#fff6ea_100%)] p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#14295F]/55">Billing Hub</p>
+                    <h3 className="text-2xl font-black tracking-tight text-[#14295F]">납부 현황, 예정일, 영수증까지 한 번에 확인하세요.</h3>
+                    <p className="text-sm font-bold leading-relaxed text-slate-600">{billingHubSummary.nextAction}</p>
+                  </div>
+                  <Badge variant="outline" className={cn('h-8 rounded-full border px-3 text-[11px] font-black', billingHubSummary.badgeClassName)}>
+                    {billingHubSummary.badgeLabel}
+                  </Badge>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">납부 일정</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{billingHubSummary.dueLabel}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">결제 수단</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{billingHubSummary.paymentMethodSummary}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">다음 행동</p>
+                    <p className="mt-1 text-sm font-black text-slate-800">{billingHubSummary.nextAction}</p>
+                  </div>
+                </div>
+                {billingHubSummary.latestActionInvoice?.isActionRequired && (
+                  <Link
+                    href={`/payment/checkout/${billingHubSummary.latestActionInvoice.id}`}
+                    className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#14295F] text-sm font-black text-white shadow-lg shadow-[#14295F]/15 transition-colors hover:bg-[#10224f]"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    미납/청구 바로 확인하기
+                  </Link>
+                )}
+              </Card>
               <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="space-y-4">
                   <div className="flex items-start justify-between gap-2">
@@ -2960,7 +3480,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               {latestInvoice ? (
                 <div className="space-y-3">
-                  {displayInvoices.map((invoice) => {
+                  {normalizedInvoices.map((invoice) => {
                     const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
                     const statusMeta = getInvoiceStatusMeta(invoice.status);
 
@@ -2984,6 +3504,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <p className="text-[15px] font-bold text-slate-600">
                               결제 마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
                             </p>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">납부 상태</p>
+                                <p className="mt-1 text-sm font-black text-slate-800">{invoice.dueLabel}</p>
+                              </div>
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">결제 수단</p>
+                                <p className="mt-1 text-sm font-black text-slate-800">{invoice.paymentMethodSummary}</p>
+                              </div>
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">다음 행동</p>
+                                <p className="mt-1 text-sm font-black text-slate-800">{invoice.nextAction}</p>
+                              </div>
+                            </div>
                           </div>
                           <p className={cn("dashboard-number leading-none text-[#14295F] whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
                             {formatWon(Number(invoice.finalPrice || 0))}
@@ -2997,6 +3531,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           >
                             <CreditCard className="h-4 w-4" />
                             결제하기
+                          </Link>
+                        )}
+                        {invoice.status === 'paid' && invoice.receiptUrl && (
+                          <Link
+                            href={invoice.receiptUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-[15px] font-black text-slate-700 transition-colors hover:bg-slate-100"
+                          >
+                            <FileText className="h-4 w-4" />
+                            영수증 보기
                           </Link>
                         )}
                       </Card>
@@ -3015,12 +3560,32 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="notifications" className="mt-0 space-y-3 animate-in fade-in duration-500">
-              {notifications.length === 0 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {notificationFilterOptions.map((filter) => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={() => setNotificationFilter(filter.key)}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black transition-all',
+                      notificationFilter === filter.key
+                        ? 'border-[#14295F] bg-[#14295F] text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600'
+                    )}
+                  >
+                    {filter.label}
+                    <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', notificationFilter === filter.key ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500')}>
+                      {filter.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {filteredNotifications.length === 0 ? (
                 <div className="py-32 text-center opacity-20 italic font-black text-slate-400 flex flex-col items-center gap-4">
                   <Bell className="h-16 w-16" /> <span className="text-sm uppercase tracking-widest">새로운 알림이 없습니다.</span>
                 </div>
               ) : (
-                notifications.map((n) => (
+                filteredNotifications.map((n) => (
                   <button
                     key={n.id}
                     type="button"
@@ -3031,10 +3596,28 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     onClick={() => void openNotificationDetail(n)}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
+                        <Badge variant="outline" className="h-5 border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-600">
+                          {getNotificationCategory(n) === 'billing'
+                            ? '청구'
+                            : getNotificationCategory(n) === 'reports'
+                              ? '리포트'
+                              : getNotificationCategory(n) === 'life'
+                                ? '생활'
+                                : '알림'}
+                        </Badge>
+                      </div>
                       {n.isImportant && <Badge variant="outline" className="bg-orange-100 text-[#FF7A16] border-none font-black text-[10px] h-5 px-2">중요</Badge>}
                     </div>
-                    <p className="text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
+                    <p className="mt-2 text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
+                    <p className="mt-1 line-clamp-2 text-sm font-bold leading-relaxed text-slate-600">{n.body || '알림 상세 내용은 눌러서 확인해 주세요.'}</p>
+                    {n.nextAction && (
+                      <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf]">
+                        {n.nextAction}
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </p>
+                    )}
                   </button>
                 ))
               )}
