@@ -283,14 +283,14 @@ export default function StudyHistoryPage() {
   const studyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !targetUid || !activeMembership) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'studyLogs', targetUid, 'days'), orderBy('dateKey', 'desc'));
-  }, [firestore, targetUid, activeMembership]);
+  }, [firestore, targetUid, activeMembership?.id]);
   const { data: logs, isLoading: logsLoading } = useCollection<StudyLogDay>(studyLogsQuery);
 
   const weekKey = selectedDateForPlan ? format(selectedDateForPlan, "yyyy-'W'II") : currentDate ? format(currentDate, "yyyy-'W'II") : '';
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !targetUid || !activeMembership || !weekKey) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items'));
-  }, [firestore, targetUid, activeMembership, weekKey]);
+  }, [firestore, targetUid, activeMembership?.id, weekKey]);
   const { data: allPlans } = useCollection<StudyPlanItem>(plansQuery);
 
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
@@ -298,13 +298,13 @@ export default function StudyHistoryPage() {
   const reportRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid || !selectedDateKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${selectedDateKey}_${targetUid}`);
-  }, [firestore, activeMembership, targetUid, selectedDateKey]);
+  }, [firestore, activeMembership?.id, targetUid, selectedDateKey]);
   const { data: dailyReport, isLoading: reportLoading } = useDoc<DailyReport>(reportRef);
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-  }, [firestore, activeMembership, targetUid]);
+  }, [firestore, activeMembership?.id, targetUid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: !!targetUid });
 
   const dailyPlans = useMemo(() => allPlans?.filter(p => p.dateKey === selectedDateKey) || [], [allPlans, selectedDateKey]);
@@ -448,66 +448,71 @@ export default function StudyHistoryPage() {
     if (isParent || !selectedDateForPlan || !firestore || !user || !activeMembership || !targetUid) return;
     const isToday = isSameDay(selectedDateForPlan, new Date());
 
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
-    const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
-    const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', itemId), { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
-    if (isToday) {
-      await applySameDayRoutinePenalty('당일 출석 루틴 시간 수정');
-      toast({
-        title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
-        description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
-      });
-    }
+    try {
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
+      const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
+      const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
+      await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', itemId), { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
+      if (isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 시간 수정');
+        toast({
+          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
+    } catch (e) { console.error(e); }
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid || !progressRef) return;
-    const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const nextState = !item.done;
-    
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
-    
-    if (nextState) {
-      const batch = writeBatch(firestore);
-      const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
-      const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
-      const progressUpdate: Record<string, any> = {
-        seasonLp: increment(10),
-        dailyLpStatus: {
-          [dateKey]: {
-            ...existingDayStatus,
-            dailyLpAmount: increment(10),
+    try {
+      const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      const nextState = !item.done;
+
+      await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
+
+      if (nextState) {
+        const batch = writeBatch(firestore);
+        const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
+        const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
+        const progressUpdate: Record<string, any> = {
+          seasonLp: increment(10),
+          dailyLpStatus: {
+            [dateKey]: {
+              ...existingDayStatus,
+              dailyLpAmount: increment(10),
+            },
           },
-        },
-        updatedAt: serverTimestamp(),
-      };
-      if (achievementCount < 5) {
-        progressUpdate.stats = { achievement: increment(0.1) };
-        progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
+          updatedAt: serverTimestamp(),
+        };
+        if (achievementCount < 5) {
+          progressUpdate.stats = { achievement: increment(0.1) };
+          progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
+        }
+        batch.set(progressRef, progressUpdate, { merge: true });
+        await batch.commit();
       }
-      batch.set(progressRef, progressUpdate, { merge: true });
-      await batch.commit();
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
-    
-    const isToday = isSameDay(selectedDateForPlan, new Date());
+    try {
+      const isToday = isSameDay(selectedDateForPlan, new Date());
 
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id));
-    if (item.category === 'schedule' && isToday) {
-      await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
-      toast({
-        title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
-        description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
-      });
-    }
-    toast({ title: "항목이 삭제되었습니다." });
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id));
+      if (item.category === 'schedule' && isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
+        toast({
+          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
+      toast({ title: "항목이 삭제되었습니다." });
+    } catch (e) { console.error(e); }
   };
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
@@ -693,7 +698,7 @@ export default function StudyHistoryPage() {
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2.5rem]" : "sm:max-w-xl rounded-[3rem]")}>
           <div className="bg-primary p-8 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle><DialogDescription className="sr-only">선택한 날짜의 학습 기록 상세</DialogDescription></DialogHeader>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[600px]")}>
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
@@ -736,7 +741,7 @@ export default function StudyHistoryPage() {
                       <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                         <DialogTrigger asChild><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black gap-1 bg-white shadow-sm border rounded-xl"><Plus className="h-3.5 w-3.5" /> 루틴 추가</Button></DialogTrigger>
                         <DialogContent className="rounded-3xl p-10 border-none shadow-2xl fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[380px]">
-                          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">생활 루틴 추가</DialogTitle></DialogHeader>
+                          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">생활 루틴 추가</DialogTitle><DialogDescription className="sr-only">새로운 생활 루틴을 추가합니다</DialogDescription></DialogHeader>
                           <Input placeholder="루틴 이름 (예: 영어 학원, 점심 식사)" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 border-2 rounded-2xl font-bold" />
                           <Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">루틴 생성</Button>
                         </DialogContent>
