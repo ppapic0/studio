@@ -109,6 +109,8 @@ const TIER_PRESETS = [
   { label: '챌린저', lp: 35000, stats: 100, rank: 1, color: 'bg-cyan-400' },
 ];
 
+const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
+
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
   late: 1,
   absence: 2,
@@ -195,6 +197,28 @@ function normalizeExamCountdowns(input: unknown): ExamCountdownSetting[] {
     .filter((item) => item.title.length > 0 || item.date.length > 0);
 
   return normalized.length > 0 ? normalized : DEFAULT_EXAM_COUNTDOWNS;
+}
+
+function getSeatActivityRank(status?: AttendanceCurrent['status'] | null): number {
+  if (status === 'studying') return 0;
+  if (status === 'away' || status === 'break') return 1;
+  if (status === 'absent') return 3;
+  return 2;
+}
+
+function pickPreferredSeatDoc<T extends { data: () => AttendanceCurrent | undefined }>(docs: T[]): T | null {
+  if (!docs.length) return null;
+
+  return [...docs].sort((a, b) => {
+    const aSeat = a.data();
+    const bSeat = b.data();
+    const rankDiff = getSeatActivityRank(aSeat?.status) - getSeatActivityRank(bSeat?.status);
+    if (rankDiff !== 0) return rankDiff;
+
+    const aTime = aSeat?.lastCheckInAt?.toMillis?.() || aSeat?.updatedAt?.toMillis?.() || 0;
+    const bTime = bSeat?.lastCheckInAt?.toMillis?.() || bSeat?.updatedAt?.toMillis?.() || 0;
+    return bTime - aTime;
+  })[0] || null;
 }
 
 function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: string): boolean {
@@ -1112,7 +1136,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
         const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
         const seatSnap = await getDocs(seatQuery);
-        seatDoc = !seatSnap.empty ? seatSnap.docs[0] : null;
+        seatDoc = !seatSnap.empty ? pickPreferredSeatDoc(seatSnap.docs as any[]) : null;
 
         if (!seatDoc && fallbackSeatRef) {
           const fallbackSeatSnap = await getDoc(fallbackSeatRef);
@@ -1128,7 +1152,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const nowTs = Date.now();
         const safeStartTs = startTime || nowTs;
         const seatStatus = seatDoc?.data?.()?.status as AttendanceCurrent['status'] | undefined;
-        if (seatStatus !== undefined && seatStatus !== 'studying') {
+        if (seatStatus && !ACTIVE_ATTENDANCE_STATUSES.includes(seatStatus)) {
           setIsTimerActive(false);
           setStartTime(null);
           toast({
