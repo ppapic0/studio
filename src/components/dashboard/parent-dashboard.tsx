@@ -807,11 +807,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', centerId, 'parentNotifications'),
       where('parentUid', '==', user.uid),
       where('studentId', '==', studentId),
-      orderBy('createdAt', 'desc'),
       limit(20)
     );
   }, [firestore, centerId, studentId, user?.uid]);
-  const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user });
+  const { data: rawRemoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user });
+  const remoteNotifications = useMemo(() => {
+    if (!rawRemoteNotifications) return rawRemoteNotifications;
+    return [...rawRemoteNotifications].sort((a, b) => {
+      const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0;
+      const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0;
+      return bTime - aTime;
+    });
+  }, [rawRemoteNotifications]);
 
   const attendance요청Query = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
