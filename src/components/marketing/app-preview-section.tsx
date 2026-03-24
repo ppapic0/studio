@@ -56,8 +56,23 @@ export function AppPreviewSection({ appSystem }: AppPreviewSectionProps) {
               key={capture.mode}
               className="overflow-hidden rounded-[1.5rem] border border-[rgba(20,41,95,0.12)] bg-white shadow-[0_16px_36px_rgba(20,41,95,0.08)]"
             >
-              <div className="relative aspect-[1.08/1] border-b border-[rgba(20,41,95,0.08)] bg-[#0D1732]">
-                <Image src={capture.image} alt={capture.title} fill sizes="(max-width: 1024px) 100vw, 33vw" className="object-cover" />
+              <div className="border-b border-[rgba(20,41,95,0.08)] bg-[linear-gradient(145deg,#F8FBFF_0%,#EEF3FF_100%)] px-5 py-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14295F]/42">MODE SUMMARY</p>
+                <p className="mt-2 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">
+                  공개 범위상 재구성 이미지는 제외하고, 각 화면에서 확인 가능한 핵심 항목만 남겼습니다.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {appSystem.guides
+                    .find((guide) => guide.mode === capture.mode)
+                    ?.checkpoints.map((checkpoint) => (
+                      <span
+                        key={`${capture.mode}-${checkpoint}`}
+                        className="rounded-full border border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-[#14295F]/72"
+                      >
+                        {checkpoint}
+                      </span>
+                    ))}
+                </div>
               </div>
               <div className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">

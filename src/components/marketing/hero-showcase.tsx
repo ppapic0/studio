@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { ArrowRight, ShieldCheck, Smartphone, Users } from 'lucide-react';
 
@@ -74,16 +73,21 @@ export function HeroShowcase() {
           href={current.href}
           className="group mt-4 block overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#09152F]"
         >
-          <div className="relative aspect-[1.4/1] w-full">
-            <Image
-              src={current.image}
-              alt={current.title}
-              fill
-              sizes="(max-width: 1024px) 100vw, 560px"
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            />
+          <div className="border-b border-white/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-5">
+            <p className="text-[10px] font-black tracking-[0.18em] text-white/48">SCREEN SUMMARY</p>
+            <p className="mt-2 break-keep text-[1.05rem] font-black leading-[1.45] text-white">
+              공개용 실제 앱 스크린샷 대신, 이 모드에서 확인 가능한 핵심 항목만 먼저 보여드립니다.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-black text-white/76">
+                {current.label}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-black text-white/76">
+                {current.stat}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-[#09152F] px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#09152F] px-4 py-3">
             <span className="text-[12px] font-black text-white/82">{current.stat}</span>
             <span className="inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
               화면 자세히 보기

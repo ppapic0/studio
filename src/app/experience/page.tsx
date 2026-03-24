@@ -152,11 +152,22 @@ function ProofCard({
   image: string;
   badge?: string;
 }) {
+  const showImage = image && !image.includes('/marketing/app-evidence/');
+
   return (
     <article className="overflow-hidden rounded-[1.5rem] border border-[#14295F]/10 bg-white shadow-sm">
-      <div className="relative aspect-[1.22/1] border-b border-[#14295F]/8 bg-[#0D1732]">
-        <Image src={image} alt={title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
-      </div>
+      {showImage ? (
+        <div className="relative aspect-[1.22/1] border-b border-[#14295F]/8 bg-[#0D1732]">
+          <Image src={image} alt={title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+        </div>
+      ) : (
+        <div className="border-b border-[#14295F]/8 bg-[linear-gradient(145deg,#F8FBFF_0%,#EEF3FF_100%)] px-5 py-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]/42">SCREEN SUMMARY</p>
+          <p className="mt-2 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">
+            공개 가능한 실제 앱 스크린샷이 아닌 재구성 화면은 제외하고, 이 모드에서 확인 가능한 흐름만 안내합니다.
+          </p>
+        </div>
+      )}
       <div className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[1rem] font-black text-[#14295F]">{title}</p>

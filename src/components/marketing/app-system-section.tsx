@@ -1,5 +1,3 @@
-import Image from 'next/image';
-
 import type { MarketingContent } from '@/lib/marketing-content';
 
 import { SectionHeading } from './section-heading';
@@ -55,8 +53,23 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
         <div className="mt-7 grid gap-4 md:grid-cols-3">
           {appSystem.captures.map((capture) => (
             <article key={capture.mode} className="overflow-hidden rounded-[1.5rem] border border-[#14295F]/10 bg-white shadow-sm">
-              <div className="relative aspect-[1.12/1] border-b border-[#14295F]/8 bg-[#0C1734]">
-                <Image src={capture.image} alt={capture.title} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
+              <div className="border-b border-[#14295F]/8 bg-[linear-gradient(145deg,#F8FBFF_0%,#EEF3FF_100%)] p-5">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[#14295F]/42">SCREEN SUMMARY</p>
+                <p className="mt-2 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">
+                  공개 가능한 실제 앱 스크린샷 대신, 이 모드에서 바로 확인할 수 있는 흐름만 먼저 정리했습니다.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {appSystem.guides
+                    .find((guide) => guide.mode === capture.mode)
+                    ?.checkpoints.map((checkpoint) => (
+                      <span
+                        key={`${capture.mode}-${checkpoint}`}
+                        className="rounded-full border border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-[#14295F]/72"
+                      >
+                        {checkpoint}
+                      </span>
+                    ))}
+                </div>
               </div>
               <div className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
