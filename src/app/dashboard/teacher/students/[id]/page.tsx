@@ -382,6 +382,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const fetchDailyStats = async () => {
       if (!firestore || !centerId || !studentId) {
         setDailyStatsMap({});
+        setStatsLoading(false);
         return;
       }
       setStatsLoading(true);
@@ -406,11 +407,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           };
         });
 
-        // Compute startHour/endHour/awayMinutes from sessions for recent 14 days
-        // when dailyStudentStats doesn't have these fields
         const recentKeys = keys.slice(0, 14);
+        setDailyStatsMap(next);
+        setStatsLoading(false);
+
+        const missingRecentKeys = recentKeys.filter((dateKey) => {
+          const stat = next[dateKey];
+          return !stat || stat.startHour === undefined || stat.endHour === undefined || stat.awayMinutes === undefined;
+        });
+
+        if (missingRecentKeys.length === 0) return;
+
         const sessionResults = await Promise.all(
-          recentKeys.map(async (dateKey) => {
+          missingRecentKeys.map(async (dateKey) => {
             try {
               const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
               const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
@@ -454,20 +463,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         if (cancelled) return;
 
-        sessionResults.forEach(({ dateKey, startHour, endHour, awayMinutes }) => {
-          if (!next[dateKey]) {
-            next[dateKey] = { totalStudyMinutes: 0 };
-          }
-          const stat = next[dateKey];
-          if (stat.startHour === undefined && startHour !== undefined) stat.startHour = startHour;
-          if (stat.endHour === undefined && endHour !== undefined) stat.endHour = endHour;
-          if (stat.awayMinutes === undefined && awayMinutes !== undefined) stat.awayMinutes = awayMinutes;
+        setDailyStatsMap((prev) => {
+          const merged = { ...prev };
+          sessionResults.forEach(({ dateKey, startHour, endHour, awayMinutes }) => {
+            const existing = merged[dateKey] || { totalStudyMinutes: 0 };
+            merged[dateKey] = {
+              ...existing,
+              startHour: existing.startHour ?? startHour,
+              endHour: existing.endHour ?? endHour,
+              awayMinutes: existing.awayMinutes ?? awayMinutes,
+            };
+          });
+          return merged;
         });
-
-        setDailyStatsMap(next);
       } catch (error) {
         console.error('[Student Detail] Failed to load daily stats:', error);
-      } finally {
         if (!cancelled) setStatsLoading(false);
       }
     };
