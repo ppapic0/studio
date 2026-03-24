@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CircleAlert, Clock3, Sparkles } from 'lucide-react';
+import Image from 'next/image';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
@@ -9,7 +9,7 @@ type AppSystemSectionProps = {
 };
 
 export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
-  const toneClassMap: Record<NonNullable<(typeof appSystem.dataMetrics)[number]['tone']>, string> = {
+  const toneClassMap: Record<NonNullable<(typeof appSystem.trustMetrics)[number]['tone']>, string> = {
     navy: 'border-[#14295F]/15 bg-[#EEF3FF] text-[#14295F]',
     orange: 'border-[#FF7A16]/20 bg-[#FFF3E8] text-[#B55200]',
     green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -53,26 +53,32 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
         </div>
 
         <div className="mt-7 grid gap-4 md:grid-cols-3">
-          {appSystem.modes.map((mode) => (
-            <article key={mode.mode} className="marketing-card p-5">
-              <span className="eyebrow-badge">{mode.mode}</span>
-              <p className="mt-3 break-keep text-sm font-semibold leading-[1.74] text-slate-600">{mode.description}</p>
-              <ul className="mt-3.5 space-y-1.5">
-                {mode.items.map((item) => (
-                  <li key={`${mode.mode}-${item}`} className="flex items-center gap-2 text-sm font-extrabold text-[#14295F]">
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: 'linear-gradient(135deg, #FF7A16, #FF9848)' }}
-                    />
-                    {item}
-                  </li>
-                ))}
-              </ul>
+          {appSystem.captures.map((capture) => (
+            <article key={capture.mode} className="overflow-hidden rounded-[1.5rem] border border-[#14295F]/10 bg-white shadow-sm">
+              <div className="relative aspect-[1.12/1] border-b border-[#14295F]/8 bg-[#0C1734]">
+                <Image src={capture.image} alt={capture.title} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
+              </div>
+              <div className="p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">{capture.mode}</p>
+                  <span className="rounded-full bg-[#F5F8FF] px-3 py-1 text-[10px] font-black text-[#14295F]/58">
+                    {capture.proofType === 'actual' ? '실제 캡처' : '재구성 캡처'}
+                  </span>
+                </div>
+                <p className="mt-2 break-keep text-[1.05rem] font-black leading-[1.35] text-[#14295F]">{capture.title}</p>
+                <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-slate-500">{capture.description}</p>
+                <div className="mt-3 rounded-[1rem] bg-[#F8FBFF] px-4 py-3 text-[11px] font-black text-[#14295F]">
+                  {capture.callout}
+                </div>
+                <a href={capture.href} className="premium-cta premium-cta-muted mt-4 h-10 px-5 text-sm">
+                  이 화면 자세히 보기
+                </a>
+              </div>
             </article>
           ))}
         </div>
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
+        <div className="mt-10 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
           <div className="space-y-6">
             <ul className="grid gap-3 sm:grid-cols-2">
               {appSystem.features.map((item) => (
@@ -84,9 +90,9 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
             </ul>
 
             <div className="marketing-card p-5">
-              <span className="eyebrow-badge">DATA SNAPSHOT</span>
+              <span className="eyebrow-badge">TRUST METRICS</span>
               <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                {appSystem.dataMetrics.map((metric) => (
+                {appSystem.trustMetrics.map((metric) => (
                   <article
                     key={`${metric.label}-${metric.value}`}
                     className={`rounded-2xl border px-3.5 py-3.5 ${
@@ -103,57 +109,24 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {appSystem.appScreens.map((screen, index) => (
-              <article key={screen.title} className="marketing-card rounded-[1.8rem] p-4">
-                <div
-                  className="rounded-[1.3rem] border p-4"
-                  style={{
-                    borderColor: 'rgba(20,41,95,0.08)',
-                    background: 'linear-gradient(160deg, #EDF2FF, #FFFFFF)',
-                  }}
-                >
-                  <div
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#FF7A16]"
-                    style={{ background: 'rgba(255,122,22,0.12)' }}
-                  >
-                    {index === 0 ? <Sparkles className="h-4 w-4" /> : null}
-                    {index === 1 ? <BarChart3 className="h-4 w-4" /> : null}
-                    {index === 2 ? <CalendarDays className="h-4 w-4" /> : null}
-                  </div>
-
-                  <p className="mt-3 text-[11px] font-black tracking-[0.14em] text-[#14295F]/55">LIVE WIDGET</p>
-                  <div
-                    className="mt-2 space-y-2 rounded-xl border p-3"
-                    style={{ borderColor: 'rgba(20,41,95,0.08)', background: 'white' }}
-                  >
-                    <div className="flex items-center justify-between text-[11px] font-black text-[#14295F]">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock3 className="h-3 w-3 text-[#FF7A16]" />
-                        최근 공부시간
-                      </span>
-                      <span>14:23</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-[#E8EEFF]">
-                      <div
-                        className="h-full w-4/5 rounded-full"
-                        style={{ background: 'linear-gradient(90deg, #14295F, #2850A8)' }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-black text-[#14295F]">
-                      <span className="inline-flex items-center gap-1">
-                        <CircleAlert className="h-3 w-3 text-rose-500" />
-                        생활 관리 지수
-                      </span>
-                      <span>5점</span>
-                    </div>
-                  </div>
+            {appSystem.guides.map((guide) => (
+              <article key={guide.mode} className="marketing-card rounded-[1.6rem] p-5">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">{guide.mode}</p>
+                <p className="mt-2 break-keep text-[1rem] font-black leading-[1.4] text-[#14295F]">{guide.headline}</p>
+                <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-slate-500">{guide.summary}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {guide.checkpoints.map((checkpoint) => (
+                    <span
+                      key={checkpoint}
+                      className="rounded-full border border-[#14295F]/10 bg-[#F8FBFF] px-3 py-1 text-[11px] font-black text-[#14295F]/64"
+                    >
+                      {checkpoint}
+                    </span>
+                  ))}
                 </div>
-
-                <div className="px-1 pb-1 pt-4">
-                  <p className="break-keep text-[1rem] font-extrabold text-[#14295F]">{screen.title}</p>
-                  <p className="mt-1 break-keep text-xs font-black text-[#FF7A16]">{screen.subtitle}</p>
-                  <p className="mt-1.5 break-keep text-xs font-semibold leading-[1.7] text-slate-600">{screen.caption}</p>
-                </div>
+                <a href={guide.href} className="premium-cta premium-cta-ghost mt-5 h-10 px-5 text-sm">
+                  {guide.label}
+                </a>
               </article>
             ))}
           </div>

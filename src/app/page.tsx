@@ -29,7 +29,7 @@ export default function HomePage() {
       <ScrollReveal><AppSystemSection appSystem={marketingContent.appSystem} /></ScrollReveal>
       <ScrollReveal><AppPreviewSection appSystem={marketingContent.appSystem} /></ScrollReveal>
       <ScrollReveal><KoreanClassSection /></ScrollReveal>
-      <ScrollReveal><ConsultSection consult={marketingContent.consult} /></ScrollReveal>
+      <ScrollReveal><ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} /></ScrollReveal>
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
       <StickyConsultCTA />
     </main>

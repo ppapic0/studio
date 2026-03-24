@@ -60,6 +60,16 @@ export type AppExperienceGuide = {
   label: string;
 };
 
+export type AppEvidenceCapture = {
+  mode: string;
+  title: string;
+  description: string;
+  image: string;
+  proofType: 'actual' | 'reconstructed';
+  callout: string;
+  href: string;
+};
+
 export type LPCycleCard = {
   title: string;
   description: string;
@@ -111,6 +121,8 @@ export type MarketingContent = {
     dataMetrics: AppDataMetric[];
     dataStory: AppDataStory;
     guides: AppExperienceGuide[];
+    captures: AppEvidenceCapture[];
+    trustMetrics: AppDataMetric[];
   };
   lpSystem: {
     heading: string;
@@ -374,6 +386,49 @@ export const marketingContent: MarketingContent = {
         href: '/go/experience?placement=app_preview_parent&mode=parent',
         label: '학부모 모드 체험',
       },
+      {
+        mode: '운영자 모드',
+        headline: '위험 신호와 개입 우선순위를 한 번에 확인',
+        summary: '운영자는 하락 추세, 미제출, 상담 필요 대상, 전후 비교를 묶어서 보고 먼저 개입합니다.',
+        checkpoints: ['위험 신호', '개입 우선순위', '피드백 발송', '전후 비교'],
+        href: '/go/experience?placement=app_preview_admin&mode=admin',
+        label: '운영자 화면 보기',
+      },
+    ],
+    captures: [
+      {
+        mode: '학생 모드',
+        title: '오늘의 루틴과 성장 지표를 한 화면에서 확인',
+        description: '학생 홈 화면 기준 재구성 캡처입니다. 오늘의 루틴, 주간 캘린더, 성장 지표, 피드백이 한 번에 보입니다.',
+        image: '/marketing/app-evidence/student-dashboard-redacted.svg',
+        proofType: 'reconstructed',
+        callout: '확인 → 추적 → 해석 → 행동',
+        href: '/experience?mode=student',
+      },
+      {
+        mode: '학부모 모드',
+        title: '상태 요약과 주간 그래프로 과정을 빠르게 확인',
+        description: '학부모 화면 기준 재구성 캡처입니다. 출결/상태 요약, 주간 그래프, 날짜별 기록, 리포트 흐름을 보여줍니다.',
+        image: '/marketing/app-evidence/parent-dashboard-redacted.svg',
+        proofType: 'reconstructed',
+        callout: '실시간 상태 → 기록 추적 → 리포트 확인',
+        href: '/experience?mode=parent',
+      },
+      {
+        mode: '운영자 모드',
+        title: '위험 신호와 개입 결과를 우선순위로 정리',
+        description: '운영자 대시보드 기준 재구성 캡처입니다. 하락 추세, 미제출, 상담, 전후 비교를 같은 문맥으로 묶습니다.',
+        image: '/marketing/app-evidence/admin-dashboard-redacted.svg',
+        proofType: 'reconstructed',
+        callout: '문제 발견 → 개입 → 변화 확인',
+        href: '/experience?mode=admin',
+      },
+    ],
+    trustMetrics: [
+      { label: '실시간 확인 항목', value: '5개', detail: '출결·상태·그래프·리포트·알림', tone: 'navy' },
+      { label: '권한별 화면', value: '3개', detail: '학생·학부모·운영자 분리', tone: 'orange' },
+      { label: '합격 사례', value: '6건', detail: '2026 주요 대학 및 성장 사례', tone: 'green' },
+      { label: '공개 증빙 자산', value: '6개', detail: '성적표 3장 + 피드백 3장', tone: 'red' },
     ],
   },
   lpSystem: {

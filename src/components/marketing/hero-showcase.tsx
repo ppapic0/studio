@@ -1,150 +1,126 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, Building2, Smartphone } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Smartphone, Users } from 'lucide-react';
 
 type ShowcaseItem = {
   label: string;
   title: string;
   desc: string;
+  proofType: string;
+  image: string;
   stat: string;
-  ctaHint?: string;
-  icon: typeof Building2;
-  color: 'navy' | 'blue' | 'orange';
-  targetId?: string;
-  targetHref?: string;
+  href: string;
+  icon: typeof Smartphone;
 };
 
 const items: ShowcaseItem[] = [
   {
-    label: 'STUDY CENTER',
-    title: '관리형 스터디센터 중심',
-    desc: '입실부터 퇴실까지, 루틴과 데이터가 기록됩니다.',
-    stat: '학기중 17:00 · 방학중 08:30 시작 N수생 별도 운영',
-    icon: Building2,
-    targetId: 'features',
-    color: 'navy',
-  },
-  {
-    label: 'CLASS SYSTEM',
-    title: '국어 수업 선택형 구조',
-    desc: '센터만 이용하거나 필요할 때 국어 수업을 추가합니다.',
-    stat: '재학생 · N수생 모두 가능',
-    ctaHint: '클릭하면 국어 수업 방식·자료·내신 대비를 확인할 수 있습니다',
-    icon: BookOpen,
-    targetHref: '/class',
-    color: 'blue',
-  },
-  {
-    label: 'APP SYSTEM',
-    title: '앱 기반 관리 시스템',
-    desc: '학생과 학부모가 각자 화면에서 흐름을 확인합니다.',
-    stat: '출결 · 공부시간 · 실행률 연결',
+    label: 'STUDENT MODE',
+    title: '오늘의 루틴과 성장 지표를 한 화면에서',
+    desc: '학생 홈 화면 기준 재구성 캡처입니다. 오늘의 루틴, 주간 캘린더, 성장 지표, 피드백 흐름을 묶었습니다.',
+    proofType: '재구성 캡처',
+    image: '/marketing/app-evidence/student-dashboard-redacted.svg',
+    stat: '루틴 · 캘린더 · 성장 지표',
+    href: '/experience?mode=student',
     icon: Smartphone,
-    targetId: 'app',
-    color: 'orange',
+  },
+  {
+    label: 'PARENT MODE',
+    title: '상태 요약과 주간 그래프로 과정을 확인',
+    desc: '학부모 화면 기준 재구성 캡처입니다. 실시간 상태, 주간 그래프, 날짜별 기록, 리포트 흐름을 보여줍니다.',
+    proofType: '재구성 캡처',
+    image: '/marketing/app-evidence/parent-dashboard-redacted.svg',
+    stat: '상태 요약 · 주간 그래프 · 리포트',
+    href: '/experience?mode=parent',
+    icon: Users,
+  },
+  {
+    label: 'ADMIN MODE',
+    title: '위험 신호와 개입 우선순위를 한 번에',
+    desc: '운영자 대시보드 기준 재구성 캡처입니다. 하락 추세, 미제출, 개입 우선순위, 전후 비교를 정리합니다.',
+    proofType: '재구성 캡처',
+    image: '/marketing/app-evidence/admin-dashboard-redacted.svg',
+    stat: '위험 신호 · 개입 · 전후 비교',
+    href: '/experience?mode=admin',
+    icon: ShieldCheck,
   },
 ];
 
 export function HeroShowcase() {
   const [active, setActive] = useState(0);
-
-  const handleItemClick = (index: number, targetId?: string, targetHref?: string) => {
-    setActive(index);
-
-    if (targetHref) {
-      window.location.href = targetHref;
-      return;
-    }
-
-    if (!targetId) return;
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const current = items[active] ?? items[0];
 
   useEffect(() => {
-    const id = setInterval(() => setActive((p) => (p + 1) % items.length), 3800);
+    const id = setInterval(() => setActive((prev) => (prev + 1) % items.length), 3800);
     return () => clearInterval(id);
   }, []);
 
   return (
-    <div className="flex flex-col gap-3">
-      {items.map((item, i) => {
-        const Icon = item.icon;
-        const isActive = i === active;
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-[1.7rem] border border-white/12 bg-white/8 p-4 shadow-[0_20px_44px_rgba(4,11,29,0.28)] backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.2em] text-white/52">PRODUCT PROOF</p>
+            <p className="mt-1 text-[1.15rem] font-black leading-[1.25] text-white">{current.title}</p>
+          </div>
+          <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[10px] font-black text-[#FFB273]">
+            {current.proofType}
+          </span>
+        </div>
 
-        return (
-          <button
-            key={item.label}
-            onClick={() => handleItemClick(i, item.targetId, item.targetHref)}
-            aria-label={item.title}
-            className={`group flex items-start gap-4 rounded-2xl border p-5 text-left transition-all duration-500 ${
-              isActive ? 'border-white/18 bg-white/9' : 'border-white/6 bg-white/3 opacity-40 hover:opacity-62'
-            }`}
-          >
-            <div
-              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors duration-400 ${
+        <a
+          href={current.href}
+          className="group mt-4 block overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#09152F]"
+        >
+          <div className="relative aspect-[1.4/1] w-full">
+            <Image
+              src={current.image}
+              alt={current.title}
+              fill
+              sizes="(max-width: 1024px) 100vw, 560px"
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-[#09152F] px-4 py-3">
+            <span className="text-[12px] font-black text-white/82">{current.stat}</span>
+            <span className="inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
+              화면 자세히 보기
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </span>
+          </div>
+        </a>
+
+        <p className="mt-4 break-keep text-[12px] font-semibold leading-[1.65] text-white/68">{current.desc}</p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {items.map((item, index) => {
+          const Icon = item.icon;
+          const isActive = index === active;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setActive(index)}
+              className={`rounded-[1.15rem] border px-3 py-3 text-left transition-all duration-300 ${
                 isActive
-                  ? item.color === 'orange'
-                    ? 'bg-[#ff7a16]/18 text-[#FF9848]'
-                    : 'bg-white/14 text-white'
-                  : 'bg-white/6 text-white/35'
+                  ? 'border-white/20 bg-white/10'
+                  : 'border-white/6 bg-white/[0.04] opacity-65 hover:opacity-90'
               }`}
             >
-              <Icon className="h-4 w-4" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p
-                className={`text-[10px] font-black tracking-[0.22em] uppercase transition-colors duration-400 ${
-                  isActive ? (item.color === 'orange' ? 'text-[#FF9848]' : 'text-white/55') : 'text-white/25'
-                }`}
-              >
-                {item.label}
-              </p>
-
-              <p
-                className={`mt-1.5 break-keep font-black leading-[1.2] transition-all duration-400 ${
-                  isActive ? 'text-[1.1rem] text-white' : 'text-[1rem] text-white/45'
-                }`}
-              >
-                {item.title}
-              </p>
-
-              <div className={`grid transition-all duration-500 ${isActive ? 'mt-2.5 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                <div className="overflow-hidden">
-                  <p className="break-keep text-[13px] font-semibold leading-[1.65] text-blue-100/55">{item.desc}</p>
-                  <p className="mt-2.5 inline-block rounded-lg border border-white/10 bg-white/6 px-3 py-1.5 text-[12px] font-black text-white/70">
-                    {item.stat}
-                  </p>
-
-                  {item.ctaHint ? (
-                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
-                      {item.ctaHint}
-                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-                    </p>
-                  ) : null}
+              <div className="flex items-center gap-2">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-white/14 text-[#FFB273]' : 'bg-white/8 text-white/46'}`}>
+                  <Icon className="h-4 w-4" />
                 </div>
+                <p className="text-[10px] font-black tracking-[0.16em] text-white/56">{item.label}</p>
               </div>
-            </div>
-          </button>
-        );
-      })}
-
-      <div className="mt-1 flex items-center justify-center gap-2">
-        {items.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setActive(i)}
-            aria-label={`${i + 1}번 항목`}
-            className={`h-1 rounded-full transition-all duration-400 ${
-              i === active ? 'w-5 bg-[#FF9848]' : 'w-1.5 bg-white/22 hover:bg-white/40'
-            }`}
-          />
-        ))}
+              <p className="mt-2 break-keep text-[13px] font-black leading-[1.4] text-white">{item.title}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
-
