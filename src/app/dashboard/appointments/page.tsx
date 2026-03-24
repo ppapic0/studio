@@ -61,7 +61,7 @@ import {
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -90,6 +90,24 @@ type ParentCommunicationRecord = {
   repliedAt?: Timestamp;
   repliedByName?: string;
   repliedByUid?: string;
+};
+
+type CenterAnnouncementRecord = {
+  id: string;
+  title?: string;
+  body?: string;
+  audience?: 'student' | 'parent' | 'all';
+  isPublished?: boolean;
+  status?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+const isPublishedAnnouncement = (item: CenterAnnouncementRecord) => {
+  const normalizedStatus = item?.status?.trim?.().toLowerCase();
+  if (normalizedStatus) return normalizedStatus === 'published';
+  if (typeof item?.isPublished === 'boolean') return item.isPublished;
+  return true;
 };
 
 type AppointmentTab = 'reservations' | 'logs' | 'inquiries' | 'parent';
@@ -244,10 +262,11 @@ export function AppointmentsPageContent({
     if (!firestore || !centerId || !shouldLoadAnnouncements) return null;
     return query(
       collection(firestore, 'centers', centerId, 'centerAnnouncements'),
-      where('isPublished', '==', true)
+      orderBy('createdAt', 'desc'),
+      limit(30),
     );
   }, [firestore, centerId, shouldLoadAnnouncements]);
-  const { data: rawAnnouncements, isLoading: announcementsLoading } = useCollection<any>(announcementsQuery, {
+  const { data: rawAnnouncements, isLoading: announcementsLoading } = useCollection<CenterAnnouncementRecord>(announcementsQuery, {
     enabled: !!centerId && shouldLoadAnnouncements,
   });
 
@@ -343,8 +362,9 @@ export function AppointmentsPageContent({
   const studentAnnouncements = useMemo(() => {
     if (!rawAnnouncements) return [];
     return [...rawAnnouncements]
-      .filter((item: any) => item?.audience === 'student' || item?.audience === 'all' || !item?.audience)
-      .sort((a: any, b: any) => (b?.createdAt?.toMillis?.() || 0) - (a?.createdAt?.toMillis?.() || 0));
+      .filter((item) => isPublishedAnnouncement(item))
+      .filter((item) => item?.audience === 'student' || item?.audience === 'all' || !item?.audience)
+      .sort((a, b) => (b?.createdAt?.toMillis?.() || 0) - (a?.createdAt?.toMillis?.() || 0));
   }, [rawAnnouncements]);
   const visibleStudentAnnouncements = useMemo(
     () => (showAll ? studentAnnouncements : studentAnnouncements.slice(0, PREVIEW_LIMIT)),
@@ -353,7 +373,8 @@ export function AppointmentsPageContent({
   const staffAnnouncements = useMemo(() => {
     if (!rawAnnouncements || !isStaff) return [];
     return [...rawAnnouncements]
-      .sort((a: any, b: any) => (b?.createdAt?.toMillis?.() || 0) - (a?.createdAt?.toMillis?.() || 0));
+      .filter((item) => isPublishedAnnouncement(item))
+      .sort((a, b) => (b?.createdAt?.toMillis?.() || 0) - (a?.createdAt?.toMillis?.() || 0));
   }, [rawAnnouncements, isStaff]);
   const visibleStaffAnnouncements = useMemo(
     () => (showAll ? staffAnnouncements : staffAnnouncements.slice(0, 3)),
