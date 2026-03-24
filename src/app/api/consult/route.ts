@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import * as admin from "firebase-admin";
 
 import { adminDb } from "@/lib/firebase-admin";
 import { resolveMarketingCenterId } from "@/lib/marketing-center";
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
     const centerId = await resolveMarketingCenterId();
     const createdAt = new Date().toISOString();
     const consultationDate = getKoreaDateKey();
+    const requestId = adminDb.collection("marketingConsultRequests").doc().id;
+    const receiptId = requestId.slice(0, 8).toUpperCase();
 
     const payload = {
       ...fields,
@@ -76,19 +79,46 @@ export async function POST(request: Request) {
       sourceLabel: WEBSITE_CONSULT_LABEL,
       status: "new",
       createdAt,
+      updatedAt: createdAt,
     };
 
-    const docRef = adminDb.collection("marketingConsultRequests").doc();
-    const receiptId = docRef.id.slice(0, 8).toUpperCase();
-    await docRef.set({ ...payload, receiptId });
+    const batch = adminDb.batch();
+    const rootRequestRef = adminDb.collection("marketingConsultRequests").doc(requestId);
+    batch.set(rootRequestRef, { ...payload, receiptId });
 
     if (centerId) {
-      await adminDb
+      const centerRequestRef = adminDb
         .collection("centers")
         .doc(centerId)
         .collection("websiteConsultRequests")
-        .add({ ...payload, receiptId, updatedAt: createdAt });
+        .doc(requestId);
+      batch.set(centerRequestRef, { ...payload, receiptId });
+
+      if (requestType === "study_center_waitlist") {
+        const waitlistRef = adminDb
+          .collection("centers")
+          .doc(centerId)
+          .collection("admissionWaitlist")
+          .doc();
+        batch.set(waitlistRef, {
+          studentName: fields.studentName,
+          parentPhone: fields.consultPhone,
+          studentPhone: "",
+          school: fields.school,
+          grade: fields.grade,
+          serviceType,
+          status: "waiting",
+          memo: WEBSITE_CONSULT_LABEL,
+          waitlistDate: consultationDate,
+          sourceLeadId: null,
+          sourceWebsiteRequestId: requestId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     }
+
+    await batch.commit();
 
     const successMessage =
       requestType === "study_center_waitlist"
