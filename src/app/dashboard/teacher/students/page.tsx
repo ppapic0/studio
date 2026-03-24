@@ -107,8 +107,14 @@ export default function StudentListPage() {
   });
 
   const centerId = activeMembership?.id;
-  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
-  const isCenterAdmin = activeMembership?.role === 'centerAdmin';
+  const isTeacherOrAdmin =
+    activeMembership?.role === 'teacher' ||
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
+  const canViewRiskPanel =
+    activeMembership?.role === 'teacher' ||
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
   const [showRiskPanel, setShowRiskPanel] = useState(false);
 
   useEffect(() => {
@@ -296,7 +302,7 @@ export default function StudentListPage() {
         </div>
       </header>
 
-      {isCenterAdmin && (
+      {canViewRiskPanel && (
         <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-border/50">
           <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
             <div className="space-y-1">
