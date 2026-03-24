@@ -83,7 +83,7 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
             {stats.map((stat, index) => (
               <article
                 key={`${stat.label}-${index}`}
-                className="rounded-[1.3rem] border border-white/10 bg-white/7 px-4 py-4 shadow-[0_14px_32px_rgba(4,11,29,0.22)] backdrop-blur"
+                className="rounded-[1.3rem] border border-white/10 bg-white/7 px-4 py-4 shadow-[0_12px_24px_rgba(4,11,29,0.18)] backdrop-blur-sm"
               >
                 <p className="text-[10px] font-black tracking-[0.18em] text-white/55">{stat.label}</p>
                 <p className="mt-2 break-keep text-[1rem] font-black leading-[1.35] text-white">{stat.value}</p>

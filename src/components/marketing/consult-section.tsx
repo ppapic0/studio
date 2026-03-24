@@ -43,8 +43,8 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
           className="overflow-hidden rounded-[2rem] border p-7 sm:p-10"
           style={{
             borderColor: 'rgba(255,255,255,0.10)',
-            background: 'rgba(255,255,255,0.04)',
-            backdropFilter: 'blur(12px)',
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(8px)',
             boxShadow: '0 1px 0 0 rgba(255,255,255,0.08) inset, 0 32px 64px -16px rgba(0,0,0,0.32)',
           }}
         >

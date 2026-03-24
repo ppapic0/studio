@@ -57,7 +57,7 @@ export function HeroShowcase() {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-[1.7rem] border border-white/12 bg-white/8 p-5 shadow-[0_20px_44px_rgba(4,11,29,0.28)] backdrop-blur">
+      <div className="overflow-hidden rounded-[1.7rem] border border-white/12 bg-white/8 p-5 shadow-[0_16px_32px_rgba(4,11,29,0.22)] backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black tracking-[0.2em] text-white/52">WEB APP VALUE</p>

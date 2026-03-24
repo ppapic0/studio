@@ -21,19 +21,7 @@ function resolvePublicOrigin(request: NextRequest) {
   return request.nextUrl.origin;
 }
 
-
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ target: string }> },
-) {
-  const { target } = await context.params;
-  const targetPath = TARGET_PATHS[target];
-  const publicOrigin = resolvePublicOrigin(request);
-
-  if (!targetPath) {
-    return NextResponse.redirect(new URL('/', publicOrigin));
-  }
-
+async function logMarketingEntry(request: NextRequest, target: string, targetPath: string) {
   const searchParams = request.nextUrl.searchParams;
   const placement = searchParams.get('placement') || 'unknown';
   const mode = searchParams.get('mode');
@@ -41,12 +29,6 @@ export async function GET(
   const source = searchParams.get('source') || 'marketing';
   const visitorId = request.cookies.get('track_marketing_vid')?.value || null;
   const sessionId = request.cookies.get('track_marketing_sid')?.value || null;
-
-  const destination = new URL(targetPath, publicOrigin);
-  for (const [key, value] of searchParams.entries()) {
-    if (key === 'placement' || key === 'source') continue;
-    destination.searchParams.set(key, value);
-  }
 
   try {
     const centerId = await resolveMarketingCenterId();
@@ -78,6 +60,30 @@ export async function GET(
   } catch (error) {
     console.error('[marketing-entry][GET] failed', error);
   }
+}
+
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ target: string }> },
+) {
+  const { target } = await context.params;
+  const targetPath = TARGET_PATHS[target];
+  const publicOrigin = resolvePublicOrigin(request);
+
+  if (!targetPath) {
+    return NextResponse.redirect(new URL('/', publicOrigin));
+  }
+
+  const searchParams = request.nextUrl.searchParams;
+
+  const destination = new URL(targetPath, publicOrigin);
+  for (const [key, value] of searchParams.entries()) {
+    if (key === 'placement' || key === 'source') continue;
+    destination.searchParams.set(key, value);
+  }
+
+  void logMarketingEntry(request, target, targetPath);
 
   return NextResponse.redirect(destination);
 }

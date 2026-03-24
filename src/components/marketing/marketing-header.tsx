@@ -13,8 +13,8 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
     <header
       className="sticky top-0 z-50"
       style={{
-        background: 'rgba(10, 20, 52, 0.88)',
-        backdropFilter: 'blur(20px) saturate(1.4)',
+        background: 'rgba(10, 20, 52, 0.92)',
+        backdropFilter: 'blur(12px) saturate(1.15)',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         boxShadow: '0 1px 0 0 rgba(255,255,255,0.05) inset, 0 8px 24px -4px rgba(0,0,0,0.28)',
       }}
