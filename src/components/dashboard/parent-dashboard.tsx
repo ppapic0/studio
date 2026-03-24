@@ -826,7 +826,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       where('parentUid', '==', user.uid),
       limit(30),
     );
-  }, [firestore, centerId, user]);
+  }, [firestore, centerId, user?.uid]);
   const { data: rawParentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
     enabled: isActive && !!centerId && !!user,
   });
