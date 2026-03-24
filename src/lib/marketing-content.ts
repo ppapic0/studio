@@ -44,6 +44,22 @@ export type AppModeCard = {
   items: string[];
 };
 
+export type AppDataStory = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  proofNotes: string[];
+};
+
+export type AppExperienceGuide = {
+  mode: string;
+  headline: string;
+  summary: string;
+  checkpoints: string[];
+  href: string;
+  label: string;
+};
+
 export type LPCycleCard = {
   title: string;
   description: string;
@@ -93,6 +109,8 @@ export type MarketingContent = {
     features: AppFeature[];
     appScreens: MockPreview[];
     dataMetrics: AppDataMetric[];
+    dataStory: AppDataStory;
+    guides: AppExperienceGuide[];
   };
   lpSystem: {
     heading: string;
@@ -279,19 +297,19 @@ export const marketingContent: MarketingContent = {
     ],
   },
   appSystem: {
-    heading: '학생을 놓치지 않는 전용 웹앱',
+    heading: '학생의 과정이 바로 보이는 전용 웹앱',
     description:
-      '학생, 학부모, 관리자 모두가 같은 흐름을 봅니다. 관리 품질을 위해 설계한 전용 웹앱입니다.',
+      '학생, 학부모, 관리자 모두가 같은 데이터를 다른 화면으로 읽습니다. 운영 데이터와 결과 증명을 함께 남기기 위해 만든 전용 웹앱입니다.',
     modes: [
       {
         mode: '학부모 모드',
-        description: '과정을 실시간으로 확인하는 앱모드 중심 구조',
-        items: ['출결 확인', '학습 현황', '리포트 수신', '성적 추이', '상담/질문'],
+        description: '과정을 실시간으로 읽고 필요한 순간에 바로 확인하는 앱 모드',
+        items: ['출결 확인', '주간 누적 그래프', '리포트 수신', '위험 신호 확인', '상담/질문'],
       },
       {
         mode: '학생 모드',
-        description: '계획부터 실행까지 직접 관리하는 학습 루틴',
-        items: ['주간 LP 작성', '오늘의 할 일', '오답 기록', '성장 그래프', '일정 관리'],
+        description: '오늘의 루틴부터 피드백 반영까지 직접 관리하는 학습 루프',
+        items: ['주간 LP 작성', '오늘의 할 일', '공부시간 누적', '성장 그래프', '피드백 확인'],
       },
       {
         mode: '관리자 모드',
@@ -300,21 +318,21 @@ export const marketingContent: MarketingContent = {
       },
     ],
     features: [
-      { title: '계획 확인', description: '해야 할 일을 주간 계획 흐름으로 정리합니다.' },
-      { title: '기록 캘린더', description: '날짜별 공부시간과 실행 결과를 바로 확인합니다.' },
-      { title: '성장 데이터', description: 'LP와 스킬 지표로 학생의 변화가 숫자로 남습니다.' },
-      { title: '알림·수납 연동', description: '상담, 리포트, 알림, 수납 상태가 하나의 흐름으로 연결됩니다.' },
+      { title: '계획 확인', description: '해야 할 일을 주간 계획 흐름으로 정리하고 오늘의 행동으로 연결합니다.' },
+      { title: '기록 캘린더', description: '날짜별 공부시간과 실행 결과를 눌러 보며 루틴의 흔들림을 확인합니다.' },
+      { title: '성장 데이터', description: '공부시간, 목표 달성률, 루틴 안정성, 시험 결과가 함께 남습니다.' },
+      { title: '알림·리포트 연동', description: '상담, 리포트, 알림, 수납 상태를 같은 화면 흐름 안에서 확인합니다.' },
     ],
     appScreens: [
       {
         title: '학생 대시보드',
-        subtitle: '오늘의 목표와 실행을 한 화면에서',
+        subtitle: '오늘의 루틴과 누적 공부시간을 한 화면에서',
         caption: '오늘 할 일, 누적 공부시간, LP, 성장 지표가 동시에 보여 학생이 바로 행동할 수 있습니다.',
       },
       {
         title: '학부모 데이터 화면',
-        subtitle: '제목 중심 알림 + 학습 캘린더',
-        caption: '제목만 먼저 보여주는 알림 구조와 캘린더형 학습 데이터로 과정을 자연스럽게 확인할 수 있습니다.',
+        subtitle: '상태 요약 + 주간 그래프 + 기록 캘린더',
+        caption: '알림 제목, 주간 누적 그래프, 날짜별 기록이 연결되어 학생의 과정을 빠르게 읽을 수 있습니다.',
       },
       {
         title: '운영 대시보드',
@@ -324,9 +342,38 @@ export const marketingContent: MarketingContent = {
     ],
     dataMetrics: [
       { label: '시즌 누적 포인트', value: '3,164 LP', detail: '실행 기반 보상 구조', tone: 'orange' },
-      { label: '평균 공부 리듬', value: '98.2점', detail: '집중력·꾸준함·목표달성 기반', tone: 'green' },
+      { label: '평균 목표 달성률', value: '83%', detail: '주간 계획 대비 실행률', tone: 'green' },
       { label: '주간 학습 시간', value: '14시간 23분', detail: '기록 캘린더 기준', tone: 'navy' },
       { label: '생활 관리 지수', value: '5점', detail: '벌점과 회복 흐름 동시 관리', tone: 'red' },
+    ],
+    dataStory: {
+      eyebrow: 'DATA OPERATING SYSTEM',
+      title: '출결만 확인하지 않고 변화의 방향까지 읽습니다',
+      description:
+        '공부시간, 목표 달성률, 루틴 안정성, 위험 신호, 시험 결과를 하나의 흐름으로 연결해 보여주는 구조입니다.',
+      proofNotes: [
+        '실시간 운영 데이터가 매일 누적됩니다.',
+        '하락 추세가 보이면 먼저 개입할 수 있습니다.',
+        '결과 데이터까지 남아 성장 증명으로 이어집니다.',
+      ],
+    },
+    guides: [
+      {
+        mode: '학생 모드',
+        headline: '오늘의 루틴부터 성장 리포트까지 직접 확인',
+        summary: '학생은 지금 해야 할 행동, 누적 공부시간, 피드백 흐름을 한 화면에서 이어서 봅니다.',
+        checkpoints: ['오늘의 루틴', '주간 캘린더', '성장 지표', '피드백 알림'],
+        href: '/go/experience?placement=app_preview_student&mode=student',
+        label: '학생 모드 체험',
+      },
+      {
+        mode: '학부모 모드',
+        headline: '실시간 상태부터 상담 흐름까지 빠르게 확인',
+        summary: '학부모는 출결, 주간 누적 그래프, 날짜별 기록, 리포트를 같은 문법으로 확인합니다.',
+        checkpoints: ['실시간 상태', '주간 그래프', '날짜별 기록', '리포트 수신'],
+        href: '/go/experience?placement=app_preview_parent&mode=parent',
+        label: '학부모 모드 체험',
+      },
     ],
   },
   lpSystem: {

@@ -21,37 +21,37 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading eyebrow="Track Web App" title={appSystem.heading} description={appSystem.description} />
 
-        {/* Experience CTA Banner */}
         <div
-          className="mt-6 overflow-hidden rounded-[1.6rem] border p-5"
+          className="mt-6 overflow-hidden rounded-[1.7rem] border p-5 sm:p-6"
           style={{
-            borderColor: 'rgba(255,122,22,0.20)',
+            borderColor: 'rgba(255,122,22,0.18)',
             background: 'linear-gradient(135deg, #FFF6ED 0%, #FFFFFF 100%)',
             boxShadow: '0 2px 8px -2px rgba(255,122,22,0.10), 0 12px 28px -6px rgba(20,41,95,0.07)',
           }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div>
-              <span className="eyebrow-badge">EXPERIENCE FIRST</span>
-              <p className="mt-3 break-keep text-[1.55rem] font-black leading-[1.14] text-[#14295F]">
-                학생 · 학부모 모드를 실제 앱처럼 체험
+              <span className="eyebrow-badge">{appSystem.dataStory.eyebrow}</span>
+              <p className="mt-3 break-keep text-[1.6rem] font-black leading-[1.18] text-[#14295F]">
+                {appSystem.dataStory.title}
               </p>
               <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.74] text-slate-600">
-                그래프, 캘린더, 알림, 수납, 성장 지표까지 실제 운영 화면처럼 확인할 수 있습니다.
+                {appSystem.dataStory.description}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <a href="/go/login?placement=app_section_login" className="premium-cta premium-cta-primary h-11 px-5 text-sm">
-                웹앱 로그인
-              </a>
-              <a href="/go/experience?placement=app_section" className="premium-cta premium-cta-secondary h-11 px-5 text-sm">
-                웹앱 체험하기
-              </a>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              {appSystem.dataStory.proofNotes.map((note) => (
+                <div
+                  key={note}
+                  className="rounded-[1.2rem] border border-[#14295F]/8 bg-white px-4 py-3 text-[12px] font-black leading-[1.55] text-[#14295F]"
+                >
+                  {note}
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Mode cards */}
         <div className="mt-7 grid gap-4 md:grid-cols-3">
           {appSystem.modes.map((mode) => (
             <article key={mode.mode} className="marketing-card p-5">
@@ -73,8 +73,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
         </div>
 
         <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
-          {/* Features + Data snapshot */}
-          <div>
+          <div className="space-y-6">
             <ul className="grid gap-3 sm:grid-cols-2">
               {appSystem.features.map((item) => (
                 <li key={item.title} className="marketing-card p-4">
@@ -84,7 +83,7 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
               ))}
             </ul>
 
-            <div className="marketing-card mt-6 p-5">
+            <div className="marketing-card p-5">
               <span className="eyebrow-badge">DATA SNAPSHOT</span>
               <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                 {appSystem.dataMetrics.map((metric) => (
@@ -103,7 +102,6 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
             </div>
           </div>
 
-          {/* App screen previews */}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {appSystem.appScreens.map((screen, index) => (
               <article key={screen.title} className="marketing-card rounded-[1.8rem] p-4">

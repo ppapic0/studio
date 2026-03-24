@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Fragment, type ReactNode } from 'react';
 import Link from 'next/link';
@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  LineChart,
   MessageCircle,
   Smartphone,
   Target,
@@ -22,9 +23,6 @@ import { cn } from '@/lib/utils';
 
 type DemoMode = 'student' | 'parent';
 
-/* ─────────────────────────────────────────
-   Utility: compact stat card
-───────────────────────────────────────── */
 function ValueCard({
   label,
   value,
@@ -48,9 +46,6 @@ function ValueCard({
   );
 }
 
-/* ─────────────────────────────────────────
-   Utility: calendar heat cell
-───────────────────────────────────────── */
 function HeatCell({ day, value, active = false }: { day: string; value: string; active?: boolean }) {
   return (
     <div
@@ -63,18 +58,15 @@ function HeatCell({ day, value, active = false }: { day: string; value: string; 
     >
       <div className="flex items-center justify-between">
         <span className="text-[9px] font-black text-[#14295F]/45">{day}</span>
-        {active && <div className="h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
+        {active ? <div className="h-1.5 w-1.5 rounded-full bg-[#FF7A16]" /> : null}
       </div>
-      <p className="dashboard-number mt-2 text-[11px] font-black text-[#14295F] tabular-nums whitespace-nowrap tracking-tighter">
+      <p className="dashboard-number mt-2 whitespace-nowrap text-[11px] font-black tracking-tighter text-[#14295F] tabular-nums">
         {value}
       </p>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────
-   Preview shell
-───────────────────────────────────────── */
 function PreviewShell({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <div
@@ -89,38 +81,163 @@ function PreviewShell({ className, children }: { className?: string; children: R
   );
 }
 
-/* ─────────────────────────────────────────
-   Student mini previews
-───────────────────────────────────────── */
-function MiniStudentToday() {
+function ChipRow({ items }: { items: string[] }) {
   return (
-    <PreviewShell>
-      <div className="rounded-[1.1rem] bg-gradient-to-br from-[#D85810] to-[#A83D0A] p-4 text-white">
-        <div className="mb-2 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-[8.5px] font-black tracking-widest text-white/80">
-          GROWTH TRACK ACTIVE
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span
+          key={item}
+          className="rounded-full border border-[#14295F]/10 bg-[#14295F]/5 px-2.5 py-1 text-[10px] font-black text-[#14295F]/60"
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function StudentShowcase() {
+  return (
+    <PreviewShell className="bg-[linear-gradient(180deg,#0F1E47_0%,#14295F_100%)] text-white">
+      <div className="rounded-[1.25rem] bg-white p-4 text-[#14295F]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.18em] text-[#14295F]/45">STUDENT HOME</p>
+            <p className="mt-1 text-[1.1rem] font-black leading-[1.32]">
+              오늘의 루틴과
+              <br />
+              누적 흐름을 한 번에 확인
+            </p>
+          </div>
+          <span className="rounded-full bg-[#FFF4E8] px-3 py-1 text-[10px] font-black text-[#C15D05]">
+            목표 달성률 83%
+          </span>
         </div>
-        <p className="text-[1rem] font-black leading-tight">
-          오늘의 성장을 위해
-          <br />
-          트랙을 시작하세요
-        </p>
-        <div className="mt-3 rounded-xl bg-white py-2 text-center text-[13px] font-black text-[#14295F]">
-          트랙 시작
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <ValueCard label="오늘의 공부시간" value="4h 12m" />
+          <ValueCard label="시즌 LP" value="3,164" tone="orange" />
+          <ValueCard label="집중력" value="98.3" tone="emerald" />
+          <ValueCard label="회복력" value="92.4" tone="rose" />
         </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <ValueCard label="오늘의 트랙" value="1h 36m" />
-        <ValueCard label="시즌 LP" value="3,164" tone="orange" />
+        <div className="mt-4 rounded-[1rem] bg-[#F5F8FF] p-3">
+          <div className="flex items-center justify-between text-[11px] font-black">
+            <span>주간 누적 그래프</span>
+            <span className="text-[#FF7A16]">14h 23m</span>
+          </div>
+          <div className="mt-3 flex h-16 items-end gap-1.5">
+            {[16, 26, 38, 52, 66, 90, 74].map((value, index) => (
+              <div
+                key={index}
+                className="flex-1 rounded-t-lg bg-[linear-gradient(180deg,#2C5DDD_0%,#14295F_100%)]"
+                style={{ height: `${value}%` }}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 rounded-[1rem] border border-[#14295F]/8 bg-white p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-black text-[#14295F]">선생님 피드백</p>
+            <span className="text-[10px] font-black text-[#14295F]/40">방금 업데이트</span>
+          </div>
+          <p className="mt-2 break-keep text-[11px] font-semibold leading-[1.6] text-[#14295F]/60">
+            수요일 이후 집중력이 회복되고 있어요. 국어 독서 복기를 목요일 밤 루틴에 고정해보세요.
+          </p>
+        </div>
       </div>
     </PreviewShell>
   );
 }
 
-function MiniStudentStats() {
+function ParentShowcase() {
+  return (
+    <PreviewShell className="bg-[linear-gradient(180deg,#FFF7EF_0%,#FFFFFF_100%)]">
+      <div className="rounded-[1.25rem] bg-[#14295F] p-4 text-white">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.18em] text-white/60">PARENT DASHBOARD</p>
+            <p className="mt-1 text-[1.1rem] font-black leading-[1.32]">
+              학생의 상태와
+              <br />
+              기록 흐름을 빠르게 확인
+            </p>
+          </div>
+          <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-black text-white/82">
+            실시간 업데이트
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <ValueCard label="주간 누적 공부시간" value="14h 23m" />
+          <ValueCard label="평균 목표 달성" value="83%" tone="orange" />
+          <ValueCard label="결제 상태" value="완납" tone="emerald" />
+          <ValueCard label="위험 신호" value="3건" tone="rose" />
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[1rem] bg-[#F7FAFF] p-3">
+          <div className="flex items-center justify-between text-[11px] font-black text-[#14295F]">
+            <span>주간 누적 그래프</span>
+            <span className="text-[#FF7A16]">목표 대비 48%</span>
+          </div>
+          <div className="mt-3 flex h-16 items-end gap-1.5">
+            {[12, 20, 32, 44, 68, 100, 74].map((value, index) => (
+              <div
+                key={index}
+                className="flex-1 rounded-t-lg bg-[linear-gradient(180deg,#FFB771_0%,#FF7A16_100%)]"
+                style={{ height: `${value}%` }}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          {['출결 상태 업데이트', '생활 기록 알림', '학습 리포트 도착'].map((item, index) => (
+            <div
+              key={item}
+              className={cn(
+                'flex items-center justify-between rounded-xl border px-3 py-3',
+                index < 2 ? 'border-[#FFB46A] bg-[#FFF9F3]' : 'border-[#14295F]/8 bg-[#F8FBFF]',
+              )}
+            >
+              <p className="text-[12px] font-black text-[#14295F]">{item}</p>
+              {index < 2 ? (
+                <div className="h-2 w-2 rounded-full bg-[#FF7A16] shadow-[0_0_8px_rgba(255,122,22,0.55)]" />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </PreviewShell>
+  );
+}
+
+function MiniStudentCalendar() {
+  return (
+    <PreviewShell>
+      <div className="mb-2 grid grid-cols-4 gap-1.5 text-center text-[8.5px] font-black uppercase tracking-widest text-[#14295F]/35">
+        {['MON', 'TUE', 'WED', 'THU'].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        <HeatCell day="3/2" value="8:25" />
+        <HeatCell day="3/3" value="4:23" />
+        <HeatCell day="3/4" value="2:46" />
+        <HeatCell day="3/5" value="1:36" active />
+      </div>
+      <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#14295F]/4 px-3 py-2">
+        <Info className="h-3 w-3 shrink-0 text-[#14295F]/35" />
+        <p className="text-[10px] font-semibold text-[#14295F]/50">
+          날짜를 누르면 그날의 기록을 확인할 수 있어요
+        </p>
+      </div>
+    </PreviewShell>
+  );
+}
+
+function MiniStudentGrowth() {
   return (
     <PreviewShell>
       <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">
-        스킬트랙 · FOCUS · CONSISTENCY
+        GROWTH METRICS
       </p>
       <div className="grid grid-cols-2 gap-2">
         <ValueCard label="집중력" value="98.3" />
@@ -132,36 +249,14 @@ function MiniStudentStats() {
   );
 }
 
-function MiniStudentCalendar() {
-  return (
-    <PreviewShell>
-      <div className="mb-2 grid grid-cols-4 gap-1.5 text-center text-[8.5px] font-black uppercase tracking-widest text-[#14295F]/35">
-        {['MON', 'TUE', 'WED', 'THU'].map((d) => <span key={d}>{d}</span>)}
-      </div>
-      <div className="grid grid-cols-4 gap-1.5">
-        <HeatCell day="3/2" value="8:25" />
-        <HeatCell day="3/3" value="4:23" />
-        <HeatCell day="3/4" value="2:46" />
-        <HeatCell day="3/5" value="1:36" active />
-      </div>
-      <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#14295F]/4 py-2 px-3">
-        <Info className="h-3 w-3 shrink-0 text-[#14295F]/35" />
-        <p className="text-[10px] font-semibold text-[#14295F]/50">
-          날짜를 누르면 그날의 기록을 확인할 수 있어요
-        </p>
-      </div>
-    </PreviewShell>
-  );
-}
-
-function MiniStudentReport() {
+function MiniStudentAction() {
   return (
     <PreviewShell>
       <div className="space-y-2">
         {[
-          { title: '계획트랙', sub: '매일 계획 → 실행 → 피드백' },
-          { title: '선생님 리포트', sub: '이번 주 분석 · 다음 전략' },
-          { title: '벌점 현황', sub: '생활관리 기준 · 회복 흐름' },
+          { title: '오늘의 루틴 재정렬', sub: '국어 독서 3지문을 저녁 블록으로 이동' },
+          { title: '선생님 피드백 확인', sub: '주간 리포트 기반으로 다음 계획 보정' },
+          { title: '알림 확인', sub: '생활 기록과 벌점 회복 흐름 반영' },
         ].map((item) => (
           <div
             key={item.title}
@@ -179,33 +274,16 @@ function MiniStudentReport() {
   );
 }
 
-/* ─────────────────────────────────────────
-   Parent mini previews
-───────────────────────────────────────── */
-function MiniParentStatus() {
-  return (
-    <PreviewShell>
-      <p className="mb-3 text-[10px] font-black text-[#FF7A16]">실시간 업데이트 중</p>
-      <div className="grid grid-cols-2 gap-2">
-        <ValueCard label="주간 누적 트랙" value="14h 23m" />
-        <ValueCard label="평균 목표 달성" value="50%" tone="orange" />
-        <ValueCard label="결제 상태" value="완납" tone="emerald" />
-        <ValueCard label="벌점 지수" value="5점" tone="rose" />
-      </div>
-    </PreviewShell>
-  );
-}
-
 function MiniParentWeekly() {
   return (
     <PreviewShell>
       <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">
-        주간 누적 트랙
+        주간 누적 그래프
       </p>
       <div className="rounded-[1.1rem] bg-[#14295F] p-3">
         <div className="flex h-14 items-end gap-1.5">
-          {[10, 10, 12, 86, 100, 70, 46].map((v, i) => (
-            <div key={i} className="flex-1 rounded-t-md bg-[#FF7A16]" style={{ height: `${v}%` }} />
+          {[10, 12, 18, 56, 78, 100, 72].map((value, index) => (
+            <div key={index} className="flex-1 rounded-t-md bg-[#FF7A16]" style={{ height: `${value}%` }} />
           ))}
         </div>
         <p className="mt-2 text-[11px] font-black text-white/80">
@@ -220,7 +298,9 @@ function MiniParentCalendar() {
   return (
     <PreviewShell>
       <div className="mb-2 grid grid-cols-4 gap-1.5 text-center text-[8.5px] font-black uppercase tracking-widest text-[#14295F]/35">
-        {['MON', 'TUE', 'WED', 'THU'].map((d) => <span key={d}>{d}</span>)}
+        {['MON', 'TUE', 'WED', 'THU'].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
       </div>
       <div className="grid grid-cols-4 gap-1.5">
         <HeatCell day="3/2" value="8:25" />
@@ -228,7 +308,7 @@ function MiniParentCalendar() {
         <HeatCell day="3/4" value="2:46" />
         <HeatCell day="3/5" value="1:36" active />
       </div>
-      <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#14295F]/4 py-2 px-3">
+      <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#14295F]/4 px-3 py-2">
         <Info className="h-3 w-3 shrink-0 text-[#14295F]/35" />
         <p className="text-[10px] font-semibold text-[#14295F]/50">
           날짜를 누르면 해당 날짜의 학습 기록을 확인할 수 있어요
@@ -238,59 +318,56 @@ function MiniParentCalendar() {
   );
 }
 
-function MiniParentAlerts() {
+function MiniParentReport() {
   return (
     <PreviewShell>
       <div className="space-y-2">
         {[
-          { title: '출결 상태 업데이트', unread: true },
-          { title: '생활 기록 알림', unread: true },
-          { title: '학습 리포트 도착', unread: false },
-        ].map((item) => (
+          { title: '학습 리포트 도착', sub: '이번 주 분석과 다음 전략 정리' },
+          { title: '위험 신호 감지', sub: '공부시간 하락과 루틴 이탈 안내' },
+          { title: '상담 메모 확인', sub: '전화 상담과 다음 체크 포인트 기록' },
+        ].map((item, index) => (
           <div
             key={item.title}
             className={cn(
-              'flex items-center justify-between rounded-xl border px-3 py-3',
-              item.unread
-                ? 'border-[#FFB46A] bg-[#FFF9F3]'
-                : 'border-[#14295F]/8 bg-[#F8FBFF]',
+              'rounded-xl border px-3 py-3',
+              index === 1 ? 'border-[#FFB46A] bg-[#FFF9F3]' : 'border-[#14295F]/8 bg-[#F8FBFF]',
             )}
           >
             <p className="text-[13px] font-black text-[#14295F]">{item.title}</p>
-            {item.unread && (
-              <div className="h-2 w-2 rounded-full bg-[#FF7A16] shadow-[0_0_8px_rgba(255,122,22,0.55)]" />
-            )}
+            <p className="mt-0.5 text-[10px] font-semibold text-[#14295F]/45">{item.sub}</p>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-center text-[10px] font-semibold text-[#14295F]/40">
-        제목만 먼저 보이고, 눌러서 상세를 확인합니다
-      </p>
     </PreviewShell>
   );
 }
 
-/* ─────────────────────────────────────────
-   Chip tag label
-───────────────────────────────────────── */
-function ChipRow({ items }: { items: string[] }) {
+function MiniParentAction() {
   return (
-    <div className="mt-3 flex flex-wrap gap-1.5">
-      {items.map((item) => (
-        <span
-          key={item}
-          className="rounded-full border border-[#14295F]/10 bg-[#14295F]/5 px-2.5 py-1 text-[10px] font-black text-[#14295F]/60"
-        >
-          {item}
-        </span>
-      ))}
-    </div>
+    <PreviewShell>
+      <div className="space-y-2">
+        {[
+          { title: '알림 제목 먼저 확인', sub: '필요한 내용만 눌러 상세 확인' },
+          { title: '주간 흐름 질문 남기기', sub: '상담/질문 버튼으로 바로 연결' },
+          { title: '다음 상담 일정 확인', sub: '학생 변화에 맞춘 체크 포인트 공유' },
+        ].map((item) => (
+          <div
+            key={item.title}
+            className="flex items-center justify-between rounded-xl border border-[#14295F]/8 bg-[#F8FBFF] px-3 py-3"
+          >
+            <div>
+              <p className="text-[13px] font-black text-[#14295F]">{item.title}</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-[#14295F]/45">{item.sub}</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[#14295F]/30" />
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
   );
 }
 
-/* ─────────────────────────────────────────
-   Preview block: text + preview
-───────────────────────────────────────── */
 function PreviewBlock({
   num,
   tag,
@@ -321,21 +398,18 @@ function PreviewBlock({
         </div>
         <h3 className="break-keep text-[1.15rem] font-black leading-[1.32] text-[#14295F]">{title}</h3>
         <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.7] text-slate-500">{body}</p>
-        {sub && (
+        {sub ? (
           <p className="mt-1.5 break-keep text-[12px] font-semibold leading-[1.6] text-slate-400">
             {sub}
           </p>
-        )}
-        {chips && <ChipRow items={chips} />}
+        ) : null}
+        {chips ? <ChipRow items={chips} /> : null}
       </div>
       <div className={cn(flip && 'lg:order-1')}>{preview}</div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────
-   Flow summary (3 steps)
-───────────────────────────────────────── */
 function FlowSummary({
   title,
   subtitle,
@@ -348,11 +422,9 @@ function FlowSummary({
   return (
     <div className="rounded-[1.5rem] border border-[#14295F]/8 bg-[#F7FAFF] p-5">
       <p className="text-[11px] font-black text-[#14295F]">{title}</p>
-      {subtitle && (
-        <p className="mt-1 text-[12px] font-semibold text-slate-400">{subtitle}</p>
-      )}
+      {subtitle ? <p className="mt-1 text-[12px] font-semibold text-slate-400">{subtitle}</p> : null}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {steps.map((step, i) => (
+        {steps.map((step, index) => (
           <Fragment key={step.label}>
             <div className="flex items-center gap-2.5 rounded-xl border border-[#14295F]/8 bg-white px-4 py-2.5 shadow-sm">
               <div className="text-[#FF7A16]">{step.icon}</div>
@@ -361,9 +433,9 @@ function FlowSummary({
                 <p className="text-[10px] font-semibold text-slate-400">{step.desc}</p>
               </div>
             </div>
-            {i < steps.length - 1 && (
+            {index < steps.length - 1 ? (
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#14295F]/25" />
-            )}
+            ) : null}
           </Fragment>
         ))}
       </div>
@@ -371,9 +443,6 @@ function FlowSummary({
   );
 }
 
-/* ─────────────────────────────────────────
-   CTA bar
-───────────────────────────────────────── */
 function ModeCTA({
   eyebrow,
   title,
@@ -410,9 +479,6 @@ function ModeCTA({
   );
 }
 
-/* ─────────────────────────────────────────
-   Mode hero (inside each mode page)
-───────────────────────────────────────── */
 function ModeHero({
   eyebrow,
   title,
@@ -445,11 +511,11 @@ function ModeHero({
           </div>
           <h2 className="mt-2 break-keep text-[1.5rem] font-black text-[#14295F] sm:text-[1.75rem]">{title}</h2>
           <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#334e6a]">{desc}</p>
-          {subdesc && (
+          {subdesc ? (
             <p className="mt-1.5 break-keep text-[13px] font-semibold leading-[1.65] text-slate-400">
               {subdesc}
             </p>
-          )}
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-2.5">
             <Link href={primaryHref} className="premium-cta premium-cta-primary h-10 px-5 text-sm">
               {primaryLabel}
@@ -466,46 +532,111 @@ function ModeHero({
   );
 }
 
-/* ─────────────────────────────────────────
-   Student mode section
-───────────────────────────────────────── */
 const studentBlocks: Array<{
-  num: string; tag: string; title: string; body: string; sub: string; chips: string[]; preview: ReactNode; flip: boolean;
+  num: string;
+  tag: string;
+  title: string;
+  body: string;
+  sub: string;
+  chips: string[];
+  preview: ReactNode;
+  flip: boolean;
 }> = [
   {
-    num: '01', tag: '오늘의 시작',
-    title: '오늘의 루틴을 바로 확인합니다',
-    body: '학생은 홈 화면에서 오늘 해야 할 루틴과 현재 흐름을 바로 확인할 수 있습니다.',
-    sub: '시작해야 할 일과 지금까지의 진행 흐름이 복잡하지 않게 정리됩니다.',
-    chips: ['오늘의 루틴', '시작하기', '실행 흐름'],
-    preview: <MiniStudentToday />,
+    num: '01',
+    tag: '확인',
+    title: '오늘의 루틴과 지금 상태를 먼저 확인합니다',
+    body: '학생은 홈 화면에서 오늘 해야 할 루틴, 누적 공부시간, 목표 달성률을 바로 확인할 수 있습니다.',
+    sub: '무엇을 해야 하는지 먼저 보이고, 바로 시작할 수 있도록 행동 중심으로 정리합니다.',
+    chips: ['오늘의 루틴', '시즌 LP', '현재 상태'],
+    preview: <StudentShowcase />,
     flip: false,
   },
   {
-    num: '02', tag: '누적 기록',
-    title: '기록은 매일 쌓이고 흐름으로 보입니다',
-    body: '공부 시간, 누적 기록, 실행 흐름을 한 화면에서 빠르게 확인할 수 있습니다.',
-    sub: '하루의 기록이 쌓여 주간 흐름과 학습 습관으로 이어집니다.',
-    chips: ['누적 시간', '실행 기록', '주간 흐름'],
-    preview: <MiniStudentStats />,
+    num: '02',
+    tag: '추적',
+    title: '주간 캘린더와 누적 지표로 흐름을 추적합니다',
+    body: '공부시간과 날짜별 기록이 쌓이면서 언제 리듬이 흔들렸는지, 어느 구간이 회복되었는지 확인할 수 있습니다.',
+    sub: '하루 기록이 주간 그래프와 캘린더로 이어져 학습 습관의 패턴이 보입니다.',
+    chips: ['주간 캘린더', '날짜별 기록', '누적 공부시간'],
+    preview: <MiniStudentCalendar />,
     flip: true,
   },
   {
-    num: '03', tag: '기록 캘린더',
-    title: '날짜별 기록을 바로 확인합니다',
-    body: '캘린더에서 원하는 날짜를 눌러 그날의 학습 기록을 확인할 수 있습니다.',
-    sub: '언제 얼마나 공부했는지, 어떤 흐름으로 쌓였는지 달력에서 바로 볼 수 있습니다.',
-    chips: ['기록 캘린더', '날짜별 확인', '학습 흐름'],
-    preview: <MiniStudentCalendar />,
+    num: '03',
+    tag: '해석',
+    title: '성장 지표와 리포트로 변화의 방향을 읽습니다',
+    body: '쌓인 기록은 집중력, 꾸준함, 목표달성 지표와 선생님 리포트로 이어져 학생이 자신의 흐름을 더 분명하게 이해할 수 있게 합니다.',
+    sub: '기록이 숫자로 남고, 숫자가 다시 해석으로 이어지는 구조입니다.',
+    chips: ['성장 지표', '리포트', '루틴 해석'],
+    preview: <MiniStudentGrowth />,
     flip: false,
   },
   {
-    num: '04', tag: '리포트 · 분석',
-    title: '기록은 분석으로 이어집니다',
-    body: '쌓인 데이터는 리포트와 분석 흐름으로 이어져 학생이 지금 상태를 더 분명하게 확인할 수 있게 합니다.',
-    sub: '단순히 기록만 남는 것이 아니라, 돌아보고 정리할 수 있는 흐름까지 연결됩니다.',
-    chips: ['리포트', '분석 흐름', '기록 정리'],
-    preview: <MiniStudentReport />,
+    num: '04',
+    tag: '행동',
+    title: '피드백과 알림을 다음 루틴으로 바로 연결합니다',
+    body: '피드백, 벌점 회복, 루틴 재정렬 같은 액션이 같은 화면에서 이어져 학생이 바로 다음 행동을 정할 수 있습니다.',
+    sub: '보고 끝나는 화면이 아니라, 다음 계획을 다시 세우게 만드는 구조입니다.',
+    chips: ['피드백', '다음 루틴', '회복 흐름'],
+    preview: <MiniStudentAction />,
+    flip: true,
+  },
+];
+
+const parentBlocks: Array<{
+  num: string;
+  tag: string;
+  title: string;
+  body: string;
+  sub: string;
+  chips: string[];
+  preview: ReactNode;
+  flip: boolean;
+}> = [
+  {
+    num: '01',
+    tag: '확인',
+    title: '학생의 현재 상태를 먼저 읽습니다',
+    body: '학부모 화면은 출결, 오늘의 공부, 결제 상태, 위험 신호처럼 지금 필요한 정보부터 먼저 보여줍니다.',
+    sub: '긴 설명보다 먼저 상태를 확인하고 필요한 알림만 열어보는 구조입니다.',
+    chips: ['실시간 상태', '출결', '위험 신호'],
+    preview: <ParentShowcase />,
+    flip: false,
+  },
+  {
+    num: '02',
+    tag: '추적',
+    title: '주간 그래프와 날짜별 기록으로 과정을 추적합니다',
+    body: '주간 누적 공부시간, 목표 대비 진행률, 날짜별 기록 캘린더를 통해 학생의 과정을 자연스럽게 따라갈 수 있습니다.',
+    sub: '매일의 기록이 어떻게 쌓이고 있는지 한눈에 읽히는 구조로 정리했습니다.',
+    chips: ['주간 그래프', '날짜별 확인', '학습 흐름'],
+    preview: (
+      <div className="grid gap-3">
+        <MiniParentWeekly />
+        <MiniParentCalendar />
+      </div>
+    ),
+    flip: true,
+  },
+  {
+    num: '03',
+    tag: '해석',
+    title: '리포트와 위험 신호로 변화의 방향을 해석합니다',
+    body: '단순한 출결 확인에 그치지 않고, 리포트와 위험 신호를 함께 보며 어떤 개입이 필요한지 이해할 수 있습니다.',
+    sub: '하락 추세와 회복 지점이 모두 남아 있어 상담의 기준이 명확해집니다.',
+    chips: ['리포트 수신', '위험 신호', '상담 기준'],
+    preview: <MiniParentReport />,
+    flip: false,
+  },
+  {
+    num: '04',
+    tag: '행동',
+    title: '알림과 상담으로 바로 다음 행동을 연결합니다',
+    body: '학부모는 알림 제목, 질문 전달, 상담 일정 확인까지 한 흐름 안에서 처리할 수 있습니다.',
+    sub: '필요한 내용만 빠르게 확인하고 다음 행동으로 넘어갈 수 있도록 설계했습니다.',
+    chips: ['알림', '질문 전달', '상담 연결'],
+    preview: <MiniParentAction />,
     flip: true,
   },
 ];
@@ -514,8 +645,8 @@ function StudentModeSection() {
   return (
     <div className="space-y-10">
       <div className="divide-y divide-[#14295F]/6">
-        {studentBlocks.map((block, i) => (
-          <div key={block.num} className={cn('py-10', i === 0 && 'pt-0')}>
+        {studentBlocks.map((block, index) => (
+          <div key={block.num} className={cn('py-10', index === 0 && 'pt-0')}>
             <PreviewBlock {...block} />
           </div>
         ))}
@@ -523,75 +654,34 @@ function StudentModeSection() {
 
       <FlowSummary
         title="학생 화면에서는 이런 흐름으로 이어집니다"
-        subtitle="해야 할 일, 쌓인 기록, 돌아보는 흐름까지 학생 화면 안에서 자연스럽게 이어집니다."
+        subtitle="확인, 추적, 해석, 행동이 학생 화면 안에서 자연스럽게 연결됩니다."
         steps={[
-          { icon: <CalendarDays className="h-4 w-4" />, label: '루틴 확인', desc: '오늘 해야 할 루틴 확인' },
-          { icon: <BarChart3 className="h-4 w-4" />, label: '기록 누적', desc: '공부 시간 · 실행 흐름' },
-          { icon: <Target className="h-4 w-4" />, label: '흐름 정리', desc: '누적 기록 · 리포트 반영' },
+          { icon: <Target className="h-4 w-4" />, label: '확인', desc: '오늘의 루틴과 현재 상태 확인' },
+          { icon: <CalendarDays className="h-4 w-4" />, label: '추적', desc: '주간 그래프와 날짜별 기록 확인' },
+          { icon: <LineChart className="h-4 w-4" />, label: '해석', desc: '성장 지표와 리포트 읽기' },
+          { icon: <Bell className="h-4 w-4" />, label: '행동', desc: '다음 루틴과 피드백 반영' },
         ]}
       />
 
       <ModeCTA
         eyebrow="STUDENT MODE"
         title="학생 화면을 직접 확인해보세요"
-        note="실제 화면에서 루틴, 기록, 누적 흐름이 어떻게 보이는지 바로 체험할 수 있습니다."
+        note="실제 화면에서 루틴, 기록, 성장 지표가 어떻게 연결되는지 바로 체험할 수 있습니다."
         primaryHref="/go/login?placement=experience_student"
         primaryLabel="실제 로그인"
+        secondaryHref="/experience?mode=parent"
+        secondaryLabel="학부모 화면 보기"
       />
     </div>
   );
 }
 
-/* ─────────────────────────────────────────
-   Parent mode section
-───────────────────────────────────────── */
-const parentBlocks: Array<{
-  num: string; tag: string; title: string; body: string; sub: string; chips: string[]; preview: ReactNode; flip: boolean;
-}> = [
-  {
-    num: '01', tag: '학생 현황 요약',
-    title: '학생 현황을 한눈에 확인합니다',
-    body: '오늘 공부, 현재 상태, 목표 달성 흐름까지 상단 화면에서 빠르게 확인할 수 있습니다.',
-    sub: '복잡한 설명보다 지금 필요한 상태를 먼저 읽을 수 있도록 정리했습니다.',
-    chips: ['오늘 공부', '현재 상태', '목표 달성'],
-    preview: <MiniParentStatus />,
-    flip: false,
-  },
-  {
-    num: '02', tag: '주간 기록',
-    title: '주간 누적 트랙과 학습 흐름을 확인합니다',
-    body: '주간 시간과 목표 달성 흐름을 학부모 화면에서 요약해 확인할 수 있습니다.',
-    sub: '매일의 기록이 어떻게 쌓이고 있는지 한눈에 읽히는 구조로 보여줍니다.',
-    chips: ['주간 누적 트랙', '학습 흐름', '목표 달성'],
-    preview: <MiniParentWeekly />,
-    flip: true,
-  },
-  {
-    num: '03', tag: '기록 캘린더',
-    title: '날짜별 학습 기록을 확인합니다',
-    body: '캘린더에서 원하는 날짜를 눌러 그날의 학습 내용을 바로 확인할 수 있습니다.',
-    sub: '기록의 흐름을 날짜별로 확인할 수 있어 학생의 학습 패턴을 더 쉽게 파악할 수 있습니다.',
-    chips: ['기록 캘린더', '날짜별 확인', '학습 내용'],
-    preview: <MiniParentCalendar />,
-    flip: false,
-  },
-  {
-    num: '04', tag: '알림 · 리포트',
-    title: '알림과 분석 흐름도 함께 연결됩니다',
-    body: '최근 알림, 분석 결과, 상담 흐름까지 학부모 화면에서 함께 확인할 수 있습니다.',
-    sub: '출결이나 기록만 따로 보는 것이 아니라, 필요한 흐름이 하나의 화면 안에서 이어집니다.',
-    chips: ['최근 알림', '분석 결과', '상담 흐름'],
-    preview: <MiniParentAlerts />,
-    flip: true,
-  },
-];
-
 function ParentModeSection() {
   return (
     <div className="space-y-10">
       <div className="divide-y divide-[#14295F]/6">
-        {parentBlocks.map((block, i) => (
-          <div key={block.num} className={cn('py-10', i === 0 && 'pt-0')}>
+        {parentBlocks.map((block, index) => (
+          <div key={block.num} className={cn('py-10', index === 0 && 'pt-0')}>
             <PreviewBlock {...block} />
           </div>
         ))}
@@ -599,18 +689,19 @@ function ParentModeSection() {
 
       <FlowSummary
         title="학부모 화면에서는 이런 흐름으로 이어집니다"
-        subtitle="오늘의 상태부터 누적 기록, 분석과 상담 흐름까지 한 번에 확인할 수 있습니다."
+        subtitle="상태 확인에서 끝나지 않고, 추적과 해석을 거쳐 상담과 행동으로 이어집니다."
         steps={[
-          { icon: <Bell className="h-4 w-4" />, label: '상태 확인', desc: '학생 현재 상태 확인' },
-          { icon: <CalendarDays className="h-4 w-4" />, label: '흐름 추적', desc: '주간 트랙 · 캘린더' },
-          { icon: <MessageCircle className="h-4 w-4" />, label: '연결', desc: '알림 · 리포트 · 상담' },
+          { icon: <Bell className="h-4 w-4" />, label: '확인', desc: '학생 현재 상태와 알림 확인' },
+          { icon: <BarChart3 className="h-4 w-4" />, label: '추적', desc: '주간 그래프와 날짜별 기록 확인' },
+          { icon: <MessageCircle className="h-4 w-4" />, label: '해석', desc: '리포트와 위험 신호 읽기' },
+          { icon: <Users className="h-4 w-4" />, label: '행동', desc: '질문 전달과 상담 연결' },
         ]}
       />
 
       <ModeCTA
         eyebrow="PARENT MODE"
         title="학부모 화면을 직접 확인해보세요"
-        note="출결, 학습 현황, 기록 흐름이 어떻게 정리되어 보이는지 바로 체험할 수 있습니다."
+        note="출결, 학습 현황, 리포트, 상담 흐름이 어떻게 정리되어 보이는지 바로 체험할 수 있습니다."
         primaryHref="/go/login?placement=experience_parent"
         primaryLabel="실제 로그인"
         secondaryHref="/experience?mode=student"
@@ -620,100 +711,93 @@ function ParentModeSection() {
   );
 }
 
-/* ─────────────────────────────────────────
-   No-mode landing (웹앱 체험 통합)
-───────────────────────────────────────── */
-function WebAppLanding() {
+function ExperienceHub() {
   return (
-    <div className="space-y-6">
-      {/* Intro */}
+    <div className="space-y-8">
       <div className="rounded-[1.75rem] border border-[#14295F]/10 bg-white p-6 shadow-[0_12px_36px_rgba(20,41,95,0.09)]">
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">
-          WEB APP PREVIEW
-        </p>
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">WEB APP PREVIEW</p>
         <h2 className="mt-2 break-keep text-[1.4rem] font-black text-[#14295F] sm:text-[1.7rem]">
-          웹앱으로 직접 확인해보세요
+          웹앱을 단순 소개가 아니라
+          <br />
+          실제 흐름처럼 체험해보세요
         </h2>
         <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#334e6a]">
-          학생은 루틴과 기록을 확인하고, 학부모는 출결과 학습 흐름을 확인합니다.
+          학생은 오늘의 루틴부터 성장 지표까지, 학부모는 실시간 상태부터 리포트와 상담 흐름까지 확인합니다.
         </p>
         <p className="mt-1.5 break-keep text-[13px] font-semibold text-slate-400">
-          같은 데이터를 보더라도 학생과 학부모에게 필요한 화면은 다르게 설계됩니다.
-        </p>
-        <p className="mt-5 text-[12px] font-semibold text-slate-500">
-          모드 탭에서 학생/학부모 화면을 선택해 바로 확인할 수 있어요.
+          같은 데이터를 보더라도 학생과 학부모의 행동이 다르기 때문에, 화면도 다르게 설계했습니다.
         </p>
       </div>
 
-      {/* Two mode cards */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Student */}
-        <article className="flex flex-col rounded-[1.75rem] border border-[#14295F]/10 bg-white p-6 shadow-sm">
+        <StudentShowcase />
+        <ParentShowcase />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-[1.5rem] border border-[#14295F]/10 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#14295F]/7">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#14295F]/7">
               <Trophy className="h-4.5 w-4.5 text-[#14295F]" />
             </div>
-            <p className="text-[1.05rem] font-black text-[#14295F]">학생 모드</p>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">STUDENT MODE</p>
+              <p className="mt-1 text-[1.05rem] font-black text-[#14295F]">학생은 스스로 루틴을 관리합니다</p>
+            </div>
           </div>
-          <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.7] text-slate-500">
-            공부습관, 누적 흐름을 학생 화면에서 바로 확인합니다.
+          <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.72] text-slate-500">
+            오늘의 루틴, 주간 캘린더, 성장 지표, 피드백이 한 화면 안에서 이어져 학생이 바로 행동할 수 있게 합니다.
           </p>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <ValueCard label="오늘의 트랙" value="1h 36m" />
-            <ValueCard label="시즌 LP" value="3,164" tone="orange" />
+          <ChipRow items={['오늘의 루틴', '주간 캘린더', '성장 지표', '피드백 알림']} />
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/experience?mode=student" className="premium-cta premium-cta-primary h-10 px-5 text-sm">
+              학생 모드 보기
+            </Link>
+            <Link href="/go/experience?placement=experience_hub_student&mode=student" className="premium-cta premium-cta-muted h-10 px-5 text-sm">
+              학생 모드 체험
+            </Link>
           </div>
-
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {['오늘의 루틴', '누적 기록', '날짜별 캘린더'].map((c) => (
-              <span
-                key={c}
-                className="rounded-full border border-[#14295F]/10 bg-[#14295F]/5 px-2.5 py-1 text-[10px] font-black text-[#14295F]/55"
-              >
-                {c}
-              </span>
-            ))}
-          </div>
-
         </article>
 
-        {/* Parent */}
-        <article className="flex flex-col rounded-[1.75rem] border border-[#14295F]/10 bg-white p-6 shadow-sm">
+        <article className="rounded-[1.5rem] border border-[#FF7A16]/14 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FF7A16]/10">
-              <Smartphone className="h-4.5 w-4.5 text-[#FF7A16]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF7A16]/10">
+              <Users className="h-4.5 w-4.5 text-[#FF7A16]" />
             </div>
-            <p className="text-[1.05rem] font-black text-[#14295F]">학부모 모드</p>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF7A16]/55">PARENT MODE</p>
+              <p className="mt-1 text-[1.05rem] font-black text-[#14295F]">학부모는 과정을 빠르게 확인합니다</p>
+            </div>
           </div>
-          <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.7] text-slate-500">
-            출결, 학습 현황, 상담 흐름을 학부모 화면에서 확인합니다.
+          <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.72] text-slate-500">
+            실시간 상태, 주간 그래프, 날짜별 기록, 리포트와 상담 흐름이 한 문법으로 정리되어 과정을 자연스럽게 읽을 수 있습니다.
           </p>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <ValueCard label="주간 누적 트랙" value="14h 23m" />
-            <ValueCard label="평균 목표 달성" value="50%" tone="orange" />
+          <ChipRow items={['실시간 상태', '주간 그래프', '날짜별 기록', '리포트 수신']} />
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/experience?mode=parent" className="premium-cta premium-cta-primary h-10 px-5 text-sm">
+              학부모 모드 보기
+            </Link>
+            <Link href="/go/experience?placement=experience_hub_parent&mode=parent" className="premium-cta premium-cta-muted h-10 px-5 text-sm">
+              학부모 모드 체험
+            </Link>
           </div>
-
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {['학생 현황', '주간 누적 트랙', '학습 기록 확인'].map((c) => (
-              <span
-                key={c}
-                className="rounded-full border border-[#14295F]/10 bg-[#FF7A16]/6 px-2.5 py-1 text-[10px] font-black text-[#D96809]/70"
-              >
-                {c}
-              </span>
-            ))}
-          </div>
-
         </article>
       </div>
+
+      <FlowSummary
+        title="웹앱 체험 페이지는 이런 순서로 구성했습니다"
+        subtitle="화면 조각을 나열하지 않고, 실제 앱을 쓰는 흐름처럼 단계별로 따라갈 수 있도록 설계했습니다."
+        steps={[
+          { icon: <Target className="h-4 w-4" />, label: '확인', desc: '대표 화면에서 핵심 상태 확인' },
+          { icon: <BarChart3 className="h-4 w-4" />, label: '추적', desc: '그래프와 캘린더로 흐름 추적' },
+          { icon: <LineChart className="h-4 w-4" />, label: '해석', desc: '리포트와 지표로 변화 해석' },
+          { icon: <MessageCircle className="h-4 w-4" />, label: '행동', desc: '알림과 상담으로 다음 행동 연결' },
+        ]}
+      />
     </div>
   );
 }
 
-/* ─────────────────────────────────────────
-   Mode tab
-───────────────────────────────────────── */
 function ModeTab({
   href,
   label,
@@ -741,9 +825,6 @@ function ModeTab({
   );
 }
 
-/* ─────────────────────────────────────────
-   Page
-───────────────────────────────────────── */
 export default function ExperiencePage() {
   const searchParams = useSearchParams();
   const mode = (searchParams.get('mode') as DemoMode | null) ?? null;
@@ -751,9 +832,7 @@ export default function ExperiencePage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#F5F8FF_0%,#FFFFFF_60%,#F8FBFF_100%)] text-[#14295F]">
       <MarketingPageTracker pageType="experience" placement="experience_page" />
-      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-
-        {/* Top nav */}
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/"
@@ -770,7 +849,6 @@ export default function ExperiencePage() {
           </Link>
         </div>
 
-        {/* Page-level mode tabs */}
         <div className="mt-6 flex flex-wrap gap-2">
           <ModeTab
             href="/experience"
@@ -792,31 +870,38 @@ export default function ExperiencePage() {
           />
         </div>
 
-        {/* Content */}
         <div className="mt-6">
-          {!mode && <WebAppLanding />}
+          {!mode ? <ExperienceHub /> : null}
 
-          {mode === 'student' && (
+          {mode === 'student' ? (
             <>
               <ModeHero
                 eyebrow="STUDENT MODE PREVIEW"
                 title="학생 모드 체험"
-                desc="루틴, 기록, 누적 흐름까지 학생 화면에서 직접 확인해보세요."
-                subdesc="오늘 해야 할 루틴부터 누적 기록, 날짜별 학습 흐름까지 학생에게 필요한 화면을 한눈에 볼 수 있도록 구성했습니다."
+                desc="오늘의 루틴, 주간 기록, 성장 지표, 피드백 흐름까지 학생 화면에서 직접 확인해보세요."
+                subdesc="학생은 무엇을 해야 하는지 먼저 보고, 기록을 쌓고, 성장 지표를 읽고, 다시 행동으로 연결하는 흐름으로 설계했습니다."
                 primaryHref="/go/login?placement=experience_hero_student"
                 primaryLabel="실제 로그인"
+                secondaryHref="/experience?mode=parent"
+                secondaryLabel="학부모 화면도 보기"
+                badge={
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-[#EEF3FF] px-3 py-1.5 text-[11px] font-black text-[#14295F]">
+                    <Smartphone className="h-3 w-3" />
+                    학생 앱 흐름
+                  </div>
+                }
               />
               <StudentModeSection />
             </>
-          )}
+          ) : null}
 
-          {mode === 'parent' && (
+          {mode === 'parent' ? (
             <>
               <ModeHero
                 eyebrow="PARENT MODE PREVIEW"
                 title="학부모 모드 체험"
-                desc="출결, 학습 현황, 기록 흐름까지 학부모 화면에서 직접 확인해보세요."
-                subdesc="학생의 하루 현황부터 주간 기록, 날짜별 학습 흐름까지 학부모가 필요한 정보를 빠르게 확인할 수 있도록 구성했습니다."
+                desc="실시간 상태, 주간 그래프, 날짜별 기록, 리포트와 상담 흐름까지 학부모 화면에서 직접 확인해보세요."
+                subdesc="학부모는 학생의 과정을 빠르게 읽고 필요한 순간에 바로 질문하거나 상담으로 연결할 수 있도록 설계했습니다."
                 primaryHref="/go/login?placement=experience_hero_parent"
                 primaryLabel="실제 로그인"
                 secondaryHref="/experience?mode=student"
@@ -830,9 +915,8 @@ export default function ExperiencePage() {
               />
               <ParentModeSection />
             </>
-          )}
+          ) : null}
         </div>
-
       </div>
     </main>
   );
