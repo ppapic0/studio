@@ -185,9 +185,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const router = useRouter();
   const firestore = useFirestore();
   const functions = useFunctions();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, memberships, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
+  const classroomMembership = useMemo(() => {
+    const hasClassroomAccess = (role?: string, status?: string) => {
+      const allowedRole = role === 'teacher' || role === 'centerAdmin' || role === 'owner';
+      if (!allowedRole) return false;
+      return !status || status === 'active';
+    };
+
+    if (activeMembership && hasClassroomAccess(activeMembership.role, activeMembership.status)) {
+      return activeMembership;
+    }
+
+    return (
+      memberships.find((membership) => hasClassroomAccess(membership.role, membership.status)) ||
+      null
+    );
+  }, [activeMembership, memberships]);
   
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<number>(Date.now());
@@ -232,18 +248,37 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(timer);
   }, []);
 
-  const centerId = activeMembership?.id;
+  const centerId = classroomMembership?.id;
   const canAdjustPenalty =
-    activeMembership?.role === 'teacher' ||
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
+    classroomMembership?.role === 'teacher' ||
+    classroomMembership?.role === 'centerAdmin' ||
+    classroomMembership?.role === 'owner';
   const canResetPenalty =
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
+    classroomMembership?.role === 'centerAdmin' ||
+    classroomMembership?.role === 'owner';
   const canTriggerAttendanceSms =
-    activeMembership?.role === 'teacher' ||
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
+    classroomMembership?.role === 'teacher' ||
+    classroomMembership?.role === 'centerAdmin' ||
+    classroomMembership?.role === 'owner';
+
+  if (membershipsLoading && !classroomMembership) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <p className="text-sm font-bold text-slate-600">실시간 교실을 준비하는 중입니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!classroomMembership || !centerId) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <p className="font-black text-muted-foreground opacity-30">실시간 교실을 열 수 있는 센터 권한을 찾지 못했습니다.</p>
+      </div>
+    );
+  }
 
   const triggerAttendanceSms = async (
     studentId: string,
