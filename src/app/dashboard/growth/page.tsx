@@ -43,6 +43,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { getTierTheme } from '@/lib/tier-theme';
+import Link from 'next/link';
 
 const STAT_CONFIG = {
   focus: { 
@@ -424,13 +425,35 @@ export default function GrowthPage() {
               { label: '부스트', val: `x${totalBoost.toFixed(2)}`, icon: Zap, color: 'text-emerald-400' },
               { label: '시즌 리셋', val: '매월 1일', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
-              <div key={i} className={cn("bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5")}>
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
-                  <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+              i === 0 ? (
+                <Link
+                  key={i}
+                  href="/dashboard/leaderboards"
+                  className={cn(
+                    "bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5 transition-all duration-200 hover:bg-white/20 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                    isMobile && "active:scale-[0.98]"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
+                    <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+                  </div>
+                  <div className="flex items-end justify-between gap-2">
+                    <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
+                    <span className={cn("font-black text-white/80 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[10px]")}>
+                      보기 <ChevronRight className={cn("inline", isMobile ? "h-3 w-3" : "h-3.5 w-3.5")} />
+                    </span>
+                  </div>
+                </Link>
+              ) : (
+                <div key={i} className={cn("bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5")}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
+                    <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+                  </div>
+                  <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
                 </div>
-                <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
-              </div>
+              )
             ))}
           </div>
         </div>
