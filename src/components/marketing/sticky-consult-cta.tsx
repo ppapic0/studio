@@ -14,13 +14,13 @@ export function StickyConsultCTA() {
 
   return (
     <div
-      className={`fixed bottom-6 right-5 z-50 transition-all duration-300 sm:bottom-8 sm:right-8 ${
+      className={`fixed bottom-4 left-4 right-4 z-50 transition-all duration-300 sm:bottom-8 sm:left-auto sm:right-8 ${
         visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'
       }`}
     >
       <a
         href="#consult"
-        className="flex items-center gap-2 rounded-2xl bg-[#14295F] px-5 py-3.5 text-[13px] font-black text-white shadow-lg transition-all active:scale-95 hover:bg-[#1c3580]"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14295F] px-5 py-3.5 text-[13px] font-black text-white shadow-lg transition-all active:scale-95 hover:bg-[#1c3580] sm:w-auto"
       >
         <MessageSquare className="h-4 w-4" />
         상담 신청

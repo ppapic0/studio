@@ -56,10 +56,10 @@ export function AppPreviewSection() {
               </div>
             </div>
             {/* Footer bar */}
-            <div className="flex items-center justify-between border-t border-[rgba(20,41,95,0.07)] bg-[#14295F]/3 px-6 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(20,41,95,0.07)] bg-[#14295F]/3 px-6 py-4">
               <a
                 href="/go/experience?placement=app_student&mode=student&view=mobile"
-                className="inline-flex items-center gap-2 text-[13px] font-black text-[#14295F] transition-all duration-200 hover:gap-3"
+                className="inline-flex min-w-0 items-center gap-2 text-[13px] font-black text-[#14295F] transition-all duration-200 hover:gap-3"
               >
                 학생 화면 체험하기
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -94,7 +94,7 @@ export function AppPreviewSection() {
               </div>
             </div>
             {/* Footer bar */}
-            <div className="flex items-center justify-between border-t border-[rgba(255,122,22,0.1)] bg-[#FF7A16]/3 px-6 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(255,122,22,0.1)] bg-[#FF7A16]/3 px-6 py-4">
               <span className="inline-flex items-center gap-2 text-[13px] font-black text-[#FF7A16]/75">
                 학부모 기능 안내
               </span>

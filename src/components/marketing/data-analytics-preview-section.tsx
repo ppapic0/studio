@@ -3,6 +3,8 @@ import { Activity, AlertTriangle, CheckCircle2, LineChart, MessageSquare } from 
 
 import { SectionHeading } from './section-heading';
 
+const trendLabels = ['3/2', '3/3', '3/4', '3/5', '3/6', '3/7', '3/8', '3/9', '3/10', '3/11', '3/12', '3/13', '3/14', '3/15'];
+
 function MiniStat({
   label,
   value,
@@ -33,7 +35,7 @@ function MiniStat({
 
 function TrendLine() {
   return (
-    <svg viewBox="0 0 620 260" className="h-[230px] w-full">
+    <svg viewBox="0 0 620 260" className="h-[210px] w-full min-w-[34rem] sm:h-[230px] sm:min-w-0">
       {[0, 1, 2, 3].map((i) => (
         <line
           key={i}
@@ -67,31 +69,33 @@ function TrendLine() {
 
 function CompletionBars() {
   return (
-    <div className="flex h-[230px] items-end gap-2 rounded-2xl border border-[#14295F]/8 bg-[#FBFCFF] px-4 pb-4 pt-6">
-      {[
-        { day: '3/2', v: 0 },
-        { day: '3/3', v: 0 },
-        { day: '3/4', v: 0 },
-        { day: '3/5', v: 0 },
-        { day: '3/6', v: 0 },
-        { day: '3/7', v: 0 },
-        { day: '3/8', v: 0 },
-        { day: '3/9', v: 0 },
-        { day: '3/10', v: 76 },
-        { day: '3/11', v: 0 },
-        { day: '3/12', v: 0 },
-        { day: '3/13', v: 0 },
-      ].map((item) => (
-        <div key={item.day} className="flex flex-1 flex-col items-center justify-end gap-2">
-          <div className="w-full rounded-t-lg bg-[#F2F4FA]">
-            <div
-              className="w-full rounded-t-lg bg-[linear-gradient(180deg,#FFB24E_0%,#FF8A00_100%)]"
-              style={{ height: `${Math.max(item.v, 2)}px` }}
-            />
+    <div className="overflow-x-auto pb-2 custom-scrollbar">
+      <div className="flex h-[230px] min-w-[26rem] items-end gap-2 rounded-2xl border border-[#14295F]/8 bg-[#FBFCFF] px-4 pb-4 pt-6 sm:min-w-0">
+        {[
+          { day: '3/2', v: 0 },
+          { day: '3/3', v: 0 },
+          { day: '3/4', v: 0 },
+          { day: '3/5', v: 0 },
+          { day: '3/6', v: 0 },
+          { day: '3/7', v: 0 },
+          { day: '3/8', v: 0 },
+          { day: '3/9', v: 0 },
+          { day: '3/10', v: 76 },
+          { day: '3/11', v: 0 },
+          { day: '3/12', v: 0 },
+          { day: '3/13', v: 0 },
+        ].map((item) => (
+          <div key={item.day} className="flex flex-1 flex-col items-center justify-end gap-2">
+            <div className="w-full rounded-t-lg bg-[#F2F4FA]">
+              <div
+                className="w-full rounded-t-lg bg-[linear-gradient(180deg,#FFB24E_0%,#FF8A00_100%)]"
+                style={{ height: `${Math.max(item.v, 2)}px` }}
+              />
+            </div>
+            <span className="text-[10px] font-black text-[#14295F]/45">{item.day}</span>
           </div>
-          <span className="text-[10px] font-black text-[#14295F]/45">{item.day}</span>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -128,11 +132,17 @@ export function DataAnalyticsPreviewSection() {
               <p className="mb-2 text-[12px] font-bold text-[#14295F]/55">
                 집중 시간의 고저패턴을 한 화면에 담아 전략을 파악합니다.
               </p>
-              <TrendLine />
-              <div className="mt-1 flex justify-between px-1 text-[10px] font-black text-[#14295F]/45">
-                {['3/2', '3/3', '3/4', '3/5', '3/6', '3/7', '3/8', '3/9', '3/10', '3/11', '3/12', '3/13', '3/14', '3/15'].map((d) => (
-                  <span key={d}>{d}</span>
-                ))}
+              <div className="overflow-x-auto pb-2 custom-scrollbar">
+                <div className="min-w-[34rem] sm:min-w-0">
+                  <TrendLine />
+                  <div className="mt-1 flex justify-between px-1 text-[9px] font-black text-[#14295F]/45 sm:text-[10px]">
+                    {trendLabels.map((d, index) => (
+                      <span key={d} className={index % 2 === 1 ? 'hidden sm:inline' : ''}>
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </article>
 

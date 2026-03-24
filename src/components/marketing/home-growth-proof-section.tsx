@@ -56,7 +56,7 @@ export function HomeGrowthProofSection() {
             </div>
           </article>
 
-          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             {growthProofCards.map((card) => (
               <article key={card.phase} className="overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white shadow-[0_10px_26px_-20px_rgba(20,41,95,0.42)]">
                 <img src={card.image} alt={`${card.phase} 성적표 익명 처리본`} className="h-[300px] w-full object-cover object-top" />
@@ -70,7 +70,7 @@ export function HomeGrowthProofSection() {
         </div>
 
         <div className="mt-6 rounded-[1.1rem] border border-[#14295F]/10 bg-white/85 px-4 py-3">
-          <p className="flex items-center gap-2 break-keep text-[12.5px] font-semibold text-[#425b78]">
+          <p className="flex flex-col items-start gap-3 break-keep text-[12.5px] font-semibold text-[#425b78] sm:flex-row sm:items-center">
             <TrendingUp className="h-4 w-4 text-[#FF7A16]" />
             전과목 코칭과 학습 관리 구조를 먼저 세우고, 국어를 핵심 과목으로 밀도 있게 연결했습니다.
             <Link href="/class" className="inline-flex items-center gap-1 font-black text-[#14295F]">

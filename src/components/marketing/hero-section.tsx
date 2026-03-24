@@ -27,14 +27,14 @@ export function HeroSection({ brand }: HeroSectionProps) {
       >
         {/* Logo image: desaturated + blurred → just a silhouette */}
         <div
-          className="absolute bottom-[-8%] right-[-6%] h-[420px] w-[420px] sm:bottom-[-10%] sm:right-[-4%] sm:h-[540px] sm:w-[540px] lg:bottom-[-12%] lg:right-[-3%] lg:h-[680px] lg:w-[680px]"
+          className="absolute bottom-[-6%] right-[-12%] h-[320px] w-[320px] sm:bottom-[-8%] sm:right-[-8%] sm:h-[420px] sm:w-[420px] md:bottom-[-10%] md:right-[-5%] md:h-[520px] md:w-[520px] lg:bottom-[-12%] lg:right-[-3%] lg:h-[680px] lg:w-[680px]"
           style={{ opacity: 0.11 }}
         >
           <Image
             src={brand.logoMark}
             alt=""
             fill
-            sizes="680px"
+            sizes="(max-width: 640px) 320px, (max-width: 1024px) 520px, 680px"
             className="object-contain"
             style={{
               filter: 'blur(2px) saturate(0.15) brightness(0.55)',
@@ -59,20 +59,20 @@ export function HeroSection({ brand }: HeroSectionProps) {
         />
       </div>
 
-      <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_0.88fr] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
+      <div className="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-14 sm:px-6 md:gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.88fr)] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
         {/* LEFT: Headline + copy + CTA */}
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           {/* Eyebrow */}
           <span className="eyebrow-badge-light">관리형 스터디센터</span>
 
           {/* Headline — 어그로체 */}
           <div className="space-y-5">
-            <h1 className="font-aggro-display break-keep text-[clamp(2rem,3.6vw,3rem)] font-black leading-[1.15] text-white">
+            <h1 className="font-aggro-display max-w-[12ch] break-keep text-[clamp(2rem,3.8vw,3rem)] font-black leading-[1.12] text-white">
               공부는 방향이 중요합니다.
               <br />
               성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
             </h1>
-            <p className="max-w-[420px] break-keep text-[15.5px] font-bold leading-[1.78] text-white/85">
+            <p className="max-w-[30rem] break-keep text-[15px] font-bold leading-[1.78] text-white/85 sm:text-[15.5px]">
               빈틈없는 관리 시스템으로
               <br />
               스스로 공부하는 습관을 형성합니다.
@@ -80,16 +80,16 @@ export function HeroSection({ brand }: HeroSectionProps) {
           </div>
 
           {/* CTAs */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <a
               href="/go/experience?placement=hero_experience"
-              className="premium-cta premium-cta-primary h-12 px-7 text-[14px]"
+              className="premium-cta premium-cta-primary h-12 justify-center px-7 text-[14px] sm:w-auto"
             >
               웹앱 체험하기
             </a>
             <a
               href="#consult"
-              className="premium-cta premium-cta-ghost h-12 px-7 text-[14px]"
+              className="premium-cta premium-cta-ghost h-12 justify-center px-7 text-[14px] sm:w-auto"
             >
               상담 신청하기
             </a>

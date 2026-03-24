@@ -19,20 +19,20 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
         boxShadow: '0 1px 0 0 rgba(255,255,255,0.05) inset, 0 8px 24px -4px rgba(0,0,0,0.28)',
       }}
     >
-      <div className="mx-auto flex h-[4.25rem] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="inline-flex items-center gap-3 transition-opacity hover:opacity-85">
+      <div className="mx-auto flex h-[4.25rem] w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="inline-flex min-w-0 flex-1 items-center gap-2.5 transition-opacity hover:opacity-85">
           <Image
             src="/track-logo-mark-white.png"
             alt={`${brand.name} 로고`}
             width={54}
             height={36}
-            className="h-9 w-auto object-contain"
+            className="h-8 w-auto shrink-0 object-contain sm:h-9"
           />
-          <div className="grid gap-0.5">
-            <span className="text-[1rem] font-bold text-white sm:text-[1.05rem]">
+          <div className="grid min-w-0 gap-0.5">
+            <span className="truncate text-[0.94rem] font-bold text-white sm:text-[1.02rem] lg:text-[1.05rem]">
               {brand.name}
             </span>
-            <span className="text-[9.5px] font-black tracking-[0.18em] text-white/50">
+            <span className="hidden text-[9.5px] font-black tracking-[0.18em] text-white/50 sm:block">
               MANAGED STUDY CENTER
             </span>
           </div>
@@ -50,11 +50,11 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
-          <a href="/go/login?placement=header" className="premium-cta premium-cta-ghost h-9 px-4 text-xs">
+        <div className="flex shrink-0 items-center gap-2">
+          <a href="/go/login?placement=header" className="premium-cta premium-cta-ghost hidden h-9 px-4 text-xs sm:inline-flex">
             웹앱 로그인
           </a>
-          <a href="/go/experience?placement=header" className="premium-cta premium-cta-primary h-10 whitespace-nowrap px-5 text-[13.5px] font-extrabold tracking-[-0.005em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)]">
+          <a href="/go/experience?placement=header" className="premium-cta premium-cta-primary h-9 whitespace-nowrap px-3.5 text-[12.5px] font-extrabold tracking-[-0.005em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)] sm:h-10 sm:px-5 sm:text-[13.5px]">
             웹앱 체험
           </a>
         </div>

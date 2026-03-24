@@ -50,7 +50,7 @@ export function DataManagementSection() {
         </div>
 
         {/* 3-step cards */}
-        <StaggerChildren stagger={100} className="mt-9 grid gap-4 sm:grid-cols-3">
+        <StaggerChildren stagger={100} className="mt-9 grid gap-4 md:grid-cols-3">
           {cards.map((card, i) => {
             const Icon = card.icon;
             return (

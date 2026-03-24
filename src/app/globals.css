@@ -152,6 +152,8 @@
 
   html {
     scroll-behavior: smooth;
+    max-width: 100%;
+    overflow-x: clip;
   }
 }
 
@@ -171,6 +173,14 @@
     text-rendering: optimizeLegibility;
     word-break: keep-all;
     overflow-wrap: break-word;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
   }
 
   /* ── Display token: body/button/card headings (Pretendard-based) ── */
