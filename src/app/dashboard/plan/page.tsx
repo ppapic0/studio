@@ -543,8 +543,12 @@ export default function StudyPlanPage() {
         setNewRoutineTitle('');
         setIsRoutineModalOpen(false);
       }
-    } catch (error) {
-      console.error("Error adding task:", error);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '할 일 추가 실패',
+        description: typeof error?.message === 'string' ? error.message : '할 일을 저장하지 못했습니다.',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -593,8 +597,12 @@ export default function StudyPlanPage() {
         });
       }
       toast({ title: type === 'attend' ? "출석 일정이 등록되었습니다." : "미등원 처리가 완료되었습니다." });
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '출석 설정 실패',
+        description: typeof e?.message === 'string' ? e.message : '출석 설정을 저장하지 못했습니다.',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -690,7 +698,13 @@ export default function StudyPlanPage() {
       }
       await batch.commit();
       toast({ title: "계획 복사 완료", description: `이번 달의 남은 ${format(selectedDate, 'EEEE', { locale: ko })}에 학습 계획이 복사되었습니다.` });
-    } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '계획 복사 실패',
+        description: typeof error?.message === 'string' ? error.message : '학습 계획을 복사하지 못했습니다.',
+      });
+    } finally { setIsSubmitting(false); }
   };
 
   const handleApplyRoutineToAllWeekdaysLegacy = async () => {
@@ -722,7 +736,13 @@ export default function StudyPlanPage() {
       }
       await batch.commit();
       toast({ title: "루틴 복사 완료", description: `이번 달의 남은 ${format(selectedDate, 'EEEE', { locale: ko })}에 생활 루틴이 복사되었습니다.` });
-    } catch (error) { console.error(error); } finally { setIsSubmitting(false); }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '루틴 복사 실패',
+        description: typeof error?.message === 'string' ? error.message : '생활 루틴을 복사하지 못했습니다.',
+      });
+    } finally { setIsSubmitting(false); }
   };
   void handleApplyTasksToAllWeekdaysLegacy;
   void handleApplyRoutineToAllWeekdaysLegacy;
@@ -1331,7 +1351,20 @@ export default function StudyPlanPage() {
                     </div>
                     <div className="space-y-6 p-8 bg-white">
                       <Input placeholder="예: 영어 학원, 점심 시간" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 rounded-2xl border-2 font-bold text-base" />
-                      <div className="flex flex-wrap gap-2">{['점심', '저녁', '학원', '독서실'].map(tag => <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white py-1.5 px-4 rounded-xl font-black text-xs" onClick={() => setNewRoutineTitle(tag)}>+{tag}</Badge>)}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {['점심', '저녁', '학원', '독서실'].map(tag => (
+                          <Button
+                            key={tag}
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-auto rounded-xl px-4 py-1.5 text-xs font-black"
+                            onClick={() => setNewRoutineTitle(tag)}
+                          >
+                            +{tag}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                     <DialogFooter className="p-8 bg-muted/30"><Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} disabled={!newRoutineTitle.trim() || isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white bg-gradient-to-br", currentTier.gradient)}>{isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : '루틴 생성'}</Button></DialogFooter>
                   </DialogContent>

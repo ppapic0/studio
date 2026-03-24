@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ export default function StudentReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode, currentTier } = useAppContext();
+  const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,7 +78,13 @@ export default function StudentReportsPage() {
         viewedAt: serverTimestamp(),
         viewedByUid: user.uid,
         viewedByName: user.displayName || activeMembership.displayName || '학생',
-      }).catch((err) => console.error('Error updating report viewed state:', err));
+      }).catch(() => {
+        toast({
+          variant: 'destructive',
+          title: '읽음 표시 실패',
+          description: '리포트는 열렸지만 읽음 상태를 저장하지 못했습니다.',
+        });
+      });
     }
   };
 

@@ -559,8 +559,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAt: serverTimestamp(),
         metadata: metadata || {},
       });
-    } catch (error) {
-      console.warn('[parent-activity] failed to log event', eventType, error);
+    } catch {
+      // Telemetry failures should never surface as parent-facing console noise.
     }
   };
 
@@ -650,8 +650,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         setSelectedDatePlans(
           snap.docs.map((docSnap) => ({ ...(docSnap.data() as StudyPlanItem), id: docSnap.id }))
         );
-      } catch (error) {
-        console.error('[parent-dashboard] failed to load selected date plans', error);
+      } catch {
         if (!cancelled) {
           setSelectedDatePlans([]);
         }
@@ -1908,12 +1907,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const parentCommunications = useMemo(() => {
     if (!rawParentCommunications) return [];
-    return [...rawParentCommunications].sort((a, b) => {
-      const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
-      const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
-      return bMs - aMs;
-    });
-  }, [rawParentCommunications]);
+    return [...rawParentCommunications]
+      .filter((item) => {
+        if (!studentId) return false;
+        if (item.studentId) return item.studentId === studentId;
+        return linkedStudentIds.length <= 1;
+      })
+      .sort((a, b) => {
+        const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+        const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+        return bMs - aMs;
+      });
+  }, [rawParentCommunications, studentId, linkedStudentIds.length]);
 
   const parentAnnouncements = useMemo(() => {
     const centerItems = (rawCenterAnnouncements || []).filter((item) => {
@@ -2128,8 +2133,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     updateDoc(doc(firestore, 'centers', centerId, 'dailyReports', target.id), {
       viewedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }).catch((error) => {
-      console.warn('[parent-dashboard] report viewed update failed', error);
+    }).catch(() => {
+      // Keep archive navigation quiet even if the parent cannot mark reports as viewed.
     });
   };
 

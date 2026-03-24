@@ -432,7 +432,13 @@ export default function StudyHistoryPage() {
         });
       }
       if (category === 'study') setNewStudyTask(''); else if (category === 'personal') setNewPersonalTask(''); else { setNewRoutineTitle(''); setIsRoutineModalOpen(false); }
-    } catch (e) { console.error(e); } finally { setIsSubmitting(false); }
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '할 일 추가 실패',
+        description: typeof e?.message === 'string' ? e.message : '할 일을 저장하지 못했습니다.',
+      });
+    } finally { setIsSubmitting(false); }
   };
 
   const to24h = (time12h: string, period: '오전' | '오후') => {
@@ -461,7 +467,13 @@ export default function StudyHistoryPage() {
           description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
         });
       }
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '루틴 시간 수정 실패',
+        description: typeof e?.message === 'string' ? e.message : '루틴 시간을 저장하지 못했습니다.',
+      });
+    }
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
@@ -494,7 +506,13 @@ export default function StudyHistoryPage() {
         batch.set(progressRef, progressUpdate, { merge: true });
         await batch.commit();
       }
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '계획 상태 변경 실패',
+        description: typeof e?.message === 'string' ? e.message : '계획 상태를 저장하지 못했습니다.',
+      });
+    }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
@@ -512,7 +530,13 @@ export default function StudyHistoryPage() {
         });
       }
       toast({ title: "항목이 삭제되었습니다." });
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '항목 삭제 실패',
+        description: typeof e?.message === 'string' ? e.message : '선택한 항목을 삭제하지 못했습니다.',
+      });
+    }
   };
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;

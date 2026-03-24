@@ -29,6 +29,8 @@ export interface CenterMembership {
   siblingDiscount?: boolean;
 }
 
+export type 센터Membership = CenterMembership;
+
 export interface Invoice {
   id: string;
   studentId: string;
