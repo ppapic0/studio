@@ -1829,11 +1829,40 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const mDisplay = totalMinutesCount % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
 
+  // dynamic hero message based on study state
+  const heroMessage = (() => {
+    if (isTimerActive) {
+      if (totalMinutesCount >= 360) return '6시간 돌파! 오늘의 챔피언';
+      if (totalMinutesCount >= 240) return '놀라운 집중력이에요';
+      if (totalMinutesCount >= 120) return '좋은 흐름을 이어가세요';
+      return '트랙 위를 달리고 있어요';
+    }
+    if (totalMinutesCount > 0) return '오늘도 성장한 하루였어요';
+    return '오늘의 트랙을 시작해 보세요';
+  })();
+
+  // yesterday comparison percentage
+  const studyVsYesterday = (() => {
+    const yMin = logMinutesByDateKey.get(yesterdayKey) || 0;
+    if (yMin === 0) return totalMinutesCount > 0 ? 100 : 0;
+    return Math.round(((totalMinutesCount - yMin) / yMin) * 100);
+  })();
+
+  // today plan completion rate
+  const todayPlanRate = (() => {
+    const plans = fetchedPlans?.filter(p => p.dateKey === todayKey && (p.category === 'study' || !p.category)) || [];
+    if (plans.length === 0) return 0;
+    return Math.round((plans.filter(p => p.done).length / plans.length) * 100);
+  })();
+
+  // unread teacher reports
+  const unreadReportCount = teacherReports.filter(r => !r.viewedAt).length;
+
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
       <section className={cn(
         "relative overflow-hidden text-white border transition-colors duration-200",
-        isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-10"
+        isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-8"
       )}
       style={{
         borderColor: tierTheme.heroBorder,
@@ -1842,224 +1871,218 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <div className="pointer-events-none absolute top-0 right-0 p-8 sm:p-12 opacity-[0.08] rotate-12">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-20 w-20" : "h-64 w-64")} />}
         </div>
-        <div className={cn("relative z-10 flex flex-col gap-4", isMobile ? "items-center text-center" : "md:flex-row md:justify-between md:text-left")}>
-          <div className={isMobile ? "space-y-2" : "space-y-4"}>
-            <div className="flex flex-col gap-1">
-              <Badge
-                variant="outline"
-                className={cn("w-fit text-white border font-black tracking-[0.14em] uppercase px-2.5 py-1", isMobile ? "mx-auto text-[8px]" : "text-[10px]")}
-                style={{ backgroundColor: tierTheme.chipBg, borderColor: tierTheme.chipBorder }}
-              >
-                {currentTier.name} 티어 활성
-              </Badge>
-              <h2 className={cn("font-aggro-display font-black whitespace-pre-line", isMobile ? "text-[1.75rem] leading-[1.2] tracking-[-0.01em]" : "text-[3.6rem] leading-[1.1] tracking-[-0.02em]")}>
-                {isTimerActive ? "트랙의 정점에\n도달하셨네요 !" : "오늘의 성장을 위해\n트랙을 시작하세요"}
-              </h2>
-            </div>
-            <div
-              className={cn("flex items-center gap-1.5 w-fit px-3 py-1 rounded-full border", isMobile ? "mx-auto" : "md:mx-0")}
-              style={{ backgroundColor: tierTheme.subtleBg, borderColor: tierTheme.subtleBorder }}
+        <div className={cn("relative z-10 flex flex-col", isMobile ? "items-center text-center gap-3" : "gap-5")}>
+          {/* Row 1: Tier badge + dynamic message */}
+          <div className={cn("flex items-center gap-2 flex-wrap", isMobile ? "justify-center" : "")}>
+            <Badge
+              variant="outline"
+              className={cn("text-white border font-black tracking-[0.14em] uppercase px-2.5 py-1 shrink-0", isMobile ? "text-[8px]" : "text-[10px]")}
+              style={{ backgroundColor: tierTheme.chipBg, borderColor: tierTheme.chipBorder }}
             >
-              <span className={cn("inline-flex h-1.5 w-1.5 rounded-full", isTimerActive ? "bg-[#FFD26C]" : "bg-white")} />
-              <span className={cn("font-black uppercase tracking-[0.15em] opacity-90 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[11px]")}>성과 엔진 활성</span>
+              {currentTier.name} 티어
+            </Badge>
+            <span className={cn("font-black text-white/80", isMobile ? "text-xs" : "text-sm")}>{heroMessage}</span>
+          </div>
+
+          {/* Row 2: Today study time (large) + yesterday delta */}
+          <div>
+            <div className={cn("dashboard-number text-white tabular-nums leading-none", isMobile ? "text-5xl" : "text-7xl")}>
+              {hDisplay}<span className={cn("opacity-50 font-bold ml-1", isMobile ? "text-base" : "text-xl")}>h</span>
+              {' '}{mDisplay}<span className={cn("opacity-50 font-bold ml-1", isMobile ? "text-base" : "text-xl")}>m</span>
             </div>
-
-            <div className="hidden">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]/55">시험 디데이 + 과목별 진도율</p>
-                  <p className="text-xs font-bold text-[#14295F]/70 mt-0.5">불안을 감각이 아닌 숫자로 확인해요.</p>
-                </div>
-                <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-8 rounded-xl border-[#14295F]/20 bg-white text-[#14295F] font-black">
-                      <CalendarClock className="h-3.5 w-3.5 mr-1" />
-                      시험 설정
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className={cn("rounded-[2rem] border border-slate-200 p-0 overflow-hidden", isMobile ? "max-w-[94vw]" : "sm:max-w-lg")}>
-                    <div className={cn("bg-[#14295F] text-white", isMobile ? "p-5" : "p-7")}>
-                      <DialogHeader>
-                        <DialogTitle className={cn("font-black tracking-tight", isMobile ? "text-xl" : "text-2xl")}>시험 디데이 설정</DialogTitle>
-                        <DialogDescription className="text-white/70 text-xs font-bold">학생 본인 기준으로 시험명과 날짜를 저장합니다.</DialogDescription>
-                      </DialogHeader>
-                    </div>
-                    <div className={cn("bg-white space-y-3", isMobile ? "p-4" : "p-6")}>
-                      {examDrafts.map((item, index) => (
-                        <div key={item.id} className="grid grid-cols-[1fr_150px_auto] gap-2 items-center">
-                          <Input
-                            value={item.title}
-                            onChange={(e) => handleExamDraftChange(item.id, 'title', e.target.value)}
-                            placeholder={`시험명 ${index + 1}`}
-                            className="h-10 rounded-xl border-[#14295F]/15 font-bold"
-                          />
-                          <Input
-                            type="date"
-                            value={item.date}
-                            onChange={(e) => handleExamDraftChange(item.id, 'date', e.target.value)}
-                            className="h-10 rounded-xl border-[#14295F]/15 font-bold"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 rounded-xl text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                            onClick={() => handleRemoveExamDraft(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 rounded-xl font-black border-dashed"
-                        onClick={handleAddExamDraft}
-                        disabled={examDrafts.length >= 6}
-                      >
-                        <Plus className="h-4 w-4 mr-1.5" />
-                        시험 추가
-                      </Button>
-                    </div>
-                    <DialogFooter className={cn("border-t bg-white", isMobile ? "p-4" : "p-5")}>
-                      <DialogClose asChild>
-                        <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold">닫기</Button>
-                      </DialogClose>
-                      <Button
-                        type="button"
-                        onClick={handleSaveExamCountdowns}
-                        disabled={isExamSaving}
-                        className="h-10 rounded-xl font-black"
-                      >
-                        {isExamSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                        저장
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              <div className={cn("mt-3 grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                {examCountdowns.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-[#14295F]/12 bg-[#F7FAFF] px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-black text-[#14295F] truncate">{item.title}</p>
-                      <Badge className="h-6 px-2.5 text-[10px] font-black border-none bg-[#14295F] text-white">{item.dLabel}</Badge>
-                    </div>
-                    <p className="mt-1 text-[11px] font-semibold text-[#14295F]/60">
-                      {item.date ? item.date : '날짜를 설정해 주세요'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 rounded-xl border border-[#14295F]/12 bg-white px-3 py-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#14295F]/55">과목별 진도율</p>
-                  <span className="text-[10px] font-bold text-[#14295F]/45">이번 주 기준</span>
-                </div>
-                <div className="mt-2.5 space-y-2">
-                  {subjectProgress.length === 0 ? (
-                    <p className="text-xs font-semibold text-[#14295F]/55">과목 정보가 있는 주간 계획이 아직 없어요.</p>
-                  ) : (
-                    subjectProgress.map((item) => (
-                      <div key={item.subject} className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-bold text-[#14295F]">
-                          <span className="truncate">{item.subject}</span>
-                          <span>{item.done}/{item.total} · {item.rate}%</span>
-                        </div>
-                        <Progress value={item.rate} className="h-2 bg-[#E8EEF9]" />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+            <div className={cn("flex items-center gap-2 mt-1.5", isMobile ? "justify-center" : "")}>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</span>
+              {totalMinutesCount > 0 && (
+                <span className={cn(
+                  "text-[10px] font-black px-2 py-0.5 rounded-full",
+                  studyVsYesterday >= 0 ? "bg-white/20 text-white" : "bg-rose-500/30 text-white"
+                )}>
+                  어제 대비 {studyVsYesterday >= 0 ? '+' : ''}{studyVsYesterday}%
+                </span>
+              )}
             </div>
           </div>
+
+          {/* Row 3: Timer (when active) + Start/Stop button */}
           <div className={cn("flex items-center gap-3", isMobile ? "flex-col w-full" : "flex-row")}>
             {isTimerActive && (
               <div
-                className={cn("flex flex-col items-center rounded-2xl border px-6 py-3", isMobile ? "w-full" : "")}
+                className={cn("flex items-center gap-2 rounded-2xl border px-4 py-2", isMobile ? "w-full justify-center" : "")}
                 style={{ backgroundColor: tierTheme.sessionBg, borderColor: tierTheme.subtleBorder }}
               >
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">실시간 세션</span>
-                <span className={cn("dashboard-number text-white tabular-nums", isMobile ? "text-5xl" : "text-7xl")}>
+                <span className="text-[9px] font-black uppercase tracking-widest opacity-50">세션</span>
+                <span className={cn("dashboard-number text-white tabular-nums", isMobile ? "text-3xl" : "text-4xl")}>
                   {formatTimer(localSeconds)}
                 </span>
               </div>
             )}
-            <div className="flex flex-col gap-2 w-full md:w-auto">
-              <button
-                type="button"
-                disabled={isProcessingAction}
-                className={cn(
-                  "w-full rounded-2xl font-aggro-display font-black md:w-auto border flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
-                  isMobile ? "h-20 text-2xl px-10" : "h-24 px-16 text-3xl",
-                  isTimerActive ? "bg-[#D34A4A] border-[#D34A4A] text-white" : "bg-[#F8FAFF] border-[#E5EBF5] text-primary"
-                )} 
-                onClick={handleStudyStartStop}
-              >
-                {isProcessingAction ? (
-                  <Loader2 className={cn("animate-spin", isMobile ? "h-6 w-6" : "h-10 w-10")} />
-                ) : isTimerActive ? (
-                  <>집중 종료 <Square className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} fill="currentColor" /></>
-                ) : (
-                  <>집중 시작 <Play className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} fill="currentColor" /></>
-                )}
-              </button>
-              
-              <Dialog>
-                <DialogTrigger asChild>
-                  <button
-                    className="w-full h-12 rounded-2xl border text-white font-aggro-display font-black gap-2 flex items-center justify-center"
-                    style={{ backgroundColor: tierTheme.subtleBg, borderColor: tierTheme.subtleBorder }}
-                  >
-                    <QrCode className="h-4 w-4" /> 나의 출입 QR
-                  </button>
-                </DialogTrigger>
-                <DialogContent className="rounded-[3rem] p-0 overflow-hidden border border-slate-200 sm:max-w-sm">
-                  <div className="bg-primary p-8 text-white text-center">
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">나의 출입 QR</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
-                    </DialogHeader>
-                  </div>
-                  <div className="p-10 bg-white flex flex-col items-center gap-6">
-                    <div className="p-6 rounded-[2rem] bg-[#fafafa] border border-primary/15">
-                      <QRCodeSVG value={qrData} size={200} level="H" includeMargin={false} />
-                    </div>
-                    <div className="text-center space-y-1">
-                      <p className="font-black text-primary text-xl tracking-tight">{user?.displayName}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">출입 인증용</p>
-                    </div>
-                  </div>
-                  <DialogFooter className="p-6 bg-muted/30">
-                    <DialogClose asChild><Button className="w-full h-12 rounded-xl font-black">닫기</Button></DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+            <button
+              type="button"
+              disabled={isProcessingAction}
+              className={cn(
+                "rounded-2xl font-aggro-display font-black border flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+                isMobile ? "h-14 text-xl px-8 w-full" : "h-16 px-12 text-2xl",
+                isTimerActive ? "bg-[#D34A4A] border-[#D34A4A] text-white" : "bg-[#F8FAFF] border-[#E5EBF5] text-primary"
+              )}
+              onClick={handleStudyStartStop}
+            >
+              {isProcessingAction ? (
+                <Loader2 className={cn("animate-spin", isMobile ? "h-5 w-5" : "h-7 w-7")} />
+              ) : isTimerActive ? (
+                <>집중 종료 <Square className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} fill="currentColor" /></>
+              ) : (
+                <>집중 시작 <Play className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} fill="currentColor" /></>
+              )}
+            </button>
           </div>
         </div>
       </section>
 
-      <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "sm:grid-cols-3")}>
+      <div className="grid grid-cols-3 gap-2.5">
         <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={hDisplay} m={mDisplay} isMobile={isMobile} />
-        <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
-        <div className={cn(isMobile ? "col-span-2" : "")}>
-          <StudyTimeTrendDialog
-            studyTimeTrend={studyTimeTrend}
-            rhythmScoreTrend={rhythmScoreTrend}
-            rhythmScoreAverage={rhythmScoreAverage}
-            startEndTrend={startEndTrend}
-            awayTimeTrend={awayTimeTrend}
-            hasRhythmScoreTrend={hasRhythmScoreTrend}
-            hasStartEndTrend={hasStartEndTrend}
-            hasAwayTrend={hasAwayTrend}
-            rhythmYAxisDomain={rhythmYAxisDomain}
-            isMobile={isMobile}
-          />
-        </div>
+
+        {/* Plan completion rate card */}
+        <Card className={cn(
+          "border border-emerald-200 bg-[linear-gradient(135deg,#f0fdf4_0%,#f7fffe_100%)] overflow-hidden",
+          isMobile ? "rounded-2xl p-3" : "rounded-[2rem] p-5"
+        )}>
+          <div className="flex items-center justify-between mb-1">
+            <span className={cn("font-black uppercase tracking-widest text-emerald-600", isMobile ? "text-[8px]" : "text-[10px]")}>계획 달성</span>
+            <div className={cn("rounded-xl bg-emerald-100 flex items-center justify-center", isMobile ? "p-1.5" : "p-2")}>
+              <Target className={cn("text-emerald-600", isMobile ? "h-3 w-3" : "h-4 w-4")} />
+            </div>
+          </div>
+          <div className={cn("dashboard-number text-emerald-600", isMobile ? "text-2xl" : "text-4xl")}>
+            {todayPlanRate}<span className="opacity-40 font-bold text-xs ml-0.5">%</span>
+          </div>
+          <div className={cn("w-full rounded-full bg-emerald-100 overflow-hidden", isMobile ? "h-1.5 mt-1.5" : "h-2 mt-2")}>
+            <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${Math.min(todayPlanRate, 100)}%` }} />
+          </div>
+        </Card>
+
+        {/* Penalty card with Dialog */}
+        <Dialog>
+          <DialogTrigger asChild>
+            <button type="button" className="text-left h-full w-full">
+              <Card className={cn(
+                "h-full border overflow-hidden cursor-pointer transition-colors",
+                penaltyPoints === 0
+                  ? "border-emerald-200 bg-[linear-gradient(135deg,#f0fdf4_0%,#f7fffe_100%)]"
+                  : penaltyPoints < 10
+                    ? "border-slate-200/80 bg-white"
+                    : "border-rose-200 bg-[linear-gradient(135deg,#fff1f2_0%,#fff5f5_100%)]",
+                isMobile ? "rounded-2xl p-3" : "rounded-[2rem] p-5"
+              )}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className={cn(
+                    "font-black uppercase tracking-widest",
+                    isMobile ? "text-[8px]" : "text-[10px]",
+                    penaltyPoints === 0 ? "text-emerald-600" : penaltyPoints < 10 ? "text-slate-500" : "text-rose-600"
+                  )}>벌점</span>
+                  <div className={cn(
+                    "rounded-xl flex items-center justify-center",
+                    isMobile ? "p-1.5" : "p-2",
+                    penaltyPoints === 0 ? "bg-emerald-100" : penaltyPoints < 10 ? "bg-slate-100" : "bg-rose-100"
+                  )}>
+                    <ShieldAlert className={cn(
+                      isMobile ? "h-3 w-3" : "h-4 w-4",
+                      penaltyPoints === 0 ? "text-emerald-600" : penaltyPoints < 10 ? "text-slate-500" : "text-rose-600"
+                    )} />
+                  </div>
+                </div>
+                <div className={cn(
+                  "dashboard-number",
+                  isMobile ? "text-2xl" : "text-4xl",
+                  penaltyPoints === 0 ? "text-emerald-600" : penaltyPoints < 10 ? "text-slate-700" : "text-rose-600"
+                )}>
+                  {penaltyPoints}<span className="opacity-40 font-bold text-xs ml-0.5">점</span>
+                </div>
+                <p className={cn(
+                  "font-bold mt-1",
+                  isMobile ? "text-[8px]" : "text-[10px]",
+                  penaltyPoints === 0 ? "text-emerald-500" : penaltyPoints < 10 ? "text-slate-400" : "text-rose-500"
+                )}>
+                  {penaltyPoints === 0 ? '안정' : penaltyPoints < 10 ? '양호' : '주의'}
+                </p>
+              </Card>
+            </button>
+          </DialogTrigger>
+          <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "max-w-[95vw] rounded-[2rem] h-[85vh]" : "max-h-[90vh]")}>
+            <div className={cn("bg-rose-600 text-white relative shrink-0", isMobile ? "p-6" : "p-10")}>
+              <ShieldAlert className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
+              <DialogHeader>
+                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
+              <div className={cn("p-10 text-center space-y-6", isMobile ? "p-5" : "")}>
+                <div className="inline-flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">벌점 점수</span>
+                  <h3 className={cn("dashboard-number text-8xl", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
+                </div>
+                <Progress value={penaltyPoints * 3.3} className="h-3 bg-muted" />
+                <p className="text-sm font-bold text-slate-600">{penaltyPoints < 10 ? "안정적인 학습 상태입니다!" : "주의가 필요한 단계입니다."}</p>
+
+                <div className={cn("grid gap-3 text-left mx-auto", isMobile ? "max-w-full" : "max-w-2xl")}>
+                  <div className="rounded-2xl border border-rose-100 bg-white p-4">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점이 발생하는 경우</p>
+                    <ul className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700 leading-relaxed">
+                      <li>지각 신청 접수 시 +1점이 반영됩니다.</li>
+                      <li>결석 신청 접수 시 +2점이 반영됩니다.</li>
+                      <li>당일 출석 루틴을 작성하거나 수정하면 +1점이 반영됩니다.</li>
+                      <li>루틴이 없는 날은 +{ROUTINE_MISSING_PENALTY_POINTS}점이 자동 반영됩니다.</li>
+                      <li>센터 관리자/선생님이 생활 기록 벌점을 부여하면 누적 점수에 추가됩니다.</li>
+                    </ul>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">누적 시 적용되는 규정</p>
+                    <div className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700">
+                      <div className="flex items-center justify-between"><span>0~4점</span><span>포인트 감점 없음 (100%)</span></div>
+                      <div className="flex items-center justify-between"><span>5~9점</span><span>포인트 3% 감소 (97%)</span></div>
+                      <div className="flex items-center justify-between"><span>10~19점</span><span>포인트 6% 감소 (94%)</span></div>
+                      <div className="flex items-center justify-between"><span>20~29점</span><span>포인트 10% 감소 (90%)</span></div>
+                      <div className="flex items-center justify-between"><span>30점 이상</span><span>포인트 15% 감소 (85%)</span></div>
+                    </div>
+                    <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
+                      현재 {penaltyPoints}점 → 이번 포인트 배율 {penaltyMultiplierPercent}% 적용
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-rose-100 bg-white p-4">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점 부여 사유 내역</p>
+                    {myPenaltyLogs.length === 0 ? (
+                      <p className="mt-2 text-xs font-semibold text-slate-500">현재 기록된 벌점 사유가 없습니다.</p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {myPenaltyLogs.map((log) => {
+                          const createdAtDate = log.createdAt?.toDate?.();
+                          const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy-MM-dd HH:mm') : '시간 미기록';
+                          const sourceLabel = PENALTY_SOURCE_LABEL[log.source] ?? '기타';
+                          return (
+                            <div key={log.id} className="rounded-xl border border-rose-100 bg-rose-50/40 px-3 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-black text-slate-800">{log.reason || '사유 미입력'}</p>
+                                <Badge variant="outline" className="shrink-0 border-rose-200 bg-white text-rose-700 text-[10px] font-black">
+                                  +{log.pointsDelta}점
+                                </Badge>
+                              </div>
+                              <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                                {createdAtLabel} · {sourceLabel}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="p-6 bg-white border-t shrink-0 flex justify-center"><DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg">확인했습니다</Button></DialogClose></DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card className={cn("border border-slate-200/80 rounded-[2.25rem] bg-white overflow-hidden", isMobile ? "rounded-[1.5rem]" : "")}>
@@ -2116,15 +2139,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <DialogTrigger asChild>
               <button className="group text-left h-full w-full">
                 <Card className={cn(
-                  "h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4",
-                  "rounded-2xl p-4"
+                  "h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4",
+                  "rounded-2xl p-4",
+                  unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
                 )}>
                   <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 h-12 w-12">
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
                   <div className="grid min-w-0">
-                    <span className="font-black tracking-tighter whitespace-nowrap truncate text-sm">선생님 리포트</span>
-                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px] whitespace-nowrap">선생님 리포트</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black tracking-tighter whitespace-nowrap truncate text-sm">선생님 리포트</span>
+                      {unreadReportCount > 0 && (
+                        <Badge className="bg-[#FF7A16] text-white border-none font-black text-[8px] h-5 px-2 shrink-0">
+                          {unreadReportCount} 새 리포트
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px] whitespace-nowrap">학습 피드백</span>
                   </div>
                   <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
                 </Card>
@@ -2204,13 +2235,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </Dialog>
         ) : (
           <Link href="/dashboard/student-reports" className="group h-full">
-            <Card className="h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6">
+            <Card className={cn(
+              "h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
+              unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
+            )}>
               <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 h-16 w-16">
                 <FileText className="h-8 w-8" />
               </div>
               <div className="grid text-left min-w-0">
-                <span className="font-black tracking-tighter whitespace-nowrap truncate text-xl">선생님 리포트</span>
-                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px] whitespace-nowrap">선생님 리포트</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-black tracking-tighter whitespace-nowrap truncate text-xl">선생님 리포트</span>
+                  {unreadReportCount > 0 && (
+                    <Badge className="bg-[#FF7A16] text-white border-none font-black text-[9px] h-5 px-2 shrink-0">
+                      {unreadReportCount} 새 리포트
+                    </Badge>
+                  )}
+                </div>
+                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px] whitespace-nowrap">학습 피드백</span>
               </div>
               <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
             </Card>
@@ -2290,100 +2331,55 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </DialogContent>
         </Dialog>
 
-        <Dialog>
-          <DialogTrigger asChild>
-            <button className="group text-left h-full w-full">
-              <Card className={cn(
-                "h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4",
-                isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
-              )}>
-                <div className={cn("rounded-2xl bg-rose-50 flex items-center justify-center shrink-0", isMobile ? "h-12 w-12" : "h-16 w-16")}>
-                  <AlertOctagon className={cn("text-rose-600", isMobile ? "h-6 w-6" : "h-8 w-8")} />
+        {/* LP, Trend, QR column */}
+        <div className={cn("flex flex-col gap-3", isMobile ? "" : "")}>
+          <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
+          <StudyTimeTrendDialog
+            studyTimeTrend={studyTimeTrend}
+            rhythmScoreTrend={rhythmScoreTrend}
+            rhythmScoreAverage={rhythmScoreAverage}
+            startEndTrend={startEndTrend}
+            awayTimeTrend={awayTimeTrend}
+            hasRhythmScoreTrend={hasRhythmScoreTrend}
+            hasStartEndTrend={hasStartEndTrend}
+            hasAwayTrend={hasAwayTrend}
+            rhythmYAxisDomain={rhythmYAxisDomain}
+            isMobile={isMobile}
+          />
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "w-full rounded-2xl border border-slate-200/80 bg-white font-black gap-2 flex items-center justify-center text-primary transition-colors hover:bg-slate-50",
+                  isMobile ? "h-12 text-sm" : "h-14 text-base"
+                )}
+              >
+                <QrCode className="h-4 w-4" /> 나의 출입 QR
+              </button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[3rem] p-0 overflow-hidden border border-slate-200 sm:max-w-sm">
+              <div className="bg-primary p-8 text-white text-center">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tighter text-white">나의 출입 QR</DialogTitle>
+                  <DialogDescription className="text-white/70 font-bold mt-1">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="p-10 bg-white flex flex-col items-center gap-6">
+                <div className="p-6 rounded-[2rem] bg-[#fafafa] border border-primary/15">
+                  <QRCodeSVG value={qrData} size={200} level="H" includeMargin={false} />
                 </div>
-                <div className="grid min-w-0">
-                  <span className={cn("font-black tracking-tighter whitespace-nowrap truncate", isMobile ? "text-sm" : "text-xl")}>벌점 현황</span>
-                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px] whitespace-nowrap")}>벌점 가이드</span>
-                </div>
-                <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
-              </Card>
-            </button>
-          </DialogTrigger>
-          <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "max-w-[95vw] rounded-[2rem] h-[85vh]" : "max-h-[90vh]")}>
-            <div className={cn("bg-rose-600 text-white relative shrink-0", isMobile ? "p-6" : "p-10")}>
-              <ShieldAlert className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
-              <DialogHeader>
-                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
-                <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
-              </DialogHeader>
-            </div>
-            <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-              <div className={cn("p-10 text-center space-y-6", isMobile ? "p-5" : "")}>
-                <div className="inline-flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">벌점 점수</span>
-                  <h3 className={cn("dashboard-number text-8xl", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
-                </div>
-                <Progress value={penaltyPoints * 3.3} className="h-3 bg-muted" />
-                <p className="text-sm font-bold text-slate-600">{penaltyPoints < 10 ? "안정적인 학습 상태입니다! ✨" : "주의가 필요한 단계입니다. ⚠️"}</p>
-
-                <div className={cn("grid gap-3 text-left mx-auto", isMobile ? "max-w-full" : "max-w-2xl")}>
-                  <div className="rounded-2xl border border-rose-100 bg-white p-4">
-                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점이 발생하는 경우</p>
-                    <ul className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700 leading-relaxed">
-                      <li>지각 신청 접수 시 `+1점`이 반영됩니다.</li>
-                      <li>결석 신청 접수 시 `+2점`이 반영됩니다.</li>
-                      <li>당일 출석 루틴을 작성하거나 수정하면 `+1점`이 반영됩니다.</li>
-                      <li>루틴이 없는 날은 +{ROUTINE_MISSING_PENALTY_POINTS}점이 자동 반영됩니다.</li>
-                      <li>센터 관리자/선생님이 생활 기록 벌점을 부여하면 누적 점수에 추가됩니다.</li>
-                    </ul>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">누적 시 적용되는 규정</p>
-                    <div className="mt-2 space-y-1.5 text-xs font-semibold text-slate-700">
-                      <div className="flex items-center justify-between"><span>0~4점</span><span>포인트 감점 없음 (100%)</span></div>
-                      <div className="flex items-center justify-between"><span>5~9점</span><span>포인트 3% 감소 (97%)</span></div>
-                      <div className="flex items-center justify-between"><span>10~19점</span><span>포인트 6% 감소 (94%)</span></div>
-                      <div className="flex items-center justify-between"><span>20~29점</span><span>포인트 10% 감소 (90%)</span></div>
-                      <div className="flex items-center justify-between"><span>30점 이상</span><span>포인트 15% 감소 (85%)</span></div>
-                    </div>
-                    <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
-                      현재 {penaltyPoints}점 → 이번 포인트 배율 {penaltyMultiplierPercent}% 적용
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-rose-100 bg-white p-4">
-                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점 부여 사유 내역</p>
-                    {myPenaltyLogs.length === 0 ? (
-                      <p className="mt-2 text-xs font-semibold text-slate-500">현재 기록된 벌점 사유가 없습니다.</p>
-                    ) : (
-                      <div className="mt-3 space-y-2">
-                        {myPenaltyLogs.map((log) => {
-                          const createdAtDate = log.createdAt?.toDate?.();
-                          const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy-MM-dd HH:mm') : '시간 미기록';
-                          const sourceLabel = PENALTY_SOURCE_LABEL[log.source] ?? '기타';
-                          return (
-                            <div key={log.id} className="rounded-xl border border-rose-100 bg-rose-50/40 px-3 py-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[11px] font-black text-slate-800">{log.reason || '사유 미입력'}</p>
-                                <Badge variant="outline" className="shrink-0 border-rose-200 bg-white text-rose-700 text-[10px] font-black">
-                                  +{log.pointsDelta}점
-                                </Badge>
-                              </div>
-                              <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                                {createdAtLabel} · {sourceLabel}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                <div className="text-center space-y-1">
+                  <p className="font-black text-primary text-xl tracking-tight">{user?.displayName}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">출입 인증용</p>
                 </div>
               </div>
-            </div>
-            <DialogFooter className="p-6 bg-white border-t shrink-0 flex justify-center"><DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg">확인했습니다</Button></DialogClose></DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter className="p-6 bg-muted/30">
+                <DialogClose asChild><Button className="w-full h-12 rounded-xl font-black">닫기</Button></DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </section>
 
       {isJacob && !isMobile && progressRef && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership?.className} schoolName={studentProfile?.schoolName} />}
