@@ -50,7 +50,7 @@ export default function AnalysisTrackPage() {
       orderBy('dateKey', 'desc'),
       limit(14)
     );
-  }, [firestore, user?.uid, activeMembership]);
+  }, [firestore, user?.uid, activeMembership?.id]);
 
   const { data: logs } = useCollection<StudyLogDay>(studyLogsQuery);
 
@@ -165,7 +165,7 @@ export default function AnalysisTrackPage() {
     });
 
     return () => { cancelled = true; };
-  }, [firestore, user?.uid, activeMembership]);
+  }, [firestore, user?.uid, activeMembership?.id]);
 
   // ── 렌더 ──────────────────────────────────────────────────────────────────────
   if (!user) {

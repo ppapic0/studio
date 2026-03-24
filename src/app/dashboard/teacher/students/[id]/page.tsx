@@ -405,6 +405,65 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             awayMinutes: typeof awayMinutesRaw === 'number' ? awayMinutesRaw : undefined,
           };
         });
+
+        // Compute startHour/endHour/awayMinutes from sessions for recent 14 days
+        // when dailyStudentStats doesn't have these fields
+        const recentKeys = keys.slice(0, 14);
+        const sessionResults = await Promise.all(
+          recentKeys.map(async (dateKey) => {
+            try {
+              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              const sessions = sessionsSnap.docs
+                .map((d) => d.data())
+                .filter((s) => !!s.startTime)
+                .map((s) => ({
+                  startTime: s.startTime?.toDate?.() as Date | undefined,
+                  endTime: s.endTime?.toDate?.() as Date | undefined,
+                }))
+                .filter((s): s is { startTime: Date; endTime: Date | undefined } => !!s.startTime);
+
+              if (!sessions.length) return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined };
+
+              const first = sessions[0].startTime;
+              const last = sessions[sessions.length - 1];
+              const startH = first.getHours() + first.getMinutes() / 60;
+              const endDate = last.endTime || last.startTime;
+              const endH = endDate.getHours() + endDate.getMinutes() / 60;
+
+              let awayMin = 0;
+              for (let i = 1; i < sessions.length; i++) {
+                const prevEnd = sessions[i - 1].endTime;
+                const currStart = sessions[i].startTime;
+                if (!prevEnd || !currStart) continue;
+                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
+                if (gap > 0 && gap < 180) awayMin += gap;
+              }
+
+              return {
+                dateKey,
+                startHour: Number(startH.toFixed(2)),
+                endHour: Number(endH.toFixed(2)),
+                awayMinutes: awayMin,
+              };
+            } catch {
+              return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined };
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        sessionResults.forEach(({ dateKey, startHour, endHour, awayMinutes }) => {
+          if (!next[dateKey]) {
+            next[dateKey] = { totalStudyMinutes: 0 };
+          }
+          const stat = next[dateKey];
+          if (stat.startHour === undefined && startHour !== undefined) stat.startHour = startHour;
+          if (stat.endHour === undefined && endHour !== undefined) stat.endHour = endHour;
+          if (stat.awayMinutes === undefined && awayMinutes !== undefined) stat.awayMinutes = awayMinutes;
+        });
+
         setDailyStatsMap(next);
       } catch (error) {
         console.error('[Student Detail] Failed to load daily stats:', error);
