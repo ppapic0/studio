@@ -11,7 +11,7 @@ import {
 import { getAuth, Auth } from 'firebase/auth';
 import {
   initializeFirestore,
-  persistentLocalCache,
+  memoryLocalCache,
   Firestore,
 } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
@@ -41,8 +41,10 @@ function ensureFirestore(app: FirebaseApp): Firestore {
   if (firestore) return firestore;
 
   firestore = initializeFirestore(app, {
-    localCache: persistentLocalCache(),
-    experimentalForceLongPolling: true,
+    // Parent dashboard attaches many real-time listeners at once.
+    // Keeping Firestore on the default in-memory cache avoids IndexedDB
+    // restore issues that were surfacing as internal assertion errors.
+    localCache: memoryLocalCache(),
   });
 
   return firestore;
