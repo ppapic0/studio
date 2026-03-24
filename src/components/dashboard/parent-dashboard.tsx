@@ -1997,6 +1997,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     setSelectedNotification(notification);
   };
 
+  const handleRecentNotificationClick = async () => {
+    const targetNotification = recentNotifications[0] || sortedNotifications[0] || null;
+    if (targetNotification) {
+      await openNotificationDetail(targetNotification);
+      return;
+    }
+    handleTabChange('notifications');
+  };
+
   const handleTabChange = (value: string) => {
     const nextTab = (value === 'life' ? 'data' : value) as ParentPortalTab;
     setTab(nextTab);
@@ -2385,7 +2394,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <button
                 type="button"
                 className="w-full flex items-center justify-between rounded-2xl border border-[#d7e3fb] bg-[#f7faff] px-4 py-3 text-left transition-all hover:bg-[#eef4ff] active:scale-[0.98]"
-                onClick={() => router.push('/dashboard?parentTab=communication')}
+                onClick={() => void handleRecentNotificationClick()}
               >
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 text-[#14295F]" />
