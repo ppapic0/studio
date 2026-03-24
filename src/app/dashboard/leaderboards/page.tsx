@@ -152,7 +152,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
           "bg-gradient-to-b from-muted/30 to-transparent relative border-b",
           isMobile ? "p-6" : "p-12"
         )}>
-          <div className="absolute top-8 right-8 opacity-5 rotate-12">
+          <div className="pointer-events-none absolute top-8 right-8 opacity-5 rotate-12">
             <Zap className={cn(isMobile ? "h-20 w-24" : "h-40 w-40", "text-amber-500")} />
           </div>
           <div className="flex items-center gap-6 relative z-10">

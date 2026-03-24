@@ -412,7 +412,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
       </DialogTrigger>
       <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
-          <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
+          <Sparkles className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
             <DialogTitle className={cn("font-black tracking-tighter whitespace-nowrap", isMobile ? "text-xl" : "text-3xl")}>포인트 획득 기록</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 러닝 포인트 내역입니다.</DialogDescription>
@@ -505,7 +505,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
       </DialogTrigger>
       <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
         <div className={cn("bg-blue-600 text-white relative", isMobile ? "p-6" : "p-10")}>
-          <Activity className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
+          <Activity className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
             <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>몰입 히스토리</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">오늘 완료된 몰입 세션입니다.</DialogDescription>
@@ -618,7 +618,7 @@ function StudyTimeTrendDialog({
 
       <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-lg", isMobile ? "max-w-[95vw] rounded-[2rem]" : "")}>
         <div className={cn("bg-[#14295F] text-white relative", isMobile ? "p-6" : "p-10")}>
-          <Activity className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
+          <Activity className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
             <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>최근 7일 공부시간 추이</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">
@@ -963,6 +963,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, activeMembership?.id]);
   const { data: centerAnnouncements } = useCollection<any>(centerAnnouncementsQuery, { enabled: isActive });
+
+  useEffect(() => {
+    router.prefetch('/dashboard/plan');
+    router.prefetch('/dashboard/student-reports');
+    router.prefetch('/dashboard/leaderboards');
+    router.prefetch('/dashboard/appointments/inquiries');
+  }, [router]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -2189,7 +2196,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           "relative overflow-hidden border-none bg-white shadow-xl ring-1 ring-black/[0.04]",
           isMobile ? "col-span-2 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
         )}>
-          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r" style={{ backgroundImage: tierTheme.heroGradient }} />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r" style={{ backgroundImage: tierTheme.heroGradient }} />
           <CardContent className={cn("relative", isMobile ? "p-5 pt-6" : "p-8 pt-9")}>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
@@ -2303,7 +2310,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </CardContent>
           </Card>
 
-          <Link href="/dashboard/leaderboards" className="block">
+          <Link href="/dashboard/leaderboards" className="block touch-manipulation">
             <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
               <CardContent className={cn("p-4", !isMobile && "p-5")}>
                 <div className="flex items-center justify-between">
@@ -2323,7 +2330,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </Link>
 
           {latestUnreadReport ? (
-            <Link href="/dashboard/student-reports" className="block">
+            <Link href="/dashboard/student-reports" className="block touch-manipulation">
               <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
                 <CardContent className={cn("p-4", !isMobile && "p-5")}>
                   <div className="flex items-center justify-between">
@@ -2338,7 +2345,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
             </Link>
           ) : latestAnnouncement ? (
-            <Link href="/dashboard/appointments/inquiries" className="block">
+            <Link href="/dashboard/appointments/inquiries" className="block touch-manipulation">
               <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
                 <CardContent className={cn("p-4", !isMobile && "p-5")}>
                   <div className="flex items-center justify-between">
@@ -2417,7 +2424,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <div>
           <Dialog>
           <DialogTrigger asChild>
-            <button type="button" className="text-left h-full w-full">
+          <button type="button" className="text-left h-full w-full touch-manipulation">
               <Card className={cn(
                 "relative h-full min-w-0 border overflow-hidden cursor-pointer transition-all duration-300",
                 penaltyPoints === 0
@@ -2489,7 +2496,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </DialogTrigger>
           <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "max-w-[95vw] rounded-[2rem] h-[85vh]" : "max-h-[90vh]")}>
             <div className={cn("bg-rose-600 text-white relative shrink-0", isMobile ? "p-6" : "p-10")}>
-              <ShieldAlert className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
+          <ShieldAlert className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
               <DialogHeader>
                 <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
                 <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
@@ -2596,11 +2603,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className="grid grid-cols-3 gap-10">
               <div className="relative">
                 <PlanColumn dateKey={yesterdayKey} label="어제의 복기" />
-                <div className="absolute top-0 -right-5 h-full w-px bg-slate-200" />
+                    <div className="pointer-events-none absolute top-0 -right-5 h-full w-px bg-slate-200" />
               </div>
               <div className="relative">
                 <PlanColumn dateKey={todayKey} label="오늘의 집중" />
-                <div className="absolute top-0 -right-5 h-full w-px bg-slate-200" />
+                    <div className="pointer-events-none absolute top-0 -right-5 h-full w-px bg-slate-200" />
               </div>
               <PlanColumn dateKey={tomorrowKey} label="내일의 준비" />
             </div>
@@ -2618,7 +2625,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             }}
           >
             <DialogTrigger asChild>
-              <button className="group text-left h-full w-full">
+              <button className="group text-left h-full w-full touch-manipulation">
                 <Card className={cn(
                   "h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4",
                   "rounded-2xl p-4",
@@ -2644,7 +2651,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </DialogTrigger>
             <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]")}>
               <div className="bg-primary p-8 text-white relative shrink-0">
-                <FileText className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+          <FileText className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black">{selectedTeacherReport ? `${selectedTeacherReport.dateKey} 리포트` : '선생님 리포트'}</DialogTitle>
                   <DialogDescription className="text-white/70 font-bold">
@@ -2715,7 +2722,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </DialogContent>
           </Dialog>
         ) : (
-          <Link href="/dashboard/student-reports" className="group h-full">
+            <Link href="/dashboard/student-reports" className="group h-full touch-manipulation">
             <Card className={cn(
               "h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
               unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
@@ -2741,7 +2748,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         <Dialog>
           <DialogTrigger asChild>
-            <button className="group text-left h-full w-full">
+              <button className="group text-left h-full w-full touch-manipulation">
               <Card className={cn(
                 "h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4",
                 isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
@@ -2759,7 +2766,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </DialogTrigger>
           <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
             <div className="bg-amber-500 p-8 text-white relative shrink-0">
-              <BellRing className="absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+          <BellRing className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
                 <DialogDescription className="text-white/70 font-bold">지각 또는 결석 사유를 입력하여 제출하세요.</DialogDescription>

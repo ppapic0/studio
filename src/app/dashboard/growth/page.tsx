@@ -158,7 +158,7 @@ function SystemGuideDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-w-[90vw]">
         <div className="bg-primary p-8 text-primary-foreground relative">
-          <Sparkles className="absolute top-4 right-4 h-10 w-10 opacity-20" />
+          <Sparkles className="pointer-events-none absolute top-4 right-4 h-10 w-10 opacity-20" />
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tighter">성장트랙 가이드</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 font-bold mt-1 text-xs">
@@ -466,7 +466,7 @@ export default function GrowthPage() {
         )}
         style={{ backgroundImage: tierTheme.heroGradient }}
       >
-        <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+        <div className="pointer-events-none absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 space-y-6", isMobile ? "space-y-4" : "space-y-10")}>
@@ -498,7 +498,7 @@ export default function GrowthPage() {
                   key={i}
                   href="/dashboard/leaderboards"
                   className={cn(
-                    "bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5 transition-all duration-200 hover:bg-white/20 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                    "touch-manipulation bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5 transition-all duration-200 hover:bg-white/20 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                     isMobile && "active:scale-[0.98]"
                   )}
                 >
