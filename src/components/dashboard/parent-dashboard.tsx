@@ -1269,6 +1269,38 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return { label: '미입실 (입실 전)', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
   }, [attendanceCurrent, todayLog, todayPlans]);
 
+  const heroMessage = useMemo(() => {
+    const name = student?.name ?? '';
+    const status = attendanceCurrent?.status || '';
+    const isStudying = ['studying', 'away', 'break'].includes(status);
+    const hasRecord = (todayLog?.totalMinutes || 0) > 0;
+
+    if (isStudying) return { text: `${name}이(가) 지금 집중하고 있어요`, tone: 'studying' as const };
+    if (hasRecord) return { text: `${name}이(가) 오늘 학습을 마쳤어요`, tone: 'done' as const };
+    return { text: `${name}의 오늘 트랙이 아직 시작되지 않았어요`, tone: 'idle' as const };
+  }, [student?.name, attendanceCurrent?.status, todayLog?.totalMinutes]);
+
+  const heroStyles = {
+    studying: {
+      bg: 'bg-[linear-gradient(135deg,#ecfdf5_0%,#f0fdf4_50%,#e8f1ff_100%)]',
+      border: 'border-emerald-200 ring-1 ring-emerald-100',
+      icon: 'bg-emerald-500',
+      textAccent: 'text-emerald-700',
+    },
+    done: {
+      bg: 'bg-[linear-gradient(135deg,#e8f1ff_0%,#f6f9ff_100%)]',
+      border: 'border-[#cfdcf8] ring-1 ring-[#cfdcf8]/60',
+      icon: 'bg-[#14295F]',
+      textAccent: 'text-[#14295F]',
+    },
+    idle: {
+      bg: 'bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)]',
+      border: 'border-slate-200 ring-1 ring-slate-100',
+      icon: 'bg-slate-400',
+      textAccent: 'text-slate-500',
+    },
+  } as const;
+
   const todayFirstCheckInLabel = useMemo(() => {
     if (!todayKey) return '입실 -';
     const checkInAt = checkInByDateKey[todayKey] || studyStartByDateKey[todayKey] || null;
@@ -1779,47 +1811,65 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   ))}
                 </div>
               )}
-              {/* 지금 집중 중 배너 */}
-              {attendanceCurrent?.status === 'studying' && (
-                <Card className="rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#f0fdf4_100%)] p-4 shadow-sm ring-1 ring-emerald-100 flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow">
-                    <Zap className="h-4 w-4 text-white fill-current" />
+              {/* 히어로 상태 카드 */}
+              <Card className={cn(
+                "rounded-[2rem] p-5 shadow-sm transition-all",
+                heroStyles[heroMessage.tone].bg,
+                heroStyles[heroMessage.tone].border
+              )}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow", heroStyles[heroMessage.tone].icon)}>
+                    {heroMessage.tone === 'studying' ? <Zap className="h-4 w-4 text-white fill-current" /> :
+                     heroMessage.tone === 'done' ? <Home className="h-4 w-4 text-white" /> :
+                     <Clock className="h-4 w-4 text-white" />}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">지금 집중 중</p>
-                    <p className="text-sm font-black text-emerald-800 leading-tight">
-                      {student?.name ?? ''}이(가) 현재 공부하고 있어요
-                    </p>
-                    <p className="text-[10px] font-bold text-emerald-600/70 mt-0.5">{todayFirstCheckInLabel}</p>
-                  </div>
-                  <div className="ml-auto shrink-0">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+                  <p className={cn("text-sm font-black leading-tight", heroStyles[heroMessage.tone].textAccent)}>
+                    {heroMessage.text}
+                  </p>
+                  {heroMessage.tone === 'studying' && (
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700 shrink-0">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                       실시간
                     </span>
+                  )}
+                </div>
+                <div className="text-center py-2">
+                  <p className="dashboard-number text-4xl text-[#14295F] leading-tight">{toHm(totalMinutes)}</p>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1 inline-block">오늘 공부</span>
+                  <p className={cn(
+                    "text-xs font-black mt-1",
+                    webAppInsightMetrics.studyVsYesterday >= 0 ? "text-emerald-600" : "text-rose-500"
+                  )}>
+                    어제 대비 {webAppInsightMetrics.studyVsYesterday >= 0 ? '+' : ''}{webAppInsightMetrics.studyVsYesterday}%
+                  </p>
+                </div>
+                {todayFirstCheckInLabel && (
+                  <p className="text-[10px] font-bold text-slate-400 text-center mt-1">{todayFirstCheckInLabel}</p>
+                )}
+              </Card>
+
+              {/* 정보 카드 3칸 그리드 */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <Card className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff2e4_0%,#fff9f2_100%)] p-3 text-center space-y-1.5 shadow-sm">
+                  <span className="text-[9px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
+                  <p className="dashboard-number text-lg text-[#14295F] leading-tight">{planRate}%</p>
+                  <div className="w-full h-1.5 rounded-full bg-orange-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#FF7A16] transition-all duration-700"
+                      style={{ width: `${Math.min(planRate, 100)}%` }}
+                    />
                   </div>
                 </Card>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="rounded-2xl border border-[#cfdcf8] bg-[linear-gradient(135deg,#e8f1ff_0%,#f6f9ff_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#c4d5ff] transition-all">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
-                  <p className="dashboard-number text-xl text-[#14295F] leading-tight whitespace-nowrap">{toHm(totalMinutes)}</p>
-                </Card>
-                <Card className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff2e4_0%,#fff9f2_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#ffbf8a] transition-all">
-                  <span className="text-[10px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
-                  <p className="dashboard-number text-2xl text-[#14295F] leading-tight">{planRate}%</p>
-                </Card>
                 <Card className={cn(
-                  "rounded-2xl border border-[#d7e3fb] bg-[linear-gradient(135deg,#eef4ff_0%,#ffffff_100%)] p-4 text-center space-y-1 shadow-sm transition-all",
+                  "rounded-2xl border p-3 text-center space-y-1 shadow-sm",
                   attendanceStatus.color
                 )}>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
-                  <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
-                  <p className="text-[10px] font-bold text-slate-500">{todayFirstCheckInLabel}</p>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">출결</span>
+                  <p className="text-base font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
                 </Card>
                 <Card
                   className={cn(
-                    "rounded-2xl p-4 text-center space-y-1 shadow-sm transition-all cursor-pointer",
+                    "rounded-2xl p-3 text-center space-y-1 shadow-sm cursor-pointer transition-all",
                     penaltyRecovery.effectivePoints === 0
                       ? "border border-emerald-200 bg-[linear-gradient(135deg,#f0fdf4_0%,#f7fffe_100%)] hover:ring-1 hover:ring-emerald-300"
                       : "border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] hover:ring-1 hover:ring-[#ffc593]"
@@ -1827,15 +1877,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   role="button"
                   onClick={() => setIsPenaltyGuideOpen(true)}
                 >
-                  <span className={cn("text-[10px] font-black uppercase tracking-widest", penaltyRecovery.effectivePoints === 0 ? "text-emerald-600" : "text-rose-600")}>벌점 지수</span>
-                  <div className="flex items-center justify-center gap-1">
-                    <p className={cn("dashboard-number text-xl leading-tight", penaltyRecovery.effectivePoints === 0 ? "text-emerald-700" : "text-rose-700")}>{penaltyRecovery.effectivePoints}</p>
-                    <span className={cn("text-xs font-black", penaltyRecovery.effectivePoints === 0 ? "text-emerald-500/70" : "text-rose-500/70")}>점</span>
+                  <span className={cn("text-[9px] font-black uppercase tracking-widest", penaltyRecovery.effectivePoints === 0 ? "text-emerald-600" : "text-rose-600")}>벌점</span>
+                  <div className="flex items-center justify-center gap-0.5">
+                    <p className={cn("dashboard-number text-lg leading-tight", penaltyRecovery.effectivePoints === 0 ? "text-emerald-700" : "text-rose-700")}>{penaltyRecovery.effectivePoints}</p>
+                    <span className={cn("text-[9px] font-black", penaltyRecovery.effectivePoints === 0 ? "text-emerald-500/70" : "text-rose-500/70")}>점</span>
                   </div>
-                  <Badge variant="outline" className={cn('h-5 border px-2 text-[10px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
-                  {penaltyRecovery.recoveredPoints > 0 && (
-                    <p className="text-[10px] font-bold text-rose-500/80">자동 회복 -{penaltyRecovery.recoveredPoints}점 반영</p>
-                  )}
                 </Card>
               </div>
 
