@@ -900,14 +900,14 @@ export default function StudyPlanPage() {
           <CardContent className={cn(isMobile ? "p-4" : "p-8 sm:p-10")}>
             {(!hasInPlan || !hasOutPlan) && !isAbsentMode ? (
               <div className={isMobile ? "space-y-6" : "flex flex-col gap-10"}>
-                <div className={cn("grid gap-4 sm:gap-8", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
-                  <div className={isMobile ? "space-y-3" : "space-y-4"}>
+                <div className={cn("grid gap-4 sm:gap-8", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.25fr)_minmax(260px,0.75fr)]")}>
+                  <div className={cn(isMobile ? "space-y-3" : "space-y-4", !isMobile && "min-w-0")}>
                     <div className="flex items-center gap-2 ml-1">
                       <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-3 w-3" : "h-4 w-4")} />
                       <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>등원 계획</Label>
                     </div>
-                    <div className={cn("flex items-center gap-2 sm:gap-3", isMobile ? "flex-col" : "flex-row")}>
-                      <div className="flex-1 grid grid-cols-2 gap-1 sm:gap-2 w-full">
+                    <div className={cn("gap-2 sm:gap-3", isMobile ? "flex flex-col" : "flex flex-col xl:flex-row xl:items-end")}>
+                      <div className={cn("grid w-full min-w-0", isMobile ? "grid-cols-2 gap-1 sm:gap-2" : "grid-cols-2 gap-2 sm:gap-3 xl:flex-1")}>
                         <div className="space-y-1">
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
                           <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
@@ -921,7 +921,7 @@ export default function StudyPlanPage() {
                     </div>
                   </div>
                   
-                  <div className={cn("flex flex-col justify-center items-center", isMobile ? "border-t border-dashed pt-4" : "border-l border-dashed pl-8")}>
+                  <div className={cn("flex flex-col justify-center items-center", isMobile ? "border-t border-dashed pt-4" : "border-t border-dashed pt-6 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0")}>
                     <p className={cn("font-bold text-muted-foreground mb-3", isMobile ? "text-[10px]" : "text-xs")}>오늘은 공부를 쉬어갑니다.</p>
                     <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className={cn("w-full rounded-xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-2 transition-all active:scale-95", isMobile ? "h-11 text-sm" : "h-14 text-lg")}>
                       <XCircle className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} /> 이날 등원하지 않습니다
