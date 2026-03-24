@@ -17,16 +17,9 @@ export async function resolveMarketingCenterId(): Promise<string | null> {
   try {
     const snapshot = await adminDb.collection('centers').limit(1).get();
     cachedCenterId = snapshot.empty ? null : (snapshot.docs[0]?.id ?? null);
-  } catch (error) {
-    console.error('[marketing-center] failed to resolve centerId:', error);
+  } catch {
+    // Marketing pages should fail closed without noisy logs when credentials are unavailable.
     cachedCenterId = null;
-  }
-
-  if (!cachedCenterId) {
-    console.warn(
-      '[marketing-center] MARKETING_CENTER_ID env var is not set and no centers found in DB. ' +
-        'Set MARKETING_CENTER_ID to the correct center document ID to enable marketing tracking.',
-    );
   }
 
   return cachedCenterId;

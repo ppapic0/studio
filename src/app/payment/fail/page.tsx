@@ -5,8 +5,7 @@ import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ArrowLeft, RefreshCw, XCircle, ShieldAlert } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { AlertCircle, ArrowLeft, Loader2, RefreshCw, XCircle, ShieldAlert } from 'lucide-react';
 
 function FailContent() {
   const searchParams = useSearchParams();
@@ -15,6 +14,7 @@ function FailContent() {
   const errorCode = searchParams.get('code');
   const errorMessage = searchParams.get('message');
   const invoiceId = searchParams.get('invoiceId');
+  const centerId = searchParams.get('centerId');
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -49,14 +49,14 @@ function FailContent() {
 
           <div className="flex flex-col gap-4">
             <Button 
-              onClick={() => invoiceId ? router.push(`/payment/checkout/${invoiceId}`) : router.back()}
+              onClick={() => invoiceId ? router.push(`/payment/checkout/${invoiceId}${centerId ? `?centerId=${centerId}` : ''}`) : router.push('/')}
               className="w-full h-20 rounded-[2.5rem] font-black text-xl bg-primary hover:bg-primary/90 text-white shadow-2xl shadow-primary/20 gap-3 active:scale-95 transition-all"
             >
               <RefreshCw className="h-6 w-6" /> 다시 시도하기
             </Button>
             <Button 
               variant="outline"
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/')}
               className="w-full h-16 rounded-2xl font-black text-lg border-2 hover:bg-muted/10 gap-2 transition-all active:scale-95"
             >
               <ArrowLeft className="h-5 w-5 opacity-40" /> 메인으로 돌아가기

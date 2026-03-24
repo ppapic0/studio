@@ -8,6 +8,10 @@ import { resolveMarketingCenterId } from "@/lib/marketing-center";
 const WEBSITE_CONSULT_SOURCE = "website";
 const WEBSITE_CONSULT_LABEL = "웹사이트 상담폼";
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 const consultSchema = z.object({
   studentName: z.string().trim().min(1, "학생 이름을 입력해주세요.").max(40, "학생 이름이 너무 깁니다."),
   school: z.string().trim().min(1, "학교명을 입력해주세요.").max(80, "학교명이 너무 깁니다."),
@@ -16,8 +20,8 @@ const consultSchema = z.object({
   consultPhone: z
     .string()
     .trim()
-    .min(8, "연락처를 입력해주세요.")
-    .max(30, "연락처 형식이 올바르지 않습니다."),
+    .transform(normalizePhone)
+    .refine((value) => value.length >= 8 && value.length <= 30, "연락처 형식이 올바르지 않습니다."),
   serviceType: z.enum(["korean_academy", "study_center"]),
   studyCenterRequestType: z.enum(["consult", "waitlist"]).optional(),
 });

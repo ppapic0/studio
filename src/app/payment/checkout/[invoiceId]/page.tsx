@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 import { AlertTriangle, ArrowLeft, CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 
@@ -13,18 +13,23 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-const TOSS_CLIENT_KEY = 'test_ck_AQ92ymxN34NDobpk74e0rajRKXvd';
+const DEFAULT_TOSS_TEST_CLIENT_KEY = 'test_ck_AQ92ymxN34NDobpk74e0rajRKXvd';
+const TOSS_CLIENT_KEY =
+  process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ||
+  (process.env.NODE_ENV !== 'production' ? DEFAULT_TOSS_TEST_CLIENT_KEY : '');
 
 export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = use(params);
   const firestore = useFirestore();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { activeMembership } = useAppContext();
 
   const [isRequesting, setIsRequesting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const centerId = activeMembership?.id || '';
+  const centerIdFromQuery = (searchParams.get('centerId') || '').trim();
+  const centerId = centerIdFromQuery || activeMembership?.id || '';
   const invoiceRef = firestore && centerId ? doc(firestore, 'centers', centerId, 'invoices', invoiceId) : null;
   const { data: invoice, isLoading: invoiceLoading } = useDoc<Invoice>(invoiceRef as any);
 
@@ -33,12 +38,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: 
   }, [invoiceLoading]);
 
   const canRequestPayment = useMemo(() => {
-    if (!invoice) return false;
+    if (!invoice || !TOSS_CLIENT_KEY) return false;
     return invoice.status === 'issued' || invoice.status === 'overdue';
   }, [invoice]);
 
   const handlePayment = async () => {
-    if (!invoice || !centerId || isRequesting || !canRequestPayment) return;
+    if (!invoice || !centerId || !TOSS_CLIENT_KEY || isRequesting || !canRequestPayment) return;
 
     setIsRequesting(true);
     try {
@@ -80,8 +85,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: 
             <CardDescription className="font-bold text-slate-500">유효하지 않은 결제 링크이거나 이미 처리된 요청일 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="h-12 w-full rounded-xl font-black" onClick={() => router.back()}>
-              이전 화면으로
+            <Button className="h-12 w-full rounded-xl font-black" onClick={() => router.push('/')}>
+              홈으로 이동
             </Button>
           </CardContent>
         </Card>
@@ -145,7 +150,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ invoiceId: 
             className="h-14 w-full rounded-2xl bg-[#14295F] font-black text-white"
           >
             {isRequesting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-            {canRequestPayment ? '토스페이먼츠로 결제하기' : '결제 가능한 상태가 아닙니다'}
+            {!TOSS_CLIENT_KEY
+              ? '결제 설정 확인 필요'
+              : canRequestPayment
+                ? '토스페이먼츠로 결제하기'
+                : '결제 가능한 상태가 아닙니다'}
           </Button>
 
           <Button type="button" variant="ghost" className="h-11 w-full rounded-xl font-black" onClick={() => router.back()}>

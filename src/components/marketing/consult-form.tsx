@@ -39,6 +39,10 @@ const INITIAL_FORM: FormState = {
 
 const GRADE_OPTIONS = ["중1", "중2", "중3", "고1", "고2", "고3"];
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 function formatKoreaTime(isoString: string) {
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -125,7 +129,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
       form.school.trim().length === 0 ||
       form.grade.length === 0 ||
       form.gender.length === 0 ||
-      form.consultPhone.trim().length === 0
+      normalizePhone(form.consultPhone).length < 8
     );
   }, [form, submitting]);
 
@@ -138,12 +142,13 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    const normalizedPhone = normalizePhone(form.consultPhone);
 
     try {
       const response = await fetch("/api/consult", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, consultPhone: normalizedPhone }),
       });
       const data = (await response.json()) as {
         ok: boolean;
@@ -165,7 +170,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
         school: form.school,
         grade: form.grade,
         gender: form.gender,
-        consultPhone: form.consultPhone,
+        consultPhone: normalizedPhone,
         requestTypeLabel: data.requestTypeLabel ?? "상담 신청",
       });
       setForm(INITIAL_FORM);
