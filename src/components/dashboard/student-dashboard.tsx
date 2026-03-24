@@ -1983,7 +1983,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 style={{ backgroundColor: tierTheme.sessionBg, borderColor: tierTheme.subtleBorder }}
               >
                 <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">실시간 세션</span>
-                <span className={cn("dashboard-number text-white", isMobile ? "text-3xl" : "text-7xl")}>
+                <span className={cn("dashboard-number text-white tabular-nums", isMobile ? "text-5xl" : "text-7xl")}>
                   {formatTimer(localSeconds)}
                 </span>
               </div>
@@ -1994,7 +1994,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 disabled={isProcessingAction}
                 className={cn(
                   "w-full rounded-2xl font-aggro-display font-black md:w-auto border flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
-                  isMobile ? "h-16 text-xl px-10" : "h-24 px-16 text-3xl",
+                  isMobile ? "h-20 text-2xl px-10" : "h-24 px-16 text-3xl",
                   isTimerActive ? "bg-[#D34A4A] border-[#D34A4A] text-white" : "bg-[#F8FAFF] border-[#E5EBF5] text-primary"
                 )} 
                 onClick={handleStudyStartStop}

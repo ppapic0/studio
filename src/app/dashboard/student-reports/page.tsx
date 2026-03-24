@@ -14,6 +14,7 @@ import {
   Search,
   Calendar,
   History,
+  X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -209,7 +210,7 @@ export default function StudentReportsPage() {
 
               <DialogFooter className="shrink-0 justify-center border-t bg-white p-6 sm:p-8">
                 <DialogClose asChild>
-                  <Button className="h-14 w-full rounded-2xl text-lg font-black">분석 완료</Button>
+                  <Button className="h-14 w-full rounded-2xl text-lg font-black gap-2">닫기 <X className="h-4 w-4" /></Button>
                 </DialogClose>
               </DialogFooter>
             </>

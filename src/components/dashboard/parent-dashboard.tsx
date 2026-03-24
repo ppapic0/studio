@@ -402,7 +402,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [activeMembership, memberships]);
 
   const centerId = active센터Membership?.id;
-  const linkedStudentIds = active센터Membership?.linkedStudentIds ?? [];
+  const linkedStudentIds = useMemo(
+    () => active센터Membership?.linkedStudentIds ?? [],
+    [active센터Membership]
+  );
   const studentId = linkedStudentIds[selectedChildIdx] ?? linkedStudentIds[0];
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
@@ -1531,7 +1534,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (points >= 20) return { label: '퇴원', badge: 'bg-rose-200 text-rose-800 border-rose-300' };
     if (points >= 12) return { label: '학부모 상담', badge: 'bg-amber-100 text-amber-800 border-amber-300' };
     if (points >= 7) return { label: '선생님과 상담', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
-    return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    return { label: '이슈 없음', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   }, [penaltyRecovery.effectivePoints]);
 
   const selectedDateLog = useMemo(() => {
@@ -1808,14 +1811,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <p className="text-[10px] font-bold text-slate-500">{todayFirstCheckInLabel}</p>
                 </Card>
                 <Card
-                  className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] p-4 text-center space-y-1 shadow-sm transition-all hover:ring-1 hover:ring-[#ffc593] cursor-pointer"
+                  className={cn(
+                    "rounded-2xl p-4 text-center space-y-1 shadow-sm transition-all cursor-pointer",
+                    penaltyRecovery.effectivePoints === 0
+                      ? "border border-emerald-200 bg-[linear-gradient(135deg,#f0fdf4_0%,#f7fffe_100%)] hover:ring-1 hover:ring-emerald-300"
+                      : "border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] hover:ring-1 hover:ring-[#ffc593]"
+                  )}
                   role="button"
                   onClick={() => setIsPenaltyGuideOpen(true)}
                 >
-                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
+                  <span className={cn("text-[10px] font-black uppercase tracking-widest", penaltyRecovery.effectivePoints === 0 ? "text-emerald-600" : "text-rose-600")}>벌점 지수</span>
                   <div className="flex items-center justify-center gap-1">
-                    <p className="dashboard-number text-xl text-rose-700 leading-tight">{penaltyRecovery.effectivePoints}</p>
-                    <span className="text-xs font-black text-rose-500/70">점</span>
+                    <p className={cn("dashboard-number text-xl leading-tight", penaltyRecovery.effectivePoints === 0 ? "text-emerald-700" : "text-rose-700")}>{penaltyRecovery.effectivePoints}</p>
+                    <span className={cn("text-xs font-black", penaltyRecovery.effectivePoints === 0 ? "text-emerald-500/70" : "text-rose-500/70")}>점</span>
                   </div>
                   <Badge variant="outline" className={cn('h-5 border px-2 text-[10px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
                   {penaltyRecovery.recoveredPoints > 0 && (
@@ -1851,75 +1859,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </p>
               </Card>
 
-              <Card className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#f7faff_0%,#ffffff_70%,#fff7ef_100%)] p-5 shadow-sm">
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-[#14295F]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 알림 3개</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {unreadRecentCount > 0 && (
-                      <Badge variant="outline" className="h-5 border-none bg-[#FF7A16]/15 px-2 text-[10px] font-black text-[#FF7A16] animate-pulse">
-                        미읽음 {unreadRecentCount}
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-500">
-                      {recentNotifications.length}건
-                    </Badge>
-                  </div>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between rounded-2xl border border-[#d7e3fb] bg-[#f7faff] px-4 py-3 text-left transition-all hover:bg-[#eef4ff] active:scale-[0.98]"
+                onClick={() => router.push('/dashboard?parentTab=communication')}
+              >
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-[#14295F]" />
+                  <span className="text-sm font-black text-[#14295F]">알림</span>
+                  {unreadRecentCount > 0 ? (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF7A16] px-1.5 text-[10px] font-black text-white animate-pulse">
+                      {unreadRecentCount}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-slate-400">{recentNotifications.length}건</span>
+                  )}
                 </div>
-                <p className="mb-3 text-[11px] font-bold text-slate-500">알림 카드를 누르면 상세 내용을 읽을 수 있어요.</p>
-                {recentNotifications.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
-                    최근 알림이 없습니다.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recentNotifications.map((notification) => {
-                      const isRead = notification.isRead || !!readMap[notification.id];
-                      return (
-                        <button
-                          type="button"
-                          key={notification.id}
-                          className={cn(
-                            'relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-all',
-                            isRead
-                              ? 'border-[#dbe4f8] bg-[#f3f7ff]'
-                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff5ea_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/80 hover:shadow-md'
-                          )}
-                          onClick={() => void openNotificationDetail(notification)}
-                        >
-                          {!isRead && (
-                            <>
-                              <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-[#FF7A16]/20 blur-xl animate-pulse" />
-                              <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16] animate-pulse" />
-                            </>
-                          )}
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <p className="truncate pr-6 text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
-                            <div className="flex shrink-0 items-center gap-1">
-                              {!isRead && (
-                                <span className="relative inline-flex h-2.5 w-2.5">
-                                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#FF7A16] opacity-70 animate-ping" />
-                                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
-                                </span>
-                              )}
-                              {notification.isImportant && (
-                                <Badge variant="outline" className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
-                                  중요
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                            {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
+                <span className="flex items-center gap-0.5 text-[11px] font-black text-slate-400">소통 탭에서 보기 <ChevronRight className="h-3 w-3" /></span>
+              </button>
               <div className="grid grid-cols-1 gap-3">
                 <Dialog>
                   <DialogTrigger asChild>
