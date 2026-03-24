@@ -179,6 +179,8 @@ export interface DailyReport {
     };
   } | null;
   viewedAt?: Timestamp;
+  viewedByUid?: string;
+  viewedByName?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

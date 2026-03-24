@@ -14,6 +14,8 @@ export type ReportItem = {
   status?: string;
   content?: string;
   viewedAt?: { toDate?: () => Date } | null;
+  viewedByUid?: string;
+  viewedByName?: string;
   updatedAt?: { toDate?: () => Date } | null;
   createdAt?: { toDate?: () => Date } | null;
   [key: string]: unknown;

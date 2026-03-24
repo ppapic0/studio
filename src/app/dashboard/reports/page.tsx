@@ -339,14 +339,22 @@ export default function DailyReportsPage() {
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-3xl")}>{student.displayName}</h3>
+                            {report?.viewedAt && (
+                              <Badge className="bg-blue-500/10 text-blue-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">읽음 확인</Badge>
+                            )}
                             {isSent && (
                               <Badge className="bg-emerald-500/10 text-emerald-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">발송 완료</Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap">
                             <p className="font-bold text-muted-foreground/60 text-[10px] sm:text-xs">
                               {report ? `최종 수정: ${format((report.updatedAt as any).toDate(), 'HH:mm')}` : "아직 작성 전"}
                             </p>
+                            {report?.viewedAt && (
+                              <p className="font-bold text-emerald-600/80 text-[10px] sm:text-xs">
+                                {`열람: ${(report.viewedByName || '학생')} · ${format((report.viewedAt as any).toDate(), 'HH:mm')}`}
+                              </p>
+                            )}
                             {report?.status === 'draft' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                             )}

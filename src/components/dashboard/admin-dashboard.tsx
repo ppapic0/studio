@@ -2286,6 +2286,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <span>{report.studentName || report.studentId}</span>
                           <span>·</span>
                           <span>{report.createdAt ? format(report.createdAt.toDate(), 'yyyy.MM.dd HH:mm') : '-'}</span>
+                          {report.viewedAt && (
+                            <Badge className="h-5 border-none bg-emerald-100 px-2 text-[10px] font-black text-emerald-700">
+                              {report.viewedByName ? `${report.viewedByName} 읽음` : '읽음'}
+                            </Badge>
+                          )}
+                          {report.viewedAt && (
+                            <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                              {`열람 시각 ${format(report.viewedAt.toDate(), 'yyyy.MM.dd HH:mm')}`}
+                            </p>
+                          )}
                         </div>
                         <p className="text-sm font-bold text-slate-700 line-clamp-2">{report.content || '리포트 내용 없음'}</p>
                       </div>

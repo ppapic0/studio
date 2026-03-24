@@ -70,11 +70,12 @@ export default function StudentReportsPage() {
   const handleOpenReport = async (report: DailyReport) => {
     setSelectedReport(report);
 
-    if (!report.viewedAt && firestore && activeMembership?.id && report.id) {
+    if (!report.viewedAt && firestore && activeMembership?.id && report.id && user) {
       const reportRef = doc(firestore, 'centers', activeMembership.id, 'dailyReports', report.id);
       updateDoc(reportRef, {
         viewedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        viewedByUid: user.uid,
+        viewedByName: user.displayName || activeMembership.displayName || '학생',
       }).catch((err) => console.error('Error updating report viewed state:', err));
     }
   };

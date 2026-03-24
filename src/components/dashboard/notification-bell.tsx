@@ -6,7 +6,7 @@ import { collection, doc, limit, orderBy, query, serverTimestamp, updateDoc } fr
 import { format } from 'date-fns';
 import { AlertTriangle, Bell, ChevronRight, Clock, FileText, MessageSquareMore, Sparkles } from 'lucide-react';
 
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useNotifications } from '@/contexts/notifications-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -39,6 +39,8 @@ type NotificationFeedItem =
       timestamp: number;
       unread: boolean;
       link: string;
+      reportId: string;
+      viewedAt?: { toDate?: () => Date } | null;
     }
   | {
       id: string;
@@ -80,6 +82,7 @@ function toMillis(value?: { toDate?: () => Date } | null) {
 
 export function NotificationBell() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { activeMembership } = useAppContext();
   const { reports, feedbacks } = useNotifications();
   const isStudentRole = activeMembership?.role === 'student';
@@ -143,6 +146,23 @@ export function NotificationBell() {
     }
   };
 
+  const markReportAsRead = async (reportId?: string, alreadyViewed?: boolean) => {
+    if (!firestore || !activeMembership || !user || !reportId || alreadyViewed) return;
+
+    try {
+      await updateDoc(
+        doc(firestore, 'centers', activeMembership.id, 'dailyReports', reportId),
+        {
+          viewedAt: serverTimestamp(),
+          viewedByUid: user.uid,
+          viewedByName: user.displayName || activeMembership.displayName || '학생',
+        }
+      );
+    } catch (error) {
+      console.error('mark report read failed', error);
+    }
+  };
+
   const studentFeedItems = useMemo<NotificationFeedItem[]>(() => {
     const reportItems: NotificationFeedItem[] = reports.map((report) => ({
       id: `report-${report.id}`,
@@ -155,6 +175,8 @@ export function NotificationBell() {
       timestamp: Math.max(toMillis(report.updatedAt), toMillis(report.createdAt)),
       unread: !report.viewedAt,
       link: '/dashboard/student-reports',
+      reportId: report.id,
+      viewedAt: report.viewedAt,
     }));
 
     const feedbackItems: NotificationFeedItem[] = feedbacks.map((feedback) => ({
@@ -351,10 +373,16 @@ export function NotificationBell() {
                 <DropdownMenuItem
                   key={item.id}
                   onSelect={(event) => {
-                    if (item.kind !== 'feedback') return;
-                    event.preventDefault();
-                    setSelectedFeedback(item.payload);
-                    void markFeedbackAsRead(item.payload);
+                    if (item.kind === 'feedback') {
+                      event.preventDefault();
+                      setSelectedFeedback(item.payload);
+                      void markFeedbackAsRead(item.payload);
+                      return;
+                    }
+
+                    if (item.kind === 'report') {
+                      void markReportAsRead(item.reportId, !!item.viewedAt);
+                    }
                   }}
                   asChild={item.kind !== 'feedback'}
                   className="p-0"
