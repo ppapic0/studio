@@ -46,6 +46,12 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe,
 } from '@/lib/attendance-auto';
+import {
+  isActiveMembershipStatus,
+  isTeacherOrAdminRole,
+  parseDateInputValue,
+  resolveMembershipByRole,
+} from '@/lib/dashboard-access';
 
 type AttendanceRecord = {
   id: string;
@@ -72,7 +78,7 @@ type StudyLogSummary = {
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, memberships, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -86,10 +92,15 @@ export default function AttendancePage() {
     setSelectedDate(new Date());
   }, []);
 
+  const classroomMembership = resolveMembershipByRole(
+    activeMembership,
+    memberships,
+    (membership) => isTeacherOrAdminRole(membership.role) && isActiveMembershipStatus(membership.status)
+  );
   const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
-  const centerId = activeMembership?.id;
-  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+  const centerId = classroomMembership?.id;
+  const isTeacherOrAdmin = Boolean(classroomMembership);
 
   // 1. 센터 모든 학생 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -291,7 +302,9 @@ export default function AttendancePage() {
     }
   };
 
-  const isLoading = !selectedDate || membersLoading || attendanceLoading || attendanceCurrentLoading || studyLogLoading;
+  const isLoading =
+    membershipsLoading ||
+    (Boolean(selectedDate) && (membersLoading || attendanceLoading || attendanceCurrentLoading || studyLogLoading));
   const attendanceMap = useMemo(() => new Map(attendanceRecords?.map(r => [r.id, r])), [attendanceRecords]);
   const attendanceCurrentMap = useMemo(() => {
     const mapped = new Map<string, AttendanceCurrent>();
@@ -424,6 +437,16 @@ export default function AttendancePage() {
     user?.uid,
   ]);
 
+  if (membershipsLoading && !classroomMembership) {
+    return (
+      <div className="p-8">
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
+        </div>
+      </div>
+    );
+  }
+
   if (!isTeacherOrAdmin) {
     return (
       <div className="p-8"><Alert><AlertTitle>권한 없음</AlertTitle><AlertDescription>교사 또는 관리자 계정으로 로그인해야 출석을 관리할 수 있습니다.</AlertDescription></Alert></div>
@@ -455,12 +478,16 @@ export default function AttendancePage() {
               <Input 
                 type="date" 
                 value={dateKey}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                onChange={(e) => setSelectedDate(parseDateInputValue(e.target.value))}
                 className="w-[180px] h-11 rounded-xl border-2 font-black"
               />
             </CardHeader>
             <CardContent className="p-0">
-              {isLoading ? <div className='flex justify-center py-20'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
+              {!selectedDate ? (
+                <div className="flex justify-center py-20">
+                  <p className="text-sm font-bold text-muted-foreground">조회할 날짜를 선택해 주세요.</p>
+                </div>
+              ) : isLoading ? <div className='flex justify-center py-20'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
               <div>
                 {!routineLoading && missingRoutineStudents.length > 0 && (
                   <div className="px-8 pt-6">

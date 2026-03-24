@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StudentNotification } from '@/lib/types';
+import { isAdminRole } from '@/lib/dashboard-access';
 
 type NotificationFeedItem =
   | {
@@ -86,7 +87,7 @@ export function NotificationBell() {
   const { activeMembership } = useAppContext();
   const { reports, feedbacks } = useNotifications();
   const isStudentRole = activeMembership?.role === 'student';
-  const isCenterAdminRole = activeMembership?.role === 'centerAdmin';
+  const isCenterAdminRole = isAdminRole(activeMembership?.role);
 
   const [selectedFeedback, setSelectedFeedback] = useState<StudentNotification | null>(null);
 

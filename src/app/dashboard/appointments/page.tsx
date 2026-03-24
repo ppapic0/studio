@@ -67,6 +67,7 @@ import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile 
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -184,8 +185,8 @@ export function AppointmentsPageContent({
 
   const isStudent = userRole === 'student';
   const isParent = userRole === 'parent';
-  const isStaff = userRole === 'teacher' || userRole === 'centerAdmin';
-  const isAdmin = userRole === 'centerAdmin';
+  const isStaff = isTeacherOrAdminRole(userRole);
+  const isAdmin = isAdminRole(userRole);
   const canAccessCommunications = isStaff || isStudent;
   const shouldLoadReservations = activeTab === 'reservations' || showAll;
   const shouldLoadLogs = activeTab === 'logs' || showAll;

@@ -22,7 +22,6 @@ import { useCollection, useFirestore, useUser, errorEmitter, FirestorePermission
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, doc, setDoc, serverTimestamp, query, where, updateDoc, deleteDoc } from 'firebase/firestore';
-import { InviteCode } from '@/lib/types';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -45,13 +44,25 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { isAdminRole } from '@/lib/dashboard-access';
+
+type InviteCode = {
+  id: string;
+  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  targetClassName?: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt?: { toDate?: () => Date } | Date | null;
+  isActive?: boolean;
+};
 
 export default function InviteCodesPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
+  const isAdmin = isAdminRole(activeMembership?.role);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -68,11 +79,11 @@ export default function InviteCodesPage() {
   });
 
   const inviteCodesQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
+    if (!firestore || !activeMembership || !isAdmin) return null;
     return query(collection(firestore, 'inviteCodes'), where('centerId', '==', activeMembership.id));
-  }, [firestore, activeMembership]);
+  }, [firestore, activeMembership, isAdmin]);
 
-  const { data: rawInviteCodes, isLoading } = useCollection<InviteCode>(inviteCodesQuery);
+  const { data: rawInviteCodes, isLoading } = useCollection<InviteCode>(inviteCodesQuery, { enabled: isAdmin });
 
   // 필터링된 코드 목록
   const inviteCodes = useMemo(() => {
@@ -189,6 +200,22 @@ export default function InviteCodesPage() {
       setConfirmDeleteId(null);
     }
   };
+
+  if (membershipsLoading && !activeMembership) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-30" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <p className="font-bold text-muted-foreground">센터 관리자만 초대 코드를 관리할 수 있습니다.</p>
+      </div>
+    );
+  }
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

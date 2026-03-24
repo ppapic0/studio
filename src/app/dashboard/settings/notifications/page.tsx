@@ -22,6 +22,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import type { NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { isAdminRole } from '@/lib/dashboard-access';
 
 const DEFAULT_FORM: Required<Pick<NotificationSettings,
   'smsEnabled' |
@@ -54,12 +55,12 @@ const DEFAULT_FORM: Required<Pick<NotificationSettings,
 export default function NotificationSettingsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
 
   const centerId = activeMembership?.id;
-  const isAdmin = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
+  const isAdmin = isAdminRole(activeMembership?.role);
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [isSaving, setIsSaving] = useState(false);
@@ -115,6 +116,14 @@ export default function NotificationSettingsPage() {
       setIsSaving(false);
     }
   };
+
+  if (membershipsLoading && !activeMembership) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-30" />
+      </div>
+    );
+  }
 
   if (!isAdmin) return null;
 

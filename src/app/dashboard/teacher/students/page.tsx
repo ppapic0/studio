@@ -69,6 +69,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
+import { isTeacherOrAdminRole } from '@/lib/dashboard-access';
 
 const RiskIntelligencePanel = dynamic(
   () => import('@/components/dashboard/risk-intelligence').then((mod) => mod.RiskIntelligence),
@@ -84,7 +85,7 @@ const RiskIntelligencePanel = dynamic(
 );
 
 export default function StudentListPage() {
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const firestore = useFirestore();
   const functions = useFunctions();
   const searchParams = useSearchParams();
@@ -107,14 +108,8 @@ export default function StudentListPage() {
   });
 
   const centerId = activeMembership?.id;
-  const isTeacherOrAdmin =
-    activeMembership?.role === 'teacher' ||
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
-  const canViewRiskPanel =
-    activeMembership?.role === 'teacher' ||
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
+  const isTeacherOrAdmin = isTeacherOrAdminRole(activeMembership?.role);
+  const canViewRiskPanel = isTeacherOrAdmin;
   const [showRiskPanel, setShowRiskPanel] = useState(false);
 
   useEffect(() => {
@@ -258,6 +253,14 @@ export default function StudentListPage() {
       default: return <Badge variant="outline" className="font-black text-[9px] h-5 opacity-40">미입실</Badge>;
     }
   };
+
+  if (membershipsLoading && !activeMembership) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-30" />
+      </div>
+    );
+  }
 
   if (!isTeacherOrAdmin) {
     return <div className="flex items-center justify-center h-[60vh]"><p>권한이 없습니다.</p></div>;
