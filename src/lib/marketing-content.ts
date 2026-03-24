@@ -157,11 +157,11 @@ export type MarketingContent = {
 
 export const marketingContent: MarketingContent = {
   brand: {
-  name: '트랙 관리형 스터디센터 · 트랙 국어학원',
+    name: '트랙 관리형 스터디센터 · 트랙 국어학원',
     slogan: '학생의 성장 궤적을 함께 그립니다',
-    heroTitle: '관리형 스터디센터가 중심입니다',
+    heroTitle: '관리의 방향이 보이면 성장도 더 깔끔하게 남습니다',
     heroDescription:
-      '루틴을 먼저 세우고, 데이터로 확인합니다. 수능 국어 수업은 필요할 때 따로 선택하고, 재학생과 N수생 모두 등록할 수 있습니다.',
+      '트랙은 공간 제공보다 운영 구조를 먼저 보여주는 관리형 스터디센터입니다. 루틴, 결과, 웹앱 흐름을 한 번에 읽기 쉽게 정리했습니다.',
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
     heroBackground: '',
@@ -176,18 +176,18 @@ export const marketingContent: MarketingContent = {
   heroStats: [
     {
       label: '2026 주요 대학 합격',
-      value: '고려대 2 · 서강대 1 · 성균관대 1 · 홍익대 1 · 아주대 1',
-      detail: '실적으로 증명한 운영 구조',
+      value: '고려대 2 · 서강대 1 · 성균관대 1',
+      detail: '합격 실적으로 남은 운영 구조',
     },
     {
       label: '센터 이용 구조',
       value: '센터 단독 등록 가능',
-      detail: '수업은 필요할 때 별도 선택',
+      detail: '국어 수업은 필요할 때 별도 선택',
     },
     {
       label: '실시간 운영 데이터',
       value: '출결 · 공부시간 · 실행률 연결',
-      detail: '보여주는 관리가 아니라 남는 관리',
+      detail: '보여주기보다 바로 읽히는 관리',
     },
   ],
   valueCards: [
@@ -309,9 +309,9 @@ export const marketingContent: MarketingContent = {
     ],
   },
   appSystem: {
-    heading: '학생의 과정이 바로 보이는 전용 웹앱',
+    heading: '학생·학부모·운영자가 같은 흐름을 읽는 전용 웹앱',
     description:
-      '학생, 학부모, 관리자 모두가 같은 데이터를 다른 화면으로 읽습니다. 운영 데이터와 결과 증명을 함께 남기기 위해 만든 전용 웹앱입니다.',
+      '홈에서는 역할별 핵심만 보여주고, 자세한 화면 흐름은 체험 페이지에서 이어서 확인할 수 있게 구성했습니다.',
     modes: [
       {
         mode: '학부모 모드',
@@ -330,10 +330,10 @@ export const marketingContent: MarketingContent = {
       },
     ],
     features: [
-      { title: '계획 확인', description: '해야 할 일을 주간 계획 흐름으로 정리하고 오늘의 행동으로 연결합니다.' },
-      { title: '기록 캘린더', description: '날짜별 공부시간과 실행 결과를 눌러 보며 루틴의 흔들림을 확인합니다.' },
-      { title: '성장 데이터', description: '공부시간, 목표 달성률, 루틴 안정성, 시험 결과가 함께 남습니다.' },
-      { title: '알림·리포트 연동', description: '상담, 리포트, 알림, 수납 상태를 같은 화면 흐름 안에서 확인합니다.' },
+      { title: '계획과 실행 연결', description: '해야 할 일을 바로 행동으로 이어지게 정리합니다.' },
+      { title: '기록 캘린더', description: '날짜별 공부시간과 흔들리는 구간을 빠르게 읽습니다.' },
+      { title: '성장 지표 확인', description: '공부시간과 결과가 같은 흐름 안에서 남습니다.' },
+      { title: '알림과 리포트', description: '상담과 피드백이 화면 흐름 안에서 이어집니다.' },
     ],
     appScreens: [
       {
@@ -372,24 +372,24 @@ export const marketingContent: MarketingContent = {
     guides: [
       {
         mode: '학생 모드',
-        headline: '오늘의 루틴부터 성장 리포트까지 직접 확인',
-        summary: '학생은 지금 해야 할 행동, 누적 공부시간, 피드백 흐름을 한 화면에서 이어서 봅니다.',
+        headline: '오늘 해야 할 행동을 바로 보는 학생 화면',
+        summary: '루틴, 공부시간, 피드백만 선명하게 확인하는 학생용 흐름입니다.',
         checkpoints: ['오늘의 루틴', '주간 캘린더', '성장 지표', '피드백 알림'],
         href: '/go/experience?placement=app_preview_student&mode=student',
         label: '학생 모드 체험',
       },
       {
         mode: '학부모 모드',
-        headline: '실시간 상태부터 상담 흐름까지 빠르게 확인',
-        summary: '학부모는 출결, 주간 누적 그래프, 날짜별 기록, 리포트를 같은 문법으로 확인합니다.',
+        headline: '현재 상태와 변화 방향을 빠르게 읽는 화면',
+        summary: '출결, 주간 그래프, 리포트를 같은 문법으로 보는 학부모용 흐름입니다.',
         checkpoints: ['실시간 상태', '주간 그래프', '날짜별 기록', '리포트 수신'],
         href: '/go/experience?placement=app_preview_parent&mode=parent',
         label: '학부모 모드 체험',
       },
       {
         mode: '운영자 모드',
-        headline: '위험 신호와 개입 우선순위를 한 번에 확인',
-        summary: '운영자는 하락 추세, 미제출, 상담 필요 대상, 전후 비교를 묶어서 보고 먼저 개입합니다.',
+        headline: '문제 발견부터 개입까지 우선순위로 보는 화면',
+        summary: '위험 신호, 상담, 전후 비교를 빠르게 연결하는 운영용 흐름입니다.',
         checkpoints: ['위험 신호', '개입 우선순위', '피드백 발송', '전후 비교'],
         href: '/go/experience?placement=app_preview_admin&mode=admin',
         label: '운영자 화면 보기',
@@ -428,7 +428,7 @@ export const marketingContent: MarketingContent = {
       { label: '실시간 확인 항목', value: '5개', detail: '출결·상태·그래프·리포트·알림', tone: 'navy' },
       { label: '권한별 화면', value: '3개', detail: '학생·학부모·운영자 분리', tone: 'orange' },
       { label: '합격 사례', value: '6건', detail: '2026 주요 대학 및 성장 사례', tone: 'green' },
-      { label: '공개 증빙 자산', value: '6개', detail: '성적표 3장 + 피드백 3장', tone: 'red' },
+      { label: '공개 증빙 자산', value: '4개', detail: '성적표 3장 + 피드백 1장', tone: 'red' },
     ],
   },
   lpSystem: {

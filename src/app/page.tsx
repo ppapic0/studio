@@ -1,9 +1,6 @@
-import { AppPreviewSection } from '@/components/marketing/app-preview-section';
 import { AppSystemSection } from '@/components/marketing/app-system-section';
 import { ConsultSection } from '@/components/marketing/consult-section';
 import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
-import { DataManagementSection } from '@/components/marketing/data-management-section';
-import { FeatureStepsSection } from '@/components/marketing/feature-steps-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { HomeGrowthProofSection } from '@/components/marketing/home-growth-proof-section';
 import { KoreanClassSection } from '@/components/marketing/korean-class-section';
@@ -21,15 +18,24 @@ export default function HomePage() {
       <MarketingPageTracker pageType="landing" placement="landing_root" />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} stats={marketingContent.heroStats} />
-      <ScrollReveal><ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} /></ScrollReveal>
-      <ScrollReveal><DataAnalyticsPreviewSection /></ScrollReveal>
-      <ScrollReveal><HomeGrowthProofSection /></ScrollReveal>
-      <ScrollReveal><FeatureStepsSection /></ScrollReveal>
-      <ScrollReveal><DataManagementSection /></ScrollReveal>
-      <ScrollReveal><AppSystemSection appSystem={marketingContent.appSystem} /></ScrollReveal>
-      <ScrollReveal><AppPreviewSection appSystem={marketingContent.appSystem} /></ScrollReveal>
-      <ScrollReveal><KoreanClassSection /></ScrollReveal>
-      <ScrollReveal><ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} /></ScrollReveal>
+      <ScrollReveal>
+        <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
+      </ScrollReveal>
+      <ScrollReveal>
+        <DataAnalyticsPreviewSection />
+      </ScrollReveal>
+      <ScrollReveal>
+        <HomeGrowthProofSection />
+      </ScrollReveal>
+      <ScrollReveal>
+        <AppSystemSection appSystem={marketingContent.appSystem} />
+      </ScrollReveal>
+      <ScrollReveal>
+        <KoreanClassSection />
+      </ScrollReveal>
+      <ScrollReveal>
+        <ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} />
+      </ScrollReveal>
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
       <StickyConsultCTA />
     </main>

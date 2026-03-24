@@ -17,7 +17,7 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
     >
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_15%_0%,rgba(25,65,170,0.52),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_85%_8%,rgba(255,122,22,0.08),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_85%_8%,rgba(255,122,22,0.10),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_50%_105%,rgba(8,18,52,0.65),transparent)]" />
       </div>
 
@@ -53,18 +53,14 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
 
       <div className="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-14 sm:px-6 md:gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.88fr)] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
         <div className="space-y-6 sm:space-y-8">
-          <span className="eyebrow-badge-light">관리형 스터디센터</span>
+          <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
           <div className="space-y-5">
-            <h1 className="font-aggro-display max-w-[12ch] break-keep text-[clamp(2rem,3.8vw,3rem)] font-black leading-[1.12] text-white">
-              공부의 방향이 보이면
-              <br />
-              성장의 기록도 <span className="text-[#FF7A16]">데이터</span>로 남습니다
+            <h1 className="font-aggro-display max-w-[11ch] break-keep text-[clamp(2rem,3.8vw,3rem)] font-black leading-[1.12] text-white">
+              {brand.heroTitle}
             </h1>
-            <p className="max-w-[33rem] break-keep text-[15px] font-bold leading-[1.78] text-white/85 sm:text-[15.5px]">
-              루틴을 먼저 세우고, 실행을 기록하고, 결과를 다시 전략으로 연결합니다.
-              <br />
-              트랙은 과정과 결과가 모두 남는 관리형 스터디센터입니다.
+            <p className="max-w-[33rem] break-keep text-[15px] font-bold leading-[1.78] text-white/84 sm:text-[15.5px]">
+              {brand.heroDescription}
             </p>
           </div>
 
@@ -79,7 +75,7 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
               href="#consult"
               className="premium-cta premium-cta-ghost h-12 justify-center px-7 text-[14px] sm:w-auto"
             >
-              상담 요청하기
+              상담 문의하기
             </a>
           </div>
 
@@ -87,12 +83,12 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
             {stats.map((stat, index) => (
               <article
                 key={`${stat.label}-${index}`}
-                className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4 shadow-[0_14px_32px_rgba(4,11,29,0.24)] backdrop-blur"
+                className="rounded-[1.3rem] border border-white/10 bg-white/7 px-4 py-4 shadow-[0_14px_32px_rgba(4,11,29,0.22)] backdrop-blur"
               >
                 <p className="text-[10px] font-black tracking-[0.18em] text-white/55">{stat.label}</p>
                 <p className="mt-2 break-keep text-[1rem] font-black leading-[1.35] text-white">{stat.value}</p>
                 {stat.detail ? (
-                  <p className="mt-1.5 break-keep text-[11.5px] font-semibold leading-[1.55] text-white/65">
+                  <p className="mt-1.5 break-keep text-[11.5px] font-semibold leading-[1.55] text-white/64">
                     {stat.detail}
                   </p>
                 ) : null}
