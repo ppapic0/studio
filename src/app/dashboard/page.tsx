@@ -140,13 +140,13 @@ export default function DashboardPage() {
   const studentProfileRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, activeMembership?.role, user?.uid]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
 
   const studentGrowthRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, activeMembership?.role, user?.uid]);
   const { data: studentGrowth } = useDoc<any>(studentGrowthRef, { enabled: isStudentRole });
 
   const examCountdownSource = studentGrowth?.examCountdowns ?? studentProfile?.examCountdowns;

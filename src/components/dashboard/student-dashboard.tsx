@@ -681,7 +681,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
-  }, [firestore, activeMembership, user, todayKey]);
+  }, [firestore, activeMembership?.id, user?.uid, todayKey]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const recentLogsQuery = useMemoFirebase(() => {
@@ -702,7 +702,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
       where('dateKey', 'in', targetDays)
     );
-  }, [firestore, activeMembership, user, weekKey, targetDays]);
+  }, [firestore, activeMembership?.id, user?.uid, weekKey, targetDays]);
   const { data: fetchedPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
 
   const weeklyPlansRef = useMemoFirebase(() => {
@@ -837,7 +837,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
       where('studentId', '==', user.uid)
     );
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, user?.uid]);
   const { data: myRequestsRaw } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
 
   const myRequests = useMemo(() => {
@@ -853,7 +853,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
       where('studentId', '==', user.uid)
     );
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, user?.uid]);
   const { data: myPenaltyLogsRaw } = useCollection<PenaltyLog>(myPenaltyLogsQuery, { enabled: isActive });
 
   const myPenaltyLogs = useMemo(() => {
@@ -869,7 +869,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       where('studentId', '==', user.uid),
       where('status', '==', 'sent')
     );
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, user?.uid]);
   const { data: teacherReportsRaw, isLoading: isTeacherReportsLoading } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
 
   const teacherReports = useMemo(() => {

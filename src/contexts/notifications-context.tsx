@@ -100,7 +100,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     });
 
     return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
+  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') {
@@ -145,7 +145,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     });
 
     return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
+  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   return (
     <NotificationsContext.Provider

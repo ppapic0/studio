@@ -390,13 +390,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', todayKey);
-  }, [firestore, activeMembership, user, todayKey]);
+  }, [firestore, activeMembership?.id, user?.uid, todayKey]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const allPlansRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !weekKey || !todayKey) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'), where('dateKey', '==', todayKey));
-  }, [firestore, activeMembership, user, weekKey, todayKey]);
+  }, [firestore, activeMembership?.id, user?.uid, weekKey, todayKey]);
   const { data: todayPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
 
   const handleStudyStartStop = useCallback(async () => {
@@ -632,7 +632,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', activeMembership.id, 'attendance요청'),
       where('studentId', '==', user.uid)
     );
-  }, [firestore, activeMembership, user]);
+  }, [firestore, activeMembership?.id, user?.uid]);
   const { data: raw요청 } = useCollection<AttendanceRequest>(my요청Query, { enabled: isActive });
 
   const my요청 = useMemo(() => {

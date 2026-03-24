@@ -263,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [user, firestore, activeMembership]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
@@ -309,7 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubProgress();
       unsubRank();
     };
-  }, [user, firestore, activeMembership]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {

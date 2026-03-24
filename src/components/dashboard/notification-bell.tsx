@@ -94,7 +94,7 @@ export function NotificationBell() {
       orderBy('createdAt', 'desc'),
       limit(120)
     );
-  }, [firestore, activeMembership, isCenterAdminRole]);
+  }, [firestore, activeMembership?.id, isCenterAdminRole]);
   const { data: reservationRows } = useCollection<any>(reservationsQuery, { enabled: isCenterAdminRole });
 
   const parentCommsQuery = useMemoFirebase(() => {
@@ -104,7 +104,7 @@ export function NotificationBell() {
       orderBy('updatedAt', 'desc'),
       limit(120)
     );
-  }, [firestore, activeMembership, isCenterAdminRole]);
+  }, [firestore, activeMembership?.id, isCenterAdminRole]);
   const { data: parentCommRows } = useCollection<any>(parentCommsQuery, { enabled: isCenterAdminRole });
 
   const reportQueueQuery = useMemoFirebase(() => {
@@ -114,7 +114,7 @@ export function NotificationBell() {
       orderBy('updatedAt', 'desc'),
       limit(120)
     );
-  }, [firestore, activeMembership, isCenterAdminRole]);
+  }, [firestore, activeMembership?.id, isCenterAdminRole]);
   const { data: reportRows } = useCollection<any>(reportQueueQuery, { enabled: isCenterAdminRole });
 
   const studentAnnouncementsQuery = useMemoFirebase(() => {
@@ -124,7 +124,7 @@ export function NotificationBell() {
       orderBy('createdAt', 'desc'),
       limit(30)
     );
-  }, [firestore, activeMembership, isStudentRole]);
+  }, [firestore, activeMembership?.id, isStudentRole]);
   const { data: studentAnnouncementRows } = useCollection<any>(studentAnnouncementsQuery, { enabled: isStudentRole });
 
   const markFeedbackAsRead = async (feedback: StudentNotification | null) => {
