@@ -99,6 +99,24 @@ npm run deploy       # Firebase 배포
 
 ---
 
+## Git — 자동 커밋·푸시 트리거
+
+**코드 파일을 수정·생성한 작업이 끝나면 항상 자동으로 실행:**
+1. `git add <변경된 파일들>` (specific 파일만, `-A` 사용 금지)
+2. `git commit -m "feat/fix/refactor/docs: ..."` (영어)
+3. `git push origin main`
+
+커밋 메시지 끝에 항상 포함:
+```
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+```
+
+예외 (자동 실행 안 함):
+- 코드 읽기·분석만 한 경우
+- 사용자가 "커밋하지 마"라고 명시한 경우
+
+---
+
 ## 코딩 컨벤션
 
 - Tailwind 동적 클래스는 `cn()` (`src/lib/utils.ts`) 사용
