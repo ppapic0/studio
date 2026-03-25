@@ -52,6 +52,26 @@ export type WebAppShowcaseScreen = {
   alt: string;
 };
 
+export type ExperienceShowcaseFrame = {
+  title: string;
+  caption: string;
+  image?: string;
+  alt: string;
+};
+
+export type ExperienceShowcaseSection = {
+  mode: string;
+  title: string;
+  summary: string;
+  highlights: string[];
+  primaryScreen: ExperienceShowcaseFrame;
+  secondaryScreens: ExperienceShowcaseFrame[];
+  insightTitle: string;
+  insightDescription: string;
+  ctaHref: string;
+  ctaLabel: string;
+};
+
 export type AppDataStory = {
   eyebrow: string;
   title: string;
@@ -123,6 +143,16 @@ export type MarketingContent = {
     heading: string;
     description: string;
     screens: WebAppShowcaseScreen[];
+  };
+  experienceShowcase: {
+    heading: string;
+    description: string;
+    sections: ExperienceShowcaseSection[];
+    footerNote: string;
+    closingTitle: string;
+    closingDescription: string;
+    closingHref: string;
+    closingLabel: string;
   };
   appSystem: {
     heading: string;
@@ -323,6 +353,77 @@ export const marketingContent: MarketingContent = {
       },
     ],
   },
+  experienceShowcase: {
+    heading: '실제 화면으로 보는 트랙 웹앱',
+    description:
+      '학생은 무엇을 바로 실행해야 하는지, 학부모는 어떤 변화를 먼저 확인해야 하는지 실제 화면 기준으로 보여드립니다.',
+    sections: [
+      {
+        mode: '학생 모드',
+        title: '학생은 오늘 해야 할 일과 공부 흐름을 한 화면에서 확인합니다',
+        summary:
+          '오늘 할 일, 루틴, 공부시간, 피드백이 한 흐름으로 연결되어 다음 행동으로 바로 이어지는 학생용 화면입니다. 확인만 하고 끝나는 것이 아니라, 바로 실행으로 이어지도록 설계했습니다.',
+        highlights: ['오늘 할 일', '루틴 확인', '공부시간', '피드백 반영'],
+        primaryScreen: {
+          title: '학생 모드 대표화면',
+          caption: '오늘 해야 할 일과 루틴, 공부 흐름을 가장 먼저 읽는 대표 화면입니다.',
+          alt: '학생 모드 대표 스크린샷 예정 자리',
+        },
+        secondaryScreens: [
+          {
+            title: '오늘 할 일 · 루틴 화면',
+            caption: '막연하게 시작하지 않도록 오늘 할 일과 루틴을 바로 확인하는 화면입니다.',
+            alt: '학생 모드 오늘 할 일과 루틴 스크린샷 예정 자리',
+          },
+          {
+            title: '공부시간 · 피드백 화면',
+            caption: '공부시간 기록과 피드백이 다음 행동으로 이어지도록 정리한 화면입니다.',
+            alt: '학생 모드 공부시간과 피드백 스크린샷 예정 자리',
+          },
+        ],
+        insightTitle: '학생 화면은 다음 행동이 보여야 합니다',
+        insightDescription:
+          '학생에게는 많은 정보보다 지금 무엇을 해야 하는지가 먼저 보여야 합니다. 트랙 학생 화면은 확인보다 실행이 앞서도록 구조를 잡습니다.',
+        ctaHref: '/go/login?placement=experience_student',
+        ctaLabel: '학생 로그인 보기',
+      },
+      {
+        mode: '학부모 모드',
+        title: '학부모는 출결과 공부 흐름을 빠르게 확인합니다',
+        summary:
+          '출결, 공부시간, 리포트, 변화 흐름을 짧은 시간 안에 읽고 현재 상태를 파악하는 학부모용 화면입니다. 길게 탐색하지 않아도 지금의 상태와 방향이 먼저 보이도록 설계했습니다.',
+        highlights: ['출결 상태', '공부시간', '리포트 확인', '상담 연결'],
+        primaryScreen: {
+          title: '학부모 모드 대표화면',
+          caption: '출결과 공부 흐름, 리포트를 빠르게 읽는 대표 화면입니다.',
+          alt: '학부모 모드 대표 스크린샷 예정 자리',
+        },
+        secondaryScreens: [
+          {
+            title: '출결 · 공부시간 화면',
+            caption: '학생의 현재 상태와 누적 공부 흐름을 먼저 확인하는 화면입니다.',
+            alt: '학부모 모드 출결과 공부시간 스크린샷 예정 자리',
+          },
+          {
+            title: '리포트 · 상담 화면',
+            caption: '리포트와 상담 흐름을 같은 맥락에서 확인하도록 정리한 화면입니다.',
+            alt: '학부모 모드 리포트와 상담 스크린샷 예정 자리',
+          },
+        ],
+        insightTitle: '학부모 화면은 빠른 확인이 먼저입니다',
+        insightDescription:
+          '학부모에게는 깊은 탐색보다 현재 상태를 짧은 시간 안에 읽을 수 있는 구조가 더 중요합니다. 출결, 공부 흐름, 리포트를 같은 문맥으로 연결해 보여줍니다.',
+        ctaHref: '/go/login?placement=experience_parent',
+        ctaLabel: '학부모 로그인 보기',
+      },
+    ],
+    footerNote: '실제 스크린샷은 순차 반영 예정입니다.',
+    closingTitle: '설명보다 실제 화면이 먼저 보이도록 준비했습니다',
+    closingDescription:
+      '스크린샷이 반영되면 학생과 학부모가 어떤 구조로 관리되는지 더 선명하게 확인할 수 있습니다.',
+    closingHref: '/#consult',
+    closingLabel: '상담 문의하기',
+  },
   appSystem: {
     heading: '우리는 실제 이렇게 관리합니다',
     description: '학생, 학부모, 센터관리자가 각각 어떤 화면으로 관리되는지 대표 화면부터 보여드립니다.',
@@ -369,7 +470,7 @@ export const marketingContent: MarketingContent = {
         headline: '학생은 오늘 해야 할 행동부터 바로 확인합니다',
         summary: '루틴, 누적 공부시간, 피드백을 한 화면에서 읽고 바로 다음 행동으로 이어가는 학생용 흐름입니다.',
         checkpoints: ['오늘 루틴', '누적 공부시간', '피드백 반영', '다음 행동'],
-        href: '/go/experience?placement=app_preview_student&mode=student',
+        href: '/go/experience?placement=app_preview_student',
         label: '학생 모드 체험',
       },
       {
@@ -377,7 +478,7 @@ export const marketingContent: MarketingContent = {
         headline: '학부모는 현재 상태와 흔들리는 구간을 먼저 읽습니다',
         summary: '출결, 주간 흐름, 날짜별 기록, 리포트를 같은 문맥으로 확인하는 학부모용 흐름입니다.',
         checkpoints: ['실시간 상태', '주간 흐름', '날짜별 기록', '리포트 확인'],
-        href: '/go/experience?placement=app_preview_parent&mode=parent',
+        href: '/go/experience?placement=app_preview_parent',
         label: '학부모 모드 체험',
       },
       {
@@ -385,7 +486,7 @@ export const marketingContent: MarketingContent = {
         headline: '운영자는 먼저 개입할 학생부터 우선순위로 봅니다',
         summary: '하락 추세, 미제출, 상담과 전후 변화를 연결해 개입 순서를 빠르게 정하는 운영용 흐름입니다.',
         checkpoints: ['하락 추세', '미제출 확인', '개입 우선순위', '전후 비교'],
-        href: '/go/experience?placement=app_preview_admin&mode=admin',
+        href: '/go/experience?placement=app_preview_admin',
         label: '운영자 화면 보기',
       },
     ],
@@ -397,7 +498,7 @@ export const marketingContent: MarketingContent = {
         image: '/marketing/app-evidence/student-dashboard-redacted.svg',
         proofType: 'reconstructed',
         callout: '확인 → 추적 → 해석 → 행동',
-        href: '/experience?mode=student',
+        href: '/experience',
       },
       {
         mode: '학부모 모드',
@@ -406,7 +507,7 @@ export const marketingContent: MarketingContent = {
         image: '/marketing/app-evidence/parent-dashboard-redacted.svg',
         proofType: 'reconstructed',
         callout: '실시간 상태 → 기록 추적 → 리포트 확인',
-        href: '/experience?mode=parent',
+        href: '/experience',
       },
       {
         mode: '운영자 모드',
@@ -415,7 +516,7 @@ export const marketingContent: MarketingContent = {
         image: '/marketing/app-evidence/admin-dashboard-redacted.svg',
         proofType: 'reconstructed',
         callout: '문제 발견 → 개입 → 변화 확인',
-        href: '/experience?mode=admin',
+        href: '/experience',
       },
     ],
     trustMetrics: [

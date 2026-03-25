@@ -1,360 +1,273 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { ArrowRight, BarChart3, Bell, ChevronLeft, LineChart, ShieldCheck, Smartphone, Target, Users } from 'lucide-react';
+import { ArrowRight, ChevronLeft, Smartphone, Users } from 'lucide-react';
 
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
+import { ScrollReveal } from '@/components/marketing/scroll-reveal';
+import { SectionHeading } from '@/components/marketing/section-heading';
+import type { MarketingContent } from '@/lib/marketing-content';
 import { marketingContent } from '@/lib/marketing-content';
-import { cn } from '@/lib/utils';
 
-type DemoMode = 'student' | 'parent' | 'admin';
+type ExperienceSection = MarketingContent['experienceShowcase']['sections'][number];
+type ExperienceFrame = ExperienceSection['primaryScreen'];
+type ExperienceTone = 'student' | 'parent';
 
-const actualProofs = [
-  '/marketing/reviews/kakao-feedback-1-redacted.jpg',
-  '/marketing/reviews/kakao-feedback-2-redacted.jpg',
-  '/marketing/reviews/kakao-feedback-3-redacted.jpg',
-];
-
-const modeContent: Record<
-  DemoMode,
+const toneStyleMap: Record<
+  ExperienceTone,
   {
     label: string;
-    title: string;
-    desc: string;
-    subdesc: string;
-    image: string;
-    proofs: Array<{ title: string; description: string; image: string }>;
-    stages: Array<{ step: string; title: string; description: string }>;
-    primaryHref: string;
-    badge: string;
+    iconWrap: string;
+    chip: string;
+    sectionCard: string;
+    frameCanvas: string;
+    device: string;
+    insight: string;
+    textButton: string;
+    glow: string;
   }
 > = {
   student: {
-    label: '학생 모드',
-    title: '학생은 오늘의 루틴과 변화의 방향을 직접 확인합니다',
-    desc: '학생 홈 화면, 주간 캘린더, 성장 지표, 피드백 이후 행동 흐름을 실제 시스템처럼 공개합니다.',
-    subdesc: '해야 할 일 확인에서 끝나는 것이 아니라, 기록 추적과 해석, 다음 행동까지 연결되는 화면을 기준으로 보여줍니다.',
-    image: '/marketing/app-evidence/student-dashboard-redacted.svg',
-    proofs: [
-      {
-        title: '대표 홈 화면',
-        description: '오늘의 루틴, 주간 그래프, 성장 지표가 함께 보입니다.',
-        image: '/marketing/app-evidence/student-dashboard-redacted.svg',
-      },
-      {
-        title: '실제 피드백 일부 공개',
-        description: '카카오 피드백 일부를 마스킹해 행동 변화의 근거로 공개합니다.',
-        image: '/marketing/reviews/kakao-feedback-1-redacted.jpg',
-      },
-    ],
-    stages: [
-      { step: '01 확인', title: '오늘의 루틴 확인', description: '학생이 지금 무엇을 해야 하는지 먼저 확인합니다.' },
-      { step: '02 추적', title: '주간 기록 추적', description: '날짜별 기록과 주간 그래프로 흐름을 추적합니다.' },
-      { step: '03 해석', title: '성장 지표 읽기', description: '집중력, 꾸준함, 목표 달성률로 상태를 읽습니다.' },
-      { step: '04 행동', title: '피드백 반영', description: '피드백과 알림을 다음 루틴으로 연결합니다.' },
-    ],
-    primaryHref: '/go/login?placement=experience_student',
-    badge: '학생 앱 흐름',
+    label: 'text-[#14295F]',
+    iconWrap: 'bg-[#EEF3FF] text-[#14295F]',
+    chip: 'border-[#14295F]/12 bg-[#EEF3FF] text-[#14295F]',
+    sectionCard: 'border-[#14295F]/10 bg-white',
+    frameCanvas: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF3FF_100%)]',
+    device: 'border-[#14295F]/12 bg-white',
+    insight: 'border-[#14295F]/10 bg-[#F8FBFF]',
+    textButton: 'border-[#14295F]/12 bg-white text-[#14295F] hover:border-[#14295F]/22 hover:bg-[#F7FAFF]',
+    glow: 'bg-[#8CB7FF]/18',
   },
   parent: {
-    label: '학부모 모드',
-    title: '학부모는 학생의 과정을 빠르게 읽고 바로 질문합니다',
-    desc: '상태 요약, 주간 그래프, 날짜별 기록, 리포트와 알림 흐름을 실제 시스템처럼 공개합니다.',
-    subdesc: '학부모는 길게 탐색하지 않고도 현재 상태와 변화의 방향을 빠르게 확인할 수 있어야 합니다.',
-    image: '/marketing/app-evidence/parent-dashboard-redacted.svg',
-    proofs: [
-      {
-        title: '상태 요약 화면',
-        description: '출결, 주간 누적, 상태 요약, 위험 신호를 한 번에 확인합니다.',
-        image: '/marketing/app-evidence/parent-dashboard-redacted.svg',
-      },
-      {
-        title: '실제 피드백 일부 공개',
-        description: '실제 피드백 자산을 마스킹해 학부모 커뮤니케이션 톤을 보여줍니다.',
-        image: '/marketing/reviews/kakao-feedback-2-redacted.jpg',
-      },
-    ],
-    stages: [
-      { step: '01 확인', title: '실시간 상태 확인', description: '학생의 현재 상태와 출결을 먼저 읽습니다.' },
-      { step: '02 추적', title: '주간 그래프 추적', description: '주간 누적 그래프와 날짜별 기록으로 과정을 봅니다.' },
-      { step: '03 해석', title: '리포트 읽기', description: '리포트와 위험 신호를 함께 보며 개입 필요성을 읽습니다.' },
-      { step: '04 행동', title: '질문/상담 연결', description: '바로 질문하거나 다음 상담으로 연결합니다.' },
-    ],
-    primaryHref: '/go/login?placement=experience_parent',
-    badge: '학부모 앱 흐름',
-  },
-  admin: {
-    label: '운영자 모드',
-    title: '운영자는 문제를 먼저 발견하고 개입 결과까지 봅니다',
-    desc: '위험 신호, 개입 우선순위, 상담/피드백 발송, 전후 비교를 같은 흐름으로 공개합니다.',
-    subdesc: '운영자 화면은 보기 좋은 리포트보다 먼저 개입할 대상을 선별하고 후속 결과를 확인하는 데 집중합니다.',
-    image: '/marketing/app-evidence/admin-dashboard-redacted.svg',
-    proofs: [
-      {
-        title: '운영자 개입 화면',
-        description: '위험 신호와 우선순위, 전후 비교를 묶어 보여주는 공개용 재구성 캡처입니다.',
-        image: '/marketing/app-evidence/admin-dashboard-redacted.svg',
-      },
-      {
-        title: '실제 결과 증빙',
-        description: '운영 구조가 결과로 이어진 실제 성적표 일부를 마스킹해 공개합니다.',
-        image: '/marketing/proof/september-mock-redacted.jpg',
-      },
-    ],
-    stages: [
-      { step: '01 확인', title: '하락 신호 감지', description: '공부시간, 목표 달성률, 미제출을 먼저 읽습니다.' },
-      { step: '02 추적', title: '대상 우선순위 정리', description: '어디에 먼저 개입할지 운영 우선순위를 잡습니다.' },
-      { step: '03 해석', title: '상담/피드백 연결', description: '개입 방식과 후속 조치를 같은 화면에서 이어갑니다.' },
-      { step: '04 행동', title: '전후 변화 확인', description: '회복과 결과 변화를 다시 확인합니다.' },
-    ],
-    primaryHref: '/go/experience?placement=experience_admin&mode=admin',
-    badge: '운영자 공개 화면',
+    label: 'text-[#B55200]',
+    iconWrap: 'bg-[#FFF3E8] text-[#FF7A16]',
+    chip: 'border-[#FF7A16]/12 bg-[#FFF3E8] text-[#B55200]',
+    sectionCard: 'border-[#FF7A16]/12 bg-white',
+    frameCanvas: 'border-[#FFD9BF] bg-[linear-gradient(180deg,#FFF9F2_0%,#FFF3E8_100%)]',
+    device: 'border-[#FF7A16]/12 bg-white',
+    insight: 'border-[#FF7A16]/12 bg-[#FFF9F2]',
+    textButton: 'border-[#FF7A16]/12 bg-white text-[#B55200] hover:border-[#FF7A16]/24 hover:bg-[#FFF9F2]',
+    glow: 'bg-[#FFB878]/20',
   },
 };
 
-function ModeTab({
-  href,
-  label,
-  active,
-  icon,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-black transition-all',
-        active
-          ? 'bg-[#14295F] text-white shadow-[0_6px_16px_rgba(20,41,95,0.22)]'
-          : 'border border-[#14295F]/12 bg-white text-[#14295F]/65 hover:border-[#14295F]/22 hover:text-[#14295F]',
-      )}
-    >
-      {icon}
-      {label}
-    </Link>
-  );
+function resolveTone(mode: string): ExperienceTone {
+  return mode === '학부모 모드' ? 'parent' : 'student';
 }
 
-function ProofCard({
-  title,
-  description,
-  image,
-  badge,
+function ModeIcon({ mode }: { mode: string }) {
+  const Icon = mode === '학부모 모드' ? Users : Smartphone;
+  return <Icon className="h-5 w-5" />;
+}
+
+function ScreenshotCard({
+  screen,
+  tone,
+  featured = false,
 }: {
-  title: string;
-  description: string;
-  image: string;
-  badge?: string;
+  screen: ExperienceFrame;
+  tone: ExperienceTone;
+  featured?: boolean;
 }) {
-  const showImage = image && !image.includes('/marketing/app-evidence/');
+  const style = toneStyleMap[tone];
 
   return (
-    <article className="overflow-hidden rounded-[1.5rem] border border-[#14295F]/10 bg-white shadow-sm">
-      {showImage ? (
-        <div className="relative aspect-[1.22/1] border-b border-[#14295F]/8 bg-[#0D1732]">
-          <Image src={image} alt={title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+    <article className={`overflow-hidden rounded-[2rem] border p-4 shadow-[0_20px_44px_rgba(20,41,95,0.08)] sm:p-5 ${style.sectionCard}`}>
+      <div className={`relative overflow-hidden rounded-[1.7rem] border p-4 sm:p-5 ${style.frameCanvas}`}>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_58%)]" />
+        <div className={`absolute -left-10 bottom-10 h-28 w-28 rounded-full blur-3xl ${style.glow}`} />
+        <div className={`absolute -right-6 top-8 h-24 w-24 rounded-full blur-3xl ${style.glow}`} />
+
+        <div className={`relative flex items-center justify-center ${featured ? 'min-h-[26rem] sm:min-h-[31rem]' : 'min-h-[18rem] sm:min-h-[20rem]'}`}>
+          <div className={`absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px] ${style.glow}`} />
+          <div
+            className={`relative aspect-[10/20] w-full overflow-hidden rounded-[2.8rem] border shadow-[0_26px_54px_rgba(20,41,95,0.16)] ${style.device} ${
+              featured ? 'max-w-[19rem]' : 'max-w-[12.5rem]'
+            }`}
+          >
+            {screen.image ? (
+              <Image
+                src={screen.image}
+                alt={screen.alt}
+                fill
+                sizes={featured ? '(max-width: 1024px) 80vw, 28vw' : '(max-width: 768px) 48vw, 18vw'}
+                className="object-contain bg-white"
+              />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                <span className="rounded-full border border-[#14295F]/10 bg-white/78 px-3 py-1 text-[10px] font-black tracking-[0.14em] text-[#14295F]/56 backdrop-blur">
+                  실제 스크린샷 예정
+                </span>
+                <p className="mt-4 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">
+                  완성된 화면이
+                  <br />
+                  이 자리에 반영됩니다.
+                </p>
+                <p className="mt-2 break-keep text-[12px] font-semibold leading-[1.65] text-[#5B7088]">
+                  지금은 구조와 설명부터 먼저 준비했습니다.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="border-b border-[#14295F]/8 bg-[linear-gradient(145deg,#F8FBFF_0%,#EEF3FF_100%)] px-5 py-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]/42">SCREEN SUMMARY</p>
-          <p className="mt-2 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">
-            공개 가능한 실제 앱 스크린샷이 아닌 재구성 화면은 제외하고, 이 모드에서 확인 가능한 흐름만 안내합니다.
-          </p>
-        </div>
-      )}
-      <div className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[1rem] font-black text-[#14295F]">{title}</p>
-          {badge ? (
-            <span className="rounded-full bg-[#F5F8FF] px-3 py-1 text-[10px] font-black text-[#14295F]/55">
-              {badge}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-slate-500">{description}</p>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-[0.98rem] font-black leading-[1.4] text-[#14295F]">{screen.title}</p>
+        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#51667D]">{screen.caption}</p>
       </div>
     </article>
   );
 }
 
-function ModeDetail({ mode }: { mode: DemoMode }) {
-  const content = modeContent[mode];
+function ExperienceSectionBlock({ section, reverse = false }: { section: ExperienceSection; reverse?: boolean }) {
+  const tone = resolveTone(section.mode);
+  const style = toneStyleMap[tone];
 
   return (
-    <div className="space-y-8">
-      <div className="overflow-hidden rounded-[1.75rem] border border-[#14295F]/10 bg-white shadow-[0_12px_36px_rgba(20,41,95,0.09)]">
-        <div className="relative px-6 py-6 sm:px-7 sm:py-7">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_6%_12%,rgba(20,41,95,0.04),transparent_20%),radial-gradient(circle_at_94%_8%,rgba(255,122,22,0.08),transparent_20%)]" />
-          <div className="relative">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">{content.label}</p>
-              <span className="rounded-full bg-[#F5F8FF] px-3 py-1.5 text-[11px] font-black text-[#14295F]">{content.badge}</span>
+    <article className={`relative overflow-hidden rounded-[2.35rem] border p-5 shadow-[0_24px_58px_rgba(20,41,95,0.10)] sm:p-7 lg:p-8 ${style.sectionCard}`}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.8),transparent_32%)]" />
+      <div className={`absolute ${reverse ? 'left-[-4%] top-[18%]' : 'right-[-4%] top-[14%]'} h-44 w-44 rounded-full blur-[120px] ${style.glow}`} />
+
+      <div className={`relative grid gap-6 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:gap-8 ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}>
+              <ModeIcon mode={section.mode} />
             </div>
-            <h2 className="mt-2 break-keep text-[1.5rem] font-black text-[#14295F] sm:text-[1.75rem]">{content.title}</h2>
-            <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#334e6a]">{content.desc}</p>
-            <p className="mt-1.5 break-keep text-[13px] font-semibold leading-[1.65] text-slate-400">{content.subdesc}</p>
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              <Link href={content.primaryHref} className="premium-cta premium-cta-primary h-10 px-5 text-sm">
-                {mode === 'admin' ? '운영자 화면 체험' : '실제 로그인'}
-              </Link>
-              <Link href="/experience" className="premium-cta premium-cta-muted h-10 px-5 text-sm">
-                전체 증거 라이브러리
-              </Link>
-            </div>
+            <p className={`text-[12px] font-black tracking-[0.14em] ${style.label}`}>{section.mode}</p>
+          </div>
+
+          <h2 className="mt-5 break-keep text-[clamp(1.7rem,3.6vw,2.4rem)] font-black leading-[1.14] text-[#14295F]">
+            {section.title}
+          </h2>
+          <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.9] text-[#40556F]">{section.summary}</p>
+
+          <div className="mt-5 flex flex-wrap gap-2.5">
+            {section.highlights.map((item) => (
+              <span key={`${section.mode}-${item}`} className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${style.chip}`}>
+                {item}
+              </span>
+            ))}
+          </div>
+
+          <div className={`mt-6 rounded-[1.5rem] border px-5 py-5 ${style.insight}`}>
+            <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">WHAT THIS SCREEN HELPS YOU READ</p>
+            <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{section.insightTitle}</p>
+            <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.8] text-[#4C627B]">{section.insightDescription}</p>
+          </div>
+
+          <div className="mt-6">
+            <Link
+              href={section.ctaHref}
+              className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-black transition-colors ${style.textButton}`}
+            >
+              {section.ctaLabel}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        <div>
+          <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {section.secondaryScreens.map((screen) => (
+              <ScreenshotCard key={`${section.mode}-${screen.title}`} screen={screen} tone={tone} />
+            ))}
           </div>
         </div>
       </div>
-
-      <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-        <ProofCard title={`${content.label} 대표 화면`} description={content.desc} image={content.image} badge="재구성 캡처" />
-        <div className="grid gap-4">
-          {content.stages.map((stage) => (
-            <article key={stage.step} className="rounded-[1.3rem] border border-[#14295F]/10 bg-white p-5 shadow-sm">
-              <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">{stage.step}</p>
-              <p className="mt-2 text-[1rem] font-black leading-[1.4] text-[#14295F]">{stage.title}</p>
-              <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-slate-500">{stage.description}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-5 md:grid-cols-2">
-        {content.proofs.map((proof, index) => (
-          <ProofCard
-            key={`${proof.title}-${index}`}
-            title={proof.title}
-            description={proof.description}
-            image={proof.image}
-            badge={index === 0 ? '대표 증빙' : '실제 자산'}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ExperienceHub() {
-  const captures = marketingContent.appSystem.captures;
-
-  return (
-    <div className="space-y-8">
-      <div className="rounded-[1.75rem] border border-[#14295F]/10 bg-white p-6 shadow-[0_12px_36px_rgba(20,41,95,0.09)]">
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">EVIDENCE LIBRARY</p>
-        <h2 className="mt-2 break-keep text-[1.4rem] font-black text-[#14295F] sm:text-[1.7rem]">
-          웹앱을 소개하지 않고
-          <br />
-          실제 시스템처럼 보여드립니다
-        </h2>
-        <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#334e6a]">
-          학생, 학부모, 운영자 화면을 각각 공개용 증거 카드로 정리했습니다. 실제 자산은 마스킹해서 공개하고, 없는 부분은 현재 앱 기준 재구성으로 보완합니다.
-        </p>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-3">
-        {captures.map((capture) => (
-          <ProofCard
-            key={capture.mode}
-            title={capture.mode}
-            description={capture.callout}
-            image={capture.image}
-            badge={capture.proofType === 'actual' ? '실제 캡처' : '재구성 캡처'}
-          />
-        ))}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {actualProofs.map((image, index) => (
-          <ProofCard
-            key={image}
-            title={`실제 피드백 자산 ${index + 1}`}
-            description="학생/학부모 커뮤니케이션 자산 일부를 마스킹해 공개합니다."
-            image={image}
-            badge="실제 자산"
-          />
-        ))}
-      </div>
-
-      <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-white p-6 text-center shadow-sm">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">FLOW</p>
-        <p className="mt-2 break-keep text-[1.1rem] font-black text-[#14295F]">
-          확인 → 추적 → 해석 → 행동 흐름으로 학생/학부모/운영자 화면을 함께 읽을 수 있게 구성했습니다.
-        </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-3">
-          <Link href="/experience?mode=student" className="premium-cta premium-cta-primary h-10 px-5 text-sm">
-            학생 모드 보기
-          </Link>
-          <Link href="/experience?mode=parent" className="premium-cta premium-cta-muted h-10 px-5 text-sm">
-            학부모 모드 보기
-          </Link>
-          <Link href="/experience?mode=admin" className="premium-cta premium-cta-muted h-10 px-5 text-sm">
-            운영자 화면 보기
-          </Link>
-        </div>
-      </div>
-    </div>
+    </article>
   );
 }
 
 export default function ExperiencePage() {
-  const searchParams = useSearchParams();
-  const rawMode = searchParams.get('mode');
-  const mode: DemoMode | null = rawMode === 'student' || rawMode === 'parent' || rawMode === 'admin' ? rawMode : null;
+  const experienceShowcase = marketingContent.experienceShowcase;
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#F5F8FF_0%,#FFFFFF_60%,#F8FBFF_100%)] text-[#14295F]">
+    <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#F8F5EF_0%,#FFFFFF_18%,#F7F9FD_100%)] text-[#14295F]">
       <MarketingPageTracker pageType="experience" placement="experience_page" />
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-[26rem] bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.12),transparent_44%),radial-gradient(circle_at_22%_10%,rgba(20,41,95,0.08),transparent_28%)]" />
+
+      <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-4 py-2 text-[13px] font-black text-[#14295F] shadow-sm"
+            className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-4 py-2 text-[13px] font-black text-[#14295F] shadow-[0_10px_24px_rgba(20,41,95,0.06)]"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             홍보 페이지로 돌아가기
           </Link>
           <Link
             href="/go/login?placement=experience_header"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_8px_18px_rgba(255,122,22,0.28)]"
+            className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_14px_24px_rgba(255,122,22,0.26)] transition-transform hover:-translate-y-0.5"
           >
             실제 로그인
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          <ModeTab href="/experience" label="증거 라이브러리" active={!mode} icon={<Target className="h-3.5 w-3.5" />} />
-          <ModeTab href="/experience?mode=student" label="학생 모드" active={mode === 'student'} icon={<Smartphone className="h-3.5 w-3.5" />} />
-          <ModeTab href="/experience?mode=parent" label="학부모 모드" active={mode === 'parent'} icon={<Users className="h-3.5 w-3.5" />} />
-          <ModeTab href="/experience?mode=admin" label="운영자 화면" active={mode === 'admin'} icon={<ShieldCheck className="h-3.5 w-3.5" />} />
-        </div>
-
-        <div className="mt-6">{mode ? <ModeDetail mode={mode} /> : <ExperienceHub />}</div>
-
-        <div className="mt-8 rounded-[1.5rem] border border-[#14295F]/10 bg-white p-6 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">TRUST METRICS</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {marketingContent.appSystem.trustMetrics.map((metric) => (
-              <div key={`${metric.label}-${metric.value}`} className="rounded-[1.1rem] bg-[#F8FBFF] px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/45">{metric.label}</p>
-                <p className="dashboard-number mt-2 text-[1.25rem] text-[#14295F]">{metric.value}</p>
-                <p className="mt-1 text-[11px] font-semibold text-[#14295F]/58">{metric.detail}</p>
+        <ScrollReveal className="mt-7">
+          <section className="relative overflow-hidden rounded-[2.6rem] border border-[#14295F]/10 bg-white px-6 py-7 shadow-[0_28px_64px_rgba(20,41,95,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,41,95,0.05),transparent_24%),radial-gradient(circle_at_92%_10%,rgba(255,122,22,0.10),transparent_24%)]" />
+            <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-8">
+              <div>
+                <SectionHeading
+                  eyebrow="ACTUAL WEB APP"
+                  title={experienceShowcase.heading}
+                  description={experienceShowcase.description}
+                />
               </div>
-            ))}
-          </div>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link href="/go/login?placement=experience_bottom" className="premium-cta premium-cta-primary h-10 px-5 text-sm">
-              실제 로그인
-            </Link>
-            <Link href="/#consult" className="premium-cta premium-cta-muted h-10 px-5 text-sm">
-              상담 요청하기
-            </Link>
-          </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <div className="rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF] px-5 py-5">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-[#14295F]/52">STUDENT VIEW</p>
+                  <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
+                    학생은 오늘 무엇을 해야 하는지가 먼저 보여야 합니다.
+                  </p>
+                </div>
+                <div className="rounded-[1.45rem] border border-[#FF7A16]/12 bg-[#FFF9F3] px-5 py-5">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-[#B55200]/70">PARENT VIEW</p>
+                  <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
+                    학부모는 짧은 시간 안에 현재 상태와 방향을 읽어야 합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </ScrollReveal>
+
+        <div className="mt-8 space-y-6 sm:space-y-7">
+          {experienceShowcase.sections.map((section, index) => (
+            <ScrollReveal key={section.mode} delay={index * 80}>
+              <ExperienceSectionBlock section={section} reverse={index % 2 === 1} />
+            </ScrollReveal>
+          ))}
         </div>
+
+        <ScrollReveal className="mt-8">
+          <div className="space-y-5">
+            <p className="text-center text-[12px] font-semibold text-[#667A95]">{experienceShowcase.footerNote}</p>
+
+            <section className="relative overflow-hidden rounded-[2.1rem] border border-[#14295F]/10 bg-white px-6 py-7 text-center shadow-[0_20px_46px_rgba(20,41,95,0.08)] sm:px-8">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,122,22,0.10),transparent_32%)]" />
+              <div className="relative mx-auto max-w-3xl">
+                <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">READY FOR REAL CAPTURES</p>
+                <h2 className="mt-3 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.2] text-[#14295F]">
+                  {experienceShowcase.closingTitle}
+                </h2>
+                <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#425A75]">
+                  {experienceShowcase.closingDescription}
+                </p>
+                <div className="mt-6">
+                  <Link href={experienceShowcase.closingHref} className="premium-cta premium-cta-primary h-11 px-6 text-sm">
+                    {experienceShowcase.closingLabel}
+                  </Link>
+                </div>
+              </div>
+            </section>
+          </div>
+        </ScrollReveal>
       </div>
     </main>
   );
