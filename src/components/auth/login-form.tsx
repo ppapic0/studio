@@ -20,8 +20,13 @@ import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'fir
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
+import {
+  PARENT_POST_LOGIN_ENTRY_MOTION_KEY,
+  STUDENT_POST_LOGIN_ENTRY_MOTION_KEY,
+  setDashboardEntryMotionKeys,
+} from '@/lib/dashboard-motion';
 import { Loader2, Mail } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -45,8 +50,6 @@ const resetSchema = z.object({
   email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
 });
 
-const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
-
 export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
@@ -61,15 +64,29 @@ export function LoginForm() {
     return value.trim().toLowerCase();
   };
 
-  const validateStudentMembershipStatus = async (uid: string) => {
-    if (!firestore) return { allowed: true as const };
+  const fetchMembershipRecords = async (uid: string) => {
+    if (!firestore) return [] as { role?: string; status?: string }[];
 
     const centersSnap = await getDocs(collection(firestore, 'userCenters', uid, 'centers'));
-    if (centersSnap.empty) return { allowed: true as const };
+    if (!centersSnap.empty) {
+      return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
+    }
 
-    const studentMemberships = centersSnap.docs
-      .map((docSnap) => docSnap.data() as { role?: string; status?: string })
-      .filter((membership) => membership.role === 'student');
+    const fallbackSnap = await getDocs(
+      query(collectionGroup(firestore, 'members'), where('id', '==', uid))
+    );
+
+    return fallbackSnap.docs.map((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      return {
+        role: typeof data.role === 'string' ? data.role : undefined,
+        status: typeof data.status === 'string' ? data.status : undefined,
+      };
+    });
+  };
+
+  const validateStudentMembershipStatus = (memberships: { role?: string; status?: string }[]) => {
+    const studentMemberships = memberships.filter((membership) => membership.role === 'student');
 
     if (studentMemberships.length === 0) return { allowed: true as const };
 
@@ -90,6 +107,30 @@ export function LoginForm() {
       allowed: false as const,
       message: `${blockedLabel} 상태 계정은 로그인할 수 없습니다. 센터 관리자에게 문의해 주세요.`,
     };
+  };
+
+  const resolveDashboardEntryMotionKeys = (memberships: { role?: string; status?: string }[]) => {
+    const activeRoles = new Set(
+      memberships
+        .filter((membership) => {
+          const normalized = normalizeMembershipStatus(membership.status);
+          return !normalized || normalized === 'active';
+        })
+        .map((membership) => membership.role)
+        .filter((role): role is string => typeof role === 'string')
+    );
+
+    const storageKeys: string[] = [];
+
+    if (activeRoles.has('student')) {
+      storageKeys.push(STUDENT_POST_LOGIN_ENTRY_MOTION_KEY);
+    }
+
+    if (activeRoles.has('parent')) {
+      storageKeys.push(PARENT_POST_LOGIN_ENTRY_MOTION_KEY);
+    }
+
+    return storageKeys;
   };
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -113,7 +154,8 @@ export function LoginForm() {
     try {
       const trimmedEmail = values.email.trim();
       const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
-      const validation = await validateStudentMembershipStatus(userCredential.user.uid);
+      const memberships = await fetchMembershipRecords(userCredential.user.uid);
+      const validation = validateStudentMembershipStatus(memberships);
       if (!validation.allowed) {
         await signOut(auth);
         toast({
@@ -132,7 +174,7 @@ export function LoginForm() {
         },
       });
       if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(PARENT_POST_LOGIN_ENTRY_MOTION_KEY, String(Date.now()));
+        setDashboardEntryMotionKeys(resolveDashboardEntryMotionKeys(memberships));
       }
       router.replace('/dashboard');
     } catch (error: any) {

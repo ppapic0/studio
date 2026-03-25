@@ -4,6 +4,10 @@ import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
+import {
+  type DashboardMotionPreset,
+  useResolvedDashboardMotionPreset,
+} from "@/lib/dashboard-motion"
 import { cn } from "@/lib/utils"
 
 const Dialog = DialogPrimitive.Root
@@ -14,43 +18,65 @@ const DialogPortal = DialogPrimitive.Portal
 
 const DialogClose = DialogPrimitive.Close
 
+interface DialogOverlayProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay> {
+  motionPreset?: DashboardMotionPreset
+}
+
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
-    {...props}
-  />
-))
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
+  DialogOverlayProps
+>(({ className, motionPreset, ...props }, ref) => {
+  const resolvedMotionPreset = useResolvedDashboardMotionPreset(motionPreset)
 
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
+  return (
+    <DialogPrimitive.Overlay
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:w-full sm:rounded-lg",
+        resolvedMotionPreset === "dashboard-premium"
+          ? "dashboard-premium-overlay fixed inset-0 z-50"
+          : "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
       )}
       {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-[#FF7A16]/90 bg-[#14295F] text-white opacity-95 shadow-[0_2px_8px_rgba(20,41,95,0.25)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FF7A16] focus:ring-offset-2 disabled:pointer-events-none">
-        <X className="h-4 w-4 text-white" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
+    />
+  )
+})
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
+
+interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  motionPreset?: DashboardMotionPreset
+}
+
+const DialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  DialogContentProps
+>(({ className, children, motionPreset, ...props }, ref) => {
+  const resolvedMotionPreset = useResolvedDashboardMotionPreset(motionPreset)
+
+  return (
+    <DialogPortal>
+      <DialogOverlay motionPreset={resolvedMotionPreset} />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          resolvedMotionPreset === "dashboard-premium"
+            ? "dashboard-premium-dialog fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-lg sm:w-full sm:rounded-[1.5rem]"
+            : "fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:w-full sm:rounded-lg",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-[#FF7A16]/90 bg-[#14295F] text-white opacity-95 shadow-[0_2px_8px_rgba(20,41,95,0.25)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FF7A16] focus:ring-offset-2 disabled:pointer-events-none">
+          <X className="h-4 w-4 text-white" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({
