@@ -8,6 +8,7 @@ import {
   Target,
   Users,
 } from 'lucide-react';
+import { unstable_noStore as noStore } from 'next/cache';
 
 import { AcademyFloatingCTA } from '@/components/marketing/academy-floating-cta';
 import { ConsultForm } from '@/components/marketing/consult-form';
@@ -15,7 +16,27 @@ import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
+import { adminDb } from '@/lib/firebase-admin';
 import { marketingContent } from '@/lib/marketing-content';
+import { resolveMarketingCenterId } from '@/lib/marketing-center';
+
+async function getWaitlistCount(): Promise<number> {
+  noStore();
+  try {
+    const centerId = await resolveMarketingCenterId();
+    if (!centerId) return 0;
+    const snap = await adminDb
+      .collection('centers')
+      .doc(centerId)
+      .collection('admissionWaitlist')
+      .where('status', '==', 'waiting')
+      .count()
+      .get();
+    return snap.data().count ?? 0;
+  } catch {
+    return 0;
+  }
+}
 
 /* ─────────────────────────────────────────────────
    Static data — defined here, not in marketing-content
@@ -106,7 +127,8 @@ const contactItems = [
    Page
 ───────────────────────────────────────────────── */
 
-export default function ClassPage() {
+export default async function ClassPage() {
+  const waitlistCount = await getWaitlistCount();
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
@@ -307,6 +329,32 @@ export default function ClassPage() {
       </ScrollReveal>
 
       {/* ══════════════════════════════════════════
+          PHILOSOPHY
+      ══════════════════════════════════════════ */}
+      <ScrollReveal>
+        <section
+          className="on-dark py-24 sm:py-36"
+          style={{ background: 'linear-gradient(155deg, #0a1330 0%, #111d3f 60%, #0d1840 100%)' }}
+        >
+          <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+            <p className="text-[10.5px] font-black tracking-[0.26em] text-[#FFB273] uppercase">
+              수업 철학
+            </p>
+            <h2 className="mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.22] text-white">
+              국어는 결국,<br />
+              설명 가능한 실력이 되어야 합니다
+            </h2>
+            <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-white/80">
+              잘 읽었다고 느끼는 것과
+              실제로 다시 설명할 수 있는 것은 다릅니다.
+              트랙의 국어 수업은 학생이 스스로 판단 기준을 세우고,
+              문제를 풀어낸 이유를 설명할 수 있는 상태까지 가는 것을 목표로 합니다.
+            </p>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ══════════════════════════════════════════
           5. TEACHING METHOD
       ══════════════════════════════════════════ */}
       <ScrollReveal>
@@ -467,32 +515,6 @@ export default function ClassPage() {
       </ScrollReveal>
 
       {/* ══════════════════════════════════════════
-          8. PHILOSOPHY
-      ══════════════════════════════════════════ */}
-      <ScrollReveal>
-        <section
-          className="on-dark py-24 sm:py-36"
-          style={{ background: 'linear-gradient(155deg, #0a1330 0%, #111d3f 60%, #0d1840 100%)' }}
-        >
-          <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-            <p className="text-[10.5px] font-black tracking-[0.26em] text-[#FFB273] uppercase">
-              수업 철학
-            </p>
-            <h2 className="mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.22] text-white">
-              국어는 결국,<br />
-              설명 가능한 실력이 되어야 합니다
-            </h2>
-            <p className="mx-auto mt-8 max-w-[520px] break-keep text-[15.5px] font-semibold leading-[1.94] text-white/80">
-              잘 읽었다고 느끼는 것과
-              실제로 다시 설명할 수 있는 것은 다릅니다.
-              트랙의 국어 수업은 학생이 스스로 판단 기준을 세우고,
-              문제를 풀어낸 이유를 설명할 수 있는 상태까지 가는 것을 목표로 합니다.
-            </p>
-          </div>
-        </section>
-      </ScrollReveal>
-
-      {/* ══════════════════════════════════════════
           9. CONSULT CTA
       ══════════════════════════════════════════ */}
       <section
@@ -526,10 +548,33 @@ export default function ClassPage() {
 
             <div className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
               {/* Consult form */}
-              <ConsultForm />
+              <ConsultForm waitlistCount={waitlistCount} />
 
               {/* Contact info */}
               <div className="space-y-4">
+                {waitlistCount > 0 && (
+                  <article
+                    className="relative overflow-hidden rounded-2xl border p-5"
+                    style={{
+                      borderColor: 'rgba(255,122,22,0.45)',
+                      background: 'linear-gradient(135deg, rgba(255,122,22,0.18) 0%, rgba(255,122,22,0.08) 100%)',
+                    }}
+                  >
+                    <div
+                      className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full opacity-20"
+                      style={{ background: 'radial-gradient(circle, #FF7A16 0%, transparent 70%)' }}
+                    />
+                    <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FF7A16]">현재 수업 대기 인원</p>
+                    <div className="mt-2 flex items-end gap-2">
+                      <span className="text-4xl font-black leading-none text-white">{waitlistCount}</span>
+                      <span className="mb-0.5 text-lg font-black text-white/70">명</span>
+                    </div>
+                    <p className="mt-1.5 break-keep text-sm font-bold leading-relaxed text-white/80">
+                      현재 수업 입학을 기다리고 있습니다.<br />
+                      <span className="text-[#FF7A16]">지금 상담 신청하면 순차적으로 연락드립니다.</span>
+                    </p>
+                  </article>
+                )}
                 {contactItems.map((item) => (
                   <article
                     key={item.label}

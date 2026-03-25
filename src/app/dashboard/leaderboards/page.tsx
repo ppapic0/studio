@@ -46,6 +46,28 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+const TIER_MILESTONES = [
+  { name: '브론즈', lp: 0 },
+  { name: '실버', lp: 5000 },
+  { name: '골드', lp: 10000 },
+  { name: '플래티넘', lp: 15000 },
+  { name: '다이아', lp: 20000 },
+  { name: '마스터', lp: 26000 },
+  { name: '그마', lp: 30000 },
+  { name: '챌린저', lp: 35000 },
+] as const;
+
+function getNextTierInfo(currentLp: number) {
+  const nextTier = TIER_MILESTONES.find((tier) => currentLp < tier.lp);
+  if (!nextTier) {
+    return { name: '챌린저 유지', remainingLp: 0 };
+  }
+  return {
+    name: nextTier.name,
+    remainingLp: Math.max(0, nextTier.lp - currentLp),
+  };
+}
+
 function isEnrolledMemberStatus(status: unknown): boolean {
   if (typeof status !== 'string') return true;
   const normalized = status.trim().toLowerCase();
@@ -130,7 +152,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
           "bg-gradient-to-b from-muted/30 to-transparent relative border-b",
           isMobile ? "p-6" : "p-12"
         )}>
-          <div className="absolute top-8 right-8 opacity-5 rotate-12">
+          <div className="pointer-events-none absolute top-8 right-8 opacity-5 rotate-12">
             <Zap className={cn(isMobile ? "h-20 w-24" : "h-40 w-40", "text-amber-500")} />
           </div>
           <div className="flex items-center gap-6 relative z-10">
@@ -246,7 +268,7 @@ function LeaderboardTab({ title, description, entries, isLoading, isMobile, stud
 export default function LeaderboardsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, currentTier } = useAppContext();
   
   const [seasonOffset, setSeasonOffset] = useState<0 | -1>(0); 
   const [rankingScope, setRankingScope] = useState<'class' | 'total'>('total');
@@ -377,6 +399,25 @@ export default function LeaderboardsPage() {
     attendanceLoading ||
     (canReadMemberRoster && membersLoading) ||
     (canReadStudentProfiles && profilesLoading);
+  const myEntry = useMemo(() => {
+    if (!user) return null;
+    return visibleLpEntries?.find((entry) => entry.studentId === user.uid) || null;
+  }, [visibleLpEntries, user]);
+  const myRank = useMemo(() => {
+    if (!user || !visibleLpEntries?.length) return 0;
+    const sorted = [...visibleLpEntries].sort((a, b) => b.value - a.value);
+    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
+    return ownIndex >= 0 ? ownIndex + 1 : 0;
+  }, [visibleLpEntries, user]);
+  const participantCount = visibleLpEntries?.length || 0;
+  const myPercentile = useMemo(() => {
+    if (!myRank || participantCount <= 0) return null;
+    return Math.max(1, Math.ceil((myRank / participantCount) * 100));
+  }, [myRank, participantCount]);
+  const nextTierInfo = useMemo(() => getNextTierInfo(myEntry?.value || 0), [myEntry?.value]);
+  const seasonNarrative = myRank > 0
+    ? `${participantCount}명 중 ${myRank}위 위치예요. 다른 사람을 쫓기보다 이번 시즌 내 페이스를 보는 용도로 활용해 보세요.`
+    : '아직 내 시즌 기록이 집계되지 않았어요. 첫 공부 기록이 쌓이면 이 화면이 바로 살아납니다.';
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -420,6 +461,107 @@ export default function LeaderboardsPage() {
           퇴원생을 제외한 재원생 중 누적 포인트를 통해 여러분의 성장을 증명하세요.
         </p>
       </header>
+
+      <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
+        <Card className={cn(
+          "border-none bg-white shadow-xl ring-1 ring-black/[0.04] overflow-hidden",
+          isMobile ? "col-span-2 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
+        )}>
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#FFB457] via-[#FF7A16] to-[#FF5A5F]" />
+          <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+                  시즌 경쟁은 부드럽게
+                </Badge>
+                <div>
+                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl leading-8" : "text-[2.35rem] leading-[1.1]")}>
+                    {myPercentile ? `이번 시즌 상위 ${myPercentile}%` : '이번 시즌 기록을 모으는 중'}
+                  </h2>
+                  <p className={cn("mt-2 font-semibold text-slate-600 break-keep", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-2xl")}>
+                    {seasonNarrative}
+                  </p>
+                </div>
+              </div>
+              <div className={cn("rounded-2xl bg-primary/5 text-primary shrink-0", isMobile ? "p-2" : "p-3")}>
+                <Trophy className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+                {currentTier.name} 티어
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border-amber-200 bg-amber-50 px-3 text-[10px] font-black text-amber-700">
+                {myEntry ? `${myEntry.value.toLocaleString()} LP` : 'LP 집계 대기'}
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border-emerald-200 bg-emerald-50 px-3 text-[10px] font-black text-emerald-700">
+                {nextTierInfo.remainingLp > 0 ? `${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점` : '최상위 티어 유지 중'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-yellow-600">현재 위치</span>
+                <Crown className="h-4 w-4 text-yellow-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
+                  {myRank > 0 ? `#${myRank}` : '대기'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">이번 시즌 내 순위</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">참여 구간</span>
+                <Flame className="h-4 w-4 text-sky-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
+                  {myPercentile ? `상위 ${myPercentile}%` : '집계중'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">직접 비교보다 내 시즌 위치</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">다음 목표</span>
+                <Zap className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
+                  {nextTierInfo.remainingLp > 0 ? `${nextTierInfo.remainingLp.toLocaleString()}점` : '유지 중'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">다음 티어까지 남은 포인트</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">한 줄 가이드</span>
+                <ChevronRight className="h-4 w-4 text-rose-400" />
+              </div>
+              <div className="mt-3">
+                <p className="text-sm font-black leading-6 text-slate-900">조급하게 올라가기보다 꾸준히 쌓는 시즌</p>
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">오늘 공부와 계획 완료가 계속 쌓이면 랭킹도 자연스럽게 따라옵니다.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <Tabs value={rankingScope} onValueChange={(val: any) => setRankingScope(val)} className="w-full">
         <div className="flex flex-col items-center gap-6 mb-8">

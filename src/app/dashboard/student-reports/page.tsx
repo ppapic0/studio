@@ -14,12 +14,14 @@ import {
   Search,
   Calendar,
   History,
+  X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +44,7 @@ export default function StudentReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode, currentTier } = useAppContext();
+  const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,12 +72,19 @@ export default function StudentReportsPage() {
   const handleOpenReport = async (report: DailyReport) => {
     setSelectedReport(report);
 
-    if (!report.viewedAt && firestore && activeMembership?.id && report.id) {
+    if (!report.viewedAt && firestore && activeMembership?.id && report.id && user) {
       const reportRef = doc(firestore, 'centers', activeMembership.id, 'dailyReports', report.id);
       updateDoc(reportRef, {
         viewedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }).catch((err) => console.error('Error updating report viewed state:', err));
+        viewedByUid: user.uid,
+        viewedByName: user.displayName || activeMembership.displayName || '학생',
+      }).catch(() => {
+        toast({
+          variant: 'destructive',
+          title: '읽음 표시 실패',
+          description: '리포트는 열렸지만 읽음 상태를 저장하지 못했습니다.',
+        });
+      });
     }
   };
 
@@ -209,7 +219,7 @@ export default function StudentReportsPage() {
 
               <DialogFooter className="shrink-0 justify-center border-t bg-white p-6 sm:p-8">
                 <DialogClose asChild>
-                  <Button className="h-14 w-full rounded-2xl text-lg font-black">분석 완료</Button>
+                  <Button className="h-14 w-full rounded-2xl text-lg font-black gap-2">닫기 <X className="h-4 w-4" /></Button>
                 </DialogClose>
               </DialogFooter>
             </>

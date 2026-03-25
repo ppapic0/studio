@@ -26,6 +26,15 @@ export const TIERS = [
   { name: '\uCC4C\uB9B0\uC800', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-[#4EB8EE] via-[#2E8FCD] to-[#153E73]' },
 ];
 
+const ACTIVE_ATTENDANCE_STATUSES = ['studying', 'away', 'break'] as const;
+
+function getSeatActivityRank(status?: string | null): number {
+  if (status === 'studying') return 0;
+  if (status === 'away' || status === 'break') return 1;
+  if (status === 'absent') return 3;
+  return 2;
+}
+
 interface AppContextType {
   memberships: CenterMembership[];
   activeMembership: CenterMembership | null;
@@ -40,6 +49,8 @@ interface AppContextType {
 
   viewMode: 'mobile' | 'desktop';
   setViewMode: (mode: 'mobile' | 'desktop') => void;
+
+  isNativeDevice: boolean;
 
   currentTier: typeof TIERS[0];
 }
@@ -59,6 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('desktop');
   const [currentTier, setCurrentTier] = useState(TIERS[0]);
+  const isNativeDevice = false;
 
   const activeMembershipRef = useRef<string | null>(null);
 
@@ -252,8 +264,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const seat = snapshot.docs[0].data();
-      if (seat?.status === 'studying' && seat.lastCheckInAt) {
+      const seat = [...snapshot.docs]
+        .sort((a, b) => {
+          const aSeat = a.data() as Record<string, any>;
+          const bSeat = b.data() as Record<string, any>;
+          const rankDiff = getSeatActivityRank(aSeat?.status) - getSeatActivityRank(bSeat?.status);
+          if (rankDiff !== 0) return rankDiff;
+
+          const aTime = aSeat?.lastCheckInAt?.toMillis?.() || aSeat?.updatedAt?.toMillis?.() || 0;
+          const bTime = bSeat?.lastCheckInAt?.toMillis?.() || bSeat?.updatedAt?.toMillis?.() || 0;
+          return bTime - aTime;
+        })[0]?.data() as Record<string, any> | undefined;
+
+      if (seat?.lastCheckInAt && ACTIVE_ATTENDANCE_STATUSES.includes(seat.status)) {
         setIsTimerActive(true);
         setStartTime(seat.lastCheckInAt.toMillis());
       } else {
@@ -263,7 +286,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [user, firestore, activeMembership]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
@@ -309,7 +332,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubProgress();
       unsubRank();
     };
-  }, [user, firestore, activeMembership]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {
@@ -330,6 +353,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLastActiveCheckTime,
       viewMode,
       setViewMode,
+      isNativeDevice,
       currentTier,
     }),
     [
@@ -340,6 +364,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       startTime,
       lastActiveCheckTime,
       viewMode,
+      isNativeDevice,
       currentTier,
     ]
   );

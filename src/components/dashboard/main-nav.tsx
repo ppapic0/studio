@@ -28,6 +28,21 @@ type MainNavProps = {
   isMobile?: boolean;
 };
 
+const adminNavItems = [
+  { href: '/dashboard', label: '운영실', icon: LayoutDashboard },
+  { href: '/dashboard/teacher', label: '실시간 교실', icon: Monitor },
+  { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
+  { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
+  { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
+  { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
+  { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
+  { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
+  { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
+  { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
+  { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
+  { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
+] as const;
+
 const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
   student: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
@@ -55,20 +70,8 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
     { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
   ],
-  centerAdmin: [
-    { href: '/dashboard', label: '운영실', icon: LayoutDashboard },
-    { href: '/dashboard/teacher', label: '실시간 교실', icon: Monitor },
-    { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
-    { href: '/dashboard/reports', label: '데일리 리포트', icon: FileText },
-    { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
-    { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
-    { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
-    { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
-    { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
-    { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
-    { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
-    { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
-  ],
+  centerAdmin: [...adminNavItems],
+  owner: [...adminNavItems],
 };
 
 export function MainNav({ isMobile = false }: MainNavProps) {

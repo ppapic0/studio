@@ -11,6 +11,7 @@ import {
   query, 
   where, 
   orderBy, 
+  getDocs,
   addDoc, 
   serverTimestamp, 
   doc, 
@@ -19,7 +20,8 @@ import {
   deleteDoc, 
   writeBatch,
   increment,
-  setDoc
+  setDoc,
+  limit,
 } from 'firebase/firestore';
 import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport } from '@/lib/types';
 import { 
@@ -118,6 +120,8 @@ const SUBJECTS = [
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
 
+const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
+
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
@@ -157,7 +161,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
   }, [timePart]);
 
   const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
-    if (disabled || isToday || isPast) return;
+    if (disabled || isPast) return;
     let nextSH = sHour, nextSM = sMin, nextSP = sPer;
     let nextEH = eHour, nextEM = eMin, nextEP = ePer;
 
@@ -186,9 +190,9 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
   const TimePicker = ({ type, h, m, p }: any) => (
     <div className={cn(
       "flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30",
-      (disabled || isToday || isPast) && "opacity-60 pointer-events-none"
+      (disabled || isPast) && "opacity-60 pointer-events-none"
     )}>
-      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)} disabled={disabled || isToday || isPast}>
+      <Select value={p} onValueChange={(v) => handleValueChange(type, 'p', v)} disabled={disabled || isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[48px] text-[10px]" : "w-[55px] text-xs")}>
           <SelectValue />
         </SelectTrigger>
@@ -198,14 +202,14 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
         </SelectContent>
       </Select>
       <div className="w-px h-2 bg-border/50 mx-0.5" />
-      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)} disabled={disabled || isToday || isPast}>
+      <Select value={h} onValueChange={(v) => handleValueChange(type, 'h', v)} disabled={disabled || isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">{HOURS.map(hour => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}</SelectContent>
       </Select>
       <span className="text-[9px] font-black opacity-30 px-0.5">:</span>
-      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)} disabled={disabled || isToday || isPast}>
+      <Select value={m} onValueChange={(v) => handleValueChange(type, 'm', v)} disabled={disabled || isPast}>
         <SelectTrigger className={cn("border-none bg-transparent font-mono font-black px-1 focus:ring-0 h-6 shadow-none", isMobile ? "w-[36px] text-[11px]" : "w-[45px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
@@ -226,10 +230,10 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
           </div>
           <Label className={cn("font-black tracking-tight block truncate", isMobile ? "text-xs" : "text-sm")}>{titlePart}</Label>
         </div>
-        {!isPast && !disabled && !isToday && (
+        {!isPast && !disabled && (
           <Button 
             variant="ghost" 
-            size="icon" 
+            size="icon"
             className={cn(
               "h-7 w-7 rounded-full text-muted-foreground hover:text-destructive transition-all",
               isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -371,14 +375,14 @@ export default function StudyHistoryPage() {
   const studyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !targetUid || !activeMembership) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'studyLogs', targetUid, 'days'), orderBy('dateKey', 'desc'));
-  }, [firestore, targetUid, activeMembership]);
+  }, [firestore, targetUid, activeMembership?.id]);
   const { data: logs, isLoading: logsLoading } = useCollection<StudyLogDay>(studyLogsQuery);
 
   const weekKey = selectedDateForPlan ? format(selectedDateForPlan, "yyyy-'W'II") : currentDate ? format(currentDate, "yyyy-'W'II") : '';
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !targetUid || !activeMembership || !weekKey) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items'));
-  }, [firestore, targetUid, activeMembership, weekKey]);
+  }, [firestore, targetUid, activeMembership?.id, weekKey]);
   const { data: allPlans } = useCollection<StudyPlanItem>(plansQuery);
 
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
@@ -386,13 +390,13 @@ export default function StudyHistoryPage() {
   const reportRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid || !selectedDateKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${selectedDateKey}_${targetUid}`);
-  }, [firestore, activeMembership, targetUid, selectedDateKey]);
+  }, [firestore, activeMembership?.id, targetUid, selectedDateKey]);
   const { data: dailyReport, isLoading: reportLoading } = useDoc<DailyReport>(reportRef);
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', targetUid);
-  }, [firestore, activeMembership, targetUid]);
+  }, [firestore, activeMembership?.id, targetUid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: !!targetUid });
 
   const dailyPlans = useMemo(() => allPlans?.filter(p => p.dateKey === selectedDateKey) || [], [allPlans, selectedDateKey]);
@@ -431,14 +435,61 @@ export default function StudyHistoryPage() {
     return logs.filter(log => isSameMonth(new Date(log.dateKey), currentDate)).reduce((acc, log) => acc + log.totalMinutes, 0);
   }, [logs, currentDate]);
 
+  const applySameDayRoutinePenalty = async (reason: string) => {
+    if (!firestore || !activeMembership || !user || !progressRef || !targetUid || !selectedDateKey) return false;
+
+    const penaltyKey = `same_day_routine:${selectedDateKey}`;
+    const existingPenaltySnap = await getDocs(
+      query(
+        collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
+        where('studentId', '==', targetUid),
+        where('source', '==', 'manual'),
+        limit(50)
+      )
+    );
+    const hasSameDayPenalty = existingPenaltySnap.docs.some((snap) => {
+      const data = snap.data() as any;
+      const createdAtDateKey = data?.createdAt?.toDate ? format(data.createdAt.toDate(), 'yyyy-MM-dd') : null;
+      const reasonText = String(data?.reason || '');
+      return data?.penaltyKey === penaltyKey || ((data?.penaltyDateKey === selectedDateKey || createdAtDateKey === selectedDateKey) && reasonText.includes('출석 루틴'));
+    });
+    if (hasSameDayPenalty) {
+      return false;
+    }
+
+    const batch = writeBatch(firestore);
+    const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
+
+    batch.set(
+      progressRef,
+      {
+        penaltyPoints: increment(SAME_DAY_ROUTINE_PENALTY_POINTS),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    batch.set(penaltyLogRef, {
+      centerId: activeMembership.id,
+      studentId: targetUid,
+      studentName: user.displayName || '학생',
+      pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
+      reason,
+      source: 'manual',
+      penaltyKey,
+      penaltyDateKey: selectedDateKey,
+      createdByUserId: user.uid,
+      createdByName: user.displayName || '학생',
+      createdAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+    return true;
+  };
+
   const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !title.trim() || !targetUid) return;
-    
     const isToday = isSameDay(selectedDateForPlan, new Date());
-    if (category === 'schedule' && isToday) {
-      toast({ variant: "destructive", title: "수정 불가", description: "당일 루틴은 변경할 수 없습니다." });
-      return;
-    }
 
     setIsSubmitting(true);
     const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
@@ -465,8 +516,21 @@ export default function StudyHistoryPage() {
       }
 
       await addDoc(colRef, data);
+      if (category === 'schedule' && isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 작성');
+        toast({
+          title: `당일 루틴 작성으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 작성/수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
       if (category === 'study') setNewStudyTask(''); else if (category === 'personal') setNewPersonalTask(''); else { setNewRoutineTitle(''); setIsRoutineModalOpen(false); }
-    } catch (e) { console.error(e); } finally { setIsSubmitting(false); }
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '할 일 추가 실패',
+        description: typeof e?.message === 'string' ? e.message : '할 일을 저장하지 못했습니다.',
+      });
+    } finally { setIsSubmitting(false); }
   };
 
   const to24h = (time12h: string, period: '오전' | '오후') => {
@@ -481,58 +545,90 @@ export default function StudyHistoryPage() {
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
     if (isParent || !selectedDateForPlan || !firestore || !user || !activeMembership || !targetUid) return;
     const isToday = isSameDay(selectedDateForPlan, new Date());
-    if (isToday) return;
 
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
-    const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
-    const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', itemId), { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
+    try {
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
+      const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
+      const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
+      await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', itemId), { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
+      if (isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 시간 수정');
+        toast({
+          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '루틴 시간 수정 실패',
+        description: typeof e?.message === 'string' ? e.message : '루틴 시간을 저장하지 못했습니다.',
+      });
+    }
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid || !progressRef) return;
-    const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const nextState = !item.done;
-    
-    await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
-    
-    if (nextState) {
-      const batch = writeBatch(firestore);
-      const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
-      const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
-      const progressUpdate: Record<string, any> = {
-        seasonLp: increment(10),
-        dailyLpStatus: {
-          [dateKey]: {
-            ...existingDayStatus,
-            dailyLpAmount: increment(10),
+    try {
+      const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      const nextState = !item.done;
+
+      await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
+
+      if (nextState) {
+        const batch = writeBatch(firestore);
+        const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
+        const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
+        const progressUpdate: Record<string, any> = {
+          seasonLp: increment(10),
+          dailyLpStatus: {
+            [dateKey]: {
+              ...existingDayStatus,
+              dailyLpAmount: increment(10),
+            },
           },
-        },
-        updatedAt: serverTimestamp(),
-      };
-      if (achievementCount < 5) {
-        progressUpdate.stats = { achievement: increment(0.1) };
-        progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
+          updatedAt: serverTimestamp(),
+        };
+        if (achievementCount < 5) {
+          progressUpdate.stats = { achievement: increment(0.1) };
+          progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
+        }
+        batch.set(progressRef, progressUpdate, { merge: true });
+        await batch.commit();
       }
-      batch.set(progressRef, progressUpdate, { merge: true });
-      await batch.commit();
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '계획 상태 변경 실패',
+        description: typeof e?.message === 'string' ? e.message : '계획 상태를 저장하지 못했습니다.',
+      });
     }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
-    
-    const isToday = isSameDay(selectedDateForPlan, new Date());
-    if (item.category === 'schedule' && isToday) {
-      toast({ variant: "destructive", title: "삭제 불가", description: "오늘의 루틴은 삭제할 수 없습니다." });
-      return;
-    }
+    try {
+      const isToday = isSameDay(selectedDateForPlan, new Date());
 
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id));
-    toast({ title: "항목이 삭제되었습니다." });
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id));
+      if (item.category === 'schedule' && isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
+        toast({
+          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
+      toast({ title: "항목이 삭제되었습니다." });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '항목 삭제 실패',
+        description: typeof e?.message === 'string' ? e.message : '선택한 항목을 삭제하지 못했습니다.',
+      });
+    }
   };
 
   const activeStudentLabel =
@@ -749,7 +845,7 @@ export default function StudyHistoryPage() {
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2.5rem]" : "sm:max-w-xl rounded-[3rem]")}>
           <div className="bg-primary p-8 text-white relative">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle><DialogDescription className="sr-only">선택한 날짜의 학습 기록 상세</DialogDescription></DialogHeader>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[600px]")}>
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
@@ -784,15 +880,15 @@ export default function StudyHistoryPage() {
                   {isToday && (
                     <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-start gap-3 mb-2">
                       <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                      <p className="text-[10px] font-bold text-amber-900 leading-relaxed">오늘의 루틴은 변경할 수 없습니다.</p>
+                      <p className="text-[10px] font-bold text-amber-900 leading-relaxed">당일 출석 루틴도 작성/수정할 수 있지만, 벌점은 하루 최대 1점만 자동 반영됩니다.</p>
                     </div>
                   )}
-                  {!isActuallyPast && !isParent && !isToday && (
+                  {!isActuallyPast && !isParent && (
                     <div className="flex justify-end">
                       <Dialog open={isRoutineModalOpen} onOpenChange={setIsRoutineModalOpen}>
                         <DialogTrigger asChild><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black gap-1 bg-white shadow-sm border rounded-xl"><Plus className="h-3.5 w-3.5" /> 루틴 추가</Button></DialogTrigger>
                         <DialogContent className="rounded-3xl p-10 border-none shadow-2xl fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[380px]">
-                          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">생활 루틴 추가</DialogTitle></DialogHeader>
+                          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tighter">생활 루틴 추가</DialogTitle><DialogDescription className="sr-only">새로운 생활 루틴을 추가합니다</DialogDescription></DialogHeader>
                           <Input placeholder="루틴 이름 (예: 영어 학원, 점심 식사)" value={newRoutineTitle} onChange={(e) => setNewRoutineTitle(e.target.value)} className="h-14 border-2 rounded-2xl font-bold" />
                           <Button onClick={() => handleAddTask(newRoutineTitle, 'schedule')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">루틴 생성</Button>
                         </DialogContent>
@@ -900,3 +996,4 @@ const getStatusBadge = (status: string) => {
 };
 
 const UserMinus = ({ className }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;
+

@@ -185,7 +185,7 @@ type LinkedStudentOption = {
   name: string;
 };
 
-const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
+const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing', 'notifications'];
 
 function normalizeParentPortalTab(value: string | null): ParentPortalTab {
   if (value === 'life') return 'data';

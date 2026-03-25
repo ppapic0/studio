@@ -40,9 +40,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { getTierTheme } from '@/lib/tier-theme';
+import Link from 'next/link';
 
 const STAT_CONFIG = {
   focus: { 
@@ -99,6 +100,35 @@ const SKILL_LABEL: Record<StatKey, string> = {
 };
 
 
+const TIER_MILESTONES = [
+  { name: '브론즈', lp: 0 },
+  { name: '실버', lp: 5000 },
+  { name: '골드', lp: 10000 },
+  { name: '플래티넘', lp: 15000 },
+  { name: '다이아', lp: 20000 },
+  { name: '마스터', lp: 26000 },
+  { name: '그마', lp: 30000 },
+  { name: '챌린저', lp: 35000 },
+] as const;
+
+function getNextTierInfo(currentLp: number) {
+  const nextTier = TIER_MILESTONES.find((tier) => currentLp < tier.lp);
+  if (!nextTier) {
+    return { name: '챌린저 유지', remainingLp: 0 };
+  }
+  return {
+    name: nextTier.name,
+    remainingLp: Math.max(0, nextTier.lp - currentLp),
+  };
+}
+
+function formatMinutesCompact(minutes: number) {
+  if (minutes >= 60) {
+    return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
+  }
+  return `${minutes}분`;
+}
+
 function isActiveStudentStatus(status: unknown): boolean {
   if (typeof status !== 'string') return true;
   const normalized = status.trim().toLowerCase();
@@ -128,7 +158,7 @@ function SystemGuideDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-w-[90vw]">
         <div className="bg-primary p-8 text-primary-foreground relative">
-          <Sparkles className="absolute top-4 right-4 h-10 w-10 opacity-20" />
+          <Sparkles className="pointer-events-none absolute top-4 right-4 h-10 w-10 opacity-20" />
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tighter">성장트랙 가이드</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 font-bold mt-1 text-xs">
@@ -377,6 +407,45 @@ export default function GrowthPage() {
   const currentLp = progress?.seasonLp || 0;
   const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
   const tierTheme = getTierTheme(currentTier);
+  const seasonPercentile = useMemo(() => {
+    if (isRankContextLoading || currentRank <= 0 || totalCount <= 0) return null;
+    return Math.max(1, Math.ceil((currentRank / totalCount) * 100));
+  }, [currentRank, totalCount, isRankContextLoading]);
+  const nextTierInfo = useMemo(() => getNextTierInfo(currentLp), [currentLp]);
+  const weeklyStudyMinutes = useMemo(() => {
+    const recentKeys = Array.from({ length: 7 }, (_, index) => format(subDays(new Date(), 6 - index), 'yyyy-MM-dd'));
+    const keySet = new Set(recentKeys);
+    return (seasonStudyLogs || [])
+      .filter((log) => keySet.has(log.dateKey))
+      .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
+  }, [seasonStudyLogs]);
+  const previousWeekStudyMinutes = useMemo(() => {
+    const recentKeys = Array.from({ length: 7 }, (_, index) => format(subDays(new Date(), 13 - index), 'yyyy-MM-dd'));
+    const keySet = new Set(recentKeys);
+    return (seasonStudyLogs || [])
+      .filter((log) => keySet.has(log.dateKey))
+      .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
+  }, [seasonStudyLogs]);
+  const weeklyDelta = weeklyStudyMinutes - previousWeekStudyMinutes;
+  const bestSeasonMinutes = useMemo(
+    () => (seasonStudyLogs || []).reduce((max, log) => Math.max(max, Math.max(0, Number(log.totalMinutes || 0))), 0),
+    [seasonStudyLogs]
+  );
+  const latestSkillMoment = useMemo(() => {
+    return (Object.entries(skillTrackHistory) as [StatKey, SkillTrackHistoryItem[]][])
+      .flatMap(([key, items]) => items.slice(0, 2).map((item) => ({ ...item, statKey: key })))
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))[0] || null;
+  }, [skillTrackHistory]);
+  const weakestStatKey = useMemo(() => {
+    return (Object.entries(stats) as [StatKey, number][])
+      .sort((a, b) => a[1] - b[1])[0]?.[0] || 'focus';
+  }, [stats]);
+  const nextActionCopy: Record<StatKey, string> = {
+    focus: '60분 이상 한 번에 몰입하는 시간을 한 번 더 만들면 집중력이 가장 빠르게 올라가요.',
+    consistency: '짧아도 좋으니 매일 첫 공부 시작 체크를 이어가면 꾸준함이 안정적으로 올라가요.',
+    achievement: '오늘 계획에서 학습 미션 3개를 끝내면 목표달성이 바로 반응하기 시작해요.',
+    resilience: '6시간 이상 공부한 날을 한 번 더 만들면 회복탄력이 크게 쌓여요.',
+  };
 
   if (isLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
 
@@ -404,7 +473,7 @@ export default function GrowthPage() {
         )}
         style={{ backgroundImage: tierTheme.heroGradient }}
       >
-        <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
+        <div className="pointer-events-none absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
           {currentTier.name === '챌린저' ? <Crown className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} /> : <Trophy className={cn(isMobile ? "h-32 w-32" : "h-64 w-64")} />}
         </div>
         <div className={cn("relative z-10 space-y-6", isMobile ? "space-y-4" : "space-y-10")}>
@@ -431,17 +500,90 @@ export default function GrowthPage() {
               { label: '부스트', val: `x${totalBoost.toFixed(2)}`, icon: Zap, color: 'text-emerald-400' },
               { label: '시즌 리셋', val: '매월 1일', icon: RefreshCw, color: 'text-blue-400' }
             ].map((item, i) => (
-              <div key={i} className={cn("bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5")}>
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
-                  <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+              i === 0 ? (
+                <Link
+                  key={i}
+                  href="/dashboard/leaderboards"
+                  className={cn(
+                    "touch-manipulation bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5 transition-all duration-200 hover:bg-white/20 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                    isMobile && "active:scale-[0.98]"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
+                    <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+                  </div>
+                  <div className="flex items-end justify-between gap-2">
+                    <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
+                    <span className={cn("font-black text-white/80 whitespace-nowrap", isMobile ? "text-[8px]" : "text-[10px]")}>
+                      보기 <ChevronRight className={cn("inline", isMobile ? "h-3 w-3" : "h-3.5 w-3.5")} />
+                    </span>
+                  </div>
+                </Link>
+              ) : (
+                <div key={i} className={cn("bg-white/15 p-3 sm:p-5 rounded-xl sm:rounded-3xl border border-white/20 flex flex-col gap-0.5")}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <item.icon className={cn(isMobile ? "h-2.5 w-2.5" : "h-3.5 w-3.5", item.color)} />
+                    <span className={cn("font-black uppercase tracking-widest opacity-80", isMobile ? "text-[7px]" : "text-[9px]")}>{item.label}</span>
+                  </div>
+                  <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
                 </div>
-                <div className={cn("font-black tracking-tight", isMobile ? "text-sm" : "text-xl")}>{item.val}</div>
-              </div>
+              )
             ))}
           </div>
         </div>
       </Card>
+
+      <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
+          <CardContent className={cn("p-5", !isMobile && "p-6")}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">이번 주 오른 이유</span>
+              <TrendingUp className="h-4 w-4 text-sky-500" />
+            </div>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
+              {latestSkillMoment ? latestSkillMoment.reason : '이번 주 성장 로그를 쌓는 중이에요.'}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              {latestSkillMoment ? latestSkillMoment.detail : '공부 시간이 쌓이거나 계획을 완료하면 이곳에 성장 이유가 바로 보입니다.'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
+          <CardContent className={cn("p-5", !isMobile && "p-6")}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">다음 1점 올리기</span>
+              <BookOpen className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
+              {STAT_CONFIG[weakestStatKey].label}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              {nextActionCopy[weakestStatKey]}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
+          <CardContent className={cn("p-5", !isMobile && "p-6")}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">기록 갱신 흐름</span>
+              <Flame className="h-4 w-4 text-rose-400" />
+            </div>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
+              {seasonPercentile ? `상위 ${seasonPercentile}% 구간` : '이번 시즌 흐름 정리 중'}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              {weeklyDelta > 0
+                ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 더 공부했어요. 이번 시즌 최고는 ${formatMinutesCompact(bestSeasonMinutes)}입니다.`
+                : weeklyDelta < 0
+                  ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 적었어요. ${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점 남아 있어요.`
+                  : `이번 주 누적 ${formatMinutesCompact(weeklyStudyMinutes)}로 페이스를 안정적으로 유지하고 있어요.`}
+            </p>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* 4대 핵심 스킬트랙 */}
       <section className={isMobile ? "space-y-3" : "space-y-6"}>

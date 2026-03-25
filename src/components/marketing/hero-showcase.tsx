@@ -1,150 +1,129 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, Building2, Smartphone } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, ShieldCheck, Smartphone, Users } from 'lucide-react';
 
 type ShowcaseItem = {
   label: string;
   title: string;
   desc: string;
-  stat: string;
-  ctaHint?: string;
-  icon: typeof Building2;
-  color: 'navy' | 'blue' | 'orange';
-  targetId?: string;
-  targetHref?: string;
+  points: string[];
+  statLabel: string;
+  statValue: string;
+  href: string;
+  cta: string;
+  icon: typeof Smartphone;
 };
 
 const items: ShowcaseItem[] = [
   {
-    label: 'STUDY CENTER',
-    title: '관리형 스터디센터 중심',
-    desc: '입실부터 퇴실까지, 루틴과 데이터가 기록됩니다.',
-    stat: '매일 오전 8:30 시작',
-    icon: Building2,
-    targetId: 'features',
-    color: 'navy',
-  },
-  {
-    label: 'CLASS SYSTEM',
-    title: '국어 수업 선택형 구조',
-    desc: '센터만 이용하거나 필요할 때 국어 수업을 추가합니다.',
-    stat: '재학생 · N수생 모두 가능',
-    ctaHint: '클릭하면 국어 수업 방식·자료·내신 대비를 확인할 수 있습니다',
-    icon: BookOpen,
-    targetHref: '/class',
-    color: 'blue',
-  },
-  {
-    label: 'APP SYSTEM',
-    title: '앱 기반 관리 시스템',
-    desc: '학생과 학부모가 각자 화면에서 흐름을 확인합니다.',
-    stat: '출결 · 공부시간 · 실행률 연결',
+    label: 'STUDENT MODE',
+    title: '루틴·학습시간·피드백을 한 흐름으로',
+    desc: '루틴, 학습시간, 피드백을 한 흐름으로 확인합니다.',
+    points: ['오늘의 루틴', '주간 캘린더', '피드백 확인'],
+    statLabel: '핵심 확인 항목',
+    statValue: '3가지',
+    href: '/experience?mode=student',
+    cta: '학생 화면 보기',
     icon: Smartphone,
-    targetId: 'app',
-    color: 'orange',
+  },
+  {
+    label: 'PARENT MODE',
+    title: '출결·그래프·리포트 실시간 확인',
+    desc: '출결, 주간 그래프, 리포트를 실시간으로 읽습니다.',
+    points: ['출결 상태', '주간 그래프', '리포트 수신'],
+    statLabel: '핵심 확인 항목',
+    statValue: '3가지',
+    href: '/experience?mode=parent',
+    cta: '학부모 화면 보기',
+    icon: Users,
+  },
+  {
+    label: 'ADMIN MODE',
+    title: '위험 신호부터 개입 결과까지',
+    desc: '위험 신호, 상담, 개입 결과를 우선순위로 정리합니다.',
+    points: ['위험 신호', '개입 우선순위', '전후 비교'],
+    statLabel: '핵심 확인 항목',
+    statValue: '3가지',
+    href: '/experience?mode=admin',
+    cta: '운영자 흐름 보기',
+    icon: ShieldCheck,
   },
 ];
 
 export function HeroShowcase() {
   const [active, setActive] = useState(0);
-
-  const handleItemClick = (index: number, targetId?: string, targetHref?: string) => {
-    setActive(index);
-
-    if (targetHref) {
-      window.location.href = targetHref;
-      return;
-    }
-
-    if (!targetId) return;
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  useEffect(() => {
-    const id = setInterval(() => setActive((p) => (p + 1) % items.length), 3800);
-    return () => clearInterval(id);
-  }, []);
+  const current = items[active] ?? items[0];
 
   return (
-    <div className="flex flex-col gap-3">
-      {items.map((item, i) => {
-        const Icon = item.icon;
-        const isActive = i === active;
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-[1.7rem] border border-white/[0.12] bg-white/[0.08] p-5 shadow-[0_16px_32px_rgba(4,11,29,0.22)] backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.2em] text-white/[0.52]">WEB APP VALUE</p>
+            <p className="mt-1 text-[1.15rem] font-black leading-[1.32] text-white">{current.title}</p>
+          </div>
+          <div className="rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[10px] font-black text-[#FFB273]">
+            {current.label}
+          </div>
+        </div>
 
-        return (
-          <button
-            key={item.label}
-            onClick={() => handleItemClick(i, item.targetId, item.targetHref)}
-            aria-label={item.title}
-            className={`group flex items-start gap-4 rounded-2xl border p-5 text-left transition-all duration-500 ${
-              isActive ? 'border-white/18 bg-white/9' : 'border-white/6 bg-white/3 opacity-40 hover:opacity-62'
-            }`}
-          >
+        <p className="mt-4 break-keep text-[13px] font-semibold leading-[1.72] text-white/[0.72]">{current.desc}</p>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {current.points.map((point) => (
             <div
-              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors duration-400 ${
+              key={point}
+              className="rounded-[1rem] border border-white/10 bg-[#0f1d42] px-3 py-3 text-[12px] font-black text-white/[0.84]"
+            >
+              {point}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-white/10 bg-[#09152F] px-4 py-3">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.16em] text-white/[0.42]">{current.statLabel}</p>
+            <p className="mt-1 text-[1rem] font-black text-white">{current.statValue}</p>
+          </div>
+          <a href={current.href} className="inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
+            {current.cta}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {items.map((item, index) => {
+          const Icon = item.icon;
+          const isActive = index === active;
+
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setActive(index)}
+              className={`rounded-[1.15rem] border px-3 py-3 text-left transition-all duration-300 ${
                 isActive
-                  ? item.color === 'orange'
-                    ? 'bg-[#ff7a16]/18 text-[#FF9848]'
-                    : 'bg-white/14 text-white'
-                  : 'bg-white/6 text-white/35'
+                  ? 'border-white/20 bg-white/10'
+                  : 'border-white/[0.06] bg-white/[0.04] opacity-70 hover:opacity-92'
               }`}
             >
-              <Icon className="h-4 w-4" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p
-                className={`text-[10px] font-black tracking-[0.22em] uppercase transition-colors duration-400 ${
-                  isActive ? 'text-white/72' : 'text-white/32'
-                }`}
-              >
-                {item.label}
-              </p>
-
-              <p
-                className={`mt-1.5 break-keep font-black leading-[1.2] transition-all duration-400 ${
-                  isActive ? 'text-[1.1rem] text-white' : 'text-[1rem] text-white/45'
-                }`}
-              >
-                {item.title}
-              </p>
-
-              <div className={`grid transition-all duration-500 ${isActive ? 'mt-2.5 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                <div className="overflow-hidden">
-                  <p className="break-keep text-[13px] font-semibold leading-[1.65] text-white/88">{item.desc}</p>
-                  <p className="mt-2.5 inline-block rounded-lg border border-white/10 bg-white/6 px-3 py-1.5 text-[12px] font-black text-white/92">
-                    {item.stat}
-                  </p>
-
-                  {item.ctaHint ? (
-                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-black text-white">
-                      {item.ctaHint}
-                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-                    </p>
-                  ) : null}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    isActive ? 'bg-white/[0.14] text-[#FFB273]' : 'bg-white/[0.08] text-white/[0.46]'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
                 </div>
+                <p className="text-[10px] font-black tracking-[0.16em] text-white/[0.56]">{item.label}</p>
               </div>
-            </div>
-          </button>
-        );
-      })}
-
-      <div className="mt-1 flex items-center justify-center gap-2">
-        {items.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setActive(i)}
-            aria-label={`${i + 1}번 항목`}
-            className={`h-1 rounded-full transition-all duration-400 ${
-              i === active ? 'w-5 bg-[#FF9848]' : 'w-1.5 bg-white/22 hover:bg-white/40'
-            }`}
-          />
-        ))}
+              <p className="mt-2 break-keep text-[13px] font-black leading-[1.4] text-white">{item.title}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
-

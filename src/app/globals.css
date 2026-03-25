@@ -152,6 +152,8 @@
 
   html {
     scroll-behavior: smooth;
+    max-width: 100%;
+    overflow-x: clip;
   }
 }
 
@@ -171,6 +173,14 @@
     text-rendering: optimizeLegibility;
     word-break: keep-all;
     overflow-wrap: break-word;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
   }
 
   /* ── Display token: body/button/card headings (Pretendard-based) ── */
@@ -525,9 +535,10 @@
 
   /* Orange CTA - 주 행동 유도 */
   .premium-cta-primary {
-    border-color: rgba(20, 41, 95, 0.18);
-    color: #14295f;
-    background-color: #ffffff;
+    border-color: rgba(255, 122, 22, 0.38);
+    color: #ffffff;
+    background-color: #FF7A16;
+    box-shadow: 0 10px 20px -10px rgba(255,122,22,0.55);
     text-shadow: none;
   }
 
@@ -547,9 +558,9 @@
 
   /* Ghost CTA - 다크 배경 위 */
   .premium-cta-ghost {
-    border-color: rgba(255,255,255,0.28);
+    border-color: rgba(255,255,255,0.24);
     color: #ffffff;
-    background-color: rgba(255,255,255,0.10);
+    background-color: rgba(255,255,255,0.08);
     backdrop-filter: blur(8px);
   }
 

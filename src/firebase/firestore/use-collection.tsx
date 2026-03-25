@@ -100,8 +100,6 @@ export function useCollection<T = any>(
           setError(contextualError)
           if (strictPermissionErrors) {
             errorEmitter.emit('permission-error', contextualError);
-          } else {
-            console.warn('[Firestore] permission denied (suppressed):', path);
           }
         } else {
           // 기타 오류(시간 동기화 등)는 무시하거나 콘솔에만 출력하여 앱 중단을 방지합니다.

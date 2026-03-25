@@ -13,52 +13,43 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
   return (
     <section
       id="results"
-      className="on-dark scroll-mt-20 py-12 sm:py-16"
-      style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
+      className="scroll-mt-20 py-12 sm:py-16"
+      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section heading */}
         <div className="mx-auto max-w-lg text-center">
-          <span className="eyebrow-badge-light">2026 RESULT</span>
-          <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.75rem,3.5vw,2.5rem)] font-black leading-[1.1] text-white">
-            실적은 감성이 아니라
+          <span className="eyebrow-badge">2026 RESULT</span>
+          <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.75rem,3.5vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
+            트랙은 감성이 아니라
             <br />
             데이터로 말합니다
           </h2>
-          <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-white/80">
+          <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-[#445b75]">
             2026학년도 수능, 트랙의 운영 구조가 만들어 낸 결과입니다.
           </p>
         </div>
 
-        {/* University data board */}
         <div className="mt-9">
-          <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-white/60">
-            2026학년도 주요 합격
+          <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-[#14295F]/46">
+            주요 합격 실적
           </p>
           <StaggerChildren stagger={80} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {universities.map((u) => (
               <article
                 key={u.label}
-                className="rounded-2xl border border-white/9 bg-white/5 px-4 py-5 text-center"
+                className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-5 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)]"
               >
-                <p className="font-brand text-[2.2rem] font-black leading-none text-white">
-                  {u.value}
-                </p>
-                <p className="mt-2 break-keep text-[12px] font-semibold text-white/70">
-                  {u.label}
-                </p>
-                <p className="mt-1 text-[10px] font-semibold text-white/50">{u.detail}</p>
+                <p className="font-brand text-[2.2rem] font-black leading-none text-[#14295F]">{u.value}</p>
+                <p className="mt-2 break-keep text-[12px] font-semibold text-[#47607B]">{u.label}</p>
+                <p className="mt-1 text-[10px] font-semibold text-[#14295F]/42">{u.detail}</p>
               </article>
             ))}
           </StaggerChildren>
         </div>
 
-        {/* Success story */}
-        <div className="mt-5 rounded-2xl border border-[#FF7A16]/22 bg-[#FF7A16]/7 px-6 py-7 sm:px-8 sm:py-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#FF9848]">
-            Success Story
-          </p>
-          <p className="font-brand mt-3 break-keep text-[1.35rem] font-black leading-[1.24] text-white sm:text-[1.55rem]">
+        <div className="mt-5 rounded-2xl border border-[#FF7A16]/18 bg-[#FFF6ED] px-6 py-7 sm:px-8 sm:py-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#FF9848]">Success Story</p>
+          <p className="font-brand mt-3 break-keep text-[1.35rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.55rem]">
             {successStory.summary}
           </p>
         </div>

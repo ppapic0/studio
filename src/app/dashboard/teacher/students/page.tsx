@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
@@ -68,11 +69,27 @@ import {
 } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import dynamic from 'next/dynamic';
+import { isTeacherOrAdminRole } from '@/lib/dashboard-access';
+
+const RiskIntelligencePanel = dynamic(
+  () => import('@/components/dashboard/risk-intelligence').then((mod) => mod.RiskIntelligence),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="py-16 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-7 w-7 animate-spin text-rose-500/40" />
+        <p className="text-xs font-bold text-muted-foreground/60">리스크 분석을 준비하는 중입니다...</p>
+      </div>
+    ),
+  }
+);
 
 export default function StudentListPage() {
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const firestore = useFirestore();
   const functions = useFunctions();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTab, setStatusTab] = useState<string>('active');
@@ -92,7 +109,21 @@ export default function StudentListPage() {
   });
 
   const centerId = activeMembership?.id;
-  const isTeacherOrAdmin = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+  const isTeacherOrAdmin = isTeacherOrAdminRole(activeMembership?.role);
+  const canViewRiskPanel = isTeacherOrAdmin;
+  const [showRiskPanel, setShowRiskPanel] = useState(false);
+
+  useEffect(() => {
+    const showRisk = searchParams.get('showRisk');
+    if (showRisk === '1' || showRisk === 'true') {
+      setShowRiskPanel(true);
+      setTimeout(() => {
+        if (typeof window === 'undefined') return;
+        const target = document.getElementById('risk-analysis');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
+    }
+  }, [searchParams]);
 
   // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회
   const membersQuery = useMemoFirebase(() => {
@@ -228,6 +259,14 @@ export default function StudentListPage() {
     }
   };
 
+  if (membershipsLoading && !activeMembership) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-30" />
+      </div>
+    );
+  }
+
   if (!isTeacherOrAdmin) {
     return <div className="flex items-center justify-center h-[60vh]"><p>권한이 없습니다.</p></div>;
   }
@@ -270,6 +309,30 @@ export default function StudentListPage() {
           </Dialog>
         </div>
       </header>
+
+      {canViewRiskPanel && (
+        <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-border/50">
+          <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
+            <div className="space-y-1">
+              <p className="text-xs font-black tracking-widest text-muted-foreground">리스크 인텔리전스</p>
+              <p className="text-sm font-bold text-muted-foreground">센터관리자 전용 리스크 분석을 학생관리 센터에서 확인합니다.</p>
+            </div>
+            <Button
+              type="button"
+              variant={showRiskPanel ? 'default' : 'outline'}
+              className="h-10 rounded-xl font-black"
+              onClick={() => setShowRiskPanel((prev) => !prev)}
+            >
+              {showRiskPanel ? '리스크 분석 닫기' : '리스크 분석 열기'}
+            </Button>
+          </div>
+          {showRiskPanel && (
+            <div id="risk-analysis" className="pt-5">
+              <RiskIntelligencePanel />
+            </div>
+          )}
+        </Card>
+      )}
 
       <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
         <TabsList className={cn("grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border border-border/50 shadow-inner", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>

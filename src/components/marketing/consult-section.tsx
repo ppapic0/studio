@@ -8,6 +8,7 @@ import { SectionHeading } from './section-heading';
 
 type ConsultSectionProps = {
   consult: MarketingContent['consult'];
+  trustMetrics: MarketingContent['appSystem']['trustMetrics'];
 };
 
 async function getWaitlistCount(): Promise<number> {
@@ -28,7 +29,7 @@ async function getWaitlistCount(): Promise<number> {
   }
 }
 
-export async function ConsultSection({ consult }: ConsultSectionProps) {
+export async function ConsultSection({ consult, trustMetrics }: ConsultSectionProps) {
   const waitlistCount = await getWaitlistCount();
 
   return (
@@ -42,15 +43,45 @@ export async function ConsultSection({ consult }: ConsultSectionProps) {
           className="overflow-hidden rounded-[2rem] border p-7 sm:p-10"
           style={{
             borderColor: 'rgba(255,255,255,0.10)',
-            background: 'rgba(255,255,255,0.04)',
-            backdropFilter: 'blur(12px)',
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(8px)',
             boxShadow: '0 1px 0 0 rgba(255,255,255,0.08) inset, 0 32px 64px -16px rgba(0,0,0,0.32)',
           }}
         >
           <SectionHeading eyebrow="Consulting" title={consult.heading} description={consult.description} light />
 
+          <div className="mt-6 grid gap-3 md:grid-cols-5">
+            {trustMetrics.map((metric) => (
+              <article
+                key={`${metric.label}-${metric.value}`}
+                className="rounded-2xl border px-4 py-4"
+                style={{
+                  borderColor: 'rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.06)',
+                }}
+              >
+                <p className="text-[10px] font-black tracking-[0.16em] text-white">{metric.label}</p>
+                <p className="mt-2 text-[1.15rem] font-black text-white">{metric.value}</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">{metric.detail}</p>
+              </article>
+            ))}
+            <article
+              className="rounded-2xl border px-4 py-4"
+              style={{
+                borderColor: 'rgba(255,122,22,0.30)',
+                background: 'rgba(255,122,22,0.10)',
+              }}
+            >
+              <p className="text-[10px] font-black tracking-[0.16em] text-[#FFB273]">현재 대기 인원</p>
+              <p className="mt-2 text-[1.15rem] font-black text-white">{waitlistCount}명</p>
+              <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">
+                상담 요청 후 순차적으로 안내 중입니다.
+              </p>
+            </article>
+          </div>
+
           <div className="mt-7 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-            <ConsultForm />
+            <ConsultForm waitlistCount={waitlistCount} />
 
             <div className="space-y-4">
               {/* 입학 대기 인원 배너 */}

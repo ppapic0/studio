@@ -263,7 +263,8 @@ export default function KioskPage() {
       let stopSessionId: string | null = null;
 
       // 퇴실(absent) 처리 시 공부 시간 저장 로직
-      if (nextStatus === 'absent' && prevStatus === 'studying' && seat.lastCheckInAt) {
+      // away/break 상태에서 퇴실해도 lastCheckInAt 기준으로 시간을 기록한다 (T-2 버그 수정)
+      if (nextStatus === 'absent' && (prevStatus === 'studying' || prevStatus === 'away' || prevStatus === 'break') && seat.lastCheckInAt) {
         const startTime = seat.lastCheckInAt.toMillis();
         const durationMinutes = Math.max(1, Math.floor((Date.now() - startTime) / 60000));
 

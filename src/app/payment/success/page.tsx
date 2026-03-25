@@ -23,7 +23,7 @@ type ConfirmInvoicePaymentResult = {
 function resolveNextHref(role: string | undefined): string {
   if (role === 'parent') return '/dashboard?parentTab=billing';
   if (role === 'centerAdmin' || role === 'owner' || role === 'teacher') return '/dashboard/revenue';
-  return '/dashboard';
+  return '/login';
 }
 
 function SuccessContent() {
@@ -39,6 +39,7 @@ function SuccessContent() {
   const [alreadyProcessed, setAlreadyProcessed] = useState(false);
 
   const nextHref = useMemo(() => resolveNextHref(activeMembership?.role), [activeMembership?.role]);
+  const nextLabel = activeMembership?.role ? '대시보드로 이동' : '로그인으로 이동';
 
   useEffect(() => {
     const invoiceId = (searchParams.get('invoiceId') || '').trim();
@@ -120,7 +121,7 @@ function SuccessContent() {
           </CardHeader>
           <CardContent className="pt-2">
             <Button className="h-12 w-full rounded-xl font-black" onClick={() => router.push(nextHref)}>
-              대시보드로 이동
+              {nextLabel}
             </Button>
           </CardContent>
         </Card>
@@ -155,7 +156,7 @@ function SuccessContent() {
             )}
           </div>
           <Button className="h-14 w-full rounded-2xl bg-[#14295F] font-black text-white" onClick={() => router.push(nextHref)}>
-            대시보드로 돌아가기
+            {activeMembership?.role ? '대시보드로 돌아가기' : '로그인으로 이동'}
           </Button>
         </CardContent>
       </Card>

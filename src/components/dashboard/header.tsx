@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   PanelLeft,
   LogOut,
@@ -48,14 +48,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MainNav } from './main-nav';
 import { NotificationBell } from './notification-bell';
 import { useAppContext } from '@/contexts/app-context';
-import { useAuth, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
+import { useAuth, useDoc, useFirestore, useFunctions, useMemoFirebase, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast } from '@/hooks/use-toast';
-import { StudentProfile, User as UserType } from '@/lib/types';
+import { CenterMembership, StudentProfile, User as UserType } from '@/lib/types';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 function resolveCallableErrorMessage(error: any): string {
   const errorCode = String(error?.code || '').toLowerCase();
@@ -122,14 +124,33 @@ export function DashboardHeader() {
   const [grade, setGrade] = useState('');
   const [parentLinkCode, setParentLinkCode] = useState('');
 
-  const userRef = firestore && user ? doc(firestore, 'users', user.uid) : null;
+  const userRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserType>(userRef as any);
 
-  const studentRef =
-    firestore && activeMembership && user
-      ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
-      : null;
+  const studentRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
+  }, [firestore, activeMembership?.id, user?.uid]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
+  const linkedStudentId =
+    activeMembership?.role === 'parent'
+      ? activeMembership?.linkedStudentIds?.[0] || null
+      : user?.uid || null;
+  const linkedStudentRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership?.id || !linkedStudentId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', linkedStudentId);
+  }, [firestore, activeMembership?.id, linkedStudentId]);
+  const { data: linkedStudentProfile } = useDoc<StudentProfile>(linkedStudentRef as any);
+  const linkedStudentMemberRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership?.id || !linkedStudentId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'members', linkedStudentId);
+  }, [firestore, activeMembership?.id, linkedStudentId]);
+  const { data: linkedStudentMember } = useDoc<CenterMembership>(linkedStudentMemberRef as any);
+  const parentHeaderTodayLabel = useMemo(() => format(new Date(), 'yyyy. MM. dd (EEE)', { locale: ko }), []);
+  const parentHeaderStudentName = linkedStudentProfile?.name || linkedStudentMember?.displayName || '학생';
 
   useEffect(() => {
     if (!isSettingsOpen) {
@@ -247,6 +268,14 @@ export function DashboardHeader() {
       </div>
 
       <div className="relative ml-auto flex items-center gap-2">
+        {isParentMode && (
+          <div className="flex items-center rounded-2xl border border-[#d6e2fb] bg-[linear-gradient(145deg,#f4f8ff_0%,#ffffff_100%)] px-3 py-1.5 shadow-sm">
+            <div className="grid gap-0.5">
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#14295F]/55">{parentHeaderTodayLabel}</p>
+              <p className="text-[11px] font-black text-[#14295F]">{parentHeaderStudentName} 학생 현황</p>
+            </div>
+          </div>
+        )}
         {!isParentMode && (
           <Button
             variant="ghost"

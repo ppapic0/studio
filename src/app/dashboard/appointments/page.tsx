@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -54,18 +54,20 @@ import {
   Check,
   X,
   FileEdit,
+  Megaphone,
   GraduationCap,
   Filter,
   ClipboardCheck
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -89,6 +91,24 @@ type ParentCommunicationRecord = {
   repliedAt?: Timestamp;
   repliedByName?: string;
   repliedByUid?: string;
+};
+
+type CenterAnnouncementRecord = {
+  id: string;
+  title?: string;
+  body?: string;
+  audience?: 'student' | 'parent' | 'all';
+  isPublished?: boolean;
+  status?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+const isPublishedAnnouncement = (item: CenterAnnouncementRecord) => {
+  const normalizedStatus = item?.status?.trim?.().toLowerCase();
+  if (normalizedStatus) return normalizedStatus === 'published';
+  if (typeof item?.isPublished === 'boolean') return item.isPublished;
+  return true;
 };
 
 type AppointmentTab = 'reservations' | 'logs' | 'inquiries' | 'parent';
@@ -132,6 +152,10 @@ export function AppointmentsPageContent({
   const [inquiryTitle, setInquiryTitle] = useState('');
   const [inquiryBody, setInquiryBody] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [announcementAudience, setAnnouncementAudience] = useState<'student' | 'parent' | 'all'>('all');
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementBody, setAnnouncementBody] = useState('');
+  const markedLogReadIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setActiveTab(forceTab);
@@ -161,13 +185,14 @@ export function AppointmentsPageContent({
 
   const isStudent = userRole === 'student';
   const isParent = userRole === 'parent';
-  const isStaff = userRole === 'teacher' || userRole === 'centerAdmin';
-  const isAdmin = userRole === 'centerAdmin';
+  const isStaff = isTeacherOrAdminRole(userRole);
+  const isAdmin = isAdminRole(userRole);
   const canAccessCommunications = isStaff || isStudent;
   const shouldLoadReservations = activeTab === 'reservations' || showAll;
   const shouldLoadLogs = activeTab === 'logs' || showAll;
   const shouldLoadCommunications = activeTab === 'inquiries' || activeTab === 'parent' || showAll;
   const shouldLoadTeachers = isStaff || isRequestModalOpen;
+  const shouldLoadAnnouncements = isStudent || isStaff;
 
   // 상담 희망 선생님 목록
   const teachersQuery = useMemoFirebase(() => {
@@ -234,6 +259,18 @@ export function AppointmentsPageContent({
     enabled: !!centerId && !!studentUid && !!userRole && shouldLoadLogs,
   });
 
+  const announcementsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !shouldLoadAnnouncements) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'centerAnnouncements'),
+      orderBy('createdAt', 'desc'),
+      limit(30),
+    );
+  }, [firestore, centerId, shouldLoadAnnouncements]);
+  const { data: rawAnnouncements, isLoading: announcementsLoading } = useCollection<CenterAnnouncementRecord>(announcementsQuery, {
+    enabled: !!centerId && shouldLoadAnnouncements,
+  });
+
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentUid || !canAccessCommunications || !shouldLoadCommunications) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'parentCommunications');
@@ -251,6 +288,14 @@ export function AppointmentsPageContent({
     if (!rawReservations) return [];
     return [...rawReservations].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
   }, [rawReservations]);
+  const reservationQuestionById = useMemo(() => {
+    const map = new Map<string, string>();
+    reservations.forEach((reservation) => {
+      const question = reservation.studentNote?.trim();
+      if (reservation.id && question) map.set(reservation.id, question);
+    });
+    return map;
+  }, [reservations]);
 
   const parentCommunications = useMemo(() => {
     if (!rawParentCommunications) return [];
@@ -314,6 +359,54 @@ export function AppointmentsPageContent({
     () => (showAll ? studentInquiries : studentInquiries.slice(0, PREVIEW_LIMIT)),
     [showAll, studentInquiries]
   );
+
+  const studentAnnouncements = useMemo(() => {
+    if (!rawAnnouncements) return [];
+    return [...rawAnnouncements]
+      .filter((item) => isPublishedAnnouncement(item))
+      .filter((item) => item?.audience === 'student' || item?.audience === 'all' || !item?.audience)
+      .sort((a, b) => (b?.createdAt?.toMillis?.() || 0) - (a?.createdAt?.toMillis?.() || 0));
+  }, [rawAnnouncements]);
+  const visibleStudentAnnouncements = useMemo(
+    () => (showAll ? studentAnnouncements : studentAnnouncements.slice(0, PREVIEW_LIMIT)),
+    [showAll, studentAnnouncements]
+  );
+  const staffAnnouncements = useMemo(() => {
+    if (!rawAnnouncements || !isStaff) return [];
+    return [...rawAnnouncements]
+      .filter((item) => isPublishedAnnouncement(item))
+      .sort((a, b) => (b?.createdAt?.toMillis?.() || 0) - (a?.createdAt?.toMillis?.() || 0));
+  }, [rawAnnouncements, isStaff]);
+  const visibleStaffAnnouncements = useMemo(
+    () => (showAll ? staffAnnouncements : staffAnnouncements.slice(0, 3)),
+    [showAll, staffAnnouncements]
+  );
+
+  useEffect(() => {
+    if (!firestore || !centerId || !user || isStaff) return;
+    if (!showAll && activeTab !== 'logs') return;
+
+    const unreadLogs = visibleLogs.filter((log) => {
+      if (!log?.id || log.readAt) return false;
+      if (markedLogReadIdsRef.current.has(log.id)) return false;
+      return true;
+    });
+    if (!unreadLogs.length) return;
+
+    unreadLogs.forEach((log) => markedLogReadIdsRef.current.add(log.id));
+
+    void Promise.all(
+      unreadLogs.map((log) =>
+        updateDoc(doc(firestore, 'centers', centerId, 'counselingLogs', log.id), {
+          readAt: serverTimestamp(),
+          readByUid: user.uid,
+          readByRole: isParent ? 'parent' : 'student',
+        }).catch(() => {
+          markedLogReadIdsRef.current.delete(log.id);
+        })
+      )
+    );
+  }, [firestore, centerId, user, isStaff, showAll, activeTab, visibleLogs, isParent]);
 
   const handleRequestAppointment = async () => {
     if (!firestore || !centerId || !user) return;
@@ -402,7 +495,9 @@ export function AppointmentsPageContent({
         type: logType,
         content: logContent.trim(),
         improvement: logImprovement.trim(),
+        studentQuestion: selectedResForLog.studentNote?.trim() || '',
         createdAt: serverTimestamp(),
+        readAt: null,
         reservationId: selectedResForLog.id
       };
 
@@ -499,6 +594,38 @@ export function AppointmentsPageContent({
       toast({ title: '답변이 저장되었습니다.' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: '답변 저장에 실패했습니다.', description: e?.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePublishAnnouncement = async () => {
+    if (!firestore || !centerId || !user || !isStaff) return;
+    if (!announcementTitle.trim() || !announcementBody.trim()) {
+      toast({ variant: 'destructive', title: '공지 제목과 내용을 입력해 주세요.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'centerAnnouncements'), {
+        title: announcementTitle.trim(),
+        body: announcementBody.trim(),
+        audience: announcementAudience,
+        isPublished: true,
+        status: 'published',
+        source: 'appointments',
+        createdByUid: user.uid,
+        createdByName: user.displayName || '센터',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: '공지사항이 발송되었습니다.' });
+      setAnnouncementTitle('');
+      setAnnouncementBody('');
+      setAnnouncementAudience('all');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '공지 발송에 실패했습니다.', description: e?.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -627,6 +754,116 @@ export function AppointmentsPageContent({
           </Dialog>
         )}
       </header>
+
+      {isStaff && (
+        <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
+          <CardHeader className={cn("bg-blue-50/30 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
+            <CardTitle className={cn("font-black text-blue-700 flex items-center gap-3", isMobile ? "text-lg" : "text-xl")}>
+              <Megaphone className="h-6 w-6 opacity-70" /> 학생/학부모 공지 발송
+            </CardTitle>
+            <CardDescription className="font-bold text-xs mt-1">상담트랙에서 작성한 공지는 학생·학부모 화면에 바로 반영됩니다.</CardDescription>
+          </CardHeader>
+          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
+            <div className="grid gap-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">공지 대상</p>
+              <Select value={announcementAudience} onValueChange={(value) => setAnnouncementAudience(value as 'student' | 'parent' | 'all')}>
+                <SelectTrigger className="h-11 rounded-xl border-2 font-bold">
+                  <SelectValue placeholder="대상 선택" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-2xl">
+                  <SelectItem value="all" className="font-bold">학생 + 학부모</SelectItem>
+                  <SelectItem value="student" className="font-bold">학생</SelectItem>
+                  <SelectItem value="parent" className="font-bold">학부모</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Input
+              value={announcementTitle}
+              onChange={(e) => setAnnouncementTitle(e.target.value)}
+              placeholder="공지 제목"
+              className="h-11 rounded-xl border-2 font-bold"
+            />
+            <Textarea
+              value={announcementBody}
+              onChange={(e) => setAnnouncementBody(e.target.value)}
+              placeholder="학생/학부모에게 전달할 공지 내용을 입력해 주세요."
+              className="min-h-[100px] rounded-xl border-2 font-semibold resize-none"
+            />
+            <div className="flex justify-end">
+              <Button onClick={handlePublishAnnouncement} disabled={isSubmitting} className="rounded-xl font-black">
+                {isSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Megaphone className="mr-1.5 h-4 w-4" />}
+                공지 발송
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">최근 공지</p>
+              {announcementsLoading ? (
+                <div className="py-3 flex justify-center"><Loader2 className="animate-spin h-5 w-5 text-slate-300" /></div>
+              ) : visibleStaffAnnouncements.length === 0 ? (
+                <p className="text-xs font-bold text-slate-400">등록된 공지가 없습니다.</p>
+              ) : (
+                <div className="space-y-2">
+                  {visibleStaffAnnouncements.map((item: any) => {
+                    const createdAt = item?.createdAt?.toDate?.();
+                    const createdAtLabel = createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '-';
+                    const audienceLabel =
+                      item?.audience === 'student' ? '학생' : item?.audience === 'parent' ? '학부모' : '학생+학부모';
+                    return (
+                      <div key={item.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-black text-slate-700 truncate">{item?.title || '공지사항'}</p>
+                          <Badge variant="outline" className="h-5 border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-500">
+                            {audienceLabel}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400">{createdAtLabel}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isStudent && (
+        <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem] mb-4" : "rounded-[2.5rem] mb-6")}>
+          <CardHeader className={cn("bg-amber-50/30 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
+            <CardTitle className={cn("font-black text-amber-700 flex items-center gap-3", isMobile ? "text-lg" : "text-xl")}>
+              <Megaphone className="h-6 w-6 opacity-70" /> 공지사항
+            </CardTitle>
+            <CardDescription className="font-bold text-xs mt-1">학생 대상 공지를 상담트랙에서 바로 확인할 수 있습니다.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {announcementsLoading ? (
+              <div className="py-12 flex justify-center"><Loader2 className="animate-spin h-7 w-7 text-primary opacity-20" /></div>
+            ) : visibleStudentAnnouncements.length === 0 ? (
+              <div className="py-14 text-center text-muted-foreground/40 font-black">등록된 공지사항이 없습니다.</div>
+            ) : (
+              <div className="divide-y divide-muted/10">
+                {visibleStudentAnnouncements.map((item: any) => {
+                  const createdAt = item?.createdAt?.toDate?.();
+                  const createdAtLabel = createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '-';
+                  return (
+                    <div key={item.id} className={cn("space-y-2", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item?.title || '공지사항'}</h3>
+                        <span className="text-[10px] font-bold text-muted-foreground shrink-0">{createdAtLabel}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">
+                        {item?.body || '내용이 없습니다.'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={(value) => !showAll && setActiveTab(value as AppointmentTab)} className="w-full flex flex-col items-center">
         {!showAll && (
@@ -769,7 +1006,12 @@ export function AppointmentsPageContent({
                 </div>
               ) : (
                 <div className="divide-y divide-muted/10">
-                  {visibleLogs.map((log) => (
+                  {visibleLogs.map((log) => {
+                    const studentQuestion =
+                      log.studentQuestion?.trim() ||
+                      (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
+                      '';
+                    return (
                     <div key={log.id} className={cn("hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -789,11 +1031,32 @@ export function AppointmentsPageContent({
                                 <GraduationCap className="h-2.5 w-2.5" /> {log.studentName}
                               </Badge>
                             )}
+                            {isStaff && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "font-black text-[9px] px-2 py-0.5",
+                                  log.readAt
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                )}
+                              >
+                                {log.readAt ? '읽음' : '미확인'}
+                              </Badge>
+                            )}
                           </div>
                           {!isMobile && <span className="text-[8px] font-black text-primary/30 tracking-[0.3em] whitespace-nowrap">상담 로그</span>}
                         </div>
                         
                         <div className="space-y-3">
+                          {studentQuestion && (
+                            <div className={cn("rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
+                              <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
+                              <p className={cn("font-bold leading-relaxed text-sky-900 whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base")}>
+                                {studentQuestion}
+                              </p>
+                            </div>
+                          )}
                           <div className={cn("rounded-[1.25rem] bg-[#fafafa] border shadow-inner", isMobile ? "p-4" : "p-5")}>
                             <p className={cn("font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base")}>{log.content}</p>
                           </div>
@@ -809,7 +1072,8 @@ export function AppointmentsPageContent({
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               {!showAll && filteredLogs.length > PREVIEW_LIMIT && (

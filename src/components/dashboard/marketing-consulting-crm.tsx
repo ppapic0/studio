@@ -63,13 +63,19 @@ interface ConsultingLead {
   parentName: string;
   parentPhone: string;
   studentPhone?: string;
+  school?: string;
+  grade?: string;
   marketingChannel: string;
   referralRoute?: ReferralRoute;
   referrerName?: string;
   consultationDate: string;
   status: LeadStatus;
   serviceType?: ServiceType;
+  requestType?: string;
+  requestTypeLabel?: string;
   memo?: string;
+  source?: string;
+  sourceRequestId?: string;
   createdAt?: any;
   updatedAt?: any;
   createdByUid?: string;
@@ -94,12 +100,14 @@ interface WebsiteConsultRequest {
   id: string;
   studentName: string;
   school: string;
+  grade?: string;
   consultPhone: string;
   consultationDate?: string;
   status: LeadStatus;
   source?: string;
   sourceLabel?: string;
   serviceType?: ServiceType;
+  requestType?: string;
   requestTypeLabel?: string;
   createdAt?: any;
   updatedAt?: any;
@@ -131,6 +139,7 @@ interface WaitlistEntry {
   memo?: string;
   waitlistDate: string;
   sourceLeadId?: string;
+  sourceWebsiteRequestId?: string;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -141,6 +150,8 @@ interface WaitlistModal {
   studentName: string;
   parentPhone: string;
   studentPhone: string;
+  school: string;
+  grade: string;
   referralRoute: ReferralRoute;
   referrerName: string;
   serviceTypes: ServiceType[];
@@ -192,6 +203,8 @@ const INITIAL_WAITLIST_MODAL = (): WaitlistModal => ({
   studentName: '',
   parentPhone: '',
   studentPhone: '',
+  school: '',
+  grade: '',
   referralRoute: '기타',
   referrerName: '',
   serviceTypes: ['korean_academy'],
@@ -327,6 +340,17 @@ export function MarketingConsultingCRM({
     return grouped;
   }, [waitlist]);
 
+  const waitlistBySourceWebsiteRequestId = useMemo(() => {
+    const grouped = new Map<string, WaitlistEntry[]>();
+    for (const entry of waitlist) {
+      if (!entry.sourceWebsiteRequestId) continue;
+      const current = grouped.get(entry.sourceWebsiteRequestId) || [];
+      current.push(entry);
+      grouped.set(entry.sourceWebsiteRequestId, current);
+    }
+    return grouped;
+  }, [waitlist]);
+
   const LEADS_PER_PAGE = 5;
 
   const filteredLeads = useMemo(() => {
@@ -335,7 +359,18 @@ export function MarketingConsultingCRM({
     return leads.filter((lead) => {
       if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
       if (!keyword) return true;
-      return [lead.studentName, lead.parentName, lead.parentPhone, lead.studentPhone, lead.referralRoute, lead.referrerName, lead.memo]
+      return [
+        lead.studentName,
+        lead.parentName,
+        lead.parentPhone,
+        lead.studentPhone,
+        lead.school,
+        lead.grade,
+        lead.referralRoute,
+        lead.referrerName,
+        lead.requestTypeLabel,
+        lead.memo,
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -355,7 +390,7 @@ export function MarketingConsultingCRM({
       if (req.linkedLeadId) return false; // 리드 DB로 이동된 건은 숨김
       if (statusFilter !== 'all' && req.status !== statusFilter) return false;
       if (!keyword) return true;
-      return [req.studentName, req.school, req.consultPhone, req.sourceLabel]
+      return [req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -533,22 +568,52 @@ export function MarketingConsultingCRM({
     if (!firestore || !centerId) return;
     setPromotingWebsiteId(request.id);
     try {
+      const linkedWaitlistEntries = waitlistBySourceWebsiteRequestId.get(request.id) || [];
+      const waitlistIds = linkedWaitlistEntries.map((entry) => entry.id);
+      const memoLines = [
+        `학교: ${request.school || '-'}`,
+        `학년: ${request.grade || '-'}`,
+        `웹 접수: ${formatDateTimeLabel(request.createdAt)}`,
+      ];
       const leadRef = await addDoc(collection(firestore, 'centers', centerId, 'consultingLeads'), {
         studentName: request.studentName?.trim() || '',
         parentName: '웹사이트 문의',
         parentPhone: request.consultPhone?.trim() || '',
         studentPhone: '',
+        school: request.school?.trim() || '',
+        grade: request.grade?.trim() || '',
         marketingChannel: request.sourceLabel || '웹사이트 상담폼',
         referralRoute: '기타',
         consultationDate: request.consultationDate || format(new Date(), 'yyyy-MM-dd'),
         status: request.status || 'new',
-        memo: [`학교: ${request.school || '-'}`, `웹 접수: ${formatDateTimeLabel(request.createdAt)}`].join('\n'),
+        serviceType: request.serviceType || null,
+        requestType: request.requestType || null,
+        requestTypeLabel: request.requestTypeLabel || null,
+        memo: memoLines.join('\n'),
         source: 'website',
         sourceRequestId: request.id,
+        addedToWaitlistId: waitlistIds[0] || null,
+        addedToWaitlistIds: waitlistIds,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdByUid: user?.uid || null,
       });
+
+      if (linkedWaitlistEntries.length > 0) {
+        await Promise.all(
+          linkedWaitlistEntries.map((entry) =>
+            updateDoc(doc(firestore, 'centers', centerId, 'admissionWaitlist', entry.id), {
+              sourceLeadId: leadRef.id,
+              studentName: request.studentName?.trim() || entry.studentName || '',
+              parentPhone: request.consultPhone?.trim() || entry.parentPhone || '',
+              school: request.school?.trim() || entry.school || '',
+              grade: request.grade?.trim() || entry.grade || '',
+              updatedAt: serverTimestamp(),
+            })
+          )
+        );
+      }
+
       await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', request.id), {
         linkedLeadId: leadRef.id,
         updatedAt: serverTimestamp(),
@@ -588,6 +653,8 @@ export function MarketingConsultingCRM({
       studentName: lead.studentName || '',
       parentPhone: lead.parentPhone || '',
       studentPhone: lead.studentPhone || '',
+      school: lead.school || '',
+      grade: lead.grade || '',
       referralRoute: (lead.referralRoute as ReferralRoute) || '기타',
       referrerName: lead.referrerName || '',
       serviceTypes,
@@ -633,6 +700,8 @@ export function MarketingConsultingCRM({
         studentName: waitlistModal.studentName.trim(),
         parentPhone: waitlistModal.parentPhone.trim(),
         studentPhone: waitlistModal.studentPhone.trim(),
+        school: waitlistModal.school.trim(),
+        grade: waitlistModal.grade.trim(),
         serviceType,
         referralRoute: waitlistModal.referralRoute,
         referrerName: waitlistModal.referralRoute === '추천' ? waitlistModal.referrerName.trim() : '',
@@ -880,7 +949,7 @@ export function MarketingConsultingCRM({
                             </Badge>
                           </div>
                           <p className="text-xs font-semibold text-slate-600">
-                            학교: {request.school || '-'} · 연락처: {request.consultPhone || '-'}
+                            학교: {request.school || '-'} {request.grade ? `· ${request.grade}` : ''} · 연락처: {request.consultPhone || '-'}
                           </p>
                           <p className="text-[11px] font-semibold text-slate-500">
                             접수일: {request.consultationDate || '-'} · 접수시각: {formatDateTimeLabel(request.createdAt)}
@@ -1155,6 +1224,10 @@ export function MarketingConsultingCRM({
                       ? '추가 대기 등록'
                       : '입학 대기 등록';
 
+                  const leadServiceLabel = lead.serviceType
+                    ? lead.requestTypeLabel || SERVICE_TYPE_META[lead.serviceType].label
+                    : lead.requestTypeLabel;
+
                   return (
                   <Card key={lead.id} className="rounded-xl border-none shadow-sm ring-1 ring-border/60">
                     <CardContent className={cn('space-y-3', isMobile ? 'p-4' : 'p-5')}>
@@ -1165,20 +1238,23 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[lead.status || 'new'].className)}>
                               {STATUS_META[lead.status || 'new'].label}
                             </Badge>
-                            {lead.serviceType && (
+                            {lead.serviceType && leadServiceLabel && (
                               <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[lead.serviceType].color)}>
-                                {SERVICE_TYPE_META[lead.serviceType].label}
+                                {leadServiceLabel}
                               </Badge>
                             )}
                             <Badge variant="outline" className="text-[10px] font-black">
                               {lead.referralRoute || lead.marketingChannel || '기타'}
                               {lead.referrerName ? ` · ${lead.referrerName}` : ''}
                             </Badge>
-                            {leadWaitlistEntries.length > 0 && (
-                              <Badge className="border-none bg-orange-100 text-[10px] font-black text-orange-700">
-                                대기 등록됨
+                            {leadActiveServiceTypes.map((serviceType) => (
+                              <Badge
+                                key={`${lead.id}-${serviceType}`}
+                                className={cn('border text-[10px] font-black', SERVICE_TYPE_META[serviceType].color)}
+                              >
+                                {SERVICE_TYPE_META[serviceType].label} 대기
                               </Badge>
-                            )}
+                            ))}
                           </div>
                           <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
                             <span className="inline-flex items-center gap-1.5">
@@ -1190,6 +1266,12 @@ export function MarketingConsultingCRM({
                               {lead.parentPhone || '-'}
                             </span>
                             {lead.studentPhone && <span>학생 연락처: {lead.studentPhone}</span>}
+                            {(lead.school || lead.grade) && (
+                              <span>
+                                {lead.school || '학교 미입력'}
+                                {lead.grade ? ` · ${lead.grade}` : ''}
+                              </span>
+                            )}
                             <span>상담일: {lead.consultationDate || '-'}</span>
                           </div>
                           {lead.memo && <p className="text-xs font-medium text-slate-500">{lead.memo}</p>}
@@ -1448,6 +1530,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[entry.serviceType].color)}>
                               {SERVICE_TYPE_META[entry.serviceType].label}
                             </Badge>
+                            {entry.sourceWebsiteRequestId && (
+                              <Badge variant="outline" className="text-[10px] font-black text-orange-600">
+                                웹 접수
+                              </Badge>
+                            )}
                             {entry.referralRoute && (
                               <Badge variant="outline" className="text-[10px] font-black">
                                 {entry.referralRoute}

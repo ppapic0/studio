@@ -14,6 +14,12 @@ export interface User {
   updatedAt: Timestamp;
 }
 
+export interface Student {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+}
+
 export interface CenterMembership {
   id: string; 
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
@@ -28,6 +34,8 @@ export interface CenterMembership {
   tutoringDiscount?: boolean;
   siblingDiscount?: boolean;
 }
+
+export type 센터Membership = CenterMembership;
 
 export interface Invoice {
   id: string;
@@ -52,6 +60,13 @@ export interface Invoice {
   paymentKey?: string; // Toss Payments
   orderId?: string;    // Toss Payments
   trackCategory?: 'studyRoom' | 'academy';
+  isActionRequired?: boolean;
+  dueLabel?: string;
+  paymentMethodSummary?: string;
+  receiptUrl?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
+  readAt?: Timestamp;
 }
 
 export interface PaymentRecord {
@@ -183,9 +198,43 @@ export interface DailyReport {
   content: string;
   status: "draft" | "sent";
   studentName?: string;
+  teacherNote?: string | null;
+  aiMeta?: {
+    teacherOneLiner: string;
+    strengths: string[];
+    improvements: string[];
+    metrics: {
+      growthRate: number;
+      deltaMinutesFromAvg: number;
+      avg7StudyMinutes: number;
+      isNewRecord: boolean;
+      alertLow: boolean;
+      streakBadge: boolean;
+      trendSummary: string;
+    };
+  } | null;
   viewedAt?: Timestamp;
+  viewedByUid?: string;
+  viewedByName?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
+  readAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface InviteCode {
+  id: string;
+  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  centerId?: string;
+  targetClassName?: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt?: Timestamp | { toDate?: () => Date } | Date | null;
+  isActive?: boolean;
+  createdByUserId?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface CounselingReservation {
@@ -211,6 +260,11 @@ export interface CounselingLog {
   type: "academic" | "life" | "career";
   content: string;
   improvement: string;
+  reservationId?: string;
+  studentQuestion?: string;
+  readAt?: Timestamp | null;
+  readByUid?: string;
+  readByRole?: 'student' | 'parent';
   createdAt: Timestamp;
 }
 
@@ -252,6 +306,12 @@ export interface AttendanceRequest {
   status: 'requested' | 'approved' | 'rejected';
   penaltyApplied: boolean;
   penaltyPointsDelta?: number;
+  statusUpdatedAt?: Timestamp;
+  slaDueAt?: Timestamp;
+  owner?: string;
+  nextAction?: string;
+  priority?: 'normal' | 'high' | 'critical';
+  readAt?: Timestamp;
   updatedAt?: Timestamp;
   updatedByUserId?: string;
   createdAt: Timestamp;
@@ -311,4 +371,77 @@ export interface StudentNotification {
   readAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+}
+
+export type ClassroomSignalRiskLevel = 'stable' | 'watch' | 'risk' | 'critical';
+export type ClassroomSignalPriority = 'low' | 'medium' | 'high' | 'critical';
+export type ClassroomOverlayMode = 'status' | 'risk' | 'penalty' | 'minutes' | 'counseling' | 'report';
+export type ClassroomIncidentType =
+  | 'away_long'
+  | 'late_or_absent'
+  | 'risk'
+  | 'unread_report'
+  | 'counseling_pending'
+  | 'penalty_threshold'
+  | 'check_in'
+  | 'check_out';
+export type ClassroomIncidentActionTarget = 'seat' | 'student' | 'report' | 'counseling';
+export type ClassroomQuickFilter =
+  | 'all'
+  | 'studying'
+  | 'awayLong'
+  | 'lateOrAbsent'
+  | 'atRisk'
+  | 'unreadReports'
+  | 'counselingPending';
+
+export interface ClassroomSignalsSummary {
+  studying: number;
+  awayLong: number;
+  lateOrAbsent: number;
+  atRisk: number;
+  unreadReports: number;
+  counselingPending: number;
+}
+
+export interface ClassroomSignalClassSummary {
+  className: string;
+  occupancyRate: number;
+  avgMinutes: number;
+  riskCount: number;
+  awayLongCount: number;
+  pendingCounselingCount: number;
+}
+
+export interface ClassroomSeatSignal {
+  studentId: string;
+  seatId: string;
+  overlayFlags: string[];
+  todayMinutes: number;
+  riskLevel: ClassroomSignalRiskLevel;
+  effectivePenaltyPoints: number;
+  hasUnreadReport: boolean;
+  hasCounselingToday: boolean;
+}
+
+export interface ClassroomSignalIncident {
+  type: ClassroomIncidentType;
+  priority: ClassroomSignalPriority;
+  studentId: string;
+  studentName: string;
+  seatId?: string;
+  className?: string;
+  reason: string;
+  occurredAt: Timestamp;
+  actionTarget: ClassroomIncidentActionTarget;
+}
+
+export interface ClassroomSignalsDocument {
+  id?: string;
+  updatedAt: Timestamp;
+  dateKey: string;
+  summary: ClassroomSignalsSummary;
+  classSummaries: ClassroomSignalClassSummary[];
+  seatSignals: ClassroomSeatSignal[];
+  incidents: ClassroomSignalIncident[];
 }

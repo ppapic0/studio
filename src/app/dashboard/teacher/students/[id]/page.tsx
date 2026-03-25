@@ -27,6 +27,13 @@ import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import {
+  buildAwayTimeInsight,
+  buildDailyStudyInsight,
+  buildRhythmInsight,
+  buildStartEndInsight,
+  buildWeeklyStudyInsight,
+} from '@/lib/learning-insights';
 
 const STAT_CONFIG = {
   focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
@@ -111,6 +118,30 @@ function normalizeRhythmMinutes(series: Array<{ studyMinutes: number; hasActualS
 function hourTickFormatter(value: number): string {
   if (!Number.isFinite(value)) return '0h';
   return `${Math.max(0, Math.round(value))}h`;
+}
+
+function hourToClockLabel(value: number): string {
+  if (!Number.isFinite(value)) return '-';
+  const normalized = Math.max(0, Math.min(24, value));
+  const totalMinutes = Math.round(normalized * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function hourNumberToDate(dateKey: string, hourValue: number | null): Date | null {
+  if (typeof hourValue !== 'number' || !Number.isFinite(hourValue)) return null;
+  const hours = Math.floor(hourValue);
+  const minutes = Math.round((hourValue - hours) * 60);
+  const target = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  target.setHours(hours, minutes, 0, 0);
+  return target;
+}
+
+function dateToHourNumber(date: Date | null): number {
+  if (!date) return 0;
+  return Number((date.getHours() + date.getMinutes() / 60).toFixed(2));
 }
 
 function toTime(value?: Timestamp): number {
@@ -230,7 +261,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isQuickFeedbackModalOpen, setIsQuickFeedbackModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [mobileInsightDialog, setMobileInsightDialog] = useState<MobileInsightView | null>(null);
-  const [mobileGraphPanel, setMobileGraphPanel] = useState<'weekly' | 'daily' | 'rhythm' | 'away' | null>(null);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
   const [logContent, setLogContent] = useState('');
@@ -353,6 +383,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const fetchDailyStats = async () => {
       if (!firestore || !centerId || !studentId) {
         setDailyStatsMap({});
+        setStatsLoading(false);
         return;
       }
       setStatsLoading(true);
@@ -376,10 +407,78 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             awayMinutes: typeof awayMinutesRaw === 'number' ? awayMinutesRaw : undefined,
           };
         });
+
+        const recentKeys = keys.slice(0, 14);
         setDailyStatsMap(next);
+        setStatsLoading(false);
+
+        const missingRecentKeys = recentKeys.filter((dateKey) => {
+          const stat = next[dateKey];
+          return !stat || stat.startHour === undefined || stat.endHour === undefined || stat.awayMinutes === undefined;
+        });
+
+        if (missingRecentKeys.length === 0) return;
+
+        const sessionResults = await Promise.all(
+          missingRecentKeys.map(async (dateKey) => {
+            try {
+              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              const sessions = sessionsSnap.docs
+                .map((d) => d.data())
+                .filter((s) => !!s.startTime)
+                .map((s) => ({
+                  startTime: s.startTime?.toDate?.() as Date | undefined,
+                  endTime: s.endTime?.toDate?.() as Date | undefined,
+                }))
+                .filter((s): s is { startTime: Date; endTime: Date | undefined } => !!s.startTime);
+
+              if (!sessions.length) return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined };
+
+              const first = sessions[0].startTime;
+              const last = sessions[sessions.length - 1];
+              const startH = first.getHours() + first.getMinutes() / 60;
+              const endDate = last.endTime || last.startTime;
+              const endH = endDate.getHours() + endDate.getMinutes() / 60;
+
+              let awayMin = 0;
+              for (let i = 1; i < sessions.length; i++) {
+                const prevEnd = sessions[i - 1].endTime;
+                const currStart = sessions[i].startTime;
+                if (!prevEnd || !currStart) continue;
+                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
+                if (gap > 0 && gap < 180) awayMin += gap;
+              }
+
+              return {
+                dateKey,
+                startHour: Number(startH.toFixed(2)),
+                endHour: Number(endH.toFixed(2)),
+                awayMinutes: awayMin,
+              };
+            } catch {
+              return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined };
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        setDailyStatsMap((prev) => {
+          const merged = { ...prev };
+          sessionResults.forEach(({ dateKey, startHour, endHour, awayMinutes }) => {
+            const existing = merged[dateKey] || { totalStudyMinutes: 0 };
+            merged[dateKey] = {
+              ...existing,
+              startHour: existing.startHour ?? startHour,
+              endHour: existing.endHour ?? endHour,
+              awayMinutes: existing.awayMinutes ?? awayMinutes,
+            };
+          });
+          return merged;
+        });
       } catch (error) {
         console.error('[Student Detail] Failed to load daily stats:', error);
-      } finally {
         if (!cancelled) setStatsLoading(false);
       }
     };
@@ -457,6 +556,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const studentReservations = useMemo(() => {
     return (reservationsRaw || []).filter((reservation) => reservation.studentId === studentId).sort((a, b) => toTime(b.scheduledAt) - toTime(a.scheduledAt));
   }, [reservationsRaw, studentId]);
+  const reservationQuestionById = useMemo(() => {
+    const map = new Map<string, string>();
+    studentReservations.forEach((reservation) => {
+      const question = reservation.studentNote?.trim();
+      if (reservation.id && question) map.set(reservation.id, question);
+    });
+    return map;
+  }, [studentReservations]);
 
   const studyLogMap = useMemo(() => {
     const map: Record<string, StudyLogDay> = {};
@@ -475,6 +582,33 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
     return Math.ceil(elapsedMs / 60000);
   }, [attendanceCurrent]);
+
+  const rhythmTrendMaps = useMemo(() => {
+    const nextStart: Record<string, Date | null> = {};
+    const nextEnd: Record<string, Date | null> = {};
+    const nextAway: Record<string, number> = {};
+
+    for (let index = 0; index < 14; index += 1) {
+      const dateKey = format(subDays(today, 13 - index), 'yyyy-MM-dd');
+      const stat = dailyStatsMap[dateKey];
+      const todayFallback =
+        dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+          ? attendanceCurrent.lastCheckInAt.toDate()
+          : null;
+
+      nextStart[dateKey] = hourNumberToDate(dateKey, stat?.startHour ?? null) || todayFallback;
+      nextEnd[dateKey] = hourNumberToDate(dateKey, stat?.endHour ?? null) || todayFallback;
+      nextAway[dateKey] = Math.max(0, Math.round(Number(stat?.awayMinutes || 0)));
+    }
+
+    return {
+      studyStartByDateKey: nextStart,
+      studyEndByDateKey: nextEnd,
+      awayMinutesByDateKey: nextAway,
+    };
+  }, [dailyStatsMap, today, todayKey, attendanceCurrent]);
+
+  const { studyStartByDateKey, studyEndByDateKey, awayMinutesByDateKey } = rhythmTrendMaps;
 
   const planByDate = useMemo(() => {
     const map: Record<string, PlanBucket> = {};
@@ -664,45 +798,28 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return dailyGrowthData.slice(start, end);
   }, [dailyGrowthData, boundedDailyGrowthWindowIndex]);
 
-  const rhythmDistributionData = useMemo(() => {
-    const DOW = ['월', '화', '수', '목', '금', '토', '일'];
-    const buckets = Array.from({ length: 7 }, (_, idx) => ({
-      label: DOW[idx],
-      startTotal: 0,
-      startCount: 0,
-      endTotal: 0,
-      endCount: 0,
-    }));
-
-    Array.from({ length: 14 }, (_, idx) => format(subDays(today, idx), 'yyyy-MM-dd')).forEach((dateKey) => {
-      const dayData = dailyStatsMap[dateKey];
-      if (!dayData) return;
-      const dow = (new Date(`${dateKey}T12:00:00`).getDay() + 6) % 7;
-      if (typeof dayData.startHour === 'number') {
-        buckets[dow].startTotal += dayData.startHour;
-        buckets[dow].startCount += 1;
-      }
-      if (typeof dayData.endHour === 'number') {
-        buckets[dow].endTotal += dayData.endHour;
-        buckets[dow].endCount += 1;
-      }
+  const startEndTimeTrendData = useMemo(() => {
+    return Array.from({ length: 14 }, (_, idx) => {
+      const day = subDays(today, 13 - idx);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const startDate = studyStartByDateKey[dateKey] || null;
+      const endDate = studyEndByDateKey[dateKey] || null;
+      return {
+        dateLabel: format(day, 'M/d', { locale: ko }),
+        startHour: dateToHourNumber(startDate),
+        endHour: dateToHourNumber(endDate),
+      };
     });
-
-    return buckets.map((bucket) => ({
-      label: bucket.label,
-      startHour: bucket.startCount > 0 ? Number((bucket.startTotal / bucket.startCount).toFixed(1)) : 0,
-      endHour: bucket.endCount > 0 ? Number((bucket.endTotal / bucket.endCount).toFixed(1)) : 0,
-    }));
-  }, [dailyStatsMap]);
+  }, [studyStartByDateKey, studyEndByDateKey]);
 
   const rhythmScoreOnlyTrend = useMemo(() => {
     const dailyRhythm = Array.from({ length: 14 }, (_, idx) => {
       const day = subDays(today, 13 - idx);
       const dateKey = format(day, 'yyyy-MM-dd');
-      const startHour = dailyStatsMap[dateKey]?.startHour;
+      const startTime = studyStartByDateKey[dateKey];
       return {
         dateLabel: format(day, 'M/d', { locale: ko }),
-        rhythmMinutes: typeof startHour === 'number' ? Math.round(startHour * 60) : null as number | null,
+        rhythmMinutes: startTime ? startTime.getHours() * 60 + startTime.getMinutes() : null as number | null,
       };
     });
 
@@ -714,7 +831,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const score = values.length >= 2 ? calculateRhythmScore(values) : values.length === 1 ? 100 : 0;
       return { dateLabel: point.dateLabel, score };
     });
-  }, [dailyStatsMap]);
+  }, [studyStartByDateKey]);
 
   const averageRhythmScore = useMemo(() => {
     const valid = rhythmScoreOnlyTrend.filter((item) => item.score > 0);
@@ -728,10 +845,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const dateKey = format(day, 'yyyy-MM-dd');
       return {
         dateLabel: format(day, 'M/d', { locale: ko }),
-        awayMinutes: Math.max(0, Math.round(Number(dailyStatsMap[dateKey]?.awayMinutes || 0))),
+        awayMinutes: Math.max(0, Math.round(Number(awayMinutesByDateKey[dateKey] || dailyStatsMap[dateKey]?.awayMinutes || 0))),
       };
     });
-  }, [dailyStatsMap]);
+  }, [awayMinutesByDateKey, dailyStatsMap]);
 
   const latestWeeklyLearningGrowthPercent = weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0;
   const latestDailyLearningGrowthPercent = dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0;
@@ -739,6 +856,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const hasDailyGrowthData = dailyGrowthData.some((day) => day.minutes > 0);
   const hasAwayTimeData = awayTimeData.some((day) => day.awayMinutes > 0);
   const hasRhythmScoreOnlyTrend = rhythmScoreOnlyTrend.some((day) => day.score > 0);
+  const hasStartEndTimeData = startEndTimeTrendData.some((day) => day.startHour > 0 || day.endHour > 0);
+  const chartInsights = useMemo(
+    () => ({
+      weekly: buildWeeklyStudyInsight(weeklyGrowthData),
+      daily: buildDailyStudyInsight(dailyGrowthWindowData),
+      rhythm: buildRhythmInsight(rhythmScoreOnlyTrend),
+      startEnd: buildStartEndInsight(
+        startEndTimeTrendData.map((item) => ({
+          startMinutes: Math.round(Number(item.startHour || 0) * 60),
+          endMinutes: Math.round(Number(item.endHour || 0) * 60),
+        }))
+      ),
+      away: buildAwayTimeInsight(awayTimeData),
+    }),
+    [weeklyGrowthData, dailyGrowthWindowData, rhythmScoreOnlyTrend, startEndTimeTrendData, awayTimeData]
+  );
 
   const studyStreakDays = useMemo(() => {
     const seriesMinutesMap = Object.fromEntries(fullSeries.map((item) => [item.dateKey, item.studyMinutes]));
@@ -1039,6 +1172,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         type: logType,
         content: logContent.trim(),
         improvement: logImprovement.trim(),
+        readAt: null,
         createdAt: serverTimestamp(),
       });
       toast({ title: '상담 일지 저장 완료' });
@@ -1133,7 +1267,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const isDataLoading = statsLoading || plansLoading || studyLogLoading;
 
   return (
-    <div className={cn('flex flex-col max-w-7xl mx-auto px-4', isMobile ? 'gap-4 pb-32' : 'gap-6 pb-24')}>
+    <div className={cn('flex flex-col max-w-7xl mx-auto px-4 w-full min-w-0 overflow-x-hidden', isMobile ? 'gap-4 pb-32' : 'gap-6 pb-24')}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-4 min-w-0">
           {!isStudentSelfView && (
@@ -1229,7 +1363,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <CardTitle className="text-base font-black tracking-tight">개인 집중도 KPI</CardTitle>
               <CardDescription className="font-bold text-[11px]">학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <CardContent className={cn("grid gap-2", isMobile ? "grid-cols-1 min-[360px]:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 학습 성장률</p>
                 <p className={cn('mt-1 text-xl font-black tabular-nums', focusKpi.todayGrowthPercent >= 0 ? 'text-emerald-700' : 'text-rose-600')}>
@@ -1254,6 +1388,44 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">학습 리듬 점수</p>
                 <p className="mt-1 text-xl font-black text-violet-700 tabular-nums">{focusKpi.rhythmScore}점</p>
                 <p className="text-[10px] font-semibold text-violet-700/80">공부시간 분산 기반</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-black tracking-tight flex items-center gap-2 text-[#14295F]">
+                <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
+                AI 그래프 인사이트 요약
+              </CardTitle>
+              <CardDescription className="font-bold text-[11px] text-[#31456f]">
+                최근 그래프를 기반으로 성장 흐름과 보완 포인트를 자동 분석했습니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2.5 pt-0">
+              <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">주간 학습시간 성장률</p>
+                <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.weekly.trend}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.weekly.improve}</p>
+              </div>
+              <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">일자별 학습시간</p>
+                <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.daily.trend}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.daily.improve}</p>
+              </div>
+              <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">리듬 점수</p>
+                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.rhythm.trend}</p>
+                </div>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">시작/종료 시각</p>
+                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.startEnd.trend}</p>
+                </div>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">외출시간</p>
+                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.away.trend}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1353,8 +1525,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                {hasRhythmScoreOnlyTrend ? (
-                  <div className="h-[260px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+                <div className="relative h-[260px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+                  <div className="h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
@@ -1375,9 +1547,45 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </RechartsLineChart>
                     </ResponsiveContainer>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">리듬 점수 산출 데이터가 없습니다.</div>
-                )}
+                  {!hasRhythmScoreOnlyTrend && (
+                    <div className="pointer-events-none absolute inset-x-6 bottom-6 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-xs font-bold text-muted-foreground backdrop-blur-sm">
+                      리듬 점수 산출 데이터가 없어 기본 축으로 표시 중입니다.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-black tracking-tight">공부 시작/종료 시각 추이</CardTitle>
+                <CardDescription className="font-bold text-[11px]">최근 14일의 첫 공부 시작 시각과 마지막 종료 시각입니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="relative h-[240px] w-full">
+                  <div className="h-full w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                        <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                        <YAxis tickLine={false} axisLine={false} width={44} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === 'startHour') return [hourToClockLabel(Number(value || 0)), '공부 시작'];
+                            return [hourToClockLabel(Number(value || 0)), '공부 종료'];
+                          }}
+                        />
+                        <Line type="monotone" dataKey="startHour" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: '#0ea5e9' }} />
+                        <Line type="monotone" dataKey="endHour" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3, fill: '#8b5cf6' }} />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {!hasStartEndTimeData && (
+                    <div className="pointer-events-none absolute inset-x-6 bottom-4 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-xs font-bold text-muted-foreground backdrop-blur-sm">
+                      시작/종료 시각 데이터가 없어 기본 축으로 표시 중입니다.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -1387,8 +1595,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <CardDescription className="font-bold text-[11px]">외출시간이 늘어나면 집중도가 떨어집니다.</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
-                {hasAwayTimeData ? (
-                  <div className="h-[240px] w-full">
+                <div className="relative h-[240px] w-full">
+                  <div className="h-full w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={awayTimeData} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
@@ -1400,9 +1608,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">외출시간 데이터가 없습니다.</div>
-                )}
+                  {!hasAwayTimeData && (
+                    <div className="pointer-events-none absolute inset-x-6 bottom-4 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-xs font-bold text-muted-foreground backdrop-blur-sm">
+                      외출시간 데이터가 없어 기본 축으로 표시 중입니다.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1413,89 +1624,170 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <div className="grid gap-4">
                 <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-black tracking-tight">그래프 보기</CardTitle>
-                    <CardDescription className="font-bold text-[11px]">앱 화면에 맞게 버튼을 눌러 그래프를 확인하세요.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0 space-y-3">
-                    <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 min-w-0">
-                      <Button variant={mobileGraphPanel === 'weekly' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'weekly' ? null : 'weekly'))}>주간 성장률</Button>
-                      <Button variant={mobileGraphPanel === 'daily' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'daily' ? null : 'daily'))}>일자별 성장률</Button>
-                      <Button variant={mobileGraphPanel === 'rhythm' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'rhythm' ? null : 'rhythm'))}>리듬 점수</Button>
-                      <Button variant={mobileGraphPanel === 'away' ? 'default' : 'outline'} className="h-9 w-full min-w-0 rounded-xl text-[11px] font-black px-2" onClick={() => setMobileGraphPanel((prev) => (prev === 'away' ? null : 'away'))}>외출시간</Button>
-                    </div>
-
-                    {mobileGraphPanel === null && (
-                      <div className="rounded-xl border border-dashed px-3 py-6 text-center text-[11px] font-bold text-muted-foreground">
-                        위 버튼에서 그래프를 선택하면 표시됩니다.
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base font-black tracking-tight">주간 학습시간 성장률</CardTitle>
+                        <CardDescription className="font-bold text-[11px]">막대: 주간 누적 학습시간 · 선: 전주 대비 성장률</CardDescription>
                       </div>
-                    )}
-
-                    {mobileGraphPanel === 'weekly' && (
-                      <div className="h-[200px] w-full">
+                      <span className={cn("text-sm font-black", latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                        이번 주 {latestWeeklyLearningGrowthPercent >= 0 ? '+' : ''}{latestWeeklyLearningGrowthPercent}%
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {hasWeeklyGrowthData ? (
+                      <div className="h-[240px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                            <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
-                            <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={32} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                            <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={30} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
-                            <Tooltip formatter={(value: number, name: string) => name === 'totalMinutes' ? [minutesToLabel(Number(value || 0)), '누적 학습시간'] : [`${Number(value || 0)}%`, '성장률']} />
-                            <Bar yAxisId="mins" dataKey="totalMinutes" fill="#c7d2fe" radius={[6, 6, 0, 0]} barSize={18} />
+                            <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} />
+                            <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={36} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={32} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                            <Tooltip
+                              formatter={(value: number, name: string) => {
+                                if (name === 'totalMinutes') return [minutesToLabel(Number(value || 0)), '누적 학습시간'];
+                                return [`${Number(value || 0)}%`, '성장률'];
+                              }}
+                            />
+                            <Bar yAxisId="mins" dataKey="totalMinutes" fill="#c7d2fe" radius={[6, 6, 0, 0]} barSize={16} />
                             <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#10b981' }} />
                           </ComposedChart>
                         </ResponsiveContainer>
                       </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">최근 주간 학습 데이터가 없습니다.</div>
                     )}
+                  </CardContent>
+                </Card>
 
-                    {mobileGraphPanel === 'daily' && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-end gap-1 flex-wrap">
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black min-w-0" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] font-black min-w-0" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
-                        </div>
-                        <div className="h-[200px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                              <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
-                              <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={32} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                              <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={30} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
-                              <Tooltip formatter={(value: number, name: string) => name === 'minutes' ? [minutesToLabel(Number(value || 0)), '평균 공부시간'] : [`${Number(value || 0)}%`, '전일 대비 성장률']} />
-                              <Bar yAxisId="mins" dataKey="minutes" fill="#bae6fd" radius={[6, 6, 0, 0]} barSize={14} />
-                              <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 2.5, fill: '#f59e0b' }} />
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </div>
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base font-black tracking-tight">일자별 학습시간 성장률</CardTitle>
+                        <CardDescription className="font-bold text-[11px]">최근 42일 중 7일 단위로 확인합니다.</CardDescription>
                       </div>
-                    )}
-
-                    {mobileGraphPanel === 'rhythm' && (
-                      <div className="h-[200px] w-full rounded-xl border border-slate-100 bg-slate-50/40 p-2">
+                      <span className={cn("text-sm font-black", latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                        최근 7일 {latestDailyLearningGrowthPercent >= 0 ? '+' : ''}{latestDailyLearningGrowthPercent}%
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pt-0">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                    </div>
+                    {hasDailyGrowthData ? (
+                      <div className="h-[240px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <RechartsLineChart data={rhythmScoreOnlyTrend} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
-                            <XAxis dataKey="dateLabel" fontSize={10} axisLine={false} tickLine={false} />
-                            <YAxis fontSize={10} axisLine={false} tickLine={false} width={26} domain={[0, 100]} />
-                            <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
-                            <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#0f172a' }} activeDot={{ r: 4, fill: '#0f172a' }} />
-                          </RechartsLineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-
-                    {mobileGraphPanel === 'away' && (
-                      <div className="h-[200px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={awayTimeData} margin={{ top: 8, right: 6, left: -10, bottom: 0 }}>
+                          <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                            <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
-                            <YAxis tickLine={false} axisLine={false} width={30} tickFormatter={(value) => `${value}m`} />
-                            <Tooltip formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
-                            <Bar dataKey="awayMinutes" fill="#fecaca" radius={[6, 6, 0, 0]} barSize={12} />
-                            <Line type="monotone" dataKey="awayMinutes" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2.5, fill: '#ef4444' }} />
+                            <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} />
+                            <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={36} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={32} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                            <Tooltip
+                              formatter={(value: number, name: string) => {
+                                if (name === 'minutes') return [minutesToLabel(Number(value || 0)), '평균 공부시간'];
+                                return [`${Number(value || 0)}%`, '전일 대비 성장률'];
+                              }}
+                            />
+                            <Bar yAxisId="mins" dataKey="minutes" fill="#bae6fd" radius={[6, 6, 0, 0]} barSize={12} />
+                            <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 2.5, fill: '#f59e0b' }} />
                           </ComposedChart>
                         </ResponsiveContainer>
                       </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm font-bold text-muted-foreground">일자별 학습 데이터가 없습니다.</div>
                     )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base font-black tracking-tight">리듬 점수 그래프</CardTitle>
+                        <CardDescription className="font-bold text-[11px]">학부모 모드와 동일한 리듬 점수 단일 추이 그래프</CardDescription>
+                      </div>
+                      <Badge variant="outline" className="font-black text-[10px]">
+                        평균 {averageRhythmScore}점
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="relative h-[240px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-2.5">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsLineChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                          <XAxis dataKey="dateLabel" fontSize={10} axisLine={false} tickLine={false} />
+                          <YAxis fontSize={10} axisLine={false} tickLine={false} width={26} domain={[0, 100]} />
+                          <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
+                          <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5, fill: '#0f172a' }} activeDot={{ r: 4, fill: '#0f172a' }} />
+                        </RechartsLineChart>
+                      </ResponsiveContainer>
+                      {!hasRhythmScoreOnlyTrend && (
+                        <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-[11px] font-bold text-muted-foreground backdrop-blur-sm">
+                          리듬 점수 산출 데이터가 없어 기본 축으로 표시 중입니다.
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-black tracking-tight">공부 시작/종료 시각 추이</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">최근 14일의 첫 공부 시작 시각과 마지막 종료 시각입니다.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="relative h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 8, right: 8, left: -6, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} />
+                          <YAxis tickLine={false} axisLine={false} width={42} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                          <Tooltip
+                            formatter={(value: number, name: string) => {
+                              if (name === 'startHour') return [hourToClockLabel(Number(value || 0)), '공부 시작'];
+                              return [hourToClockLabel(Number(value || 0)), '공부 종료'];
+                            }}
+                          />
+                          <Line type="monotone" dataKey="startHour" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 2.5, fill: '#0ea5e9' }} />
+                          <Line type="monotone" dataKey="endHour" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 2.5, fill: '#8b5cf6' }} />
+                        </RechartsLineChart>
+                      </ResponsiveContainer>
+                      {!hasStartEndTimeData && (
+                        <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-[11px] font-bold text-muted-foreground backdrop-blur-sm">
+                          시작/종료 시각 데이터가 없어 기본 축으로 표시 중입니다.
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-black tracking-tight">학습 중간 외출시간 추이</CardTitle>
+                    <CardDescription className="font-bold text-[11px]">외출시간이 늘어나면 집중도가 떨어집니다.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="relative h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={awayTimeData} margin={{ top: 8, right: 6, left: -10, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                          <YAxis tickLine={false} axisLine={false} width={30} tickFormatter={(value) => `${value}m`} />
+                          <Tooltip formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
+                          <Bar dataKey="awayMinutes" fill="#fecaca" radius={[6, 6, 0, 0]} barSize={12} />
+                          <Line type="monotone" dataKey="awayMinutes" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2.5, fill: '#ef4444' }} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                      {!hasAwayTimeData && (
+                        <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-lg border border-dashed bg-white/70 px-3 py-2 text-center text-[11px] font-bold text-muted-foreground backdrop-blur-sm">
+                          외출시간 데이터가 없어 기본 축으로 표시 중입니다.
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1504,7 +1796,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
+                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성 점수</span><span>{focusKpi.rhythmScore}점</span></div><Progress value={focusKpi.rhythmScore} className="h-2" /></div>
                     <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
                     <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
                   </CardContent>
@@ -1521,6 +1813,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
                       </div>
                     ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {riskSignals.length === 0 ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">{riskSignals.map((signal) => <Badge key={signal} variant="outline" className="font-black border-rose-200 text-rose-600 bg-rose-50">{signal}</Badge>)}</div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1566,13 +1871,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <CardContent className="pt-0">
                     <div className="h-[280px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
+                        <ComposedChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
                           <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
                           <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
                           <Tooltip content={<CustomTooltip unit="%" />} />
                           <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
-                        </BarChart>
+                          <Line type="monotone" dataKey="completionRate" stroke="#b45309" strokeWidth={2.5} dot={{ r: 3, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} />
+                        </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
@@ -1585,7 +1891,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성</span><span>{rhythmScore}점</span></div><Progress value={rhythmScore} className="h-2" /></div>
+                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성 점수</span><span>{focusKpi.rhythmScore}점</span></div><Progress value={focusKpi.rhythmScore} className="h-2" /></div>
                     <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
                     <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
                   </CardContent>
@@ -1677,6 +1983,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                               <Badge className="border-none bg-[#fff3e9] text-[#ff7a16] font-black text-[9px] h-5 px-2">
                                 한 줄 피드백
                               </Badge>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "font-black text-[9px] h-5 px-1.5",
+                                  feedback.readAt
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                )}
+                              >
+                                {feedback.readAt ? '읽음' : '미확인'}
+                              </Badge>
                               <span className="text-[10px] font-bold text-muted-foreground">
                                 {feedback.createdAt ? format(feedback.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}
                               </span>
@@ -1693,17 +2010,40 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   ) : studentCounselingLogs.length === 0 ? (
                   <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">작성된 상담 일지가 없습니다.</div>
                 ) : (
-                  studentCounselingLogs.slice(0, 10).map((log) => (
+                  studentCounselingLogs.slice(0, 10).map((log) => {
+                    const studentQuestion =
+                      log.studentQuestion?.trim() ||
+                      (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
+                      '';
+                    return (
                     <div key={log.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge className="font-black text-[10px] rounded-full bg-primary text-white">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-black text-[10px] h-5 px-1.5",
+                            log.readAt
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-amber-200 bg-amber-50 text-amber-700"
+                          )}
+                        >
+                          {log.readAt ? '읽음' : '미확인'}
+                        </Badge>
                         <span className="text-xs font-bold text-muted-foreground">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}</span>
                         <span className="text-xs font-bold text-muted-foreground">· {log.teacherName || '담당 선생님'}</span>
                       </div>
+                      {studentQuestion && (
+                        <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2">
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
+                          <p className="text-sm font-bold leading-relaxed text-sky-900 whitespace-pre-wrap">{studentQuestion}</p>
+                        </div>
+                      )}
                       <p className="text-sm font-bold leading-relaxed text-slate-800">{log.content}</p>
                       {log.improvement && <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700">개선 포인트: {log.improvement}</div>}
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </CardContent>
             </Card>
@@ -2107,15 +2447,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </DialogContent>
         </Dialog>
 
+      {!isMobile && (
         <Card className="rounded-[2rem] border-none shadow-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white overflow-hidden">
-        <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
-            <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
-          </div>
-          <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
-        </CardContent>
-      </Card>
+          <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
+              <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
+            </div>
+            <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

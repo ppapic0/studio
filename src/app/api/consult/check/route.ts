@@ -2,38 +2,52 @@ import { NextResponse } from "next/server";
 
 import { adminDb } from "@/lib/firebase-admin";
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const phone = searchParams.get("phone")?.trim();
   const name = searchParams.get("name")?.trim();
+  const normalizedPhone = normalizePhone(phone || "");
 
-  if (!phone || phone.length < 8) {
+  if (!normalizedPhone || normalizedPhone.length < 8) {
     return NextResponse.json({ ok: false, message: "연락처를 입력해주세요." }, { status: 400 });
   }
 
   try {
-    let query = adminDb
-      .collection("marketingConsultRequests")
-      .where("consultPhone", "==", phone)
-      .orderBy("createdAt", "desc")
-      .limit(5);
-
-    if (name) {
-      query = adminDb
+    const runQuery = async (phoneValue: string) => {
+      let query = adminDb
         .collection("marketingConsultRequests")
-        .where("consultPhone", "==", phone)
-        .where("studentName", "==", name)
+        .where("consultPhone", "==", phoneValue)
         .orderBy("createdAt", "desc")
         .limit(5);
-    }
 
-    const snapshot = await query.get();
+      if (name) {
+        query = adminDb
+          .collection("marketingConsultRequests")
+          .where("consultPhone", "==", phoneValue)
+          .where("studentName", "==", name)
+          .orderBy("createdAt", "desc")
+          .limit(5);
+      }
 
-    if (snapshot.empty) {
+      return query.get();
+    };
+
+    const snapshots = await Promise.all(
+      Array.from(new Set([phone, normalizedPhone].filter((value): value is string => !!value))).map(runQuery),
+    );
+
+    const docs = snapshots.flatMap((snapshot) => snapshot.docs);
+    const uniqueDocs = Array.from(new Map(docs.map((doc) => [doc.id, doc])).values()).slice(0, 5);
+
+    if (uniqueDocs.length === 0) {
       return NextResponse.json({ ok: true, results: [] });
     }
 
-    const results = snapshot.docs.map((doc) => {
+    const results = uniqueDocs.map((doc) => {
       const d = doc.data();
       return {
         receiptId: d.receiptId as string,

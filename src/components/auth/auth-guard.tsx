@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/experience', '/class', '/lp']);
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading: userLoading } = useUser();
+  const { user, isUserLoading: userLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);

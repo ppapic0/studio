@@ -32,6 +32,15 @@ export function BottomNav() {
   const activeParentTab = searchParams.get('parentTab') || 'home';
   const useBrandNav = isParent || isMobileMode;
 
+  const adminNavItems = [
+    { href: '/dashboard', label: '운영', icon: LayoutDashboard },
+    { href: '/dashboard/teacher', label: '교실', icon: Monitor },
+    { href: '/dashboard/reports', label: '리포트', icon: FileText },
+    { href: '/dashboard/leads', label: '리드DB', icon: Megaphone },
+    { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
+    { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
+  ] as const;
+
   const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
     student: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
@@ -51,18 +60,12 @@ export function BottomNav() {
     parent: [
       { href: '/dashboard?parentTab=home', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard?parentTab=studyDetail', label: '학습', icon: History },
-      { href: '/dashboard?parentTab=data', label: '데이터', icon: FileText },
+      { href: '/dashboard?parentTab=data', label: '학습분석', icon: FileText },
       { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
       { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
     ],
-    centerAdmin: [
-      { href: '/dashboard', label: '운영', icon: LayoutDashboard },
-      { href: '/dashboard/teacher', label: '교실', icon: Monitor },
-      { href: '/dashboard/reports', label: '리포트', icon: FileText },
-      { href: '/dashboard/leads', label: '리드DB', icon: Megaphone },
-      { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
-      { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
-    ],
+    centerAdmin: [...adminNavItems],
+    owner: [...adminNavItems],
   };
 
   const currentNav = navItems[role] || [];

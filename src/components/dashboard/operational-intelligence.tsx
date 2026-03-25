@@ -10,6 +10,7 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   AttendanceCurrent,
+  CounselingReservation,
   CenterMembership,
   PaymentRecord,
   StudentProfile,
@@ -40,6 +41,9 @@ import {
 import { eachDayOfInterval, format, subDays } from 'date-fns';
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
+type LeadRecord = { createdAt?: TimestampLike };
+
+const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
 function toDateSafe(value: TimestampLike): Date | null {
   if (!value) return null;
@@ -57,6 +61,15 @@ function toDateSafe(value: TimestampLike): Date | null {
 
 function createEmptyHourBuckets() {
   return Array.from({ length: 24 }, () => 0);
+}
+
+function createEmptyWeekdayBuckets() {
+  return Array.from({ length: 7 }, () => 0);
+}
+
+function toWeekdayIndex(date: Date) {
+  const day = date.getDay();
+  return day === 0 ? 6 : day - 1; // Monday-first
 }
 
 function addMinutesToHourBuckets(buckets: number[], start: Date, end: Date) {
@@ -121,6 +134,36 @@ export function OperationalIntelligence() {
     );
   }, [firestore, centerId]);
   const { data: payments, isLoading: paymentsLoading } = useCollection<PaymentRecord>(paymentsQuery);
+
+  const counselingQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingReservations'),
+      orderBy('scheduledAt', 'desc'),
+      limit(1200)
+    );
+  }, [firestore, centerId]);
+  const { data: counselingReservations, isLoading: counselingLoading } = useCollection<CounselingReservation>(counselingQuery);
+
+  const consultingLeadsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'consultingLeads'),
+      orderBy('createdAt', 'desc'),
+      limit(1200)
+    );
+  }, [firestore, centerId]);
+  const { data: consultingLeads, isLoading: consultingLeadsLoading } = useCollection<LeadRecord>(consultingLeadsQuery);
+
+  const websiteConsultQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'websiteConsultRequests'),
+      orderBy('createdAt', 'desc'),
+      limit(1200)
+    );
+  }, [firestore, centerId]);
+  const { data: websiteConsultRequests, isLoading: websiteConsultLoading } = useCollection<LeadRecord>(websiteConsultQuery);
 
   const [studyMinutesByStudent, setStudyMinutesByStudent] = useState<Record<string, number>>({});
   const [dailyStudyMinutesByDate, setDailyStudyMinutesByDate] = useState<Record<string, number>>({});
@@ -346,6 +389,64 @@ export function OperationalIntelligence() {
     const prevStudyRatio = studyRatioTrend[studyRatioTrend.length - 2]?.ratio ?? 0;
     const studyTrendDelta = lastStudyRatio - prevStudyRatio;
 
+    const recentPatternStart = subDays(now, 59);
+    const consultationHourBuckets = createEmptyHourBuckets();
+    const consultationWeekdayBuckets = createEmptyWeekdayBuckets();
+
+    (counselingReservations || []).forEach((reservation) => {
+      const when = toDateSafe(reservation.scheduledAt as TimestampLike);
+      if (!when || when < recentPatternStart) return;
+      consultationHourBuckets[when.getHours()] += 1;
+      consultationWeekdayBuckets[toWeekdayIndex(when)] += 1;
+    });
+
+    const leadHourBuckets = createEmptyHourBuckets();
+    const leadWeekdayBuckets = createEmptyWeekdayBuckets();
+    const leadEvents = [...(consultingLeads || []), ...(websiteConsultRequests || [])];
+    leadEvents.forEach((lead) => {
+      const when = toDateSafe(lead.createdAt as TimestampLike);
+      if (!when || when < recentPatternStart) return;
+      leadHourBuckets[when.getHours()] += 1;
+      leadWeekdayBuckets[toWeekdayIndex(when)] += 1;
+    });
+
+    const consultationByHour = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      label: `${String(hour).padStart(2, '0')}시`,
+      count: consultationHourBuckets[hour] || 0,
+    }));
+    const leadByHour = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      label: `${String(hour).padStart(2, '0')}시`,
+      count: leadHourBuckets[hour] || 0,
+    }));
+
+    const consultationByWeekday = WEEKDAY_LABELS.map((label, index) => ({
+      weekday: label,
+      count: consultationWeekdayBuckets[index] || 0,
+    }));
+    const leadByWeekday = WEEKDAY_LABELS.map((label, index) => ({
+      weekday: label,
+      count: leadWeekdayBuckets[index] || 0,
+    }));
+
+    const consultationPeakHour = consultationByHour.reduce(
+      (best, row) => (row.count > best.count ? row : best),
+      consultationByHour[0]
+    );
+    const consultationPeakWeekday = consultationByWeekday.reduce(
+      (best, row) => (row.count > best.count ? row : best),
+      consultationByWeekday[0]
+    );
+    const leadPeakHour = leadByHour.reduce(
+      (best, row) => (row.count > best.count ? row : best),
+      leadByHour[0]
+    );
+    const leadPeakWeekday = leadByWeekday.reduce(
+      (best, row) => (row.count > best.count ? row : best),
+      leadByWeekday[0]
+    );
+
     return {
       studentTeacherRatio,
       currentOccupancyRate,
@@ -362,10 +463,38 @@ export function OperationalIntelligence() {
       averageTargetMinutes: Math.round(averageTargetMinutes),
       studyRatioTrend,
       studyTrendDelta,
+      consultationByHour,
+      consultationByWeekday,
+      leadByHour,
+      leadByWeekday,
+      consultationPeakHour,
+      consultationPeakWeekday,
+      leadPeakHour,
+      leadPeakWeekday,
+      consultationTotal: consultationByHour.reduce((sum, row) => sum + row.count, 0),
+      leadTotal: leadByHour.reduce((sum, row) => sum + row.count, 0),
     };
-  }, [allMembers, attendanceList, dailyStudyMinutesByDate, payments, studyMinutesByStudent, studentProfiles, todaySessionMinutesByHour]);
+  }, [
+    allMembers,
+    attendanceList,
+    dailyStudyMinutesByDate,
+    payments,
+    studyMinutesByStudent,
+    studentProfiles,
+    todaySessionMinutesByHour,
+    counselingReservations,
+    consultingLeads,
+    websiteConsultRequests,
+  ]);
 
-  const isLoading = membersLoading || attendanceLoading || studentsLoading || paymentsLoading || analyticsLoading;
+  const isLoading =
+    membersLoading ||
+    attendanceLoading ||
+    studentsLoading ||
+    paymentsLoading ||
+    counselingLoading ||
+    consultingLeadsLoading ||
+    websiteConsultLoading;
 
   if (isLoading) {
     return (
@@ -382,6 +511,11 @@ export function OperationalIntelligence() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {analyticsLoading && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-xs font-bold text-blue-700">
+          학습 세부 지표를 추가 계산 중입니다. 주요 운영 지표는 먼저 표시됩니다.
+        </div>
+      )}
       <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
         <Card className="rounded-[2.5rem] border-none shadow-xl bg-white text-[#14295F] p-8 relative overflow-hidden ring-1 ring-[#14295F]/15">
           <Armchair className="absolute -right-4 -top-4 h-40 w-40 opacity-10" />
@@ -453,6 +587,112 @@ export function OperationalIntelligence() {
           <p className="text-[11px] font-bold text-muted-foreground mt-3">
             평균 {opsMetrics.averageDailyStudyMinutes}분 / 목표 {opsMetrics.averageTargetMinutes}분
           </p>
+        </Card>
+      </section>
+
+      <section className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
+        <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
+          <CardHeader className="bg-blue-50/30 border-b p-8">
+            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
+              <Clock3 className="h-6 w-6 text-blue-600" /> 시간대별 상담 현황
+            </CardTitle>
+            <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
+              최근 60일 / 상담 예약 기준
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 p-8">
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-black tracking-widest text-blue-700/70">총 상담</p>
+                <p className="dashboard-number mt-1 text-2xl text-blue-700">{opsMetrics.consultationTotal}</p>
+              </div>
+              <div className="col-span-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-black tracking-widest text-blue-700/70">피크 구간</p>
+                <p className="mt-1 text-sm font-black text-blue-900">
+                  요일: {opsMetrics.consultationPeakWeekday.weekday}요일 · 시간: {opsMetrics.consultationPeakHour.label}
+                </p>
+              </div>
+            </div>
+
+            <div className="h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={opsMetrics.consultationByWeekday} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eff6ff" />
+                  <XAxis dataKey="weekday" axisLine={false} tickLine={false} fontSize={11} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <Tooltip formatter={(value: number) => [`${value}건`, '상담']} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} barSize={22} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={opsMetrics.consultationByHour} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eff6ff" />
+                  <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    fontSize={10}
+                    interval={2}
+                  />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <Tooltip formatter={(value: number) => [`${value}건`, '상담']} />
+                  <Bar dataKey="count" fill="#60a5fa" radius={[6, 6, 0, 0]} barSize={8} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
+          <CardHeader className="bg-orange-50/30 border-b p-8">
+            <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
+              <BarChart3 className="h-6 w-6 text-orange-500" /> 시간대별 리드DB 등록
+            </CardTitle>
+            <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-60">
+              최근 60일 / 리드 + 웹상담 접수
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 p-8">
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-black tracking-widest text-orange-700/70">총 등록</p>
+                <p className="dashboard-number mt-1 text-2xl text-orange-700">{opsMetrics.leadTotal}</p>
+              </div>
+              <div className="col-span-2 rounded-xl border border-orange-100 bg-orange-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-black tracking-widest text-orange-700/70">피크 구간</p>
+                <p className="mt-1 text-sm font-black text-orange-900">
+                  요일: {opsMetrics.leadPeakWeekday.weekday}요일 · 시간: {opsMetrics.leadPeakHour.label}
+                </p>
+              </div>
+            </div>
+
+            <div className="h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={opsMetrics.leadByWeekday} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fff7ed" />
+                  <XAxis dataKey="weekday" axisLine={false} tickLine={false} fontSize={11} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <Tooltip formatter={(value: number) => [`${value}건`, '리드 등록']} />
+                  <Bar dataKey="count" fill="#f97316" radius={[8, 8, 0, 0]} barSize={22} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={opsMetrics.leadByHour} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fff7ed" />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={10} interval={2} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <Tooltip formatter={(value: number) => [`${value}건`, '리드 등록']} />
+                  <Bar dataKey="count" fill="#fb923c" radius={[6, 6, 0, 0]} barSize={8} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
         </Card>
       </section>
 

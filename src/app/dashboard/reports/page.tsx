@@ -51,6 +51,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generateDailyReport } from '@/ai/flows/generate-daily-report';
 import { sendKakaoNotification } from '@/lib/kakao-service';
+import { parseDateInputValue } from '@/lib/dashboard-access';
+import { toDateSafe } from '@/lib/attendance-auto';
 
 export default function DailyReportsPage() {
   const { user } = useUser();
@@ -62,10 +64,10 @@ export default function DailyReportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // 초기 날짜를 어제로 즉시 설정하여 로딩 지연 방지
-  const [selectedDate, setSelectedDate] = useState<Date>(() => subDays(new Date(), 1));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => subDays(new Date(), 1));
 
-  const dateKey = format(selectedDate, 'yyyy-MM-dd');
-  const weekKey = format(selectedDate, "yyyy-'W'II");
+  const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const centerId = activeMembership?.id;
 
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
@@ -73,7 +75,26 @@ export default function DailyReportsPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [reportContent, setReportContent] = useState('');
   const [teacherNote, setTeacherNote] = useState('');
+  const [aiReportMeta, setAiReportMeta] = useState<null | {
+    teacherOneLiner: string;
+    strengths: string[];
+    improvements: string[];
+    metrics: {
+      growthRate: number;
+      deltaMinutesFromAvg: number;
+      avg7StudyMinutes: number;
+      isNewRecord: boolean;
+      alertLow: boolean;
+      streakBadge: boolean;
+      trendSummary: string;
+    };
+  }>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const formatTimestampLabel = (value: unknown, fallback: string) => {
+    const parsed = toDateSafe(value);
+    return parsed ? format(parsed, 'HH:mm') : fallback;
+  };
 
   // 재원생(active)이면서 역할이 student인 멤버만 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -103,7 +124,8 @@ export default function DailyReportsPage() {
     setSelectedStudent({ id: studentId, name: studentName });
     const existing = dailyReports?.find(r => r.studentId === studentId);
     setReportContent(existing?.content || '');
-    setTeacherNote('');
+    setTeacherNote(existing?.teacherNote || '');
+    setAiReportMeta(existing?.aiMeta || null);
     setIsWriteModalOpen(true);
   };
 
@@ -152,6 +174,12 @@ export default function DailyReportsPage() {
 
       const result = await generateDailyReport(aiInput);
       setReportContent(result.content);
+      setAiReportMeta({
+        teacherOneLiner: result.teacherOneLiner,
+        strengths: result.strengths,
+        improvements: result.improvements,
+        metrics: result.metrics,
+      });
       toast({ title: `인공지능 리포트 생성 완료 (진단: Lv.${result.level})` });
     } catch (e: any) {
       toast({ 
@@ -177,6 +205,8 @@ export default function DailyReportsPage() {
         teacherId: user.uid,
         dateKey,
         content: reportContent,
+        teacherNote: teacherNote.trim() || null,
+        aiMeta: aiReportMeta || null,
         status,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
@@ -217,7 +247,7 @@ export default function DailyReportsPage() {
             <Input 
               type="date" 
               value={dateKey}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+              onChange={(e) => setSelectedDate(parseDateInputValue(e.target.value))}
               className={cn("font-black rounded-[1.25rem] shadow-sm border-2 pl-11 focus-visible:ring-primary/20 transition-all", isMobile ? "h-12 w-full text-sm" : "h-14 w-[200px]")}
             />
           </div>
@@ -316,14 +346,22 @@ export default function DailyReportsPage() {
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-3xl")}>{student.displayName}</h3>
+                            {report?.viewedAt && (
+                              <Badge className="bg-blue-500/10 text-blue-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">읽음 확인</Badge>
+                            )}
                             {isSent && (
                               <Badge className="bg-emerald-500/10 text-emerald-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">발송 완료</Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap">
                             <p className="font-bold text-muted-foreground/60 text-[10px] sm:text-xs">
-                              {report ? `최종 수정: ${format((report.updatedAt as any).toDate(), 'HH:mm')}` : "아직 작성 전"}
+                              {report ? `최종 수정: ${formatTimestampLabel(report.updatedAt, '시간 미확정')}` : "아직 작성 전"}
                             </p>
+                            {report?.viewedAt && (
+                              <p className="font-bold text-emerald-600/80 text-[10px] sm:text-xs">
+                                {`열람: ${(report.viewedByName || '학생')} · ${formatTimestampLabel(report.viewedAt, '시간 미확정')}`}
+                              </p>
+                            )}
                             {report?.status === 'draft' && (
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                             )}

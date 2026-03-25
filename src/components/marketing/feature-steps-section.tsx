@@ -156,9 +156,10 @@ export function FeatureStepsSection() {
               입실 시간, 공부 흐름, 쉬는 구간까지 구조화된 일과를 운영합니다. 좌석 제공이 아닌 공부습관 완성이 목표입니다.
             </p>
             <div className="mt-4 rounded-xl border border-[#14295F]/8 bg-[#14295F]/4 px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-[13px] font-black text-[#14295F]">매일 오전 8:30</p>
-                <p className="mt-0.5 text-[11px] font-semibold text-slate-400">운영 시작</p>
+              <div className="pr-2">
+                <p className="text-[12px] font-black leading-[1.45] text-[#14295F] break-keep">
+                  학기중 오후 5:00 ~ 다음날 오전 1:00 · 방학중 오전 8:30 ~ 다음날 오전 1:00 · N수생 별도 운영시간 운영
+                </p>
               </div>
               <ArrowRight className="h-4 w-4 text-[#14295F]/30 group-hover:text-[#14295F]/60 group-hover:translate-x-0.5 transition-all" />
             </div>

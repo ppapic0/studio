@@ -60,7 +60,7 @@ export function AppointmentNotifier() {
     });
 
     return () => unsubscribe();
-  }, [firestore, user, activeMembership]);
+  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   if (!notification) return null;
 

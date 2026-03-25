@@ -1,230 +1,663 @@
 import Link from 'next/link';
-import { Activity, AlertTriangle, CheckCircle2, LineChart, MessageSquare } from 'lucide-react';
+import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowRight, BarChart3, Clock3, LineChart } from 'lucide-react';
 
-import { SectionHeading } from './section-heading';
+type Point = {
+  x: number;
+  y: number;
+};
 
-function MiniStat({
-  label,
-  value,
-  note,
-  accent,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  accent: 'blue' | 'green' | 'orange' | 'rose';
-}) {
-  const accentMap = {
-    blue: 'bg-[#2F63E3]',
-    green: 'bg-emerald-500',
-    orange: 'bg-amber-500',
-    rose: 'bg-rose-500',
+type ChartConfig = {
+  width: number;
+  height: number;
+  padLeft: number;
+  padRight: number;
+  padTop: number;
+  padBottom: number;
+  min: number;
+  max: number;
+};
+
+type LegendTone = 'navy' | 'orange' | 'green' | 'violet' | 'rose';
+
+const chartLabels = ['3/2', '3/4', '3/6', '3/8', '3/10', '3/12', '3/14', '3/16'];
+
+const overviewStudyHours = [5.4, 5.9, 6.5, 7.4, 8.3, 9.6, 10.8, 11.1];
+const overviewGoalRates = [61, 64, 67, 74, 79, 86, 90, 93];
+
+const growthHours = [3.1, 4.0, 5.2, 4.8, 6.3, 7.1, 7.5, 7.8];
+const growthRates = [8, 14, 23, 18, 31, 40, 44, 46];
+
+const rhythmScores = [74, 77, 83, 81, 87, 90, 89, 92];
+const studyStartTimes = [9.1, 8.8, 8.7, 8.5, 8.4, 8.3, 8.2, 8.2];
+const studyEndTimes = [23.2, 23.1, 23.1, 23.0, 23.0, 22.9, 23.0, 22.9];
+const breakMinutes = [0.6, 0.3, 2.4, 0.2, 0.2, 0.1, 0.1, 0.1];
+
+const heroMetrics = [
+  {
+    label: '주간 누적 학습',
+    value: '14시간 23분',
+    detail: '최근 7일 기준',
+    tone: 'navy' as const,
+  },
+  {
+    label: '평균 목표 달성률',
+    value: '93%',
+    detail: '후반부 안정화',
+    tone: 'orange' as const,
+  },
+  {
+    label: '리듬 안정도',
+    value: '91점',
+    detail: '상위권 유지',
+    tone: 'green' as const,
+  },
+];
+
+const LARGE_CHART: ChartConfig = {
+  width: 720,
+  height: 292,
+  padLeft: 28,
+  padRight: 28,
+  padTop: 24,
+  padBottom: 42,
+  min: 0,
+  max: 100,
+};
+
+const MINI_CHART: ChartConfig = {
+  width: 520,
+  height: 220,
+  padLeft: 28,
+  padRight: 22,
+  padTop: 22,
+  padBottom: 34,
+  min: 0,
+  max: 100,
+};
+
+function getPlotBottom(config: ChartConfig) {
+  return config.height - config.padBottom;
+}
+
+function getPlotRight(config: ChartConfig) {
+  return config.width - config.padRight;
+}
+
+function getSeriesPoints(values: number[], config: ChartConfig): Point[] {
+  const plotWidth = getPlotRight(config) - config.padLeft;
+  const plotHeight = getPlotBottom(config) - config.padTop;
+  const lastIndex = Math.max(values.length - 1, 1);
+
+  return values.map((value, index) => ({
+    x: config.padLeft + (plotWidth / lastIndex) * index,
+    y:
+      config.padTop +
+      plotHeight -
+      ((value - config.min) / (config.max - config.min || 1)) * plotHeight,
+  }));
+}
+
+function toPolyline(points: Point[]) {
+  return points.map(({ x, y }) => `${x},${y}`).join(' ');
+}
+
+function toAreaPolygon(points: Point[], baseline: number) {
+  if (!points.length) return '';
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+  return `${toPolyline(points)} ${last.x},${baseline} ${first.x},${baseline}`;
+}
+
+function formatHourLabel(value: number) {
+  const wholeHour = Math.floor(value);
+  const minutes = Math.round((value - wholeHour) * 60);
+  return `${String(wholeHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function ChartLegend({ label, tone }: { label: string; tone: LegendTone }) {
+  const toneClassMap: Record<LegendTone, string> = {
+    navy: 'bg-[#EEF3FF] text-[#14295F]',
+    orange: 'bg-[#FFF3E8] text-[#B55200]',
+    green: 'bg-[#EEF9F5] text-[#0C8F69]',
+    violet: 'bg-[#F4EEFF] text-[#6D44C5]',
+    rose: 'bg-[#FFF1F4] text-[#C43E68]',
   };
 
   return (
-    <article className="relative overflow-hidden rounded-3xl border border-[#14295F]/10 bg-white p-4 shadow-[0_10px_26px_rgba(20,41,95,0.09)]">
-      <span className={`absolute right-4 top-4 h-5 w-5 rounded-full ${accentMap[accent]}`} />
-      <p className="text-[11px] font-black tracking-[0.14em] text-[#14295F]/45">{label}</p>
-      <p className="dashboard-number mt-2 text-[2rem] leading-none text-[#14295F]">{value}</p>
-      <p className="mt-1 text-[11px] font-bold text-[#14295F]/55">{note}</p>
+    <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black ${toneClassMap[tone]}`}>
+      {label}
+    </span>
+  );
+}
+
+function DataBadge({ label, tone = 'navy' }: { label: string; tone?: LegendTone }) {
+  const toneClassMap: Record<LegendTone, string> = {
+    navy: 'border-[#14295F]/10 bg-[#F3F7FF] text-[#425A75]',
+    orange: 'border-[#FF7A16]/16 bg-[#FFF5EC] text-[#B55200]',
+    green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    violet: 'border-violet-200 bg-violet-50 text-violet-700',
+    rose: 'border-rose-200 bg-rose-50 text-rose-700',
+  };
+
+  return (
+    <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black ${toneClassMap[tone]}`}>
+      {label}
+    </span>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: LegendTone;
+}) {
+  const toneClassMap: Record<LegendTone, string> = {
+    navy: 'border-[#14295F]/10 bg-[#F7FAFF]',
+    orange: 'border-[#FF7A16]/14 bg-[#FFF7F0]',
+    green: 'border-emerald-200 bg-[#F4FBF8]',
+    violet: 'border-violet-200 bg-violet-50',
+    rose: 'border-rose-200 bg-rose-50',
+  };
+
+  return (
+    <article className={`rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_20px_rgba(20,41,95,0.04)] ${toneClassMap[tone]}`}>
+      <p className="text-[11px] font-black text-[#4D627A]">{label}</p>
+      <p className="dashboard-number mt-2 text-[1.7rem] text-[#14295F]">{value}</p>
+      <p className="mt-1.5 text-[11px] font-bold text-[#5A6E85]">{detail}</p>
     </article>
   );
 }
 
-function TrendLine() {
+function ChartPanel({
+  icon: Icon,
+  title,
+  description,
+  badge,
+  legend,
+  footer,
+  children,
+  className = '',
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  badge: ReactNode;
+  legend?: ReactNode;
+  footer: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <svg viewBox="0 0 620 260" className="h-[230px] w-full">
-      {[0, 1, 2, 3].map((i) => (
-        <line
-          key={i}
-          x1="0"
-          y1={20 + i * 60}
-          x2="620"
-          y2={20 + i * 60}
-          stroke="rgba(20,41,95,0.09)"
-          strokeDasharray="4 6"
-        />
-      ))}
-      <polyline
-        fill="none"
-        stroke="rgba(20,41,95,0.2)"
-        strokeWidth="11"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points="8,238 70,238 126,238 180,236 228,112 276,88 322,138 366,72 410,198 460,56 508,144 560,226 612,246"
-      />
+    <article
+      className={`rounded-[1.55rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:p-6 ${className}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 shrink-0 text-[#14295F]" />
+            <h3 className="break-keep text-[1.05rem] font-black text-[#14295F] sm:text-[1.15rem]">{title}</h3>
+          </div>
+          <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.7] text-[#50657D]">{description}</p>
+        </div>
+        {badge}
+      </div>
+
+      {legend ? <div className="mt-4 flex flex-wrap gap-2">{legend}</div> : null}
+
+      <div className="mt-4">{children}</div>
+
+      <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-4 py-3">
+        <p className="break-keep text-[12.5px] font-semibold leading-[1.65] text-[#425A75]">{footer}</p>
+      </div>
+    </article>
+  );
+}
+
+function OverviewTrendChart() {
+  const studyConfig = { ...LARGE_CHART, min: 4.5, max: 12 };
+  const rateConfig = { ...LARGE_CHART, min: 55, max: 95 };
+  const studyPoints = getSeriesPoints(overviewStudyHours, studyConfig);
+  const goalPoints = getSeriesPoints(overviewGoalRates, rateConfig);
+  const baseline = getPlotBottom(LARGE_CHART);
+
+  return (
+    <svg viewBox={`0 0 ${LARGE_CHART.width} ${LARGE_CHART.height}`} className="h-[245px] w-full sm:h-[270px]" aria-hidden="true">
+      {[0, 1, 2, 3].map((index) => {
+        const y =
+          LARGE_CHART.padTop +
+          index * ((getPlotBottom(LARGE_CHART) - LARGE_CHART.padTop) / 3);
+        return (
+          <line
+            key={index}
+            x1={LARGE_CHART.padLeft}
+            y1={y}
+            x2={getPlotRight(LARGE_CHART)}
+            y2={y}
+            stroke="rgba(20,41,95,0.10)"
+            strokeDasharray="4 8"
+          />
+        );
+      })}
+
+      <polygon points={toAreaPolygon(studyPoints, baseline)} fill="rgba(20,41,95,0.05)" />
+
       <polyline
         fill="none"
         stroke="#14295F"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
-        points="8,238 70,238 126,238 180,236 228,112 276,88 322,138 366,72 410,198 460,56 508,144 560,226 612,246"
+        points={toPolyline(studyPoints)}
       />
+      <polyline
+        fill="none"
+        stroke="#FF7A16"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(goalPoints)}
+      />
+
+      {studyPoints.map((point) => (
+        <circle key={`study-${point.x}`} cx={point.x} cy={point.y} r="4.5" fill="#14295F" />
+      ))}
+      {goalPoints.map((point) => (
+        <circle key={`goal-${point.x}`} cx={point.x} cy={point.y} r="4.5" fill="#FF7A16" />
+      ))}
+
+      {chartLabels.map((label, index) => (
+        <text
+          key={label}
+          x={studyPoints[index]?.x ?? LARGE_CHART.padLeft}
+          y={LARGE_CHART.height - 12}
+          textAnchor="middle"
+          fontSize="12"
+          fontWeight="700"
+          fill="#51667D"
+        >
+          {label}
+        </text>
+      ))}
     </svg>
   );
 }
 
-function CompletionBars() {
+function WeeklyGrowthChart() {
+  const barConfig = { ...MINI_CHART, min: 0, max: 8.5 };
+  const lineConfig = { ...MINI_CHART, min: 0, max: 50 };
+  const barPoints = getSeriesPoints(growthHours, barConfig);
+  const linePoints = getSeriesPoints(growthRates, lineConfig);
+  const baseline = getPlotBottom(MINI_CHART);
+
   return (
-    <div className="flex h-[230px] items-end gap-2 rounded-2xl border border-[#14295F]/8 bg-[#FBFCFF] px-4 pb-4 pt-6">
-      {[
-        { day: '3/2', v: 0 },
-        { day: '3/3', v: 0 },
-        { day: '3/4', v: 0 },
-        { day: '3/5', v: 0 },
-        { day: '3/6', v: 0 },
-        { day: '3/7', v: 0 },
-        { day: '3/8', v: 0 },
-        { day: '3/9', v: 0 },
-        { day: '3/10', v: 76 },
-        { day: '3/11', v: 0 },
-        { day: '3/12', v: 0 },
-        { day: '3/13', v: 0 },
-      ].map((item) => (
-        <div key={item.day} className="flex flex-1 flex-col items-center justify-end gap-2">
-          <div className="w-full rounded-t-lg bg-[#F2F4FA]">
-            <div
-              className="w-full rounded-t-lg bg-[linear-gradient(180deg,#FFB24E_0%,#FF8A00_100%)]"
-              style={{ height: `${Math.max(item.v, 2)}px` }}
-            />
-          </div>
-          <span className="text-[10px] font-black text-[#14295F]/45">{item.day}</span>
-        </div>
+    <svg viewBox={`0 0 ${MINI_CHART.width} ${MINI_CHART.height}`} className="h-[200px] w-full" aria-hidden="true">
+      {[0, 1, 2, 3].map((index) => {
+        const y = MINI_CHART.padTop + index * ((baseline - MINI_CHART.padTop) / 3);
+        return (
+          <line
+            key={index}
+            x1={MINI_CHART.padLeft}
+            y1={y}
+            x2={getPlotRight(MINI_CHART)}
+            y2={y}
+            stroke="rgba(20,41,95,0.09)"
+            strokeDasharray="4 8"
+          />
+        );
+      })}
+
+      {barPoints.map((point, index) => {
+        const barWidth = 28;
+        return (
+          <rect
+            key={`bar-${chartLabels[index]}`}
+            x={point.x - barWidth / 2}
+            y={point.y}
+            width={barWidth}
+            height={baseline - point.y}
+            rx="8"
+            fill="rgba(93, 148, 255, 0.32)"
+          />
+        );
+      })}
+
+      <polyline
+        fill="none"
+        stroke="#18B88A"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(linePoints)}
+      />
+
+      {linePoints.map((point) => (
+        <circle key={`growth-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#18B88A" />
       ))}
-    </div>
+
+      {chartLabels.map((label, index) => (
+        <text
+          key={label}
+          x={barPoints[index]?.x ?? MINI_CHART.padLeft}
+          y={MINI_CHART.height - 10}
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="700"
+          fill="#5B7087"
+        >
+          {label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function RhythmChart() {
+  const rhythmConfig = { ...MINI_CHART, min: 68, max: 96 };
+  const rhythmPoints = getSeriesPoints(rhythmScores, rhythmConfig);
+  const baseline = getPlotBottom(MINI_CHART);
+
+  return (
+    <svg viewBox={`0 0 ${MINI_CHART.width} ${MINI_CHART.height}`} className="h-[200px] w-full" aria-hidden="true">
+      {[0, 1, 2, 3].map((index) => {
+        const y = MINI_CHART.padTop + index * ((baseline - MINI_CHART.padTop) / 3);
+        return (
+          <line
+            key={index}
+            x1={MINI_CHART.padLeft}
+            y1={y}
+            x2={getPlotRight(MINI_CHART)}
+            y2={y}
+            stroke="rgba(20,41,95,0.08)"
+            strokeDasharray="4 8"
+          />
+        );
+      })}
+
+      <polygon points={toAreaPolygon(rhythmPoints, baseline)} fill="rgba(31, 179, 138, 0.10)" />
+      <polyline
+        fill="none"
+        stroke="#18B88A"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(rhythmPoints)}
+      />
+
+      {rhythmPoints.map((point) => (
+        <circle key={`rhythm-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#18B88A" />
+      ))}
+
+      {chartLabels.map((label, index) => (
+        <text
+          key={label}
+          x={rhythmPoints[index]?.x ?? MINI_CHART.padLeft}
+          y={MINI_CHART.height - 10}
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="700"
+          fill="#5B7087"
+        >
+          {label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function StudyWindowChart() {
+  const timeConfig = { ...MINI_CHART, padLeft: 52, min: 8, max: 24 };
+  const startPoints = getSeriesPoints(studyStartTimes, timeConfig);
+  const endPoints = getSeriesPoints(studyEndTimes, timeConfig);
+  const baseline = getPlotBottom(timeConfig);
+  const yTicks = [8, 12, 16, 20, 24];
+
+  return (
+    <svg viewBox={`0 0 ${timeConfig.width} ${timeConfig.height}`} className="h-[200px] w-full" aria-hidden="true">
+      {yTicks.map((tick) => {
+        const [{ y }] = getSeriesPoints([tick], { ...timeConfig, padRight: timeConfig.width - timeConfig.padLeft });
+        return (
+          <g key={tick}>
+            <line
+              x1={timeConfig.padLeft}
+              y1={y}
+              x2={getPlotRight(timeConfig)}
+              y2={y}
+              stroke="rgba(20,41,95,0.08)"
+              strokeDasharray="4 8"
+            />
+            <text x="8" y={y + 4} fontSize="11" fontWeight="700" fill="#5B7087">
+              {formatHourLabel(tick)}
+            </text>
+          </g>
+        );
+      })}
+
+      <polyline
+        fill="none"
+        stroke="#3292FF"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(startPoints)}
+      />
+      <polyline
+        fill="none"
+        stroke="#8B5CF6"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(endPoints)}
+      />
+
+      {startPoints.map((point) => (
+        <circle key={`start-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#3292FF" />
+      ))}
+      {endPoints.map((point) => (
+        <circle key={`end-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#8B5CF6" />
+      ))}
+
+      {chartLabels.map((label, index) => (
+        <text
+          key={label}
+          x={startPoints[index]?.x ?? timeConfig.padLeft}
+          y={timeConfig.height - 10}
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="700"
+          fill="#5B7087"
+        >
+          {label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function BreakTimeChart() {
+  const breakConfig = { ...MINI_CHART, min: 0, max: 3 };
+  const breakPoints = getSeriesPoints(breakMinutes, breakConfig);
+  const baseline = getPlotBottom(breakConfig);
+
+  return (
+    <svg viewBox={`0 0 ${breakConfig.width} ${breakConfig.height}`} className="h-[200px] w-full" aria-hidden="true">
+      {[0, 1, 2, 3].map((index) => {
+        const y = breakConfig.padTop + index * ((baseline - breakConfig.padTop) / 3);
+        return (
+          <line
+            key={index}
+            x1={breakConfig.padLeft}
+            y1={y}
+            x2={getPlotRight(breakConfig)}
+            y2={y}
+            stroke="rgba(20,41,95,0.08)"
+            strokeDasharray="4 8"
+          />
+        );
+      })}
+
+      <polygon points={toAreaPolygon(breakPoints, baseline)} fill="rgba(255, 98, 127, 0.14)" />
+      <polyline
+        fill="none"
+        stroke="#FF6B7A"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(breakPoints)}
+      />
+
+      {breakPoints.map((point) => (
+        <circle key={`break-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#FF6B7A" />
+      ))}
+
+      {chartLabels.map((label, index) => (
+        <text
+          key={label}
+          x={breakPoints[index]?.x ?? breakConfig.padLeft}
+          y={breakConfig.height - 10}
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="700"
+          fill="#5B7087"
+        >
+          {label}
+        </text>
+      ))}
+    </svg>
   );
 }
 
 export function DataAnalyticsPreviewSection() {
   return (
-    <section id="data-approach" className="scroll-mt-28 bg-[#EEF2FA] py-16 sm:py-20">
+    <section id="data-approach" className="scroll-mt-28 bg-[#F7F9FD] py-16 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          eyebrow="Data Driven"
-          title="데이터로 학습을 해석하는 화면을 먼저 보여드립니다"
-          description="학생의 공부시간, 루틴, 계획완수율, 위험신호를 한 화면에서 읽을 수 있는 구조입니다. 단순한 ‘좋은 분위기’가 아니라, 어떤 근거로 지도하는지 바로 전달합니다."
-        />
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="eyebrow-badge">DATA DRIVEN</span>
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(2rem,4.7vw,3rem)] font-black leading-[1.06] text-[#14295F]">
+            실제 앱처럼 누적되는 그래프를
+            <br />
+            홈에서도 먼저 보여드립니다
+          </h2>
+          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.8] text-[#2F4662] sm:text-[15.5px]">
+            공부시간, 목표 달성률, 성장률, 리듬, 시작·종료 시간, 중간 이탈시간까지 한 화면에서 읽을 수 있도록
+            실제 운영 구조를 홈페이지용으로 다시 정리했습니다.
+          </p>
+        </div>
 
-        <div className="mt-8 space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MiniStat label="평균 공부시간" value="4시간 12분" note="최근 14일 기준" accent="blue" />
-            <MiniStat label="평균 공부 리듬" value="0점" note="릴듬 유지 개선 필요" accent="green" />
-            <MiniStat label="계획 완수율" value="83%" note="실행 기반 분석" accent="orange" />
-            <MiniStat label="성장 연동도" value="0/0" note="분석 포인트 설계 상태" accent="rose" />
-          </div>
+        <div className="mt-7 grid gap-3 md:grid-cols-3">
+          {heroMetrics.map((metric) => (
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              detail={metric.detail}
+              tone={metric.tone}
+            />
+          ))}
+        </div>
 
-          <div className="grid gap-5 xl:grid-cols-[1.8fr_1fr]">
-            <article className="rounded-[1.9rem] border border-[#14295F]/12 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.11)]">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <LineChart className="h-4 w-4 text-[#14295F]" />
-                  <h3 className="text-xl font-black tracking-tight text-[#14295F]">공부시간 추이</h3>
-                </div>
-                <div className="inline-flex rounded-full bg-[#14295F] px-3 py-1 text-[11px] font-black text-white">
-                  14일
-                </div>
-              </div>
-              <p className="mb-2 text-[12px] font-bold text-[#14295F]/55">
-                집중 시간의 고저패턴을 한 화면에 담아 전략을 파악합니다.
+        <div className="mt-8">
+          <ChartPanel
+            icon={LineChart}
+            title="공부시간 × 목표 달성률 추이"
+            description="공부시간이 늘수록 목표 달성률도 함께 올라가는 흐름을 한 눈에 읽게 구성했습니다."
+            badge={<DataBadge label="최근 2주 흐름" tone="navy" />}
+            legend={
+              <>
+                <ChartLegend label="공부시간" tone="navy" />
+                <ChartLegend label="목표 달성률" tone="orange" />
+              </>
+            }
+            footer="후반부로 갈수록 공부시간과 목표 달성률이 함께 안정화되는 모습이 보이도록 설계했습니다."
+          >
+            <OverviewTrendChart />
+          </ChartPanel>
+        </div>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <ChartPanel
+            icon={BarChart3}
+            title="주간 학습시간 성장률"
+            description="주간 누적 학습시간과 전주 대비 성장률을 같이 봐서 실제 개선 속도를 읽습니다."
+            badge={<DataBadge label="상승세 유지" tone="green" />}
+            legend={
+              <>
+                <ChartLegend label="주간 학습시간" tone="navy" />
+                <ChartLegend label="전주 대비 성장률" tone="green" />
+              </>
+            }
+            footer="학습시간이 늘어나는 구간에서 성장률도 같이 받쳐주는 흐름으로 보이게 구성했습니다."
+          >
+            <WeeklyGrowthChart />
+          </ChartPanel>
+
+          <ChartPanel
+            icon={Activity}
+            title="학습 리듬 추이"
+            description="매일 비슷한 흐름으로 공부를 시작하고 유지하는 안정감을 점수로 확인합니다."
+            badge={<DataBadge label="최근 평균 89점" tone="green" />}
+            footer="중간에 작은 흔들림이 있어도 다시 회복되는 패턴이 보여 학습 태도가 안정적으로 보입니다."
+          >
+            <RhythmChart />
+          </ChartPanel>
+
+          <ChartPanel
+            icon={Clock3}
+            title="공부 시작/종료 시간 추이"
+            description="시작 시간은 당겨지고 종료 시간은 일정하게 유지되는지 함께 확인합니다."
+            badge={<DataBadge label="시간 안정화" tone="violet" />}
+            legend={
+              <>
+                <ChartLegend label="공부 시작" tone="navy" />
+                <ChartLegend label="공부 종료" tone="violet" />
+              </>
+            }
+            footer="시작 시각 편차가 줄고 종료 시각도 크게 흔들리지 않아 루틴이 단단해진 인상을 줍니다."
+          >
+            <StudyWindowChart />
+          </ChartPanel>
+
+          <ChartPanel
+            icon={AlertTriangle}
+            title="학습 중간 이탈시간 추이"
+            description="집중 흐름을 끊는 중간 이탈시간이 짧고 빠르게 회복되는지 확인합니다."
+            badge={<DataBadge label="낮음 유지" tone="rose" />}
+            footer="초반 1회 이탈 이후에는 짧고 안정적인 수준으로 유지돼 관리가 잘 되고 있는 흐름으로 보입니다."
+          >
+            <BreakTimeChart />
+          </ChartPanel>
+        </div>
+
+        <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-5 py-5 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[12px] font-bold text-[#FF7A16]">NEXT VIEW</p>
+              <p className="mt-1.5 break-keep text-[1.05rem] font-black leading-[1.42] text-[#14295F]">
+                같은 데이터도 학생, 학부모, 운영자는 서로 다르게 읽습니다.
               </p>
-              <TrendLine />
-              <div className="mt-1 flex justify-between px-1 text-[10px] font-black text-[#14295F]/45">
-                {['3/2', '3/3', '3/4', '3/5', '3/6', '3/7', '3/8', '3/9', '3/10', '3/11', '3/12', '3/13', '3/14', '3/15'].map((d) => (
-                  <span key={d}>{d}</span>
-                ))}
-              </div>
-            </article>
-
-            <article className="rounded-[1.9rem] border border-[#14295F]/12 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.11)]">
-              <div className="mb-4 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[#FF8A00]" />
-                <h3 className="text-xl font-black tracking-tight text-[#14295F]">계획 완수율</h3>
-              </div>
-              <p className="mb-3 text-[12px] font-bold text-[#14295F]/55">
-                일별 완료율로 실행력의 안정성을 검증합니다.
+              <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#52667D]">
+                아래 역할별 화면에서 누가 어떤 그래프를 먼저 보는지 이어서 확인할 수 있게 연결합니다.
               </p>
-              <CompletionBars />
-            </article>
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[1fr_2.1fr]">
-            <article className="rounded-[1.9rem] border border-[#14295F]/12 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.11)]">
-              <div className="mb-4 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-[#14295F]" />
-                <h3 className="text-xl font-black tracking-tight text-[#14295F]">인지 리듬 지표</h3>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-[12px] font-black text-[#14295F]/72">
-                    <span>리듬 안정성</span>
-                    <span>0점</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-[#E7ECF7]" />
-                </div>
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-[12px] font-black text-[#14295F]/72">
-                    <span>집중 성장률 (평균)</span>
-                    <span className="text-emerald-600">+0%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-[#E7ECF7]">
-                    <div className="h-2 w-1/2 rounded-full bg-[#14295F]" />
-                  </div>
-                </div>
-                <div className="inline-flex rounded-full bg-[#FF8A00] px-3 py-1 text-[11px] font-black text-white">
-                  학습 시간 고정 필요
-                </div>
-              </div>
-            </article>
-
-            <article className="rounded-[1.9rem] border border-[#14295F]/12 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.11)]">
-              <div className="mb-4 flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-[#2F63E3]" />
-                <h3 className="text-xl font-black tracking-tight text-[#14295F]">인지과학 코칭 포인트</h3>
-              </div>
-              <div className="space-y-2.5">
-                {[
-                  '최근 14일 평균 공부시간은 4시간 12분입니다.',
-                  '완수율이 안정적입니다. 난이도 상향 과제를 단계적으로 추가해도 좋습니다.',
-                  '학습 리듬 변동이 큽니다. 매일 같은 시작 시간을 고정하세요.',
-                ].map((item, i) => (
-                  <div key={item} className="flex items-start gap-3 rounded-xl border border-[#14295F]/12 bg-[#F8FAFF] px-4 py-3">
-                    <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#14295F] text-[10px] font-black text-white">
-                      {i + 1}
-                    </span>
-                    <p className="text-[13px] font-bold leading-relaxed text-[#14295F]/82">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </div>
-
-          <article className="rounded-[1.6rem] border border-[#14295F]/10 bg-white p-4 shadow-[0_10px_24px_rgba(20,41,95,0.08)]">
-            <div className="mb-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-rose-500" />
-              <h4 className="text-sm font-black tracking-tight text-[#14295F]">위험 신호 및 지원 우선순위</h4>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-black text-rose-700">학습 리듬 불안정</span>
-              <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-black text-rose-700">최근 30일 성장 기록 부족</span>
-            </div>
-          </article>
 
-          <div className="rounded-[1.7rem] bg-[linear-gradient(100deg,#19B38F_0%,#15B59A_44%,#1CB3A2_100%)] p-5 text-white shadow-[0_18px_36px_rgba(16,145,121,0.25)] sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/72">GROWTH OUTPUT</p>
-                <p className="mt-2 text-2xl font-black tracking-tight">포인트 4,253 · 스킬 평균 3점</p>
-              </div>
-              <Link
-                href="/go/experience?placement=data_preview_cta&mode=student&view=desktop"
-                className="premium-cta premium-cta-ghost h-11 px-5 text-sm"
-              >
-                성장지표 상세 보기
+            <div className="flex flex-wrap gap-3">
+              <Link href="#app" className="premium-cta premium-cta-primary h-11 gap-1.5 px-5 text-sm">
+                역할별 화면 이어보기
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link href="/experience" className="premium-cta premium-cta-muted h-11 px-5 text-sm">
+                전체 체험 보기
               </Link>
             </div>
           </div>
-        </div>
+        </article>
       </div>
     </section>
   );
