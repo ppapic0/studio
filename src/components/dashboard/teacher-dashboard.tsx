@@ -116,6 +116,7 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import {
   PRIMARY_ROOM_ID,
   buildSeatId,
@@ -1209,6 +1210,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
       const prevStatus = selectedSeat.status;
+      const nowDate = new Date();
+      const todayDateKey = format(nowDate, 'yyyy-MM-dd');
 
       // 퇴실 처리 시 공부 시간 강제 저장 로직
       if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedSeat.lastCheckInAt) {
@@ -1265,6 +1268,88 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       };
 
       batch.update(seatRef, updateData);
+
+      appendAttendanceEventToBatch(batch, firestore, centerId, {
+        studentId,
+        dateKey: todayDateKey,
+        eventType: 'status_override',
+        occurredAt: nowDate,
+        source: 'teacher_dashboard',
+        seatId: selectedSeat.id,
+        statusBefore: prevStatus,
+        statusAfter: nextStatus,
+      });
+
+      if (prevStatus === 'absent' && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_in',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkInAt: nowDate,
+          source: 'teacher_dashboard',
+        });
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_end',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'teacher_dashboard',
+        });
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_start',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'teacher_dashboard',
+        });
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_out',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkOutAt: nowDate,
+          hasCheckOutRecord: true,
+          source: 'teacher_dashboard',
+        });
+      } else {
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'teacher_dashboard',
+        });
+      }
+
       await batch.commit();
       // 카카오 알림톡 발송 (선생님 수동 조작)
       const studentName = studentsById.get(studentId)?.name || '학생';
