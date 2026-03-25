@@ -20,9 +20,9 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">2026 RESULT</span>
           <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.75rem,3.5vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
-            결과가 먼저 보이되
+            트랙은 감성이 아니라
             <br />
-            과정의 신뢰가 함께 남습니다
+            데이터로 말합니다
           </h2>
           <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-[#445b75]">
             합격 실적과 성장 사례를 같은 문맥에서 보여주는 홈의 첫 신뢰 섹션입니다.
