@@ -55,7 +55,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getCountFromServer, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -142,6 +142,25 @@ function getNextTierInfo(currentLp: number) {
     name: nextTier.name,
     remainingLp: Math.max(0, nextTier.lp - currentLp),
   };
+}
+
+function isActiveStudentStatus(status: unknown): boolean {
+  if (typeof status !== 'string') return true;
+  const normalized = status.trim().toLowerCase();
+  if (!normalized) return true;
+  return normalized === 'active';
+}
+
+function isSyntheticStudentId(studentId: unknown): boolean {
+  if (typeof studentId !== 'string') return true;
+  const normalized = studentId.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized.startsWith('test-') ||
+    normalized.startsWith('seed-') ||
+    normalized.startsWith('mock-') ||
+    normalized.includes('dummy')
+  );
 }
 
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
@@ -768,7 +787,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
   const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
-  const [seasonParticipantCount, setSeasonParticipantCount] = useState(0);
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -1012,6 +1030,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership?.id, periodKey, user?.uid]);
   const { data: leaderboardEntry } = useDoc<LeaderboardEntry>(leaderboardEntryRef, { enabled: isActive });
 
+  const totalEntriesQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !periodKey) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
+  }, [firestore, activeMembership?.id, periodKey]);
+  const { data: totalRankEntries } = useCollection<LeaderboardEntry>(totalEntriesQuery, { enabled: isActive });
+
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership?.id]);
+  const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+
+  const attendanceCurrentQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
+  }, [firestore, activeMembership?.id]);
+  const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive });
+
   const centerAnnouncementsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -1040,35 +1080,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const timeoutId = window.setTimeout(prefetchRoutes, 800);
     return () => window.clearTimeout(timeoutId);
   }, [isActive, router]);
-
-  useEffect(() => {
-    if (!isActive || !firestore || !activeMembership || !periodKey) {
-      setSeasonParticipantCount(0);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadParticipantCount = async () => {
-      try {
-        const entriesRef = collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
-        const countSnapshot = await getCountFromServer(entriesRef);
-        if (!cancelled) {
-          setSeasonParticipantCount(countSnapshot.data().count);
-        }
-      } catch {
-        if (!cancelled) {
-          setSeasonParticipantCount(0);
-        }
-      }
-    };
-
-    void loadParticipantCount();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, firestore, activeMembership?.id, periodKey]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -2117,11 +2128,63 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (alreadyEarnedPlanBonus || todayStudyTasks.length < 3 || todayRemainingTasks.length === 0) return 0;
     return Math.round(100 * finalMultiplier);
   }, [progress?.dailyLpStatus, todayKey, todayStudyTasks.length, todayRemainingTasks.length, finalMultiplier]);
-  const seasonRank = leaderboardEntry?.rank || 0;
+
+  const activeStudentIds = useMemo(() => {
+    if (!activeStudentMembers) return null;
+    return new Set(
+      activeStudentMembers
+        .filter((member) => isActiveStudentStatus(member.status))
+        .map((member) => member.id)
+    );
+  }, [activeStudentMembers]);
+
+  const assignedStudentIds = useMemo(() => {
+    if (!attendanceCurrent) return null;
+    return new Set(
+      attendanceCurrent
+        .map((seat) => (typeof seat.studentId === 'string' ? seat.studentId.trim() : ''))
+        .filter((studentId) => studentId.length > 0 && !isSyntheticStudentId(studentId))
+    );
+  }, [attendanceCurrent]);
+
+  const validRankEntries = useMemo(() => {
+    if (!totalRankEntries) return [];
+    let filtered = totalRankEntries.filter((entry) => !isSyntheticStudentId(entry.studentId));
+
+    if (assignedStudentIds && assignedStudentIds.size > 0) {
+      filtered = filtered.filter((entry) => assignedStudentIds.has(entry.studentId));
+    }
+    if (activeStudentIds && activeStudentIds.size > 0) {
+      filtered = filtered.filter((entry) => activeStudentIds.has(entry.studentId));
+    }
+
+    return filtered;
+  }, [totalRankEntries, assignedStudentIds, activeStudentIds]);
+
+  const seasonParticipantCount = validRankEntries.length;
+  const isRankContextLoading = activeMembersLoading || attendanceLoading;
+
+  const seasonRank = useMemo(() => {
+    const snapshotRank = leaderboardEntry?.rank || 0;
+    if (!user || validRankEntries.length === 0) return snapshotRank;
+
+    const sorted = [...validRankEntries].sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
+    if (ownIndex >= 0) return ownIndex + 1;
+
+    const snapshotValue = Number(leaderboardEntry?.value);
+    if (!Number.isFinite(snapshotValue)) return snapshotRank;
+
+    const higherCount = sorted.filter((entry) => (Number(entry.value) || 0) > snapshotValue).length;
+    return Math.min(sorted.length, higherCount + 1);
+  }, [leaderboardEntry?.rank, leaderboardEntry?.value, validRankEntries, user?.uid]);
+
   const seasonPercentile = useMemo(() => {
+    if (isRankContextLoading) return null;
     if (!seasonRank || seasonParticipantCount <= 0) return null;
-    return Math.max(1, Math.ceil((seasonRank / seasonParticipantCount) * 100));
-  }, [seasonRank, seasonParticipantCount]);
+    const safeRank = Math.min(seasonRank, seasonParticipantCount);
+    return Math.max(1, Math.ceil((safeRank / seasonParticipantCount) * 100));
+  }, [isRankContextLoading, seasonRank, seasonParticipantCount]);
   const nextTierInfo = useMemo(
     () => getNextTierInfo(progress?.seasonLp || 0),
     [progress?.seasonLp]
