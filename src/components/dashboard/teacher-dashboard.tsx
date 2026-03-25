@@ -107,6 +107,7 @@ import type { CenterAdminAttendanceSeatSignal } from '@/lib/center-admin-attenda
 import {
   getCenterAdminDomainSummary,
   getCenterAdminSeatOverlayPresentation,
+  type CenterAdminSeatDomainKey,
   type CenterAdminSeatOverlayMode,
   type CenterAdminStudentSeatSignal,
 } from '@/lib/center-admin-seat-heatmap';
@@ -224,6 +225,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
   const [seatOverlayMode, setSeatOverlayMode] = useState<CenterAdminSeatOverlayMode>('composite');
+  const [selectedSeatInsightKey, setSelectedSeatInsightKey] = useState<CenterAdminSeatDomainKey | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -794,6 +796,29 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => getCenterAdminDomainSummary(selectedSeatSignal),
     [selectedSeatSignal]
   );
+
+  const selectedSeatDomainInsight = useMemo(
+    () =>
+      selectedSeatDomainSummary.find((domain) => domain.key === selectedSeatInsightKey) ||
+      selectedSeatDomainSummary[0] ||
+      null,
+    [selectedSeatDomainSummary, selectedSeatInsightKey]
+  );
+
+  useEffect(() => {
+    if (!selectedSeatDomainSummary.length) {
+      setSelectedSeatInsightKey(null);
+      return;
+    }
+
+    setSelectedSeatInsightKey((current) => {
+      if (current && selectedSeatDomainSummary.some((domain) => domain.key === current)) {
+        return current;
+      }
+
+      return [...selectedSeatDomainSummary].sort((a, b) => a.score - b.score)[0]?.key || selectedSeatDomainSummary[0].key;
+    });
+  }, [selectedSeatDomainSummary]);
 
   const selectedAttendanceSignal = useMemo<CenterAdminAttendanceSeatSignal | null>(() => {
     if (!selectedSeat) return null;
@@ -2247,15 +2272,61 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   </p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                  {selectedSeatDomainSummary.map((domain) => (
-                                    <div key={domain.key} className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{domain.label}</p>
-                                      <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
-                                        {domain.score}
-                                      </Badge>
+                                <div className="space-y-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-[11px] font-bold text-white/70">
+                                      점수를 누르면 왜 이 점수가 나왔는지와 바로 할 대응을 AI 기준으로 짧게 보여줍니다.
+                                    </p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                                      점수 선택
+                                    </p>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                    {selectedSeatDomainSummary.map((domain) => {
+                                      const isActive = domain.key === selectedSeatInsightKey;
+                                      return (
+                                        <button
+                                          key={domain.key}
+                                          type="button"
+                                          onClick={() => setSelectedSeatInsightKey(domain.key)}
+                                          className={cn(
+                                            "rounded-2xl border px-3 py-3 text-center transition-all",
+                                            isActive
+                                              ? "border-white bg-white/20 shadow-lg shadow-black/10"
+                                              : "border-white/10 bg-white/10 hover:bg-white/15"
+                                          )}
+                                        >
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{domain.label}</p>
+                                          <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
+                                            {domain.score}
+                                          </Badge>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {selectedSeatDomainInsight && (
+                                    <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/20 p-4">
+                                      <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">AI 분석</p>
+                                          <p className="mt-1 text-sm font-black text-white">
+                                            {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
+                                          </p>
+                                        </div>
+                                        <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
+                                          {selectedSeatDomainInsight.score}
+                                        </Badge>
+                                      </div>
+                                      <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
+                                        {selectedSeatDomainInsight.analysis}
+                                      </p>
+                                      <p className="mt-2 text-xs font-bold leading-relaxed text-white/75">
+                                        대응: {selectedSeatDomainInsight.action}
+                                      </p>
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
                               </>
                             )}

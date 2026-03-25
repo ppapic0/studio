@@ -41,6 +41,15 @@ export interface CenterAdminStudentSeatSignal {
   topReason: string;
 }
 
+export interface CenterAdminDomainSummaryItem {
+  key: CenterAdminSeatDomainKey;
+  label: string;
+  score: number;
+  badgeClass: string;
+  analysis: string;
+  action: string;
+}
+
 export interface CenterAdminSeatOverlayLegendItem {
   key: string;
   label: string;
@@ -154,6 +163,15 @@ export const CENTER_ADMIN_SEAT_DOMAIN_LABELS: Record<CenterAdminSeatDomainKey, s
   billing: '수납',
   efficiency: '효율',
 };
+
+function formatDurationLabel(totalMinutes: number) {
+  if (totalMinutes <= 0) return '0분';
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours <= 0) return `${minutes}분`;
+  if (minutes <= 0) return `${hours}시간`;
+  return `${hours}시간 ${minutes}분`;
+}
 
 function resolveScoreToneMeta(score: number) {
   const tone = getHeatmapTone(score);
@@ -330,14 +348,125 @@ export function getCenterAdminScoreSurfaceClass(score: number) {
   return resolveScoreToneMeta(score).surfaceClass;
 }
 
-export function getCenterAdminDomainSummary(signal?: CenterAdminStudentSeatSignal | null) {
-  if (!signal) return [];
-  return (Object.keys(CENTER_ADMIN_SEAT_DOMAIN_LABELS) as CenterAdminSeatDomainKey[]).map((key) => ({
+export function getCenterAdminDomainInsight(
+  signal: CenterAdminStudentSeatSignal,
+  key: CenterAdminSeatDomainKey,
+): CenterAdminDomainSummaryItem {
+  const score = signal.domainScores[key];
+  const label = CENTER_ADMIN_SEAT_DOMAIN_LABELS[key];
+  const badgeClass = getCenterAdminScoreBadgeClass(score);
+  let analysis = '';
+  let action = '';
+
+  if (key === 'operational') {
+    if (signal.attendanceStatus === 'absent') {
+      if (signal.todayMinutes >= 1) {
+        analysis = `오늘 ${formatDurationLabel(signal.todayMinutes)} 학습 후 현재 퇴실 상태라 운영 점수가 ${score}점으로 보수적으로 잡혔습니다.`;
+        action = '다음 입실 예정 시각을 확인하고 남은 학습 블록 목표를 다시 짧게 잡아주세요.';
+      } else {
+        analysis = `아직 입실 신호가 없어 오늘 학습 루틴이 시작되지 않아 운영 점수가 ${score}점입니다.`;
+        action = '루틴 시각과 첫 공부 블록을 바로 확인해 입실 코칭부터 넣어주는 것이 좋습니다.';
+      }
+    } else if (signal.currentAwayMinutes >= 20) {
+      analysis = `현재 외출/휴식이 ${signal.currentAwayMinutes}분 이어져 오늘 학습 흐름 점수가 ${score}점으로 내려갔습니다.`;
+      action = '복귀 시각을 체크하고 바로 이어갈 다음 30~60분 집중 과제를 하나만 확정해 주세요.';
+    } else if (signal.todayMinutes < 120) {
+      analysis = `오늘 누적 공부시간이 ${formatDurationLabel(signal.todayMinutes)} 수준이라 운영 점수가 ${score}점으로 아직 낮게 보입니다.`;
+      action = '첫 완료 과제를 작게 다시 잡아 빠르게 공부 리듬을 회복시키는 대응이 좋습니다.';
+    } else if (score >= 85) {
+      analysis = `오늘 입실과 학습 흐름이 안정적이라 운영 점수가 ${score}점으로 높게 유지되고 있습니다.`;
+      action = '지금 페이스를 유지하면서 다음 체크 시점만 짧게 확인해 주면 충분합니다.';
+    } else {
+      analysis = `오늘 학습 흐름은 유지되고 있지만 집중도나 계획 실행 밀도가 완전히 올라오지 않아 운영 점수가 ${score}점입니다.`;
+      action = '현재 과제를 더 작게 쪼개고 다음 완료 기준을 명확히 잡아 점수를 끌어올리는 것이 좋습니다.';
+    }
+  } else if (key === 'parent') {
+    if (signal.hasUnreadReport && signal.hasCounselingToday) {
+      analysis = `최근 리포트 미열람이 있지만 오늘 상담 일정이 있어 학부모 반응 점수는 ${score}점으로 회복 여지가 있습니다.`;
+      action = '상담에서 오늘 변화 한 가지와 다음 행동 한 가지를 짧게 공유해 열람과 응답을 동시에 끌어올려 주세요.';
+    } else if (signal.hasUnreadReport) {
+      analysis = `최근 발송한 리포트가 아직 미열람 상태라 학부모 반응 점수가 ${score}점으로 낮아졌습니다.`;
+      action = '핵심 변화 한 줄만 다시 보내고 확인 회신을 받아 반응 신호를 회복하는 것이 좋습니다.';
+    } else if (signal.hasCounselingToday) {
+      analysis = `오늘 상담 연결 포인트가 잡혀 있어 학부모 소통 점수는 ${score}점으로 안정적으로 유지되고 있습니다.`;
+      action = '상담 후 바로 짧은 요약 메시지를 남겨 다음 열람과 응답까지 이어지게 해주세요.';
+    } else if (score >= 85) {
+      analysis = `최근 열람과 소통 흐름이 안정적이라 학부모 점수가 ${score}점으로 높게 유지되고 있습니다.`;
+      action = '특이사항만 짧게 이어가면 충분하고, 과도한 추가 연락보다는 리듬 유지가 더 좋습니다.';
+    } else {
+      analysis = `학부모 반응 데이터가 아주 약한 것은 아니지만 최근 상호작용 밀도가 낮아 ${score}점으로 보입니다.`;
+      action = '이번 주 변화 포인트를 한 줄 요약으로 먼저 보내고, 필요 시 짧은 상담 제안을 붙여 주세요.';
+    }
+  } else if (key === 'risk') {
+    if (signal.effectivePenaltyPoints >= 7 && signal.currentAwayMinutes >= 20) {
+      analysis = `벌점 ${signal.effectivePenaltyPoints}점과 ${signal.currentAwayMinutes}분 장기 외출이 함께 보여 리스크 점수가 ${score}점까지 낮아졌습니다.`;
+      action = '오늘은 자리 이탈 원인과 다음 행동 약속 한 가지를 바로 합의해 재발 가능성을 먼저 줄여 주세요.';
+    } else if (signal.effectivePenaltyPoints >= 7) {
+      analysis = `누적 벌점이 ${signal.effectivePenaltyPoints}점이라 행동 리스크 신호가 커져 현재 점수는 ${score}점입니다.`;
+      action = '최근 벌점 원인을 짧게 복기하고 오늘 바로 지킬 행동 기준 하나만 다시 잡아 주세요.';
+    } else if (signal.currentAwayMinutes >= 20) {
+      analysis = `현재 외출/휴식이 ${signal.currentAwayMinutes}분 이어져 이탈 리스크가 커졌고 점수도 ${score}점으로 내려갔습니다.`;
+      action = '복귀 즉시 다음 체크 시각과 착석 목표를 확정해 흐름이 끊기지 않게 관리해 주세요.';
+    } else if (score >= 85) {
+      analysis = `현재 큰 위험 신호가 적고 운영 흐름도 안정적이라 리스크 점수가 ${score}점으로 높습니다.`;
+      action = '지금 상태를 유지하면서 갑작스러운 이탈만 가볍게 모니터링하면 충분합니다.';
+    } else {
+      analysis = `즉시 큰 경보는 아니지만 최근 행동 안정도가 완전히 올라오지 않아 리스크 점수가 ${score}점입니다.`;
+      action = '오늘 기준으로 지켜야 할 핵심 한 가지를 짧게 다시 확인해 안정 구간으로 올리는 것이 좋습니다.';
+    }
+  } else if (key === 'billing') {
+    if (signal.invoiceStatus === 'overdue') {
+      analysis = `당월 수납이 연체 상태라 수납 건강도가 크게 깎이면서 점수가 ${score}점으로 떨어졌습니다.`;
+      action = '보호자에게 금일 확인 메시지를 보내고 실제 결제 예정일을 확정해 두는 대응이 가장 좋습니다.';
+    } else if (signal.invoiceStatus === 'issued') {
+      analysis = `청구는 나갔지만 아직 미납 상태라 수납 점수가 ${score}점으로 보수적으로 잡혀 있습니다.`;
+      action = '안내 메시지 한 번 더 보내고 결제 예정 시점을 체크해 연체 전환을 막아 주세요.';
+    } else if (signal.invoiceStatus === 'paid') {
+      analysis = `당월 수납이 정상 완료되어 수납 점수가 ${score}점으로 안정적으로 유지되고 있습니다.`;
+      action = '추가 대응은 거의 필요 없고 다음 청구 주기만 놓치지 않게 관리하면 충분합니다.';
+    } else if (signal.invoiceStatus === 'void' || signal.invoiceStatus === 'refunded') {
+      analysis = `이번 달 수납 상태가 예외 처리되어 있어 수납 점수는 ${score}점의 중립에 가깝게 보입니다.`;
+      action = '환불이나 무효 사유가 운영 기록과 맞는지만 한 번 확인해 두면 좋습니다.';
+    } else {
+      analysis = `현재 수납 이슈 데이터가 없어 수납 점수는 ${score}점의 중립값으로 표시되고 있습니다.`;
+      action = '실제 청구 예정 여부만 한 번 확인해 두면 이후 점수 해석이 더 정확해집니다.';
+    }
+  } else {
+    if (signal.hasUnreadReport && signal.currentAwayMinutes >= 20) {
+      analysis = `리포트 미열람과 ${signal.currentAwayMinutes}분 장기 외출이 겹쳐 운영 후속조치 효율 점수가 ${score}점입니다.`;
+      action = '복귀 확인 후 오늘 리포트 핵심 한 줄과 다음 체크 시각을 바로 남겨 운영 밀도를 높여 주세요.';
+    } else if (signal.hasUnreadReport) {
+      analysis = `최근 리포트 후속 확인이 닿지 않아 운영 효율 점수가 ${score}점으로 내려가 있습니다.`;
+      action = '오늘 변화 포인트를 한 줄로 다시 전달하고 확인 여부를 바로 체크해 주세요.';
+    } else if (signal.currentAwayMinutes >= 20) {
+      analysis = `장기 외출로 현장 팔로업이 길어지면서 운영 효율 점수가 ${score}점까지 낮아졌습니다.`;
+      action = '복귀 즉시 다음 행동과 체크 시각을 짧게 확정해 운영 공백을 줄여 주세요.';
+    } else if (score >= 85) {
+      analysis = `팔로업과 운영 흐름이 안정적으로 유지돼 효율 점수가 ${score}점으로 좋습니다.`;
+      action = '현재 방식 그대로 유지하면서 예외 상황만 빠르게 닫아주면 충분합니다.';
+    } else {
+      analysis = `운영 후속조치 밀도가 아주 낮지는 않지만 더 촘촘하게 관리할 여지가 있어 효율 점수가 ${score}점입니다.`;
+      action = '오늘 꼭 남겨야 할 코멘트와 다음 확인 시각을 짧게 남겨 운영 리듬을 정리해 주세요.';
+    }
+  }
+
+  return {
     key,
-    label: CENTER_ADMIN_SEAT_DOMAIN_LABELS[key],
-    score: signal.domainScores[key],
-    badgeClass: getCenterAdminScoreBadgeClass(signal.domainScores[key]),
-  }));
+    label,
+    score,
+    badgeClass,
+    analysis,
+    action,
+  };
+}
+
+export function getCenterAdminDomainSummary(
+  signal?: CenterAdminStudentSeatSignal | null,
+): CenterAdminDomainSummaryItem[] {
+  if (!signal) return [];
+  return (Object.keys(CENTER_ADMIN_SEAT_DOMAIN_LABELS) as CenterAdminSeatDomainKey[]).map((key) =>
+    getCenterAdminDomainInsight(signal, key),
+  );
 }
 
 export function getCenterAdminSeatOverlayPresentation(params: {
