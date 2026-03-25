@@ -399,7 +399,18 @@ function JacobTierController({ progressRef, currentStats, currentLp, userId, cen
   );
 }
 
-function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatus?: GrowthProgress['dailyLpStatus'], totalBoost: number, isMobile: boolean }) {
+function LPHistoryDialog({
+  dailyLpStatus,
+  totalBoost,
+  isMobile,
+  variant = 'compact',
+}: {
+  dailyLpStatus?: GrowthProgress['dailyLpStatus'],
+  totalBoost: number,
+  isMobile: boolean,
+  variant?: 'compact' | 'featured',
+}) {
+  const isFeatured = variant === 'featured';
   const sortedDates = useMemo(() => {
     if (!dailyLpStatus) return [];
     return Object.entries(dailyLpStatus).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 30);
@@ -431,39 +442,100 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
     <Dialog>
       <DialogTrigger asChild>
         <Card className={cn(
-          "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
+          "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border transition-all duration-300 cursor-pointer",
+          isFeatured
+            ? "border-amber-200/80 bg-[radial-gradient(circle_at_top_right,#ffe7a8_0%,#fffdf5_40%,#fff8e1_100%)] shadow-[0_26px_70px_-42px_rgba(245,158,11,0.6)] ring-1 ring-amber-100/80"
+            : "border-slate-200/80 bg-white",
           isMobile
-            ? "rounded-[1.4rem] bg-[radial-gradient(circle_at_top_right,#fde68a_0%,#ffffff_58%,#fffbeb_100%)] shadow-[0_18px_40px_-28px_rgba(245,158,11,0.5)]"
-            : "rounded-[1.75rem]"
+            ? isFeatured
+              ? "rounded-[1.5rem] shadow-[0_24px_54px_-38px_rgba(245,158,11,0.62)]"
+              : "rounded-[1.4rem] bg-[radial-gradient(circle_at_top_right,#fde68a_0%,#ffffff_58%,#fffbeb_100%)] shadow-[0_18px_40px_-28px_rgba(245,158,11,0.5)]"
+            : isFeatured
+              ? "rounded-[2.5rem]"
+              : "rounded-[1.75rem]"
         )}>
-          {isMobile && <div className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-amber-200/60 blur-2xl" />}
-          <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
+          <div
+            className={cn(
+              "pointer-events-none absolute rounded-full bg-amber-200/60 blur-2xl",
+              isFeatured
+                ? isMobile
+                  ? "-right-6 -top-8 h-24 w-24"
+                  : "-right-10 -top-10 h-36 w-36"
+                : isMobile
+                  ? "-right-6 -top-8 h-20 w-20"
+                  : "-right-8 -top-8 h-24 w-24"
+            )}
+          />
+          {isFeatured && (
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0)_42%)]" />
+          )}
+          <CardHeader className={cn(
+            "flex flex-row items-center justify-between pb-2",
+            isFeatured
+              ? isMobile
+                ? "px-5 pt-5"
+                : "px-8 pt-8"
+              : isMobile
+                ? "px-5 pt-5"
+                : "px-8 pt-8"
+          )}>
             <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[9px]" : "text-[10px]")}>시즌 LP</CardTitle>
-            <div className={cn("bg-amber-50 rounded-xl text-amber-600", isMobile ? "p-2" : "p-2.5")}>
+            <div className={cn(
+              "rounded-xl text-amber-600",
+              isFeatured ? "bg-white/80 shadow-[0_14px_32px_-24px_rgba(245,158,11,0.8)]" : "bg-amber-50",
+              isMobile ? "p-2" : "p-2.5"
+            )}>
               <Zap className={cn("text-amber-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
-          <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("grid items-end gap-3", isMobile ? "grid-cols-[minmax(0,1fr)_6.8rem]" : "grid-cols-[minmax(0,1fr)_8.4rem] gap-4")}>
+          <CardContent className={cn(
+            "relative z-10",
+            isFeatured
+              ? isMobile
+                ? "px-5 pb-5 pt-1"
+                : "px-8 pb-8 pt-1"
+              : isMobile
+                ? "px-5 pb-5"
+                : "px-10 pb-10"
+          )}>
+            <div className={cn(
+              "grid items-end gap-3",
+              isFeatured
+                ? isMobile
+                  ? "grid-cols-[minmax(0,1fr)_7.6rem]"
+                  : "grid-cols-[minmax(0,1fr)_10rem] gap-5"
+                : isMobile
+                  ? "grid-cols-[minmax(0,1fr)_6.8rem]"
+                  : "grid-cols-[minmax(0,1fr)_8.4rem] gap-4"
+            )}>
               <div className="min-w-0">
-                <div className={cn("dashboard-number text-amber-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
+                <div className={cn(
+                  "dashboard-number text-amber-600 leading-none tracking-tight",
+                  isFeatured
+                    ? isMobile
+                      ? "text-[clamp(2.35rem,12vw,3rem)]"
+                      : "text-[clamp(3.2rem,5vw,4.8rem)]"
+                    : isMobile
+                      ? "text-[clamp(2rem,10vw,2.7rem)]"
+                      : "text-6xl sm:text-7xl"
+                )}>
                   {totalLp.toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
                 </div>
-                <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3 flex-wrap" : "mt-6")}>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "font-aggro-display border border-[#FF7A16] bg-[#FF7A16] text-white font-extrabold leading-none",
-                        isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
-                      )}
-                    >
-                      히스토리 분석 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
-                    </Badge>
-                    {isMobile && (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black tracking-wide text-amber-700">
-                        +{Math.max(0, Math.round((totalBoost - 1) * 100))}%
-                      </span>
+                <div className={cn("flex items-center gap-2", isMobile ? "mt-3 flex-wrap" : isFeatured ? "mt-5" : "mt-6")}>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "font-aggro-display border border-[#FF7A16] bg-[#FF7A16] text-white font-extrabold leading-none",
+                      isMobile ? "h-7 px-2.5 text-[11px]" : isFeatured ? "h-9 px-4 text-[12px]" : "h-8 px-3.5 text-[12px]"
                     )}
+                  >
+                    히스토리 분석 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                  </Badge>
+                  {isMobile && (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black tracking-wide text-amber-700">
+                      +{Math.max(0, Math.round((totalBoost - 1) * 100))}%
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1949,6 +2021,106 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     router.push('/dashboard/plan');
   }, [handleStudyStartStop, missionAction.mode, router]);
 
+  const missionActionIcon = missionAction.mode === 'report'
+    ? <FileText className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+    : missionAction.mode === 'plan' || missionAction.mode === 'review'
+      ? <ListTodo className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+      : <Sparkles className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />;
+
+  const todayDashboardSummary = (
+    <Card className={cn(
+      "relative overflow-hidden border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.42)] ring-1 ring-slate-100/80",
+      isMobile ? "rounded-[1.5rem]" : "rounded-[2.25rem]"
+    )}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,rgba(255,255,255,0),rgba(59,130,246,0.28),rgba(255,255,255,0))]" />
+      <div className="pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full bg-sky-100/60 blur-3xl" />
+      <CardContent className={cn("relative", isMobile ? "p-5" : "p-7")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Badge className="border-none bg-primary/8 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+              오늘 요약
+            </Badge>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base" : "text-xl")}>
+              오늘 흐름을 한눈에 정리했어요
+            </p>
+          </div>
+          <div className={cn(
+            "shrink-0 rounded-2xl border border-white/80 bg-white/85 text-primary shadow-[0_12px_24px_-20px_rgba(59,130,246,0.55)]",
+            isMobile ? "p-2.5" : "p-3"
+          )}>
+            {missionActionIcon}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]")}>
+            <div className="rounded-[1.25rem] border border-slate-200/80 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">지금</p>
+              <p className={cn("mt-2 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base leading-6" : "text-xl")}>
+                {compactMissionTitle}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionAction.meta}</p>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-primary/10 bg-primary/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary/55">오늘 목표</p>
+              <p className={cn("dashboard-number mt-2 text-primary leading-none", isMobile ? "text-[1.55rem]" : "text-[2.1rem]")}>
+                {todayDoneTaskCount}<span className="ml-1 text-sm font-bold opacity-40">/ {todayTaskCount || 0}</span>
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-primary/70">{todayPlanRate}% 완료</p>
+            </div>
+
+            <div className={cn(
+              "rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+              isMobile ? "col-span-2" : ""
+            )}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{missionFocusCard.label}</p>
+              <p className={cn("mt-2 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base" : "text-xl")}>
+                {missionFocusCard.value}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500">
+                {missionFocusCard.detail}
+              </p>
+            </div>
+          </div>
+
+          <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-stretch")}>
+            <div className="rounded-[1.25rem] border border-slate-200/80 bg-white/92 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+                  {missionAction.meta}
+                </Badge>
+                {weeklyStudyDelta !== 0 && (
+                  <Badge variant="outline" className={cn(
+                    "h-7 rounded-full px-3 text-[10px] font-black",
+                    weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
+                  )}>
+                    {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm font-black leading-6 text-slate-900">
+                {missionAction.accent}
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => void handleMissionAction()}
+              disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
+              className={cn(
+                "student-cta rounded-2xl border border-primary/12 bg-white font-black text-primary shadow-[0_20px_40px_-28px_rgba(59,130,246,0.45)] transition-all hover:bg-primary/5",
+                isMobile ? "h-12 w-full text-sm" : "min-w-[10rem] px-8 text-base"
+              )}
+            >
+              {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
       <section className={cn(
@@ -2050,85 +2222,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
-        <Card className={cn(
-          "relative overflow-hidden border-none bg-white shadow-xl ring-1 ring-black/[0.04]",
-          isMobile ? "col-span-2 mt-3 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
-        )}>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r" style={{ backgroundImage: tierTheme.heroGradient }} />
-          <CardContent className={cn("relative", isMobile ? "p-5 pt-8" : "p-8 pt-9")}>
-            <div className="flex items-center justify-between gap-3">
-              <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
-                오늘 대시보드
-              </Badge>
-              <div className="rounded-2xl bg-primary/5 text-primary shrink-0 p-3">
-                {missionAction.mode === 'report' ? <FileText className="h-5 w-5" /> : missionAction.mode === 'plan' || missionAction.mode === 'review' ? <ListTodo className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]")}>
-                <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">지금</p>
-                  <p className={cn("mt-2 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-2xl")}>
-                    {compactMissionTitle}
-                  </p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionAction.meta}</p>
-                </div>
-
-                <div className="rounded-[1.35rem] border border-primary/10 bg-primary/5 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-primary/55">오늘 목표</p>
-                  <p className={cn("dashboard-number mt-2 text-primary leading-none", isMobile ? "text-[1.7rem]" : "text-[2.4rem]")}>
-                    {todayDoneTaskCount}<span className="ml-1 text-sm font-bold opacity-40">/ {todayTaskCount || 0}</span>
-                  </p>
-                  <p className="mt-1 text-[11px] font-semibold text-primary/70">{todayPlanRate}% 완료</p>
-                </div>
-
-                <div className={cn("rounded-[1.35rem] border border-emerald-100 bg-emerald-50/70 p-4", isMobile ? "col-span-2" : "")}>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{missionFocusCard.label}</p>
-                  <p className={cn("mt-2 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-2xl")}>
-                    {missionFocusCard.value}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500">
-                    {missionFocusCard.detail}
-                  </p>
-                </div>
-              </div>
-
-              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-stretch")}>
-                <div className="rounded-[1.35rem] border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
-                      {missionAction.meta}
-                    </Badge>
-                    {weeklyStudyDelta !== 0 && (
-                      <Badge variant="outline" className={cn(
-                        "h-7 rounded-full px-3 text-[10px] font-black",
-                        weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
-                      )}>
-                        {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="mt-3 line-clamp-2 text-sm font-black leading-6 text-slate-900">
-                    {missionAction.accent}
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={() => void handleMissionAction()}
-                  disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
-                  className={cn(
-                    "student-cta rounded-2xl font-black shadow-lg transition-all",
-                    isMobile ? "h-12 w-full text-sm" : "min-w-[10rem] px-8 text-base"
-                  )}
-                >
-                  {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className={cn(isMobile ? "col-span-2" : "col-span-7")}>
+          <LPHistoryDialog
+            dailyLpStatus={progress?.dailyLpStatus}
+            totalBoost={totalBoost}
+            isMobile={isMobile}
+            variant="featured"
+          />
+        </div>
 
         <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
           <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
@@ -2626,9 +2727,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </DialogContent>
         </Dialog>
 
-        {/* LP, Trend, QR column */}
+        {/* Utility column */}
         <div className={cn("flex flex-col gap-3", isMobile ? "" : "")}>
-          <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
           <Dialog>
             <DialogTrigger asChild>
               <button
@@ -2666,6 +2766,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {isJacob && !isMobile && progressRef && activeMembership && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership.className} schoolName={studentProfile?.schoolName} />}
+
+      <section>
+        {todayDashboardSummary}
+      </section>
     </div>
   );
 }
