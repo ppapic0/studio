@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -19,15 +20,16 @@ import {
 import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 
+const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
+const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
+
 export function BottomNav() {
   const { activeMembership, currentTier, viewMode } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isMobileMode = viewMode === 'mobile';
-
-  if (!activeMembership) return null;
-
-  const role = activeMembership.role;
+  const [playParentEntry, setPlayParentEntry] = useState(false);
+  const role = activeMembership?.role;
   const isParent = role === 'parent';
   const activeParentTab = searchParams.get('parentTab') || 'home';
   const useBrandNav = isParent || isMobileMode;
@@ -40,6 +42,22 @@ export function BottomNav() {
     { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
     { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
   ] as const;
+
+  useEffect(() => {
+    if (!isParent || typeof window === 'undefined') return;
+
+    const raw = window.sessionStorage.getItem(PARENT_POST_LOGIN_ENTRY_MOTION_KEY);
+    const timestamp = Number(raw);
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS) {
+      return;
+    }
+
+    setPlayParentEntry(true);
+    const timer = window.setTimeout(() => setPlayParentEntry(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [isParent]);
+
+  if (!activeMembership || !role) return null;
 
   const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
     student: [
@@ -75,16 +93,19 @@ export function BottomNav() {
       className={cn(
         'z-50 transition-all duration-300',
         useBrandNav
-          ? 'h-[5.8rem] rounded-t-[1.75rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.38rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.46)]'
+          ? isParent
+            ? 'h-[5.1rem] rounded-t-[1.45rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.2rem)] shadow-[0_-14px_28px_rgba(10,20,52,0.42)] sm:h-[5.25rem]'
+            : 'h-[5.8rem] rounded-t-[1.75rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.38rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.46)]'
           : 'h-20 border-t border-black/[0.06] bg-white/95 pb-6 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-2xl',
-        isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden'
+        isParent || isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden',
+        playParentEntry && 'parent-nav-enter parent-entry-delay-5'
       )}
     >
       <nav
         className={cn(
           'h-full',
           isParent
-            ? 'grid grid-cols-5 gap-0.5 px-1.5 pt-1'
+            ? 'grid grid-cols-5 gap-0 px-1 pt-0.5'
             : useBrandNav
               ? 'grid gap-1 px-2 pt-1.5'
               : 'flex items-center justify-around px-2'
@@ -118,7 +139,7 @@ export function BottomNav() {
               <div
                 className={cn(
                   'rounded-xl transition-all',
-                  isParent ? 'p-1.5' : 'p-2',
+                  isParent ? 'p-[0.28rem] sm:p-[0.38rem]' : 'p-2',
                   isActive
                     ? useBrandNav
                       ? 'bg-[#FF7A16] text-[#14295F] shadow-[0_6px_14px_rgba(255,122,22,0.45)]'
@@ -130,7 +151,7 @@ export function BottomNav() {
               >
                 <item.icon
                   className={cn(
-                    isParent ? 'h-4 w-4' : 'h-5 w-5',
+                    isParent ? 'h-[0.9rem] w-[0.9rem] sm:h-[0.98rem] sm:w-[0.98rem]' : 'h-5 w-5',
                     'transition-all duration-300',
                     isActive ? 'stroke-[2.4px] scale-110' : 'stroke-[2px]'
                   )}
@@ -140,14 +161,14 @@ export function BottomNav() {
               <span
                 className={cn(
                   'font-black tracking-tight transition-all duration-300 whitespace-nowrap',
-                  isParent ? 'text-[12px] leading-tight px-0.5 text-center' : 'text-[10px]',
+                  isParent ? 'px-0.5 text-center text-[9.8px] leading-[1.02] sm:text-[10.5px]' : 'text-[10px]',
                   isActive ? 'opacity-100' : 'opacity-45'
                 )}
               >
                 {item.label}
               </span>
 
-              {isActive && useBrandNav && <div className="absolute bottom-0.5 h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
+              {isActive && useBrandNav && <div className="absolute bottom-[0.35rem] h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
               {isActive && !useBrandNav && (
                 <div
                   className={cn(

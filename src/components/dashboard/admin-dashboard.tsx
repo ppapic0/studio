@@ -83,6 +83,8 @@ import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { CenterAdminHeatmap } from '@/components/dashboard/center-admin-heatmap';
+import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 
 const isLikelyUid = (value: string): boolean => {
   const normalized = value.trim();
@@ -160,6 +162,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+  const { rows: adminHeatmapRows, isLoading: adminHeatmapLoading } = useCenterAdminHeatmap({
+    centerId,
+    isActive,
+    selectedClass,
+  });
 
   // 1. 센터 모든 재원생
   const membersQuery = useMemoFirebase(() => {
@@ -1332,6 +1339,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       {metrics ? (
         <>
+          <section className="px-1">
+            <CenterAdminHeatmap
+              title="운영 히트맵"
+              description="운영 KPI, 학부모 반응, 위험 인텔리전스, 수납, 운영 효율을 같은 건강도 체계로 확인합니다."
+              rows={adminHeatmapRows}
+              isLoading={adminHeatmapLoading}
+              variant="full"
+            />
+          </section>
+
           <section className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <Activity className="h-5 w-5 text-primary" />
