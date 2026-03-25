@@ -984,9 +984,9 @@ function formatMinutes(minutes: number) {
 
 const PARENT_CALENDAR_LEGEND = [
   { label: '기록 없음', swatch: 'from-white via-slate-50 to-slate-100 ring-slate-200/90' },
-  { label: '짧은 몰입', swatch: 'from-white via-emerald-50 to-emerald-100 ring-emerald-200/85' },
-  { label: '집중 흐름', swatch: 'from-white via-teal-50 to-emerald-100 ring-teal-200/85' },
-  { label: '깊은 몰입', swatch: 'from-white via-sky-50 to-indigo-100 ring-blue-200/90' },
+  { label: '짧은 몰입', swatch: 'from-white via-emerald-100 to-emerald-200 ring-emerald-300/90' },
+  { label: '집중 흐름', swatch: 'from-white via-teal-100 to-cyan-200 ring-teal-300/90' },
+  { label: '깊은 몰입', swatch: 'from-white via-sky-100 to-indigo-200 ring-blue-300/90' },
 ] as const;
 
 function formatWon(value: number) {
@@ -2247,20 +2247,30 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const getHeatmapColor = (minutes: number) => {
     if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
-    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(246,253,249,0.98)_62%,rgba(238,251,245,0.98)_100%)] ring-1 ring-inset ring-emerald-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.16)]';
-    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,247,0.98)_58%,rgba(229,250,242,0.98)_100%)] ring-1 ring-inset ring-emerald-200/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.18)]';
-    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(236,253,250,0.98)_54%,rgba(227,248,248,0.98)_100%)] ring-1 ring-inset ring-teal-200/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.18)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(239,250,255,0.98)_52%,rgba(228,240,255,0.98)_100%)] ring-1 ring-inset ring-sky-200/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.18)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(236,245,255,0.98)_48%,rgba(226,235,255,0.98)_100%)] ring-1 ring-inset ring-blue-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.2)]';
+    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
+    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(229,252,242,0.98)_56%,rgba(214,247,233,0.98)_100%)] ring-1 ring-inset ring-emerald-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.22)]';
+    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(223,250,246,0.98)_52%,rgba(210,243,246,0.98)_100%)] ring-1 ring-inset ring-teal-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.22)]';
+    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
     if (minutes === 0) return 'from-slate-200 via-slate-300 to-slate-200';
-    if (minutes < 60) return 'from-emerald-200 via-emerald-300 to-teal-300';
-    if (minutes < 180) return 'from-emerald-300 via-teal-300 to-cyan-300';
-    if (minutes < 300) return 'from-teal-300 via-cyan-300 to-sky-300';
-    if (minutes < 480) return 'from-sky-300 via-blue-300 to-indigo-300';
-    return 'from-sky-400 via-blue-400 to-indigo-500';
+    if (minutes < 60) return 'from-emerald-300 via-emerald-400 to-teal-400';
+    if (minutes < 180) return 'from-emerald-400 via-teal-400 to-cyan-400';
+    if (minutes < 300) return 'from-teal-400 via-cyan-400 to-sky-400';
+    if (minutes < 480) return 'from-sky-400 via-blue-400 to-indigo-400';
+    return 'from-sky-500 via-blue-500 to-indigo-600';
+  };
+
+  const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
+    if (minutes === 0) return 'border-slate-200 text-slate-500';
+    if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
+    if (minutes < 180) return 'border-emerald-400/95 text-slate-950';
+    if (minutes < 300) return 'border-teal-400/95 text-slate-950';
+    if (minutes < 480) return 'border-sky-400/95 text-slate-950';
+    return 'border-indigo-400/95 text-slate-950';
   };
 
   const notifications: ParentNotificationItem[] = useMemo(() => {
@@ -3237,7 +3247,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
                         {isCurrentMonth && (
                           <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
-                            <div className={cn("h-[3px] rounded-full bg-gradient-to-r opacity-90", getCalendarAccentClass(minutes))} />
+                            <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                           </div>
                         )}
                         <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
@@ -3263,20 +3273,31 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
                           <div
                             className={cn(
-                              "rounded-[0.9rem] border bg-white text-center font-mono font-black tabular-nums leading-tight tracking-[0.02em] whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              isMobile ? "px-2 py-1.5 text-[10px] md:text-[11px]" : "px-3 py-2 text-[13px]",
-                              isCurrentMonth && minutes > 0
-                                ? "border-slate-300/90 text-slate-900"
-                                : "border-slate-200 text-slate-500"
+                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                              isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
+                              getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                             )}
                           >
-                            {timeLabel}
+                            {isMobile ? (
+                              <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
+                                {timeLabel}
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                  공부시간
+                                </span>
+                                <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
+                                  {timeLabel}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {!isMobile && isCurrentMonth && (
                           <div className="pointer-events-none absolute inset-x-3 bottom-12">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                              {minutes > 0 ? '학습 기록' : '기록 대기'}
+                              {minutes > 0 ? '오늘 학습 기록' : '기록 대기'}
                             </div>
                           </div>
                         )}
