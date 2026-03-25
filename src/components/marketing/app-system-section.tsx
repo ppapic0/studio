@@ -145,10 +145,10 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
           />
         </div>
 
-        <div className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start">
+        <div className="mt-10 space-y-5">
           {featuredScreen ? <ScreenCard screen={featuredScreen} featured /> : null}
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="grid gap-5 md:grid-cols-2">
             {sideScreens.map((screen) => (
               <ScreenCard key={screen.title} screen={screen} />
             ))}
