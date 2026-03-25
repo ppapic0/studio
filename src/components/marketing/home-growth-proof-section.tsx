@@ -70,7 +70,7 @@ export function HomeGrowthProofSection() {
                     STEP 0{index + 1} · {item.step}
                   </p>
                   <p className="mt-1 text-[1rem] font-black leading-[1.42] text-[#14295F]">{item.title}</p>
-                  <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.68] text-[#53687F]">{item.summary}</p>
+                  <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.68] text-[#3A5470]">{item.summary}</p>
                 </article>
               ))}
             </div>
@@ -79,16 +79,16 @@ export function HomeGrowthProofSection() {
               <p className="text-[10px] font-black tracking-[0.18em] text-white/60">BEFORE / AFTER</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1rem] bg-white/8 px-4 py-4">
-                  <p className="text-[11px] font-black text-white/68">국어 백분위</p>
-                  <p className="mt-1 text-[1.1rem] font-black">82 → 96 → 99</p>
+                  <p className="text-[11px] font-black text-white/80">국어 백분위</p>
+                  <p className="mt-1 text-[1.35rem] font-black">82 → 96 → 99</p>
                 </div>
                 <div className="rounded-[1rem] bg-white/8 px-4 py-4">
-                  <p className="text-[11px] font-black text-white/68">주간 학습 시간</p>
-                  <p className="mt-1 text-[1.1rem] font-black">21h → 34h</p>
+                  <p className="text-[11px] font-black text-white/80">주간 학습 시간</p>
+                  <p className="mt-1 text-[1.35rem] font-black">21h → 34h</p>
                 </div>
                 <div className="rounded-[1rem] bg-white/8 px-4 py-4">
-                  <p className="text-[11px] font-black text-white/68">개입 기록</p>
-                  <p className="mt-1 text-[1.1rem] font-black">14회 누적</p>
+                  <p className="text-[11px] font-black text-white/80">개입 기록</p>
+                  <p className="mt-1 text-[1.35rem] font-black">14회 누적</p>
                 </div>
               </div>
             </div>
@@ -110,19 +110,19 @@ export function HomeGrowthProofSection() {
                   key={item.image}
                   className="overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white shadow-[0_10px_26px_rgba(20,41,95,0.06)]"
                 >
-                  <div className="relative aspect-[0.92/1]">
+                  <div className="relative aspect-[3/4]">
                     <Image
                       src={item.image}
                       alt={item.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 33vw"
-                      className="object-cover object-top"
+                      className="object-cover object-center"
                     />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0d1732]/88 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <p className="text-[10px] font-black tracking-[0.16em] text-white/68">{item.label}</p>
-                      <p className="mt-1 text-[14px] font-black text-white">{item.title}</p>
-                      <p className="mt-1 text-[11px] font-semibold text-white/74">{item.caption}</p>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0d1732]/88 to-transparent" />
+                    <div className="absolute bottom-3 left-4 right-4">
+                      <p className="text-[10px] font-black tracking-[0.16em] text-white/80">{item.label}</p>
+                      <p className="mt-0.5 text-[14px] font-black text-white">{item.title}</p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-white/90">{item.caption}</p>
                     </div>
                   </div>
                 </article>
@@ -145,7 +145,7 @@ export function HomeGrowthProofSection() {
                   <p className="mt-2 break-keep text-[1.1rem] font-black leading-[1.45] text-[#14295F]">
                     성적표만이 아니라 실제 피드백 흐름도 함께 남깁니다
                   </p>
-                  <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.72] text-[#53687F]">
+                  <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.72] text-[#3A5470]">
                     증빙 이미지는 이 섹션에만 모아서 보여주고, 다른 섹션에서는 같은 이미지를 반복하지 않습니다.
                   </p>
                 </div>
