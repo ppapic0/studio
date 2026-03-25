@@ -243,7 +243,7 @@ export const marketingContent: MarketingContent = {
   ],
   successStory: {
     title: '성장 사례',
-    summary: '3등급에서 출발해 수능 백분위 99, 고려대학교 합격으로 이어진 실제 사례가 있습니다.',
+    summary: '3등급에서 출발해 수능 백분위 99, 고려대학교 합격으로 이어졌습니다. 이 사례는 시작일 뿐, 더 많은 변화가 이어지고 있습니다.',
   },
   classSystem: [
     {
