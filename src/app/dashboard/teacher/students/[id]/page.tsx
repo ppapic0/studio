@@ -54,6 +54,7 @@ type DailyStatSnapshot = {
 };
 type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
 type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
+type DetailPresentationMode = 'default' | 'student-analysis';
 
 const STATUS_LABEL: Record<CounselingReservation['status'], string> = {
   requested: '요청',
@@ -203,10 +204,50 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
   return fallback;
 }
 
-const CustomTooltip = ({ active, payload, label, unit = '분' }: any) => {
+function getPresentationTone(colorClass: string) {
+  if (colorClass.includes('emerald')) {
+    return {
+      chip: 'border-[#d5f2e7] bg-[#effcf6] text-[#0f8f65]',
+      text: 'text-[#0f8f65]',
+      bar: 'from-[#0f8f65] via-[#1cb980] to-[#6ce0b0]',
+    };
+  }
+  if (colorClass.includes('amber')) {
+    return {
+      chip: 'border-[#ffe1c5] bg-[#fff3e8] text-[#d86a11]',
+      text: 'text-[#d86a11]',
+      bar: 'from-[#ff7a16] via-[#ff9438] to-[#ffc58b]',
+    };
+  }
+  if (colorClass.includes('violet')) {
+    return {
+      chip: 'border-[#eadfff] bg-[#f6f0ff] text-[#7d4ed8]',
+      text: 'text-[#7d4ed8]',
+      bar: 'from-[#7d4ed8] via-[#9d6bff] to-[#c6abff]',
+    };
+  }
+  if (colorClass.includes('rose')) {
+    return {
+      chip: 'border-[#ffdbe2] bg-[#fff2f5] text-[#dc4b74]',
+      text: 'text-[#dc4b74]',
+      bar: 'from-[#dc4b74] via-[#f1668f] to-[#f8a3b8]',
+    };
+  }
+  return {
+    chip: 'border-[#d9e6ff] bg-[#eef4ff] text-[#2554d4]',
+    text: 'text-[#2554d4]',
+    bar: 'from-[#2554d4] via-[#4f7cff] to-[#87aaff]',
+  };
+}
+
+const CustomTooltip = ({ active, payload, label, unit = '분', presentationMode = 'default' }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white/95 backdrop-blur-xl border-2 border-primary/10 p-4 rounded-2xl shadow-xl ring-1 ring-black/5">
+      <div className={cn(
+        presentationMode === 'student-analysis'
+          ? 'analysis-card rounded-[1.15rem] border-none px-4 py-3 shadow-[0_22px_36px_-28px_rgba(20,41,95,0.46)]'
+          : 'bg-white/95 backdrop-blur-xl border-2 border-primary/10 p-4 rounded-2xl shadow-xl ring-1 ring-black/5'
+      )}>
         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{label}</p>
         <div className="flex items-baseline gap-1.5"><span className="text-2xl font-black text-primary">{payload[0].value}</span><span className="text-xs font-black text-primary/60">{unit}</span></div>
       </div>
@@ -215,7 +256,67 @@ const CustomTooltip = ({ active, payload, label, unit = '분' }: any) => {
   return null;
 };
 
-function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMobile, onClick }: { title: string; value: string; subValue: string; icon: any; colorClass: string; isMobile: boolean; onClick?: () => void; }) {
+function StatAnalysisCard({
+  title,
+  value,
+  subValue,
+  icon: Icon,
+  colorClass,
+  isMobile,
+  onClick,
+  presentationMode = 'default',
+  progress = 0,
+}: {
+  title: string;
+  value: string;
+  subValue: string;
+  icon: any;
+  colorClass: string;
+  isMobile: boolean;
+  onClick?: () => void;
+  presentationMode?: DetailPresentationMode;
+  progress?: number;
+}) {
+  const tone = getPresentationTone(colorClass);
+
+  if (presentationMode === 'student-analysis') {
+    return (
+      <Card
+        className={cn(
+          'analysis-kpi-card min-w-0 overflow-hidden rounded-[1.5rem] border-none bg-white transition-all',
+          onClick && 'cursor-pointer active:scale-[0.985]'
+        )}
+        onClick={onClick}
+      >
+        <CardHeader className={cn('pb-2 flex flex-row items-start justify-between', isMobile ? 'px-4 pt-4' : 'px-5 pt-5')}>
+          <div className="min-w-0">
+            <CardTitle className={cn('min-w-0 font-black uppercase break-keep text-[#64789f]', isMobile ? 'text-[9px] leading-tight tracking-[0.2em]' : 'text-[10px] tracking-[0.22em]')}>
+              {title}
+            </CardTitle>
+            <div className={cn('mt-3 font-black tracking-tight break-keep text-[#14295F]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
+              {value}
+            </div>
+            <p className={cn('font-semibold mt-1 break-keep text-[#5c6f96]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
+              {subValue}
+            </p>
+          </div>
+          <div className={cn('rounded-[1rem] border px-3 py-2 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.32)]', tone.chip)}>
+            <Icon className={cn(isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4', tone.text)} />
+          </div>
+        </CardHeader>
+        <CardContent className={cn(isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+          <div className="analysis-kpi-track">
+            <span className={cn('bg-gradient-to-r', tone.bar)} style={{ width: `${Math.max(0, Math.min(100, Math.round(progress)))}%` }} />
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8290b0]">Insight Rail</span>
+            <span className={cn('text-[10px] font-black', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className={cn('min-w-0 border-none shadow-md overflow-hidden relative bg-white rounded-[1.5rem] sm:rounded-[2rem] transition-all', onClick && 'hover:shadow-xl active:scale-[0.98] cursor-pointer')} onClick={onClick}>
       <div className={cn('absolute top-0 left-0 w-1 h-full', colorClass.replace('text-', 'bg-'))} />
@@ -228,7 +329,13 @@ function StatAnalysisCard({ title, value, subValue, icon: Icon, colorClass, isMo
   );
 }
 
-export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function StudentDetailPage({
+  params,
+  presentationMode = 'default',
+}: {
+  params: Promise<{ id: string }>;
+  presentationMode?: DetailPresentationMode;
+}) {
   const { id: studentId } = use(params);
   const { user: currentUser } = useUser();
   const { activeMembership, viewMode } = useAppContext();
@@ -238,6 +345,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
 
   const isMobile = viewMode === 'mobile';
+  const isAnalysisPresentation = presentationMode === 'student-analysis';
   const centerId = activeMembership?.id;
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
@@ -1265,10 +1373,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const isDataLoading = statsLoading || plansLoading || studyLogLoading;
+  const counselingProgress = studentReservations.length > 0
+    ? Math.round((studentReservations.filter((item) => item.status === 'done').length / studentReservations.length) * 100)
+    : 0;
+  const detailActionButtonClass = isAnalysisPresentation ? 'analysis-action-button' : '';
+  const detailTabListClass = isAnalysisPresentation
+    ? cn('analysis-tab-rail rounded-[1.5rem] grid p-1.5 gap-1.5', isMobile ? 'h-auto grid-cols-2' : 'h-14 grid-cols-3')
+    : cn('rounded-2xl bg-muted/30 grid p-1 gap-1', isMobile ? 'h-auto grid-cols-2' : 'h-12 grid-cols-3');
+  const detailTabTriggerClass = isAnalysisPresentation
+    ? 'analysis-tab-trigger min-w-0 rounded-[1rem] font-black text-xs gap-1.5 px-3 py-2.5'
+    : 'min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2';
 
   return (
-    <div className={cn('flex flex-col max-w-7xl mx-auto px-4 w-full min-w-0 overflow-x-hidden', isMobile ? 'gap-4 pb-32' : 'gap-6 pb-24')}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className={cn(
+      'flex flex-col max-w-7xl mx-auto px-4 w-full min-w-0 overflow-x-hidden',
+      isMobile ? 'gap-4 pb-32' : 'gap-6 pb-24',
+      isAnalysisPresentation && 'analysis-shell student-analysis-shell'
+    )}>
+      <div className={cn(
+        'flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between',
+        isAnalysisPresentation && 'analysis-profile-shell'
+      )}>
         <div className="flex items-start gap-4 min-w-0">
           {!isStudentSelfView && (
             <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 mt-1" asChild>
@@ -1293,14 +1418,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
-          {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
-          {canWriteCounseling && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
-          {canEditStudentInfo && <Button variant="outline" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
+          {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
+          {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
+          {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
+          {canEditStudentInfo && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
           {canEditGrowthData && (
             <Button
               variant="outline"
-              className="rounded-2xl font-black h-11 px-5 text-xs gap-2"
+              className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)}
               onClick={() => {
                 setIsMasteryModalOpen(true);
                 setIsEditStats(true);
@@ -1313,7 +1438,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
+      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4", isAnalysisPresentation && 'analysis-summary-rail')}>
         <StatAnalysisCard
           title="평균 공부시간"
           value={minutesToLabel(avgStudyMinutes)}
@@ -1322,6 +1447,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           colorClass="text-blue-500"
           isMobile={isMobile}
           onClick={() => setIsAvgStudyModalOpen(true)}
+          presentationMode={presentationMode}
+          progress={(avgStudyMinutes / 180) * 100}
         />
         <StatAnalysisCard
           title="평균 공부 리듬"
@@ -1331,6 +1458,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           colorClass="text-emerald-500"
           isMobile={isMobile}
           onClick={() => setIsRhythmGuideModalOpen(true)}
+          presentationMode={presentationMode}
+          progress={rhythmScore}
         />
         <StatAnalysisCard
           title="계획 완수율"
@@ -1339,6 +1468,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           icon={CheckCircle2}
           colorClass="text-amber-500"
           isMobile={isMobile}
+          presentationMode={presentationMode}
+          progress={avgCompletionRate}
         />
         <StatAnalysisCard
           title="상담 진행도"
@@ -1347,14 +1478,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           icon={MessageSquare}
           colorClass="text-rose-500"
           isMobile={isMobile}
+          presentationMode={presentationMode}
+          progress={counselingProgress}
         />
       </section>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6 min-w-0">
-        <TabsList className={cn("rounded-2xl bg-muted/30 grid p-1 gap-1", isMobile ? "h-auto grid-cols-2" : "h-12 grid-cols-3")}>
-          <TabsTrigger value="overview" className="min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2"><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
-          <TabsTrigger value="counseling" className="min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2"><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
-          <TabsTrigger value="plans" className={cn("min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2", isMobile && "col-span-2")}><BookOpen className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">계획/루틴</span></TabsTrigger>
+        <TabsList className={detailTabListClass}>
+          <TabsTrigger value="overview" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
+          <TabsTrigger value="counseling" className={detailTabTriggerClass}><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
+          <TabsTrigger value="plans" className={cn(detailTabTriggerClass, isMobile && "col-span-2")}><BookOpen className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">계획/루틴</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
@@ -1392,7 +1525,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
 
-          <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]">
+          <Card className={cn("rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]", isAnalysisPresentation && "analysis-signal-band border-none")}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-black tracking-tight flex items-center gap-2 text-[#14295F]">
                 <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
@@ -1432,7 +1565,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           {!isMobile && (
           <div className="grid gap-4">
-            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+            <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1470,7 +1603,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+            <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1481,8 +1614,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <span className={cn("text-sm font-black", latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                       최근 7일 {latestDailyLearningGrowthPercent >= 0 ? '+' : ''}{latestDailyLearningGrowthPercent}%
                     </span>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                    <Button variant="outline" size="sm" className={cn("h-7 px-2 text-[11px] font-black", isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                    <Button variant="outline" size="sm" className={cn("h-7 px-2 text-[11px] font-black", isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
                   </div>
                 </div>
               </CardHeader>
@@ -1512,7 +1645,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+            <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1556,7 +1689,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+            <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-black tracking-tight">공부 시작/종료 시각 추이</CardTitle>
                 <CardDescription className="font-bold text-[11px]">최근 14일의 첫 공부 시작 시각과 마지막 종료 시각입니다.</CardDescription>
@@ -1589,7 +1722,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+            <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-black tracking-tight">학습 중간 외출시간 추이</CardTitle>
                 <CardDescription className="font-bold text-[11px]">외출시간이 늘어나면 집중도가 떨어집니다.</CardDescription>
@@ -1622,7 +1755,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           {isMobile ? (
             <>
               <div className="grid gap-4">
-                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1660,7 +1793,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1674,8 +1807,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardHeader>
                   <CardContent className="space-y-2 pt-0">
                     <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
-                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] font-black" onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                      <Button variant="outline" size="sm" className={cn("h-7 px-2 text-[11px] font-black", isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                      <Button variant="outline" size="sm" className={cn("h-7 px-2 text-[11px] font-black", isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
                     </div>
                     {hasDailyGrowthData ? (
                       <div className="h-[240px] w-full">
@@ -1702,7 +1835,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1734,7 +1867,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-black tracking-tight">공부 시작/종료 시각 추이</CardTitle>
                     <CardDescription className="font-bold text-[11px]">최근 14일의 첫 공부 시작 시각과 마지막 종료 시각입니다.</CardDescription>
@@ -1765,7 +1898,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-slate-200 bg-white">
+                <Card className={cn("rounded-[1.5rem] border border-slate-200 bg-white", isAnalysisPresentation && "analysis-chart-stage border-none")}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-black tracking-tight">학습 중간 외출시간 추이</CardTitle>
                     <CardDescription className="font-bold text-[11px]">외출시간이 늘어나면 집중도가 떨어집니다.</CardDescription>
@@ -1833,7 +1966,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           ) : (
             <>
               <div className="grid gap-6 lg:grid-cols-12">
-                <Card className="lg:col-span-8 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+                <Card className={cn("lg:col-span-8 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 공부시간 추이</CardTitle>
@@ -1841,7 +1974,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
                       {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
-                        <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className="h-8 px-3 rounded-lg text-[10px] font-black" onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
+                        <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className={cn("h-8 px-3 rounded-lg text-[10px] font-black", isAnalysisPresentation && focusedChartView !== key && detailActionButtonClass)} onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
                       ))}
                     </div>
                   </CardHeader>
@@ -1855,7 +1988,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
                           <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
                           <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={38} />
-                          <Tooltip content={<CustomTooltip unit="분" />} />
+                          <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
                           <Area type="monotone" dataKey="studyMinutes" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#studyMinutesGradient)" />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -1863,7 +1996,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-4 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden">
+                <Card className={cn("lg:col-span-4 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
                     <CardDescription className="font-bold text-[11px]">일별 완료율로 실행력의 안정성을 점검합니다.</CardDescription>
@@ -1875,7 +2008,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
                           <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
                           <YAxis tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={32} domain={[0, 100]} />
-                          <Tooltip content={<CustomTooltip unit="%" />} />
+                          <Tooltip content={<CustomTooltip unit="%" presentationMode={presentationMode} />} />
                           <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
                           <Line type="monotone" dataKey="completionRate" stroke="#b45309" strokeWidth={2.5} dot={{ r: 3, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} />
                         </ComposedChart>
@@ -1942,7 +2075,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     const scheduledAt = reservation.scheduledAt?.toDate();
                     const isPast = scheduledAt ? isBefore(scheduledAt, startOfDay(today)) : false;
                     return (
-                      <div key={reservation.id} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
+                    <div key={reservation.id} className={cn("rounded-xl border border-border/60 bg-muted/10 px-3 py-3", isAnalysisPresentation && "analysis-record-card")}>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <p className="text-sm font-black text-slate-800">{scheduledAt ? format(scheduledAt, 'M월 d일 (EEE) HH:mm', { locale: ko }) : '일정 미기입'}</p>
                           <Badge className={cn('font-black text-[10px] rounded-full px-2.5', reservation.status === 'done' && 'bg-emerald-500', reservation.status === 'confirmed' && 'bg-blue-500', reservation.status === 'requested' && 'bg-amber-500', reservation.status === 'canceled' && 'bg-slate-500')}>{STATUS_LABEL[reservation.status]}</Badge>
@@ -1978,7 +2111,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     ) : (
                       <div className="space-y-2">
                         {studentQuickFeedbacks.slice(0, 4).map((feedback) => (
-                          <div key={feedback.id} className="rounded-xl border border-white bg-white px-3 py-3 shadow-sm">
+                          <div key={feedback.id} className={cn("rounded-xl border border-white bg-white px-3 py-3 shadow-sm", isAnalysisPresentation && "analysis-record-card")}>
                             <div className="mb-1 flex items-center gap-2">
                               <Badge className="border-none bg-[#fff3e9] text-[#ff7a16] font-black text-[9px] h-5 px-2">
                                 한 줄 피드백
@@ -2016,7 +2149,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
                       '';
                     return (
-                    <div key={log.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
+                    <div key={log.id} className={cn("rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm", isAnalysisPresentation && "analysis-record-card")}>
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge className="font-black text-[10px] rounded-full bg-primary text-white">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
                         <Badge
@@ -2068,7 +2201,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 pastPlanGroups.map((group) => {
                   const date = new Date(`${group.dateKey}T00:00:00`);
                   return (
-                    <div key={group.dateKey} className="rounded-xl border border-border/60 p-3.5 bg-muted/10">
+                    <div key={group.dateKey} className={cn("rounded-xl border border-border/60 p-3.5 bg-muted/10", isAnalysisPresentation && "analysis-dual-lane-card")}>
                       <div className="flex items-center justify-between mb-2"><p className="text-sm font-black text-slate-800">{format(date, 'M월 d일 (EEE)', { locale: ko })}</p><Badge variant="outline" className="font-black text-[10px] rounded-full">학습 {group.studies.length} · 루틴 {group.routines.length}</Badge></div>
                       <div className="grid gap-2 md:grid-cols-2">
                         <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-2.5"><p className="text-[11px] font-black text-emerald-700 mb-1.5">학습 할 일</p>{group.studies.length === 0 ? <p className="text-xs font-bold text-emerald-700/70">등록된 학습 계획 없음</p> : <div className="space-y-1">{group.studies.slice(0, 4).map((item) => <div key={item.id} className="flex items-center justify-between text-xs font-semibold text-emerald-800"><span className="truncate pr-2">{item.title}</span><span className="shrink-0 font-black">{item.done ? '완료' : '대기'}</span></div>)}</div>}</div>
@@ -2209,7 +2342,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
                     <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
                     <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={36} />
-                    <Tooltip content={<CustomTooltip unit="분" />} />
+                          <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
                     <Area type="monotone" dataKey="studyMinutes" stroke="#10b981" strokeWidth={3} fill="url(#rhythmStudyMinutesGradient)" />
                   </AreaChart>
                 </ResponsiveContainer>

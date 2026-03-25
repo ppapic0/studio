@@ -71,6 +71,13 @@ export async function POST(request: Request) {
     const consultationDate = getKoreaDateKey();
     const requestId = adminDb.collection("marketingConsultRequests").doc().id;
     const receiptId = requestId.slice(0, 8).toUpperCase();
+    const shouldAutoCreateLead = Boolean(centerId && requestType === "study_center_waitlist");
+    const autoLeadId = shouldAutoCreateLead
+      ? adminDb.collection("centers").doc(centerId!).collection("consultingLeads").doc().id
+      : null;
+    const autoWaitlistId = shouldAutoCreateLead
+      ? adminDb.collection("centers").doc(centerId!).collection("admissionWaitlist").doc().id
+      : null;
 
     const payload = {
       ...fields,
@@ -82,6 +89,7 @@ export async function POST(request: Request) {
       source: WEBSITE_CONSULT_SOURCE,
       sourceLabel: WEBSITE_CONSULT_LABEL,
       status: "new",
+      linkedLeadId: autoLeadId,
       createdAt,
       updatedAt: createdAt,
     };
@@ -98,12 +106,50 @@ export async function POST(request: Request) {
         .doc(requestId);
       batch.set(centerRequestRef, { ...payload, receiptId });
 
-      if (requestType === "study_center_waitlist") {
+      if (shouldAutoCreateLead && autoLeadId && autoWaitlistId) {
+        const leadRef = adminDb
+          .collection("centers")
+          .doc(centerId)
+          .collection("consultingLeads")
+          .doc(autoLeadId);
         const waitlistRef = adminDb
           .collection("centers")
           .doc(centerId)
           .collection("admissionWaitlist")
-          .doc();
+          .doc(autoWaitlistId);
+
+        const memoLines = [
+          "웹 입학 대기 신청",
+          `학교: ${fields.school}`,
+          `학년: ${fields.grade}`,
+          `웹 접수: ${createdAt}`,
+        ];
+
+        batch.set(leadRef, {
+          studentName: fields.studentName,
+          parentName: "웹사이트 문의",
+          parentPhone: fields.consultPhone,
+          studentPhone: "",
+          school: fields.school,
+          grade: fields.grade,
+          marketingChannel: WEBSITE_CONSULT_LABEL,
+          referralRoute: "기타",
+          referrerName: "",
+          consultationDate,
+          status: "new",
+          serviceType,
+          requestType,
+          requestTypeLabel,
+          memo: memoLines.join("\n"),
+          source: WEBSITE_CONSULT_SOURCE,
+          sourceRequestId: requestId,
+          addedToWaitlistId: autoWaitlistId,
+          addedToWaitlistIds: [autoWaitlistId],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdByUid: null,
+        });
+
         batch.set(waitlistRef, {
           studentName: fields.studentName,
           parentPhone: fields.consultPhone,
@@ -114,7 +160,7 @@ export async function POST(request: Request) {
           status: "waiting",
           memo: WEBSITE_CONSULT_LABEL,
           waitlistDate: consultationDate,
-          sourceLeadId: null,
+          sourceLeadId: autoLeadId,
           sourceWebsiteRequestId: requestId,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),

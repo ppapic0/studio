@@ -549,7 +549,341 @@
     animation: track-runner-spark 1.5s ease-in-out infinite;
   }
 
+  @keyframes analysis-sheen {
+    0% {
+      transform: translateX(-130%);
+      opacity: 0;
+    }
+    18% {
+      opacity: 0.34;
+    }
+    55% {
+      opacity: 0.18;
+    }
+    100% {
+      transform: translateX(130%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes analysis-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.58;
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+  }
+
+  .analysis-shell {
+    position: relative;
+  }
+
+  .analysis-tab-rail {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 41, 95, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(243,247,255,0.98) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 14px 32px -24px rgba(20,41,95,0.32);
+  }
+
+  .analysis-tab-rail::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.65) 18%, rgba(255,255,255,0) 42%),
+      radial-gradient(circle at 85% 20%, rgba(255,122,22,0.1), transparent 28%);
+  }
+
+  .analysis-tab-trigger {
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    color: rgba(20, 41, 95, 0.68);
+    transition:
+      transform 180ms ease-out,
+      color 180ms ease-out,
+      background-color 180ms ease-out,
+      box-shadow 180ms ease-out;
+  }
+
+  .analysis-tab-trigger[data-state="active"] {
+    color: #14295f;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,255,0.98) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 12px 28px -24px rgba(20,41,95,0.34),
+      0 0 0 1px rgba(20,41,95,0.05);
+  }
+
+  .analysis-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 41, 95, 0.11);
+    background:
+      radial-gradient(circle at top right, rgba(79,124,255,0.08), transparent 26%),
+      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(247,250,255,0.99) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 10px 24px -20px rgba(20,41,95,0.34),
+      0 24px 44px -30px rgba(20,41,95,0.26);
+  }
+
+  .analysis-card::before,
+  .analysis-kpi-card::before,
+  .analysis-chart-stage::before,
+  .analysis-signal-band::before,
+  .analysis-profile-shell::before {
+    content: "";
+    position: absolute;
+    inset-x: 1.25rem;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.8), rgba(255,255,255,0));
+  }
+
+  .analysis-card-warm {
+    border-color: rgba(255, 122, 22, 0.16);
+    background:
+      radial-gradient(circle at top right, rgba(255,122,22,0.12), transparent 32%),
+      linear-gradient(180deg, rgba(255,249,242,1) 0%, rgba(255,255,255,0.99) 100%);
+  }
+
+  .analysis-kpi-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 41, 95, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(247,250,255,0.98) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 12px 26px -22px rgba(20,41,95,0.28),
+      0 20px 36px -28px rgba(20,41,95,0.22);
+  }
+
+  .analysis-kpi-card::after,
+  .analysis-chart-stage::after,
+  .analysis-profile-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.24) 42%, transparent 66%);
+    transform: translateX(-130%);
+    animation: analysis-sheen 7.2s linear infinite;
+  }
+
+  .analysis-kpi-track {
+    height: 0.38rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(20, 41, 95, 0.08);
+    box-shadow: inset 0 1px 1px rgba(20,41,95,0.08);
+  }
+
+  .analysis-kpi-track > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2554d4 0%, #4f7cff 58%, #ff7a16 100%);
+    box-shadow: 0 0 14px rgba(79,124,255,0.28);
+  }
+
+  .analysis-chart-stage {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 41, 95, 0.12);
+    background:
+      radial-gradient(circle at 15% 0%, rgba(79,124,255,0.09), transparent 28%),
+      radial-gradient(circle at 100% 18%, rgba(255,122,22,0.08), transparent 24%),
+      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(245,249,255,0.99) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 16px 34px -28px rgba(20,41,95,0.34),
+      0 26px 52px -38px rgba(20,41,95,0.22);
+  }
+
+  .analysis-signal-band {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(31, 79, 191, 0.12);
+    background:
+      linear-gradient(135deg, rgba(244,248,255,0.95) 0%, rgba(255,255,255,0.96) 44%, rgba(255,247,240,0.92) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.94),
+      0 14px 28px -26px rgba(20,41,95,0.22);
+  }
+
+  .analysis-health-card,
+  .analysis-record-card,
+  .analysis-dual-lane-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 41, 95, 0.09);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(249,251,255,0.98) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.92),
+      0 12px 24px -24px rgba(20,41,95,0.22);
+  }
+
+  .analysis-health-card {
+    min-width: 0;
+  }
+
+  .analysis-risk-chip {
+    border: 1px solid rgba(255, 122, 22, 0.18);
+    background:
+      linear-gradient(180deg, rgba(255,247,238,1) 0%, rgba(255,255,255,0.98) 100%);
+    color: #9a4c13;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.92),
+      0 14px 24px -26px rgba(255,122,22,0.28);
+  }
+
+  .analysis-ring-shell {
+    position: relative;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    box-shadow:
+      0 18px 30px -24px rgba(20,41,95,0.36),
+      inset 0 1px 0 rgba(255,255,255,0.42);
+  }
+
+  .analysis-ring-core {
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(246,249,255,0.98) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.94),
+      0 8px 18px -18px rgba(20,41,95,0.26);
+  }
+
+  .analysis-pulse-dot {
+    animation: analysis-pulse 1.9s ease-in-out infinite;
+  }
+
+  .analysis-profile-shell {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 41, 95, 0.12);
+    border-radius: 2rem;
+    padding: 1.25rem;
+    background:
+      radial-gradient(circle at top left, rgba(79,124,255,0.12), transparent 30%),
+      radial-gradient(circle at top right, rgba(255,122,22,0.12), transparent 28%),
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,248,255,0.98) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 18px 36px -30px rgba(20,41,95,0.28);
+  }
+
+  .analysis-action-button {
+    border-color: rgba(20, 41, 95, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,255,0.98) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.94),
+      0 14px 24px -24px rgba(20,41,95,0.28);
+  }
+
+  .analysis-summary-rail {
+    position: relative;
+  }
+
+  .student-analysis-shell {
+    position: relative;
+  }
+
+  .student-analysis-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 0% 0%, rgba(79,124,255,0.06), transparent 20%),
+      radial-gradient(circle at 100% 0%, rgba(255,122,22,0.06), transparent 18%);
+  }
+
+  .student-analysis-shell [data-slot="card"]:not(.tier-hero-card) {
+    border: 1px solid rgba(20, 41, 95, 0.11);
+    background:
+      radial-gradient(circle at top right, rgba(79,124,255,0.08), transparent 24%),
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(247,250,255,0.99) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 12px 28px -26px rgba(20,41,95,0.28),
+      0 26px 48px -38px rgba(20,41,95,0.18);
+  }
+
+  .student-analysis-shell [data-slot="card-header"] {
+    position: relative;
+    z-index: 1;
+  }
+
+  .student-analysis-shell .analysis-tab-rail {
+    border-color: rgba(20, 41, 95, 0.12);
+  }
+
+  .student-analysis-shell .analysis-record-card,
+  .student-analysis-shell .analysis-dual-lane-card {
+    transition:
+      transform 180ms ease-out,
+      border-color 180ms ease-out,
+      box-shadow 180ms ease-out;
+  }
+
   @media (hover: hover) {
+    .analysis-card:hover,
+    .analysis-kpi-card:hover,
+    .analysis-chart-stage:hover,
+    .analysis-health-card:hover,
+    .analysis-record-card:hover,
+    .analysis-dual-lane-card:hover,
+    .analysis-profile-shell:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 1px 0 0 rgba(255,255,255,0.98) inset,
+        0 -1px 0 0 rgba(20,41,95,0.04) inset,
+        0 14px 28px -20px rgba(20,41,95,0.24),
+        0 28px 52px -34px rgba(20,41,95,0.22);
+    }
+
+    .analysis-tab-trigger:hover {
+      color: #14295f;
+      transform: translateY(-1px);
+    }
+
+    .analysis-action-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(20, 41, 95, 0.2);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(245,249,255,0.99) 100%);
+    }
+
+    .student-analysis-shell .analysis-record-card:hover,
+    .student-analysis-shell .analysis-dual-lane-card:hover {
+      border-color: rgba(20, 41, 95, 0.18);
+    }
+
     .marketing-card,
     .marketing-card-soft,
     .marketing-card-warm {
@@ -1479,6 +1813,10 @@
   .hero-firework-core,
   .hero-particle-twinkle,
   .float-spark,
+  .analysis-kpi-card::after,
+  .analysis-chart-stage::after,
+  .analysis-profile-shell::after,
+  .analysis-pulse-dot,
   .plan-mission-enter,
   .plan-runner-token,
   .plan-runner-track,
