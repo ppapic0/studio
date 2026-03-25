@@ -37,19 +37,23 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
             {universities.map((u) => (
               <article
                 key={u.label}
-                className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-5 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)]"
+                className="brand-sheen-panel relative overflow-hidden rounded-2xl border border-[#14295F]/10 bg-white px-4 py-5 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)]"
               >
-                <p className="font-brand text-[2.2rem] font-black leading-none text-[#14295F]">{u.value}</p>
-                <p className="mt-2 break-keep text-[12px] font-semibold text-[#47607B]">{u.label}</p>
-                <p className="mt-1 text-[10px] font-semibold text-[#14295F]/42">{u.detail}</p>
+                <div className="brand-glow-drift absolute -right-6 top-0 h-16 w-16 rounded-full bg-[#FFB878]/10 blur-2xl" />
+                <div className="relative">
+                  <p className="brand-number-pop font-brand text-[2.2rem] font-black leading-none text-[#14295F]">{u.value}</p>
+                  <p className="mt-2 break-keep text-[12px] font-semibold text-[#47607B]">{u.label}</p>
+                  <p className="mt-1 text-[10px] font-semibold text-[#14295F]/42">{u.detail}</p>
+                </div>
               </article>
             ))}
           </StaggerChildren>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-[#FF7A16]/18 bg-[#FFF6ED] px-6 py-7 sm:px-8 sm:py-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#FF9848]">Success Story</p>
-          <p className="font-brand mt-3 break-keep text-[1.35rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.55rem]">
+        <div className="brand-sheen-panel relative mt-5 overflow-hidden rounded-2xl border border-[#FF7A16]/18 bg-[#FFF6ED] px-6 py-7 sm:px-8 sm:py-8">
+          <div className="brand-glow-drift absolute right-8 top-4 h-24 w-24 rounded-full bg-[#FFB878]/18 blur-3xl" />
+          <p className="relative text-[10px] font-black uppercase tracking-[0.24em] text-[#FF9848]">Success Story</p>
+          <p className="font-brand relative mt-3 break-keep text-[1.35rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.55rem]">
             {successStory.summary}
           </p>
         </div>

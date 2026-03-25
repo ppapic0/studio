@@ -4,6 +4,7 @@ import { Smartphone, Users } from 'lucide-react';
 import type { MarketingContent } from '@/lib/marketing-content';
 
 import { SectionHeading } from './section-heading';
+import { StaggerChildren } from './stagger-children';
 
 type WebAppShowcaseSectionProps = {
   webAppShowcase: MarketingContent['webAppShowcase'];
@@ -36,14 +37,21 @@ function ScreenshotFrame({ screen }: { screen: ShowcaseScreen }) {
   const style = screenStyleMap[screen.mode as keyof typeof screenStyleMap] ?? screenStyleMap['학생 모드'];
 
   return (
-    <div className={`relative overflow-hidden rounded-[2rem] border p-5 sm:p-7 ${style.canvas}`}>
+    <div className={`brand-sheen-panel relative overflow-hidden rounded-[2rem] border p-5 sm:p-7 ${style.canvas}`}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.82),transparent_52%)]" />
-      <div className="absolute -left-10 bottom-8 h-28 w-28 rounded-full bg-white/40 blur-3xl" />
-      <div className="absolute -right-8 top-10 h-32 w-32 rounded-full bg-white/35 blur-3xl" />
+      <div className="brand-glow-drift absolute -left-10 bottom-8 h-28 w-28 rounded-full bg-white/40 blur-3xl" />
+      <div
+        className="brand-glow-drift absolute -right-8 top-10 h-32 w-32 rounded-full bg-white/35 blur-3xl"
+        style={{ animationDelay: '-2.1s' }}
+      />
+      <div className="brand-glow-drift absolute left-1/2 top-10 h-28 w-28 -translate-x-1/2 rounded-full bg-[#FFB878]/14 blur-3xl" />
 
       <div className="relative flex min-h-[21rem] items-center justify-center sm:min-h-[24rem]">
+        <div className="brand-glow-drift absolute inset-y-8 left-1/2 w-[18rem] -translate-x-1/2 rounded-[3rem] bg-[#14295F]/8 blur-3xl" />
         <div
-          className={`relative aspect-[10/20] w-full max-w-[17rem] overflow-hidden rounded-[2.6rem] border shadow-[0_24px_48px_rgba(20,41,95,0.14)] ${style.device}`}
+          className={`relative aspect-[10/20] w-full max-w-[17rem] overflow-hidden rounded-[2.6rem] border shadow-[0_24px_48px_rgba(20,41,95,0.14)] ${style.device} ${
+            screen.image ? '' : 'brand-sheen-panel'
+          }`}
         >
           {screen.image ? (
             <Image
@@ -81,7 +89,10 @@ function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reve
   const imageColumnClass = reverse ? 'lg:col-start-1 lg:row-span-2 lg:row-start-1' : 'lg:col-start-2 lg:row-span-2 lg:row-start-1';
 
   return (
-    <article className={`rounded-[2rem] border p-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)] sm:p-6 lg:p-8 ${style.card}`}>
+    <article
+      className={`brand-sheen-panel relative overflow-hidden rounded-[2rem] border p-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)] sm:p-6 lg:p-8 ${style.card}`}
+    >
+      <div className="brand-glow-drift absolute -right-10 top-6 h-28 w-28 rounded-full bg-[#FFB878]/12 blur-3xl" />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.84fr)_minmax(0,1.16fr)] lg:gap-x-10">
         <div className={textColumnClass}>
           <div className="flex items-center gap-3">
@@ -106,10 +117,11 @@ function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reve
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2.5">
-            {screen.highlights.map((item) => (
+            {screen.highlights.map((item, index) => (
               <span
                 key={`${screen.mode}-${item}`}
-                className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${style.chip}`}
+                className={`brand-chip-rise rounded-full border px-3 py-1.5 text-[11px] font-black ${style.chip}`}
+                style={{ animationDelay: `${0.08 + index * 0.08}s` }}
               >
                 {item}
               </span>
@@ -125,11 +137,18 @@ export function WebAppShowcaseSection({ webAppShowcase }: WebAppShowcaseSectionP
   return (
     <section
       id="app"
-      className="scroll-mt-28 py-16 sm:py-20"
+      className="relative scroll-mt-28 overflow-hidden py-16 sm:py-20"
       style={{ background: 'linear-gradient(180deg, #F7F9FD 0%, #FFFFFF 100%)' }}
     >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="brand-glow-drift absolute left-[-4%] top-[18%] h-56 w-56 rounded-full bg-[#8CB7FF]/10 blur-[110px]" />
+        <div
+          className="brand-glow-drift absolute right-[-3%] top-[30%] h-64 w-64 rounded-full bg-[#FFB878]/14 blur-[120px]"
+          style={{ animationDelay: '-2.7s' }}
+        />
+      </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center [&_.eyebrow-badge]:mx-auto">
+        <div className="relative mx-auto max-w-3xl text-center [&_.eyebrow-badge]:mx-auto">
           <SectionHeading
             eyebrow="ACTUAL WEB APP"
             title={webAppShowcase.heading}
@@ -137,11 +156,11 @@ export function WebAppShowcaseSection({ webAppShowcase }: WebAppShowcaseSectionP
           />
         </div>
 
-        <div className="mt-10 space-y-5 sm:space-y-6">
+        <StaggerChildren stagger={140} className="mt-10 space-y-5 sm:space-y-6">
           {webAppShowcase.screens.map((screen, index) => (
             <ShowcaseRow key={screen.mode} screen={screen} reverse={index % 2 === 1} />
           ))}
-        </div>
+        </StaggerChildren>
 
         <p className="mt-6 text-center text-[12px] font-semibold text-[#667A95]">
           실제 스크린샷은 순차 반영 예정입니다.

@@ -1610,6 +1610,148 @@
   }
 }
 
+@keyframes brand-glow-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.96);
+    opacity: 0.38;
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.08);
+    opacity: 0.82;
+  }
+}
+
+@keyframes brand-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes brand-chart-draw {
+  from {
+    stroke-dashoffset: var(--brand-path-length, 1000);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes brand-bar-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scaleY(0.35);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes brand-sheen-pass {
+  0% {
+    opacity: 0;
+    transform: translateX(-140%);
+  }
+  18%,
+  60% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(140%);
+  }
+}
+
+@keyframes brand-scan-sweep {
+  0%,
+  100% {
+    transform: translateX(-36%);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateX(36%);
+    opacity: 0.68;
+  }
+}
+
+@keyframes brand-number-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes brand-chip-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes brand-beacon-pulse {
+  0% {
+    transform: scale(0.82);
+    opacity: 0;
+  }
+  22% {
+    opacity: 0.52;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+@keyframes brand-cta-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes brand-arrow-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes brand-flow-line {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.48;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 0.84;
+  }
+  100% {
+    background-position: 200% 50%;
+    opacity: 0.48;
+  }
+}
+
 @keyframes float-spark {
   0%,
   100% {
@@ -1689,6 +1831,133 @@
 .hero-particle-twinkle {
   animation: hero-particle-twinkle 3.8s ease-in-out infinite;
   will-change: transform, opacity;
+}
+
+.brand-glow-drift {
+  animation: brand-glow-drift 9.6s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.brand-pulse-dot {
+  animation: brand-dot-pulse 2.7s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.brand-chart-draw {
+  stroke-dasharray: var(--brand-path-length, 1000);
+  stroke-dashoffset: var(--brand-path-length, 1000);
+}
+
+.sr-visible .brand-chart-draw {
+  animation: brand-chart-draw 1.35s cubic-bezier(0.22, 0.88, 0.24, 1) forwards;
+}
+
+.brand-bar-rise {
+  opacity: 0;
+  transform: translateY(10px) scaleY(0.35);
+  transform-origin: center bottom;
+}
+
+.sr-visible .brand-bar-rise {
+  animation: brand-bar-rise 0.82s cubic-bezier(0.22, 0.88, 0.24, 1) forwards;
+}
+
+.brand-number-pop {
+  opacity: 0;
+  transform: translateY(14px) scale(0.92);
+}
+
+.sr-visible .brand-number-pop {
+  animation: brand-number-pop 0.56s cubic-bezier(0.22, 0.88, 0.24, 1) forwards;
+}
+
+.brand-chip-rise {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.sr-visible .brand-chip-rise {
+  animation: brand-chip-rise 0.52s cubic-bezier(0.22, 0.88, 0.24, 1) forwards;
+}
+
+.brand-sheen-panel {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.brand-sheen-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(112deg, transparent 18%, rgba(255,255,255,0.08) 34%, rgba(255,255,255,0.28) 49%, rgba(255,255,255,0.1) 62%, transparent 78%);
+  transform: translateX(-140%);
+  opacity: 0;
+}
+
+.sr-visible .brand-sheen-panel::after {
+  animation: brand-sheen-pass 1.9s ease-out 0.18s 1 both;
+}
+
+.brand-panel-scan {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.brand-panel-scan::before {
+  content: "";
+  position: absolute;
+  inset: -18% -36%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,122,22,0.02) 42%,
+    rgba(255,184,122,0.14) 50%,
+    rgba(20,41,95,0.03) 58%,
+    transparent 100%
+  );
+  animation: brand-scan-sweep 9.8s ease-in-out infinite;
+}
+
+.brand-beacon {
+  position: relative;
+  isolation: isolate;
+}
+
+.brand-beacon::before,
+.brand-beacon::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 184, 122, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  animation: brand-beacon-pulse 2.9s ease-out infinite;
+}
+
+.brand-beacon::after {
+  animation-delay: 1.45s;
+}
+
+.brand-cta-float {
+  animation: brand-cta-float 4.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.brand-cta-arrow {
+  animation: brand-arrow-nudge 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.brand-flow-line {
+  background-size: 200% 100%;
+  animation: brand-flow-line 5.6s linear infinite;
 }
 
 .float-spark {
@@ -1812,6 +2081,11 @@
   .hero-firework,
   .hero-firework-core,
   .hero-particle-twinkle,
+  .brand-glow-drift,
+  .brand-pulse-dot,
+  .brand-cta-float,
+  .brand-cta-arrow,
+  .brand-flow-line,
   .float-spark,
   .analysis-kpi-card::after,
   .analysis-chart-stage::after,
@@ -1848,5 +2122,26 @@
   .auth-primary-button {
     transition: none !important;
     transform: none !important;
+  }
+
+  .brand-chart-draw {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+
+  .brand-bar-rise,
+  .brand-number-pop,
+  .brand-chip-rise {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .brand-sheen-panel::after,
+  .brand-panel-scan::before,
+  .brand-beacon::before,
+  .brand-beacon::after {
+    animation: none !important;
+    opacity: 0 !important;
   }
 }

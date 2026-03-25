@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Activity, AlertTriangle, ArrowRight, BarChart3, Clock3, LineChart } from 'lucide-react';
 
+import { StaggerChildren } from './stagger-children';
+
 type Point = {
   x: number;
   y: number;
@@ -168,10 +170,15 @@ function MetricCard({
   };
 
   return (
-    <article className={`rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_20px_rgba(20,41,95,0.04)] ${toneClassMap[tone]}`}>
-      <p className="text-[11px] font-black text-[#4D627A]">{label}</p>
-      <p className="dashboard-number mt-2 text-[1.7rem] text-[#14295F]">{value}</p>
-      <p className="mt-1.5 text-[11px] font-bold text-[#5A6E85]">{detail}</p>
+    <article
+      className={`brand-sheen-panel relative overflow-hidden rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_20px_rgba(20,41,95,0.04)] ${toneClassMap[tone]}`}
+    >
+      <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/14 blur-2xl" />
+      <div className="relative">
+        <p className="text-[11px] font-black text-[#4D627A]">{label}</p>
+        <p className="brand-number-pop dashboard-number mt-2 text-[1.7rem] text-[#14295F]">{value}</p>
+        <p className="mt-1.5 text-[11px] font-bold text-[#5A6E85]">{detail}</p>
+      </div>
     </article>
   );
 }
@@ -197,25 +204,32 @@ function ChartPanel({
 }) {
   return (
     <article
-      className={`rounded-[1.55rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:p-6 ${className}`}
+      className={`brand-panel-scan relative overflow-hidden rounded-[1.55rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:p-6 ${className}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 shrink-0 text-[#14295F]" />
-            <h3 className="break-keep text-[1.05rem] font-black text-[#14295F] sm:text-[1.15rem]">{title}</h3>
+      <div className="brand-glow-drift absolute -left-8 top-5 h-24 w-24 rounded-full bg-[#FF7A16]/8 blur-3xl" />
+      <div
+        className="brand-glow-drift absolute right-6 top-4 h-28 w-28 rounded-full bg-[#8AB2FF]/10 blur-3xl"
+        style={{ animationDelay: '-2.4s' }}
+      />
+      <div className="relative">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 shrink-0 text-[#14295F]" />
+              <h3 className="break-keep text-[1.05rem] font-black text-[#14295F] sm:text-[1.15rem]">{title}</h3>
+            </div>
+            <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.7] text-[#50657D]">{description}</p>
           </div>
-          <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.7] text-[#50657D]">{description}</p>
+          {badge}
         </div>
-        {badge}
-      </div>
 
-      {legend ? <div className="mt-4 flex flex-wrap gap-2">{legend}</div> : null}
+        {legend ? <div className="mt-4 flex flex-wrap gap-2">{legend}</div> : null}
 
-      <div className="mt-4">{children}</div>
+        <div className="mt-4">{children}</div>
 
-      <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-4 py-3">
-        <p className="break-keep text-[12.5px] font-semibold leading-[1.65] text-[#425A75]">{footer}</p>
+        <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-4 py-3">
+          <p className="break-keep text-[12.5px] font-semibold leading-[1.65] text-[#425A75]">{footer}</p>
+        </div>
       </div>
     </article>
   );
@@ -250,27 +264,47 @@ function OverviewTrendChart() {
       <polygon points={toAreaPolygon(studyPoints, baseline)} fill="rgba(20,41,95,0.05)" />
 
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#14295F"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(studyPoints)}
+        style={{ ['--brand-path-length' as string]: 1000 }}
       />
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#FF7A16"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(goalPoints)}
+        style={{ ['--brand-path-length' as string]: 1000, animationDelay: '0.18s' }}
       />
 
       {studyPoints.map((point) => (
-        <circle key={`study-${point.x}`} cx={point.x} cy={point.y} r="4.5" fill="#14295F" />
+        <circle
+          key={`study-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4.5"
+          fill="#14295F"
+          style={{ animationDelay: `${(point.x % 7) * 0.08}s` }}
+        />
       ))}
       {goalPoints.map((point) => (
-        <circle key={`goal-${point.x}`} cx={point.x} cy={point.y} r="4.5" fill="#FF7A16" />
+        <circle
+          key={`goal-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4.5"
+          fill="#FF7A16"
+          style={{ animationDelay: `${(point.x % 5) * 0.1}s` }}
+        />
       ))}
 
       {chartLabels.map((label, index) => (
@@ -319,27 +353,39 @@ function WeeklyGrowthChart() {
         return (
           <rect
             key={`bar-${chartLabels[index]}`}
+            className="brand-bar-rise"
             x={point.x - barWidth / 2}
             y={point.y}
             width={barWidth}
             height={baseline - point.y}
             rx="8"
             fill="rgba(93, 148, 255, 0.32)"
+            style={{ animationDelay: `${index * 0.08}s` }}
           />
         );
       })}
 
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#18B88A"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(linePoints)}
+        style={{ ['--brand-path-length' as string]: 1000, animationDelay: '0.22s' }}
       />
 
-      {linePoints.map((point) => (
-        <circle key={`growth-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#18B88A" />
+      {linePoints.map((point, index) => (
+        <circle
+          key={`growth-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4"
+          fill="#18B88A"
+          style={{ animationDelay: `${index * 0.09}s` }}
+        />
       ))}
 
       {chartLabels.map((label, index) => (
@@ -383,16 +429,26 @@ function RhythmChart() {
 
       <polygon points={toAreaPolygon(rhythmPoints, baseline)} fill="rgba(31, 179, 138, 0.10)" />
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#18B88A"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(rhythmPoints)}
+        style={{ ['--brand-path-length' as string]: 1000 }}
       />
 
       {rhythmPoints.map((point) => (
-        <circle key={`rhythm-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#18B88A" />
+        <circle
+          key={`rhythm-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4"
+          fill="#18B88A"
+          style={{ animationDelay: `${(point.x % 6) * 0.09}s` }}
+        />
       ))}
 
       {chartLabels.map((label, index) => (
@@ -441,27 +497,47 @@ function StudyWindowChart() {
       })}
 
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#3292FF"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(startPoints)}
+        style={{ ['--brand-path-length' as string]: 1000 }}
       />
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#8B5CF6"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(endPoints)}
+        style={{ ['--brand-path-length' as string]: 1000, animationDelay: '0.2s' }}
       />
 
       {startPoints.map((point) => (
-        <circle key={`start-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#3292FF" />
+        <circle
+          key={`start-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4"
+          fill="#3292FF"
+          style={{ animationDelay: `${(point.x % 8) * 0.07}s` }}
+        />
       ))}
       {endPoints.map((point) => (
-        <circle key={`end-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#8B5CF6" />
+        <circle
+          key={`end-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4"
+          fill="#8B5CF6"
+          style={{ animationDelay: `${(point.x % 9) * 0.06}s` }}
+        />
       ))}
 
       {chartLabels.map((label, index) => (
@@ -505,16 +581,26 @@ function BreakTimeChart() {
 
       <polygon points={toAreaPolygon(breakPoints, baseline)} fill="rgba(255, 98, 127, 0.14)" />
       <polyline
+        className="brand-chart-draw"
         fill="none"
         stroke="#FF6B7A"
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={toPolyline(breakPoints)}
+        style={{ ['--brand-path-length' as string]: 1000 }}
       />
 
       {breakPoints.map((point) => (
-        <circle key={`break-${point.x}`} cx={point.x} cy={point.y} r="4" fill="#FF6B7A" />
+        <circle
+          key={`break-${point.x}`}
+          className="brand-pulse-dot"
+          cx={point.x}
+          cy={point.y}
+          r="4"
+          fill="#FF6B7A"
+          style={{ animationDelay: `${(point.x % 4) * 0.1}s` }}
+        />
       ))}
 
       {chartLabels.map((label, index) => (
@@ -536,9 +622,20 @@ function BreakTimeChart() {
 
 export function DataAnalyticsPreviewSection() {
   return (
-    <section id="data-approach" className="scroll-mt-28 bg-[#F7F9FD] py-16 sm:py-20">
+    <section id="data-approach" className="relative scroll-mt-28 overflow-hidden bg-[#F7F9FD] py-16 sm:py-20">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="brand-glow-drift absolute left-[-8%] top-[14%] h-44 w-44 rounded-full bg-[#7AA7FF]/10 blur-[90px]" />
+        <div
+          className="brand-glow-drift absolute right-[-4%] top-[22%] h-56 w-56 rounded-full bg-[#FFB878]/14 blur-[110px]"
+          style={{ animationDelay: '-2.8s' }}
+        />
+        <div
+          className="brand-glow-drift absolute left-[20%] bottom-[10%] h-36 w-36 rounded-full bg-[#FF7A16]/8 blur-[90px]"
+          style={{ animationDelay: '-4.1s' }}
+        />
+      </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="relative mx-auto max-w-3xl text-center">
           <span className="eyebrow-badge">DATA DRIVEN</span>
           <h2 className="font-aggro-display mt-4 break-keep text-[clamp(2rem,4.7vw,3rem)] font-black leading-[1.06] text-[#14295F]">
             실제 앱처럼 누적되는 그래프를
@@ -551,7 +648,7 @@ export function DataAnalyticsPreviewSection() {
           </p>
         </div>
 
-        <div className="mt-7 grid gap-3 md:grid-cols-3">
+        <StaggerChildren stagger={90} className="mt-7 grid gap-3 md:grid-cols-3">
           {heroMetrics.map((metric) => (
             <MetricCard
               key={metric.label}
@@ -561,7 +658,7 @@ export function DataAnalyticsPreviewSection() {
               tone={metric.tone}
             />
           ))}
-        </div>
+        </StaggerChildren>
 
         <div className="mt-8">
           <ChartPanel
@@ -650,7 +747,7 @@ export function DataAnalyticsPreviewSection() {
             <div className="flex flex-wrap gap-3">
               <Link href="#app" className="premium-cta premium-cta-primary h-11 gap-1.5 px-5 text-sm">
                 역할별 화면 이어보기
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />
               </Link>
               <Link href="/experience" className="premium-cta premium-cta-muted h-11 px-5 text-sm">
                 전체 체험 보기

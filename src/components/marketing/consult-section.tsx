@@ -5,6 +5,7 @@ import { unstable_noStore as noStore } from 'next/cache';
 
 import { ConsultForm } from './consult-form';
 import { SectionHeading } from './section-heading';
+import { StaggerChildren } from './stagger-children';
 
 type ConsultSectionProps = {
   consult: MarketingContent['consult'];
@@ -35,12 +36,19 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
   return (
     <section
       id="consult"
-      className="on-dark scroll-mt-28 py-10 sm:py-14"
+      className="on-dark relative scroll-mt-28 overflow-hidden py-10 sm:py-14"
       style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
     >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="brand-glow-drift absolute left-[-8%] top-[12%] h-56 w-56 rounded-full bg-[#2E5CB8]/16 blur-[120px]" />
+        <div
+          className="brand-glow-drift absolute right-[-4%] top-[8%] h-72 w-72 rounded-full bg-[#FF7A16]/12 blur-[140px]"
+          style={{ animationDelay: '-3.2s' }}
+        />
+      </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
-          className="overflow-hidden rounded-[2rem] border p-7 sm:p-10"
+          className="brand-sheen-panel relative overflow-hidden rounded-[2rem] border p-7 sm:p-10"
           style={{
             borderColor: 'rgba(255,255,255,0.10)',
             background: 'rgba(255,255,255,0.05)',
@@ -50,35 +58,39 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
         >
           <SectionHeading eyebrow="Consulting" title={consult.heading} description={consult.description} light />
 
-          <div className="mt-6 grid gap-3 md:grid-cols-5">
+          <StaggerChildren className="mt-6 grid gap-3 md:grid-cols-5" stagger={85}>
             {trustMetrics.map((metric) => (
               <article
                 key={`${metric.label}-${metric.value}`}
-                className="rounded-2xl border px-4 py-4"
+                className="brand-sheen-panel rounded-2xl border px-4 py-4"
                 style={{
                   borderColor: 'rgba(255,255,255,0.12)',
                   background: 'rgba(255,255,255,0.06)',
                 }}
               >
                 <p className="text-[10px] font-black tracking-[0.16em] text-white">{metric.label}</p>
-                <p className="mt-2 text-[1.15rem] font-black text-white">{metric.value}</p>
+                <p className="brand-number-pop mt-2 text-[1.15rem] font-black text-white">{metric.value}</p>
                 <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">{metric.detail}</p>
               </article>
             ))}
             <article
-              className="rounded-2xl border px-4 py-4"
+              className="brand-beacon brand-sheen-panel relative rounded-2xl border px-4 py-4"
               style={{
                 borderColor: 'rgba(255,122,22,0.30)',
                 background: 'rgba(255,122,22,0.10)',
               }}
             >
+              <div
+                className="brand-glow-drift absolute -right-6 top-0 h-20 w-20 rounded-full bg-[#FFB878]/20 blur-3xl"
+                style={{ animationDelay: '-1.7s' }}
+              />
               <p className="text-[10px] font-black tracking-[0.16em] text-[#FFB273]">현재 대기 인원</p>
-              <p className="mt-2 text-[1.15rem] font-black text-white">{waitlistCount}명</p>
+              <p className="brand-number-pop mt-2 text-[1.15rem] font-black text-white">{waitlistCount}명</p>
               <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">
                 상담 요청 후 순차적으로 안내 중입니다.
               </p>
             </article>
-          </div>
+          </StaggerChildren>
 
           <div className="mt-7 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
             <ConsultForm waitlistCount={waitlistCount} />
@@ -87,7 +99,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
               {/* 입학 대기 인원 배너 */}
               {waitlistCount > 0 && (
                 <article
-                  className="relative overflow-hidden rounded-2xl border p-5"
+                  className="brand-panel-scan relative overflow-hidden rounded-2xl border p-5"
                   style={{
                     borderColor: 'rgba(255,122,22,0.45)',
                     background: 'linear-gradient(135deg, rgba(255,122,22,0.18) 0%, rgba(255,122,22,0.08) 100%)',
@@ -95,12 +107,12 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                 >
                   {/* 배경 장식 */}
                   <div
-                    className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full opacity-20"
+                    className="brand-glow-drift pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full opacity-20"
                     style={{ background: 'radial-gradient(circle, #FF7A16 0%, transparent 70%)' }}
                   />
                   <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FF7A16]">WAITLIST</p>
                   <div className="mt-2 flex items-end gap-2">
-                    <span className="text-4xl font-black leading-none text-white">{waitlistCount}</span>
+                    <span className="brand-number-pop text-4xl font-black leading-none text-white">{waitlistCount}</span>
                     <span className="mb-0.5 text-lg font-black text-white/70">명</span>
                   </div>
                   <p className="mt-1.5 break-keep text-sm font-bold leading-relaxed text-white/80">
@@ -117,7 +129,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
               ].map((item) => (
                 <article
                   key={item.label}
-                  className="rounded-2xl border p-5"
+                  className="brand-sheen-panel rounded-2xl border p-5"
                   style={{
                     borderColor: 'rgba(255,255,255,0.10)',
                     background: 'rgba(255,255,255,0.06)',
@@ -133,19 +145,19 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
               <div className="flex flex-wrap gap-3 pt-1">
                 <a
                   href="#consult-form"
-                  className="premium-cta premium-cta-primary h-12 px-6 text-sm"
+                  className="premium-cta premium-cta-primary brand-cta-float h-12 px-6 text-sm"
                 >
                   상담 폼 작성하기
                 </a>
                 <a
                   href="/go/login?placement=consult_section"
-                  className="premium-cta premium-cta-ghost h-12 px-6 text-sm"
+                  className="premium-cta premium-cta-ghost brand-cta-float h-12 px-6 text-sm"
                 >
                   웹앱 로그인
                 </a>
                 <a
                   href="/go/experience?placement=consult_section"
-                  className="premium-cta premium-cta-ghost h-12 px-6 text-sm"
+                  className="premium-cta premium-cta-ghost brand-cta-float h-12 px-6 text-sm"
                 >
                   웹앱 체험하기
                 </a>

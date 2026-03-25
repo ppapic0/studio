@@ -100,7 +100,7 @@ export function HomeGrowthProofSection() {
 
             <div className="mt-7 rounded-[1.4rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white shadow-[0_18px_34px_rgba(20,41,95,0.16)]">
               <p className="text-[10px] font-black tracking-[0.18em] text-white/62">CASE SNAPSHOT</p>
-              <p className="mt-2 break-keep text-[1.35rem] font-black leading-[1.3]">
+              <p className="brand-number-pop mt-2 break-keep text-[1.35rem] font-black leading-[1.3]">
                 6월 3등급에서 시작해
                 <br />
                 수능 백분위 99까지 올라간 사례
@@ -118,7 +118,7 @@ export function HomeGrowthProofSection() {
           </article>
 
           <div className="space-y-4">
-            <article className="overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
+            <article className="brand-sheen-panel overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
               <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#F8FBFF_0%,#FFF4EB_100%)] px-5 py-5 sm:px-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -137,52 +137,64 @@ export function HomeGrowthProofSection() {
                   {caseTimeline.map((item) => (
                     <article
                       key={item.phase}
-                      className={`rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_22px_rgba(20,41,95,0.04)] ${item.tone}`}
+                      className={`brand-sheen-panel relative overflow-hidden rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_22px_rgba(20,41,95,0.04)] ${item.tone}`}
                     >
-                      <p className="text-[10px] font-black tracking-[0.16em] opacity-70">{item.phase}</p>
-                      <p className="mt-2 text-[1.1rem] font-black leading-none">{item.score}</p>
-                      <p className="mt-2 text-[13px] font-semibold opacity-85">{item.percentile}</p>
+                      <div className="relative">
+                        <p className="text-[10px] font-black tracking-[0.16em] opacity-70">{item.phase}</p>
+                        <p className="brand-number-pop mt-2 text-[1.1rem] font-black leading-none">{item.score}</p>
+                        <p className="mt-2 text-[13px] font-semibold opacity-85">{item.percentile}</p>
+                      </div>
                     </article>
                   ))}
                 </div>
               </div>
 
               <div className="px-5 py-5 sm:px-6 sm:py-6">
-                <div className="grid gap-3 lg:grid-cols-3">
-                  {interventionHighlights.map((item) => {
-                    const Icon = item.icon;
+                <div className="relative">
+                  <div className="brand-flow-line pointer-events-none absolute left-[16%] right-[16%] top-9 hidden h-[2px] rounded-full bg-[linear-gradient(90deg,rgba(255,122,22,0.08),rgba(255,122,22,0.68),rgba(20,41,95,0.08))] lg:block" />
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    {interventionHighlights.map((item, index) => {
+                      const Icon = item.icon;
 
-                    return (
-                      <article
-                        key={item.label}
-                        className="rounded-[1.35rem] border border-[#14295F]/9 bg-[#F9FBFF] px-4 py-4"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">{item.label}</span>
-                          <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[#14295F]/7 text-[#14295F]">
-                            <Icon className="h-4 w-4" />
+                      return (
+                        <article
+                          key={item.label}
+                          className="brand-sheen-panel relative rounded-[1.35rem] border border-[#14295F]/9 bg-[#F9FBFF] px-4 py-4"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">{item.label}</span>
+                            <div
+                              className="brand-glow-drift flex h-8 w-8 items-center justify-center rounded-2xl bg-[#14295F]/7 text-[#14295F]"
+                              style={{ animationDelay: `${index * 0.4}s` }}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </div>
                           </div>
-                        </div>
-                        <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{item.title}</p>
-                        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#425a75]">
-                          {item.description}
-                        </p>
-                        <p className="mt-4 rounded-[0.95rem] bg-white px-3 py-2 text-[12px] font-black text-[#14295F] shadow-[inset_0_0_0_1px_rgba(20,41,95,0.06)]">
-                          {item.emphasis}
-                        </p>
-                      </article>
-                    );
-                  })}
+                          <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{item.title}</p>
+                          <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#425a75]">
+                            {item.description}
+                          </p>
+                          <p
+                            className="brand-chip-rise mt-4 rounded-[0.95rem] bg-white px-3 py-2 text-[12px] font-black text-[#14295F] shadow-[inset_0_0_0_1px_rgba(20,41,95,0.06)]"
+                            style={{ animationDelay: `${0.12 + index * 0.08}s` }}
+                          >
+                            {item.emphasis}
+                          </p>
+                        </article>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {caseMetrics.map((item) => (
                     <article
                       key={item.label}
-                      className="rounded-[1.2rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white"
+                      className="brand-sheen-panel relative overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white"
                     >
+                      <div className="brand-glow-drift absolute -right-8 top-0 h-16 w-16 rounded-full bg-white/12 blur-2xl" />
                       <p className="text-[10px] font-black tracking-[0.16em] text-white/58">{item.label}</p>
-                      <p className="mt-2 break-keep text-[1.2rem] font-black leading-[1.22]">{item.value}</p>
+                      <p className="brand-number-pop mt-2 break-keep text-[1.2rem] font-black leading-[1.22]">{item.value}</p>
                       <p className="mt-1.5 text-[11px] font-semibold text-white/68">{item.detail}</p>
                     </article>
                   ))}
