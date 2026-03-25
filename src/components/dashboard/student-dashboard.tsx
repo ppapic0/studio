@@ -48,14 +48,13 @@ import {
   Plus,
   Trash2
 } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getCountFromServer, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -78,7 +77,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { DailyStudentStat, StudyPlanItem, WithId, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
+import { DailyStudentStat, StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -142,6 +141,25 @@ function getNextTierInfo(currentLp: number) {
     name: nextTier.name,
     remainingLp: Math.max(0, nextTier.lp - currentLp),
   };
+}
+
+function isActiveStudentStatus(status: unknown): boolean {
+  if (typeof status !== 'string') return true;
+  const normalized = status.trim().toLowerCase();
+  if (!normalized) return true;
+  return normalized === 'active';
+}
+
+function isSyntheticStudentId(studentId: unknown): boolean {
+  if (typeof studentId !== 'string') return true;
+  const normalized = studentId.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized.startsWith('test-') ||
+    normalized.startsWith('seed-') ||
+    normalized.startsWith('mock-') ||
+    normalized.includes('dummy')
+  );
 }
 
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
@@ -768,7 +786,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
   const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
-  const [seasonParticipantCount, setSeasonParticipantCount] = useState(0);
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -829,15 +846,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, activeMembership?.id, user?.uid, weekKey]);
   const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansRef, { enabled: isActive });
-
-  const plansByDay = useMemo(() => {
-    const map: Record<string, StudyPlanItem[]> = {};
-    fetchedPlans?.forEach(p => {
-      if (!map[p.dateKey]) map[p.dateKey] = [];
-      map[p.dateKey].push(p);
-    });
-    return map;
-  }, [fetchedPlans]);
 
   const logMinutesByDateKey = useMemo(() => {
     const map = new Map<string, number>();
@@ -1012,6 +1020,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership?.id, periodKey, user?.uid]);
   const { data: leaderboardEntry } = useDoc<LeaderboardEntry>(leaderboardEntryRef, { enabled: isActive });
 
+  const totalEntriesQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !periodKey) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
+  }, [firestore, activeMembership?.id, periodKey]);
+  const { data: totalRankEntries } = useCollection<LeaderboardEntry>(totalEntriesQuery, { enabled: isActive });
+
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'members'),
+      where('role', '==', 'student'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, activeMembership?.id]);
+  const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+
+  const attendanceCurrentQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
+  }, [firestore, activeMembership?.id]);
+  const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive });
+
   const centerAnnouncementsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -1040,35 +1070,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const timeoutId = window.setTimeout(prefetchRoutes, 800);
     return () => window.clearTimeout(timeoutId);
   }, [isActive, router]);
-
-  useEffect(() => {
-    if (!isActive || !firestore || !activeMembership || !periodKey) {
-      setSeasonParticipantCount(0);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadParticipantCount = async () => {
-      try {
-        const entriesRef = collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
-        const countSnapshot = await getCountFromServer(entriesRef);
-        if (!cancelled) {
-          setSeasonParticipantCount(countSnapshot.data().count);
-        }
-      } catch {
-        if (!cancelled) {
-          setSeasonParticipantCount(0);
-        }
-      }
-    };
-
-    void loadParticipantCount();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, firestore, activeMembership?.id, periodKey]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -1729,78 +1730,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => clearInterval(interval);
   }, [isTimerActive, startTime]);
 
-  const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (!firestore || !user || !activeMembership || !progressRef || !weekKey) return;
-    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
-    const nextState = !item.done;
-    
-    await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
-    
-    if (nextState) {
-      const batch = writeBatch(firestore);
-      const achievementCount = progress?.dailyLpStatus?.[item.dateKey]?.achievementCount || 0;
-      const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
-      const existingDayStatus = (progress?.dailyLpStatus?.[item.dateKey] || {}) as Record<string, any>;
-      const dayStatusUpdate: Record<string, any> = { ...existingDayStatus };
-      const statsUpdate: Record<string, any> = {};
-      let shouldCommitProgress = false;
-      let shouldSyncRank = false;
-
-      if (achievementCount < 5) {
-        statsUpdate.achievement = increment(0.1);
-        dayStatusUpdate.achievementCount = increment(1);
-        shouldCommitProgress = true;
-      }
-
-      const dailyItems = plansByDay[item.dateKey] || [];
-      const studyTasks = dailyItems.filter(p => p.category === 'study' || !p.category);
-      const doneCount = studyTasks.filter(t => t.done).length + (item.category !== 'schedule' ? 1 : 0);
-      
-      let finalNewLp = progress?.seasonLp || 0;
-
-      if (studyTasks.length >= 3 && doneCount === studyTasks.length && !progress?.dailyLpStatus?.[item.dateKey]?.plan) {
-        const planLp = Math.round(100 * finalMultiplier);
-        finalNewLp += planLp;
-        progressUpdate.seasonLp = increment(planLp);
-        dayStatusUpdate.plan = true;
-        dayStatusUpdate.dailyLpAmount = increment(planLp);
-        shouldCommitProgress = true;
-        shouldSyncRank = true;
-        toast({ title: "모든 계획 완료! 계획 보너스 포인트 획득 🎉" });
-      }
-
-      if (Object.keys(statsUpdate).length > 0) {
-        progressUpdate.stats = statsUpdate;
-      }
-      if (Object.keys(dayStatusUpdate).length > 0) {
-        progressUpdate.dailyLpStatus = {
-          [item.dateKey]: dayStatusUpdate,
-        };
-      }
-
-      if (shouldCommitProgress) {
-        batch.set(progressRef, progressUpdate, { merge: true });
-        await batch.commit();
-      }
-
-      if (shouldSyncRank) {
-        try {
-          const rankRef = doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
-          await setDoc(rankRef, {
-            studentId: user.uid,
-            displayNameSnapshot: user.displayName || '학생',
-            classNameSnapshot: activeMembership.className || null,
-            schoolNameSnapshot: studentProfile?.schoolName || null,
-            value: finalNewLp,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-        } catch (rankError: any) {
-          console.warn('[student-track] plan leaderboard sync skipped', rankError?.message || rankError);
-        }
-      }
-    }
-  };
-
   const handleRequestSubmit = async () => {
     if (!firestore || !activeMembership || !user || !progressRef) return;
 
@@ -1967,60 +1896,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
-  const PlanColumn = ({ dateKey, label }: { dateKey: string, label: string }) => {
-    const items = plansByDay[dateKey] || [];
-    const studyTasks = items.filter(p => p.category === 'study' || !p.category);
-    const routineItems = items.filter(p => p.category === 'schedule');
-    const isTodayCol = dateKey === todayKey;
-
-    return (
-      <div className={cn("flex flex-col gap-4 h-full", !isTodayCol && "opacity-60")}>
-        <div className="flex items-center justify-between px-2">
-          <div className="grid">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</span>
-            <span className="text-xs font-black text-[#14295F]">{dateKey}</span>
-          </div>
-          <Badge variant="outline" className="h-5 px-2 font-black text-[9px] border-primary/20">{studyTasks.filter(t => t.done).length}/{studyTasks.length} 완료</Badge>
-        </div>
-        
-        <div className="flex-1 space-y-2.5">
-          {studyTasks.length === 0 ? (
-            <div className="py-10 text-center opacity-20 italic font-black text-[10px] border-2 border-dashed border-slate-200 rounded-3xl">계획 없음</div>
-          ) : studyTasks.map(task => (
-            <div key={task.id} className={cn(
-              "flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-colors",
-              task.done ? "bg-[#f8faff] border-primary/5" : "bg-white border-slate-100"
-            )}>
-              <Checkbox 
-                checked={task.done} 
-                onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} 
-                className="h-5 w-5 rounded-md border-2" 
-              />
-              <Label className={cn(
-                "flex-1 text-sm font-black tracking-tight leading-tight whitespace-nowrap truncate break-keep",
-                task.done ? "line-through text-slate-400 italic" : "text-slate-800"
-              )}>
-                {task.title}
-              </Label>
-            </div>
-          ))}
-        </div>
-
-        {routineItems.length > 0 && (
-          <div className="pt-4 border-t border-dashed">
-            <div className="flex flex-wrap gap-1.5">
-              {routineItems.map(item => (
-                <Badge key={item.id} variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 font-black text-[8px] h-5 px-2">
-                  <Timer className="h-2.5 w-2.5 mr-1" /> {item.title.split(': ')[0]}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
   if (!isActive) return null;
@@ -2117,11 +1992,63 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (alreadyEarnedPlanBonus || todayStudyTasks.length < 3 || todayRemainingTasks.length === 0) return 0;
     return Math.round(100 * finalMultiplier);
   }, [progress?.dailyLpStatus, todayKey, todayStudyTasks.length, todayRemainingTasks.length, finalMultiplier]);
-  const seasonRank = leaderboardEntry?.rank || 0;
+
+  const activeStudentIds = useMemo(() => {
+    if (!activeStudentMembers) return null;
+    return new Set(
+      activeStudentMembers
+        .filter((member) => isActiveStudentStatus(member.status))
+        .map((member) => member.id)
+    );
+  }, [activeStudentMembers]);
+
+  const assignedStudentIds = useMemo(() => {
+    if (!attendanceCurrent) return null;
+    return new Set(
+      attendanceCurrent
+        .map((seat) => (typeof seat.studentId === 'string' ? seat.studentId.trim() : ''))
+        .filter((studentId) => studentId.length > 0 && !isSyntheticStudentId(studentId))
+    );
+  }, [attendanceCurrent]);
+
+  const validRankEntries = useMemo(() => {
+    if (!totalRankEntries) return [];
+    let filtered = totalRankEntries.filter((entry) => !isSyntheticStudentId(entry.studentId));
+
+    if (assignedStudentIds && assignedStudentIds.size > 0) {
+      filtered = filtered.filter((entry) => assignedStudentIds.has(entry.studentId));
+    }
+    if (activeStudentIds && activeStudentIds.size > 0) {
+      filtered = filtered.filter((entry) => activeStudentIds.has(entry.studentId));
+    }
+
+    return filtered;
+  }, [totalRankEntries, assignedStudentIds, activeStudentIds]);
+
+  const seasonParticipantCount = validRankEntries.length;
+  const isRankContextLoading = activeMembersLoading || attendanceLoading;
+
+  const seasonRank = useMemo(() => {
+    const snapshotRank = leaderboardEntry?.rank || 0;
+    if (!user || validRankEntries.length === 0) return snapshotRank;
+
+    const sorted = [...validRankEntries].sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
+    if (ownIndex >= 0) return ownIndex + 1;
+
+    const snapshotValue = Number(leaderboardEntry?.value);
+    if (!Number.isFinite(snapshotValue)) return snapshotRank;
+
+    const higherCount = sorted.filter((entry) => (Number(entry.value) || 0) > snapshotValue).length;
+    return Math.min(sorted.length, higherCount + 1);
+  }, [leaderboardEntry?.rank, leaderboardEntry?.value, validRankEntries, user?.uid]);
+
   const seasonPercentile = useMemo(() => {
+    if (isRankContextLoading) return null;
     if (!seasonRank || seasonParticipantCount <= 0) return null;
-    return Math.max(1, Math.ceil((seasonRank / seasonParticipantCount) * 100));
-  }, [seasonRank, seasonParticipantCount]);
+    const safeRank = Math.min(seasonRank, seasonParticipantCount);
+    return Math.max(1, Math.ceil((safeRank / seasonParticipantCount) * 100));
+  }, [isRankContextLoading, seasonRank, seasonParticipantCount]);
   const nextTierInfo = useMemo(
     () => getNextTierInfo(progress?.seasonLp || 0),
     [progress?.seasonLp]
@@ -2727,48 +2654,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </Dialog>
         </div>
       </div>
-
-      <Card className={cn("border border-slate-200/80 rounded-[2.25rem] bg-white overflow-hidden", isMobile ? "rounded-[1.5rem]" : "")}>
-        <CardHeader className={cn("bg-slate-50/50 border-b flex flex-row items-center justify-between", isMobile ? "p-5" : "p-8")}>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-primary/5 text-primary">
-              <ListTodo className="h-6 w-6" />
-            </div>
-            <div className="grid">
-              <CardTitle className="font-aggro-display font-black text-2xl tracking-tighter text-slate-900 leading-none">계획트랙</CardTitle>
-              <p className="font-aggro-display text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">학습 루틴 보드</p>
-            </div>
-          </div>
-          {isMobile ? (
-            <Badge variant="outline" className="bg-[#eef4ff] text-primary border-[#dbe8ff] font-black h-6 px-3">{fetchedPlans?.filter(p => p.dateKey === todayKey && p.done).length || 0} 완료</Badge>
-          ) : (
-            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border">
-              <span className="text-[11px] font-black text-primary uppercase tracking-widest whitespace-nowrap">3일 아카이브 보기</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            </div>
-          )}
-        </CardHeader>
-        
-        <CardContent className={cn(isMobile ? "p-5" : "p-10")}>
-          {isMobile ? (
-            <div className="max-w-xl mx-auto">
-              <PlanColumn dateKey={todayKey} label="오늘의 목표" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-10">
-              <div className="relative">
-                <PlanColumn dateKey={yesterdayKey} label="어제의 복기" />
-                    <div className="pointer-events-none absolute top-0 -right-5 h-full w-px bg-slate-200" />
-              </div>
-              <div className="relative">
-                <PlanColumn dateKey={todayKey} label="오늘의 집중" />
-                    <div className="pointer-events-none absolute top-0 -right-5 h-full w-px bg-slate-200" />
-              </div>
-              <PlanColumn dateKey={tomorrowKey} label="내일의 준비" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
         {isMobile ? (
