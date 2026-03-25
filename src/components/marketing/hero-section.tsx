@@ -181,12 +181,14 @@ export function HeroSection({ brand }: HeroSectionProps) {
             <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
             <div className="space-y-5">
-              <h1 className="font-aggro-display text-[clamp(1.52rem,7.2vw,5.1rem)] font-black leading-[0.98] tracking-[-0.05em] text-white">
-                {heroTitleLines.map((line, index) => (
-                  <span key={`${line}-${index}`} className="block whitespace-nowrap break-keep">
-                    {renderTitleLine(line)}
-                  </span>
-                ))}
+              <h1 className="font-aggro-display text-[clamp(1.52rem,7vw,4.95rem)] font-black tracking-[-0.038em] text-white">
+                <span className="flex flex-col items-center gap-[0.06em] sm:gap-[0.065em]">
+                  {heroTitleLines.map((line, index) => (
+                    <span key={`${line}-${index}`} className="block whitespace-nowrap break-keep leading-[0.93]">
+                      {renderTitleLine(line)}
+                    </span>
+                  ))}
+                </span>
               </h1>
               <p className="mx-auto max-w-[38rem] break-keep text-[15px] font-semibold leading-[1.8] text-white/[0.82] sm:text-[16.5px]">
                 {brand.heroDescription}
