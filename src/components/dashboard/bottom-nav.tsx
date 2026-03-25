@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 
-import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -18,12 +19,18 @@ import {
 } from 'lucide-react';
 
 import { useAppContext } from '@/contexts/app-context';
+import {
+  DASHBOARD_POST_LOGIN_ENTRY_MAX_AGE_MS,
+  PARENT_POST_LOGIN_ENTRY_MOTION_KEY,
+  getStudentDashboardRouteKey,
+} from '@/lib/dashboard-motion';
 import { cn } from '@/lib/utils';
 
-const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
-const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
+type BottomNavProps = {
+  playStudentEntry?: boolean;
+};
 
-export function BottomNav() {
+export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
   const { activeMembership, currentTier, viewMode } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -31,8 +38,13 @@ export function BottomNav() {
   const [playParentEntry, setPlayParentEntry] = useState(false);
   const role = activeMembership?.role;
   const isParent = role === 'parent';
+  const isStudent = role === 'student';
   const activeParentTab = searchParams.get('parentTab') || 'home';
   const useBrandNav = isParent || isMobileMode;
+  const activeStudentRouteKey = useMemo(
+    () => (isStudent ? getStudentDashboardRouteKey(pathname) : null),
+    [isStudent, pathname]
+  );
 
   const adminNavItems = [
     { href: '/dashboard', label: '운영', icon: LayoutDashboard },
@@ -48,7 +60,7 @@ export function BottomNav() {
 
     const raw = window.sessionStorage.getItem(PARENT_POST_LOGIN_ENTRY_MOTION_KEY);
     const timestamp = Number(raw);
-    if (!Number.isFinite(timestamp) || Date.now() - timestamp > PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS) {
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > DASHBOARD_POST_LOGIN_ENTRY_MAX_AGE_MS) {
       return;
     }
 
@@ -87,6 +99,17 @@ export function BottomNav() {
   };
 
   const currentNav = navItems[role] || [];
+  const activeStudentIndex = isStudent
+    ? currentNav.findIndex((item) => getStudentDashboardRouteKey(item.href) === activeStudentRouteKey)
+    : -1;
+
+  const studentIndicatorStyle =
+    activeStudentIndex >= 0
+      ? ({
+          '--student-nav-count': currentNav.length,
+          '--student-nav-index': activeStudentIndex,
+        } as CSSProperties)
+      : undefined;
 
   return (
     <div
@@ -98,12 +121,13 @@ export function BottomNav() {
             : 'h-[5.8rem] rounded-t-[1.75rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.38rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.46)]'
           : 'h-20 border-t border-black/[0.06] bg-white/95 pb-6 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-2xl',
         isParent || isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden',
-        playParentEntry && 'parent-nav-enter parent-entry-delay-5'
+        playParentEntry && 'parent-nav-enter parent-entry-delay-5',
+        playStudentEntry && isStudent && 'student-nav-enter student-entry-delay-5'
       )}
     >
       <nav
         className={cn(
-          'h-full',
+          'relative h-full',
           isParent
             ? 'grid grid-cols-5 gap-0 px-1 pt-0.5'
             : useBrandNav
@@ -112,6 +136,10 @@ export function BottomNav() {
         )}
         style={!isParent && useBrandNav ? { gridTemplateColumns: `repeat(${Math.max(currentNav.length, 1)}, minmax(0, 1fr))` } : undefined}
       >
+        {isStudent && useBrandNav && activeStudentIndex >= 0 && (
+          <div className="student-nav-active-indicator" style={studentIndicatorStyle} aria-hidden="true" />
+        )}
+
         {currentNav.map((item) => {
           const [itemPath, itemQuery] = item.href.split('?');
           const isParentQueryItem = role === 'parent' && !!itemQuery;
@@ -124,13 +152,14 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'relative flex min-w-0 flex-col items-center justify-center rounded-2xl transition-all active:scale-95',
                 isParent ? 'h-full gap-0.5' : 'h-full min-w-[52px] gap-1 group',
                 useBrandNav
                   ? isActive
                     ? 'text-[#FFD7AE]'
-                    : 'text-white/65'
+                    : 'text-white/68'
                   : isActive
                     ? 'text-primary'
                     : 'text-muted-foreground/40'
@@ -142,10 +171,10 @@ export function BottomNav() {
                   isParent ? 'p-[0.28rem] sm:p-[0.38rem]' : 'p-2',
                   isActive
                     ? useBrandNav
-                      ? 'bg-[#FF7A16] text-[#14295F] shadow-[0_6px_14px_rgba(255,122,22,0.45)]'
+                      ? 'bg-[#FF7A16] text-[#14295F] shadow-[0_10px_18px_rgba(255,122,22,0.40)]'
                       : `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg`
                     : useBrandNav
-                      ? 'bg-white/10 text-white/85'
+                      ? 'bg-white/10 text-white/90'
                       : 'group-hover:bg-muted/50'
                 )}
               >

@@ -51,6 +51,10 @@ import { useAppContext } from '@/contexts/app-context';
 import { useAuth, useDoc, useFirestore, useFunctions, useMemoFirebase, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import {
+  DASHBOARD_POST_LOGIN_ENTRY_MAX_AGE_MS,
+  PARENT_POST_LOGIN_ENTRY_MOTION_KEY,
+} from '@/lib/dashboard-motion';
 import { cn } from '@/lib/utils';
 import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -104,10 +108,11 @@ function normalizeParentLinkCode(value: unknown): string {
   return '';
 }
 
-const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
-const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
+type DashboardHeaderProps = {
+  playStudentEntry?: boolean;
+};
 
-export function DashboardHeader() {
+export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderProps) {
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
@@ -116,7 +121,9 @@ export function DashboardHeader() {
   const { toast } = useToast();
   const { activeMembership, viewMode, setViewMode } = useAppContext();
   const isParentMode = activeMembership?.role === 'parent';
+  const isStudentMode = activeMembership?.role === 'student';
   const isMobileView = isParentMode || viewMode === 'mobile';
+  const dashboardMotionPreset = isParentMode || isStudentMode ? 'dashboard-premium' : 'default';
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -270,7 +277,8 @@ export function DashboardHeader() {
         isMobileView
           ? 'border-b border-[rgba(255,170,80,0.20)] bg-[linear-gradient(180deg,rgba(255,247,238,0.98)_0%,rgba(255,255,255,0.96)_100%)] shadow-[0_1px_0_0_rgba(255,255,255,0.9)_inset,0_4px_16px_rgba(20,41,95,0.09)] backdrop-blur-md'
           : 'border-b border-[rgba(20,41,95,0.07)] bg-white/85 backdrop-blur-xl shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset] md:border-0 md:bg-transparent md:shadow-none',
-        playParentEntry && 'parent-shell-enter parent-entry-delay-1'
+        playParentEntry && 'parent-shell-enter parent-entry-delay-1',
+        playStudentEntry && !isParentMode && 'student-shell-enter student-entry-delay-1'
       )}
     >
       <div className={cn('flex items-center', isParentMode ? 'gap-1.5' : 'gap-2')}>
@@ -288,7 +296,7 @@ export function DashboardHeader() {
               <span className="sr-only">메뉴 열기</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="sm:max-w-xs">
+          <SheetContent side="left" motionPreset={dashboardMotionPreset} className="sm:max-w-xs">
             <MainNav isMobile={true} />
           </SheetContent>
         </Sheet>
@@ -377,7 +385,10 @@ export function DashboardHeader() {
       </div>
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500 w-[90vw] max-w-[350px] sm:w-auto">
+        <DialogContent
+          motionPreset={dashboardMotionPreset}
+          className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md transition-all duration-500 w-[90vw] max-w-[350px] sm:w-auto"
+        >
           <div className="bg-primary text-white relative overflow-hidden p-6 sm:p-8">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
             <DialogTitle className="font-black tracking-tighter text-xl sm:text-2xl">프로필 설정</DialogTitle>
@@ -442,7 +453,10 @@ export function DashboardHeader() {
       </Dialog>
 
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
-        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500 w-[95vw] max-w-[370px] sm:w-auto h-[80vh] sm:h-auto max-h-[85vh]">
+        <DialogContent
+          motionPreset={dashboardMotionPreset}
+          className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500 w-[95vw] max-w-[370px] sm:w-auto h-[80vh] sm:h-auto max-h-[85vh]"
+        >
           <div className="bg-accent text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
             <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
             <DialogTitle className="font-black tracking-tighter flex items-center gap-3 text-xl sm:text-3xl">
