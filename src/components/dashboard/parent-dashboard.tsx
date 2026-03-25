@@ -45,6 +45,8 @@ import {
   Tooltip,
   BarChart,
   Bar,
+  ComposedChart,
+  Area,
 } from 'recharts';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { 
@@ -89,6 +91,12 @@ import {
   type StudentProfile,
 } from '@/lib/types';
 import { ROUTINE_MISSING_PENALTY_POINTS } from '@/lib/attendance-auto';
+import {
+  buildAwayTimeInsight,
+  buildRhythmInsight,
+  buildStartEndInsight,
+  buildWeeklyStudyInsight,
+} from '@/lib/learning-insights';
 
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -186,6 +194,7 @@ type LinkedStudentOption = {
 };
 
 type ParentMetricTone = 'study' | 'plan' | 'attendance' | 'penalty';
+type ParentAnalyticsTone = 'growth' | 'rhythm' | 'window' | 'away';
 
 type ParentSparklinePoint = {
   label: string;
@@ -203,6 +212,16 @@ type ParentMetricToneStyle = {
   fillEnd: string;
   dot: string;
   mutedDot: string;
+};
+
+type ParentAnalyticsToneStyle = {
+  card: string;
+  iconWrap: string;
+  icon: string;
+  eyebrow: string;
+  badge: string;
+  chartShell: string;
+  insight: string;
 };
 
 const PARENT_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentMetricToneStyle> = {
@@ -253,6 +272,45 @@ const PARENT_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentMetricToneStyle>
     fillEnd: 'rgba(210, 70, 100, 0.02)',
     dot: '#d24664',
     mutedDot: '#e7bbc7',
+  },
+};
+
+const PARENT_ANALYTICS_TONE_STYLES: Record<ParentAnalyticsTone, ParentAnalyticsToneStyle> = {
+  growth: {
+    card: 'border-[#d9e6ff] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_55%,#edf5ff_100%)] shadow-[0_20px_40px_-28px_rgba(20,41,95,0.30)]',
+    iconWrap: 'border-[#d6e4ff] bg-white/90',
+    icon: 'text-[#204ca3]',
+    eyebrow: 'text-[#5d79a5]',
+    badge: 'border-[#cae4df] bg-[#ecfbf6] text-[#0f8a72]',
+    chartShell: 'border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(237,245,255,0.94)_100%)]',
+    insight: 'border-[#dce8ff] bg-white/86 text-[#39537d]',
+  },
+  rhythm: {
+    card: 'border-[#d8f1eb] bg-[linear-gradient(180deg,#f7fffc_0%,#ffffff_56%,#eefcf7_100%)] shadow-[0_20px_40px_-28px_rgba(16,185,129,0.22)]',
+    iconWrap: 'border-[#d6f0e6] bg-white/90',
+    icon: 'text-[#11967a]',
+    eyebrow: 'text-[#4b7b70]',
+    badge: 'border-[#caefe3] bg-[#ecfbf5] text-[#15836b]',
+    chartShell: 'border-[#d6f0e6] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(236,251,245,0.96)_100%)]',
+    insight: 'border-[#d7f0e7] bg-white/86 text-[#35695e]',
+  },
+  window: {
+    card: 'border-[#dce4ff] bg-[linear-gradient(180deg,#fafbff_0%,#ffffff_56%,#f1f4ff_100%)] shadow-[0_20px_40px_-28px_rgba(85,99,255,0.20)]',
+    iconWrap: 'border-[#dce5ff] bg-white/90',
+    icon: 'text-[#5363ff]',
+    eyebrow: 'text-[#66719a]',
+    badge: 'border-[#e1ddff] bg-[#f5f2ff] text-[#6c52d9]',
+    chartShell: 'border-[#dde4ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(241,244,255,0.96)_100%)]',
+    insight: 'border-[#e1e6ff] bg-white/86 text-[#475587]',
+  },
+  away: {
+    card: 'border-[#ffdbe2] bg-[linear-gradient(180deg,#fffafc_0%,#ffffff_56%,#fff1f4_100%)] shadow-[0_20px_40px_-28px_rgba(225,29,72,0.18)]',
+    iconWrap: 'border-[#ffdbe2] bg-white/90',
+    icon: 'text-[#d53f64]',
+    eyebrow: 'text-[#b45a6f]',
+    badge: 'border-[#ffd5de] bg-[#fff1f4] text-[#c73a5d]',
+    chartShell: 'border-[#ffe0e7] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,241,244,0.96)_100%)]',
+    insight: 'border-[#ffe2e8] bg-white/86 text-[#8a4b5a]',
   },
 };
 
@@ -410,6 +468,59 @@ function ParentMetricCardShell({
       <div className={cn('pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.orb)} />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(255,255,255,0)_44%)]" />
       <div className="relative z-10 h-full">{children}</div>
+    </Card>
+  );
+}
+
+function ParentAnalyticsCard({
+  tone,
+  icon,
+  title,
+  description,
+  badge,
+  insight,
+  className,
+  children,
+}: {
+  tone: ParentAnalyticsTone;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  badge: string;
+  insight: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const toneStyle = PARENT_ANALYTICS_TONE_STYLES[tone];
+
+  return (
+    <Card className={cn('relative min-w-0 overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-[transform,box-shadow] duration-200 active:scale-[0.992] sm:p-6', toneStyle.card, className)}>
+      <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-white/50 blur-3xl" />
+      <div className="relative z-10">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]', toneStyle.iconWrap, toneStyle.icon)}>
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', toneStyle.eyebrow)}>Parent Analytics</p>
+              <h3 className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">{title}</h3>
+              <p className="mt-1 break-keep text-[12px] font-bold leading-[1.6] text-slate-500 sm:text-[12.5px]">
+                {description}
+              </p>
+            </div>
+          </div>
+          <span className={cn('shrink-0 rounded-full border px-3 py-1 text-[10px] font-black tracking-tight shadow-sm', toneStyle.badge)}>
+            {badge}
+          </span>
+        </div>
+        <div className={cn('mt-4 overflow-hidden rounded-[1.45rem] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] sm:p-4', toneStyle.chartShell)}>
+          {children}
+        </div>
+        <div className={cn('mt-4 rounded-[1.2rem] border px-3.5 py-3 text-[11px] font-bold leading-relaxed sm:text-[11.5px]', toneStyle.insight)}>
+          {insight}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -672,7 +783,7 @@ function RhythmTimeChartDialog({
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight">학습 리듬 시간</DialogTitle>
             <DialogDescription className="text-white/70 font-bold">
-              최근 7일 기준 첫 공부 세션 시작 시각입니다.
+              최근 14일 기준 첫 공부 세션 시작 시각입니다.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -896,6 +1007,30 @@ function formatWon(value: number) {
   return `₩${safe.toLocaleString()}`;
 }
 
+function minutesToAxisLabel(value: number) {
+  const safeMinutes = Math.max(0, Math.round(Number(value || 0)));
+  if (safeMinutes >= 60) {
+    const hourValue = safeMinutes / 60;
+    return `${Number.isInteger(hourValue) ? hourValue : hourValue.toFixed(1)}h`;
+  }
+  return `${safeMinutes}m`;
+}
+
+function dateToHourNumber(date: Date | null) {
+  if (!date) return null;
+  return Number((date.getHours() + date.getMinutes() / 60).toFixed(2));
+}
+
+function hourToClockLabel(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '00:00';
+  return toClockLabel(Math.round(value * 60));
+}
+
+function toSignedPercentLabel(value: number) {
+  const safeValue = Math.round(Number(value || 0));
+  return `${safeValue > 0 ? '+' : ''}${safeValue}%`;
+}
+
 type InvoiceStatusMeta = {
   label: string;
   mobileLabel: string;
@@ -992,6 +1127,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const { memberships, activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const [today, setToday] = useState<Date | null>(null);
@@ -1015,6 +1151,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
+  const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
+  const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
   const [growthCelebration, setGrowthCelebration] = useState<GrowthCelebrationState | null>(null);
   const [showEntryMotion, setShowEntryMotion] = useState(false);
   const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
@@ -1178,6 +1316,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     setSelectedNotification(null);
     setSelectedChildReport(null);
     setSelectedCalendarDate(null);
+    setCheckInByDateKey({});
+    setStudyStartByDateKey({});
+    setStudyEndByDateKey({});
+    setAwayMinutesByDateKey({});
     setGrowthCelebration(null);
     setShowEntryMotion(false);
   }, [studentId]);
@@ -1241,7 +1383,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
   const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
 
-  const recentAnalyticsStartKey = today ? format(subDays(today, 34), 'yyyy-MM-dd') : '';
+  const analyticsLookbackDays = tab === 'data' ? 42 : 35;
+  const recentAnalyticsStartKey = today ? format(subDays(today, analyticsLookbackDays - 1), 'yyyy-MM-dd') : '';
   const calendarRangeStartKey = format(startOfWeek(startOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   const calendarRangeEndKey = format(endOfWeek(endOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
@@ -1356,48 +1499,118 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [isActive, firestore, centerId, studentId, today]);
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId || !today) {
+    if (!shouldLoadStudyAnalytics || !firestore || !centerId || !studentId || !today) {
       setStudyStartByDateKey({});
+      setStudyEndByDateKey({});
+      setAwayMinutesByDateKey({});
       return;
     }
 
     let cancelled = false;
-    const targetDateKeys = Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
+    const targetDateCount = tab === 'data' ? 14 : 7;
+    const targetDateKeys = Array.from({ length: targetDateCount }, (_, index) => {
+      const day = subDays(today, targetDateCount - 1 - index);
       return format(day, 'yyyy-MM-dd');
     });
 
-    const loadStudyStartTrend = async () => {
+    const loadStudySessionTrend = async () => {
       try {
-        const pairs = await Promise.all(
+        const results = await Promise.all(
           targetDateKeys.map(async (dateKey) => {
-            const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
-            const firstSessionQuery = query(sessionsRef, orderBy('startTime', 'asc'), limit(1));
-            const snapshot = await getDocs(firstSessionQuery);
-            const firstSession = snapshot.docs[0]?.data() as StudySession | undefined;
-            const sessionStart = firstSession?.startTime ? toDateSafe(firstSession.startTime as TimestampLike) : null;
             const todayFallback =
               dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
                 ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
                 : null;
-            return [dateKey, sessionStart || todayFallback] as const;
+
+            try {
+              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              const sessions = sessionsSnap.docs
+                .map((snapshot) => snapshot.data() as Partial<StudySession>)
+                .filter((session) => !!session.startTime)
+                .map((session) => ({
+                  startTime: toDateSafe(session.startTime as TimestampLike),
+                  endTime: toDateSafe(session.endTime as TimestampLike),
+                }))
+                .filter((session): session is { startTime: Date; endTime: Date | null } => !!session.startTime);
+
+              if (!sessions.length) {
+                return {
+                  dateKey,
+                  startAt: todayFallback,
+                  endAt: todayFallback,
+                  awayMinutes: 0,
+                };
+              }
+
+              const firstSession = sessions[0];
+              const lastSession = sessions[sessions.length - 1];
+              let awayMinutes = 0;
+
+              for (let index = 1; index < sessions.length; index += 1) {
+                const previousEnd = sessions[index - 1].endTime;
+                const currentStart = sessions[index].startTime;
+                if (!previousEnd || !currentStart) continue;
+                const gapMinutes = Math.round((currentStart.getTime() - previousEnd.getTime()) / 60000);
+                if (gapMinutes > 0 && gapMinutes < 180) {
+                  awayMinutes += gapMinutes;
+                }
+              }
+
+              return {
+                dateKey,
+                startAt: firstSession.startTime,
+                endAt: lastSession.endTime || lastSession.startTime || todayFallback,
+                awayMinutes,
+              };
+            } catch {
+              return {
+                dateKey,
+                startAt: todayFallback,
+                endAt: todayFallback,
+                awayMinutes: 0,
+              };
+            }
           })
         );
 
         if (!cancelled) {
-          setStudyStartByDateKey(Object.fromEntries(pairs) as Record<string, Date | null>);
+          setStudyStartByDateKey(
+            Object.fromEntries(results.map((item) => [item.dateKey, item.startAt ?? null])) as Record<string, Date | null>
+          );
+          setStudyEndByDateKey(
+            Object.fromEntries(results.map((item) => [item.dateKey, item.endAt ?? null])) as Record<string, Date | null>
+          );
+          setAwayMinutesByDateKey(
+            Object.fromEntries(results.map((item) => [item.dateKey, Math.max(0, Math.round(item.awayMinutes || 0))])) as Record<string, number>
+          );
         }
       } catch (error) {
         console.warn('[parent-dashboard] failed to load study rhythm trend', error);
-        if (!cancelled) setStudyStartByDateKey({});
+        if (!cancelled) {
+          setStudyStartByDateKey({});
+          setStudyEndByDateKey({});
+          setAwayMinutesByDateKey({});
+        }
       }
     };
 
-    void loadStudyStartTrend();
+    void loadStudySessionTrend();
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status]);
+  }, [
+    attendanceCurrent?.lastCheckInAt,
+    attendanceCurrent?.status,
+    centerId,
+    firestore,
+    isActive,
+    shouldLoadStudyAnalytics,
+    studentId,
+    tab,
+    today,
+    todayKey,
+  ]);
 
   const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
   const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
@@ -1574,8 +1787,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const dailyRhythmTrend = useMemo(() => {
     if (!today) return [] as { date: string; rhythmMinutes: number | null }[];
 
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
+    return Array.from({ length: 14 }, (_, index) => {
+      const day = subDays(today, 13 - index);
       const dateKey = format(day, 'yyyy-MM-dd');
       const studyStart = studyStartByDateKey[dateKey] || null;
 
@@ -1763,6 +1976,134 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [studyPlans, weeklyStudyPlans, weeklyTotalStudyMinutes]);
 
   const subjectTotalMinutes = subjectsData.reduce((sum, subject) => sum + subject.minutes, 0);
+
+  const studyTrend42 = useMemo(() => {
+    if (!today) return [] as Array<{ dateKey: string; dateLabel: string; minutes: number }>;
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = subDays(today, 41 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return {
+        dateKey,
+        dateLabel: format(day, 'M/d', { locale: ko }),
+        minutes: logMinutesByDateKey.get(dateKey) || 0,
+      };
+    });
+  }, [today, logMinutesByDateKey]);
+
+  const weeklyGrowthData = useMemo(() => {
+    if (studyTrend42.length === 0) return [] as Array<{ label: string; totalMinutes: number; growth: number }>;
+
+    const buckets = Array.from({ length: 6 }, (_, index) => {
+      const chunk = studyTrend42.slice(index * 7, index * 7 + 7);
+      return {
+        label: chunk[0]?.dateLabel || '',
+        totalMinutes: chunk.reduce((sum, item) => sum + item.minutes, 0),
+      };
+    });
+
+    return buckets.map((bucket, index, source) => {
+      if (index === 0) return { ...bucket, growth: 0 };
+      const previousTotal = source[index - 1].totalMinutes;
+      return {
+        ...bucket,
+        growth: previousTotal > 0 ? Math.round(((bucket.totalMinutes - previousTotal) / previousTotal) * 100) : 0,
+      };
+    });
+  }, [studyTrend42]);
+
+  const latestWeeklyLearningGrowthPercent = weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0;
+  const hasWeeklyGrowthData = weeklyGrowthData.some((week) => week.totalMinutes > 0);
+
+  const rhythmScoreOnlyTrend = useMemo(() => {
+    return dailyRhythmTrend.map((point, index, source) => {
+      const values = source
+        .slice(Math.max(0, index - 2), index + 1)
+        .map((item) => item.rhythmMinutes)
+        .filter((item): item is number => typeof item === 'number');
+      const score = values.length >= 2 ? calculateRhythmScore(values) : values.length === 1 ? 100 : 0;
+      return { date: point.date, score };
+    });
+  }, [dailyRhythmTrend]);
+
+  const averageRhythmScore = useMemo(() => {
+    const validScores = rhythmScoreOnlyTrend.filter((item) => item.score > 0);
+    if (!validScores.length) return 0;
+    return Math.round(validScores.reduce((sum, item) => sum + item.score, 0) / validScores.length);
+  }, [rhythmScoreOnlyTrend]);
+
+  const startEndTimeTrendData = useMemo(() => {
+    if (!today) return [] as Array<{ date: string; startHour: number | null; endHour: number | null }>;
+
+    return Array.from({ length: 14 }, (_, index) => {
+      const day = subDays(today, 13 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return {
+        date: format(day, 'M/d', { locale: ko }),
+        startHour: dateToHourNumber(studyStartByDateKey[dateKey] || null),
+        endHour: dateToHourNumber(studyEndByDateKey[dateKey] || null),
+      };
+    });
+  }, [today, studyStartByDateKey, studyEndByDateKey]);
+
+  const startEndYAxisDomain = useMemo(() => {
+    const values = startEndTimeTrendData
+      .flatMap((point) => [point.startHour, point.endHour])
+      .filter((value): value is number => typeof value === 'number');
+
+    if (!values.length) return [8, 24] as [number, number];
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const lower = Math.max(0, Math.floor((min - 1) * 2) / 2);
+    const upper = Math.min(24, Math.ceil((max + 1) * 2) / 2);
+    return lower === upper ? [Math.max(0, lower - 1), Math.min(24, upper + 1)] as [number, number] : [lower, upper] as [number, number];
+  }, [startEndTimeTrendData]);
+
+  const awayTimeTrendData = useMemo(() => {
+    if (!today) return [] as Array<{ date: string; awayMinutes: number }>;
+
+    return Array.from({ length: 14 }, (_, index) => {
+      const day = subDays(today, 13 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return {
+        date: format(day, 'M/d', { locale: ko }),
+        awayMinutes: Math.max(0, Math.round(Number(awayMinutesByDateKey[dateKey] || 0))),
+      };
+    });
+  }, [today, awayMinutesByDateKey]);
+
+  const hasRhythmScoreOnlyTrend = rhythmScoreOnlyTrend.some((item) => item.score > 0);
+  const hasStartEndTimeData = startEndTimeTrendData.some((item) => item.startHour !== null || item.endHour !== null);
+  const hasAwayTimeData = awayTimeTrendData.some((item) => item.awayMinutes > 0);
+
+  const weeklyGrowthInsight = useMemo(() => buildWeeklyStudyInsight(weeklyGrowthData), [weeklyGrowthData]);
+  const rhythmInsight = useMemo(() => buildRhythmInsight(rhythmScoreOnlyTrend), [rhythmScoreOnlyTrend]);
+  const startEndInsight = useMemo(
+    () =>
+      buildStartEndInsight(
+        startEndTimeTrendData.map((item) => ({
+          startMinutes: item.startHour ? Math.round(item.startHour * 60) : 0,
+          endMinutes: item.endHour ? Math.round(item.endHour * 60) : 0,
+        }))
+      ),
+    [startEndTimeTrendData]
+  );
+  const awayTimeInsight = useMemo(() => buildAwayTimeInsight(awayTimeTrendData), [awayTimeTrendData]);
+
+  const analyticsAverageStartLabel = useMemo(() => {
+    const validStarts = startEndTimeTrendData
+      .map((item) => item.startHour)
+      .filter((value): value is number => typeof value === 'number');
+    if (!validStarts.length) return '기록 대기';
+    const average = validStarts.reduce((sum, value) => sum + value, 0) / validStarts.length;
+    return hourToClockLabel(average);
+  }, [startEndTimeTrendData]);
+
+  const analyticsAverageAwayMinutes = useMemo(() => {
+    if (!awayTimeTrendData.length) return 0;
+    return Math.round(awayTimeTrendData.reduce((sum, item) => sum + item.awayMinutes, 0) / awayTimeTrendData.length);
+  }, [awayTimeTrendData]);
 
   const recentPenaltyReasons = useMemo(() => {
     const sorted요청 = [...(attendance요청 || [])].sort((a, b) => {
@@ -3035,6 +3376,194 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="data" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
+              <Card
+                className={cn(
+                  'overflow-hidden rounded-[2.15rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#fbfdff_0%,#ffffff_58%,#f5f8ff_100%)] p-5 shadow-[0_24px_54px_-42px_rgba(20,41,95,0.28)] sm:p-6',
+                  showEntryMotion && 'parent-card-enter parent-entry-delay-2'
+                )}
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e4ff] bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5472a4] shadow-sm">
+                      <FileText className="h-3.5 w-3.5 text-[#14295F]" />
+                      학습 분석 리포트
+                    </div>
+                    <h3 className="mt-3 break-keep text-[1.28rem] font-black tracking-tight text-[#14295F] sm:text-[1.42rem]">
+                      {activeStudentLabel} 학생의 최근 학습 흐름을
+                      <br className="hidden sm:block" />
+                      차분하게 읽을 수 있게 정리했어요
+                    </h3>
+                    <p className="mt-2 break-keep text-[12.5px] font-bold leading-[1.7] text-slate-500 sm:text-[13px]">
+                      최근 42일 학습시간과 최근 14일 리듬 데이터를 바탕으로, 학부모님이 핵심 변화만 빠르게 파악할 수 있게 구성했습니다.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                    <Badge variant="outline" className="h-8 justify-center rounded-full border border-[#d9e6ff] bg-white/92 px-4 text-[10px] font-black text-[#14295F] shadow-sm">
+                      최근 6주 학습시간
+                    </Badge>
+                    <Badge variant="outline" className="h-8 justify-center rounded-full border border-[#d7f0e6] bg-white/92 px-4 text-[10px] font-black text-[#15836b] shadow-sm">
+                      최근 14일 리듬
+                    </Badge>
+                  </div>
+                </div>
+              </Card>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <ParentAnalyticsCard
+                  tone="growth"
+                  icon={<BarChart3 className="h-[18px] w-[18px]" />}
+                  title="주간 학습시간 성장률"
+                  description="주간 누적 학습시간과 전주 대비 성장률을 함께 봐서 실제 개선 속도를 읽습니다."
+                  badge={hasWeeklyGrowthData ? `이번 주 ${toSignedPercentLabel(latestWeeklyLearningGrowthPercent)}` : '데이터 대기'}
+                  insight={weeklyGrowthInsight.trend}
+                  className={showEntryMotion ? 'parent-card-enter parent-entry-delay-3' : undefined}
+                >
+                  {hasWeeklyGrowthData ? (
+                    <div className="h-[220px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 6, left: -12, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7eefb" />
+                          <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} />
+                          <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={34} tickFormatter={(value) => minutesToAxisLabel(Number(value))} />
+                          <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={32} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '1rem', border: '1px solid #d7e3fb', boxShadow: '0 18px 36px rgba(20,41,95,0.12)' }}
+                            formatter={(value: number, name: string) => {
+                              if (name === 'totalMinutes') return [toHm(Math.round(Number(value || 0))), '주간 학습시간'];
+                              return [`${Math.round(Number(value || 0))}%`, '전주 대비 성장률'];
+                            }}
+                          />
+                          <Bar yAxisId="mins" dataKey="totalMinutes" fill="#cadeff" radius={[8, 8, 0, 0]} barSize={22} isAnimationActive={!prefersReducedMotion} />
+                          <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#10b981" strokeWidth={2.8} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 4, fill: '#10b981' }} isAnimationActive={!prefersReducedMotion} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-[220px] items-center justify-center rounded-[1.2rem] border border-dashed border-[#d8e5ff] bg-white/80 text-center text-sm font-bold text-slate-400">
+                      최근 6주 학습 데이터가 아직 충분하지 않습니다.
+                    </div>
+                  )}
+                </ParentAnalyticsCard>
+
+                <ParentAnalyticsCard
+                  tone="rhythm"
+                  icon={<Activity className="h-[18px] w-[18px]" />}
+                  title="학습 리듬 추이"
+                  description="비슷한 흐름으로 공부를 시작하고 유지하는 안정감을 점수로 확인합니다."
+                  badge={hasRhythmScoreOnlyTrend ? `평균 ${averageRhythmScore}점` : '기록 대기'}
+                  insight={rhythmInsight.trend}
+                  className={showEntryMotion ? 'parent-card-enter parent-entry-delay-3' : undefined}
+                >
+                  {hasRhythmScoreOnlyTrend ? (
+                    <div className="h-[220px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: -6, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="parent-rhythm-area" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8BE4C7" stopOpacity={0.38} />
+                              <stop offset="100%" stopColor="#8BE4C7" stopOpacity={0.04} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dff1ea" />
+                          <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
+                          <YAxis tickLine={false} axisLine={false} width={28} domain={[0, 100]} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '1rem', border: '1px solid #d7f0e7', boxShadow: '0 18px 36px rgba(16,185,129,0.12)' }}
+                            formatter={(value: number) => [`${Math.round(Number(value || 0))}점`, '리듬 점수']}
+                          />
+                          <Area type="monotone" dataKey="score" stroke="none" fill="url(#parent-rhythm-area)" isAnimationActive={!prefersReducedMotion} />
+                          <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={3} dot={{ r: 2.5, fill: '#0f766e' }} activeDot={{ r: 4, fill: '#0f766e' }} isAnimationActive={!prefersReducedMotion} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-[220px] items-center justify-center rounded-[1.2rem] border border-dashed border-[#d7f0e7] bg-white/80 text-center text-sm font-bold text-slate-400">
+                      최근 14일 리듬 점수를 계산할 기록이 부족합니다.
+                    </div>
+                  )}
+                </ParentAnalyticsCard>
+
+                <ParentAnalyticsCard
+                  tone="window"
+                  icon={<Clock3 className="h-[18px] w-[18px]" />}
+                  title="공부 시작/종료 시간 추이"
+                  description="시작 시간은 일정하게, 종료 시간은 무리 없이 유지되는지를 함께 확인합니다."
+                  badge={hasStartEndTimeData ? `평균 시작 ${analyticsAverageStartLabel}` : '기록 대기'}
+                  insight={startEndInsight.trend}
+                  className={showEntryMotion ? 'parent-card-enter parent-entry-delay-4' : undefined}
+                >
+                  {hasStartEndTimeData ? (
+                    <div className="h-[220px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eaedff" />
+                          <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
+                          <YAxis tickLine={false} axisLine={false} width={40} domain={startEndYAxisDomain} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '1rem', border: '1px solid #dde4ff', boxShadow: '0 18px 36px rgba(83,99,255,0.10)' }}
+                            formatter={(value: number, name: string) => {
+                              if (name === 'startHour') return [hourToClockLabel(Number(value || 0)), '공부 시작'];
+                              return [hourToClockLabel(Number(value || 0)), '공부 종료'];
+                            }}
+                          />
+                          <Line type="monotone" dataKey="startHour" stroke="#0ea5e9" strokeWidth={2.8} dot={{ r: 2.5, fill: '#0ea5e9' }} activeDot={{ r: 4, fill: '#0ea5e9' }} connectNulls={false} isAnimationActive={!prefersReducedMotion} />
+                          <Line type="monotone" dataKey="endHour" stroke="#8b5cf6" strokeWidth={2.8} dot={{ r: 2.5, fill: '#8b5cf6' }} activeDot={{ r: 4, fill: '#8b5cf6' }} connectNulls={false} isAnimationActive={!prefersReducedMotion} />
+                        </RechartsLineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-[220px] items-center justify-center rounded-[1.2rem] border border-dashed border-[#dce5ff] bg-white/80 text-center text-sm font-bold text-slate-400">
+                      시작·종료 시각 기록이 아직 충분하지 않습니다.
+                    </div>
+                  )}
+                </ParentAnalyticsCard>
+
+                <ParentAnalyticsCard
+                  tone="away"
+                  icon={<AlertTriangle className="h-[18px] w-[18px]" />}
+                  title="학습 중간 이탈시간 추이"
+                  description="학습 흐름을 끊는 중간 이탈시간이 짧고 빠르게 회복되는지 확인합니다."
+                  badge={hasStartEndTimeData ? (hasAwayTimeData ? `평균 ${analyticsAverageAwayMinutes}분` : '안정적') : '기록 대기'}
+                  insight={hasStartEndTimeData ? awayTimeInsight.trend : '학습 세션 기록이 더 쌓이면 이탈시간 흐름을 함께 볼 수 있습니다.'}
+                  className={showEntryMotion ? 'parent-card-enter parent-entry-delay-4' : undefined}
+                >
+                  {hasStartEndTimeData ? (
+                    <div className="h-[220px] w-full">
+                      {hasAwayTimeData ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={awayTimeTrendData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fde5eb" />
+                            <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
+                            <YAxis tickLine={false} axisLine={false} width={30} tickFormatter={(value) => `${value}m`} />
+                            <Tooltip
+                              contentStyle={{ borderRadius: '1rem', border: '1px solid #ffe0e7', boxShadow: '0 18px 36px rgba(225,29,72,0.10)' }}
+                              formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '이탈시간']}
+                            />
+                            <Bar dataKey="awayMinutes" fill="#fecdd7" radius={[8, 8, 0, 0]} barSize={16} isAnimationActive={!prefersReducedMotion} />
+                            <Line type="monotone" dataKey="awayMinutes" stroke="#fb7185" strokeWidth={2.8} dot={{ r: 2.5, fill: '#fb7185' }} activeDot={{ r: 4, fill: '#fb7185' }} isAnimationActive={!prefersReducedMotion} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center rounded-[1.2rem] border border-dashed border-[#ffe0e7] bg-white/80 text-center text-sm font-bold text-slate-400">
+                          최근 14일 기준 눈에 띄는 이탈시간은 없었습니다.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex h-[220px] items-center justify-center rounded-[1.2rem] border border-dashed border-[#ffe0e7] bg-white/80 text-center text-sm font-bold text-slate-400">
+                      학습 세션 기록이 더 쌓이면 이탈시간 흐름을 확인할 수 있습니다.
+                    </div>
+                  )}
+                </ParentAnalyticsCard>
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-2 px-1">
+                  <Sparkles className="h-4 w-4 text-slate-400" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">추가 데이터</span>
+                </div>
+              </div>
+
               <Card
                 className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm cursor-pointer"
                 role="button"
