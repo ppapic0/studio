@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { doc, collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { AttendanceCurrent, 센터Membership, GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
+import { AttendanceCurrent, 센터Membership, GrowthProgress, LeaderboardEntry, StudyLogDay, DailyReport } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -110,6 +110,15 @@ const TIER_MILESTONES = [
   { name: '그마', lp: 30000 },
   { name: '챌린저', lp: 35000 },
 ] as const;
+
+function summarizeReportLine(content?: string | null) {
+  if (!content) return '';
+  return content
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 88);
+}
 
 function getNextTierInfo(currentLp: number) {
   const nextTier = TIER_MILESTONES.find((tier) => currentLp < tier.lp);
@@ -229,6 +238,16 @@ export default function GrowthPage() {
     );
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: seasonStudyLogs } = useCollection<StudyLogDay>(seasonStudyLogsQuery);
+
+  const reportsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
+      where('studentId', '==', user.uid),
+      where('status', '==', 'sent')
+    );
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: teacherReportsRaw } = useCollection<DailyReport>(reportsQuery);
 
   const rankQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -446,6 +465,124 @@ export default function GrowthPage() {
     achievement: '오늘 계획에서 학습 미션 3개를 끝내면 목표달성이 바로 반응하기 시작해요.',
     resilience: '6시간 이상 공부한 날을 한 번 더 만들면 회복탄력이 크게 쌓여요.',
   };
+  const teacherReports = useMemo(
+    () => [...(teacherReportsRaw || [])].sort((a, b) => b.dateKey.localeCompare(a.dateKey)),
+    [teacherReportsRaw]
+  );
+  const latestCoachReport = teacherReports[0] || null;
+  const reportCoachLine = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
+    || latestCoachReport?.nextAction?.trim()
+    || summarizeReportLine(latestCoachReport?.content);
+  const growthCoachInsight = useMemo(() => {
+    if (reportCoachLine) {
+      return {
+        label: '리포트 기반 한마디',
+        title: reportCoachLine,
+        detail: latestCoachReport?.aiMeta?.metrics?.trendSummary?.trim()
+          || '최근 코칭 리포트에서 지금 흐름에 맞는 핵심 한 줄을 골라 보여드리고 있어요.',
+        chip: latestCoachReport?.dateKey ? `${latestCoachReport.dateKey} 리포트` : '최근 코칭',
+        aside: latestCoachReport?.nextAction?.trim() || `${STAT_CONFIG[weakestStatKey].label}을 먼저 챙기면 다음 상승 폭이 더 커져요.`,
+      };
+    }
+
+    if (weeklyDelta > 0) {
+      return {
+        label: 'AI 성장 한마디',
+        title: `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 더 몰입했어요.`,
+        detail: `${latestSkillMoment ? `${latestSkillMoment.reason} 흐름이 살아 있고, ` : ''}${STAT_CONFIG[weakestStatKey].label}만 더 챙기면 다음 구간 진입이 더 빨라져요.`,
+        chip: seasonPercentile ? `센터 상위 ${seasonPercentile}%` : '페이스 상승 중',
+        aside: nextTierInfo.remainingLp > 0 ? `${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점` : '현재 티어 유지 구간',
+      };
+    }
+
+    if (weeklyStudyMinutes >= 360) {
+      return {
+        label: 'AI 성장 한마디',
+        title: '이번 주 페이스는 안정적으로 유지되고 있어요.',
+        detail: `${STAT_CONFIG[weakestStatKey].label}에 한 번만 더 힘을 주면 성장 카드가 더 선명해져요.`,
+        chip: `이번 주 ${formatMinutesCompact(weeklyStudyMinutes)}`,
+        aside: latestSkillMoment?.reason || '한 번의 깊은 세션이 다음 포인트를 만듭니다.',
+      };
+    }
+
+    return {
+      label: 'AI 성장 한마디',
+      title: '오늘 한 번의 깊은 세션이 흐름을 바꿔요.',
+      detail: `${STAT_CONFIG[weakestStatKey].label}부터 먼저 챙기면 이번 주 성장 그래프가 다시 살아납니다.`,
+      chip: nextTierInfo.remainingLp > 0 ? `${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점` : '시즌 데이터 축적 중',
+      aside: '가장 먼저 60분 한 번을 만들어 보세요.',
+    };
+  }, [
+    reportCoachLine,
+    latestCoachReport?.aiMeta?.metrics?.trendSummary,
+    latestCoachReport?.dateKey,
+    latestCoachReport?.nextAction,
+    weakestStatKey,
+    weeklyDelta,
+    latestSkillMoment,
+    seasonPercentile,
+    nextTierInfo.name,
+    nextTierInfo.remainingLp,
+    weeklyStudyMinutes,
+  ]);
+  const growthInsightCards = useMemo(() => {
+    return [
+      {
+        kicker: '이번 주 오른 이유',
+        title: latestSkillMoment ? latestSkillMoment.reason : '이번 주 성장 로그를 쌓는 중이에요.',
+        body: latestSkillMoment ? latestSkillMoment.detail : '공부 시간이 쌓이거나 계획을 완료하면 가장 먼저 잡힌 상승 이유가 이곳에 보입니다.',
+        footer: latestSkillMoment
+          ? `${SKILL_LABEL[latestSkillMoment.statKey]} 트랙 반응`
+          : '최근 상승 요인 집계 중',
+        icon: TrendingUp,
+        pillClass: 'bg-sky-50/90 text-sky-700 ring-sky-100',
+        iconClass: 'bg-white/80 text-sky-600 shadow-[0_16px_32px_-24px_rgba(14,165,233,0.75)]',
+        footerClass: 'bg-white/80 text-sky-700 ring-sky-100',
+        glowClass: 'from-sky-500/[0.18] via-cyan-500/[0.08] to-transparent',
+      },
+      {
+        kicker: '다음 1점 올리기',
+        title: STAT_CONFIG[weakestStatKey].label,
+        body: nextActionCopy[weakestStatKey],
+        footer: `현재 ${STAT_CONFIG[weakestStatKey].label} ${stats[weakestStatKey].toFixed(1)} / 100`,
+        icon: BookOpen,
+        pillClass: 'bg-emerald-50/90 text-emerald-700 ring-emerald-100',
+        iconClass: 'bg-white/80 text-emerald-600 shadow-[0_16px_32px_-24px_rgba(16,185,129,0.8)]',
+        footerClass: 'bg-white/80 text-emerald-700 ring-emerald-100',
+        glowClass: 'from-emerald-500/[0.18] via-teal-500/[0.08] to-transparent',
+      },
+      {
+        kicker: '기록 갱신 흐름',
+        title: seasonPercentile ? `상위 ${seasonPercentile}% 구간` : '이번 시즌 흐름 정리 중',
+        body: weeklyDelta > 0
+          ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 더 공부했어요. 이번 시즌 최고는 ${formatMinutesCompact(bestSeasonMinutes)}입니다.`
+          : weeklyDelta < 0
+            ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 적었어요. ${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점 남아 있어요.`
+            : `이번 주 누적 ${formatMinutesCompact(weeklyStudyMinutes)}로 페이스를 안정적으로 유지하고 있어요.`,
+        footer: weeklyDelta > 0
+          ? `지난주 대비 +${formatMinutesCompact(Math.abs(weeklyDelta))}`
+          : seasonPercentile
+            ? `센터 상위 ${seasonPercentile}%`
+            : `${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점`,
+        icon: Flame,
+        pillClass: 'bg-rose-50/90 text-rose-700 ring-rose-100',
+        iconClass: 'bg-white/80 text-rose-500 shadow-[0_16px_32px_-24px_rgba(244,63,94,0.8)]',
+        footerClass: 'bg-white/80 text-rose-700 ring-rose-100',
+        glowClass: 'from-rose-500/[0.18] via-orange-400/[0.08] to-transparent',
+      },
+    ] as const;
+  }, [
+    latestSkillMoment,
+    weakestStatKey,
+    nextActionCopy,
+    stats,
+    seasonPercentile,
+    weeklyDelta,
+    bestSeasonMinutes,
+    nextTierInfo.name,
+    nextTierInfo.remainingLp,
+    weeklyStudyMinutes,
+  ]);
 
   if (isLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
 
@@ -534,55 +671,80 @@ export default function GrowthPage() {
         </div>
       </Card>
 
-      <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
-          <CardContent className={cn("p-5", !isMobile && "p-6")}>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">이번 주 오른 이유</span>
-              <TrendingUp className="h-4 w-4 text-sky-500" />
+      <section className={isMobile ? "space-y-3" : "space-y-4"}>
+        <Card className="relative overflow-hidden rounded-[1.75rem] border-none bg-[linear-gradient(135deg,#fffdf7_0%,#ffffff_46%,#f6fbff_100%)] shadow-[0_24px_60px_-34px_rgba(15,23,42,0.3)] ring-1 ring-black/[0.05]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(253,224,71,0.2),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.12),transparent_34%)]" />
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+          <CardContent className={cn("relative", isMobile ? "p-5" : "p-6")}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-700 shadow-sm ring-1 ring-amber-100">
+                {growthCoachInsight.label}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-white shadow-sm">
+                {growthCoachInsight.chip}
+              </span>
             </div>
-            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
-              {latestSkillMoment ? latestSkillMoment.reason : '이번 주 성장 로그를 쌓는 중이에요.'}
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              {latestSkillMoment ? latestSkillMoment.detail : '공부 시간이 쌓이거나 계획을 완료하면 이곳에 성장 이유가 바로 보입니다.'}
-            </p>
+            <div className={cn("mt-4 flex gap-4", isMobile ? "flex-col" : "items-end justify-between")}>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/85 shadow-[0_16px_32px_-22px_rgba(251,191,36,0.9)] ring-1 ring-white/80 backdrop-blur-sm">
+                    <Sparkles className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className={cn("font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-lg leading-7" : "text-[1.7rem] leading-10")}>
+                      {growthCoachInsight.title}
+                    </p>
+                    <p className="max-w-3xl text-sm font-semibold leading-6 text-slate-600 break-keep">
+                      {growthCoachInsight.detail}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className={cn("shrink-0 rounded-[1.5rem] bg-white/82 p-4 shadow-[0_18px_36px_-26px_rgba(15,23,42,0.32)] ring-1 ring-white/90 backdrop-blur-sm", isMobile ? "w-full" : "max-w-[18rem]")}>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">다음 포인트</p>
+                <p className="mt-2 text-sm font-black leading-6 text-slate-900 break-keep">{growthCoachInsight.aside}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
-          <CardContent className={cn("p-5", !isMobile && "p-6")}>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">다음 1점 올리기</span>
-              <BookOpen className="h-4 w-4 text-emerald-500" />
-            </div>
-            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
-              {STAT_CONFIG[weakestStatKey].label}
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              {nextActionCopy[weakestStatKey]}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.75rem]">
-          <CardContent className={cn("p-5", !isMobile && "p-6")}>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">기록 갱신 흐름</span>
-              <Flame className="h-4 w-4 text-rose-400" />
-            </div>
-            <p className={cn("mt-3 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-xl")}>
-              {seasonPercentile ? `상위 ${seasonPercentile}% 구간` : '이번 시즌 흐름 정리 중'}
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              {weeklyDelta > 0
-                ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 더 공부했어요. 이번 시즌 최고는 ${formatMinutesCompact(bestSeasonMinutes)}입니다.`
-                : weeklyDelta < 0
-                  ? `지난주보다 ${formatMinutesCompact(Math.abs(weeklyDelta))} 적었어요. ${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점 남아 있어요.`
-                  : `이번 주 누적 ${formatMinutesCompact(weeklyStudyMinutes)}로 페이스를 안정적으로 유지하고 있어요.`}
-            </p>
-          </CardContent>
-        </Card>
+        <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+          {growthInsightCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card
+                key={card.kicker}
+                className="group relative overflow-hidden rounded-[1.75rem] border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.98)_100%)] shadow-[0_20px_54px_-38px_rgba(15,23,42,0.38)] ring-1 ring-black/[0.05] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-34px_rgba(15,23,42,0.42)]"
+              >
+                <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br", card.glowClass)} />
+                <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+                <CardContent className={cn("relative flex h-full flex-col", isMobile ? "p-5" : "p-6")}>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-sm ring-1", card.pillClass)}>
+                      {card.kicker}
+                    </span>
+                    <div className={cn("flex h-10 w-10 items-center justify-center rounded-2xl ring-1 ring-white/80 backdrop-blur-sm", card.iconClass)}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <p className={cn("font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-lg leading-7" : "text-[1.35rem] leading-8")}>
+                      {card.title}
+                    </p>
+                    <p className="text-sm font-semibold leading-6 text-slate-600 break-keep">
+                      {card.body}
+                    </p>
+                  </div>
+                  <div className="mt-auto pt-4">
+                    <span className={cn("inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[11px] font-black shadow-sm ring-1", card.footerClass)}>
+                      {card.footer}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </section>
 
       {/* 4대 핵심 스킬트랙 */}
