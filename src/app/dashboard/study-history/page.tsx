@@ -827,10 +827,10 @@ export default function StudyHistoryPage() {
                   </div>
 
                   {isMobile ? (
-                    <div className="absolute inset-x-1 bottom-1.5">
+                    <div className="absolute bottom-1.5 left-1 right-1">
                       <div
                         className={cn(
-                          "rounded-[0.7rem] border text-center font-mono font-black tabular-nums py-1 leading-tight text-[10px] tracking-tight whitespace-nowrap backdrop-blur-[10px] shadow-[0_18px_30px_-22px_rgba(15,23,42,0.5)]",
+                          "flex items-center justify-between gap-1.5 rounded-[0.8rem] border px-2 py-1.5 leading-tight backdrop-blur-[10px] shadow-[0_18px_30px_-22px_rgba(15,23,42,0.5)]",
                           minutes >= 300
                             ? "border-white/95 bg-white text-[#0f214d] shadow-[0_20px_34px_-22px_rgba(15,23,42,0.58)]"
                             : minutes > 0
@@ -838,7 +838,15 @@ export default function StudyHistoryPage() {
                               : "border-white/75 bg-white/84 text-slate-500"
                         )}
                       >
-                        {isCurrentMonth ? formatMinutes(minutes) : '--'}
+                        <span className="font-mono text-[11px] font-black tabular-nums tracking-tight whitespace-nowrap">
+                          {isCurrentMonth ? formatMinutes(minutes) : '--'}
+                        </span>
+                        <span className={cn(
+                          "truncate text-[8px] font-black uppercase tracking-[0.14em]",
+                          minutes > 0 && isCurrentMonth ? "text-slate-500" : "text-slate-400"
+                        )}>
+                          {isCurrentMonth ? focusLabel : ''}
+                        </span>
                       </div>
                     </div>
                   ) : (
@@ -867,7 +875,7 @@ export default function StudyHistoryPage() {
                   )}
 
                   {isTodayCalendar && (
-                    <div className="absolute bottom-1.5 right-1.5">
+                    <div className={cn("absolute right-1.5", isMobile ? "bottom-8" : "bottom-1.5")}>
                       <div className="rounded-full border border-white/50 bg-primary p-1 text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.6)]"><Activity className={cn(isMobile ? "h-2 w-2" : "h-2.5 w-2.5")} /></div>
                     </div>
                   )}
