@@ -200,15 +200,15 @@ export function DataAnalyticsPreviewSection() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <LineChart className="h-4 w-4 text-[#14295F]" />
-                <h3 className="text-[1.05rem] font-black text-[#14295F]">공부시간 × 국어 백분위 추이</h3>
+                <h3 className="text-[1.05rem] font-black text-[#14295F]">공부시간 × 목표 달성률 추이</h3>
               </div>
               <div className="flex flex-wrap gap-2 text-[11px] font-black">
                 <span className="rounded-full bg-[#EEF3FF] px-3 py-1 text-[#14295F]">공부시간</span>
-                <span className="rounded-full bg-[#FFF2E5] px-3 py-1 text-[#D96809]">국어 백분위</span>
+                <span className="rounded-full bg-[#FFF2E5] px-3 py-1 text-[#D96809]">목표 달성률</span>
               </div>
             </div>
             <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.7] text-[#48607B]">
-              시간 흐름 안에서 무엇이 좋아지고 무엇이 흔들리는지 보게 만듭니다.
+              공부시간이 늘수록 목표 달성률도 같이 올라가는 흐름을 보여줍니다.
             </p>
             <div className="mt-4 overflow-x-auto pb-2 custom-scrollbar">
               <div className="min-w-[30rem]">
