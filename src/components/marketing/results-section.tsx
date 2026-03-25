@@ -25,7 +25,7 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
             데이터로 말합니다
           </h2>
           <p className="mt-3 break-keep text-[14px] font-bold leading-[1.7] text-[#445b75]">
-            합격 실적과 성장 사례를 같은 문맥에서 보여주는 홈의 첫 신뢰 섹션입니다.
+            2026학년도 수능, 트랙의 운영 구조가 만들어 낸 결과입니다.
           </p>
         </div>
 
