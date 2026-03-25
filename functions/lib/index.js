@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -148,6 +148,68 @@ function normalizeStatsPayload(value) {
         hasAny = true;
     }
     return hasAny ? result : null;
+}
+function average(values) {
+    if (values.length === 0)
+        return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+function toTimestampOrNow(value) {
+    if (!value)
+        return null;
+    if (value instanceof admin.firestore.Timestamp)
+        return value;
+    if (value instanceof Date)
+        return admin.firestore.Timestamp.fromDate(value);
+    if (typeof value === "object" && value !== null) {
+        const maybeTs = value;
+        if (typeof maybeTs.toDate === "function") {
+            const date = maybeTs.toDate();
+            if (date instanceof Date && Number.isFinite(date.getTime())) {
+                return admin.firestore.Timestamp.fromDate(date);
+            }
+        }
+        if (typeof maybeTs.toMillis === "function") {
+            const millis = maybeTs.toMillis();
+            if (Number.isFinite(millis)) {
+                return admin.firestore.Timestamp.fromMillis(millis);
+            }
+        }
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return admin.firestore.Timestamp.fromMillis(value);
+    }
+    if (typeof value === "string") {
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) {
+            return admin.firestore.Timestamp.fromMillis(parsed);
+        }
+    }
+    return null;
+}
+function asTrimmedString(value, fallback = "") {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+function safeAverageMinutes(values) {
+    return values.length === 0 ? 0 : Math.round(average(values));
+}
+function parseExpectedArrivalMinutes(value, fallback) {
+    const parsed = parseHourMinute(typeof value === "string" && value.trim().length > 0 ? value : fallback);
+    if (!parsed)
+        return null;
+    return parsed.hour * 60 + parsed.minute;
+}
+function sortByPriority(a, b) {
+    const priorityWeight = {
+        critical: 0,
+        high: 1,
+        medium: 2,
+        low: 3,
+    };
+    const priorityDiff = priorityWeight[a.priority] - priorityWeight[b.priority];
+    if (priorityDiff !== 0)
+        return priorityDiff;
+    return toMillisSafe(b.occurredAt) - toMillisSafe(a.occurredAt);
 }
 function toMillisSafe(value) {
     if (!value)
@@ -370,6 +432,402 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap
 }
 function isAdminRole(role) {
     return typeof role === "string" && adminRoles.has(role);
+}
+function chunkArray(items, size) {
+    if (size <= 0)
+        return [items];
+    const chunks = [];
+    for (let index = 0; index < items.length; index += size) {
+        chunks.push(items.slice(index, index + size));
+    }
+    return chunks;
+}
+async function getDocsInChunks(db, refs) {
+    const snapshots = [];
+    for (const refsChunk of chunkArray(refs, 80)) {
+        if (refsChunk.length === 0)
+            continue;
+        const chunkSnaps = await db.getAll(...refsChunk);
+        snapshots.push(...chunkSnaps);
+    }
+    return snapshots;
+}
+function derivePenaltyPointsFromLogs(logs) {
+    const sortedLogs = [...logs].sort((a, b) => toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt));
+    let total = 0;
+    for (const log of sortedLogs) {
+        const delta = parseFiniteNumber(log.pointsDelta);
+        if (delta === null)
+            continue;
+        if (log.source === "reset") {
+            total = Math.max(0, total + delta);
+            continue;
+        }
+        total = Math.max(0, total + delta);
+    }
+    return Math.max(0, Math.round(total));
+}
+function getRiskLevelFromSignals(params) {
+    const { riskCacheAtRisk, effectivePenaltyPoints, awayLong, lateOrAbsent, unreadReport, counselingToday, todayMinutes, targetDailyMinutes, } = params;
+    if (effectivePenaltyPoints >= 12)
+        return "critical";
+    if (effectivePenaltyPoints >= 7 || riskCacheAtRisk || awayLong || lateOrAbsent)
+        return "risk";
+    if (unreadReport || counselingToday)
+        return "watch";
+    if (targetDailyMinutes > 0 && todayMinutes < Math.max(30, Math.round(targetDailyMinutes * 0.5)))
+        return "watch";
+    return "stable";
+}
+function buildOverlayFlagsFromSignals(params) {
+    const flags = new Set();
+    if (params.riskLevel === "risk" || params.riskLevel === "critical")
+        flags.add("risk");
+    if (params.effectivePenaltyPoints >= 7)
+        flags.add("penalty");
+    if (params.awayLong)
+        flags.add("away_long");
+    if (params.lateOrAbsent)
+        flags.add("late_or_absent");
+    if (params.unreadReport)
+        flags.add("report");
+    if (params.counselingToday)
+        flags.add("counseling");
+    if (params.targetDailyMinutes > 0 && params.todayMinutes < Math.max(30, Math.round(params.targetDailyMinutes * 0.5))) {
+        flags.add("minutes");
+    }
+    return Array.from(flags);
+}
+function buildIncident(type, priority, student, reason, occurredAt) {
+    return {
+        type,
+        priority,
+        studentId: student.studentId,
+        studentName: student.studentName,
+        seatId: student.seatId,
+        className: student.className,
+        reason,
+        occurredAt,
+        actionTarget: `/dashboard/teacher/students/${student.studentId}`,
+    };
+}
+async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
+    var _a, _b, _c;
+    const settings = await loadNotificationSettings(db, centerId);
+    const graceMinutes = Number.isFinite(Number(settings.lateAlertGraceMinutes))
+        ? Math.max(0, Number(settings.lateAlertGraceMinutes))
+        : 20;
+    const defaultArrivalTime = settings.defaultArrivalTime || "17:00";
+    const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
+    const weekAgoKey = toDateKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
+    const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const [membersSnap, attendanceSnap, todayStatsSnap, riskCacheSnap, counselingSnap, reportsSnap, penaltyLogsSnap] = await Promise.all([
+        db.collection(`centers/${centerId}/members`).where("role", "==", "student").where("status", "==", "active").get(),
+        db.collection(`centers/${centerId}/attendanceCurrent`).get(),
+        db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get(),
+        db.doc(`centers/${centerId}/riskCache/${dateKey}`).get(),
+        db.collection(`centers/${centerId}/counselingReservations`).get(),
+        db.collection(`centers/${centerId}/dailyReports`).where("status", "==", "sent").get(),
+        db.collection(`centers/${centerId}/penaltyLogs`).where("createdAt", ">=", penaltyCutoff).get(),
+    ]);
+    const activeMembers = membersSnap.docs.map((docSnap) => (Object.assign({ id: docSnap.id }, docSnap.data())));
+    if (activeMembers.length === 0) {
+        return {
+            updatedAt: admin.firestore.Timestamp.now(),
+            dateKey,
+            summary: {
+                studying: 0,
+                awayLong: 0,
+                lateOrAbsent: 0,
+                atRisk: 0,
+                unreadReports: 0,
+                counselingPending: 0,
+            },
+            classSummaries: [],
+            seatSignals: [],
+            incidents: [],
+        };
+    }
+    const studentIds = activeMembers.map((member) => member.id);
+    const studentRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
+    const progressRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/growthProgress/${studentId}`));
+    const [studentSnaps, progressSnaps] = await Promise.all([
+        getDocsInChunks(db, studentRefs),
+        getDocsInChunks(db, progressRefs),
+    ]);
+    const studentMap = new Map();
+    studentSnaps.forEach((snap) => {
+        if (snap.exists)
+            studentMap.set(snap.id, snap.data());
+    });
+    const progressMap = new Map();
+    progressSnaps.forEach((snap) => {
+        if (snap.exists)
+            progressMap.set(snap.id, snap.data());
+    });
+    const attendanceByStudentId = new Map();
+    attendanceSnap.forEach((seatDoc) => {
+        const seatData = seatDoc.data();
+        const seatStudentId = asTrimmedString(seatData === null || seatData === void 0 ? void 0 : seatData.studentId, "");
+        if (seatStudentId) {
+            attendanceByStudentId.set(seatStudentId, Object.assign({ id: seatDoc.id }, seatData));
+        }
+    });
+    const todayStatsByStudentId = new Map();
+    todayStatsSnap.forEach((statDoc) => {
+        const statData = statDoc.data();
+        const statStudentId = asTrimmedString(statData === null || statData === void 0 ? void 0 : statData.studentId, statDoc.id);
+        todayStatsByStudentId.set(statStudentId, statData);
+    });
+    const riskCacheStudentIds = new Set(Array.isArray((_a = riskCacheSnap.data()) === null || _a === void 0 ? void 0 : _a.atRiskStudentIds) ? (_b = riskCacheSnap.data()) === null || _b === void 0 ? void 0 : _b.atRiskStudentIds : []);
+    const riskCacheUpdatedAt = toTimestampOrNow((_c = riskCacheSnap.data()) === null || _c === void 0 ? void 0 : _c.updatedAt);
+    const pendingCounselingByStudentId = new Map();
+    counselingSnap.forEach((reservationDoc) => {
+        const reservation = reservationDoc.data();
+        const reservationStudentId = asTrimmedString(reservation === null || reservation === void 0 ? void 0 : reservation.studentId, "");
+        if (!reservationStudentId)
+            return;
+        const status = asTrimmedString(reservation === null || reservation === void 0 ? void 0 : reservation.status, "");
+        if (status === "done" || status === "canceled")
+            return;
+        const scheduledAt = toTimestampOrNow(reservation === null || reservation === void 0 ? void 0 : reservation.scheduledAt);
+        if (!scheduledAt)
+            return;
+        if (toDateKey(toKstDate(scheduledAt.toDate())) !== dateKey)
+            return;
+        const current = pendingCounselingByStudentId.get(reservationStudentId) || [];
+        current.push(Object.assign({ id: reservationDoc.id }, reservation));
+        pendingCounselingByStudentId.set(reservationStudentId, current);
+    });
+    const unreadReportByStudentId = new Map();
+    reportsSnap.forEach((reportDoc) => {
+        const report = reportDoc.data();
+        if (asTrimmedString(report === null || report === void 0 ? void 0 : report.status, "") !== "sent")
+            return;
+        const reportDateKey = asTrimmedString(report === null || report === void 0 ? void 0 : report.dateKey, "");
+        if (!reportDateKey || reportDateKey < weekAgoKey || reportDateKey > dateKey)
+            return;
+        if (report === null || report === void 0 ? void 0 : report.viewedAt)
+            return;
+        const reportStudentId = asTrimmedString(report === null || report === void 0 ? void 0 : report.studentId, "");
+        if (!reportStudentId)
+            return;
+        const current = unreadReportByStudentId.get(reportStudentId);
+        if (!current || toMillisSafe(report.updatedAt) > toMillisSafe(current.latest.updatedAt)) {
+            unreadReportByStudentId.set(reportStudentId, {
+                latest: Object.assign({ id: reportDoc.id }, report),
+                count: ((current === null || current === void 0 ? void 0 : current.count) || 0) + 1,
+            });
+        }
+        else {
+            unreadReportByStudentId.set(reportStudentId, {
+                latest: current.latest,
+                count: current.count + 1,
+            });
+        }
+    });
+    const penaltyLogsByStudentId = new Map();
+    penaltyLogsSnap.forEach((logDoc) => {
+        const log = logDoc.data();
+        const logStudentId = asTrimmedString(log === null || log === void 0 ? void 0 : log.studentId, "");
+        if (!logStudentId)
+            return;
+        const current = penaltyLogsByStudentId.get(logStudentId) || [];
+        current.push(Object.assign({ id: logDoc.id }, log));
+        penaltyLogsByStudentId.set(logStudentId, current);
+    });
+    const contexts = activeMembers
+        .map((member) => {
+        var _a;
+        const studentId = member.id;
+        const student = studentMap.get(studentId) || {};
+        const progress = progressMap.get(studentId) || {};
+        const attendance = attendanceByStudentId.get(studentId) || null;
+        const todayStats = todayStatsByStudentId.get(studentId) || {};
+        const unreadReport = unreadReportByStudentId.has(studentId);
+        const counselingToday = (pendingCounselingByStudentId.get(studentId) || []).length > 0;
+        const studentName = asTrimmedString(student === null || student === void 0 ? void 0 : student.name, asTrimmedString(member === null || member === void 0 ? void 0 : member.displayName, "학생"));
+        const className = asTrimmedString(student === null || student === void 0 ? void 0 : student.className, asTrimmedString(member === null || member === void 0 ? void 0 : member.className, "미분류"));
+        const seatNo = Number.isFinite(Number(student === null || student === void 0 ? void 0 : student.seatNo)) ? Number(student.seatNo) : 0;
+        const seatId = (attendance === null || attendance === void 0 ? void 0 : attendance.id) || (seatNo > 0 ? `seat_${String(seatNo).padStart(3, "0")}` : studentId);
+        const lastCheckInAt = toTimestampOrNow(attendance === null || attendance === void 0 ? void 0 : attendance.lastCheckInAt);
+        const seatStatus = asTrimmedString(attendance === null || attendance === void 0 ? void 0 : attendance.status, "absent");
+        const targetDailyMinutes = Number.isFinite(Number(student === null || student === void 0 ? void 0 : student.targetDailyMinutes))
+            ? Math.max(0, Number(student.targetDailyMinutes))
+            : 0;
+        const todayMinutes = Math.max(0, Math.round(Number((todayStats === null || todayStats === void 0 ? void 0 : todayStats.totalStudyMinutes) || 0)));
+        const penaltyLogs = penaltyLogsByStudentId.get(studentId) || [];
+        const penaltyFromProgress = parseFiniteNumber(progress === null || progress === void 0 ? void 0 : progress.penaltyPoints);
+        const effectivePenaltyPoints = penaltyFromProgress !== null
+            ? Math.max(0, Math.round(penaltyFromProgress))
+            : derivePenaltyPointsFromLogs(penaltyLogs);
+        const awayLong = Boolean(lastCheckInAt &&
+            (seatStatus === "away" || seatStatus === "break") &&
+            Math.max(0, Math.floor((nowKst.getTime() - lastCheckInAt.toMillis()) / 60000)) >= 15);
+        const expectedArrivalTime = asTrimmedString(student === null || student === void 0 ? void 0 : student.expectedArrivalTime, defaultArrivalTime);
+        const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime, defaultArrivalTime);
+        const hasCurrentAttendance = seatStatus === "studying" || seatStatus === "away" || seatStatus === "break";
+        const lateOrAbsent = Boolean(expectedArrivalMinutes !== null &&
+            !hasCurrentAttendance &&
+            nowMinutes >= expectedArrivalMinutes + graceMinutes);
+        const riskCacheAtRisk = riskCacheStudentIds.has(studentId);
+        const riskLevel = getRiskLevelFromSignals({
+            riskCacheAtRisk,
+            effectivePenaltyPoints,
+            awayLong,
+            lateOrAbsent,
+            unreadReport,
+            counselingToday,
+            todayMinutes,
+            targetDailyMinutes,
+        });
+        const overlayFlags = buildOverlayFlagsFromSignals({
+            riskLevel,
+            effectivePenaltyPoints,
+            awayLong,
+            lateOrAbsent,
+            unreadReport,
+            counselingToday,
+            todayMinutes,
+            targetDailyMinutes,
+        });
+        let occurredAt = riskCacheUpdatedAt || admin.firestore.Timestamp.now();
+        if (awayLong && lastCheckInAt)
+            occurredAt = lastCheckInAt;
+        if (lateOrAbsent && expectedArrivalMinutes !== null) {
+            const expectedDate = new Date(nowKst);
+            expectedDate.setHours(Math.floor(expectedArrivalMinutes / 60), expectedArrivalMinutes % 60, 0, 0);
+            occurredAt = admin.firestore.Timestamp.fromDate(expectedDate);
+        }
+        if (unreadReport) {
+            const unreadReportRecord = (_a = unreadReportByStudentId.get(studentId)) === null || _a === void 0 ? void 0 : _a.latest;
+            const unreadTs = toTimestampOrNow((unreadReportRecord === null || unreadReportRecord === void 0 ? void 0 : unreadReportRecord.updatedAt) || (unreadReportRecord === null || unreadReportRecord === void 0 ? void 0 : unreadReportRecord.createdAt));
+            if (unreadTs)
+                occurredAt = unreadTs;
+        }
+        if (counselingToday) {
+            const upcoming = (pendingCounselingByStudentId.get(studentId) || [])
+                .map((reservation) => ({
+                reservation,
+                timestamp: toTimestampOrNow(reservation === null || reservation === void 0 ? void 0 : reservation.scheduledAt),
+            }))
+                .filter((item) => item.timestamp)
+                .sort((a, b) => { var _a, _b; return (((_a = a.timestamp) === null || _a === void 0 ? void 0 : _a.toMillis()) || 0) - (((_b = b.timestamp) === null || _b === void 0 ? void 0 : _b.toMillis()) || 0); })[0];
+            if (upcoming === null || upcoming === void 0 ? void 0 : upcoming.timestamp)
+                occurredAt = upcoming.timestamp;
+        }
+        const latestPenaltyLog = penaltyLogs
+            .map((log) => ({ log, timestamp: toTimestampOrNow(log === null || log === void 0 ? void 0 : log.createdAt) }))
+            .filter((item) => item.timestamp)
+            .sort((a, b) => { var _a, _b; return (((_a = b.timestamp) === null || _a === void 0 ? void 0 : _a.toMillis()) || 0) - (((_b = a.timestamp) === null || _b === void 0 ? void 0 : _b.toMillis()) || 0); })[0];
+        if (latestPenaltyLog === null || latestPenaltyLog === void 0 ? void 0 : latestPenaltyLog.timestamp)
+            occurredAt = latestPenaltyLog.timestamp;
+        return {
+            studentId,
+            studentName,
+            className,
+            seatId,
+            seatNo,
+            seatStatus,
+            lastCheckInAt,
+            expectedArrivalTime,
+            targetDailyMinutes,
+            todayMinutes,
+            riskCacheAtRisk,
+            effectivePenaltyPoints,
+            unreadReport,
+            counselingToday,
+            awayLong,
+            lateOrAbsent,
+            riskLevel,
+            overlayFlags,
+            occurredAt,
+        };
+    })
+        .sort((a, b) => {
+        const classDiff = a.className.localeCompare(b.className, "ko");
+        if (classDiff !== 0)
+            return classDiff;
+        return a.seatNo - b.seatNo;
+    });
+    const classGroups = new Map();
+    for (const context of contexts) {
+        const current = classGroups.get(context.className) || [];
+        current.push(context);
+        classGroups.set(context.className, current);
+    }
+    const summary = {
+        studying: contexts.filter((context) => context.seatStatus === "studying").length,
+        awayLong: contexts.filter((context) => context.awayLong).length,
+        lateOrAbsent: contexts.filter((context) => context.lateOrAbsent).length,
+        atRisk: contexts.filter((context) => context.riskLevel === "risk" || context.riskLevel === "critical").length,
+        unreadReports: contexts.filter((context) => context.unreadReport).length,
+        counselingPending: contexts.filter((context) => context.counselingToday).length,
+    };
+    const classSummaries = Array.from(classGroups.entries())
+        .map(([className, students]) => {
+        const activeCount = students.length;
+        const occupiedCount = students.filter((student) => student.seatStatus !== "absent").length;
+        return {
+            className,
+            occupancyRate: activeCount > 0 ? Math.round((occupiedCount / activeCount) * 100) : 0,
+            avgMinutes: safeAverageMinutes(students.map((student) => student.todayMinutes)),
+            riskCount: students.filter((student) => student.riskLevel === "risk" || student.riskLevel === "critical").length,
+            awayLongCount: students.filter((student) => student.awayLong).length,
+            pendingCounselingCount: students.filter((student) => student.counselingToday).length,
+        };
+    })
+        .sort((a, b) => a.className.localeCompare(b.className, "ko"));
+    const incidents = [];
+    for (const context of contexts) {
+        if (context.riskCacheAtRisk || context.riskLevel === "risk" || context.riskLevel === "critical") {
+            incidents.push(buildIncident("risk", context.riskLevel === "critical" ? "critical" : "high", context, context.riskCacheAtRisk
+                ? "최근 14일 학습량이 목표 대비 부족합니다."
+                : "종합 관제 기준에서 주의가 필요한 학생입니다.", context.occurredAt));
+        }
+        if (context.awayLong) {
+            incidents.push(buildIncident("away_long", "high", context, "외출/휴식 상태가 15분 이상 지속되고 있습니다.", context.occurredAt));
+        }
+        if (context.lateOrAbsent) {
+            incidents.push(buildIncident("late_or_absent", "high", context, `예상 등교 시간 ${context.expectedArrivalTime || defaultArrivalTime} 기준으로 미입실 상태입니다.`, context.occurredAt));
+        }
+        if (context.effectivePenaltyPoints >= 12) {
+            incidents.push(buildIncident("penalty_threshold", "critical", context, `실효 벌점 ${context.effectivePenaltyPoints}점이 임계값을 넘었습니다.`, context.occurredAt));
+        }
+        else if (context.effectivePenaltyPoints >= 7) {
+            incidents.push(buildIncident("penalty_threshold", "high", context, `실효 벌점 ${context.effectivePenaltyPoints}점이 개입 기준을 넘었습니다.`, context.occurredAt));
+        }
+        if (context.unreadReport) {
+            incidents.push(buildIncident("unread_report", "medium", context, "최근 7일 발송된 리포트가 아직 열람되지 않았습니다.", context.occurredAt));
+        }
+        if (context.counselingToday) {
+            incidents.push(buildIncident("counseling_pending", "medium", context, "오늘 상담이 예정되어 있습니다.", context.occurredAt));
+        }
+    }
+    incidents.sort(sortByPriority);
+    return {
+        updatedAt: admin.firestore.Timestamp.now(),
+        dateKey,
+        summary,
+        classSummaries,
+        seatSignals: contexts.map((context) => ({
+            studentId: context.studentId,
+            seatId: context.seatId,
+            overlayFlags: context.overlayFlags,
+            todayMinutes: context.todayMinutes,
+            riskLevel: context.riskLevel,
+            effectivePenaltyPoints: context.effectivePenaltyPoints,
+            hasUnreadReport: context.unreadReport,
+            hasCounselingToday: context.counselingToday,
+        })),
+        incidents: incidents.slice(0, 120),
+    };
+}
+async function refreshClassroomSignalsForCenter(db, centerId, nowKst) {
+    const dateKey = toDateKey(nowKst);
+    const payload = await buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey);
+    await db.doc(`centers/${centerId}/classroomSignals/${dateKey}`).set(Object.assign(Object.assign({}, payload), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
+    return payload;
 }
 function assertInviteUsable(inv, expectedRole) {
     if (!allowedRoles.includes(inv.intendedRole)) {
@@ -1756,5 +2214,309 @@ exports.cleanupOldDocuments = functions
     }
     console.log("[cleanup] run complete", { centerCount: centersSnap.size, totalDeleted });
     return null;
+});
+/**
+ * 매주 일요일 오후 8시(KST) — 학부모에게 자녀의 주간 공부 리포트 SMS 발송
+ * 지난 7일(월~일) 합산 집중 시간을 dailyStudentStats에서 읽어 SMS로 전송합니다.
+ */
+exports.scheduledWeeklyReport = functions
+    .region(region)
+    .pubsub.schedule("0 20 * * 0")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    var _a;
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+    // 지난 7일 dateKey 생성
+    const dateKeys = [];
+    for (let i = 1; i <= 7; i++) {
+        const d = new Date(nowKst);
+        d.setDate(d.getDate() - i);
+        dateKeys.push(toDateKey(d));
+    }
+    const centersSnap = await db.collection("centers").get();
+    let totalSent = 0;
+    for (const centerDoc of centersSnap.docs) {
+        const centerId = centerDoc.id;
+        const settings = await loadNotificationSettings(db, centerId);
+        if (settings.smsEnabled === false || !settings.smsProvider || settings.smsProvider === "none")
+            continue;
+        // 활성 학생 목록
+        const membersSnap = await db
+            .collection(`centers/${centerId}/members`)
+            .where("role", "==", "student")
+            .where("status", "==", "active")
+            .get();
+        for (const memberDoc of membersSnap.docs) {
+            const studentId = memberDoc.id;
+            // 7일 총 집중 시간 합산
+            let weeklyMinutes = 0;
+            await Promise.all(dateKeys.map(async (dateKey) => {
+                var _a, _b;
+                const statSnap = await db
+                    .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
+                    .get();
+                if (statSnap.exists) {
+                    weeklyMinutes += Number((_b = (_a = statSnap.data()) === null || _a === void 0 ? void 0 : _a.totalStudyMinutes) !== null && _b !== void 0 ? _b : 0);
+                }
+            }));
+            const studentData = (await db.doc(`centers/${centerId}/students/${studentId}`).get()).data();
+            const studentName = typeof (studentData === null || studentData === void 0 ? void 0 : studentData.name) === "string" ? studentData.name : "학생";
+            const targetWeekly = (Number((_a = studentData === null || studentData === void 0 ? void 0 : studentData.targetDailyMinutes) !== null && _a !== void 0 ? _a : 0) * 5);
+            const weeklyHours = Math.floor(weeklyMinutes / 60);
+            const weeklyMins = weeklyMinutes % 60;
+            const timeLabel = weeklyHours > 0 ? `${weeklyHours}시간 ${weeklyMins}분` : `${weeklyMins}분`;
+            const achieveRate = targetWeekly > 0 ? Math.round((weeklyMinutes / targetWeekly) * 100) : null;
+            const achieveLabel = achieveRate !== null ? ` (목표 대비 ${achieveRate}%)` : "";
+            const message = `[주간 리포트] ${studentName} 학생이 이번 주 ${timeLabel} 공부했습니다${achieveLabel}.`;
+            const recipients = await collectParentRecipients(db, centerId, studentId);
+            if (recipients.length === 0)
+                continue;
+            const ts = admin.firestore.Timestamp.now();
+            const batch = db.batch();
+            const provider = settings.smsProvider || "none";
+            recipients.forEach((recipient) => {
+                const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
+                batch.set(queueRef, {
+                    centerId,
+                    studentId,
+                    parentUid: recipient.parentUid,
+                    to: recipient.phoneNumber,
+                    provider,
+                    sender: settings.smsSender || null,
+                    endpointUrl: settings.smsEndpointUrl || null,
+                    message,
+                    eventType: "weekly_report",
+                    status: "queued",
+                    createdAt: ts,
+                    updatedAt: ts,
+                });
+            });
+            await batch.commit();
+            totalSent += recipients.length;
+        }
+    }
+    console.log("[weekly-report] run complete", { centerCount: centersSnap.size, totalSent });
+    return null;
+});
+/**
+ * 세션 문서 생성 시 durationMinutes 유효성 검증 및 LP 서버 보정
+ * - 0분 이하 또는 360분 초과 세션은 경계값으로 클램프
+ * - closedReason이 있는 자동 종료 세션은 검증에서 제외
+ */
+exports.onSessionCreated = functions
+    .region(region)
+    .firestore.document("centers/{centerId}/studyLogs/{studentId}/days/{dateKey}/sessions/{sessionId}")
+    .onCreate(async (snap, context) => {
+    var _a;
+    const data = snap.data();
+    const { centerId, studentId, dateKey } = context.params;
+    // 자동 종료 세션은 Cloud Function 자체가 생성했으므로 재검증 불필요
+    if (data.closedReason)
+        return null;
+    const rawDuration = Number((_a = data.durationMinutes) !== null && _a !== void 0 ? _a : 0);
+    if (!Number.isFinite(rawDuration) || rawDuration < 0) {
+        console.warn("[session-validate] invalid durationMinutes", { centerId, studentId, sessionId: snap.id, rawDuration });
+        await snap.ref.update({ durationMinutes: 0, validationFlag: "clamped_negative" });
+        return null;
+    }
+    const MAX_MINUTES = 360;
+    if (rawDuration > MAX_MINUTES) {
+        const clamped = MAX_MINUTES;
+        const db = admin.firestore();
+        const batch = db.batch();
+        batch.update(snap.ref, { durationMinutes: clamped, validationFlag: "clamped_max" });
+        // dailyStudentStats 보정: 초과분 차감
+        const overageMinutes = rawDuration - clamped;
+        const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
+        batch.set(statRef, {
+            totalStudyMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        // studyLogs day 보정
+        const logRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+        batch.set(logRef, {
+            totalMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        await batch.commit();
+        console.log("[session-validate] clamped max", { centerId, studentId, sessionId: snap.id, rawDuration, clamped });
+    }
+    return null;
+});
+/**
+ * 매일 오후 9시(KST) — 최근 14일 집중 시간이 목표 대비 30% 미만인 학생을 위험군으로 분류
+ * - riskCache/{dateKey} 에 atRiskStudentIds 저장 (교사 대시보드 배지용)
+ * - 센터 관리자에게 위험군 학생 목록 SMS 발송
+ */
+exports.scheduledDailyRiskAlert = functions
+    .region(region)
+    .pubsub.schedule("0 21 * * *")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    var _a;
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+    const todayKey = toDateKey(nowKst);
+    const dateKeys = [];
+    for (let i = 0; i < 14; i++) {
+        const d = new Date(nowKst);
+        d.setDate(d.getDate() - i);
+        dateKeys.push(toDateKey(d));
+    }
+    const centersSnap = await db.collection("centers").get();
+    let totalAtRisk = 0;
+    for (const centerDoc of centersSnap.docs) {
+        const centerId = centerDoc.id;
+        const membersSnap = await db
+            .collection(`centers/${centerId}/members`)
+            .where("role", "==", "student")
+            .where("status", "==", "active")
+            .get();
+        const atRiskStudentIds = [];
+        const atRiskNames = [];
+        for (const memberDoc of membersSnap.docs) {
+            const studentId = memberDoc.id;
+            const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+            if (!studentSnap.exists)
+                continue;
+            const studentData = studentSnap.data();
+            const targetDailyMinutes = Number((_a = studentData === null || studentData === void 0 ? void 0 : studentData.targetDailyMinutes) !== null && _a !== void 0 ? _a : 0);
+            if (targetDailyMinutes <= 0)
+                continue;
+            const target14Days = targetDailyMinutes * 14;
+            let actual14Minutes = 0;
+            await Promise.all(dateKeys.map(async (dateKey) => {
+                var _a, _b;
+                const statSnap = await db
+                    .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
+                    .get();
+                if (statSnap.exists) {
+                    actual14Minutes += Number((_b = (_a = statSnap.data()) === null || _a === void 0 ? void 0 : _a.totalStudyMinutes) !== null && _b !== void 0 ? _b : 0);
+                }
+            }));
+            const achieveRate = actual14Minutes / target14Days;
+            if (achieveRate < 0.3) {
+                atRiskStudentIds.push(studentId);
+                const name = typeof studentData.name === "string" ? studentData.name : studentId;
+                atRiskNames.push(name);
+            }
+        }
+        // riskCache 저장 (교사 대시보드 배지용)
+        await db.doc(`centers/${centerId}/riskCache/${todayKey}`).set({
+            atRiskStudentIds,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            dateKey: todayKey,
+        }, { merge: true });
+        // 위험군이 있으면 관리자에게 SMS
+        if (atRiskStudentIds.length > 0) {
+            const settings = await loadNotificationSettings(db, centerId);
+            if (settings.smsEnabled !== false && settings.smsProvider && settings.smsProvider !== "none") {
+                const adminSnap = await db
+                    .collection(`centers/${centerId}/members`)
+                    .where("role", "in", ["centerAdmin", "owner"])
+                    .limit(5)
+                    .get();
+                const message = `[위험군 알림] ${atRiskNames.slice(0, 5).join(", ")}${atRiskStudentIds.length > 5 ? ` 외 ${atRiskStudentIds.length - 5}명` : ""}의 14일 집중시간이 목표 대비 30% 미만입니다.`;
+                const ts = admin.firestore.Timestamp.now();
+                const batch = db.batch();
+                for (const adminDoc of adminSnap.docs) {
+                    const adminData = adminDoc.data();
+                    const phone = normalizePhoneNumber(adminData === null || adminData === void 0 ? void 0 : adminData.phoneNumber);
+                    if (!phone)
+                        continue;
+                    const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
+                    batch.set(queueRef, {
+                        centerId,
+                        to: phone,
+                        provider: settings.smsProvider,
+                        sender: settings.smsSender || null,
+                        endpointUrl: settings.smsEndpointUrl || null,
+                        message,
+                        eventType: "risk_alert",
+                        status: "queued",
+                        createdAt: ts,
+                        updatedAt: ts,
+                    });
+                }
+                await batch.commit();
+            }
+            totalAtRisk += atRiskStudentIds.length;
+        }
+    }
+    console.log("[daily-risk-alert] run complete", { centerCount: centersSnap.size, totalAtRisk });
+    return null;
+});
+/**
+ * 5분마다 교실 관제 신호 캐시를 갱신합니다.
+ */
+exports.scheduledClassroomSignalsRefresh = functions
+    .region(region)
+    .runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+})
+    .pubsub.schedule("every 5 minutes")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+    const centersSnap = await db.collection("centers").get();
+    let refreshed = 0;
+    for (const centerDoc of centersSnap.docs) {
+        try {
+            await refreshClassroomSignalsForCenter(db, centerDoc.id, nowKst);
+            refreshed += 1;
+        }
+        catch (error) {
+            console.error("[classroom-signals] scheduled refresh failed", {
+                centerId: centerDoc.id,
+                error,
+            });
+        }
+    }
+    console.log("[classroom-signals] scheduled refresh complete", {
+        centerCount: centersSnap.size,
+        refreshed,
+        dateKey: toDateKey(nowKst),
+    });
+    return null;
+});
+/**
+ * 교사/센터관리자가 특정 센터의 교실 관제 신호를 수동 갱신합니다.
+ */
+exports.refreshClassroomSignals = functions
+    .region(region)
+    .runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+})
+    .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = typeof (data === null || data === void 0 ? void 0 : data.centerId) === "string" ? data.centerId.trim() : "";
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId is required.");
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role || (membership.role !== "teacher" && !isAdminRole(membership.role))) {
+        throw new functions.https.HttpsError("permission-denied", "Only teacher/admin can refresh classroom signals.");
+    }
+    if (!isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Inactive membership.");
+    }
+    const nowKst = toKstDate();
+    const payload = await refreshClassroomSignalsForCenter(db, centerId, nowKst);
+    return {
+        ok: true,
+        centerId,
+        dateKey: payload.dateKey,
+        updatedAt: payload.updatedAt,
+        summary: payload.summary,
+        classSummaryCount: payload.classSummaries.length,
+        incidentCount: payload.incidents.length,
+    };
 });
 //# sourceMappingURL=index.js.map
