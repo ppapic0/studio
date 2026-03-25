@@ -33,6 +33,7 @@ import {
   CalendarDays,
   Loader2,
   CreditCard,
+  X,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -94,7 +95,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsContent } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -172,6 +173,68 @@ type ParentCommunicationRecord = {
   repliedAt?: { toDate?: () => Date };
   repliedByName?: string;
 };
+
+type GrowthCelebrationState = {
+  increaseRate: number;
+  todayMinutes: number;
+  previous7DayAverage: number;
+};
+
+function ParentGrowthCelebration({
+  celebration,
+  studentName,
+  onClose,
+}: {
+  celebration: GrowthCelebrationState;
+  studentName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[70] flex justify-center px-4 sm:px-6">
+      <div className="fade-up-pop pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[1.85rem] border border-[#ffd5a7] bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(255,244,231,0.98)_55%,rgba(238,244,255,0.98)_100%)] p-4 shadow-[0_18px_36px_rgba(20,41,95,0.18)] backdrop-blur-xl">
+        <div className="soft-glow absolute -right-6 top-2 h-24 w-24 rounded-full bg-[#FFB46D]/40 blur-3xl" />
+        <div className="soft-glow absolute -left-8 bottom-0 h-20 w-20 rounded-full bg-[#9fc0ff]/35 blur-3xl" />
+        <Sparkles className="float-spark absolute right-5 top-5 h-4 w-4 text-[#FF7A16]" />
+
+        <div className="relative z-10 flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#14295F] text-white shadow-[0_10px_20px_rgba(20,41,95,0.22)]">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">Growth Update</p>
+                <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">
+                  {studentName} 학생의 오늘 흐름이 좋아졌어요
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-[#14295F]/10 bg-white/85 p-1.5 text-[#14295F] shadow-sm transition-colors hover:bg-white"
+                aria-label="성장 알림 닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-600">
+              우리 아이 공부가 최근 7일 평균보다{' '}
+              <span className="font-black text-[#FF7A16]">{celebration.increaseRate}%</span> 증가했어요.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className="h-7 rounded-full border border-[#ffd4aa] bg-white/90 px-3 text-[11px] font-black text-[#14295F]">
+                오늘 {toHm(celebration.todayMinutes)}
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border border-[#d5e3ff] bg-[#eef4ff] px-3 text-[11px] font-black text-[#14295F]">
+                최근 평균 {toHm(celebration.previous7DayAverage)}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function RhythmTimeChartDialog({
   trend,
@@ -538,8 +601,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
+  const [growthCelebration, setGrowthCelebration] = useState<GrowthCelebrationState | null>(null);
   const visitLoggedRef = useRef(false);
   const reportReadLoggedRef = useRef<Record<string, boolean>>({});
+  const growthCelebrationTimerRef = useRef<number | null>(null);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -968,6 +1033,47 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [dailyStudyTrend]
   );
 
+  const previous7DayMinutes = useMemo(() => {
+    if (!today) return [] as number[];
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, index + 1);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return logMinutesByDateKey.get(dateKey) || 0;
+    });
+  }, [today, logMinutesByDateKey]);
+
+  const previous7DayStudyDaysCount = useMemo(
+    () => previous7DayMinutes.filter((minutes) => minutes > 0).length,
+    [previous7DayMinutes]
+  );
+
+  const previous7DayAverageMinutes = useMemo(() => {
+    if (previous7DayMinutes.length === 0) return 0;
+    return Math.round(
+      previous7DayMinutes.reduce((sum, minutes) => sum + minutes, 0) / previous7DayMinutes.length
+    );
+  }, [previous7DayMinutes]);
+
+  const growthCelebrationCandidate = useMemo<GrowthCelebrationState | null>(() => {
+    if (totalMinutes <= 0) return null;
+    if (previous7DayAverageMinutes <= 0) return null;
+    if (previous7DayStudyDaysCount < 3) return null;
+    if (totalMinutes <= previous7DayAverageMinutes) return null;
+
+    const increaseRate = Math.round(
+      ((totalMinutes - previous7DayAverageMinutes) / previous7DayAverageMinutes) * 100
+    );
+
+    if (increaseRate <= 0) return null;
+
+    return {
+      increaseRate,
+      todayMinutes: totalMinutes,
+      previous7DayAverage: previous7DayAverageMinutes,
+    };
+  }, [totalMinutes, previous7DayAverageMinutes, previous7DayStudyDaysCount]);
+
   const weeklyStudyPlans = (weeklyPlans || []).filter((item) => item.category === 'study' || !item.category);
   const weeklyPlanTotal = weeklyStudyPlans.length;
   const weeklyPlanDone = weeklyStudyPlans.filter((item) => item.done).length;
@@ -1269,6 +1375,47 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   }, [penaltyRecovery.effectivePoints]);
 
+  const heroTone = useMemo(() => {
+    if (growthCelebrationCandidate) {
+      return {
+        badgeLabel: '성장 상승',
+        badgeClassName: 'border-[#ffd2a2] bg-[#fff3e6] text-[#FF7A16]',
+        title: '평균보다 더 좋은 흐름을 보이고 있어요',
+        description: `오늘 공부 시간이 직전 7일 평균보다 ${growthCelebrationCandidate.increaseRate}% 높습니다. 학습 리듬이 점점 안정되고 있어요.`,
+      };
+    }
+
+    if (weeklyPlanCompletionRate >= 85 && penaltyRecovery.effectivePoints === 0) {
+      return {
+        badgeLabel: '안정 성장',
+        badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        title: '루틴이 안정적으로 유지되고 있어요',
+        description: '계획 이행과 생활 리듬이 모두 차분하게 이어지고 있습니다. 부모님이 보시기에도 안심되는 흐름이에요.',
+      };
+    }
+
+    if (attendanceStatus.label.includes('학습') || attendanceStatus.label.includes('귀가')) {
+      return {
+        badgeLabel: '실시간 확인',
+        badgeClassName: 'border-[#d8e5ff] bg-[#eef4ff] text-[#14295F]',
+        title: '오늘의 학습 흐름을 앱에서 바로 확인할 수 있어요',
+        description: '등원 상태, 공부 시간, 계획 달성률을 한 화면에서 빠르게 보실 수 있도록 정리했습니다.',
+      };
+    }
+
+    return {
+      badgeLabel: '안심 체크',
+      badgeClassName: 'border-slate-200 bg-white text-slate-600',
+      title: '자녀의 오늘 흐름을 차분하게 확인해 보세요',
+      description: '학습 리듬과 생활 상태를 복잡하지 않게, 앱 기준으로 보기 쉽게 모았습니다.',
+    };
+  }, [
+    growthCelebrationCandidate,
+    weeklyPlanCompletionRate,
+    penaltyRecovery.effectivePoints,
+    attendanceStatus.label,
+  ]);
+
   const selectedDateLog = useMemo(() => {
     if (!selectedDateKey) return null;
     return (allLogs || []).find((log) => log.dateKey === selectedDateKey) || null;
@@ -1295,6 +1442,45 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     () => (attendance요청 || []).find((request) => request.date === selectedDateKey),
     [attendance요청, selectedDateKey]
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (growthCelebrationTimerRef.current) {
+      window.clearTimeout(growthCelebrationTimerRef.current);
+      growthCelebrationTimerRef.current = null;
+    }
+
+    if (!isActive || tab !== 'home' || !centerId || !studentId || !todayKey || !growthCelebrationCandidate) {
+      setGrowthCelebration(null);
+      return;
+    }
+
+    const storageKey = `parent-growth-celebration:${centerId}:${studentId}:${todayKey}`;
+
+    try {
+      if (window.localStorage.getItem(storageKey)) {
+        setGrowthCelebration(null);
+        return;
+      }
+      window.localStorage.setItem(storageKey, 'shown');
+    } catch {
+      // Ignore storage issues and still show once during this render cycle.
+    }
+
+    setGrowthCelebration(growthCelebrationCandidate);
+    growthCelebrationTimerRef.current = window.setTimeout(() => {
+      setGrowthCelebration(null);
+      growthCelebrationTimerRef.current = null;
+    }, 3200);
+
+    return () => {
+      if (growthCelebrationTimerRef.current) {
+        window.clearTimeout(growthCelebrationTimerRef.current);
+        growthCelebrationTimerRef.current = null;
+      }
+    };
+  }, [isActive, tab, centerId, studentId, todayKey, growthCelebrationCandidate]);
 
   const readNotification = async (notification: ParentNotificationItem) => {
     setReadMap((prev) => ({ ...prev, [notification.id]: true }));
@@ -1455,183 +1641,328 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <div className={cn("space-y-4 pb-24", isMobile ? "px-0" : "max-w-4xl mx-auto px-4")}>
-      <Card className="overflow-hidden rounded-[2.5rem] border-none bg-white shadow-2xl ring-1 ring-slate-200/60 transition-all duration-500">
-        <CardContent className={cn('p-6 space-y-6')}>
-          <div className="flex flex-col gap-1 px-1">
-            <CardTitle className="font-aggro-display text-[1.85rem] font-black tracking-[-0.02em] text-[#14295F] leading-[1.1]">
-              {student?.name || '자녀'} 학생 현황
-            </CardTitle>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-              {today && format(today, 'yyyy. MM. dd (EEEE)', {locale: ko})}
-              <span className="opacity-30">|</span>
-              <span className="text-[#FF7A16]">실시간 업데이트 중</span>
-            </p>
+    <div className={cn("relative space-y-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))]", isMobile ? "px-0" : "mx-auto max-w-5xl px-4")}>
+      {growthCelebration && (
+        <ParentGrowthCelebration
+          celebration={growthCelebration}
+          studentName={student?.name || '자녀'}
+          onClose={() => setGrowthCelebration(null)}
+        />
+      )}
+
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
+        <TabsContent value="home" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
+          <section className="relative overflow-hidden rounded-[2.35rem] border border-[#d7e5ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_54%,#fff4e7_100%)] p-5 shadow-[0_10px_24px_rgba(20,41,95,0.10)] sm:p-6">
+            <div className="soft-glow absolute -right-8 top-2 h-24 w-24 rounded-full bg-[#ffb979]/35 blur-3xl" />
+            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#9bbcff]/30 blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.10),transparent_32%)]" />
+
+            <div className="relative z-10 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Badge variant="outline" className="h-7 rounded-full border border-white/80 bg-white/85 px-3 text-[11px] font-black text-[#14295F] shadow-sm">
+                  {today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
+                </Badge>
+                <div className="flex items-center gap-2 rounded-full border border-[#d8e6ff] bg-white/85 px-3 py-1.5 shadow-sm">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">실시간 앱 모니터링</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#6f82a3]">Parent App Summary</p>
+                <div className="space-y-1">
+                  <h2 className="font-aggro-display text-[1.9rem] leading-[1.08] tracking-[-0.03em] text-[#14295F] sm:text-[2.35rem]">
+                    <span className="block">{student?.name || '자녀'} 학생이</span>
+                    <span className="block">{heroTone.title}</span>
+                  </h2>
+                  <p className="max-w-2xl break-keep text-sm font-bold leading-relaxed text-slate-600">
+                    {heroTone.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[11px] font-black shadow-sm', heroTone.badgeClassName)}>
+                  {heroTone.badgeLabel}
+                </Badge>
+                {growthCelebrationCandidate && (
+                  <Badge variant="outline" className="h-7 rounded-full border border-[#ffd6ac] bg-[#fff6ec] px-3 text-[11px] font-black text-[#FF7A16] shadow-sm">
+                    평균 대비 +{growthCelebrationCandidate.increaseRate}%
+                  </Badge>
+                )}
+                <Badge variant="outline" className="h-7 rounded-full border border-[#d8e6ff] bg-[#eef4ff] px-3 text-[11px] font-black text-[#14295F] shadow-sm">
+                  출결 {attendanceStatus.label.split('(')[0].trim()}
+                </Badge>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="min-w-0 rounded-[1.55rem] border border-white/80 bg-white/82 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.08)] backdrop-blur-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">오늘 공부</p>
+                  <p className="mt-2 truncate text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {toHm(totalMinutes)}
+                  </p>
+                  <p className="mt-2 text-[11px] font-bold text-slate-500">
+                    최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-[1.55rem] border border-white/80 bg-white/82 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.08)] backdrop-blur-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">주간 요약</p>
+                  <p className="mt-2 text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {toHm(weeklyTotalStudyMinutes)}
+                  </p>
+                  <p className="mt-2 text-[11px] font-bold text-slate-500">
+                    계획 달성 {weeklyPlanCompletionRate > 0 ? `${weeklyPlanCompletionRate}%` : `${planRate}%`}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-[1.55rem] border border-white/80 bg-white/82 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.08)] backdrop-blur-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">학습 리듬</p>
+                  <p className="mt-2 text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {rhythmScore > 0 ? `${rhythmScore}점` : '대기 중'}
+                  </p>
+                  <p className="mt-2 text-[11px] font-bold text-slate-500">
+                    최근 기록일 {latestStudySnapshot?.studyDateLabel || '아직 없음'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <Card className="min-w-0 rounded-[1.75rem] border border-[#d8e5ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_100%)] p-4 shadow-sm sm:p-5">
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">오늘 공부</span>
+                  <p className="min-w-0 break-words text-[1.45rem] font-black leading-[1.02] tracking-[-0.03em] text-[#14295F]">
+                    {toHm(totalMinutes)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  {growthCelebrationCandidate ? (
+                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd4a8] bg-[#fff4e9] px-2.5 text-[10px] font-black text-[#FF7A16]">
+                      평균 대비 +{growthCelebrationCandidate.increaseRate}%
+                    </Badge>
+                  ) : (
+                    <p className="text-[11px] font-bold text-slate-500">
+                      최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            <Card className="min-w-0 rounded-[1.75rem] border border-[#ffd6ac] bg-[linear-gradient(145deg,#fff8f1_0%,#fff2e2_100%)] p-4 shadow-sm sm:p-5">
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d26d12]">계획 달성</span>
+                  <p className="text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {planRate}%
+                  </p>
+                </div>
+                <p className="text-[11px] font-bold text-slate-500">
+                  주간 평균 {weeklyPlanCompletionRate > 0 ? `${weeklyPlanCompletionRate}%` : '계획 대기'}
+                </p>
+              </div>
+            </Card>
+
+            <Card className={cn(
+              "min-w-0 rounded-[1.75rem] border p-4 shadow-sm sm:p-5",
+              attendanceStatus.color
+            )}>
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">출결 상태</span>
+                  <p className="break-keep text-[1.28rem] font-black leading-[1.12] tracking-[-0.02em]">
+                    {attendanceStatus.label}
+                  </p>
+                </div>
+                <p className="text-[11px] font-bold text-slate-500">앱에서 실시간으로 확인 중</p>
+              </div>
+            </Card>
+
+            <Card
+              className="min-w-0 cursor-pointer rounded-[1.75rem] border border-rose-200 bg-[linear-gradient(145deg,#fff8f8_0%,#fff0f0_100%)] p-4 shadow-sm transition-all hover:shadow-md sm:p-5"
+              role="button"
+              onClick={() => setIsPenaltyGuideOpen(true)}
+            >
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">벌점 지수</span>
+                  <div className="flex items-end gap-1">
+                    <p className="text-[1.55rem] font-black leading-none tracking-[-0.03em] text-rose-700">
+                      {penaltyRecovery.effectivePoints}
+                    </p>
+                    <span className="pb-0.5 text-xs font-black text-rose-500/75">점</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', penaltyMeta.badge)}>
+                    {penaltyMeta.label}
+                  </Badge>
+                  {penaltyRecovery.recoveredPoints > 0 && (
+                    <p className="text-[11px] font-bold text-rose-500/85">
+                      자동 회복 -{penaltyRecovery.recoveredPoints}점
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
           </div>
 
-          <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-            <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="rounded-2xl border border-[#cfdcf8] bg-[linear-gradient(135deg,#e8f1ff_0%,#f6f9ff_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#c4d5ff] transition-all">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">오늘 공부</span>
-                  <p className="dashboard-number text-xl text-[#14295F] leading-tight whitespace-nowrap">{toHm(totalMinutes)}</p>
-                </Card>
-                <Card className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff2e4_0%,#fff9f2_100%)] p-4 text-center space-y-1 shadow-sm group hover:shadow-md hover:ring-1 hover:ring-[#ffbf8a] transition-all">
-                  <span className="text-[10px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
-                  <p className="dashboard-number text-2xl text-[#14295F] leading-tight">{planRate}%</p>
-                </Card>
-                <Card className={cn(
-                  "rounded-2xl border border-[#d7e3fb] bg-[linear-gradient(135deg,#eef4ff_0%,#ffffff_100%)] p-4 text-center space-y-1 shadow-sm transition-all",
-                  attendanceStatus.color
-                )}>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">출결 상태</span>
-                  <p className="text-lg font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
-                </Card>
-                <Card
-                  className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] p-4 text-center space-y-1 shadow-sm transition-all hover:ring-1 hover:ring-[#ffc593] cursor-pointer"
-                  role="button"
-                  onClick={() => setIsPenaltyGuideOpen(true)}
-                >
-                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 지수</span>
-                  <div className="flex items-center justify-center gap-1">
-                    <p className="dashboard-number text-xl text-rose-700 leading-tight">{penaltyRecovery.effectivePoints}</p>
-                    <span className="text-xs font-black text-rose-500/70">점</span>
-                  </div>
-                  <Badge variant="outline" className={cn('h-5 border px-2 text-[10px] font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
-                  {penaltyRecovery.recoveredPoints > 0 && (
-                    <p className="text-[10px] font-bold text-rose-500/80">자동 회복 -{penaltyRecovery.recoveredPoints}점 반영</p>
-                  )}
-                </Card>
-              </div>
-
-              <Card
-                role="button"
-                tabIndex={0}
-                onClick={handleOpenReportsArchive}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    handleOpenReportsArchive();
-                  }
-                }}
-                className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#eef4ff_0%,#f5f9ff_55%,#fff4e8_100%)] p-6 ring-1 ring-[#d7e3fb]/70 relative overflow-hidden group shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
-              >
-                <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:rotate-12 transition-transform duration-700">
-                  <MessageCircle className="h-20 w-20 text-[#14295F]" />
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={handleOpenReportsArchive}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleOpenReportsArchive();
+              }
+            }}
+            className="group relative overflow-hidden rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_60%,#fff4e8_100%)] p-5 shadow-sm ring-1 ring-[#d7e4ff]/70 transition-transform active:scale-[0.99] sm:p-6"
+          >
+            <div className="absolute right-0 top-0 p-4 opacity-[0.04] transition-transform duration-700 group-hover:rotate-12">
+              <MessageCircle className="h-20 w-20 text-[#14295F]" />
+            </div>
+            <div className="relative z-10 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-[#FF7A16]" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14295F]">우리 아이 리포트</span>
                 </div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#FF7A16] fill-current" />
-                    <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">우리아이 리포트 확인하기</span>
-                  </div>
-                  {report?.viewedAt && <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] h-4 px-1.5">읽음</Badge>}
-                </div>
-                <p className="text-sm font-bold text-slate-800 leading-relaxed break-keep relative z-10 line-clamp-2">
-                    {report?.content || '카드를 누르면, 우리 아이가 받은 리포트를 확인할 수 있습니다.'}
-                </p>
-              </Card>
-
-              <Card className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#f7faff_0%,#ffffff_70%,#fff7ef_100%)] p-5 shadow-sm">
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-[#14295F]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 알림 3개</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {unreadRecentCount > 0 && (
-                      <Badge variant="outline" className="h-5 border-none bg-[#FF7A16]/15 px-2 text-[10px] font-black text-[#FF7A16] animate-pulse">
-                        미읽음 {unreadRecentCount}
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-500">
-                      {recentNotifications.length}건
+                <div className="flex items-center gap-2">
+                  {report?.viewedAt ? (
+                    <Badge variant="outline" className="h-6 rounded-full border-none bg-emerald-100 px-2.5 text-[10px] font-black text-emerald-700">
+                      읽음
                     </Badge>
-                  </div>
+                  ) : (
+                    <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/12 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                      새 리포트
+                    </Badge>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
                 </div>
-                <p className="mb-3 text-[11px] font-bold text-slate-500">알림 카드를 누르면 상세 내용을 읽을 수 있어요.</p>
-                {recentNotifications.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
-                    최근 알림이 없습니다.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recentNotifications.map((notification) => {
-                      const isRead = notification.isRead || !!readMap[notification.id];
-                      return (
-                        <button
-                          type="button"
-                          key={notification.id}
-                          className={cn(
-                            'relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-all',
-                            isRead
-                              ? 'border-[#dbe4f8] bg-[#f3f7ff]'
-                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff5ea_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/80 hover:shadow-md'
-                          )}
-                          onClick={() => void openNotificationDetail(notification)}
-                        >
-                          {!isRead && (
-                            <>
-                              <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-[#FF7A16]/20 blur-xl animate-pulse" />
-                              <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16] animate-pulse" />
-                            </>
-                          )}
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <p className="truncate pr-6 text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
-                            <div className="flex shrink-0 items-center gap-1">
-                              {!isRead && (
-                                <span className="relative inline-flex h-2.5 w-2.5">
-                                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#FF7A16] opacity-70 animate-ping" />
-                                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
-                                </span>
-                              )}
-                              {notification.isImportant && (
-                                <Badge variant="outline" className="h-5 shrink-0 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
-                                  중요
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+              </div>
+              <div className="space-y-2 rounded-[1.6rem] border border-white/80 bg-white/78 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.06)]">
+                <p className="text-sm font-black tracking-tight text-[#14295F]">
+                  오늘 부모님이 가장 먼저 보셔야 할 내용
+                </p>
+                <p className="line-clamp-3 break-keep text-sm font-bold leading-relaxed text-slate-700">
+                  {report?.content || '카드를 누르면 자녀의 최근 학습 리포트와 선생님 피드백을 바로 확인할 수 있습니다.'}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-sm sm:p-6">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-[#14295F]" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">최근 알림 3개</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {unreadRecentCount > 0 && (
+                  <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                    미읽음 {unreadRecentCount}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-500">
+                  {recentNotifications.length}건
+                </Badge>
+              </div>
+            </div>
+            <p className="mb-3 text-[11px] font-bold text-slate-500">터치하면 상세 내용을 바로 확인할 수 있어요.</p>
+
+            {recentNotifications.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
+                최근 알림이 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {recentNotifications.map((notification) => {
+                  const isRead = notification.isRead || !!readMap[notification.id];
+
+                  return (
+                    <button
+                      type="button"
+                      key={notification.id}
+                      className={cn(
+                        'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-all',
+                        isRead
+                          ? 'border-[#dde6f9] bg-white'
+                          : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 hover:shadow-md'
+                      )}
+                      onClick={() => void openNotificationDetail(notification)}
+                    >
+                      {!isRead && (
+                        <>
+                          <div className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full bg-[#FF7A16]/20 blur-xl" />
+                          <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16]" />
+                        </>
+                      )}
+                      <div className="relative z-10 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
                             {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
                           </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-              <div className="grid grid-cols-1 gap-3">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="w-full h-14 rounded-2xl bg-[#14295F] text-white hover:bg-[#14295F]/90 font-black gap-2 text-base shadow-xl active:scale-[0.98] transition-all">
-                      <TrendingUp className="h-5 w-5" /> 인공지능 학습 인사이트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
-                    <div className="bg-[#14295F] p-10 text-white relative">
-                      <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
-                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1 text-xs">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
-                    </div>
-                    <div className="p-6 space-y-3 bg-[#fafafa]">
-                      {aiInsights.map((insight, i) => (
-                        <div key={i} className="flex items-start gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-orange-200">
-                          <div className="h-2 w-2 rounded-full bg-[#FF7A16] mt-2 shrink-0" />
-                          <p className="text-sm font-bold text-slate-700 leading-relaxed">{insight}</p>
                         </div>
-                      ))}
-                    </div>
-                    <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F] text-white">확인했습니다</Button></DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {!isRead && (
+                            <span className="relative inline-flex h-2.5 w-2.5">
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-[#FF7A16] opacity-70 animate-ping" />
+                              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
+                            </span>
+                          )}
+                          {notification.isImportant && (
+                            <Badge variant="outline" className="h-5 rounded-full border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
+                              중요
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            </TabsContent>
+            )}
+          </Card>
 
-            <TabsContent value="studyDetail" className="mt-0 space-y-6 animate-in fade-in duration-500">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="h-14 w-full rounded-[1.7rem] bg-[#14295F] text-base font-black text-white shadow-[0_14px_28px_rgba(20,41,95,0.20)] transition-all hover:bg-[#10224f] active:scale-[0.98]">
+                <TrendingUp className="mr-2 h-5 w-5" />
+                인공지능 학습 인사이트 보기
+                <ChevronRight className="ml-auto h-4 w-4 opacity-40" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[3rem] border-none p-0 shadow-2xl overflow-hidden sm:max-w-md">
+              <div className="relative bg-[#14295F] p-10 text-white">
+                <Sparkles className="absolute right-0 top-0 h-32 w-32 p-8 opacity-20" />
+                <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
+                <DialogDescription className="mt-1 text-xs font-bold text-white/70">
+                  자녀의 학습 패턴을 차분하고 보기 쉽게 정리했습니다.
+                </DialogDescription>
+              </div>
+              <div className="space-y-3 bg-[#fafafa] p-6">
+                {aiInsights.map((insight, i) => (
+                  <div key={i} className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-orange-200">
+                    <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF7A16]" />
+                    <p className="text-sm font-bold leading-relaxed text-slate-700">{insight}</p>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter className="border-t bg-white p-6">
+                <DialogClose asChild>
+                  <Button className="h-14 w-full rounded-2xl bg-[#14295F] text-lg font-black text-white">확인했습니다</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+            <TabsContent value="studyDetail" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
               {/* 주간 성과 요약 (기존 리포트 내용 통합) */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border-none bg-white p-4 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-500 block mb-2 uppercase tracking-widest">주간 누적 트랙</span>
                   <div className="flex items-baseline justify-center gap-0.5 flex-wrap leading-tight">
@@ -1651,7 +1982,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <div className="flex items-center justify-between px-1">
+              <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col">
                   <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">학습 일관성 맵</p>
@@ -1764,7 +2095,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   })}
                 </div>
               </Card>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
                   <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-500 uppercase">
                     <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
@@ -1828,7 +2159,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </TabsContent>
 
-            <TabsContent value="data" className="mt-0 space-y-4 animate-in fade-in duration-500">
+            <TabsContent value="data" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
               <Card
                 className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm cursor-pointer"
                 role="button"
@@ -1911,8 +2242,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </TabsContent>
 
-            <TabsContent value="communication" className="mt-0 space-y-4 animate-in fade-in duration-500">
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100">
+            <TabsContent value="communication" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
                 <div className="space-y-4">
                   <div className="grid gap-2">
@@ -1934,7 +2265,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100">
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
                   <MessageCircle className="h-5 w-5 text-[#FF7A16]" />
                   건의사항 · 질의 · 요청사항
@@ -1998,7 +2329,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100">
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
                   <Bell className="h-5 w-5 text-[#14295F]" />
                   문의 내역과 답변
@@ -2063,7 +2394,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
             </TabsContent>
 
-            <TabsContent value="billing" className="mt-0 space-y-4 animate-in fade-in duration-500">
+            <TabsContent value="billing" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
               <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="space-y-4">
                   <div className="flex items-start justify-between gap-2">
@@ -2197,9 +2528,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 ))
               )}
             </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      </Tabs>
 
       <Dialog open={isReportArchiveOpen} onOpenChange={setIsReportArchiveOpen}>
         <DialogContent className={cn("overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl", isMobile ? "max-w-[95vw]" : "sm:max-w-4xl")}>

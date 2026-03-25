@@ -340,6 +340,14 @@ export default function DashboardPage() {
       return <TeacherDashboard isActive={true} />;
     }
 
+    if (userRole === 'parent') {
+      return (
+        <div className="flex flex-col gap-3">
+          <ParentDashboard isActive={true} />
+        </div>
+      );
+    }
+
     return (
       <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
         <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
@@ -438,7 +446,6 @@ export default function DashboardPage() {
 
         <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
           <StudentDashboard isActive={userRole === 'student'} />
-          <ParentDashboard isActive={userRole === 'parent'} />
         </div>
       </div>
     );
