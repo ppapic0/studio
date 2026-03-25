@@ -92,7 +92,6 @@ export type MarketingContent = {
     heroBackground: string;
   };
   nav: MarketingNavItem[];
-  heroStats: MarketingStat[];
   valueCards: MarketingCard[];
   director: {
     heading: string;
@@ -159,8 +158,9 @@ export const marketingContent: MarketingContent = {
   brand: {
     name: '트랙 관리형 스터디센터 · 트랙 국어학원',
     slogan: '학생의 성장 궤적을 함께 그립니다',
-    heroTitle: '루틴이 쌓이면, 성장이 남습니다',
-    heroDescription: '루틴·실행·결과를 하나의 흐름으로 연결하는 관리형 스터디센터입니다.',
+    heroTitle: '공부는 방향이 중요합니다.\n성장의 길, 트랙에서\n시작됩니다.',
+    heroDescription:
+      '관리형 스터디센터와 국어학원이 같은 방향으로 연결됩니다. 학생은 루틴을 만들고, 학부모는 변화를 확인합니다.',
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
     heroBackground: '',
@@ -171,12 +171,6 @@ export const marketingContent: MarketingContent = {
     { label: '합격 실적', href: '/#results' },
     { label: '국어 수업', href: '/class' },
     { label: '상담 문의', href: '/#consult' },
-  ],
-  heroStats: [
-    {
-      label: '2026 합격 실적',
-      value: '고려대 2 · 서강대 1 · 성균관대 1 등',
-    },
   ],
   valueCards: [
     {

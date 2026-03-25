@@ -17,7 +17,7 @@ export default function HomePage() {
     <main className="min-h-screen overflow-x-clip bg-white text-slate-900">
       <MarketingPageTracker pageType="landing" placement="landing_root" />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
-      <HeroSection brand={marketingContent.brand} stats={marketingContent.heroStats} />
+      <HeroSection brand={marketingContent.brand} />
       <ScrollReveal>
         <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
       </ScrollReveal>
