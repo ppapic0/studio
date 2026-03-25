@@ -19,11 +19,6 @@ export type ProgramStep = {
   description: string;
 };
 
-export type AppFeature = {
-  title: string;
-  description: string;
-};
-
 export type MockPreview = {
   title: string;
   subtitle: string;
@@ -38,10 +33,14 @@ export type AppDataMetric = {
   tone?: 'navy' | 'orange' | 'green' | 'red';
 };
 
-export type AppModeCard = {
+export type AppScreenPreview = {
   mode: string;
-  description: string;
-  items: string[];
+  title: string;
+  summary: string;
+  highlights: string[];
+  frame: 'desktop' | 'phone';
+  featured: boolean;
+  image?: string;
 };
 
 export type AppDataStory = {
@@ -114,10 +113,7 @@ export type MarketingContent = {
   appSystem: {
     heading: string;
     description: string;
-    modes: AppModeCard[];
-    features: AppFeature[];
-    appScreens: MockPreview[];
-    dataMetrics: AppDataMetric[];
+    appScreens: AppScreenPreview[];
     dataStory: AppDataStory;
     guides: AppExperienceGuide[];
     captures: AppEvidenceCapture[];
@@ -291,54 +287,33 @@ export const marketingContent: MarketingContent = {
     ],
   },
   appSystem: {
-    heading: '같은 데이터를, 역할마다 먼저 읽어야 할 화면으로 나눴습니다',
-    description:
-      '방금 본 신호를 학생은 행동으로, 학부모는 상태 확인으로, 운영자는 개입 우선순위로 읽게 구성했습니다.',
-    modes: [
+    heading: '우리는 실제 이렇게 관리합니다',
+    description: '학생, 학부모, 센터관리자가 각각 어떤 화면으로 관리되는지 대표 화면부터 보여드립니다.',
+    appScreens: [
+      {
+        mode: '센터관리자',
+        title: '센터관리자 대시보드 대표화면',
+        summary: '위험 신호 · 미제출 · 개입 우선순위',
+        highlights: ['위험 신호', '미제출', '개입 우선순위'],
+        frame: 'desktop',
+        featured: true,
+      },
       {
         mode: '학부모 모드',
-        description: '과정을 실시간으로 읽고 필요한 순간에 바로 확인하는 앱 모드',
-        items: ['출결 확인', '주간 누적 그래프', '리포트 수신', '위험 신호 확인', '상담/질문'],
+        title: '학부모 모드 대표화면',
+        summary: '출결 · 공부시간 · 리포트 확인',
+        highlights: ['출결 상태', '공부시간', '리포트 확인'],
+        frame: 'phone',
+        featured: false,
       },
       {
         mode: '학생 모드',
-        description: '오늘의 루틴부터 피드백 반영까지 직접 관리하는 학습 루프',
-        items: ['주간 LP 작성', '오늘의 할 일', '공부시간 누적', '성장 그래프', '피드백 확인'],
+        title: '학생 모드 대표화면',
+        summary: '루틴 · 오늘 할 일 · 피드백 확인',
+        highlights: ['오늘 루틴', '오늘 할 일', '피드백 확인'],
+        frame: 'phone',
+        featured: false,
       },
-      {
-        mode: '관리자 모드',
-        description: '위험 신호를 놓치지 않는 운영 대시보드',
-        items: ['하락 추세 감지', '미제출 확인', '피드백 발송', '상담 이력', '우선 연락 대상 추천'],
-      },
-    ],
-    features: [
-      { title: '계획과 실행 연결', description: '해야 할 일을 바로 행동으로 이어지게 정리합니다.' },
-      { title: '기록 캘린더', description: '날짜별 공부시간과 흔들리는 구간을 빠르게 읽습니다.' },
-      { title: '성장 지표 확인', description: '공부시간과 결과가 같은 흐름 안에서 남습니다.' },
-      { title: '알림과 리포트', description: '상담과 피드백이 화면 흐름 안에서 이어집니다.' },
-    ],
-    appScreens: [
-      {
-        title: '학생 대시보드',
-        subtitle: '오늘의 루틴과 누적 공부시간을 한 화면에서',
-        caption: '오늘 할 일, 누적 공부시간, LP, 성장 지표가 동시에 보여 학생이 바로 행동할 수 있습니다.',
-      },
-      {
-        title: '학부모 데이터 화면',
-        subtitle: '상태 요약 + 주간 그래프 + 기록 캘린더',
-        caption: '알림 제목, 주간 누적 그래프, 날짜별 기록이 연결되어 학생의 과정을 빠르게 읽을 수 있습니다.',
-      },
-      {
-        title: '운영 대시보드',
-        subtitle: '위험 신호와 우선 대응 대상 확인',
-        caption: '하락 추세, 미제출, 상담 요청, 수납 상태까지 연결해 조기 개입이 가능한 구조입니다.',
-      },
-    ],
-    dataMetrics: [
-      { label: '시즌 누적 포인트', value: '3,164 LP', detail: '실행 기반 보상 구조', tone: 'orange' },
-      { label: '평균 목표 달성률', value: '83%', detail: '주간 계획 대비 실행률', tone: 'green' },
-      { label: '주간 학습 시간', value: '14시간 23분', detail: '기록 캘린더 기준', tone: 'navy' },
-      { label: '생활 관리 지수', value: '5점', detail: '벌점과 회복 흐름 동시 관리', tone: 'red' },
     ],
     dataStory: {
       eyebrow: 'DATA OPERATING SYSTEM',
