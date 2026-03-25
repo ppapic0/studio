@@ -7,7 +7,7 @@ type ShowcaseItem = {
   label: string;
   title: string;
   desc: string;
-  points: string[];
+  points: { label: string; detail: string }[];
   statLabel: string;
   statValue: string;
   href: string;
@@ -20,7 +20,11 @@ const items: ShowcaseItem[] = [
     label: 'STUDENT MODE',
     title: '루틴·학습시간·피드백을 한 흐름으로',
     desc: '루틴, 학습시간, 피드백을 한 흐름으로 확인합니다.',
-    points: ['오늘의 루틴', '주간 캘린더', '피드백 확인'],
+    points: [
+      { label: '오늘의 루틴', detail: 'LP 기반 오늘 해야 할 공부 목록을 시간대별로 확인합니다.' },
+      { label: '주간 캘린더', detail: '날짜별 공부시간과 미제출 여부를 한눈에 파악합니다.' },
+      { label: '피드백 확인', detail: '선생님의 피드백을 앱 안에서 바로 확인하고 반영합니다.' },
+    ],
     statLabel: '핵심 확인 항목',
     statValue: '3가지',
     href: '/experience?mode=student',
@@ -31,7 +35,11 @@ const items: ShowcaseItem[] = [
     label: 'PARENT MODE',
     title: '출결·그래프·리포트 실시간 확인',
     desc: '출결, 주간 그래프, 리포트를 실시간으로 읽습니다.',
-    points: ['출결 상태', '주간 그래프', '리포트 수신'],
+    points: [
+      { label: '출결 상태', detail: '등원·퇴원 시간과 출결 상태를 실시간으로 확인합니다.' },
+      { label: '주간 그래프', detail: '주별 공부시간 누적 그래프로 학습 추이를 파악합니다.' },
+      { label: '리포트 수신', detail: '주간 학습 리포트를 앱 알림으로 바로 받아볼 수 있습니다.' },
+    ],
     statLabel: '핵심 확인 항목',
     statValue: '3가지',
     href: '/experience?mode=parent',
@@ -42,7 +50,11 @@ const items: ShowcaseItem[] = [
     label: 'ADMIN MODE',
     title: '위험 신호부터 개입 결과까지',
     desc: '위험 신호, 상담, 개입 결과를 우선순위로 정리합니다.',
-    points: ['위험 신호', '개입 우선순위', '전후 비교'],
+    points: [
+      { label: '위험 신호', detail: '공부시간 하락·미제출 등 위험 패턴을 자동으로 감지합니다.' },
+      { label: '개입 우선순위', detail: '개입이 필요한 학생을 긴급도 순으로 정렬해 보여줍니다.' },
+      { label: '전후 비교', detail: '개입 전후 공부시간과 성적 변화를 나란히 비교합니다.' },
+    ],
     statLabel: '핵심 확인 항목',
     statValue: '3가지',
     href: '/experience?mode=admin',
@@ -52,6 +64,56 @@ const items: ShowcaseItem[] = [
 ];
 
 const INTERVAL_MS = 3500;
+
+function PointChip({ label, detail }: { label: string; detail: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click (for touch devices)
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      className="group relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onClick={() => setOpen((v) => !v)}
+    >
+      <div className="cursor-default rounded-[1rem] border border-white/10 bg-[#0f1d42] px-3 py-3 text-[12px] font-black text-white transition-colors duration-150 hover:border-white/24 hover:bg-[#162245]">
+        {label}
+      </div>
+
+      {/* Tooltip */}
+      <div
+        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-52 rounded-[0.9rem] border border-white/14 bg-[#0d1b3e] p-3 shadow-[0_8px_24px_rgba(4,11,29,0.5)] backdrop-blur-sm"
+        style={{
+          opacity: open ? 1 : 0,
+          transform: open ? 'translateY(0)' : 'translateY(4px)',
+          transition: 'opacity 0.18s ease, transform 0.18s ease',
+        }}
+      >
+        <p className="text-[10px] font-black tracking-[0.14em] text-[#FFB273]">{label}</p>
+        <p className="mt-1.5 break-keep text-[11.5px] font-semibold leading-[1.65] text-white/88">{detail}</p>
+        {/* Arrow */}
+        <span className="absolute -bottom-[5px] left-5 h-2.5 w-2.5 rotate-45 border-b border-r border-white/14 bg-[#0d1b3e]" />
+      </div>
+    </div>
+  );
+}
 
 export function HeroShowcase() {
   const [active, setActive] = useState(0);
@@ -72,7 +134,6 @@ export function HeroShowcase() {
     }, 220);
   }, []);
 
-  // Progress bar animation via rAF
   useEffect(() => {
     if (paused) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -138,12 +199,7 @@ export function HeroShowcase() {
 
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           {current.points.map((point) => (
-            <div
-              key={point}
-              className="rounded-[1rem] border border-white/10 bg-[#0f1d42] px-3 py-3 text-[12px] font-black text-white"
-            >
-              {point}
-            </div>
+            <PointChip key={point.label} label={point.label} detail={point.detail} />
           ))}
         </div>
 
@@ -176,7 +232,6 @@ export function HeroShowcase() {
                   : 'border-white/10 bg-white/[0.04] opacity-85 hover:opacity-100'
               }`}
             >
-              {/* Progress bar on active tab */}
               {isActive && (
                 <span
                   className="pointer-events-none absolute bottom-0 left-0 h-[2.5px] rounded-full bg-[#FFB273]"
