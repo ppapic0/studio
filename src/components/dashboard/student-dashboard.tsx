@@ -2198,6 +2198,62 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     weeklyStudyMinutes,
   ]);
 
+  const compactMissionTitle = useMemo(() => {
+    switch (missionAction.mode) {
+      case 'timer':
+        return '집중 유지';
+      case 'start':
+        return '첫 세션 시작';
+      case 'plan':
+        return '미션 정리';
+      case 'report':
+        return '코칭 확인';
+      default:
+        return '루틴 마감';
+    }
+  }, [missionAction.mode]);
+
+  const missionFocusCard = useMemo(() => {
+    if (todayMissionList.length > 0) {
+      const firstTask = todayMissionList[0];
+      return {
+        label: '남은 미션',
+        value: `${todayRemainingTasks.length}개`,
+        detail: firstTask.targetMinutes
+          ? `${firstTask.title} · ${firstTask.targetMinutes}분`
+          : firstTask.title,
+      };
+    }
+
+    if (unreadReportCount > 0) {
+      return {
+        label: '코칭',
+        value: `${unreadReportCount}개`,
+        detail: coachSummary || '도착한 리포트를 확인해 보세요.',
+      };
+    }
+
+    if (latestAnnouncement) {
+      return {
+        label: '센터 공지',
+        value: '새 소식',
+        detail: latestAnnouncement.title || '센터 공지를 확인해 보세요.',
+      };
+    }
+
+    return {
+      label: '오늘 상태',
+      value: '완료',
+      detail: '오늘 흐름을 잘 마무리했어요.',
+    };
+  }, [
+    todayMissionList,
+    todayRemainingTasks.length,
+    unreadReportCount,
+    coachSummary,
+    latestAnnouncement,
+  ]);
+
   const handleMissionAction = useCallback(async () => {
     if (missionAction.mode === 'timer' || missionAction.mode === 'start') {
       await handleStudyStartStop();
@@ -2302,83 +2358,76 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         )}>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r" style={{ backgroundImage: tierTheme.heroGradient }} />
           <CardContent className={cn("relative", isMobile ? "p-5 pt-8" : "p-8 pt-9")}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-2">
-                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
-                  {missionAction.meta}
-                </Badge>
-                <div>
-                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-[1.3rem] leading-[1.35] break-keep" : "text-[2.5rem] leading-[1.1]")}>
-                    {missionAction.title}
-                  </h2>
-                  <p className={cn("mt-2 font-semibold text-slate-600 break-keep", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-2xl")}>
-                    {missionAction.description}
+            <div className="flex items-center justify-between gap-3">
+              <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+                오늘 대시보드
+              </Badge>
+              <div className="rounded-2xl bg-primary/5 text-primary shrink-0 p-3">
+                {missionAction.mode === 'report' ? <FileText className="h-5 w-5" /> : missionAction.mode === 'plan' || missionAction.mode === 'review' ? <ListTodo className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]")}>
+                <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">지금</p>
+                  <p className={cn("mt-2 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-2xl")}>
+                    {compactMissionTitle}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionAction.meta}</p>
+                </div>
+
+                <div className="rounded-[1.35rem] border border-primary/10 bg-primary/5 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-primary/55">오늘 목표</p>
+                  <p className={cn("dashboard-number mt-2 text-primary leading-none", isMobile ? "text-[1.7rem]" : "text-[2.4rem]")}>
+                    {todayDoneTaskCount}<span className="ml-1 text-sm font-bold opacity-40">/ {todayTaskCount || 0}</span>
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-primary/70">{todayPlanRate}% 완료</p>
+                </div>
+
+                <div className={cn("rounded-[1.35rem] border border-emerald-100 bg-emerald-50/70 p-4", isMobile ? "col-span-2" : "")}>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{missionFocusCard.label}</p>
+                  <p className={cn("mt-2 font-black tracking-tight text-slate-900", isMobile ? "text-lg" : "text-2xl")}>
+                    {missionFocusCard.value}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500">
+                    {missionFocusCard.detail}
                   </p>
                 </div>
               </div>
-              {!isMobile && (
-                <div className="rounded-2xl bg-primary/5 text-primary shrink-0 p-3">
-                  {missionAction.mode === 'report' ? <FileText className="h-6 w-6" /> : missionAction.mode === 'plan' || missionAction.mode === 'review' ? <ListTodo className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-                </div>
-              )}
-            </div>
 
-            <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-end")}>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
-                    오늘 목표 {todayDoneTaskCount}/{todayTaskCount || 0}
-                  </Badge>
-                  <Badge variant="outline" className="h-7 rounded-full border-emerald-200 bg-emerald-50 px-3 text-[10px] font-black text-emerald-700">
-                    {missionAction.accent}
-                  </Badge>
-                  {weeklyStudyDelta !== 0 && (
-                    <Badge variant="outline" className={cn(
-                      "h-7 rounded-full px-3 text-[10px] font-black",
-                      weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
-                    )}>
-                      {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-stretch")}>
+                <div className="rounded-[1.35rem] border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+                      {missionAction.meta}
                     </Badge>
-                  )}
+                    {weeklyStudyDelta !== 0 && (
+                      <Badge variant="outline" className={cn(
+                        "h-7 rounded-full px-3 text-[10px] font-black",
+                        weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
+                      )}>
+                        {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm font-black leading-6 text-slate-900">
+                    {missionAction.accent}
+                  </p>
                 </div>
-                {todayMissionList.length > 0 ? (
-                  <div className="grid gap-2">
-                    {todayMissionList.map((task, index) => (
-                      <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                        <div className={cn(
-                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-black",
-                          index === 0 ? "bg-primary text-white" : "bg-white text-primary ring-1 ring-slate-200"
-                        )}>
-                          {index + 1}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-slate-900">{task.title}</p>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                            {task.targetMinutes ? `${task.targetMinutes}분 목표` : '오늘의 미션'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className={cn("rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70", isMobile ? "px-3 py-3" : "px-4 py-4")}>
-                    <p className="text-sm font-black text-slate-800">오늘의 미션을 거의 마무리했어요.</p>
-                    <p className="mt-1 text-[11px] font-semibold text-slate-500">지금 흐름을 유지하면 오늘 하루를 아주 깔끔하게 끝낼 수 있어요.</p>
-                  </div>
-                )}
-              </div>
 
-              <Button
-                type="button"
-                onClick={() => void handleMissionAction()}
-                disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
-                className={cn(
-                  "student-cta rounded-2xl font-black shadow-lg transition-all",
-                  isMobile ? "h-12 w-full text-sm" : "h-14 px-8 text-base"
-                )}
-              >
-                {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleMissionAction()}
+                  disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
+                  className={cn(
+                    "student-cta rounded-2xl font-black shadow-lg transition-all",
+                    isMobile ? "h-12 w-full text-sm" : "min-w-[10rem] px-8 text-base"
+                  )}
+                >
+                  {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
