@@ -16,7 +16,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { activeMembership, viewMode } = useAppContext();
-  const isMobileView = activeMembership?.role === 'parent' || viewMode === 'mobile';
+  const isParentMode = activeMembership?.role === 'parent';
+  const isMobileView = isParentMode || viewMode === 'mobile';
 
   return (
     <NotificationsProvider>
@@ -24,7 +25,9 @@ export default function DashboardLayout({
       className={cn(
         'dashboard-shell min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
         isMobileView
-          ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-2.5 pb-5 sm:px-3 sm:pb-6'
+          ? isParentMode
+            ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eef4ff_48%,#e6efff_100%)] px-1.5 pb-4 sm:px-3 sm:pb-5 md:px-4'
+            : 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-2.5 pb-5 sm:px-3 sm:pb-6'
           : 'bg-[#f2f4f8] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
       )}
     >
@@ -58,13 +61,20 @@ export default function DashboardLayout({
       <div
         className={cn(
           'flex flex-col transition-all duration-700 relative z-10',
-          isMobileView
+          isParentMode
+            ? 'parent-app-shell overflow-hidden rounded-[3rem] border-[8px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f4f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.52)] ring-2 ring-[#ffb985]/40 relative mt-2 sm:mt-3'
+            : isMobileView
             ? 'dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-3 sm:mt-4'
             : 'w-full min-h-screen'
         )}
       >
         {isMobileView && (
-          <div className="dashboard-mobile-notch pointer-events-none absolute left-1/2 top-0 z-30 h-6 w-32 -translate-x-1/2 rounded-b-[1.2rem] bg-[#0f224f] shadow-[0_5px_14px_rgba(0,0,0,0.32)]" />
+          <div
+            className={cn(
+              'pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 rounded-b-[1.2rem] bg-[#0f224f] shadow-[0_5px_14px_rgba(0,0,0,0.32)]',
+              isParentMode ? 'parent-app-notch h-5 w-28 sm:h-6 sm:w-32' : 'dashboard-mobile-notch h-6 w-32'
+            )}
+          />
         )}
 
         <DashboardHeader />
@@ -72,7 +82,11 @@ export default function DashboardLayout({
         <main
           className={cn(
             'flex-1 min-h-0 flex flex-col gap-4 mx-auto w-full custom-scrollbar overflow-y-auto relative z-10',
-            isMobileView ? 'dashboard-mobile-main p-4 px-4 pb-24 pt-5' : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
+            isParentMode
+              ? 'parent-app-main p-4 px-4 pb-24 pt-4 md:px-5 md:pt-5'
+              : isMobileView
+                ? 'dashboard-mobile-main p-4 px-4 pb-24 pt-5'
+                : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
           )}
         >
           {children}
@@ -83,7 +97,15 @@ export default function DashboardLayout({
         <ReportNotifier />
 
         {(isMobileView || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
-          <div className={isMobileView ? 'dashboard-mobile-nav-wrap absolute bottom-0 left-0 right-0 z-50' : ''}>
+          <div
+            className={
+              isParentMode
+                ? 'parent-app-nav-wrap absolute bottom-0 left-0 right-0 z-50'
+                : isMobileView
+                  ? 'dashboard-mobile-nav-wrap absolute bottom-0 left-0 right-0 z-50'
+                  : ''
+            }
+          >
             <BottomNav />
           </div>
         )}

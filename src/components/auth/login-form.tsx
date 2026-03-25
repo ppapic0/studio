@@ -45,6 +45,8 @@ const resetSchema = z.object({
   email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
 });
 
+const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
+
 export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
@@ -129,6 +131,9 @@ export function LoginForm() {
           emailDomain: trimmedEmail.includes('@') ? trimmedEmail.split('@')[1] : null,
         },
       });
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(PARENT_POST_LOGIN_ENTRY_MOTION_KEY, String(Date.now()));
+      }
       router.replace('/dashboard');
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -195,16 +200,27 @@ export function LoginForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="auth-rise-in parent-entry-delay-3 rounded-[1.4rem] border border-[#dfe7f7] bg-[linear-gradient(145deg,#f9fbff_0%,#f4f8ff_100%)] px-4 py-3 shadow-[0_12px_28px_-18px_rgba(20,41,95,0.22)]">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#ff7a16]">APP LOGIN</p>
+        <p className="mt-1 text-[13px] font-bold leading-6 text-[#4b6179]">
+          로그인 후 역할에 맞는 앱형 대시보드가 자연스럽게 이어지도록 연결됩니다.
+        </p>
+      </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
           <FormField
             control={form.control}
             name="email"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-bold">이메일</FormLabel>
+              <FormItem className="auth-rise-in parent-entry-delay-3">
+                <FormLabel className="pl-1 font-black text-[#425a75]">이메일</FormLabel>
                 <FormControl>
-                  <Input placeholder="name@example.com" {...field} disabled={isLoading} className="rounded-xl h-12" />
+                  <Input
+                    placeholder="name@example.com"
+                    {...field}
+                    disabled={isLoading}
+                    className="auth-input-glow h-12 rounded-[1.15rem] border-[#dbe5f6] bg-white/95 px-4 font-bold shadow-[0_10px_24px_-18px_rgba(20,41,95,0.32)]"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -214,9 +230,9 @@ export function LoginForm() {
             control={form.control}
             name="password"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="auth-rise-in parent-entry-delay-4">
                 <div className="flex items-center">
-                  <FormLabel className="font-bold">비밀번호</FormLabel>
+                  <FormLabel className="pl-1 font-black text-[#425a75]">비밀번호</FormLabel>
 
                   <Dialog
                     open={isResetOpen}
@@ -279,13 +295,22 @@ export function LoginForm() {
                   </Dialog>
                 </div>
                 <FormControl>
-                  <Input type="password" {...field} disabled={isLoading} className="rounded-xl h-12" />
+                  <Input
+                    type="password"
+                    {...field}
+                    disabled={isLoading}
+                    className="auth-input-glow h-12 rounded-[1.15rem] border-[#dbe5f6] bg-white/95 px-4 font-bold shadow-[0_10px_24px_-18px_rgba(20,41,95,0.32)]"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white hover:text-white h-14 rounded-2xl font-black text-lg shadow-xl mt-2 transition-all active:scale-95" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="auth-primary-button auth-rise-in parent-entry-delay-5 mt-2 h-14 w-full rounded-[1.4rem] bg-[#14295F] text-lg font-black text-white transition-all hover:bg-[#10214d] hover:text-white"
+            disabled={isLoading}
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -294,7 +319,7 @@ export function LoginForm() {
             ) : '로그인'}
           </Button>
         </form>
-        <div className="mt-4 text-center text-sm font-bold text-muted-foreground">
+        <div className="auth-rise-in parent-entry-delay-5 mt-4 text-center text-sm font-bold text-muted-foreground">
           계정이 없으신가요?{' '}
           <Link href="/signup" className="underline font-black text-primary">
             가입하기

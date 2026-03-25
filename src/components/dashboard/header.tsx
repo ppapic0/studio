@@ -104,6 +104,9 @@ function normalizeParentLinkCode(value: unknown): string {
   return '';
 }
 
+const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
+const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
+
 export function DashboardHeader() {
   const { user } = useUser();
   const auth = useAuth();
@@ -119,6 +122,7 @@ export function DashboardHeader() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSettingsFormInitialized, setIsSettingsFormInitialized] = useState(false);
+  const [playParentEntry, setPlayParentEntry] = useState(false);
 
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
@@ -175,6 +179,20 @@ export function DashboardHeader() {
       setIsSettingsFormInitialized(true);
     }
   }, [isSettingsOpen, isSettingsFormInitialized, studentProfile, userProfile]);
+
+  useEffect(() => {
+    if (!isParentMode || typeof window === 'undefined') return;
+
+    const raw = window.sessionStorage.getItem(PARENT_POST_LOGIN_ENTRY_MOTION_KEY);
+    const timestamp = Number(raw);
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS) {
+      return;
+    }
+
+    setPlayParentEntry(true);
+    const timer = window.setTimeout(() => setPlayParentEntry(false), 1100);
+    return () => window.clearTimeout(timer);
+  }, [isParentMode]);
 
   const handleSignOut = async () => {
     if (!auth) return;
@@ -247,16 +265,25 @@ export function DashboardHeader() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 flex h-14 items-center gap-4 px-4 md:static md:h-auto md:px-6',
+        'sticky top-0 z-30 flex items-center md:static md:h-auto',
+        isParentMode ? 'h-[3.25rem] gap-2 px-3 sm:h-14 sm:px-4 md:px-5' : 'h-14 gap-4 px-4 md:px-6',
         isMobileView
           ? 'border-b border-[rgba(255,170,80,0.20)] bg-[linear-gradient(180deg,rgba(255,247,238,0.98)_0%,rgba(255,255,255,0.96)_100%)] shadow-[0_1px_0_0_rgba(255,255,255,0.9)_inset,0_4px_16px_rgba(20,41,95,0.09)] backdrop-blur-md'
-          : 'border-b border-[rgba(20,41,95,0.07)] bg-white/85 backdrop-blur-xl shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset] md:border-0 md:bg-transparent md:shadow-none'
+          : 'border-b border-[rgba(20,41,95,0.07)] bg-white/85 backdrop-blur-xl shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset] md:border-0 md:bg-transparent md:shadow-none',
+        playParentEntry && 'parent-shell-enter parent-entry-delay-1'
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className={cn('flex items-center', isParentMode ? 'gap-1.5' : 'gap-2')}>
         <Sheet>
           <SheetTrigger asChild>
-            <Button size="icon" variant="outline" className="md:hidden rounded-full border-[#1a336d]/20 bg-white/80 shadow-sm">
+            <Button
+              size="icon"
+              variant="outline"
+              className={cn(
+                'md:hidden rounded-full border-[#1a336d]/20 bg-white/80 shadow-sm',
+                isParentMode ? 'h-9 w-9' : ''
+              )}
+            >
               <PanelLeft className="h-5 w-5" />
               <span className="sr-only">메뉴 열기</span>
             </Button>
@@ -301,7 +328,8 @@ export function DashboardHeader() {
               size="icon"
               className={cn(
                 'overflow-hidden rounded-full border-2 border-primary/10 shadow-sm interactive-button',
-                isMobileView && 'border-[#14295F]/20 bg-white'
+                isMobileView && 'border-[#14295F]/20 bg-white',
+                isParentMode ? 'h-9 w-9 sm:h-10 sm:w-10' : ''
               )}
             >
               <Avatar className="h-full w-full">
