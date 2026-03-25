@@ -437,6 +437,28 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
     return Object.entries(dailyLpStatus).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 30);
   }, [dailyLpStatus]);
 
+  const totalLp = useMemo(
+    () => Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0),
+    [dailyLpStatus]
+  );
+
+  const lpTrendPoints = useMemo(() => {
+    if (!dailyLpStatus) return [];
+
+    const ascending = Object.entries(dailyLpStatus)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, data]) => ({
+        date,
+        amount: Math.max(0, Number(data?.dailyLpAmount || 0)),
+      }));
+
+    let cumulative = 0;
+    return ascending.map((item) => {
+      cumulative += item.amount;
+      return { date: item.date, total: cumulative };
+    }).slice(-8);
+  }, [dailyLpStatus]);
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -454,24 +476,32 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
             </div>
           </CardHeader>
           <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("dashboard-number text-amber-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
-              {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
-            </div>
-            <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "font-aggro-display border border-[#FF7A16] bg-[#FF7A16] text-white font-extrabold leading-none",
-                    isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
-                  )}
-                >
-                  히스토리 분석 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
-                </Badge>
-                {isMobile && (
-                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black tracking-wide text-amber-700">
-                    +{Math.max(0, Math.round((totalBoost - 1) * 100))}%
-                  </span>
-                )}
+            <div className={cn("grid items-end gap-3", isMobile ? "grid-cols-[minmax(0,1fr)_6.8rem]" : "grid-cols-[minmax(0,1fr)_8.4rem] gap-4")}>
+              <div className="min-w-0">
+                <div className={cn("dashboard-number text-amber-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
+                  {totalLp.toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
+                </div>
+                <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3 flex-wrap" : "mt-6")}>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "font-aggro-display border border-[#FF7A16] bg-[#FF7A16] text-white font-extrabold leading-none",
+                        isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
+                      )}
+                    >
+                      히스토리 분석 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                    </Badge>
+                    {isMobile && (
+                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black tracking-wide text-amber-700">
+                        +{Math.max(0, Math.round((totalBoost - 1) * 100))}%
+                      </span>
+                    )}
+                </div>
+              </div>
+
+              <div className="self-stretch flex items-end justify-end">
+                <MiniLpTrendSparkline data={lpTrendPoints} isMobile={isMobile} />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -520,6 +550,81 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MiniLpTrendSparkline({
+  data,
+  isMobile,
+}: {
+  data: Array<{ date: string; total: number }>;
+  isMobile: boolean;
+}) {
+  const width = isMobile ? 108 : 132;
+  const height = isMobile ? 72 : 82;
+  const chartHeight = isMobile ? 38 : 44;
+  const paddingX = 5;
+  const paddingY = 5;
+  const gradientId = isMobile ? 'season-lp-fill-mobile' : 'season-lp-fill-desktop';
+
+  const normalizedData = data.length > 1
+    ? data
+    : data.length === 1
+      ? [data[0], data[0]]
+      : [
+          { date: 'start', total: 0 },
+          { date: 'end', total: 0 },
+        ];
+
+  const values = normalizedData.map((item) => item.total);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = Math.max(1, maxValue - minValue);
+
+  const getX = (index: number) => {
+    if (normalizedData.length <= 1) return width / 2;
+    return paddingX + (index / (normalizedData.length - 1)) * (width - paddingX * 2);
+  };
+
+  const getY = (value: number) => {
+    const usableHeight = chartHeight - paddingY * 2;
+    return chartHeight - paddingY - ((value - minValue) / range) * usableHeight;
+  };
+
+  const linePath = normalizedData
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(point.total)}`)
+    .join(' ');
+  const areaPath = `${linePath} L ${getX(normalizedData.length - 1)} ${chartHeight} L ${getX(0)} ${chartHeight} Z`;
+  const lastPoint = normalizedData[normalizedData.length - 1];
+  const lastPointX = getX(normalizedData.length - 1);
+  const lastPointY = getY(lastPoint.total);
+
+  return (
+    <div className={cn(
+      "pointer-events-none w-full rounded-[1.2rem] border border-amber-100/80 bg-white/85 px-2.5 py-2 shadow-[0_16px_36px_-30px_rgba(245,158,11,0.55)]",
+      isMobile ? "min-h-[4.6rem]" : "min-h-[5.2rem]"
+    )}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-amber-600/60">누적</span>
+        <span className="text-[9px] font-black text-amber-600">{lastPoint.total.toLocaleString()}</span>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={cn("mt-1 w-full", isMobile ? "h-[3rem]" : "h-[3.4rem]")}
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FDBA74" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#FDBA74" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke="#F59E0B" strokeWidth={isMobile ? 2.6 : 2.8} strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 3.2 : 3.6} fill="#F59E0B" />
+        <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 1.4 : 1.6} fill="#FFF7ED" />
+      </svg>
+    </div>
   );
 }
 
