@@ -2255,7 +2255,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   {missionAction.meta}
                 </Badge>
                 <div>
-                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl leading-8" : "text-[2.5rem] leading-[1.1]")}>
+                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-[1.3rem] leading-[1.35] break-keep" : "text-[2.5rem] leading-[1.1]")}>
                     {missionAction.title}
                   </h2>
                   <p className={cn("mt-2 font-semibold text-slate-600 break-keep", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-2xl")}>
@@ -2263,9 +2263,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </p>
                 </div>
               </div>
-              <div className={cn("rounded-2xl bg-primary/5 text-primary shrink-0", isMobile ? "p-2" : "p-3")}>
-                {missionAction.mode === 'report' ? <FileText className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /> : missionAction.mode === 'plan' || missionAction.mode === 'review' ? <ListTodo className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} /> : <Sparkles className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />}
-              </div>
+              {!isMobile && (
+                <div className="rounded-2xl bg-primary/5 text-primary shrink-0 p-3">
+                  {missionAction.mode === 'report' ? <FileText className="h-6 w-6" /> : missionAction.mode === 'plan' || missionAction.mode === 'review' ? <ListTodo className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+                </div>
+              )}
             </div>
 
             <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-end")}>
@@ -2282,7 +2284,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       "h-7 rounded-full px-3 text-[10px] font-black",
                       weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
                     )}>
-                      지난주 대비 {weeklyStudyDelta > 0 ? '+' : ''}{formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
+                      {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
                     </Badge>
                   )}
                 </div>
@@ -2306,7 +2308,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4">
+                  <div className={cn("rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70", isMobile ? "px-3 py-3" : "px-4 py-4")}>
                     <p className="text-sm font-black text-slate-800">오늘의 미션을 거의 마무리했어요.</p>
                     <p className="mt-1 text-[11px] font-semibold text-slate-500">지금 흐름을 유지하면 오늘 하루를 아주 깔끔하게 끝낼 수 있어요.</p>
                   </div>

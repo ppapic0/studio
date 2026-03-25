@@ -159,7 +159,7 @@ export const marketingContent: MarketingContent = {
   brand: {
     name: '트랙 관리형 스터디센터 · 트랙 국어학원',
     slogan: '학생의 성장 궤적을 함께 그립니다',
-    heroTitle: '공부는 방향이 중요합니다. 성장의 길, 트랙에서 시작됩니다.',
+    heroTitle: '루틴이 쌓이면, 성장이 남습니다',
     heroDescription: '루틴·실행·결과를 하나의 흐름으로 연결하는 관리형 스터디센터입니다.',
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
@@ -175,7 +175,7 @@ export const marketingContent: MarketingContent = {
   heroStats: [
     {
       label: '2026 합격 실적',
-      value: '고려대 2 · 서강대 1 · 성균관대 1 등',
+      value: '고려대 2 · 서강대 1 · 성균관대 1',
     },
     {
       label: '센터 단독 등록',
@@ -243,7 +243,7 @@ export const marketingContent: MarketingContent = {
   ],
   successStory: {
     title: '성장 사례',
-    summary: '이 외에도 트랙에서는 여러 성공사례가 있습니다.',
+    summary: '3등급에서 출발해 수능 백분위 99, 고려대학교 합격으로 이어진 실제 사례가 있습니다.',
   },
   classSystem: [
     {
@@ -422,9 +422,9 @@ export const marketingContent: MarketingContent = {
     ],
     trustMetrics: [
       { label: '실시간 확인 항목', value: '5개', detail: '출결·상태·그래프·리포트·알림', tone: 'navy' },
-      { label: '하루 확인 항목', value: '12개+', detail: '루틴·출결·피드백·리포트 등', tone: 'orange' },
-      { label: '역할별 전용 화면', value: '3가지', detail: '학생·학부모·운영자 분리 구성', tone: 'green' },
-      { label: '실시간 데이터 반영', value: '5분 이내', detail: '공부 기록 → 화면 반영 속도', tone: 'red' },
+      { label: '권한별 화면', value: '3개', detail: '학생·학부모·운영자 분리', tone: 'orange' },
+      { label: '합격 사례', value: '6건', detail: '2026 주요 대학 및 성장 사례', tone: 'green' },
+      { label: '공개 증빙 자산', value: '4개', detail: '성적표 3장 + 피드백 1장', tone: 'red' },
     ],
   },
   lpSystem: {

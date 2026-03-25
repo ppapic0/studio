@@ -56,12 +56,10 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
           <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
           <div className="space-y-5">
-            <h1 className="font-aggro-display break-keep text-[clamp(2rem,3.8vw,3rem)] font-black leading-[1.18] text-white">
-              공부는 방향이 중요합니다.<br />
-              성장의 길, <span className="text-[#FF7A16]">트랙</span>에서<br />
-              시작됩니다.
+            <h1 className="font-aggro-display max-w-[11ch] break-keep text-[clamp(2rem,3.8vw,3rem)] font-black leading-[1.12] text-white">
+              {brand.heroTitle}
             </h1>
-            <p className="max-w-[33rem] break-keep text-[16px] font-normal leading-[1.7] text-white sm:text-[16.5px]">
+            <p className="max-w-[33rem] break-keep text-[16px] font-normal leading-[1.7] text-white/84 sm:text-[16.5px]">
               {brand.heroDescription}
             </p>
           </div>
