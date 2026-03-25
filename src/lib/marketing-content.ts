@@ -177,14 +177,6 @@ export const marketingContent: MarketingContent = {
       label: '2026 합격 실적',
       value: '고려대 2 · 서강대 1 · 성균관대 1',
     },
-    {
-      label: '센터 단독 등록',
-      value: '국어 수업은 별도 선택',
-    },
-    {
-      label: '실시간 데이터 확인',
-      value: '출결 · 공부시간 · 실행률',
-    },
   ],
   valueCards: [
     {

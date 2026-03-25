@@ -10,6 +10,13 @@ type HeroSectionProps = {
 };
 
 export function HeroSection({ brand, stats }: HeroSectionProps) {
+  const statGridClass =
+    stats.length === 1
+      ? 'max-w-[18rem]'
+      : stats.length === 2
+        ? 'sm:grid-cols-2'
+        : 'sm:grid-cols-2 xl:grid-cols-3';
+
   return (
     <section
       id="hero"
@@ -79,7 +86,7 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
             </a>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={`grid gap-3 ${statGridClass}`}>
             {stats.map((stat, index) => (
               <article
                 key={`${stat.label}-${index}`}
