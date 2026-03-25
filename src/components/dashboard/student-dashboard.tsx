@@ -80,17 +80,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { DailyStudentStat, StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart as RechartsLineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import {
   ROUTINE_MISSING_PENALTY_POINTS,
@@ -210,27 +199,6 @@ function toClockLabel(totalMinutes: number): string {
   const h = Math.floor(safe / 60).toString().padStart(2, '0');
   const m = (safe % 60).toString().padStart(2, '0');
   return `${h}:${m}`;
-}
-
-function hourNumberToDate(dateKey: string, hourValue?: number | null): Date | null {
-  if (typeof hourValue !== 'number' || !Number.isFinite(hourValue)) return null;
-  const base = parse(dateKey, 'yyyy-MM-dd', new Date());
-  if (Number.isNaN(base.getTime())) return null;
-  const clamped = Math.max(0, Math.min(24, hourValue));
-  const h = Math.floor(clamped);
-  const m = Math.max(0, Math.min(59, Math.round((clamped - h) * 60)));
-  base.setHours(h, m, 0, 0);
-  return base;
-}
-
-function calculateRhythmScore(minutes: number[]): number {
-  if (!minutes.length) return 0;
-  const safeMinutes = minutes.map((value) => Math.max(0, Math.round(value)));
-  const avg = safeMinutes.reduce((acc, value) => acc + value, 0) / safeMinutes.length;
-  if (avg <= 0) return 0;
-  const variance = safeMinutes.reduce((acc, value) => acc + (value - avg) ** 2, 0) / safeMinutes.length;
-  const std = Math.sqrt(variance);
-  return Math.max(0, Math.min(100, Math.round(100 - (std / avg) * 100)));
 }
 
 function normalizeExamCountdowns(input: unknown): ExamCountdownSetting[] {
@@ -717,153 +685,6 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
   );
 }
 
-function StudyTimeTrendDialog({
-  studyTimeTrend,
-  rhythmScoreTrend,
-  rhythmScoreAverage,
-  startEndTrend,
-  awayTimeTrend,
-  hasRhythmScoreTrend,
-  hasStartEndTrend,
-  hasAwayTrend,
-  rhythmYAxisDomain,
-  isMobile,
-}: {
-  studyTimeTrend: Array<{ date: string; minutes: number }>;
-  rhythmScoreTrend: Array<{ date: string; score: number }>;
-  rhythmScoreAverage: number;
-  startEndTrend: Array<{ date: string; startMinutes: number; endMinutes: number }>;
-  awayTimeTrend: Array<{ date: string; awayMinutes: number }>;
-  hasRhythmScoreTrend: boolean;
-  hasStartEndTrend: boolean;
-  hasAwayTrend: boolean;
-  rhythmYAxisDomain: [number, number];
-  isMobile: boolean;
-}) {
-  const avgMinutes = useMemo(() => {
-    if (!studyTimeTrend.length) return 0;
-    return Math.round(studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0) / studyTimeTrend.length);
-  }, [studyTimeTrend]);
-  const totalMinutes = useMemo(() => studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0), [studyTimeTrend]);
-  const latestMinutes = studyTimeTrend[studyTimeTrend.length - 1]?.minutes || 0;
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Card className={cn(
-          "student-cta student-cta-card border border-slate-200/80 bg-white rounded-[1.75rem] overflow-hidden transition-colors duration-200 cursor-pointer",
-          isMobile ? "rounded-[1.25rem]" : ""
-        )}>
-          <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
-            <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>
-              최근 7일 공부시간 추이
-            </CardTitle>
-            <div className={cn("bg-sky-50 rounded-xl text-sky-600", isMobile ? "p-2" : "p-2.5")}>
-              <Clock className={cn("text-sky-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
-            </div>
-          </CardHeader>
-          <CardContent className={cn("px-8 pb-6", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("dashboard-number text-sky-700", isMobile ? "text-2xl" : "text-4xl sm:text-5xl")}>
-              {formatMinutesToKorean(avgMinutes)}
-            </div>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">최근 7일 평균 공부시간</p>
-            <div className={cn("mt-3 h-20 w-full", isMobile ? "h-16" : "h-20")}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsLineChart data={studyTimeTrend}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                  <YAxis hide />
-                  <Line
-                    type="monotone"
-                    dataKey="minutes"
-                    stroke="#0ea5e9"
-                    strokeWidth={2.5}
-                    dot={{ r: 2.5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1 }}
-                    activeDot={{ r: 4, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1 }}
-                  />
-                </RechartsLineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </DialogTrigger>
-
-      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-lg", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "")}>
-        <div className={cn("bg-[#14295F] text-white relative", isMobile ? "p-6" : "p-10")}>
-          <Activity className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
-          <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>최근 7일 공부시간 추이</DialogTitle>
-            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">
-              일자별 실제 공부시간 흐름을 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-
-        <div className={cn("p-6 space-y-6 bg-white max-h-[70vh] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4" : "")}>
-          <div className={cn("grid gap-2", isMobile ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-3")}>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">최근 7일 총 공부시간</p>
-              <p className="dashboard-number text-2xl text-[#14295F]">{formatMinutesToKorean(totalMinutes)}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">평균 학습시간</p>
-              <p className="dashboard-number text-2xl text-[#14295F]">{formatMinutesToKorean(avgMinutes)}</p>
-            </div>
-            <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 p-3", isMobile ? "sm:col-span-2" : "")}>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">오늘 공부시간</p>
-              <p className="text-xs font-bold text-slate-700 mt-1">{formatMinutesToKorean(latestMinutes)}</p>
-            </div>
-          </div>
-
-          <div className={cn("w-full", isMobile ? "h-56" : "h-64")}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsLineChart data={studyTimeTrend} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 11, fontWeight: 700 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                  tickFormatter={(value: number) => `${Math.round(value / 60)}h`}
-                />
-                <Tooltip
-                  cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                  contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: 'none' }}
-                  formatter={(value: number) => {
-                    return [formatMinutesToKorean(Number(value || 0)), '공부시간'];
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="minutes"
-                  stroke="#0ea5e9"
-                  strokeWidth={3}
-                  dot={{ r: 3.5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1.5 }}
-                  activeDot={{ r: 5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 2 }}
-                />
-              </RechartsLineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <Card className="rounded-[1.25rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-4 shadow-none">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">안내</p>
-            <p className="mt-1 text-xs font-bold leading-relaxed text-slate-700">
-              리듬 점수, 시작/종료 시각, 외출시간 그래프는 분석트랙에서 확인할 수 있습니다.
-            </p>
-          </Card>
-        </div>
-
-        <DialogFooter className={cn("bg-white border-t justify-center", isMobile ? "p-4" : "p-6")}>
-          <DialogClose asChild>
-            <Button variant="ghost" className="font-bold text-muted-foreground h-10">닫기</Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -888,9 +709,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
-  const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
-  const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
-  const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -959,118 +777,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     });
     return map;
   }, [recentLogs]);
-
-  useEffect(() => {
-    if (!isActive || !firestore || !activeMembership?.id || !user?.uid || !today) {
-      setStudyStartByDateKey({});
-      setStudyEndByDateKey({});
-      setAwayMinutesByDateKey({});
-      return;
-    }
-
-    let cancelled = false;
-    const centerId = activeMembership.id;
-    const studentId = user.uid;
-    const targetDateKeys = Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
-      return format(day, 'yyyy-MM-dd');
-    });
-
-    const loadRhythmTrends = async () => {
-      try {
-        const pairs = await Promise.all(
-          targetDateKeys.map(async (dateKey) => {
-            try {
-              const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
-              const statSnap = await getDoc(statRef);
-              const statData = statSnap.exists() ? (statSnap.data() as Record<string, unknown>) : null;
-              const statStartHourRaw = statData?.startHour ?? statData?.firstStudyHour;
-              const statEndHourRaw = statData?.endHour ?? statData?.lastStudyHour;
-              const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
-              const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
-              const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
-              const hasAwayMinutesStat = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw);
-              const statAwayMinutes = hasAwayMinutesStat
-                ? Math.max(0, Math.round(statAwayMinutesRaw))
-                : 0;
-
-              if (statStart && statEnd && hasAwayMinutesStat) {
-                return [
-                  dateKey,
-                  {
-                    start: statStart,
-                    end: statEnd,
-                    awayMinutes: statAwayMinutes,
-                  },
-                ] as const;
-              }
-
-              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
-              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
-              const sessions = sessionsSnap.docs
-                .map((item) => item.data() as StudySession)
-                .filter((item) => !!item.startTime)
-                .map((item) => ({
-                  startTime: toDateSafeAttendance(item.startTime as any),
-                  endTime: toDateSafeAttendance(item.endTime as any),
-                }))
-                .filter((item) => item.startTime) as Array<{ startTime: Date; endTime: Date | null }>;
-
-              const firstSession = sessions[0] || null;
-              const lastSession = sessions[sessions.length - 1] || null;
-              const sessionStart = firstSession?.startTime || null;
-              const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
-              let sessionAwayMinutes = 0;
-              for (let i = 1; i < sessions.length; i += 1) {
-                const prevEnd = sessions[i - 1].endTime;
-                const currStart = sessions[i].startTime;
-                if (!prevEnd || !currStart) continue;
-                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
-                if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
-              }
-
-              return [
-                dateKey,
-                {
-                  start: sessionStart || statStart,
-                  end: sessionEnd || statEnd,
-                  awayMinutes: sessionAwayMinutes > 0 ? sessionAwayMinutes : statAwayMinutes,
-                },
-              ] as const;
-            } catch {
-              return [
-                dateKey,
-                { start: null, end: null, awayMinutes: 0 },
-              ] as const;
-            }
-          })
-        );
-
-        if (cancelled) return;
-        const nextStart: Record<string, Date | null> = {};
-        const nextEnd: Record<string, Date | null> = {};
-        const nextAway: Record<string, number> = {};
-        pairs.forEach(([dateKey, value]) => {
-          nextStart[dateKey] = value.start || null;
-          nextEnd[dateKey] = value.end || null;
-          nextAway[dateKey] = Math.max(0, Math.round(value.awayMinutes || 0));
-        });
-        setStudyStartByDateKey(nextStart);
-        setStudyEndByDateKey(nextEnd);
-        setAwayMinutesByDateKey(nextAway);
-      } catch {
-        if (cancelled) return;
-        setStudyStartByDateKey({});
-        setStudyEndByDateKey({});
-        setAwayMinutesByDateKey({});
-      }
-    };
-
-    void loadRhythmTrends();
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, firestore, activeMembership?.id, user?.uid, today]);
 
   // 3. 나의 신청 내역 조회
   const myRequestsQuery = useMemoFirebase(() => {
@@ -1215,90 +921,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       };
     });
   }, [today, logMinutesByDateKey]);
-
-  const dailyRhythmTrend = useMemo(() => {
-    if (!today) return [] as { date: string; rhythmMinutes: number | null }[];
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
-      const dateKey = format(day, 'yyyy-MM-dd');
-      const studyStart = studyStartByDateKey[dateKey] || null;
-      return {
-        date: format(day, 'MM/dd', { locale: ko }),
-        rhythmMinutes: studyStart ? studyStart.getHours() * 60 + studyStart.getMinutes() : null,
-      };
-    });
-  }, [today, studyStartByDateKey]);
-
-  const rhythmScoreTrend = useMemo(() => {
-    const values = dailyRhythmTrend.map((point) => point.rhythmMinutes);
-    return dailyRhythmTrend.map((point, index) => {
-      const windowValues = values
-        .slice(0, index + 1)
-        .filter((value): value is number => typeof value === 'number');
-      const score = windowValues.length >= 2 ? calculateRhythmScore(windowValues) : windowValues.length === 1 ? 100 : 0;
-      return { date: point.date, score };
-    });
-  }, [dailyRhythmTrend]);
-
-  const rhythmScoreAverage = useMemo(() => {
-    const valid = rhythmScoreTrend.filter((item) => item.score > 0);
-    if (!valid.length) return 0;
-    return Math.round(valid.reduce((sum, item) => sum + item.score, 0) / valid.length);
-  }, [rhythmScoreTrend]);
-
-  const startEndTrend = useMemo(() => {
-    if (!today) return [] as Array<{ date: string; startMinutes: number; endMinutes: number }>;
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
-      const dateKey = format(day, 'yyyy-MM-dd');
-      const start = studyStartByDateKey[dateKey];
-      const end = studyEndByDateKey[dateKey];
-      return {
-        date: format(day, 'MM/dd', { locale: ko }),
-        startMinutes: start ? start.getHours() * 60 + start.getMinutes() : 0,
-        endMinutes: end ? end.getHours() * 60 + end.getMinutes() : 0,
-      };
-    });
-  }, [today, studyStartByDateKey, studyEndByDateKey]);
-
-  const awayTimeTrend = useMemo(() => {
-    if (!today) return [] as Array<{ date: string; awayMinutes: number }>;
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
-      const dateKey = format(day, 'yyyy-MM-dd');
-      return {
-        date: format(day, 'MM/dd', { locale: ko }),
-        awayMinutes: Math.max(0, awayMinutesByDateKey[dateKey] || 0),
-      };
-    });
-  }, [today, awayMinutesByDateKey]);
-
-  const hasRhythmScoreTrend = useMemo(
-    () => rhythmScoreTrend.some((item) => item.score > 0),
-    [rhythmScoreTrend]
-  );
-  const hasStartEndTrend = useMemo(
-    () => startEndTrend.some((item) => item.startMinutes > 0 || item.endMinutes > 0),
-    [startEndTrend]
-  );
-  const hasAwayTrend = useMemo(
-    () => awayTimeTrend.some((item) => item.awayMinutes > 0),
-    [awayTimeTrend]
-  );
-
-  const rhythmYAxisDomain = useMemo(() => {
-    const values = startEndTrend
-      .flatMap((point) => [point.startMinutes, point.endMinutes])
-      .filter((value) => value > 0);
-    if (values.length === 0) return [420, 1320] as [number, number];
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const padding = Math.max(30, Math.round((max - min) * 0.25));
-    const lower = Math.max(0, Math.floor((min - padding) / 30) * 30);
-    const upper = Math.min(24 * 60, Math.ceil((max + padding) / 30) * 30);
-    if (lower === upper) return [Math.max(0, lower - 60), Math.min(24 * 60, upper + 60)] as [number, number];
-    return [lower, upper] as [number, number];
-  }, [startEndTrend]);
 
   const examCountdowns = useMemo(() => {
     const todayStart = new Date();
@@ -2967,18 +2589,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         {/* LP, Trend, QR column */}
         <div className={cn("flex flex-col gap-3", isMobile ? "" : "")}>
           <LPHistoryDialog dailyLpStatus={progress?.dailyLpStatus} totalBoost={totalBoost} isMobile={isMobile} />
-          <StudyTimeTrendDialog
-            studyTimeTrend={studyTimeTrend}
-            rhythmScoreTrend={rhythmScoreTrend}
-            rhythmScoreAverage={rhythmScoreAverage}
-            startEndTrend={startEndTrend}
-            awayTimeTrend={awayTimeTrend}
-            hasRhythmScoreTrend={hasRhythmScoreTrend}
-            hasStartEndTrend={hasStartEndTrend}
-            hasAwayTrend={hasAwayTrend}
-            rhythmYAxisDomain={rhythmYAxisDomain}
-            isMobile={isMobile}
-          />
           <Dialog>
             <DialogTrigger asChild>
               <button
