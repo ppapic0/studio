@@ -8,14 +8,28 @@ const trendLabels = ['3/2', '3/4', '3/6', '3/8', '3/10', '3/12', '3/14', '3/16']
 const weeklyRates = [71, 74, 68, 79, 83, 88, 83];
 const weekLabels = ['1주', '2주', '3주', '4주', '5주', '6주', '7주'];
 
-// 0=없음 1=낮음 2=보통 3=높음 4=매우높음
-const activityData = [
-  3, 4, 2, 4, 3, 1,
-  4, 4, 3, 4, 4, 2,
-  3, 3, 0, 4, 3, 4,
-  4, 4, 2, 3, 4, 4,
-  3, 4, 4, 2, 4, 3,
+// 3월 1일 = 수요일 (offset 2: 월=0, 화=1, 수=2)
+const CALENDAR_START_OFFSET = 2;
+const WEEK_DAYS = ['월', '화', '수', '목', '금', '토', '일'];
+
+const dayData: { day: number; hours: number }[] = [
+  { day: 1, hours: 4 }, { day: 2, hours: 7 }, { day: 3, hours: 5 }, { day: 4, hours: 2 }, { day: 5, hours: 1 },
+  { day: 6, hours: 6 }, { day: 7, hours: 7 }, { day: 8, hours: 5 }, { day: 9, hours: 6 }, { day: 10, hours: 7 },
+  { day: 11, hours: 3 }, { day: 12, hours: 2 },
+  { day: 13, hours: 7 }, { day: 14, hours: 6 }, { day: 15, hours: 0 }, { day: 16, hours: 6 }, { day: 17, hours: 7 },
+  { day: 18, hours: 4 }, { day: 19, hours: 2 },
+  { day: 20, hours: 8 }, { day: 21, hours: 7 }, { day: 22, hours: 6 }, { day: 23, hours: 7 }, { day: 24, hours: 8 },
+  { day: 25, hours: 5 }, { day: 26, hours: 3 },
+  { day: 27, hours: 8 }, { day: 28, hours: 7 }, { day: 29, hours: 8 }, { day: 30, hours: 7 },
 ];
+
+function getHourLevel(hours: number) {
+  if (hours === 0) return 0;
+  if (hours <= 2) return 1;
+  if (hours <= 4) return 2;
+  if (hours <= 6) return 3;
+  return 4;
+}
 
 const metrics = [
   { label: '주간 학습 시간', value: '14h 23m', detail: '기록 캘린더 기준 누적' },
@@ -108,33 +122,63 @@ function WeeklyBarChart() {
   );
 }
 
+const CELL_BG = [
+  'bg-[#14295F]/5 border border-[#14295F]/10',
+  'bg-[#14295F]/15',
+  'bg-[#14295F]/32',
+  'bg-[#14295F]/58',
+  'bg-[#14295F]',
+];
+const CELL_TEXT = [
+  'text-[#14295F]/40',
+  'text-[#14295F]/70',
+  'text-[#14295F]',
+  'text-white/90',
+  'text-white',
+];
+
 function ActivityHeatmap() {
-  const cols = 6;
-  const cellSize = 26;
-  const gap = 5;
-  const opacities = [0.05, 0.18, 0.38, 0.62, 1];
+  const totalCells = 5 * 7;
+  const cells: ({ day: number; hours: number } | null)[] = [
+    ...Array(CALENDAR_START_OFFSET).fill(null),
+    ...dayData,
+  ];
+  while (cells.length < totalCells) cells.push(null);
 
   return (
-    <svg
-      viewBox={`0 0 ${cols * (cellSize + gap) - gap} ${5 * (cellSize + gap) - gap}`}
-      className="w-full max-w-[200px]"
-    >
-      {activityData.map((level, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        return (
-          <rect
-            key={i}
-            x={col * (cellSize + gap)}
-            y={row * (cellSize + gap)}
-            width={cellSize}
-            height={cellSize}
-            rx="6"
-            fill={`rgba(20,41,95,${opacities[level] ?? 0.05})`}
-          />
-        );
-      })}
-    </svg>
+    <div className="w-full">
+      <div className="grid grid-cols-7 gap-1 mb-1.5">
+        {WEEK_DAYS.map((d) => (
+          <div key={d} className="text-center text-[9px] font-black text-[#14295F]/45">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((cell, i) => {
+          const level = cell ? getHourLevel(cell.hours) : -1;
+          return (
+            <div
+              key={i}
+              className={`rounded-[6px] aspect-square flex flex-col items-center justify-center gap-[1px] ${
+                cell ? CELL_BG[level] : ''
+              }`}
+            >
+              {cell && (
+                <>
+                  <span className={`text-[9px] font-black leading-none ${CELL_TEXT[level]}`}>
+                    {cell.day}
+                  </span>
+                  {cell.hours > 0 && (
+                    <span className={`text-[7.5px] font-semibold leading-none ${CELL_TEXT[level]} opacity-80`}>
+                      {cell.hours}h
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -219,15 +263,14 @@ export function DataAnalyticsPreviewSection() {
               <ActivityHeatmap />
             </div>
             <div className="mt-3 flex items-center justify-end gap-1.5">
-              <span className="text-[10px] font-black text-[#14295F]/40">낮음</span>
-              {[0.06, 0.22, 0.44, 0.68, 1].map((o) => (
-                <span
-                  key={o}
-                  className="inline-block h-3 w-3 rounded-[3px]"
-                  style={{ background: `rgba(20,41,95,${o})` }}
-                />
+              <span className="text-[9px] font-black text-[#14295F]/40">공부시간</span>
+              {['0h', '1-2h', '3-4h', '5-6h', '7h+'].map((label, i) => (
+                <span key={label} className="flex items-center gap-0.5">
+                  <span className="inline-block h-3 w-3 rounded-[3px]"
+                    style={{ background: `rgba(20,41,95,${[0.06, 0.18, 0.35, 0.6, 1][i]})` }} />
+                  <span className="text-[8px] font-semibold text-[#14295F]/40">{label}</span>
+                </span>
               ))}
-              <span className="text-[10px] font-black text-[#14295F]/40">높음</span>
             </div>
           </article>
         </div>
