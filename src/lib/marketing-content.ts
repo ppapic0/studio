@@ -159,7 +159,7 @@ export const marketingContent: MarketingContent = {
   brand: {
     name: '트랙 관리형 스터디센터 · 트랙 국어학원',
     slogan: '학생의 성장 궤적을 함께 그립니다',
-    heroTitle: '루틴이 쌓이면, 성장이 남습니다',
+    heroTitle: '공부는 방향이 중요합니다. 성장의 길, 트랙에서 시작됩니다.',
     heroDescription: '루틴·실행·결과를 하나의 흐름으로 연결하는 관리형 스터디센터입니다.',
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
