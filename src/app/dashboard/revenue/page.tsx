@@ -83,6 +83,7 @@ import { RiskIntelligence } from '@/components/dashboard/risk-intelligence';
 import { OperationalIntelligence } from '@/components/dashboard/operational-intelligence';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
+import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
 import Link from 'next/link';
@@ -861,16 +862,18 @@ export default function RevenuePage() {
                   </div>
                   <div className="space-y-3">
                     {top3Assigned.map(({ seat, student, latestInvoice, isOverdue, overdueDays }: any) => {
+                      const seatIdentity = resolveSeatIdentity(seat);
+                      const seatLabel = formatSeatLabel(seat);
                       return (
                         <div key={seat.id} className="flex flex-col p-5 rounded-3xl bg-[#fafafa] border border-border/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group/seat">
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-2xl bg-white border-2 border-primary/5 flex items-center justify-center font-black text-xs text-primary/40 shadow-inner group-hover/seat:bg-primary group-hover/seat:text-white transition-all">
-                                {seat.seatNo}
+                                {seatIdentity.roomSeatNo || seat.seatNo}
                               </div>
                               <div className="grid">
                                 <span className="font-black text-base tracking-tight">{student?.displayName || '학생'}</span>
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{seat.seatZone || '자유석'}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{seatLabel} · {seat.seatZone || '자유석'}</span>
                               </div>
                             </div>
                             {latestInvoice ? (

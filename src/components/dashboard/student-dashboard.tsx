@@ -95,6 +95,7 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
+import { resolveSeatIdentity } from '@/lib/seat-layout';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -850,22 +851,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const centerId = activeMembership.id;
       let seatDoc: any = null;
       let fallbackSeatRef: any = null;
-      let fallbackSeatNo: number | null = null;
+      let fallbackSeatIdentity: ReturnType<typeof resolveSeatIdentity> | null = null;
       let fallbackSeatZone: string | null = null;
       try {
         const studentRef = doc(firestore, 'centers', centerId, 'students', user.uid);
         const studentSnap = await getDoc(studentRef);
         if (studentSnap.exists()) {
           const studentData = studentSnap.data() as Partial<StudentProfile>;
-          const rawSeatNo = studentData?.seatNo;
-          const parsedSeatNo = typeof rawSeatNo === 'number'
-            ? rawSeatNo
-            : Number.parseInt(String(rawSeatNo ?? ''), 10);
-          if (Number.isFinite(parsedSeatNo) && parsedSeatNo > 0) {
-            fallbackSeatNo = parsedSeatNo;
+          const identity = resolveSeatIdentity(studentData);
+          if (identity.seatId && identity.seatNo > 0) {
+            fallbackSeatIdentity = identity;
             fallbackSeatZone = studentData?.seatZone || null;
-            const seatId = `seat_${parsedSeatNo.toString().padStart(3, '0')}`;
-            fallbackSeatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId);
+            fallbackSeatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', identity.seatId);
           }
         }
 
@@ -996,8 +993,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             status: 'absent',
             updatedAt: serverTimestamp(),
           };
-          if (fallbackSeatNo) {
-            stopSeatPayload.seatNo = fallbackSeatNo;
+          if (fallbackSeatIdentity) {
+            stopSeatPayload.seatNo = fallbackSeatIdentity.seatNo;
+            stopSeatPayload.roomId = fallbackSeatIdentity.roomId;
+            stopSeatPayload.roomSeatNo = fallbackSeatIdentity.roomSeatNo;
             stopSeatPayload.type = 'seat';
           }
           if (fallbackSeatZone) {
@@ -1159,8 +1158,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             lastCheckInAt: Timestamp.fromMillis(nowTs),
             updatedAt: serverTimestamp(),
           };
-          if (fallbackSeatNo) {
-            startSeatPayload.seatNo = fallbackSeatNo;
+          if (fallbackSeatIdentity) {
+            startSeatPayload.seatNo = fallbackSeatIdentity.seatNo;
+            startSeatPayload.roomId = fallbackSeatIdentity.roomId;
+            startSeatPayload.roomSeatNo = fallbackSeatIdentity.roomSeatNo;
             startSeatPayload.type = 'seat';
           }
           if (fallbackSeatZone) {

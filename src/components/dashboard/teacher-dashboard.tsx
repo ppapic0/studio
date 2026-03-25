@@ -69,9 +69,10 @@ import {
   getDocs,
   limit,
   increment,
-  getDoc
+  getDoc,
+  deleteField,
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog, LayoutRoomConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -104,6 +105,16 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
+import {
+  PRIMARY_ROOM_ID,
+  buildSeatId,
+  formatSeatLabel,
+  getGlobalSeatNo,
+  getRoomLabel,
+  hasAssignedSeat,
+  normalizeLayoutRooms,
+  resolveSeatIdentity,
+} from '@/lib/seat-layout';
 
 const CustomTooltip = ({ active, payload, label, unit = '시간' }: any) => {
   if (active && payload && payload.length) {
@@ -150,6 +161,11 @@ function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   return REQUEST_PENALTY_POINTS.late;
 }
 
+type ResolvedAttendanceSeat = AttendanceCurrent & {
+  roomId: string;
+  roomSeatNo: number;
+};
+
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -184,9 +200,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const staleSeatCleanupInFlightRef = useRef(false);
   
   const [selectedClass, setSelectedClass] = useState<string>('all');
-
-  const [gridRows, setGridRows] = useState(7);
-  const [gridCols, setGridCols] = useState(10);
+  const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
+  const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
 
   useEffect(() => {
     setMounted(true);
@@ -230,12 +245,62 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: centerData } = useDoc<any>(centerRef);
 
+  const persistedRooms = useMemo(
+    () => normalizeLayoutRooms(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
+
   useEffect(() => {
-    if (centerData?.layoutSettings) {
-      setGridRows(centerData.layoutSettings.rows || 7);
-      setGridCols(centerData.layoutSettings.cols || 10);
+    setRoomDrafts((prev) => {
+      const next: Record<string, { rows: number; cols: number }> = {};
+      persistedRooms.forEach((room) => {
+        next[room.id] = {
+          rows: prev[room.id]?.rows ?? room.rows,
+          cols: prev[room.id]?.cols ?? room.cols,
+        };
+      });
+      return next;
+    });
+  }, [persistedRooms]);
+
+  useEffect(() => {
+    if (selectedRoomView === 'all') return;
+    const hasSelectedRoom = persistedRooms.some((room) => room.id === selectedRoomView);
+    if (!hasSelectedRoom) {
+      setSelectedRoomView('all');
     }
-  }, [centerData]);
+  }, [persistedRooms, selectedRoomView]);
+
+  useEffect(() => {
+    if (selectedRoomView === 'all' && isEditMode) {
+      setIsEditMode(false);
+    }
+  }, [selectedRoomView, isEditMode]);
+
+  const roomConfigs = useMemo(
+    () =>
+      persistedRooms.map((room) => ({
+        ...room,
+        rows: roomDrafts[room.id]?.rows ?? room.rows,
+        cols: roomDrafts[room.id]?.cols ?? room.cols,
+      })),
+    [persistedRooms, roomDrafts]
+  );
+
+  const persistedRoomMap = useMemo(
+    () => new Map(persistedRooms.map((room) => [room.id, room])),
+    [persistedRooms]
+  );
+
+  const roomConfigMap = useMemo(
+    () => new Map(roomConfigs.map((room) => [room.id, room])),
+    [roomConfigs]
+  );
+
+  const selectedRoomConfig =
+    selectedRoomView === 'all'
+      ? null
+      : roomConfigMap.get(selectedRoomView) || roomConfigs[0] || null;
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -264,9 +329,48 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
+  const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(() => {
+    if (!attendanceList) return [];
+    return attendanceList.map((seat) => {
+      const identity = resolveSeatIdentity(seat);
+      return {
+        ...seat,
+        roomId: identity.roomId,
+        roomSeatNo: identity.roomSeatNo,
+        seatNo: identity.seatNo,
+        type: seat.type || 'seat',
+      };
+    });
+  }, [attendanceList]);
+
+  const studentsById = useMemo(
+    () => new Map((students || []).map((student) => [student.id, student])),
+    [students]
+  );
+
+  const studentMembersById = useMemo(
+    () => new Map((studentMembers || []).map((member) => [member.id, member])),
+    [studentMembers]
+  );
+
+  const seatById = useMemo(
+    () => new Map(resolvedAttendanceList.map((seat) => [seat.id, seat])),
+    [resolvedAttendanceList]
+  );
+
+  const seatByStudentId = useMemo(() => {
+    const mapped = new Map<string, ResolvedAttendanceSeat>();
+    resolvedAttendanceList.forEach((seat) => {
+      if (seat.studentId) {
+        mapped.set(seat.studentId, seat);
+      }
+    });
+    return mapped;
+  }, [resolvedAttendanceList]);
+
   useEffect(() => {
     if (!firestore || !centerId || !isActive) return;
-    if (!attendanceList || !students || !studentMembers) return;
+    if (!resolvedAttendanceList.length || !students || !studentMembers) return;
     if (staleSeatCleanupInFlightRef.current) return;
 
     const knownStudentIds = new Set<string>();
@@ -281,7 +385,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     });
 
-    const staleSeats = attendanceList.filter((seat) => {
+    const staleSeats = resolvedAttendanceList.filter((seat) => {
       const seatStudentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
       if (!seatStudentId) return false;
       return !knownStudentIds.has(seatStudentId);
@@ -312,7 +416,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         staleSeatCleanupInFlightRef.current = false;
       }
     })();
-  }, [firestore, centerId, isActive, attendanceList, students, studentMembers]);
+  }, [firestore, centerId, isActive, resolvedAttendanceList, students, studentMembers]);
 
   const todayStatsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !todayKey) return null;
@@ -417,48 +521,127 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   };
 
+  const filteredMembers = useMemo(
+    () =>
+      (studentMembers || []).filter(
+        (member) =>
+          member.status === 'active' && (selectedClass === 'all' || member.className === selectedClass)
+      ),
+    [studentMembers, selectedClass]
+  );
+
+  const targetMemberIds = useMemo(
+    () => new Set(filteredMembers.map((member) => member.id)),
+    [filteredMembers]
+  );
+
+  const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
+    const seatId = buildSeatId(room.id, roomSeatNo);
+    const existingSeat = seatById.get(seatId);
+    if (existingSeat) return existingSeat;
+
+    return {
+      id: seatId,
+      roomId: room.id,
+      roomSeatNo,
+      seatNo: getGlobalSeatNo(room.id, roomSeatNo),
+      status: 'absent',
+      type: 'seat',
+      updatedAt: Timestamp.now(),
+    };
+  };
+
+  const roomSummaries = useMemo(() => {
+    return roomConfigs.map((room) => {
+      let physicalSeats = 0;
+      let studying = 0;
+      let away = 0;
+      let assigned = 0;
+
+      for (let roomSeatNo = 1; roomSeatNo <= room.rows * room.cols; roomSeatNo += 1) {
+        const seat = getSeatForRoom(room, roomSeatNo);
+        if (seat.type === 'aisle') continue;
+        physicalSeats += 1;
+
+        const member = seat.studentId ? studentMembersById.get(seat.studentId) : null;
+        const isIncluded =
+          selectedClass === 'all'
+            ? true
+            : Boolean(member && member.className === selectedClass && member.status === 'active');
+
+        if (!isIncluded) continue;
+        if (seat.studentId) assigned += 1;
+        if (seat.status === 'studying') studying += 1;
+        if (seat.status === 'away' || seat.status === 'break') away += 1;
+      }
+
+      return {
+        ...room,
+        physicalSeats,
+        studying,
+        away,
+        assigned,
+        availableSeats: Math.max(0, physicalSeats - assigned),
+        hasUnsavedChanges:
+          room.rows !== (persistedRoomMap.get(room.id)?.rows ?? room.rows) ||
+          room.cols !== (persistedRoomMap.get(room.id)?.cols ?? room.cols),
+      };
+    });
+  }, [roomConfigs, persistedRoomMap, selectedClass, studentMembersById, seatById]);
+
+  const selectedRoomSummary =
+    selectedRoomView === 'all'
+      ? null
+      : roomSummaries.find((room) => room.id === selectedRoomView) || null;
+
+  const roomScopedKpi = selectedRoomSummary
+    ? {
+        studying: selectedRoomSummary.studying,
+        away: selectedRoomSummary.away,
+        absent: Math.max(
+          0,
+          selectedRoomSummary.physicalSeats - selectedRoomSummary.studying - selectedRoomSummary.away
+        ),
+        total: selectedRoomSummary.physicalSeats,
+      }
+    : null;
+
   const stats = useMemo(() => {
-    if (!mounted || !attendanceList || !studentMembers) return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
+    if (!mounted || !studentMembers) {
+      return { studying: 0, absent: 0, away: 0, total: 0, totalCenterMinutes: 0, avgMinutes: 0, top20Avg: 0 };
+    }
 
     let studying = 0;
     let away = 0;
     let totalMins = 0;
-    let filteredLiveMinutes: number[] = [];
+    const filteredLiveMinutes: number[] = [];
 
-    const filteredMembers = studentMembers.filter(m => 
-      (selectedClass === 'all' || m.className === selectedClass) && m.status === 'active'
-    );
-    const targetMemberIds = new Set(filteredMembers.map(m => m.id));
-
-    filteredMembers.forEach(member => {
-      const seat = attendanceList.find(a => a.studentId === member.id);
+    filteredMembers.forEach((member) => {
+      const seat = seatByStudentId.get(member.id);
       const status = seat?.status || 'absent';
       const timeInfo = getStudentStudyTimes(member.id, status, seat?.lastCheckInAt);
-      
+
       totalMins += timeInfo.totalMins;
       filteredLiveMinutes.push(timeInfo.totalMins);
 
-      if (status === 'studying') studying++;
-      else if (status === 'away' || status === 'break') away++;
+      if (status === 'studying') studying += 1;
+      else if (status === 'away' || status === 'break') away += 1;
     });
 
-    const aisleIds = new Set(attendanceList.filter(s => s.type === 'aisle').map(s => s.id));
-    let totalPhysicalSeats = 0;
-    for(let i = 1; i <= gridRows * gridCols; i++) {
-        const sid = `seat_${i.toString().padStart(3, '0')}`;
-        if(!aisleIds.has(sid)) totalPhysicalSeats++;
-    }
-
-    let totalDisplayCount = selectedClass !== 'all' ? targetMemberIds.size : totalPhysicalSeats;
-    let absent = Math.max(0, totalDisplayCount - studying - away);
+    const totalPhysicalSeats = roomSummaries.reduce((sum, room) => sum + room.physicalSeats, 0);
+    const totalDisplayCount = selectedClass !== 'all' ? targetMemberIds.size : totalPhysicalSeats;
+    const absent = Math.max(0, totalDisplayCount - studying - away);
 
     const avgMinutes = filteredLiveMinutes.length > 0 ? Math.round(totalMins / filteredLiveMinutes.length) : 0;
     const sortedMinutes = [...filteredLiveMinutes].sort((a, b) => b - a);
     const top20Count = Math.max(1, Math.ceil(sortedMinutes.length * 0.2));
-    const top20Avg = sortedMinutes.length > 0 ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, m) => acc + m, 0) / top20Count) : 0;
+    const top20Avg =
+      sortedMinutes.length > 0
+        ? Math.round(sortedMinutes.slice(0, top20Count).reduce((acc, mins) => acc + mins, 0) / top20Count)
+        : 0;
 
     return { studying, absent, away, total: totalDisplayCount, totalCenterMinutes: totalMins, avgMinutes, top20Avg };
-  }, [attendanceList, todayStats, studentMembers, selectedClass, now, mounted, gridRows, gridCols]);
+  }, [filteredMembers, mounted, now, roomSummaries, seatByStudentId, studentMembers, selectedClass, targetMemberIds]);
 
   const centerTrendData = useMemo(() => {
     if (!mounted) return [];
@@ -513,17 +696,41 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
-    return students.filter(s => {
-      const membership = studentMembers.find(m => m.id === s.id);
-      return membership?.status === 'active' && (!s.seatNo || s.seatNo === 0);
-    }).filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [students, studentMembers, searchTerm]);
+    const keyword = searchTerm.toLowerCase();
+    return students
+      .filter((student) => {
+        const membership = studentMembersById.get(student.id);
+        return membership?.status === 'active' && !hasAssignedSeat(student);
+      })
+      .filter((student) => student.name.toLowerCase().includes(keyword));
+  }, [students, studentMembers, studentMembersById, searchTerm]);
+
+  const roomResizeConflicts = useMemo(() => {
+    const conflictMap = new Map<string, ResolvedAttendanceSeat[]>();
+
+    roomConfigs.forEach((room) => {
+      const maxCells = room.rows * room.cols;
+      const conflicts = resolvedAttendanceList
+        .filter((seat) => seat.roomId === room.id)
+        .filter((seat) => seat.roomSeatNo > maxCells)
+        .filter((seat) => Boolean(seat.studentId) || Boolean(seat.seatZone) || seat.type === 'aisle')
+        .sort((a, b) => a.roomSeatNo - b.roomSeatNo);
+      conflictMap.set(room.id, conflicts);
+    });
+
+    return conflictMap;
+  }, [resolvedAttendanceList, roomConfigs]);
 
   const selectedStudentName = useMemo(() => {
     if (!selectedSeat?.studentId) return '학생';
-    const matched = students?.find((student) => student.id === selectedSeat.studentId);
+    const matched = studentsById.get(selectedSeat.studentId);
     return matched?.name || '학생';
-  }, [students, selectedSeat?.studentId]);
+  }, [studentsById, selectedSeat?.studentId]);
+
+  const selectedSeatLabel = useMemo(
+    () => formatSeatLabel(selectedSeat, roomConfigs),
+    [selectedSeat, roomConfigs]
+  );
 
   const selectedPenaltyRecovery = useMemo(() => {
     const basePoints = Math.max(0, Math.round(Number(selectedStudentPenaltyPoints || 0)));
@@ -543,6 +750,104 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       latestPositiveLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd HH:mm') : '-',
     };
   }, [selectedStudentPenaltyPoints, selectedStudentPenaltyLogs]);
+
+  const handleToggleEditMode = () => {
+    if (!isEditMode && selectedRoomView === 'all' && roomConfigs[0]) {
+      setSelectedRoomView(roomConfigs[0].id);
+      toast({
+        title: `${roomConfigs[0].name} 도면 편집으로 전환되었습니다.`,
+        description: '호실별 가로/세로와 좌석 배치를 바로 수정할 수 있습니다.',
+      });
+    }
+    setIsEditMode((prev) => !prev);
+  };
+
+  const handleRoomDraftChange = (roomId: string, key: 'rows' | 'cols', value: string) => {
+    const fallbackRoom = persistedRoomMap.get(roomId);
+    const fallbackValue = key === 'rows' ? fallbackRoom?.rows ?? 7 : fallbackRoom?.cols ?? 10;
+    const parsed = Number.parseInt(value, 10);
+    const safeValue = Number.isFinite(parsed) ? Math.min(24, Math.max(1, parsed)) : fallbackValue;
+
+    setRoomDrafts((prev) => ({
+      ...prev,
+      [roomId]: {
+        rows: key === 'rows' ? safeValue : prev[roomId]?.rows ?? fallbackRoom?.rows ?? 7,
+        cols: key === 'cols' ? safeValue : prev[roomId]?.cols ?? fallbackRoom?.cols ?? 10,
+      },
+    }));
+  };
+
+  const handleCancelRoomDraft = (roomId: string) => {
+    const persistedRoom = persistedRoomMap.get(roomId);
+    if (!persistedRoom) return;
+    setRoomDrafts((prev) => ({
+      ...prev,
+      [roomId]: {
+        rows: persistedRoom.rows,
+        cols: persistedRoom.cols,
+      },
+    }));
+  };
+
+  const handleSaveRoomSettings = async (roomId: string) => {
+    if (!firestore || !centerId) return;
+
+    const roomDraft = roomDrafts[roomId];
+    const persistedRoom = persistedRoomMap.get(roomId);
+    if (!roomDraft || !persistedRoom) return;
+
+    const conflicts = roomResizeConflicts.get(roomId) || [];
+    if (conflicts.length > 0) {
+      const preview = conflicts
+        .slice(0, 3)
+        .map((seat) => formatSeatLabel(seat, roomConfigs))
+        .join(', ');
+      toast({
+        variant: 'destructive',
+        title: '축소 저장을 진행할 수 없습니다.',
+        description:
+          conflicts.length > 3
+            ? `${preview} 외 ${conflicts.length - 3}개 셀에 배정 또는 통로 설정이 남아 있습니다. 먼저 정리해 주세요.`
+            : `${preview} 셀에 배정 또는 통로 설정이 남아 있습니다. 먼저 정리해 주세요.`,
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const nextRooms = persistedRooms.map((room) =>
+        room.id === roomId
+          ? {
+              ...room,
+              rows: roomDraft.rows,
+              cols: roomDraft.cols,
+            }
+          : room
+      );
+
+      await setDoc(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            rows: nextRooms[0]?.rows ?? roomDraft.rows,
+            cols: nextRooms[0]?.cols ?? roomDraft.cols,
+            rooms: nextRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      toast({
+        title: `${getRoomLabel(roomId, roomConfigs)} 도면이 저장되었습니다.`,
+        description: `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영했습니다.`,
+      });
+    } catch (error) {
+      toast({ variant: 'destructive', title: '도면 저장 실패' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;
@@ -853,8 +1158,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         }
       }
 
-      const updateData: any = { 
-        status: nextStatus, 
+      const updateData: any = {
+        seatNo: selectedSeat.seatNo,
+        roomId: selectedSeat.roomId,
+        roomSeatNo: selectedSeat.roomSeatNo,
+        type: selectedSeat.type || 'seat',
+        status: nextStatus,
         updatedAt: serverTimestamp(),
         ...(nextStatus === 'studying' ? { lastCheckInAt: serverTimestamp() } : {})
       };
@@ -862,7 +1171,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       batch.update(seatRef, updateData);
       await batch.commit();
       // 카카오 알림톡 발송 (선생님 수동 조작)
-      const studentName = students?.find(s => s.id === studentId)?.name || '학생';
+      const studentName = studentsById.get(studentId)?.name || '학생';
       const autoCheckInAt =
         nextStatus === 'studying'
           ? new Date()
@@ -903,34 +1212,37 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const handleUpdateZone = async (zone: string) => {
     if (!firestore || !centerId || !selectedSeat) return;
+    const normalizedZone = zone === '미정' ? null : zone;
     setIsSaving(true);
     try {
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
-      await updateDoc(seatRef, { seatZone: zone, updatedAt: serverTimestamp() });
+      await setDoc(seatRef, {
+        seatNo: selectedSeat.seatNo,
+        roomId: selectedSeat.roomId,
+        roomSeatNo: selectedSeat.roomSeatNo,
+        seatZone: normalizedZone ?? deleteField(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
       
       if (selectedSeat.studentId) {
         const studentRef = doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId);
-        await updateDoc(studentRef, { seatZone: zone, updatedAt: serverTimestamp() });
+        await updateDoc(studentRef, {
+          seatId: selectedSeat.id,
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          seatZone: normalizedZone ?? deleteField(),
+          updatedAt: serverTimestamp(),
+        });
       }
       
       toast({ title: "구역 설정이 완료되었습니다." });
-      setSelectedSeat({ ...selectedSeat, seatZone: zone });
+      setSelectedSeat({ ...selectedSeat, seatZone: normalizedZone ?? undefined });
     } catch (e) {
       toast({ variant: "destructive", title: "설정 실패" });
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleSaveGridSettings = async () => {
-    if (!firestore || !centerId) return;
-    setIsSaving(true);
-    try {
-      await setDoc(doc(firestore, 'centers', centerId), {
-        layoutSettings: { rows: gridRows, cols: gridCols, updatedAt: serverTimestamp() }
-      }, { merge: true });
-      toast({ title: "그리드 크기가 저장되었습니다." });
-    } catch (e) { toast({ variant: "destructive", title: "저장 실패" }); } finally { setIsSaving(false); }
   };
 
   const handleToggleCellType = async () => {
@@ -941,10 +1253,55 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
       if (nextType === 'aisle' && selectedSeat.studentId) {
-        batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { seatNo: 0, updatedAt: serverTimestamp() });
-        batch.set(seatRef, { type: 'aisle', studentId: null, status: 'absent', updatedAt: serverTimestamp() }, { merge: true });
+        batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), {
+          seatNo: 0,
+          seatId: deleteField(),
+          roomId: deleteField(),
+          roomSeatNo: deleteField(),
+          seatZone: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+        batch.set(
+          seatRef,
+          {
+            type: 'aisle',
+            studentId: null,
+            seatNo: selectedSeat.seatNo,
+            roomId: selectedSeat.roomId,
+            roomSeatNo: selectedSeat.roomSeatNo,
+            seatZone: deleteField(),
+            status: 'absent',
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } else if (nextType === 'aisle') {
+        batch.set(
+          seatRef,
+          {
+            type: 'aisle',
+            studentId: null,
+            seatNo: selectedSeat.seatNo,
+            roomId: selectedSeat.roomId,
+            roomSeatNo: selectedSeat.roomSeatNo,
+            seatZone: deleteField(),
+            status: 'absent',
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       } else {
-        batch.set(seatRef, { type: nextType, updatedAt: serverTimestamp() }, { merge: true });
+        batch.set(
+          seatRef,
+          {
+            type: nextType,
+            seatNo: selectedSeat.seatNo,
+            roomId: selectedSeat.roomId,
+            roomSeatNo: selectedSeat.roomSeatNo,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       }
       await batch.commit();
       toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
@@ -958,12 +1315,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
-      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), { 
-        seatNo: selectedSeat.seatNo, 
+      batch.update(doc(firestore, 'centers', centerId, 'students', student.id), {
+        seatId: selectedSeat.id,
+        seatNo: selectedSeat.seatNo,
+        roomId: selectedSeat.roomId,
+        roomSeatNo: selectedSeat.roomSeatNo,
         seatZone: selectedSeat.seatZone || null,
-        updatedAt: serverTimestamp() 
+        updatedAt: serverTimestamp()
       });
-      batch.set(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { studentId: student.id, status: 'absent', type: 'seat', updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(
+        doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
+        {
+          studentId: student.id,
+          status: 'absent',
+          type: 'seat',
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          seatZone: selectedSeat.seatZone || null,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
       await batch.commit();
       toast({ title: `${student.name} 학생 배정 완료` });
       setIsAssigning(false);
@@ -976,13 +1349,35 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
-      batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), { seatNo: 0, updatedAt: serverTimestamp() });
-      batch.set(doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id), { studentId: null, status: 'absent', updatedAt: serverTimestamp() }, { merge: true });
+      batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), {
+        seatNo: 0,
+        seatId: deleteField(),
+        roomId: deleteField(),
+        roomSeatNo: deleteField(),
+        seatZone: deleteField(),
+        updatedAt: serverTimestamp(),
+      });
+      batch.set(
+        doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
+        {
+          studentId: null,
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          status: 'absent',
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
       await batch.commit();
       toast({ title: "배정 해제 완료" });
       setIsManaging(false);
     } catch (e) { toast({ variant: "destructive", title: "해제 실패" }); } finally { setIsSaving(false); }
   };
+
+  const activeRoomConflicts = selectedRoomConfig
+    ? roomResizeConflicts.get(selectedRoomConfig.id) || []
+    : [];
 
   if (!mounted) return (
     <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-4">
@@ -1046,6 +1441,67 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </header>
 
       <section className="px-4">
+        <Card className="rounded-[2rem] border-none bg-white/90 shadow-sm ring-1 ring-black/5">
+          <CardContent className={cn("flex flex-col gap-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
+            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="h-6 border-none bg-primary/10 px-2.5 text-[10px] font-black text-primary">
+                  실시간 교실 보기
+                </Badge>
+                <p className="text-xs font-bold text-muted-foreground">
+                  전체는 통합 현황, 호실 선택 시 상세 도면과 배치 수정을 확인합니다.
+                </p>
+              </div>
+              {selectedRoomView !== 'all' && (
+                <p className="text-[11px] font-black text-primary/70">
+                  현재 선택: {getRoomLabel(selectedRoomView, roomConfigs)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={selectedRoomView === 'all' ? 'default' : 'outline'}
+                onClick={() => setSelectedRoomView('all')}
+                className={cn(
+                  "rounded-2xl px-4 font-black",
+                  isMobile ? "h-10 flex-1 min-w-[88px]" : "h-11",
+                  selectedRoomView === 'all' ? "bg-primary text-white" : "border-2"
+                )}
+              >
+                전체
+              </Button>
+              {roomConfigs.map((room) => (
+                <Button
+                  key={room.id}
+                  type="button"
+                  variant={selectedRoomView === room.id ? 'default' : 'outline'}
+                  onClick={() => setSelectedRoomView(room.id)}
+                  className={cn(
+                    "rounded-2xl px-4 font-black gap-2",
+                    isMobile ? "h-10 flex-1 min-w-[96px]" : "h-11",
+                    selectedRoomView === room.id ? "bg-primary text-white" : "border-2"
+                  )}
+                >
+                  {room.name}
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "h-5 border-none px-1.5 text-[9px] font-black",
+                      selectedRoomView === room.id ? "bg-white/15 text-white" : "bg-primary/5 text-primary"
+                    )}
+                  >
+                    {room.cols}x{room.rows}
+                  </Badge>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="px-4">
         <Card className="rounded-[2.5rem] border-none shadow-sm bg-white p-6 sm:p-8 overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform duration-1000"><TrendingUp className="h-32 w-32" /></div>
           <CardHeader className="p-0 mb-6">
@@ -1093,10 +1549,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       <section className={cn("grid gap-4 px-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
         {[
-          { label: '학습 중', val: stats.studying, color: 'text-blue-600', icon: Activity },
-          { label: '미입실', val: stats.absent, color: 'text-rose-500', icon: AlertCircle },
-          { label: '외출/휴식', val: stats.away, color: 'text-amber-500', icon: Clock },
-          { label: selectedClass === 'all' ? '전체 좌석' : `${selectedClass} 정원`, val: stats.total, color: 'text-primary', icon: Armchair, hasEdit: true }
+          { label: '학습 중', val: roomScopedKpi?.studying ?? stats.studying, color: 'text-blue-600', icon: Activity },
+          { label: '미입실', val: roomScopedKpi?.absent ?? stats.absent, color: 'text-rose-500', icon: AlertCircle },
+          { label: '외출/휴식', val: roomScopedKpi?.away ?? stats.away, color: 'text-amber-500', icon: Clock },
+          {
+            label:
+              selectedRoomView === 'all'
+                ? selectedClass === 'all'
+                  ? '전체 좌석'
+                  : `${selectedClass} 정원`
+                : `${getRoomLabel(selectedRoomView, roomConfigs)} 좌석`,
+            val: roomScopedKpi?.total ?? stats.total,
+            color: 'text-primary',
+            icon: Armchair,
+            hasEdit: true,
+          }
         ].map((item, i) => (
           <Card key={i} className="rounded-[2rem] sm:rounded-[2.5rem] border-none shadow-sm bg-white p-5 sm:p-8 transition-all hover:shadow-md relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
@@ -1109,7 +1576,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <Button 
                   variant={isEditMode ? "default" : "outline"} 
                   size="sm" 
-                  onClick={() => setIsEditMode(!isEditMode)}
+                  onClick={handleToggleEditMode}
                   className={cn(
                     "rounded-xl h-8 px-2.5 sm:h-9 sm:px-3 font-black text-[9px] sm:text-[10px] gap-1.5 transition-all shadow-sm",
                     isEditMode ? "bg-primary text-white" : "border-2 hover:bg-primary/5"
@@ -1123,78 +1590,259 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      <Card className={cn(
-        "rounded-[3rem] border-none shadow-xl bg-white mx-4 overflow-hidden transition-all duration-500",
-        isEditMode ? "ring-4 ring-primary/20" : ""
-      )}>
-        <CardHeader className={cn("bg-muted/5 border-b px-6 py-4 sm:px-10 sm:py-6")}>
-          <div className="flex justify-between items-center">
-            <CardTitle className={cn("font-black tracking-tight flex items-center gap-2", isMobile ? "text-lg" : "text-xl")}>
-              <Armchair className={cn("opacity-40", isMobile ? "h-4 w-4" : "h-5 w-5")} /> 
-              {isEditMode ? '배치 수정' : '좌석 상황판'}
-              {selectedClass !== 'all' && <Badge variant="secondary" className="bg-primary/5 text-primary border-none ml-2">{selectedClass}</Badge>}
-            </CardTitle>
-            <Badge variant="outline" className="border-primary/40 font-black text-[9px] px-3 h-6 uppercase">{gridCols}x{gridRows}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className={cn("flex justify-center", isMobile ? "p-4" : "p-6 sm:p-10")}>
-          <ScrollArea className="w-full max-w-full">
-            <div className={cn("rounded-[2.5rem] border-2 border-muted/30 bg-[#fafafa] w-fit mx-auto", isMobile ? "p-4" : "p-6 sm:p-10 shadow-inner")}>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(64px, 1fr))` }}>
-                {Array.from({ length: gridCols }).map((_, colIndex) => (
-                  <div key={colIndex} className="flex flex-col gap-2">
-                    {Array.from({ length: gridRows }).map((_, rowIndex) => {
-                      const seatNo = colIndex * gridRows + rowIndex + 1;
-                      const seatId = `seat_${seatNo.toString().padStart(3, '0')}`;
-                      const seat = attendanceList?.find(a => a.id === seatId) || { id: seatId, seatNo, status: 'absent', type: 'seat' } as AttendanceCurrent;
-                      const student = students?.find(s => s.id === seat?.studentId);
-                      const studentMember = studentMembers?.find(m => m.id === seat?.studentId);
-                      const occupantId = typeof seat?.studentId === 'string' ? seat.studentId : '';
-                      const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
-                      const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
-                      
-                      const timeInfo = occupantId ? getStudentStudyTimes(occupantId, seat.status, seat.lastCheckInAt) : null;
-                      const isAisle = seat?.type === 'aisle';
-                      const isStudying = timeInfo?.isStudying;
-                      const isAway = !isEditMode && (seat?.status === 'away' || seat?.status === 'break');
-
-                      return (
-                        <div key={seatNo} onClick={() => handleSeatClick(seat)} className={cn(
-                          "aspect-square min-w-[64px] rounded-2xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden p-1 cursor-pointer shadow-sm border-2 outline-none",
-                          isFilteredOut ? "opacity-20 grayscale border-transparent bg-muted/10" : 
-                          isAisle ? "bg-transparent border-transparent text-transparent hover:bg-muted/10" : 
-                          isStudying ? "bg-blue-600 border-blue-700 text-white shadow-xl scale-[1.03] z-10" : 
-                          isAway ? "bg-amber-50 border-amber-600 text-white" : 
-                          occupantId ? "bg-white border-primary/30 text-primary" : "bg-white border-primary/40 text-primary/5 hover:border-primary/60",
-                          isEditMode && isAisle && "border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20"
-                        )}>
-                          {!isAisle && <span className={cn("text-[7px] font-black absolute top-1 left-1.5", isStudying || isAway ? "opacity-60" : "opacity-40")}>{seatNo}</span>}
-                          {seat?.seatZone && !isAisle && (
-                            <Badge variant="outline" className={cn("absolute top-1 right-1 h-3.5 px-1 border-none font-black text-[6px]", isStudying || isAway ? "bg-white/20 text-white" : "bg-primary/5 text-primary/40")}>{seat.seatZone.charAt(0)}</Badge>
-                          )}
-                          {isAisle ? (isEditMode && <MapIcon className="h-3 w-3 opacity-40" />) : occupantId ? (
-                            <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
-                              <span className="text-[10px] font-black truncate w-full text-center tracking-tighter leading-none mb-0.5">{occupantName}</span>
-                              <div className="flex flex-col items-center leading-[1.1]">
-                                <span className={cn("text-[8px] font-black tracking-tighter whitespace-nowrap", isStudying || isAway ? "text-white" : "text-primary")}>{`세션 ${timeInfo?.session}`}</span>
-                                <span className={cn("text-[8px] font-black tracking-tighter whitespace-nowrap", isStudying || isAway ? "text-white/90" : "text-primary/80")}>{`누적 ${timeInfo?.total}`}</span>
-                              </div>
-                              {isStudying && <Zap className="h-2 w-2 fill-current animate-pulse text-white/50 mt-0.5" />}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center"><span className="text-[7px] font-black tracking-tighter opacity-100 uppercase">빈좌석</span>{isEditMode && <UserPlus className="h-2.5 w-2.5 mt-0.5 text-primary/40" />}</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+      {selectedRoomView === 'all' ? (
+        <Card className="mx-4 overflow-hidden rounded-[3rem] border-none bg-white shadow-xl">
+          <CardHeader className="border-b bg-muted/5 px-6 py-5 sm:px-10 sm:py-6">
+            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
+              <div className="grid gap-1">
+                <CardTitle className={cn("flex items-center gap-2 font-black tracking-tight", isMobile ? "text-lg" : "text-xl")}>
+                  <Armchair className={cn("opacity-40", isMobile ? "h-4 w-4" : "h-5 w-5")} />
+                  호실별 실시간 요약
+                </CardTitle>
+                <CardDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  같은 쿼리 데이터를 유지하고, 호실별로 분리해서 확인합니다.
+                </CardDescription>
               </div>
+              <Badge variant="outline" className="h-6 border-primary/40 px-3 text-[10px] font-black uppercase">
+                전체 보기
+              </Badge>
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className={cn("grid gap-4", isMobile ? "p-4" : "p-6 sm:grid-cols-2 sm:p-8")}>
+            {roomSummaries.map((room) => (
+              <Card key={room.id} className="rounded-[2rem] border border-primary/10 bg-[#fafafa] shadow-sm">
+                <CardContent className="space-y-5 p-5 sm:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="grid gap-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.28em] text-primary/50">Room Overview</p>
+                      <h3 className="text-2xl font-black tracking-tight text-primary">{room.name}</h3>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge className="border-none bg-primary/10 text-primary font-black">
+                        {room.cols} x {room.rows}
+                      </Badge>
+                      {room.hasUnsavedChanges && (
+                        <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">
+                          미리보기 변경됨
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">물리 좌석</p>
+                      <p className="dashboard-number mt-1 text-3xl text-primary">{room.physicalSeats}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">학습 중</p>
+                      <p className="dashboard-number mt-1 text-3xl text-blue-600">{room.studying}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">배정 좌석</p>
+                      <p className="dashboard-number mt-1 text-3xl text-emerald-600">{room.assigned}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">가용 좌석</p>
+                      <p className="dashboard-number mt-1 text-3xl text-slate-700">{room.availableSeats}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-primary/15 bg-white p-4">
+                    <p className="text-xs font-bold leading-relaxed text-muted-foreground">
+                      {selectedClass === 'all'
+                        ? '도면 상세와 편집은 각 호실 화면에서 확인합니다.'
+                        : `${selectedClass} 필터가 적용된 상태입니다.`}
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => setSelectedRoomView(room.id)}
+                      className="h-11 rounded-xl font-black"
+                    >
+                      {room.name} 도면 보기
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </CardContent>
+        </Card>
+      ) : selectedRoomConfig ? (
+        <Card className={cn(
+          "mx-4 overflow-hidden rounded-[3rem] border-none bg-white shadow-xl transition-all duration-500",
+          isEditMode ? "ring-4 ring-primary/20" : ""
+        )}>
+          <CardHeader className="border-b bg-muted/5 px-6 py-4 sm:px-10 sm:py-6">
+            <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-center justify-between")}>
+              <div className="grid gap-1">
+                <CardTitle className={cn("flex items-center gap-2 font-black tracking-tight", isMobile ? "text-lg" : "text-xl")}>
+                  <Armchair className={cn("opacity-40", isMobile ? "h-4 w-4" : "h-5 w-5")} />
+                  {selectedRoomConfig.name} {isEditMode ? '배치 수정' : '좌석 상황판'}
+                  {selectedClass !== 'all' && (
+                    <Badge variant="secondary" className="ml-2 border-none bg-primary/5 text-primary">
+                      {selectedClass}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-xs font-bold text-muted-foreground">
+                  {selectedRoomConfig.name}만 집중해서 보고, 전체 수치는 상단 KPI에서 함께 확인합니다.
+                </CardDescription>
+              </div>
+
+              {isEditMode ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 shadow-sm">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">가로</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={roomDrafts[selectedRoomConfig.id]?.cols ?? selectedRoomConfig.cols}
+                      onChange={(event) => handleRoomDraftChange(selectedRoomConfig.id, 'cols', event.target.value)}
+                      className="h-9 w-20 rounded-xl border-2 text-center font-black"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 shadow-sm">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">세로</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={roomDrafts[selectedRoomConfig.id]?.rows ?? selectedRoomConfig.rows}
+                      onChange={(event) => handleRoomDraftChange(selectedRoomConfig.id, 'rows', event.target.value)}
+                      className="h-9 w-20 rounded-xl border-2 text-center font-black"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleCancelRoomDraft(selectedRoomConfig.id)}
+                    className="h-11 rounded-xl border-2 font-black"
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleSaveRoomSettings(selectedRoomConfig.id)}
+                    disabled={
+                      isSaving ||
+                      !roomSummaries.find((room) => room.id === selectedRoomConfig.id)?.hasUnsavedChanges
+                    }
+                    className="h-11 rounded-xl font-black gap-2"
+                  >
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    저장
+                  </Button>
+                </div>
+              ) : (
+                <Badge variant="outline" className="h-6 border-primary/40 px-3 text-[10px] font-black uppercase">
+                  {selectedRoomConfig.cols}x{selectedRoomConfig.rows}
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-6 sm:p-10")}>
+            {isEditMode && activeRoomConflicts.length > 0 && (
+              <div className="rounded-[2rem] border border-rose-200 bg-rose-50/70 p-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-rose-600" />
+                  <p className="text-sm font-black text-rose-700">축소 저장 전 정리가 필요한 셀이 있습니다.</p>
+                </div>
+                <p className="mt-2 text-xs font-bold leading-relaxed text-rose-700/90">
+                  {activeRoomConflicts
+                    .slice(0, 5)
+                    .map((seat) => formatSeatLabel(seat, roomConfigs))
+                    .join(', ')}
+                  {activeRoomConflicts.length > 5 ? ` 외 ${activeRoomConflicts.length - 5}개` : ''}
+                </p>
+              </div>
+            )}
+
+            <ScrollArea className="w-full max-w-full">
+              <div className={cn("mx-auto w-fit rounded-[2.5rem] border-2 border-muted/30 bg-[#fafafa]", isMobile ? "p-4" : "p-6 sm:p-10 shadow-inner")}>
+                <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${selectedRoomConfig.cols}, minmax(64px, 1fr))` }}>
+                  {Array.from({ length: selectedRoomConfig.cols }).map((_, colIndex) => (
+                    <div key={`${selectedRoomConfig.id}_${colIndex}`} className="flex flex-col gap-2">
+                      {Array.from({ length: selectedRoomConfig.rows }).map((_, rowIndex) => {
+                        const roomSeatNo = colIndex * selectedRoomConfig.rows + rowIndex + 1;
+                        const seat = getSeatForRoom(selectedRoomConfig, roomSeatNo);
+                        const student = seat.studentId ? studentsById.get(seat.studentId) : undefined;
+                        const studentMember = seat.studentId ? studentMembersById.get(seat.studentId) : undefined;
+                        const occupantId = typeof seat.studentId === 'string' ? seat.studentId : '';
+                        const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
+                        const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
+                        const timeInfo = occupantId ? getStudentStudyTimes(occupantId, seat.status, seat.lastCheckInAt) : null;
+                        const isAisle = seat.type === 'aisle';
+                        const isStudying = timeInfo?.isStudying;
+                        const isAway = !isEditMode && (seat.status === 'away' || seat.status === 'break');
+
+                        return (
+                          <div
+                            key={`${selectedRoomConfig.id}_${roomSeatNo}`}
+                            onClick={() => handleSeatClick(seat)}
+                            className={cn(
+                              "relative aspect-square min-w-[64px] cursor-pointer overflow-hidden rounded-2xl border-2 p-1 outline-none shadow-sm transition-all duration-500",
+                              "flex flex-col items-center justify-center",
+                              isFilteredOut ? "border-transparent bg-muted/10 opacity-20 grayscale" :
+                              isAisle ? "border-transparent bg-transparent text-transparent hover:bg-muted/10" :
+                              isStudying ? "z-10 scale-[1.03] border-blue-700 bg-blue-600 text-white shadow-xl" :
+                              isAway ? "border-amber-600 bg-amber-50 text-white" :
+                              occupantId ? "border-primary/30 bg-white text-primary" :
+                              "border-primary/40 bg-white text-primary/5 hover:border-primary/60",
+                              isEditMode && isAisle && "border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20"
+                            )}
+                          >
+                            {!isAisle && (
+                              <span className={cn("absolute left-1.5 top-1 text-[7px] font-black", isStudying || isAway ? "opacity-60" : "opacity-40")}>
+                                {roomSeatNo}
+                              </span>
+                            )}
+                            {seat.seatZone && !isAisle && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "absolute right-1 top-1 h-3.5 border-none px-1 text-[6px] font-black",
+                                  isStudying || isAway ? "bg-white/20 text-white" : "bg-primary/5 text-primary/40"
+                                )}
+                              >
+                                {seat.seatZone.charAt(0)}
+                              </Badge>
+                            )}
+                            {isAisle ? (
+                              isEditMode && <MapIcon className="h-3 w-3 opacity-40" />
+                            ) : occupantId ? (
+                              <div className="flex w-full flex-col items-center gap-0.5 px-0.5">
+                                <span className="mb-0.5 w-full truncate text-center text-[10px] font-black leading-none tracking-tighter">
+                                  {occupantName}
+                                </span>
+                                <div className="flex flex-col items-center leading-[1.1]">
+                                  <span className={cn("whitespace-nowrap text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white" : "text-primary")}>
+                                    세션 {timeInfo?.session}
+                                  </span>
+                                  <span className={cn("whitespace-nowrap text-[8px] font-black tracking-tighter", isStudying || isAway ? "text-white/90" : "text-primary/80")}>
+                                    누적 {timeInfo?.total}
+                                  </span>
+                                </div>
+                                {isStudying && <Zap className="mt-0.5 h-2 w-2 animate-pulse fill-current text-white/50" />}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center">
+                                <span className="text-[7px] font-black uppercase tracking-tighter opacity-100">빈좌석</span>
+                                {isEditMode && <UserPlus className="mt-0.5 h-2.5 w-2.5 text-primary/40" />}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className={cn("grid gap-6 px-4", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
         <div className="lg:col-span-7 space-y-4">
@@ -1316,9 +1964,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     <div className={cn("p-10 text-white relative shrink-0", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
                       <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><Sparkles className="h-32 w-32" /></div>
                       <DialogHeader className="relative z-10">
-                        <DialogTitle className="text-3xl sm:text-4xl font-black tracking-tighter">{students?.find(s => s.id === selectedSeat.studentId)?.name || '학생'}</DialogTitle>
+                        <DialogTitle className="text-3xl sm:text-4xl font-black tracking-tighter">{studentsById.get(selectedSeat.studentId || '')?.name || '학생'}</DialogTitle>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">좌석 {selectedSeat.seatNo}</Badge>
+                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">{selectedSeatLabel}</Badge>
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] whitespace-nowrap">{formatAttendanceStatus(selectedSeat.status)}</Badge>
                           {selectedSeat.seatZone && <Badge className="bg-white text-primary border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.seatZone}</Badge>}
                         </div>
@@ -1697,7 +2345,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-none rounded-none" : "sm:max-w-md")}>
           <div className="bg-primary p-8 text-white relative shrink-0">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
-            <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">좌석 번호: {selectedSeat?.seatNo}</p></DialogHeader>
+            <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">{selectedSeatLabel}</p></DialogHeader>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-white space-y-6">
             {isEditMode && (
@@ -1707,7 +2355,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 {selectedSeat?.type !== 'aisle' && (
                   <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                    <Select value={selectedSeat?.seatZone || '자유석'} onValueChange={handleUpdateZone}>
+                    <Select value={selectedSeat?.seatZone || '미정'} onValueChange={handleUpdateZone}>
                       <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
                         <SelectValue placeholder="구역 선택" />
                       </SelectTrigger>
