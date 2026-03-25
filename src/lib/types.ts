@@ -14,6 +14,12 @@ export interface User {
   updatedAt: Timestamp;
 }
 
+export interface Student {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+}
+
 export interface CenterMembership {
   id: string; 
   role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
@@ -195,6 +201,20 @@ export interface DailyReport {
   readAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface InviteCode {
+  id: string;
+  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  centerId?: string;
+  targetClassName?: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt?: Timestamp | { toDate?: () => Date } | Date | null;
+  isActive?: boolean;
+  createdByUserId?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface CounselingReservation {

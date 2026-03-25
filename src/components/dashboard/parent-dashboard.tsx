@@ -539,6 +539,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+  const isHomeTab = tab === 'home';
+  const needsStudyData = isHomeTab || tab === 'studyDetail' || tab === 'data';
+  const needsStatusData = needsStudyData || tab === 'notifications';
+  const needsNotificationsData = isHomeTab || tab === 'notifications';
+  const needsCommunicationData = isHomeTab || tab === 'communication';
+  const needsAnnouncementsData = tab === 'communication';
+  const needsBillingData = isHomeTab || tab === 'billing' || tab === 'notifications';
+  const needsPenaltyData = isHomeTab || tab === 'data' || tab === 'notifications';
+  const needsGrowthData = isHomeTab || tab === 'studyDetail' || tab === 'data';
+  const needsLatestReportData = isHomeTab || tab === 'notifications' || isReportArchiveOpen;
+  const needsReportsArchiveData = isReportArchiveOpen;
+  const needsAttendanceRequestData = tab === 'studyDetail' || tab === 'data';
+  const notificationsLimit = isHomeTab ? 8 : 20;
+  const parentCommunicationsLimit = isHomeTab ? 8 : 30;
+  const penaltyLogsLimit = isHomeTab || tab === 'notifications' ? 40 : 120;
+  const invoiceLimit = isHomeTab ? 24 : 120;
 
   useEffect(() => {
     setNotificationFilter('all');
@@ -595,26 +611,68 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { data: student } = useDoc<StudentProfile>(studentRef, { enabled: isActive && !!studentId });
 
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
-  const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
+  const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId && needsStatusData });
 
   // 캘린더용 모든 로그 조회
-  const allLogsQuery = useMemoFirebase(() => {
+  const currentCalendarMonthRange = useMemo(() => {
+    const monthStart = startOfMonth(currentCalendarDate);
+    const monthEnd = endOfMonth(currentCalendarDate);
+    return {
+      startKey: format(monthStart, 'yyyy-MM-dd'),
+      endKey: format(monthEnd, 'yyyy-MM-dd'),
+    };
+  }, [currentCalendarDate]);
+
+  const recentLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'), orderBy('dateKey', 'desc'));
+    return query(
+      collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
+      orderBy('dateKey', 'desc'),
+      limit(120)
+    );
   }, [firestore, centerId, studentId]);
-  const { data: allLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(allLogsQuery, { enabled: isActive && !!studentId });
+  const { data: recentLogs, isLoading: recentLogsLoading } = useCollection<StudyLogDay>(recentLogsQuery, {
+    enabled: isActive && !!studentId && needsStudyData,
+  });
+
+  const calendarLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
+      where('dateKey', '>=', currentCalendarMonthRange.startKey),
+      where('dateKey', '<=', currentCalendarMonthRange.endKey),
+      orderBy('dateKey', 'desc')
+    );
+  }, [firestore, centerId, studentId, currentCalendarMonthRange.startKey, currentCalendarMonthRange.endKey]);
+  const { data: calendarLogs, isLoading: calendarLogsLoading } = useCollection<StudyLogDay>(calendarLogsQuery, {
+    enabled: isActive && !!studentId && needsStudyData,
+  });
+
+  const { allLogs, logsLoading } = useMemo(() => {
+    const mergedById = new Map<string, StudyLogDay>();
+    [...(recentLogs || []), ...(calendarLogs || [])].forEach((log) => {
+      if (log?.id) {
+        mergedById.set(log.id, log);
+      }
+    });
+
+    return {
+      allLogs: Array.from(mergedById.values()).sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
+      logsLoading: recentLogsLoading || calendarLogsLoading,
+    };
+  }, [recentLogs, calendarLogs, recentLogsLoading, calendarLogsLoading]);
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !todayKey || !weekKey) return null;
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, studentId, todayKey, weekKey]);
-  const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive && !!studentId });
+  const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive && !!studentId && needsStudyData });
 
   const weeklyPlansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !weekKey) return null;
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'));
   }, [firestore, centerId, studentId, weekKey]);
-  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: isActive && !!studentId });
+  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: isActive && !!studentId && needsStudyData });
 
   const selectedDateKey = selectedCalendarDate ? format(selectedCalendarDate, 'yyyy-MM-dd') : '';
   const selectedDateWeekKey = selectedCalendarDate ? format(selectedCalendarDate, "yyyy-'W'II") : '';
@@ -626,11 +684,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       limit(1)
     );
   }, [firestore, centerId, studentId]);
-  const { data: attendanceCurrentDocs } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive && !!studentId });
+  const { data: attendanceCurrentDocs } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive && !!studentId && needsStatusData });
   const attendanceCurrent = attendanceCurrentDocs?.[0];
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId || !selectedDateKey || !selectedDateWeekKey) {
+    if (!isActive || !needsStudyData || !firestore || !centerId || !studentId || !selectedDateKey || !selectedDateWeekKey) {
       setSelectedDatePlans([]);
       setIsSelectedDatePlansLoading(false);
       return;
@@ -665,10 +723,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
+  }, [isActive, needsStudyData, firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId || !today) {
+    if (!isActive || !needsStudyData || !firestore || !centerId || !studentId || !today) {
       setCheckInByDateKey({});
       return;
     }
@@ -720,10 +778,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt]);
+  }, [isActive, needsStudyData, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt]);
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId || !today) {
+    if (!isActive || !needsStudyData || !firestore || !centerId || !studentId || !today) {
       setStudyStartByDateKey({});
       setStudyEndByDateKey({});
       setAwayMinutesByDateKey({});
@@ -749,9 +807,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
               const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
               const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
-              const statAwayMinutes = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw)
+              const hasAwayMinutesStat = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw);
+              const statAwayMinutes = hasAwayMinutesStat
                 ? Math.max(0, Math.round(statAwayMinutesRaw))
                 : 0;
+
+              const todayFallback =
+                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
+                  : null;
+
+              if (statStart && statEnd && hasAwayMinutesStat) {
+                return [
+                  dateKey,
+                  {
+                    start: statStart,
+                    end: statEnd,
+                    awayMinutes: statAwayMinutes,
+                  },
+                ] as const;
+              }
 
               const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
               const snapshot = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
@@ -776,11 +851,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
                 if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
               }
-
-              const todayFallback =
-                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
-                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
-                  : null;
 
               return [
                 dateKey,
@@ -836,10 +906,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status]);
+  }, [isActive, needsStudyData, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status]);
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId || !yesterdayKey) {
+    if (!isActive || !needsLatestReportData || !firestore || !centerId || !studentId || !yesterdayKey) {
       setReport(null);
       return;
     }
@@ -867,7 +937,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, yesterdayKey]);
+  }, [isActive, needsLatestReportData, firestore, centerId, studentId, yesterdayKey]);
 
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !report?.content) return;
@@ -895,7 +965,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [isActive, firestore, centerId, studentId, report, yesterdayKey]);
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId) {
+    if (!isActive || !needsReportsArchiveData || !firestore || !centerId || !studentId) {
       setRawReportsArchive([]);
       return;
     }
@@ -925,14 +995,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId]);
+  }, [isActive, needsReportsArchiveData, firestore, centerId, studentId]);
   const reportsArchive = useMemo(
     () => [...(rawReportsArchive || [])].sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
     [rawReportsArchive]
   );
 
+  useEffect(() => {
+    if (!isReportArchiveOpen || selectedChildReport || reportsArchive.length === 0) return;
+    setSelectedChildReport(reportsArchive[0] || null);
+  }, [isReportArchiveOpen, selectedChildReport, reportsArchive]);
+
   const growthRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'growthProgress', studentId)), [firestore, centerId, studentId]);
-  const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId });
+  const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId && needsGrowthData });
 
   const remoteNotificationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !user) return null;
@@ -940,10 +1015,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', centerId, 'parentNotifications'),
       where('parentUid', '==', user.uid),
       where('studentId', '==', studentId),
-      limit(20)
+      limit(notificationsLimit)
     );
-  }, [firestore, centerId, studentId, user?.uid]);
-  const { data: rawRemoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user });
+  }, [firestore, centerId, studentId, user?.uid, notificationsLimit]);
+  const { data: rawRemoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user && needsNotificationsData });
   const remoteNotifications = useMemo(() => {
     if (!rawRemoteNotifications) return rawRemoteNotifications;
     return [...rawRemoteNotifications].sort((a, b) => {
@@ -957,18 +1032,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId || !studentId) return null;
     return query(collection(firestore, 'centers', centerId, 'attendance요청'), where('studentId', '==', studentId), limit(30));
   }, [firestore, centerId, studentId]);
-  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: isActive && !!studentId });
+  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: isActive && !!studentId && needsAttendanceRequestData });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user) return null;
     return query(
       collection(firestore, 'centers', centerId, 'parentCommunications'),
       where('parentUid', '==', user.uid),
-      limit(30),
+      limit(parentCommunicationsLimit),
     );
-  }, [firestore, centerId, user?.uid]);
+  }, [firestore, centerId, user?.uid, parentCommunicationsLimit]);
   const { data: rawParentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
-    enabled: isActive && !!centerId && !!user,
+    enabled: isActive && !!centerId && !!user && needsCommunicationData,
   });
 
   const centerAnnouncementsQuery = useMemoFirebase(() => {
@@ -981,7 +1056,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: rawCenterAnnouncements, isLoading: centerAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
     centerAnnouncementsQuery,
-    { enabled: isActive && !!centerId }
+    { enabled: isActive && !!centerId && needsAnnouncementsData }
   );
 
   const legacyParentAnnouncementsQuery = useMemoFirebase(() => {
@@ -994,24 +1069,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: rawLegacyParentAnnouncements, isLoading: legacyParentAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
     legacyParentAnnouncementsQuery,
-    { enabled: isActive && !!centerId }
+    { enabled: isActive && !!centerId && needsAnnouncementsData }
   );
 
   const penaltyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120));
-  }, [firestore, centerId, studentId]);
-  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: isActive && !!studentId });
+    return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(penaltyLogsLimit));
+  }, [firestore, centerId, studentId, penaltyLogsLimit]);
+  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: isActive && !!studentId && needsPenaltyData });
 
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
       where('studentId', '==', studentId),
-      limit(120)
+      limit(invoiceLimit)
     );
-  }, [firestore, centerId, studentId]);
-  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: isActive && !!studentId });
+  }, [firestore, centerId, studentId, invoiceLimit]);
+  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: isActive && !!studentId && needsBillingData });
 
   const sortedInvoices = useMemo(() => {
     return [...(studentInvoices || [])].sort((a, b) => {

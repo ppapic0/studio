@@ -55,7 +55,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getCountFromServer, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -459,6 +459,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
 
 function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobile }: { studentId: string, centerId: string, todayKey: string, h: number, m: number, isMobile: boolean }) {
   const firestore = useFirestore();
+  const [isOpen, setIsOpen] = useState(false);
   const sessionsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !todayKey) return null;
     return query(
@@ -467,10 +468,10 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
     );
   }, [firestore, centerId, studentId, todayKey]);
 
-  const { data: sessions, isLoading } = useCollection<StudySession>(sessionsQuery);
+  const { data: sessions, isLoading } = useCollection<StudySession>(sessionsQuery, { enabled: isOpen });
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Card className={cn(
           "group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
@@ -719,6 +720,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
   const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
+  const [seasonParticipantCount, setSeasonParticipantCount] = useState(0);
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -826,9 +828,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
               const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
               const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
-              const statAwayMinutes = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw)
+              const hasAwayMinutesStat = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw);
+              const statAwayMinutes = hasAwayMinutesStat
                 ? Math.max(0, Math.round(statAwayMinutesRaw))
                 : 0;
+
+              if (statStart && statEnd && hasAwayMinutesStat) {
+                return [
+                  dateKey,
+                  {
+                    start: statStart,
+                    end: statEnd,
+                    awayMinutes: statAwayMinutes,
+                  },
+                ] as const;
+              }
 
               const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
               const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
@@ -944,15 +958,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return [...teacherReportsRaw].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [teacherReportsRaw]);
 
-  const leaderboardQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !periodKey) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
-      orderBy('value', 'desc'),
-      limit(200)
-    );
-  }, [firestore, activeMembership?.id, periodKey]);
-  const { data: leaderboardEntries } = useCollection<LeaderboardEntry>(leaderboardQuery, { enabled: isActive });
+  const leaderboardEntryRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user || !periodKey) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+  }, [firestore, activeMembership?.id, periodKey, user?.uid]);
+  const { data: leaderboardEntry } = useDoc<LeaderboardEntry>(leaderboardEntryRef, { enabled: isActive });
 
   const centerAnnouncementsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -965,11 +975,52 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: centerAnnouncements } = useCollection<any>(centerAnnouncementsQuery, { enabled: isActive });
 
   useEffect(() => {
-    router.prefetch('/dashboard/plan');
-    router.prefetch('/dashboard/student-reports');
-    router.prefetch('/dashboard/leaderboards');
-    router.prefetch('/dashboard/appointments/inquiries');
-  }, [router]);
+    if (!isActive || typeof window === 'undefined') return;
+
+    const prefetchRoutes = () => {
+      router.prefetch('/dashboard/plan');
+      router.prefetch('/dashboard/student-reports');
+      router.prefetch('/dashboard/leaderboards');
+      router.prefetch('/dashboard/appointments/inquiries');
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(prefetchRoutes, { timeout: 2000 });
+      return () => window.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = window.setTimeout(prefetchRoutes, 800);
+    return () => window.clearTimeout(timeoutId);
+  }, [isActive, router]);
+
+  useEffect(() => {
+    if (!isActive || !firestore || !activeMembership || !periodKey) {
+      setSeasonParticipantCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadParticipantCount = async () => {
+      try {
+        const entriesRef = collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries');
+        const countSnapshot = await getCountFromServer(entriesRef);
+        if (!cancelled) {
+          setSeasonParticipantCount(countSnapshot.data().count);
+        }
+      } catch {
+        if (!cancelled) {
+          setSeasonParticipantCount(0);
+        }
+      }
+    };
+
+    void loadParticipantCount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, activeMembership?.id, periodKey]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -2018,13 +2069,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (alreadyEarnedPlanBonus || todayStudyTasks.length < 3 || todayRemainingTasks.length === 0) return 0;
     return Math.round(100 * finalMultiplier);
   }, [progress?.dailyLpStatus, todayKey, todayStudyTasks.length, todayRemainingTasks.length, finalMultiplier]);
-  const seasonRank = useMemo(() => {
-    if (!user || !leaderboardEntries?.length) return 0;
-    const sorted = [...leaderboardEntries].sort((a, b) => (b.value || 0) - (a.value || 0));
-    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
-    return ownIndex >= 0 ? ownIndex + 1 : 0;
-  }, [leaderboardEntries, user?.uid]);
-  const seasonParticipantCount = leaderboardEntries?.length || 0;
+  const seasonRank = leaderboardEntry?.rank || 0;
   const seasonPercentile = useMemo(() => {
     if (!seasonRank || seasonParticipantCount <= 0) return null;
     return Math.max(1, Math.ceil((seasonRank / seasonParticipantCount) * 100));

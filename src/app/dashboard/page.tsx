@@ -437,8 +437,11 @@ export default function DashboardPage() {
         </div>
 
         <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
-          <StudentDashboard isActive={userRole === 'student'} />
-          <ParentDashboard isActive={userRole === 'parent'} />
+          {userRole === 'student' ? (
+            <StudentDashboard isActive={true} />
+          ) : (
+            <ParentDashboard isActive={true} />
+          )}
         </div>
       </div>
     );

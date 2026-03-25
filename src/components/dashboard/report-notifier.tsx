@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/app-context';
 import { useNotifications, ReportItem } from '@/contexts/notifications-context';
 import {
@@ -32,7 +32,10 @@ export function ReportNotifier() {
     clearLatestReport();
   }, [latestReport, clearLatestReport]);
 
-  if (!notification) return null;
+  const reportContent = typeof notification?.content === 'string' ? notification.content : '';
+  const reportDateKey = notification?.dateKey || '새 리포트';
+
+  if (!notification || !reportContent) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -49,13 +52,13 @@ export function ReportNotifier() {
               <div className="bg-white/20 p-1.5 rounded-lg">
                 <FileText className="h-4 w-4 text-white animate-bounce" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 whitespace-nowrap">새 분석 도착</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 whitespace-nowrap">AI 분석 도착</span>
             </div>
             <DialogTitle className="text-3xl font-black tracking-tighter">
               데일리 리포트가 도착했습니다
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1">
-              성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 합쳐진 최적의 솔루션입니다.
+              학생 데이터를 바탕으로 생성된 리포트를 바로 확인할 수 있어요.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -63,10 +66,10 @@ export function ReportNotifier() {
         <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6 sm:p-10">
           <div className="flex justify-center mb-6">
             <Badge variant="secondary" className="rounded-full px-4 py-1.5 bg-white border-2 border-primary/10 shadow-sm font-black text-primary gap-2">
-              <Wand2 className="h-3.5 w-3.5" /> {notification.dateKey} 분석 결과
+              <Wand2 className="h-3.5 w-3.5" /> {reportDateKey} 분석 결과
             </Badge>
           </div>
-          <VisualReportViewer content={notification.content} />
+          <VisualReportViewer content={reportContent} />
         </div>
 
         <DialogFooter className="p-6 bg-white border-t shrink-0">
