@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import {
   Bell,
   CalendarCheck,
@@ -185,7 +185,80 @@ type LinkedStudentOption = {
   name: string;
 };
 
-const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing', 'notifications'];
+type ParentMetricTone = 'study' | 'plan' | 'attendance' | 'penalty';
+
+type ParentSparklinePoint = {
+  label: string;
+  value: number | null;
+};
+
+type ParentMetricToneStyle = {
+  card: string;
+  orb: string;
+  panel: string;
+  eyebrow: string;
+  badge: string;
+  stroke: string;
+  fillStart: string;
+  fillEnd: string;
+  dot: string;
+  mutedDot: string;
+};
+
+const PARENT_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentMetricToneStyle> = {
+  study: {
+    card: 'border-[#d6e3ff] bg-[linear-gradient(180deg,#f7fbff_0%,#ffffff_58%,#eef5ff_100%)] shadow-[0_18px_34px_-24px_rgba(20,41,95,0.30)] ring-1 ring-[#dce8ff]/80',
+    orb: 'bg-[#9bbcff]/34',
+    panel: 'border-[#d9e6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(239,245,255,0.92)_100%)]',
+    eyebrow: 'text-[#56739f]',
+    badge: 'border-[#d4e3ff] bg-white/92 text-[#14295F]',
+    stroke: '#204ca3',
+    fillStart: 'rgba(44, 102, 210, 0.26)',
+    fillEnd: 'rgba(44, 102, 210, 0.02)',
+    dot: '#204ca3',
+    mutedDot: '#b9cae7',
+  },
+  plan: {
+    card: 'border-[#ffe0bb] bg-[linear-gradient(180deg,#fffaf3_0%,#ffffff_58%,#fff3e7_100%)] shadow-[0_18px_34px_-24px_rgba(210,109,18,0.25)] ring-1 ring-[#ffe3bf]/85',
+    orb: 'bg-[#ffc990]/34',
+    panel: 'border-[#ffe0bf] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(255,247,236,0.95)_100%)]',
+    eyebrow: 'text-[#c66a13]',
+    badge: 'border-[#ffd8ab] bg-white/92 text-[#b45f0d]',
+    stroke: '#e27d18',
+    fillStart: 'rgba(226, 125, 24, 0.24)',
+    fillEnd: 'rgba(226, 125, 24, 0.02)',
+    dot: '#e27d18',
+    mutedDot: '#e7c49e',
+  },
+  attendance: {
+    card: 'border-[#d8ebf0] bg-[linear-gradient(180deg,#f8fdff_0%,#ffffff_60%,#eef8fb_100%)] shadow-[0_16px_30px_-24px_rgba(26,94,120,0.18)] ring-1 ring-[#d9eef2]/80',
+    orb: 'bg-[#8ed3e4]/24',
+    panel: 'border-[#d6eaef] bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(239,249,252,0.94)_100%)]',
+    eyebrow: 'text-[#477281]',
+    badge: 'border-[#d4eaef] bg-white/90 text-[#245565]',
+    stroke: '#1b728d',
+    fillStart: 'rgba(27, 114, 141, 0.18)',
+    fillEnd: 'rgba(27, 114, 141, 0.02)',
+    dot: '#1b728d',
+    mutedDot: '#b9d7df',
+  },
+  penalty: {
+    card: 'border-[#ffd9df] bg-[linear-gradient(180deg,#fff9fa_0%,#ffffff_58%,#fff0f3_100%)] shadow-[0_18px_34px_-24px_rgba(225,29,72,0.18)] ring-1 ring-[#ffe3e7]/85',
+    orb: 'bg-[#ffb0bf]/26',
+    panel: 'border-[#ffd8df] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(255,242,245,0.95)_100%)]',
+    eyebrow: 'text-[#d24664]',
+    badge: 'border-[#ffd4dc] bg-white/92 text-[#c33453]',
+    stroke: '#d24664',
+    fillStart: 'rgba(210, 70, 100, 0.18)',
+    fillEnd: 'rgba(210, 70, 100, 0.02)',
+    dot: '#d24664',
+    mutedDot: '#e7bbc7',
+  },
+};
+
+const PARENT_PENALTY_STAGE_LABELS = ['정상', '주의', '상담', '강화'] as const;
+
+const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
 const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
 const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
 
@@ -196,6 +269,259 @@ function normalizeParentPortalTab(value: string | null): ParentPortalTab {
     return value as ParentPortalTab;
   }
   return 'home';
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setPrefersReducedMotion(mediaQuery.matches);
+    sync();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', sync);
+      return () => mediaQuery.removeEventListener('change', sync);
+    }
+
+    mediaQuery.addListener(sync);
+    return () => mediaQuery.removeListener(sync);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+function formatSignedMinutes(deltaMinutes: number) {
+  if (deltaMinutes === 0) return '변동 없음';
+  return `${deltaMinutes > 0 ? '+' : '-'}${toHm(Math.abs(deltaMinutes))}`;
+}
+
+function buildParentSparklineGeometry(values: Array<number | null>, width: number, height: number) {
+  const paddingX = 8;
+  const paddingY = 8;
+  const validValues = values.filter((value): value is number => typeof value === 'number');
+  const stepX = values.length > 1 ? (width - paddingX * 2) / (values.length - 1) : 0;
+
+  if (validValues.length === 0) {
+    return {
+      hasValue: false,
+      linePath: '',
+      areaPaths: [] as string[],
+      pathLength: 0,
+      points: values.map((value, index) => ({
+        x: paddingX + stepX * index,
+        y: height / 2,
+        value,
+      })),
+    };
+  }
+
+  const minValue = Math.min(...validValues);
+  const maxValue = Math.max(...validValues);
+  const normalizedMin = minValue === maxValue ? Math.max(0, minValue - 1) : minValue;
+  const normalizedMax = minValue === maxValue ? maxValue + 1 : maxValue;
+  const innerHeight = height - paddingY * 2;
+
+  const points = values.map((value, index) => {
+    const x = paddingX + stepX * index;
+    if (value === null) {
+      return { x, y: height - paddingY, value };
+    }
+
+    const progress = (value - normalizedMin) / Math.max(normalizedMax - normalizedMin, 1);
+    return {
+      x,
+      y: height - paddingY - progress * innerHeight,
+      value,
+    };
+  });
+
+  const lineSegments: string[] = [];
+  const areaPaths: string[] = [];
+  let currentSegment: Array<{ x: number; y: number }> = [];
+  let pathLength = 0;
+
+  const flushSegment = () => {
+    if (currentSegment.length === 0) return;
+
+    const linePath = currentSegment
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+      .join(' ');
+    lineSegments.push(linePath);
+
+    if (currentSegment.length >= 2) {
+      const firstPoint = currentSegment[0];
+      const lastPoint = currentSegment[currentSegment.length - 1];
+      areaPaths.push(
+        `${linePath} L ${lastPoint.x.toFixed(2)} ${(height - paddingY).toFixed(2)} L ${firstPoint.x.toFixed(2)} ${(height - paddingY).toFixed(2)} Z`
+      );
+    }
+
+    currentSegment = [];
+  };
+
+  points.forEach((point) => {
+    if (point.value === null) {
+      flushSegment();
+      return;
+    }
+
+    if (currentSegment.length > 0) {
+      const previousPoint = currentSegment[currentSegment.length - 1];
+      pathLength += Math.hypot(point.x - previousPoint.x, point.y - previousPoint.y);
+    }
+
+    currentSegment.push({ x: point.x, y: point.y });
+  });
+  flushSegment();
+
+  return {
+    hasValue: true,
+    linePath: lineSegments.join(' '),
+    areaPaths,
+    pathLength: Math.max(pathLength, 1),
+    points,
+  };
+}
+
+function ParentMetricCardShell({
+  tone,
+  className,
+  children,
+  interactive = false,
+  ...props
+}: ComponentPropsWithoutRef<typeof Card> & {
+  tone: ParentMetricTone;
+  children: ReactNode;
+  interactive?: boolean;
+}) {
+  const toneStyle = PARENT_METRIC_TONE_STYLES[tone];
+
+  return (
+    <Card
+      {...props}
+      className={cn(
+        'group relative min-w-0 overflow-hidden rounded-[1.65rem] border p-4 transition-[transform,box-shadow,background] duration-200 active:scale-[0.985] md:hover:-translate-y-0.5 sm:p-5',
+        toneStyle.card,
+        interactive && 'cursor-pointer',
+        className
+      )}
+    >
+      <div className={cn('pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.orb)} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(255,255,255,0)_44%)]" />
+      <div className="relative z-10 h-full">{children}</div>
+    </Card>
+  );
+}
+
+function ParentMetricSparkline({
+  tone,
+  points,
+  label,
+  valueLabel,
+  className,
+  showArea = true,
+}: {
+  tone: ParentMetricTone;
+  points: ParentSparklinePoint[];
+  label: string;
+  valueLabel: string;
+  className?: string;
+  showArea?: boolean;
+}) {
+  const toneStyle = PARENT_METRIC_TONE_STYLES[tone];
+  const gradientId = useId().replace(/:/g, '');
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [isDrawn, setIsDrawn] = useState(prefersReducedMotion);
+  const width = 126;
+  const height = 70;
+  const valuesKey = useMemo(
+    () => points.map((point) => `${point.label}:${point.value ?? 'null'}`).join('|'),
+    [points]
+  );
+  const geometry = useMemo(
+    () => buildParentSparklineGeometry(points.map((point) => point.value), width, height),
+    [points]
+  );
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setIsDrawn(true);
+      return;
+    }
+
+    setIsDrawn(false);
+    const frameId = window.requestAnimationFrame(() => setIsDrawn(true));
+    return () => window.cancelAnimationFrame(frameId);
+  }, [prefersReducedMotion, valuesKey]);
+
+  return (
+    <div className={cn('rounded-[1.15rem] border p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)] sm:p-2.5', toneStyle.panel, className)}>
+      <div className="mb-1.5 flex flex-col items-start gap-0.5 sm:mb-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        <span className={cn('text-[8px] font-black uppercase tracking-[0.16em] sm:text-[9px] sm:tracking-[0.18em]', toneStyle.eyebrow)}>{label}</span>
+        <span className="text-[9px] font-black text-slate-500 sm:text-[10px]">{valueLabel}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="block h-[3.6rem] w-full overflow-visible sm:h-[4.25rem]">
+        <defs>
+          <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={toneStyle.fillStart} />
+            <stop offset="100%" stopColor={toneStyle.fillEnd} />
+          </linearGradient>
+        </defs>
+
+        <path d={`M 8 ${(height - 9).toFixed(2)} L ${(width - 8).toFixed(2)} ${(height - 9).toFixed(2)}`} stroke="rgba(148,163,184,0.18)" strokeWidth="1" strokeDasharray="3 4" fill="none" />
+        <path d={`M 8 ${(height / 2).toFixed(2)} L ${(width - 8).toFixed(2)} ${(height / 2).toFixed(2)}`} stroke="rgba(148,163,184,0.10)" strokeWidth="1" strokeDasharray="2 5" fill="none" />
+
+        {geometry.hasValue && showArea
+          ? geometry.areaPaths.map((pathValue, index) => (
+              <path
+                key={`${gradientId}-area-${index}`}
+                d={pathValue}
+                fill={`url(#${gradientId}-fill)`}
+                opacity={isDrawn ? 1 : 0}
+                style={{
+                  transition: prefersReducedMotion ? 'none' : 'opacity 500ms ease 140ms',
+                }}
+              />
+            ))
+          : null}
+
+        {geometry.hasValue ? (
+          <path
+            d={geometry.linePath}
+            fill="none"
+            stroke={toneStyle.stroke}
+              strokeWidth="2.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              strokeDasharray: geometry.pathLength,
+              strokeDashoffset: isDrawn ? 0 : geometry.pathLength,
+              opacity: isDrawn ? 1 : 0.7,
+              transition: prefersReducedMotion
+                ? 'none'
+                : 'stroke-dashoffset 720ms cubic-bezier(0.2, 0.85, 0.24, 1), opacity 220ms ease',
+            }}
+          />
+        ) : (
+          <path d={`M 8 ${(height * 0.63).toFixed(2)} C 32 ${(height * 0.54).toFixed(2)}, 54 ${(height * 0.66).toFixed(2)}, 76 ${(height * 0.58).toFixed(2)} S 104 ${(height * 0.56).toFixed(2)}, ${(width - 8).toFixed(2)} ${(height * 0.61).toFixed(2)}`} stroke="rgba(148,163,184,0.34)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 5" fill="none" />
+        )}
+
+        {geometry.points.map((point, index) => (
+          <circle
+            key={`${gradientId}-point-${index}`}
+            cx={point.x}
+            cy={point.value === null ? height - 9 : point.y}
+            r={point.value === null ? 2.4 : 2.8}
+            fill={point.value === null ? toneStyle.mutedDot : toneStyle.dot}
+            opacity={point.value === null ? 0.65 : 0.95}
+          />
+        ))}
+      </svg>
+    </div>
+  );
 }
 
 function ParentDurationValue({
@@ -734,6 +1060,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+  const previousRecentWeekKey = useMemo(() => {
+    if (!today || !weekKey) return '';
+    const recentWeekKeys = Array.from(
+      new Set(
+        Array.from({ length: 7 }, (_, index) => format(subDays(today, 6 - index), "yyyy-'W'II"))
+      )
+    );
+    return recentWeekKeys.find((candidate) => candidate !== weekKey) || '';
+  }, [today, weekKey]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('parentTab');
@@ -948,6 +1283,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'));
   }, [firestore, centerId, studentId, weekKey]);
   const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: shouldLoadStudyAnalytics });
+
+  const previousWeekPlansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !previousRecentWeekKey) return null;
+    return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', previousRecentWeekKey, 'items'));
+  }, [firestore, centerId, studentId, previousRecentWeekKey]);
+  const { data: previousWeekPlans } = useCollection<StudyPlanItem>(previousWeekPlansQuery, {
+    enabled: shouldLoadStudyAnalytics && !!previousRecentWeekKey,
+  });
 
   const selectedDateKey = selectedCalendarDate ? format(selectedCalendarDate, 'yyyy-MM-dd') : '';
   const selectedDateWeekKey = selectedCalendarDate ? format(selectedCalendarDate, "yyyy-'W'II") : '';
@@ -1333,6 +1676,70 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const weeklyPlanTotal = weeklyStudyPlans.length;
   const weeklyPlanDone = weeklyStudyPlans.filter((item) => item.done).length;
   const weeklyPlanCompletionRate = weeklyPlanTotal > 0 ? Math.round((weeklyPlanDone / weeklyPlanTotal) * 100) : 0;
+  const recentTrendPlans = useMemo(() => {
+    const deduped = new Map<string, StudyPlanItem>();
+    [...(weeklyPlans || []), ...(previousWeekPlans || [])].forEach((item) => {
+      if (item.category && item.category !== 'study') return;
+      deduped.set(item.id || `${item.dateKey}-${item.title}`, item);
+    });
+    return Array.from(deduped.values());
+  }, [weeklyPlans, previousWeekPlans]);
+
+  const dailyPlanTrend = useMemo(() => {
+    if (!today) {
+      return [] as Array<{ date: string; dateKey: string; rate: number | null; total: number; done: number }>;
+    }
+
+    const plansByDateKey = new Map<string, StudyPlanItem[]>();
+    recentTrendPlans.forEach((item) => {
+      const current = plansByDateKey.get(item.dateKey) || [];
+      current.push(item);
+      plansByDateKey.set(item.dateKey, current);
+    });
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 6 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const items = plansByDateKey.get(dateKey) || [];
+      const total = items.length;
+      const done = items.filter((item) => item.done).length;
+
+      return {
+        date: format(day, 'MM/dd', { locale: ko }),
+        dateKey,
+        rate: total > 0 ? Math.round((done / total) * 100) : null,
+        total,
+        done,
+      };
+    });
+  }, [today, recentTrendPlans]);
+
+  const studyTrendHasActivity = useMemo(
+    () => dailyStudyTrend.some((item) => item.minutes > 0),
+    [dailyStudyTrend]
+  );
+  const studyTrendPeakMinutes = useMemo(
+    () => dailyStudyTrend.reduce((max, item) => Math.max(max, item.minutes), 0),
+    [dailyStudyTrend]
+  );
+  const yesterdayStudyMinutes = dailyStudyTrend.length > 1 ? dailyStudyTrend[dailyStudyTrend.length - 2]?.minutes || 0 : 0;
+  const studyDeltaFromYesterday = totalMinutes - yesterdayStudyMinutes;
+
+  const planTrendActiveDays = useMemo(
+    () => dailyPlanTrend.filter((item) => item.total > 0).length,
+    [dailyPlanTrend]
+  );
+  const planTrendCompletedDays = useMemo(
+    () => dailyPlanTrend.filter((item) => item.total > 0 && item.done === item.total).length,
+    [dailyPlanTrend]
+  );
+  const planTrendAverageRate = useMemo(() => {
+    const availableRates = dailyPlanTrend
+      .map((item) => item.rate)
+      .filter((rate): rate is number => typeof rate === 'number');
+    if (availableRates.length === 0) return 0;
+    return Math.round(availableRates.reduce((sum, rate) => sum + rate, 0) / availableRates.length);
+  }, [dailyPlanTrend]);
 
   const subjectsData = useMemo(() => {
     const source = weeklyStudyPlans.length > 0 ? weeklyStudyPlans : studyPlans;
@@ -1628,6 +2035,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (points >= 12) return { label: '학부모 상담', badge: 'bg-amber-100 text-amber-800 border-amber-300' };
     if (points >= 7) return { label: '선생님과 상담', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
     return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+  }, [penaltyRecovery.effectivePoints]);
+  const penaltyStageLevel = useMemo(() => {
+    const points = penaltyRecovery.effectivePoints;
+    if (points >= 20) return 4;
+    if (points >= 12) return 3;
+    if (points >= 7) return 2;
+    return 1;
   }, [penaltyRecovery.effectivePoints]);
 
   const heroTone = useMemo(() => {
@@ -2027,97 +2441,187 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </section>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Card
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-[minmax(0,1.16fr)_minmax(0,1.16fr)_minmax(0,0.92fr)_minmax(0,0.92fr)] xl:gap-4">
+            <ParentMetricCardShell
+              tone="study"
               className={cn(
-                'min-w-0 overflow-hidden rounded-[1.65rem] border border-[#d8e6ff] bg-[linear-gradient(180deg,#f5f9ff_0%,#ffffff_100%)] p-4 shadow-sm transition-[transform,box-shadow] duration-200 active:scale-[0.985] md:hover:-translate-y-0.5 md:hover:shadow-[0_18px_32px_-18px_rgba(20,41,95,0.28)] sm:p-5',
+                'md:min-h-[12.2rem] lg:min-h-[13rem]',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="flex min-h-[132px] flex-col justify-between gap-2.5 sm:min-h-[150px]">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">오늘 공부</span>
-                  <ParentDurationValue minutes={totalMinutes} className="text-[1.55rem] sm:text-[1.82rem]" />
-                </div>
-                <div className="space-y-1">
-                  {growthCelebrationCandidate ? (
-                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd4a8] bg-[#fff4e9] px-2.5 text-[10px] font-black text-[#FF7A16]">
-                      평균 대비 +{growthCelebrationCandidate.increaseRate}%
-                    </Badge>
-                  ) : (
-                    <p className="text-[11px] font-bold leading-5 text-slate-500">
-                      최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            <Card
-              className={cn(
-                'min-w-0 overflow-hidden rounded-[1.65rem] border border-[#ffd7af] bg-[linear-gradient(180deg,#fff7ee_0%,#ffffff_100%)] p-4 shadow-sm transition-[transform,box-shadow] duration-200 active:scale-[0.985] md:hover:-translate-y-0.5 md:hover:shadow-[0_18px_32px_-18px_rgba(210,109,18,0.24)] sm:p-5',
-                showEntryMotion && 'parent-card-enter parent-entry-delay-3'
-              )}
-            >
-              <div className="flex min-h-[132px] flex-col justify-between gap-2.5 sm:min-h-[150px]">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d26d12]">계획 달성</span>
-                  <ParentStatValue value={planRate} unit="%" className="text-[1.6rem] sm:text-[1.9rem]" />
-                </div>
-                <p className="text-[11px] font-bold leading-5 text-slate-500">
-                  주간 평균 {weeklyPlanCompletionRate > 0 ? `${weeklyPlanCompletionRate}%` : '계획 대기'}
-                </p>
-              </div>
-            </Card>
-
-            <Card
-              className={cn(
-                'min-w-0 overflow-hidden rounded-[1.65rem] border p-4 shadow-sm transition-[transform,box-shadow] duration-200 active:scale-[0.985] md:hover:-translate-y-0.5 md:hover:shadow-[0_18px_32px_-18px_rgba(20,41,95,0.22)] sm:p-5',
-                attendanceStatus.color,
-                showEntryMotion && 'parent-card-enter parent-entry-delay-4'
-              )}
-            >
-              <div className="flex min-h-[132px] flex-col justify-between gap-2.5 sm:min-h-[150px]">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">출결 상태</span>
-                  <p className="max-w-[11ch] break-keep text-[1.05rem] font-black leading-[1.14] tracking-[-0.03em] text-[#14295F] sm:text-[1.16rem]">
-                    {attendanceStatus.label}
+              <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
+                <div className="min-w-0 space-y-2.5 pr-[5.15rem] sm:pr-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
+                    {growthCelebrationCandidate ? (
+                      <Badge variant="outline" className="h-6 rounded-full border border-[#d4e3ff] bg-white/90 px-2.5 text-[10px] font-black text-[#204ca3]">
+                        +{growthCelebrationCandidate.increaseRate}%
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="h-6 rounded-full border border-[#d4e3ff] bg-white/90 px-2.5 text-[10px] font-black text-[#204ca3]">
+                        7일 흐름
+                      </Badge>
+                    )}
+                  </div>
+                  <ParentDurationValue minutes={totalMinutes} className="text-[1.4rem] sm:text-[1.72rem] lg:text-[1.92rem]" />
+                  <p className="text-[11px] font-bold leading-5 text-slate-500">
+                    최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
                   </p>
+                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#56739f]">전일 대비</p>
+                    <p className="mt-1 text-[12px] font-black text-[#14295F]">
+                      {studyTrendHasActivity ? formatSignedMinutes(studyDeltaFromYesterday) : '기록 대기'}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[11px] font-bold leading-5 text-slate-500">앱에서 실시간으로 확인 중</p>
-              </div>
-            </Card>
-
-            <Card
-              className={cn(
-                'min-w-0 cursor-pointer overflow-hidden rounded-[1.65rem] border border-rose-200 bg-[linear-gradient(180deg,#fff7f8_0%,#ffffff_100%)] p-4 shadow-sm transition-[transform,box-shadow] duration-200 active:scale-[0.985] md:hover:-translate-y-0.5 md:hover:shadow-[0_18px_32px_-18px_rgba(225,29,72,0.24)] sm:p-5',
-                showEntryMotion && 'parent-card-enter parent-entry-delay-4'
-              )}
-              role="button"
-              onClick={() => setIsPenaltyGuideOpen(true)}
-            >
-              <div className="flex min-h-[132px] flex-col justify-between gap-2.5 sm:min-h-[150px]">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">벌점 지수</span>
-                  <ParentStatValue
-                    value={penaltyRecovery.effectivePoints}
-                    unit="점"
-                    className="text-[1.6rem] text-rose-700 sm:text-[1.9rem]"
-                    unitClassName="text-rose-400"
+                <div className="absolute right-0 top-0 w-[4.7rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
+                  <ParentMetricSparkline
+                    tone="study"
+                    points={dailyStudyTrend.map((point) => ({
+                      label: point.date,
+                      value: studyTrendHasActivity ? point.minutes : null,
+                    }))}
+                    label="7일 흐름"
+                    valueLabel={studyTrendHasActivity ? `최고 ${toHm(studyTrendPeakMinutes)}` : '기록 대기'}
+                    className="w-full"
                   />
                 </div>
-                <div className="space-y-1.5">
+              </div>
+            </ParentMetricCardShell>
+
+            <ParentMetricCardShell
+              tone="plan"
+              className={cn(
+                'md:min-h-[12.2rem] lg:min-h-[13rem]',
+                showEntryMotion && 'parent-card-enter parent-entry-delay-3'
+              )}
+            >
+              <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
+                <div className="min-w-0 space-y-2.5 pr-[5.15rem] sm:pr-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
+                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd8ab] bg-white/90 px-2.5 text-[10px] font-black text-[#b45f0d]">
+                      {planTotal > 0 ? `오늘 ${planDone}/${planTotal}` : '계획 대기'}
+                    </Badge>
+                  </div>
+                  <ParentStatValue value={planRate} unit="%" className="text-[1.44rem] sm:text-[1.76rem] lg:text-[1.96rem]" unitClassName="text-[#d09248]" />
+                  <p className="text-[11px] font-bold leading-5 text-slate-500">
+                    주간 평균 {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
+                  </p>
+                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#c66a13]">완료일</p>
+                    <p className="mt-1 text-[12px] font-black text-[#9b5910]">
+                      {planTrendActiveDays > 0 ? `${planTrendCompletedDays}/${planTrendActiveDays}일` : '최근 7일 대기'}
+                    </p>
+                  </div>
+                </div>
+                <div className="absolute right-0 top-0 w-[4.7rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
+                  <ParentMetricSparkline
+                    tone="plan"
+                    points={dailyPlanTrend.map((point) => ({
+                      label: point.date,
+                      value: point.rate,
+                    }))}
+                    label="7일 달성률"
+                    valueLabel={planTrendActiveDays > 0 ? `평균 ${planTrendAverageRate}%` : '계획 대기'}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </ParentMetricCardShell>
+
+            <ParentMetricCardShell
+              tone="attendance"
+              className={cn(
+                'md:min-h-[11rem] lg:min-h-[11.4rem]',
+                showEntryMotion && 'parent-card-enter parent-entry-delay-4'
+              )}
+            >
+              <div className="flex h-full flex-col justify-between gap-3">
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#477281]">출결 상태</span>
+                    <Badge variant="outline" className="h-6 rounded-full border border-[#d4eaef] bg-white/90 px-2.5 text-[10px] font-black text-[#245565]">
+                      실시간
+                    </Badge>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/80 bg-white/88 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.36)]">
+                      <attendanceStatus.icon className="h-[1.125rem] w-[1.125rem] text-[#1b728d]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#245565]">앱 연동 중</span>
+                      </div>
+                      <p className="break-keep text-[1rem] font-black leading-[1.18] tracking-[-0.03em] text-[#14295F] sm:text-[1.08rem]">
+                        {attendanceStatus.label}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.22)]">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#477281]">최근 기록</p>
+                  <p className="mt-1 text-[12px] font-black text-[#14295F]">{recentLifeAttendanceSummary.recentStudyDate}</p>
+                  <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">앱에서 실시간으로 확인 중</p>
+                </div>
+              </div>
+            </ParentMetricCardShell>
+
+            <ParentMetricCardShell
+              tone="penalty"
+              interactive
+              role="button"
+              onClick={() => setIsPenaltyGuideOpen(true)}
+              className={cn(
+                'md:min-h-[11rem] lg:min-h-[11.4rem]',
+                showEntryMotion && 'parent-card-enter parent-entry-delay-4'
+              )}
+            >
+              <div className="flex h-full flex-col justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d24664]">벌점 지수</span>
+                    <ParentStatValue
+                      value={penaltyRecovery.effectivePoints}
+                      unit="점"
+                      className="text-[1.52rem] text-rose-700 sm:text-[1.78rem] lg:text-[1.96rem]"
+                      unitClassName="text-rose-400"
+                    />
+                  </div>
                   <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', penaltyMeta.badge)}>
                     {penaltyMeta.label}
                   </Badge>
-                  {penaltyRecovery.recoveredPoints > 0 && (
-                    <p className="text-[11px] font-bold leading-5 text-rose-500/85">
-                      자동 회복 -{penaltyRecovery.recoveredPoints}점
+                </div>
+                <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_16px_-16px_rgba(210,70,100,0.22)]">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#d24664]">위험도 단계</p>
+                    <p className="text-[11px] font-black text-rose-500">
+                      {penaltyRecovery.recoveredPoints > 0 ? `회복 -${penaltyRecovery.recoveredPoints}점` : '회복 대기'}
                     </p>
-                  )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {PARENT_PENALTY_STAGE_LABELS.map((label, index) => {
+                      const isActiveStage = index < penaltyStageLevel;
+                      return (
+                        <div
+                          key={label}
+                          className={cn(
+                            'rounded-full px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-[0.14em] transition-colors',
+                            isActiveStage ? 'bg-rose-500 text-white shadow-[0_8px_16px_-12px_rgba(225,29,72,0.52)]' : 'bg-rose-100/75 text-rose-300'
+                          )}
+                        >
+                          {label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
+                    원점수 {penaltyRecovery.basePoints}점 · 최근 기록 {penaltyRecovery.latestPositiveDateLabel}
+                  </p>
                 </div>
               </div>
-            </Card>
+            </ParentMetricCardShell>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.06fr_0.94fr]">
