@@ -267,6 +267,53 @@ function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: 
   }
 }
 
+function TrackRunnerIllustration({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        "track-runner-shell rounded-[1.5rem] border border-white/15 bg-white/12 backdrop-blur-md",
+        isMobile ? "w-full p-3" : "min-w-[210px] p-4"
+      )}
+    >
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/65">집중 페이스</p>
+          <p className={cn("font-black tracking-tight text-white", isMobile ? "text-sm" : "text-base")}>오늘 공부가 제대로 굴러가고 있어요</p>
+        </div>
+        <div className="track-runner-spark mt-1 h-2.5 w-2.5 rounded-full bg-[#FFD26C] shadow-[0_0_0_6px_rgba(255,210,108,0.18)]" />
+      </div>
+      <svg
+        viewBox="0 0 180 110"
+        className={cn("w-full", isMobile ? "h-[74px]" : "h-[90px]")}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path className="track-runner-path" d="M8 84H172" stroke="rgba(255,255,255,0.34)" strokeWidth="4" strokeLinecap="round" />
+        <path d="M130 28C145 28 153 36 164 36" stroke="rgba(255,255,255,0.26)" strokeWidth="4" strokeLinecap="round" />
+        <path d="M138 44C148 44 154 49 162 49" stroke="rgba(255,255,255,0.18)" strokeWidth="3" strokeLinecap="round" />
+        <g className="track-runner" transform="translate(66 18)">
+          <circle cx="20" cy="12" r="10" fill="#FFD7AE" />
+          <path d="M20 22L28 40L18 54L36 72" stroke="#F8FAFF" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M28 40L44 34" stroke="#F8FAFF" strokeWidth="7" strokeLinecap="round" />
+          <g className="track-runner-arm-front" transform="translate(26 34)">
+            <path d="M0 0L18 4" stroke="#FFD7AE" strokeWidth="6" strokeLinecap="round" />
+          </g>
+          <g className="track-runner-arm-back" transform="translate(24 30)">
+            <path d="M0 0L-16 8" stroke="#FFD7AE" strokeWidth="6" strokeLinecap="round" />
+          </g>
+          <g className="track-runner-leg-front" transform="translate(18 54)">
+            <path d="M0 0L20 18" stroke="#FFB870" strokeWidth="7" strokeLinecap="round" />
+          </g>
+          <g className="track-runner-leg-back" transform="translate(18 54)">
+            <path d="M0 0L-14 18" stroke="#FFB870" strokeWidth="7" strokeLinecap="round" />
+          </g>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 function JacobTierController({ progressRef, currentStats, currentLp, userId, centerId, periodKey, displayName, className, schoolName }: { progressRef: any, currentStats: any, currentLp: number, userId: string, centerId: string, periodKey: string, displayName: string, className?: string, schoolName?: string }) {
   const [stats, setStats] = useState(currentStats);
   const [lp, setLp] = useState(currentLp);
@@ -376,7 +423,7 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
     <Dialog>
       <DialogTrigger asChild>
         <Card className={cn(
-          "group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
+          "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
           isMobile
             ? "rounded-[1.4rem] bg-[radial-gradient(circle_at_top_right,#fde68a_0%,#ffffff_58%,#fffbeb_100%)] shadow-[0_18px_40px_-28px_rgba(245,158,11,0.5)]"
             : "rounded-[1.75rem]"
@@ -388,8 +435,8 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
               <Zap className={cn("text-amber-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
-          <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-4 pb-4" : "")}>
-            <div className={cn("dashboard-number text-amber-600", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
+          <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
+            <div className={cn("dashboard-number text-amber-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
               {Object.values(dailyLpStatus || {}).reduce((acc, curr) => acc + (curr.dailyLpAmount || 0), 0).toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
             </div>
             <div className={cn("flex items-center gap-2 mt-4", isMobile ? "mt-3" : "mt-6")}>
@@ -411,15 +458,15 @@ function LPHistoryDialog({ dailyLpStatus, totalBoost, isMobile }: { dailyLpStatu
           </CardContent>
         </Card>
       </DialogTrigger>
-      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
+      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
           <Sparkles className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter whitespace-nowrap", isMobile ? "text-xl" : "text-3xl")}>포인트 획득 기록</DialogTitle>
+            <DialogTitle className={cn("font-black tracking-tighter break-keep", isMobile ? "text-xl" : "text-3xl")}>포인트 획득 기록</DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 러닝 포인트 내역입니다.</DialogDescription>
           </DialogHeader>
         </div>
-        <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "p-4" : "")}>
+        <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "max-h-[calc(86svh-10.5rem)] p-4" : "")}>
           {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 포인트가 없습니다.</div>) : (
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
@@ -475,7 +522,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Card className={cn(
-          "group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
+          "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
           isMobile
             ? "rounded-[1.4rem] bg-[radial-gradient(circle_at_top_right,#dbeafe_0%,#ffffff_58%,#f7fbff_100%)] shadow-[0_18px_40px_-28px_rgba(37,99,235,0.55)]"
             : "rounded-[1.75rem]"
@@ -487,8 +534,8 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
               <Clock className={cn("text-blue-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
             </div>
           </CardHeader>
-          <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-4 pb-4" : "")}>
-            <div className={cn("dashboard-number text-blue-600", isMobile ? "text-4xl" : "text-6xl sm:text-7xl")}>
+          <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
+            <div className={cn("dashboard-number text-blue-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
               {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>m</span>
             </div>
             <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-2.5 flex-wrap" : "mt-6")}>
@@ -505,7 +552,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
           </CardContent>
         </Card>
       </DialogTrigger>
-      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "max-w-[90vw] rounded-[2rem]" : "")}>
+      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
         <div className={cn("bg-blue-600 text-white relative", isMobile ? "p-6" : "p-10")}>
           <Activity className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
@@ -513,7 +560,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
             <DialogDescription className="text-white/70 font-bold mt-1 text-xs">오늘 완료된 몰입 세션입니다.</DialogDescription>
           </DialogHeader>
         </div>
-        <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "p-4" : "")}>
+        <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "max-h-[calc(86svh-10.5rem)] p-4" : "")}>
           {isLoading ? (
             <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
           ) : !sessions || sessions.length === 0 ? (
@@ -528,7 +575,7 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
                     </div>
                     <div className="grid leading-tight">
                       <span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter whitespace-nowrap">기록됨</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">기록됨</span>
                     </div>
                   </div>
                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-none font-black text-[10px] px-2.5">{session.durationMinutes}분</Badge>
@@ -581,7 +628,7 @@ function StudyTimeTrendDialog({
     <Dialog>
       <DialogTrigger asChild>
         <Card className={cn(
-          "border border-slate-200/80 bg-white rounded-[1.75rem] overflow-hidden transition-colors duration-200 cursor-pointer",
+          "student-cta student-cta-card border border-slate-200/80 bg-white rounded-[1.75rem] overflow-hidden transition-colors duration-200 cursor-pointer",
           isMobile ? "rounded-[1.25rem]" : ""
         )}>
           <CardHeader className={cn("flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-5 pt-5" : "")}>
@@ -618,7 +665,7 @@ function StudyTimeTrendDialog({
         </Card>
       </DialogTrigger>
 
-      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-lg", isMobile ? "max-w-[95vw] rounded-[2rem]" : "")}>
+      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-lg", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "")}>
         <div className={cn("bg-[#14295F] text-white relative", isMobile ? "p-6" : "p-10")}>
           <Activity className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
@@ -629,8 +676,8 @@ function StudyTimeTrendDialog({
           </DialogHeader>
         </div>
 
-        <div className={cn("p-6 space-y-6 bg-white max-h-[70vh] overflow-y-auto custom-scrollbar", isMobile ? "p-4" : "")}>
-          <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-3")}>
+        <div className={cn("p-6 space-y-6 bg-white max-h-[70vh] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4" : "")}>
+          <div className={cn("grid gap-2", isMobile ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-3")}>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">최근 7일 총 공부시간</p>
               <p className="dashboard-number text-2xl text-[#14295F]">{formatMinutesToKorean(totalMinutes)}</p>
@@ -639,7 +686,7 @@ function StudyTimeTrendDialog({
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">평균 학습시간</p>
               <p className="dashboard-number text-2xl text-[#14295F]">{formatMinutesToKorean(avgMinutes)}</p>
             </div>
-            <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 p-3", isMobile ? "col-span-2" : "")}>
+            <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 p-3", isMobile ? "sm:col-span-2" : "")}>
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">오늘 공부시간</p>
               <p className="text-xs font-bold text-slate-700 mt-1">{formatMinutesToKorean(latestMinutes)}</p>
             </div>
@@ -2166,8 +2213,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
       <section className={cn(
-        "relative overflow-hidden text-white border transition-colors duration-200",
-        isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-8"
+        "student-hero-enter relative overflow-hidden text-white border transition-colors duration-200",
+        isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-10"
       )}
       style={{
         borderColor: tierTheme.heroBorder,
@@ -2225,8 +2272,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               type="button"
               disabled={isProcessingAction}
               className={cn(
-                "rounded-2xl font-aggro-display font-black border flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
-                isMobile ? "h-14 text-xl px-8 w-full" : "h-16 px-12 text-2xl",
+                "student-cta rounded-2xl font-aggro-display font-black border flex items-center justify-center gap-2.5 text-center leading-none disabled:opacity-50 disabled:cursor-not-allowed",
+                isMobile ? "min-h-[3.85rem] w-full px-6 text-[1.15rem]" : "h-16 px-12 text-2xl",
                 isTimerActive ? "bg-[#D34A4A] border-[#D34A4A] text-white" : "bg-[#F8FAFF] border-[#E5EBF5] text-primary"
               )}
               onClick={handleStudyStartStop}
@@ -2240,6 +2287,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               )}
             </button>
           </div>
+          {isTimerActive && (
+            <div className={cn("mt-3", isMobile ? "w-full" : "mx-auto w-full max-w-[18rem]")}>
+              <TrackRunnerIllustration isMobile={isMobile} />
+            </div>
+          )}
         </div>
       </section>
 
@@ -2321,7 +2373,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 onClick={() => void handleMissionAction()}
                 disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
                 className={cn(
-                  "rounded-2xl font-black shadow-lg transition-all",
+                  "student-cta rounded-2xl font-black shadow-lg transition-all",
                   isMobile ? "h-12 w-full text-sm" : "h-14 px-8 text-base"
                 )}
               >
@@ -2480,7 +2532,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <DialogTrigger asChild>
           <button type="button" className="text-left h-full w-full touch-manipulation">
               <Card className={cn(
-                "relative h-full min-w-0 border overflow-hidden cursor-pointer transition-all duration-300",
+                "student-cta student-cta-card relative h-full min-w-0 border overflow-hidden cursor-pointer transition-all duration-300",
                 penaltyPoints === 0
                   ? "border-emerald-200 bg-[radial-gradient(circle_at_top_right,#bbf7d0_0%,#ffffff_58%,#f0fdf4_100%)]"
                   : penaltyPoints < 10
@@ -2548,19 +2600,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
             </button>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "max-w-[95vw] rounded-[2rem] h-[85vh]" : "max-h-[90vh]")}>
+          <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-2xl flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "max-h-[90vh]")}>
             <div className={cn("bg-rose-600 text-white relative shrink-0", isMobile ? "p-6" : "p-10")}>
           <ShieldAlert className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
               <DialogHeader>
-                <DialogTitle className={cn("font-black tracking-tighter", isMobile ? "text-3xl" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
+                <DialogTitle className={cn("font-black tracking-tighter break-keep", isMobile ? "text-[1.85rem]" : "text-4xl")}>벌점 및 규정 가이드</DialogTitle>
                 <DialogDescription className="text-white/70 font-bold mt-1 text-sm">벌점은 쌓이지 않게, 성장은 끊기지 않게 관리하세요.</DialogDescription>
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-              <div className={cn("p-10 text-center space-y-6", isMobile ? "p-5" : "")}>
+              <div className={cn("p-10 text-center space-y-6", isMobile ? "max-h-[calc(88svh-10.5rem)] p-5" : "")}>
                 <div className="inline-flex flex-col items-center gap-1">
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">벌점 점수</span>
-                  <h3 className={cn("dashboard-number text-8xl", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
+                  <h3 className={cn("dashboard-number leading-none", isMobile ? "text-[clamp(2.75rem,18vw,4.25rem)]" : "text-8xl", penaltyPoints < 10 ? "text-emerald-500" : "text-rose-600")}>{penaltyPoints}</h3>
                 </div>
                 <Progress value={penaltyPoints * 3.3} className="h-3 bg-muted" />
                 <p className="text-sm font-bold text-slate-600">{penaltyPoints < 10 ? "안정적인 학습 상태입니다!" : "주의가 필요한 단계입니다."}</p>
@@ -2681,7 +2733,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
                 <Card className={cn(
-                  "h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4",
+                  "student-cta student-cta-card h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4",
                   "rounded-2xl p-4",
                   unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
                 )}>
@@ -2690,31 +2742,31 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <div className="grid min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-black tracking-tighter whitespace-nowrap truncate text-sm">선생님 리포트</span>
+                      <span className="font-black tracking-tighter text-sm break-keep">선생님 리포트</span>
                       {unreadReportCount > 0 && (
                         <Badge className="bg-[#FF7A16] text-white border-none font-black text-[8px] h-5 px-2 shrink-0">
                           {unreadReportCount} 새 리포트
                         </Badge>
                       )}
                     </div>
-                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px] whitespace-nowrap">학습 피드백</span>
+                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px]">학습 피드백</span>
                   </div>
                   <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
                 </Card>
               </button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]")}>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-[450px] max-h-[90vh]")}>
               <div className="bg-primary p-8 text-white relative shrink-0">
           <FileText className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-black">{selectedTeacherReport ? `${selectedTeacherReport.dateKey} 리포트` : '선생님 리포트'}</DialogTitle>
+                  <DialogTitle className="text-2xl font-black break-keep">{selectedTeacherReport ? `${selectedTeacherReport.dateKey} 리포트` : '선생님 리포트'}</DialogTitle>
                   <DialogDescription className="text-white/70 font-bold">
                     {selectedTeacherReport ? '선생님이 발송한 리포트 상세 내용입니다.' : '최근에 발송된 리포트를 바로 확인할 수 있어요.'}
                   </DialogDescription>
                 </DialogHeader>
               </div>
 
-              <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6">
+              <div className={cn("flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4" : "")}>
                 {selectedTeacherReport ? (
                   <div className="bg-white rounded-2xl border border-border/50 p-4">
                     <VisualReportViewer content={selectedTeacherReport.content} />
@@ -2778,7 +2830,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         ) : (
             <Link href="/dashboard/student-reports" className="group h-full touch-manipulation">
             <Card className={cn(
-              "h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
+              "student-cta student-cta-card h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
               unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
             )}>
               <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 h-16 w-16">
@@ -2786,14 +2838,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="grid text-left min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-black tracking-tighter whitespace-nowrap truncate text-xl">선생님 리포트</span>
+                  <span className="font-black tracking-tighter text-xl break-keep">선생님 리포트</span>
                   {unreadReportCount > 0 && (
                     <Badge className="bg-[#FF7A16] text-white border-none font-black text-[9px] h-5 px-2 shrink-0">
                       {unreadReportCount} 새 리포트
                     </Badge>
                   )}
                 </div>
-                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px] whitespace-nowrap">학습 피드백</span>
+                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">학습 피드백</span>
               </div>
               <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
             </Card>
@@ -2804,21 +2856,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
               <Card className={cn(
-                "h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4",
+                "student-cta student-cta-card h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4",
                 isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
               )}>
                 <div className={cn("rounded-2xl bg-amber-50 flex items-center justify-center shrink-0", isMobile ? "h-12 w-12" : "h-16 w-16")}>
                   <ClipboardPen className={cn("text-amber-600", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
                 <div className="grid min-w-0">
-                  <span className={cn("font-black tracking-tighter whitespace-nowrap truncate", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
-                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px] whitespace-nowrap")}>빠른 요청</span>
+                  <span className={cn("font-black tracking-tighter break-keep", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
+                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>빠른 요청</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
               </Card>
             </button>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+          <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
             <div className="bg-amber-500 p-8 text-white relative shrink-0">
           <BellRing className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
@@ -2827,9 +2879,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-              <div className="p-8 space-y-8">
+              <div className={cn("p-8 space-y-8", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4 space-y-5" : "")}>
                 <div className="grid gap-6 bg-white p-6 rounded-[2rem] border">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
                     <div className="space-y-1.5">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">신청 종류</Label>
                       <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
@@ -2869,7 +2921,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </div>
             </div>
-            <DialogFooter className="p-6 border-t shrink-0 bg-white"><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
+            <DialogFooter className={cn("border-t shrink-0 bg-white", isMobile ? "p-4" : "p-6")}><DialogClose asChild><Button variant="ghost" className="w-full font-black">닫기</Button></DialogClose></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -2893,30 +2945,30 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <button
                 type="button"
                 className={cn(
-                  "w-full rounded-2xl border border-slate-200/80 bg-white font-black gap-2 flex items-center justify-center text-primary transition-colors hover:bg-slate-50",
+                  "student-cta w-full rounded-2xl border border-slate-200/80 bg-white font-black gap-2 flex items-center justify-center text-primary transition-colors hover:bg-slate-50",
                   isMobile ? "h-12 text-sm" : "h-14 text-base"
                 )}
               >
                 <QrCode className="h-4 w-4" /> 나의 출입 QR
               </button>
             </DialogTrigger>
-            <DialogContent className="rounded-[3rem] p-0 overflow-hidden border border-slate-200 sm:max-w-sm">
-              <div className="bg-primary p-8 text-white text-center">
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 sm:max-w-sm", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
+              <div className={cn("bg-primary p-8 text-white text-center", isMobile ? "p-6" : "")}>
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black tracking-tighter text-white">나의 출입 QR</DialogTitle>
                   <DialogDescription className="text-white/70 font-bold mt-1">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
                 </DialogHeader>
               </div>
-              <div className="p-10 bg-white flex flex-col items-center gap-6">
-                <div className="p-6 rounded-[2rem] bg-[#fafafa] border border-primary/15">
-                  <QRCodeSVG value={qrData} size={200} level="H" includeMargin={false} />
+              <div className={cn("bg-white flex flex-col items-center gap-6", isMobile ? "p-5" : "p-10")}>
+                <div className={cn("rounded-[2rem] bg-[#fafafa] border border-primary/15", isMobile ? "p-4" : "p-6")}>
+                  <QRCodeSVG value={qrData} size={isMobile ? 176 : 200} level="H" includeMargin={false} />
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="font-black text-primary text-xl tracking-tight">{user?.displayName}</p>
+                  <p className={cn("font-black text-primary tracking-tight break-keep", isMobile ? "text-lg" : "text-xl")}>{user?.displayName}</p>
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">출입 인증용</p>
                 </div>
               </div>
-              <DialogFooter className="p-6 bg-muted/30">
+              <DialogFooter className={cn("bg-muted/30", isMobile ? "p-4" : "p-6")}>
                 <DialogClose asChild><Button className="w-full h-12 rounded-xl font-black">닫기</Button></DialogClose>
               </DialogFooter>
             </DialogContent>

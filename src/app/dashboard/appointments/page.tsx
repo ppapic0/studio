@@ -692,20 +692,20 @@ export function AppointmentsPageContent({
         ) : isStudent && (
           <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
             <DialogTrigger asChild>
-              <Button size="lg" className={cn("rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-[340px] h-14" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
+              <Button size="lg" className={cn("student-cta rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
                 <CalendarPlus className="h-5 w-5" /> 새 상담 신청
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[380px]" : "sm:max-w-md")}>
-              <div className={cn("p-10 text-white relative", `bg-gradient-to-br ${currentTier.gradient}`)}>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
+              <div className={cn("text-white relative", isMobile ? "p-6" : "p-10", `bg-gradient-to-br ${currentTier.gradient}`)}>
                 <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
                 <DialogHeader>
-                  <DialogTitle className="text-3xl font-black tracking-tighter text-left">상담 신청</DialogTitle>
+                  <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
                   <DialogDescription className="text-white/70 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
                 </DialogHeader>
               </div>
-              <div className="p-8 space-y-6 bg-white max-h-[60vh] overflow-y-auto custom-scrollbar">
-                <div className="grid grid-cols-2 gap-4">
+              <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
+                <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
                     <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
@@ -745,7 +745,7 @@ export function AppointmentsPageContent({
                   />
                 </div>
               </div>
-              <DialogFooter className="p-8 bg-muted/30">
+              <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
                 <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white", `bg-gradient-to-br ${currentTier.gradient}`)}>
                   {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 신청 완료'}
                 </Button>
@@ -867,20 +867,20 @@ export function AppointmentsPageContent({
 
       <Tabs value={activeTab} onValueChange={(value) => !showAll && setActiveTab(value as AppointmentTab)} className="w-full flex flex-col items-center">
         {!showAll && (
-          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-4" : isStudent ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-14 max-w-[340px]" : isStaff ? "h-16 max-w-3xl mx-auto" : isStudent ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
-            <TabsTrigger value="reservations" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-4" : isStudent ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-auto max-w-full gap-1" : isStaff ? "h-16 max-w-3xl mx-auto" : isStudent ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
+            <TabsTrigger value="reservations" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
               <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
             </TabsTrigger>
-            <TabsTrigger value="logs" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+            <TabsTrigger value="logs" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
               <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
             </TabsTrigger>
             {(isStudent || isStaff) && (
-              <TabsTrigger value="inquiries" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+              <TabsTrigger value="inquiries" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
                 <MessageSquare className="h-4 w-4" /> <span className="text-xs sm:text-sm">질문/건의</span>
               </TabsTrigger>
             )}
             {isStaff && (
-              <TabsTrigger value="parent" className="rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all">
+              <TabsTrigger value="parent" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
                 <ClipboardCheck className="h-4 w-4" /> <span className="text-xs sm:text-sm">학부모 요청</span>
               </TabsTrigger>
             )}
@@ -908,12 +908,12 @@ export function AppointmentsPageContent({
                     <div key={res.id} className={cn("flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4", isMobile ? "p-5" : "p-6 sm:p-8")}>
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
                         <div className={cn("rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
-                          <span className={cn("font-black text-primary/60 group-hover:text-white/60 tracking-tighter whitespace-nowrap", isMobile ? "text-[8px]" : "text-[10px]")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
+                          <span className={cn("font-black text-primary/60 group-hover:text-white/60 tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
                           <span className={cn("font-black text-primary group-hover:text-white leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
                         </div>
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={cn("font-black tracking-tight whitespace-nowrap", isMobile ? "text-sm" : "text-base sm:text-lg")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
+                            <h3 className={cn("font-black tracking-tight break-keep", isMobile ? "text-sm" : "text-base sm:text-lg")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
                             {getStatusBadge(res.status)}
                           </div>
                           <p className={cn("font-bold text-muted-foreground flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs")}>
@@ -974,7 +974,7 @@ export function AppointmentsPageContent({
           <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
             <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
               <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col" : "flex-row")}>
-                <CardTitle className={cn("font-black text-emerald-700 flex items-center gap-3 whitespace-nowrap", isMobile ? "text-lg" : "text-xl")}>
+                <CardTitle className={cn("font-black text-emerald-700 flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
                   <CheckCircle2 className="h-6 w-6 opacity-60" /> 피드백 및 결과 일지
                 </CardTitle>
                 
@@ -1023,7 +1023,7 @@ export function AppointmentsPageContent({
                               <Clock className="h-3 w-3 opacity-40" />
                               {log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd') : ''}
                             </span>
-                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] px-2 py-0.5 whitespace-nowrap">
+                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] px-2 py-0.5">
                               {log.createdAt ? getSeasonName(log.createdAt.toDate()) : ''}
                             </Badge>
                             {!isStudent && (
@@ -1045,7 +1045,7 @@ export function AppointmentsPageContent({
                               </Badge>
                             )}
                           </div>
-                          {!isMobile && <span className="text-[8px] font-black text-primary/30 tracking-[0.3em] whitespace-nowrap">상담 로그</span>}
+                          {!isMobile && <span className="text-[8px] font-black text-primary/30 tracking-[0.3em]">상담 로그</span>}
                         </div>
                         
                         <div className="space-y-3">
@@ -1093,7 +1093,7 @@ export function AppointmentsPageContent({
           <TabsContent value="inquiries" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
             <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
               <CardHeader className={cn("bg-sky-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
-                <CardTitle className={cn("font-black text-sky-700 flex items-center gap-3 whitespace-nowrap", isMobile ? "text-lg" : "text-xl")}>
+                <CardTitle className={cn("font-black text-sky-700 flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
                   <MessageSquare className="h-6 w-6 opacity-60" /> 질문/건의함
                 </CardTitle>
                 <CardDescription className="font-bold text-xs mt-1">궁금한 점이나 건의사항을 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
@@ -1190,7 +1190,7 @@ export function AppointmentsPageContent({
             <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
               <CardHeader className={cn("bg-blue-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
                 <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-stretch" : "flex-row")}>
-                  <CardTitle className={cn("font-black text-blue-700 flex items-center gap-3 whitespace-nowrap", isMobile ? "text-lg" : "text-xl")}>
+                  <CardTitle className={cn("font-black text-blue-700 flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
                     <ClipboardCheck className="h-6 w-6 opacity-60" /> 상담 문의함
                   </CardTitle>
                   <div className={cn("flex items-center gap-2", isMobile ? "w-full flex-col" : "w-auto")}>
@@ -1314,14 +1314,14 @@ export function AppointmentsPageContent({
       </Tabs>
 
       <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
-        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl sm:max-w-md">
+        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl", isMobile ? "w-[min(94vw,28rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
           <div className="bg-emerald-600 p-8 text-white relative">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tighter">상담 일지 작성</DialogTitle>
               <DialogDescription className="text-white/70 font-bold">상담 후 피드백을 기록하세요.</DialogDescription>
             </DialogHeader>
           </div>
-          <div className="p-8 space-y-5 bg-white">
+          <div className={cn("space-y-5 bg-white", isMobile ? "max-h-[calc(86svh-9rem)] overflow-y-auto p-5" : "p-8")}>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 유형</label>
               <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
@@ -1342,7 +1342,7 @@ export function AppointmentsPageContent({
               <Input placeholder="학생이 수행할 과제나 개선점" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className="rounded-xl h-12 border-2" />
             </div>
           </div>
-          <DialogFooter className="p-8 bg-muted/30">
+          <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
             <Button onClick={handleSaveCounselLog} disabled={isSubmitting || !logContent.trim()} className="w-full h-14 rounded-2xl font-black bg-emerald-600 text-white shadow-xl">
               {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 완료 및 일지 저장'}
             </Button>

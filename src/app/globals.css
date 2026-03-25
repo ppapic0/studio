@@ -479,6 +479,76 @@
     @apply transition-all duration-200 ease-in-out active:scale-95;
   }
 
+  .student-cta {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    transition:
+      transform 180ms ease-out,
+      box-shadow 180ms ease-out,
+      border-color 180ms ease-out,
+      background-color 180ms ease-out,
+      color 180ms ease-out;
+    box-shadow:
+      0 10px 26px -18px rgba(20, 41, 95, 0.55),
+      0 2px 8px rgba(20, 41, 95, 0.08);
+  }
+
+  .student-cta::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, transparent 22%, rgba(255,255,255,0.16) 48%, transparent 76%);
+    transform: translateX(-135%);
+    transition: transform 620ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  }
+
+  .student-cta-card {
+    border-color: rgba(20, 41, 95, 0.09);
+    background-image: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,255,0.98) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.96) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 8px 20px -16px rgba(20,41,95,0.38),
+      0 18px 36px -28px rgba(20,41,95,0.42);
+  }
+
+  .student-hero-enter {
+    animation: fade-up-pop 0.5s cubic-bezier(0.2, 0.9, 0.2, 1);
+  }
+
+  .track-runner-shell {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .track-runner {
+    transform-origin: center;
+    animation: track-runner-bob 1.8s ease-in-out infinite;
+  }
+
+  .track-runner-arm-front,
+  .track-runner-leg-back {
+    transform-origin: 50% 12%;
+    animation: track-runner-swing 0.9s ease-in-out infinite;
+  }
+
+  .track-runner-arm-back,
+  .track-runner-leg-front {
+    transform-origin: 50% 12%;
+    animation: track-runner-swing 0.9s ease-in-out infinite reverse;
+  }
+
+  .track-runner-path {
+    stroke-dasharray: 10 10;
+    animation: track-runner-path 1.3s linear infinite;
+  }
+
+  .track-runner-spark {
+    animation: track-runner-spark 1.5s ease-in-out infinite;
+  }
+
   @media (hover: hover) {
     .marketing-card,
     .marketing-card-soft,
@@ -515,6 +585,17 @@
 
     .interactive-button:hover {
       @apply scale-105;
+    }
+
+    .student-cta:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 16px 28px -20px rgba(20, 41, 95, 0.58),
+        0 8px 18px -16px rgba(255, 122, 22, 0.48);
+    }
+
+    .student-cta:hover::after {
+      transform: translateX(135%);
     }
   }
 
@@ -767,19 +848,24 @@
 
 /* iPhone 15 baseline shell for app mode */
 .dashboard-mobile-shell {
-  width: 393px;
+  width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
   max-width: calc(100vw - 0.75rem);
-  height: 852px;
+  height: min(53.25rem, calc(100svh - 0.75rem));
+  min-height: min(43rem, calc(100svh - 0.75rem));
   max-height: calc(100svh - 0.75rem);
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main {
   min-height: 0;
-  padding: 1rem 0.95rem 5.75rem;
+  padding: 1rem 0.95rem calc(6.45rem + env(safe-area-inset-bottom, 0px));
   gap: 0.95rem;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
+}
+
+.dashboard-mobile-nav-wrap {
+  padding: 0 0.35rem 0.35rem;
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"]:not(.tier-hero-card) {
@@ -851,6 +937,19 @@
   background-color: rgba(247, 250, 255, 0.96);
 }
 
+.dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"].dashboard-mobile-roomy [data-slot="card-header"] {
+  padding: 1.15rem 1.15rem 0.7rem;
+}
+
+.dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"].dashboard-mobile-roomy [data-slot="card-content"] {
+  padding: 1.15rem;
+  padding-top: 0;
+}
+
+.dashboard-mobile-shell .dashboard-mobile-main [data-slot="card"].dashboard-mobile-roomy [data-slot="card-footer"] {
+  padding: 0 1.15rem 1.15rem;
+}
+
 @media (max-width: 480px) {
   .dashboard-mobile-shell {
     width: 100%;
@@ -917,13 +1016,54 @@
 
 @media (max-height: 760px) and (max-width: 480px) {
   .dashboard-mobile-shell {
-    height: calc(100svh - 0.35rem);
+    height: min(100svh - 0.35rem, 49rem);
     margin-top: 0.15rem;
   }
 
   .dashboard-mobile-main {
     padding-top: 0.85rem;
-    padding-bottom: 5.15rem;
+    padding-bottom: calc(5.45rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@keyframes track-runner-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes track-runner-swing {
+  0%,
+  100% {
+    transform: rotate(18deg);
+  }
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+
+@keyframes track-runner-path {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -40;
+  }
+}
+
+@keyframes track-runner-spark {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0) scale(0.92);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate3d(-3px, -4px, 0) scale(1.08);
   }
 }
 
@@ -975,7 +1115,20 @@
 @media (prefers-reduced-motion: reduce) {
   .fade-up-pop,
   .soft-glow,
-  .float-spark {
+  .float-spark,
+  .student-hero-enter,
+  .track-runner,
+  .track-runner-arm-front,
+  .track-runner-arm-back,
+  .track-runner-leg-front,
+  .track-runner-leg-back,
+  .track-runner-path,
+  .track-runner-spark {
     animation: none !important;
+  }
+
+  .student-cta,
+  .student-cta::after {
+    transition: none !important;
   }
 }
