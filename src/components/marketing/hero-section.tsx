@@ -24,6 +24,64 @@ function renderTitleLine(line: string) {
 
 export function HeroSection({ brand }: HeroSectionProps) {
   const heroTitleLines = brand.heroTitle.split('\n');
+  const heroFireworks = [
+    {
+      className: 'right-[10%] top-[7%] h-44 w-44 sm:h-56 sm:w-56 lg:h-72 lg:w-72',
+      ringColor: 'rgba(255,188,126,0.34)',
+      coreColor: 'rgba(255,136,48,0.28)',
+      delay: '0.2s',
+      duration: '7.8s',
+      opacity: 0.44,
+    },
+    {
+      className: 'left-[16%] top-[26%] h-20 w-20 sm:h-28 sm:w-28 lg:h-32 lg:w-32',
+      ringColor: 'rgba(255,170,102,0.3)',
+      coreColor: 'rgba(255,214,168,0.18)',
+      delay: '1.8s',
+      duration: '6.3s',
+      opacity: 0.3,
+    },
+    {
+      className: 'left-[9%] bottom-[18%] h-16 w-16 sm:h-24 sm:w-24 lg:h-28 lg:w-28',
+      ringColor: 'rgba(112,162,255,0.2)',
+      coreColor: 'rgba(255,160,84,0.16)',
+      delay: '3.1s',
+      duration: '8.6s',
+      opacity: 0.2,
+    },
+  ];
+  const heroParticles = [
+    {
+      className: 'left-[20%] top-[17%] h-1.5 w-1.5 sm:h-2 sm:w-2',
+      color: 'rgba(255,206,160,0.92)',
+      delay: '0.4s',
+      duration: '3.8s',
+    },
+    {
+      className: 'right-[23%] top-[20%] h-2 w-2 sm:h-2.5 sm:w-2.5',
+      color: 'rgba(255,153,62,0.88)',
+      delay: '1.4s',
+      duration: '4.6s',
+    },
+    {
+      className: 'left-[27%] bottom-[24%] h-1.5 w-1.5 sm:h-2 sm:w-2',
+      color: 'rgba(158,199,255,0.72)',
+      delay: '2.2s',
+      duration: '4.1s',
+    },
+    {
+      className: 'right-[15%] bottom-[28%] h-1.5 w-1.5 sm:h-2 sm:w-2',
+      color: 'rgba(255,188,126,0.84)',
+      delay: '0.9s',
+      duration: '3.5s',
+    },
+    {
+      className: 'right-[30%] top-[31%] h-1 w-1 sm:h-1.5 sm:w-1.5',
+      color: 'rgba(255,255,255,0.82)',
+      delay: '2.8s',
+      duration: '4.9s',
+    },
+  ];
 
   return (
     <section
@@ -39,31 +97,55 @@ export function HeroSection({ brand }: HeroSectionProps) {
       </div>
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute left-[12%] top-[16%] h-28 w-28 rounded-full bg-[#FF7A16]/10 blur-3xl sm:h-36 sm:w-36" />
-        <div className="absolute right-[16%] top-[10%] h-36 w-36 rounded-full bg-[#FF9A47]/12 blur-3xl sm:h-44 sm:w-44 lg:h-56 lg:w-56" />
-        <div className="absolute right-[10%] top-[8%] h-40 w-40 rounded-full bg-[#FF7A16]/8 blur-[90px] sm:h-52 sm:w-52 lg:h-72 lg:w-72" />
         <div
-          className="absolute right-[12%] top-[8%] h-44 w-44 opacity-35 sm:h-56 sm:w-56 lg:h-72 lg:w-72"
-          style={{
-            background:
-              'repeating-conic-gradient(from 0deg, rgba(255,188,126,0.28) 0deg 4deg, transparent 4deg 18deg)',
-            WebkitMaskImage:
-              'radial-gradient(circle, transparent 0%, transparent 30%, black 42%, transparent 70%)',
-            maskImage:
-              'radial-gradient(circle, transparent 0%, transparent 30%, black 42%, transparent 70%)',
-          }}
+          className="hero-orb-drift absolute left-[12%] top-[16%] h-28 w-28 rounded-full bg-[#FF7A16]/10 blur-3xl sm:h-36 sm:w-36"
+          style={{ animationDelay: '-1.4s', animationDuration: '9.2s' }}
         />
         <div
-          className="absolute left-[18%] top-[28%] h-24 w-24 opacity-22 sm:h-28 sm:w-28"
-          style={{
-            background:
-              'repeating-conic-gradient(from 0deg, rgba(255,170,102,0.3) 0deg 5deg, transparent 5deg 20deg)',
-            WebkitMaskImage:
-              'radial-gradient(circle, transparent 0%, transparent 24%, black 40%, transparent 72%)',
-            maskImage:
-              'radial-gradient(circle, transparent 0%, transparent 24%, black 40%, transparent 72%)',
-          }}
+          className="hero-orb-drift absolute right-[16%] top-[10%] h-36 w-36 rounded-full bg-[#FF9A47]/12 blur-3xl sm:h-44 sm:w-44 lg:h-56 lg:w-56"
+          style={{ animationDelay: '-0.5s', animationDuration: '10.8s' }}
         />
+        <div
+          className="hero-orb-drift absolute right-[10%] top-[8%] h-40 w-40 rounded-full bg-[#FF7A16]/8 blur-[90px] sm:h-52 sm:w-52 lg:h-72 lg:w-72"
+          style={{ animationDelay: '-2.2s', animationDuration: '12.4s' }}
+        />
+        {heroFireworks.map((firework) => (
+          <div
+            key={firework.className}
+            className={`hero-firework absolute ${firework.className}`}
+            style={{
+              opacity: firework.opacity,
+              animationDelay: firework.delay,
+              animationDuration: firework.duration,
+              background: `repeating-conic-gradient(from 0deg, ${firework.ringColor} 0deg 4deg, transparent 4deg 18deg)`,
+              WebkitMaskImage:
+                'radial-gradient(circle, transparent 0%, transparent 28%, black 42%, transparent 72%)',
+              maskImage:
+                'radial-gradient(circle, transparent 0%, transparent 28%, black 42%, transparent 72%)',
+            }}
+          >
+            <div
+              className="hero-firework-core absolute inset-[34%] rounded-full blur-md"
+              style={{
+                animationDelay: firework.delay,
+                animationDuration: firework.duration,
+                background: `radial-gradient(circle, ${firework.coreColor} 0%, transparent 76%)`,
+              }}
+            />
+          </div>
+        ))}
+        {heroParticles.map((particle) => (
+          <span
+            key={particle.className}
+            className={`hero-particle-twinkle absolute rounded-full ${particle.className}`}
+            style={{
+              background: particle.color,
+              boxShadow: `0 0 18px ${particle.color}`,
+              animationDelay: particle.delay,
+              animationDuration: particle.duration,
+            }}
+          />
+        ))}
         <div
           className="absolute bottom-[-6%] right-[-12%] h-[320px] w-[320px] sm:bottom-[-8%] sm:right-[-8%] sm:h-[420px] sm:w-[420px] md:bottom-[-10%] md:right-[-5%] md:h-[520px] md:w-[520px] lg:bottom-[-12%] lg:right-[-3%] lg:h-[680px] lg:w-[680px]"
           style={{ opacity: 0.11 }}
