@@ -43,6 +43,15 @@ export type AppScreenPreview = {
   image?: string;
 };
 
+export type WebAppShowcaseScreen = {
+  mode: string;
+  title: string;
+  summary: string;
+  highlights: string[];
+  image?: string;
+  alt: string;
+};
+
 export type AppDataStory = {
   eyebrow: string;
   title: string;
@@ -109,6 +118,11 @@ export type MarketingContent = {
     description: string;
     features: MarketingCard[];
     seatTypes: MarketingCard[];
+  };
+  webAppShowcase: {
+    heading: string;
+    description: string;
+    screens: WebAppShowcaseScreen[];
   };
   appSystem: {
     heading: string;
@@ -283,6 +297,29 @@ export const marketingContent: MarketingContent = {
       {
         title: '프라이버시 보호형 좌석',
         description: '개인별 집중 공간을 확보해 외부 자극을 줄이고, 각자의 루틴을 흔들림 없이 이어갈 수 있도록 돕습니다.',
+      },
+    ],
+  },
+  webAppShowcase: {
+    heading: '실제 화면으로 보는 트랙 웹앱',
+    description:
+      '주저리주저리 설명하지 않고, 학생과 학부모가 실제로 어떤 화면으로 관리되는지 먼저 보여드립니다.',
+    screens: [
+      {
+        mode: '학생 모드',
+        title: '학생은 오늘 해야 할 일과 루틴을 한 화면에서 확인합니다',
+        summary:
+          '막연하게 공부를 시작하지 않도록, 오늘 할 일과 공부시간, 피드백을 한 흐름으로 보여주는 학생용 화면입니다. 확인하고 끝나는 것이 아니라 바로 다음 행동으로 이어지게 설계했습니다.',
+        highlights: ['오늘 할 일', '루틴 확인', '공부시간', '피드백 반영'],
+        alt: '학생 모드 실제 스크린샷 예정 자리',
+      },
+      {
+        mode: '학부모 모드',
+        title: '학부모는 출결과 공부 흐름을 빠르게 확인합니다',
+        summary:
+          '출결, 공부시간, 리포트가 따로 놀지 않도록 한 화면 흐름으로 보여주는 학부모용 화면입니다. 짧은 시간 안에도 학생의 현재 상태와 변화 방향을 파악할 수 있게 설계했습니다.',
+        highlights: ['출결 상태', '공부시간', '리포트 확인', '상담 연결'],
+        alt: '학부모 모드 실제 스크린샷 예정 자리',
       },
     ],
   },

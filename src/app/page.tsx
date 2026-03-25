@@ -1,4 +1,3 @@
-import { AppSystemSection } from '@/components/marketing/app-system-section';
 import { ConsultSection } from '@/components/marketing/consult-section';
 import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
 import { HeroSection } from '@/components/marketing/hero-section';
@@ -10,6 +9,7 @@ import { MarketingPageTracker } from '@/components/marketing/marketing-page-trac
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StickyConsultCTA } from '@/components/marketing/sticky-consult-cta';
+import { WebAppShowcaseSection } from '@/components/marketing/web-app-showcase-section';
 import { marketingContent } from '@/lib/marketing-content';
 
 export default function HomePage() {
@@ -28,7 +28,7 @@ export default function HomePage() {
         <DataAnalyticsPreviewSection />
       </ScrollReveal>
       <ScrollReveal>
-        <AppSystemSection appSystem={marketingContent.appSystem} />
+        <WebAppShowcaseSection webAppShowcase={marketingContent.webAppShowcase} />
       </ScrollReveal>
       <ScrollReveal>
         <KoreanClassSection />
