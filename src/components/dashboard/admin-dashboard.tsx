@@ -1342,10 +1342,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <section className="px-1">
             <CenterAdminHeatmap
               title="운영 히트맵"
-              description="운영 KPI, 학부모 반응, 위험 인텔리전스, 수납, 운영 효율을 같은 건강도 체계로 확인합니다."
+              description="운영 KPI, 학부모 반응, 위험 인텔리전스, 수납, 운영 효율을 같은 건강도 체계로 보고, 같은 점수가 실시간 교실 좌석에도 바로 반영됩니다."
               rows={adminHeatmapRows}
               isLoading={adminHeatmapLoading}
               variant="full"
+              actionHref="/dashboard/teacher"
+              actionLabel="실시간 교실 이동"
             />
           </section>
 

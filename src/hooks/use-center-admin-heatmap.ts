@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { format, subDays } from 'date-fns';
+import { endOfDay, format, startOfDay, subDays } from 'date-fns';
 import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
@@ -22,10 +22,23 @@ import {
   scoreParentVisitHealth,
   type CenterAdminHeatmapRow,
 } from '@/lib/center-admin-heatmap';
+import {
+  buildCenterAdminPrimaryChip,
+  buildCenterAdminSecondaryFlags,
+  buildCenterAdminSeatLegend,
+  buildCenterAdminSeatOverlaySummary,
+  buildCenterAdminTopReason,
+  scoreStudentInvoiceHealth,
+  type CenterAdminSeatOverlayLegend,
+  type CenterAdminSeatOverlaySummary,
+  type CenterAdminStudentSeatSignal,
+} from '@/lib/center-admin-seat-heatmap';
 import { getInvoiceMonth } from '@/lib/invoice-analytics';
+import { resolveSeatIdentity } from '@/lib/seat-layout';
 import type {
   AttendanceCurrent,
   CenterMembership,
+  CounselingReservation,
   DailyReport,
   DailyStudentStat,
   GrowthProgress,
@@ -45,6 +58,11 @@ type UseCenterAdminHeatmapOptions = {
   centerId?: string;
   isActive: boolean;
   selectedClass?: string;
+};
+
+type ResolvedAttendanceSeat = AttendanceCurrent & {
+  roomId: string;
+  roomSeatNo: number;
 };
 
 function toMillis(value: unknown) {
@@ -82,6 +100,41 @@ function sumInvoiceWindow(invoices: Invoice[]) {
     },
     { billed: 0, collected: 0, arrears: 0 }
   );
+}
+
+function scoreAttendanceStatus(status?: AttendanceCurrent['status']) {
+  if (status === 'studying') return 100;
+  if (status === 'away' || status === 'break') return 55;
+  return 25;
+}
+
+function scoreReportRegularity(studentReports: DailyReport[], nowMs: number) {
+  const latestReport = [...studentReports]
+    .filter((report) => report.status === 'sent')
+    .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt))[0];
+
+  if (!latestReport) return 75;
+
+  const ageMs = Math.max(0, nowMs - toMillis(latestReport.updatedAt || latestReport.createdAt));
+  const ageDays = ageMs / (24 * 60 * 60 * 1000);
+  if (ageDays <= 1) return 95;
+  if (ageDays <= 3) return 82;
+  if (ageDays <= 7) return 68;
+  return 45;
+}
+
+function scoreCommentDensity(studentReports: DailyReport[]) {
+  const latestReport = [...studentReports]
+    .filter((report) => report.status === 'sent')
+    .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt))[0];
+
+  if (!latestReport) return 75;
+
+  const contentLength = (latestReport.content || '').trim().length;
+  if (contentLength >= 280) return 95;
+  if (contentLength >= 180) return 82;
+  if (contentLength >= 100) return 68;
+  return 45;
 }
 
 export function useCenterAdminHeatmap({
@@ -123,6 +176,20 @@ export function useCenterAdminHeatmap({
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
+  const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(
+    () =>
+      (attendanceList || []).map((seat) => {
+        const identity = resolveSeatIdentity(seat);
+        return {
+          ...seat,
+          roomId: identity.roomId,
+          roomSeatNo: identity.roomSeatNo,
+          seatNo: identity.seatNo,
+        };
+      }),
+    [attendanceList]
+  );
+
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isActive) return null;
     return query(
@@ -145,6 +212,16 @@ export function useCenterAdminHeatmap({
     return collection(firestore, 'centers', centerId, 'parentCommunications');
   }, [firestore, centerId, isActive]);
   const { data: parentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationEntry>(parentCommunicationsQuery, { enabled: isActive });
+
+  const appointmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isActive) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingReservations'),
+      where('scheduledAt', '>=', Timestamp.fromDate(startOfDay(today))),
+      where('scheduledAt', '<=', Timestamp.fromDate(endOfDay(today)))
+    );
+  }, [firestore, centerId, isActive, today]);
+  const { data: todayAppointments, isLoading: appointmentsLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
 
   const kpiQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isActive) return null;
@@ -213,6 +290,8 @@ export function useCenterAdminHeatmap({
     return (activeMembers || []).filter((member) => selectedClass === 'all' || member.className === selectedClass);
   }, [activeMembers, selectedClass]);
 
+  const allActiveMembers = useMemo(() => activeMembers || [], [activeMembers]);
+  const allActiveMemberIds = useMemo(() => new Set(allActiveMembers.map((member) => member.id)), [allActiveMembers]);
   const targetMemberIds = useMemo(() => new Set(filteredMembers.map((member) => member.id)), [filteredMembers]);
   const progressById = useMemo(
     () =>
@@ -233,11 +312,94 @@ export function useCenterAdminHeatmap({
     return nextMap;
   }, [dailyReports, targetMemberIds]);
 
+  const reportsByStudentId = useMemo(() => {
+    const nextMap = new Map<string, DailyReport[]>();
+    (dailyReports || []).forEach((report) => {
+      if (!allActiveMemberIds.has(report.studentId)) return;
+      const bucket = nextMap.get(report.studentId) || [];
+      bucket.push(report);
+      nextMap.set(report.studentId, bucket);
+    });
+
+    nextMap.forEach((items, studentId) => {
+      nextMap.set(
+        studentId,
+        [...items].sort((a, b) => toMillis(b.updatedAt || b.createdAt) - toMillis(a.updatedAt || a.createdAt))
+      );
+    });
+
+    return nextMap;
+  }, [allActiveMemberIds, dailyReports]);
+
   const kpiByDate = useMemo(() => new Map((kpiHistory || []).map((item) => [item.date, item])), [kpiHistory]);
 
   const currentMonthInvoices = useMemo(() => {
     return (invoices || []).filter((invoice) => getInvoiceMonth(invoice) === currentMonth);
   }, [invoices, currentMonth]);
+
+  const currentMonthInvoiceByStudentId = useMemo(() => {
+    const nextMap = new Map<string, Invoice>();
+    currentMonthInvoices.forEach((invoice) => {
+      if (!allActiveMemberIds.has(invoice.studentId)) return;
+      const current = nextMap.get(invoice.studentId);
+      if (
+        !current ||
+        toMillis(invoice.updatedAt) > toMillis(current.updatedAt) ||
+        toMillis(invoice.cycleEndDate) > toMillis(current.cycleEndDate)
+      ) {
+        nextMap.set(invoice.studentId, invoice);
+      }
+    });
+    return nextMap;
+  }, [allActiveMemberIds, currentMonthInvoices]);
+
+  const attendanceByStudentId = useMemo(() => {
+    const nextMap = new Map<string, ResolvedAttendanceSeat>();
+    resolvedAttendanceList.forEach((seat) => {
+      if (!seat.studentId) return;
+      nextMap.set(seat.studentId, seat);
+    });
+    return nextMap;
+  }, [resolvedAttendanceList]);
+
+  const todayStatsByStudentId = useMemo(
+    () => new Map(((statsByDate[todayKey] || []) as DailyStudentStat[]).map((item) => [item.studentId, item])),
+    [statsByDate, todayKey]
+  );
+
+  const parentEvents30dByStudentId = useMemo(() => {
+    const nextMap = new Map<string, ParentActivityEvent[]>();
+    (parentActivityEvents || []).forEach((event) => {
+      if (!allActiveMemberIds.has(event.studentId)) return;
+      if (toMillis(event.createdAt) < thirtyDaysAgoMs) return;
+      const bucket = nextMap.get(event.studentId) || [];
+      bucket.push(event);
+      nextMap.set(event.studentId, bucket);
+    });
+    return nextMap;
+  }, [allActiveMemberIds, parentActivityEvents, thirtyDaysAgoMs]);
+
+  const parentCommunications30dByStudentId = useMemo(() => {
+    const nextMap = new Map<string, ParentCommunicationEntry[]>();
+    (parentCommunications || []).forEach((item) => {
+      if (!item.studentId || !allActiveMemberIds.has(item.studentId)) return;
+      if (toMillis(item.createdAt) < thirtyDaysAgoMs) return;
+      const bucket = nextMap.get(item.studentId) || [];
+      bucket.push(item);
+      nextMap.set(item.studentId, bucket);
+    });
+    return nextMap;
+  }, [allActiveMemberIds, parentCommunications, thirtyDaysAgoMs]);
+
+  const counselingTodayStudentIds = useMemo(() => {
+    const ids = new Set<string>();
+    (todayAppointments || []).forEach((appointment) => {
+      if (allActiveMemberIds.has(appointment.studentId)) {
+        ids.add(appointment.studentId);
+      }
+    });
+    return ids;
+  }, [allActiveMemberIds, todayAppointments]);
 
   const summary = useMemo(() => {
     const totalStudents = filteredMembers.length;
@@ -672,6 +834,144 @@ export function useCenterAdminHeatmap({
     ];
   }, [summary, trendByArea]);
 
+  const studentSignals = useMemo<CenterAdminStudentSeatSignal[]>(() => {
+    const nowMs = Date.now();
+
+    return allActiveMembers
+      .map((member) => {
+        const seat = attendanceByStudentId.get(member.id);
+        if (!seat || !seat.studentId) return null;
+
+        const stat = todayStatsByStudentId.get(member.id);
+        const progress = progressById.get(member.id);
+        const studentReports = (reportsByStudentId.get(member.id) || []).filter((report) => report.status === 'sent');
+        const latestInvoice = currentMonthInvoiceByStudentId.get(member.id);
+        const invoiceStatus = latestInvoice?.status || 'none';
+        const parentEvents = parentEvents30dByStudentId.get(member.id) || [];
+        const parentCommunicationsByStudent = parentCommunications30dByStudentId.get(member.id) || [];
+        const appVisits = parentEvents.filter((event) => event.eventType === 'app_visit').length;
+        const consultationCount = Math.max(
+          parentEvents.filter((event) => event.eventType === 'consultation_request').length,
+          parentCommunicationsByStudent.filter((item) => item.type === 'consultation').length
+        );
+        const viewedReports = studentReports.filter((report) => report.viewedAt).length;
+        const hasUnreadReport = studentReports.length > 0 && viewedReports < studentReports.length;
+        const hasCounselingToday = counselingTodayStudentIds.has(member.id);
+        const liveStudyMinutes =
+          seat.status === 'studying' && seat.lastCheckInAt
+            ? Math.max(0, Math.ceil((nowMs - seat.lastCheckInAt.toMillis()) / 60000))
+            : 0;
+        const currentAwayMinutes =
+          (seat.status === 'away' || seat.status === 'break') && seat.lastCheckInAt
+            ? Math.max(0, Math.floor((nowMs - seat.lastCheckInAt.toMillis()) / 60000))
+            : 0;
+        const todayMinutes = Math.round(Number(stat?.totalStudyMinutes || 0)) + liveStudyMinutes;
+        const penaltyPoints = Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)));
+
+        const operationalScore = averageHealth([
+          calculateCenterFocusScore(
+            todayMinutes,
+            Math.round(stat?.todayPlanCompletionRate || 0),
+            Number(stat?.studyTimeGrowthRate || 0),
+            Number(progress?.stats?.focus || 0),
+            penaltyPoints
+          ),
+          stat ? clampHealth(Number(stat.todayPlanCompletionRate || 0)) : 70,
+          scoreAttendanceStatus(seat.status),
+        ]);
+
+        const parentScore = averageHealth([
+          appVisits > 0 ? scoreParentVisitHealth(appVisits) : 80,
+          studentReports.length > 0 ? clampHealth((viewedReports / studentReports.length) * 100) : 80,
+          clampHealth(90 - consultationCount * 20 - (hasCounselingToday ? 10 : 0)),
+        ]);
+
+        const riskScore = averageHealth([
+          clampHealth(100 - riskScoreFromDaily(stat, progress)),
+          clampHealth(100 - Math.min(100, (penaltyPoints / 12) * 100)),
+          stat ? scoreGrowthHealth(Number(stat.studyTimeGrowthRate || 0)) : 80,
+        ]);
+
+        const billingScore = scoreStudentInvoiceHealth(invoiceStatus);
+
+        const efficiencyScore = averageHealth([
+          scoreReportRegularity(studentReports, nowMs),
+          scoreCommentDensity(studentReports),
+          seat.status === 'away' || seat.status === 'break' ? scoreAwayHealth(currentAwayMinutes) : 75,
+        ]);
+
+        const domainScores = {
+          operational: operationalScore,
+          parent: parentScore,
+          risk: riskScore,
+          billing: billingScore,
+          efficiency: efficiencyScore,
+        };
+
+        const compositeHealth = averageHealth(Object.values(domainScores));
+        const secondaryFlags = buildCenterAdminSecondaryFlags({
+          hasUnreadReport,
+          hasCounselingToday,
+          invoiceStatus,
+          currentAwayMinutes,
+          status: seat.status,
+        });
+        const baseSignal = {
+          studentId: member.id,
+          seatId: seat.id,
+          roomId: seat.roomId,
+          roomSeatNo: seat.roomSeatNo,
+          attendanceStatus: seat.status,
+          compositeHealth,
+          domainScores,
+          todayMinutes,
+          effectivePenaltyPoints: penaltyPoints,
+          hasUnreadReport,
+          hasCounselingToday,
+          currentAwayMinutes,
+          invoiceStatus,
+          primaryChip: buildCenterAdminPrimaryChip(compositeHealth),
+          secondaryFlags,
+        };
+
+        return {
+          ...baseSignal,
+          topReason: buildCenterAdminTopReason(baseSignal),
+        };
+      })
+      .filter(Boolean) as CenterAdminStudentSeatSignal[];
+  }, [
+    allActiveMembers,
+    attendanceByStudentId,
+    counselingTodayStudentIds,
+    currentMonthInvoiceByStudentId,
+    parentCommunications30dByStudentId,
+    parentEvents30dByStudentId,
+    progressById,
+    reportsByStudentId,
+    todayStatsByStudentId,
+  ]);
+
+  const seatSignalsBySeatId = useMemo(
+    () => new Map(studentSignals.map((signal) => [signal.seatId, signal])),
+    [studentSignals]
+  );
+
+  const studentSignalsByStudentId = useMemo(
+    () => new Map(studentSignals.map((signal) => [signal.studentId, signal])),
+    [studentSignals]
+  );
+
+  const seatOverlayLegend = useMemo<CenterAdminSeatOverlayLegend>(() => buildCenterAdminSeatLegend(), []);
+
+  const seatOverlaySummary = useMemo<CenterAdminSeatOverlaySummary>(
+    () =>
+      buildCenterAdminSeatOverlaySummary(
+        studentSignals.filter((signal) => selectedClass === 'all' || targetMemberIds.has(signal.studentId))
+      ),
+    [selectedClass, studentSignals, targetMemberIds]
+  );
+
   const isLoading =
     membersLoading ||
     progressLoading ||
@@ -679,6 +979,7 @@ export function useCenterAdminHeatmap({
     reportsLoading ||
     parentEventsLoading ||
     parentCommunicationsLoading ||
+    appointmentsLoading ||
     kpiLoading ||
     invoicesLoading ||
     statsLoading;
@@ -686,5 +987,9 @@ export function useCenterAdminHeatmap({
   return {
     rows,
     isLoading,
+    seatSignalsBySeatId,
+    studentSignalsByStudentId,
+    seatOverlayLegend,
+    seatOverlaySummary,
   };
 }
