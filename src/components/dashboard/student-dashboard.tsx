@@ -596,7 +596,23 @@ function MiniLpTrendSparkline({
   );
 }
 
-function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobile }: { studentId: string, centerId: string, todayKey: string, h: number, m: number, isMobile: boolean }) {
+function StudySessionHistoryDialog({
+  studentId,
+  centerId,
+  todayKey,
+  h,
+  m,
+  isMobile,
+  triggerMode = 'card',
+}: {
+  studentId: string;
+  centerId: string;
+  todayKey: string;
+  h: number;
+  m: number;
+  isMobile: boolean;
+  triggerMode?: 'card' | 'button';
+}) {
   const firestore = useFirestore();
   const [isOpen, setIsOpen] = useState(false);
   const sessionsQuery = useMemoFirebase(() => {
@@ -612,36 +628,49 @@ function StudySessionHistoryDialog({ studentId, centerId, todayKey, h, m, isMobi
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Card className={cn(
-          "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
-          isMobile
-            ? "rounded-[1.4rem] bg-[radial-gradient(circle_at_top_right,#dbeafe_0%,#ffffff_58%,#f7fbff_100%)] shadow-[0_18px_40px_-28px_rgba(37,99,235,0.55)]"
-            : "rounded-[1.75rem]"
-        )}>
-          {isMobile && <div className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-sky-200/60 blur-2xl" />}
-          <CardHeader className={cn("relative z-10 flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-4 pt-4" : "")}>
-            <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>오늘의 트랙</CardTitle>
-            <div className={cn("rounded-xl text-blue-600 transition-colors duration-300", isMobile ? "bg-white/80 p-2 shadow-sm" : "bg-blue-50 p-2.5")}>
-              <Clock className={cn("text-blue-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
-            </div>
-          </CardHeader>
-          <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
-            <div className={cn("dashboard-number text-blue-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
-              {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>m</span>
-            </div>
-            <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-2.5 flex-wrap" : "mt-6")}>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "font-aggro-display border border-[#FF7A16] bg-[#FF7A16] text-white font-extrabold leading-none shadow-[0_12px_24px_-18px_rgba(255,122,22,0.9)]",
-                    isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
-                  )}
-                >
-                  세션 보기 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
-                </Badge>
-            </div>
-          </CardContent>
-        </Card>
+        {triggerMode === 'button' ? (
+          <button
+            type="button"
+            className={cn(
+              "student-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/18 bg-white/12 font-black text-white backdrop-blur-sm",
+              isMobile ? "h-9 px-3 text-[11px] shadow-[0_14px_30px_-22px_rgba(15,23,42,0.5)]" : "h-10 px-4 text-xs"
+            )}
+          >
+            <Clock className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+            세션 확인
+          </button>
+        ) : (
+          <Card className={cn(
+            "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-slate-200/80 bg-white transition-all duration-300 cursor-pointer",
+            isMobile
+              ? "rounded-[1.4rem] bg-[radial-gradient(circle_at_top_right,#dbeafe_0%,#ffffff_58%,#f7fbff_100%)] shadow-[0_18px_40px_-28px_rgba(37,99,235,0.55)]"
+              : "rounded-[1.75rem]"
+          )}>
+            {isMobile && <div className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-sky-200/60 blur-2xl" />}
+            <CardHeader className={cn("relative z-10 flex flex-row items-center justify-between pb-2 px-8 pt-8", isMobile ? "px-4 pt-4" : "")}>
+              <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground", isMobile ? "text-[9px]" : "text-[10px]")}>오늘의 트랙</CardTitle>
+              <div className={cn("rounded-xl text-blue-600 transition-colors duration-300", isMobile ? "bg-white/80 p-2 shadow-sm" : "bg-blue-50 p-2.5")}>
+                <Clock className={cn("text-blue-600", isMobile ? "h-4 w-4" : "h-6 w-6")} />
+              </div>
+            </CardHeader>
+            <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
+              <div className={cn("dashboard-number text-blue-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
+                {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>m</span>
+              </div>
+              <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-2.5 flex-wrap" : "mt-6")}>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "font-aggro-display border border-[#FF7A16] bg-[#FF7A16] text-white font-extrabold leading-none shadow-[0_12px_24px_-18px_rgba(255,122,22,0.9)]",
+                      isMobile ? "h-7 px-2.5 text-[11px]" : "h-8 px-3.5 text-[12px]"
+                    )}
+                  >
+                    세션 보기 <ChevronRight className={cn("ml-1", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                  </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </DialogTrigger>
       <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
         <div className={cn("bg-blue-600 text-white relative", isMobile ? "p-6" : "p-10")}>
@@ -1947,21 +1976,36 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </div>
 
           {/* Row 2: Today study time (large) + yesterday delta */}
-          <div>
-            <div className={cn("dashboard-number text-white tabular-nums leading-none", isMobile ? "text-5xl" : "text-7xl")}>
-              {hDisplay}<span className={cn("opacity-50 font-bold ml-1", isMobile ? "text-base" : "text-xl")}>h</span>
-              {' '}{mDisplay}<span className={cn("opacity-50 font-bold ml-1", isMobile ? "text-base" : "text-xl")}>m</span>
-            </div>
-            <div className={cn("flex items-center gap-2 mt-1.5", isMobile ? "justify-center" : "")}>
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</span>
-              {totalMinutesCount > 0 && (
-                <span className={cn(
-                  "text-[10px] font-black px-2 py-0.5 rounded-full",
-                  studyVsYesterday >= 0 ? "bg-white/20 text-white" : "bg-rose-500/30 text-white"
-                )}>
-                  어제 대비 {studyVsYesterday >= 0 ? '+' : ''}{studyVsYesterday}%
-                </span>
-              )}
+          <div className={cn("w-full", isMobile ? "" : "max-w-[34rem]")}>
+            <div className={cn("flex gap-3", isMobile ? "items-start justify-between" : "items-end justify-between")}>
+              <div className={cn("min-w-0", isMobile ? "text-left" : "")}>
+                <div className={cn("dashboard-number text-white tabular-nums leading-none", isMobile ? "text-5xl" : "text-7xl")}>
+                  {hDisplay}<span className={cn("opacity-50 font-bold ml-1", isMobile ? "text-base" : "text-xl")}>h</span>
+                  {' '}{mDisplay}<span className={cn("opacity-50 font-bold ml-1", isMobile ? "text-base" : "text-xl")}>m</span>
+                </div>
+                <div className={cn("flex items-center gap-2 mt-1.5", isMobile ? "flex-wrap" : "")}>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</span>
+                  {totalMinutesCount > 0 && (
+                    <span className={cn(
+                      "text-[10px] font-black px-2 py-0.5 rounded-full",
+                      studyVsYesterday >= 0 ? "bg-white/20 text-white" : "bg-rose-500/30 text-white"
+                    )}>
+                      어제 대비 {studyVsYesterday >= 0 ? '+' : ''}{studyVsYesterday}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className={cn("shrink-0", isMobile ? "pt-1" : "pb-1")}>
+                <StudySessionHistoryDialog
+                  studentId={user!.uid}
+                  centerId={activeMembership!.id}
+                  todayKey={todayKey}
+                  h={hDisplay}
+                  m={mDisplay}
+                  isMobile={isMobile}
+                  triggerMode="button"
+                />
+              </div>
             </div>
           </div>
 
@@ -2191,11 +2235,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </section>
 
-      <div className={cn("grid gap-2.5 [&>*]:min-w-0", isMobile ? "grid-cols-2 auto-rows-fr" : "grid-cols-3")}>
-        <div className={cn(isMobile ? "col-span-2" : "")}>
-          <StudySessionHistoryDialog studentId={user!.uid} centerId={activeMembership!.id} todayKey={todayKey} h={hDisplay} m={mDisplay} isMobile={isMobile} />
-        </div>
-
+      <div className={cn("grid gap-2.5 [&>*]:min-w-0", isMobile ? "grid-cols-2 auto-rows-fr" : "grid-cols-2")}>
         {/* Plan completion rate card */}
         <Card className={cn(
           "relative h-full min-w-0 overflow-hidden border border-emerald-200/80",
