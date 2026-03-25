@@ -180,6 +180,22 @@ type GrowthCelebrationState = {
   previous7DayAverage: number;
 };
 
+type LinkedStudentOption = {
+  id: string;
+  name: string;
+};
+
+const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
+
+function normalizeParentPortalTab(value: string | null): ParentPortalTab {
+  if (value === 'life') return 'data';
+  if (value === 'reports') return 'home';
+  if (value && PARENT_PORTAL_TABS.includes(value as ParentPortalTab)) {
+    return value as ParentPortalTab;
+  }
+  return 'home';
+}
+
 function ParentGrowthCelebration({
   celebration,
   studentName,
@@ -602,6 +618,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [growthCelebration, setGrowthCelebration] = useState<GrowthCelebrationState | null>(null);
+  const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
   const visitLoggedRef = useRef(false);
   const reportReadLoggedRef = useRef<Record<string, boolean>>({});
   const growthCelebrationTimerRef = useRef<number | null>(null);
@@ -612,24 +629,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => setToday(new Date()), []);
 
-  useEffect(() => {
-    const requestedTab = searchParams.get('parentTab');
-    if (!requestedTab) return;
-
-    if (requestedTab === 'life') {
-      setTab('data');
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('parentTab', 'data');
-      router.replace(`${pathname}?${params.toString()}`);
-      return;
-    }
-
-    const normalizedTab = requestedTab as ParentPortalTab;
-    if (normalizedTab) {
-      setTab(normalizedTab);
-    }
-  }, [searchParams, pathname, router]);
-
   const active센터Membership = useMemo(() => {
     if (activeMembership) {
       return memberships.find((membership) => membership.id === activeMembership.id) || activeMembership;
@@ -638,10 +637,102 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [activeMembership, memberships]);
 
   const centerId = active센터Membership?.id;
-  const studentId = active센터Membership?.linkedStudentIds?.[0];
+  const linkedStudentIds = useMemo(
+    () =>
+      (active센터Membership?.linkedStudentIds || []).filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0
+      ),
+    [active센터Membership?.linkedStudentIds]
+  );
+  const linkedStudentIdsKey = linkedStudentIds.join(',');
+  const requestedStudentId = searchParams.get('parentStudentId');
+  const studentId = useMemo(() => {
+    if (linkedStudentIds.length === 0) return undefined;
+    if (requestedStudentId && linkedStudentIds.includes(requestedStudentId)) {
+      return requestedStudentId;
+    }
+    return linkedStudentIds[0];
+  }, [linkedStudentIds, requestedStudentId]);
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('parentTab');
+    const normalizedTab = normalizeParentPortalTab(requestedTab);
+    if (tab !== normalizedTab) {
+      setTab(normalizedTab);
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    let shouldReplace = false;
+
+    if (requestedTab !== normalizedTab) {
+      params.set('parentTab', normalizedTab);
+      shouldReplace = true;
+      if (requestedTab === 'reports') {
+        setIsReportArchiveOpen(true);
+      }
+    }
+
+    if (linkedStudentIds.length > 1 && studentId) {
+      if (requestedStudentId !== studentId) {
+        params.set('parentStudentId', studentId);
+        shouldReplace = true;
+      }
+    } else if (requestedStudentId) {
+      params.delete('parentStudentId');
+      shouldReplace = true;
+    }
+
+    if (shouldReplace) {
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [searchParams, pathname, router, linkedStudentIds.length, requestedStudentId, studentId, tab]);
+
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || linkedStudentIds.length === 0) {
+      setLinkedStudents([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLinkedStudents = async () => {
+      try {
+        const records = await Promise.all(
+          linkedStudentIds.map(async (id, index) => {
+            const snap = await getDoc(doc(firestore, 'centers', centerId, 'students', id));
+            const data = snap.data() as StudentProfile | undefined;
+            return {
+              id,
+              name: data?.name?.trim() || `자녀 ${index + 1}`,
+            };
+          })
+        );
+
+        if (!cancelled) {
+          setLinkedStudents(records);
+        }
+      } catch (error) {
+        console.warn('[parent-dashboard] failed to load linked students', error);
+        if (!cancelled) {
+          setLinkedStudents(
+            linkedStudentIds.map((id, index) => ({
+              id,
+              name: `자녀 ${index + 1}`,
+            }))
+          );
+        }
+      }
+    };
+
+    void loadLinkedStudents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, centerId, linkedStudentIdsKey]);
   const logParentActivity = async (
     eventType: ParentActivityEvent['eventType'],
     metadata?: Record<string, any>
@@ -669,30 +760,74 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     void logParentActivity('app_visit', { source: 'dashboard_open', tab });
   }, [isActive, centerId, studentId, user, tab]);
 
+  useEffect(() => {
+    visitLoggedRef.current = false;
+    reportReadLoggedRef.current = {};
+    setReadMap({});
+    setSelectedNotification(null);
+    setSelectedChildReport(null);
+    setSelectedCalendarDate(null);
+    setGrowthCelebration(null);
+  }, [studentId]);
+
   const studentRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'students', studentId)), [firestore, centerId, studentId]);
   const { data: student } = useDoc<StudentProfile>(studentRef, { enabled: isActive && !!studentId });
+  const activeStudentLabel = useMemo(
+    () =>
+      linkedStudents.find((item) => item.id === studentId)?.name ||
+      student?.name ||
+      (linkedStudentIds.length > 1 ? '자녀 선택' : '자녀'),
+    [linkedStudents, student?.name, studentId, linkedStudentIds.length]
+  );
+  const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
+  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && tab === 'home';
+  const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
+  const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
+  const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
 
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
   const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
 
-  // 캘린더용 모든 로그 조회
+  const recentAnalyticsStartKey = today ? format(subDays(today, 34), 'yyyy-MM-dd') : '';
+  const calendarRangeStartKey = format(startOfWeek(startOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const calendarRangeEndKey = format(endOfWeek(endOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+
+  // 홈/학습/데이터용 최근 로그 또는 캘린더 범위만 조회
   const allLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'), orderBy('dateKey', 'desc'));
-  }, [firestore, centerId, studentId]);
-  const { data: allLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(allLogsQuery, { enabled: isActive && !!studentId });
+
+    const baseRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
+    if (tab === 'studyDetail') {
+      return query(
+        baseRef,
+        where('dateKey', '>=', calendarRangeStartKey),
+        where('dateKey', '<=', calendarRangeEndKey),
+        orderBy('dateKey', 'desc')
+      );
+    }
+
+    if (!recentAnalyticsStartKey || !todayKey) return null;
+
+    return query(
+      baseRef,
+      where('dateKey', '>=', recentAnalyticsStartKey),
+      where('dateKey', '<=', todayKey),
+      orderBy('dateKey', 'desc')
+    );
+  }, [firestore, centerId, studentId, tab, calendarRangeStartKey, calendarRangeEndKey, recentAnalyticsStartKey, todayKey]);
+  const { data: allLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(allLogsQuery, { enabled: shouldLoadStudyAnalytics });
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !todayKey || !weekKey) return null;
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, studentId, todayKey, weekKey]);
-  const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive && !!studentId });
+  const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: shouldLoadStudyAnalytics });
 
   const weeklyPlansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !weekKey) return null;
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'));
   }, [firestore, centerId, studentId, weekKey]);
-  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: isActive && !!studentId });
+  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: shouldLoadStudyAnalytics });
 
   const selectedDateKey = selectedCalendarDate ? format(selectedCalendarDate, 'yyyy-MM-dd') : '';
   const selectedDateWeekKey = selectedCalendarDate ? format(selectedCalendarDate, "yyyy-'W'II") : '';
@@ -837,7 +972,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       limit(50),
     );
   }, [firestore, centerId, studentId]);
-  const { data: rawReportsArchive } = useCollection<DailyReport>(reportsArchiveQuery, { enabled: isActive && !!studentId });
+  const { data: rawReportsArchive } = useCollection<DailyReport>(reportsArchiveQuery, { enabled: shouldLoadReportArchive });
   const reportsArchive = useMemo(
     () => [...(rawReportsArchive || [])].sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
     [rawReportsArchive]
@@ -856,13 +991,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       limit(20)
     );
   }, [firestore, centerId, studentId, user?.uid]);
-  const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user });
+  const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: shouldLoadNotifications });
 
   const attendance요청Query = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(collection(firestore, 'centers', centerId, 'attendance요청'), where('studentId', '==', studentId), limit(30));
   }, [firestore, centerId, studentId]);
-  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: isActive && !!studentId });
+  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: shouldLoadStudyAnalytics });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user) return null;
@@ -873,14 +1008,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId, user]);
   const { data: rawParentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
-    enabled: isActive && !!centerId && !!user,
+    enabled: shouldLoadParentCommunications,
   });
 
   const penaltyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120));
   }, [firestore, centerId, studentId]);
-  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: isActive && !!studentId });
+  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: shouldLoadStudyAnalytics });
 
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
@@ -890,7 +1025,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       limit(120)
     );
   }, [firestore, centerId, studentId]);
-  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: isActive && !!studentId });
+  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: shouldLoadInvoices });
 
   const sortedInvoices = useMemo(() => {
     return [...(studentInvoices || [])].sort((a, b) => {
@@ -1482,6 +1617,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [isActive, tab, centerId, studentId, todayKey, growthCelebrationCandidate]);
 
+  useEffect(() => {
+    if (!isReportArchiveOpen) return;
+
+    if (selectedChildReport) {
+      const hasSelectedReport = reportsArchive.some((item) => item.id === selectedChildReport.id);
+      if (!hasSelectedReport) {
+        setSelectedChildReport(reportsArchive[0] || null);
+      }
+      return;
+    }
+
+    if (reportsArchive.length > 0) {
+      setSelectedChildReport(reportsArchive[0]);
+    }
+  }, [isReportArchiveOpen, reportsArchive, selectedChildReport]);
+
   const readNotification = async (notification: ParentNotificationItem) => {
     setReadMap((prev) => ({ ...prev, [notification.id]: true }));
     void logParentActivity('app_visit', { source: 'notification_read', notificationId: notification.id, notificationType: notification.type });
@@ -1493,12 +1644,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleTabChange = (value: string) => {
-    const nextTab = (value === 'life' ? 'data' : value) as ParentPortalTab;
+    const nextTab = normalizeParentPortalTab(value);
     setTab(nextTab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('parentTab', nextTab);
     router.replace(`${pathname}?${params.toString()}`);
     void logParentActivity('app_visit', { source: 'tab_change', tab: nextTab });
+  };
+
+  const handleStudentChange = (nextStudentId: string) => {
+    if (nextStudentId === studentId) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('parentTab', tab);
+    if (linkedStudentIds.length > 1) {
+      params.set('parentStudentId', nextStudentId);
+    } else {
+      params.delete('parentStudentId');
+    }
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const handleOpenReportsArchive = () => {
@@ -1648,6 +1812,30 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           studentName={student?.name || '자녀'}
           onClose={() => setGrowthCelebration(null)}
         />
+      )}
+
+      {linkedStudents.length > 1 && (
+        <section className="rounded-[1.7rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Parent Profile</p>
+              <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">{activeStudentLabel} 학생 화면</h3>
+              <p className="mt-1 text-sm font-bold text-slate-500">여러 자녀가 연결된 경우, 확인할 학생을 빠르게 전환할 수 있어요.</p>
+            </div>
+            <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleStudentChange}>
+              <SelectTrigger className="h-12 w-full rounded-[1.1rem] border border-[#d7e4ff] bg-white px-4 text-left font-black text-[#14295F] shadow-sm sm:w-[220px]">
+                <SelectValue placeholder="자녀 선택" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border border-slate-200 bg-white">
+                {linkedStudents.map((item) => (
+                  <SelectItem key={item.id} value={item.id} className="font-bold">
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
       )}
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">

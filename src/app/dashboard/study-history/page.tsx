@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -13,6 +14,7 @@ import {
   addDoc, 
   serverTimestamp, 
   doc, 
+  getDoc,
   updateDoc, 
   deleteDoc, 
   writeBatch,
@@ -97,6 +99,11 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
+
+type LinkedStudentOption = {
+  id: string;
+  name: string;
+};
 
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
@@ -257,10 +264,29 @@ export default function StudyHistoryPage() {
   const firestore = useFirestore();
   const { activeMembership, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   
   const isMobile = viewMode === 'mobile';
   const isParent = activeMembership?.role === 'parent';
-  const targetUid = isParent ? activeMembership?.linkedStudentIds?.[0] : user?.uid;
+  const linkedStudentIds = useMemo(
+    () =>
+      (activeMembership?.linkedStudentIds || []).filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0
+      ),
+    [activeMembership?.linkedStudentIds]
+  );
+  const linkedStudentIdsKey = linkedStudentIds.join(',');
+  const requestedParentStudentId = searchParams.get('parentStudentId');
+  const targetUid = useMemo(() => {
+    if (!isParent) return user?.uid;
+    if (linkedStudentIds.length === 0) return undefined;
+    if (requestedParentStudentId && linkedStudentIds.includes(requestedParentStudentId)) {
+      return requestedParentStudentId;
+    }
+    return linkedStudentIds[0];
+  }, [isParent, user?.uid, linkedStudentIds, requestedParentStudentId]);
 
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);
@@ -271,8 +297,74 @@ export default function StudyHistoryPage() {
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
 
   useEffect(() => { setCurrentDate(new Date()); }, []);
+
+  useEffect(() => {
+    if (!isParent) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    let shouldReplace = false;
+
+    if (linkedStudentIds.length > 1 && targetUid) {
+      if (requestedParentStudentId !== targetUid) {
+        params.set('parentStudentId', targetUid);
+        shouldReplace = true;
+      }
+    } else if (requestedParentStudentId) {
+      params.delete('parentStudentId');
+      shouldReplace = true;
+    }
+
+    if (shouldReplace) {
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [isParent, searchParams, router, pathname, requestedParentStudentId, linkedStudentIds.length, targetUid]);
+
+  useEffect(() => {
+    if (!isParent || !firestore || !activeMembership?.id || linkedStudentIds.length === 0) {
+      setLinkedStudents([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLinkedStudents = async () => {
+      try {
+        const records = await Promise.all(
+          linkedStudentIds.map(async (id, index) => {
+            const snap = await getDoc(doc(firestore, 'centers', activeMembership.id, 'students', id));
+            const data = snap.data() as { name?: string } | undefined;
+            return {
+              id,
+              name: data?.name?.trim() || `자녀 ${index + 1}`,
+            };
+          })
+        );
+
+        if (!cancelled) {
+          setLinkedStudents(records);
+        }
+      } catch (error) {
+        console.warn('[study-history] failed to load linked students', error);
+        if (!cancelled) {
+          setLinkedStudents(
+            linkedStudentIds.map((id, index) => ({
+              id,
+              name: `자녀 ${index + 1}`,
+            }))
+          );
+        }
+      }
+    };
+
+    void loadLinkedStudents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isParent, firestore, activeMembership?.id, linkedStudentIdsKey]);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -443,6 +535,18 @@ export default function StudyHistoryPage() {
     toast({ title: "항목이 삭제되었습니다." });
   };
 
+  const activeStudentLabel =
+    linkedStudents.find((item) => item.id === targetUid)?.name ||
+    (linkedStudentIds.length > 1 ? '자녀 선택' : '자녀');
+
+  const handleParentStudentChange = (nextStudentId: string) => {
+    if (!isParent || nextStudentId === targetUid) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('parentStudentId', nextStudentId);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const isToday = selectedDateForPlan ? isSameDay(selectedDateForPlan, new Date()) : false;
   const tierTheme = getTierTheme(currentTier);
@@ -455,6 +559,25 @@ export default function StudyHistoryPage() {
         <div className="flex flex-col gap-1">
           <h1 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 ml-1">학습 기록·히스토리</p>
+          {isParent && linkedStudents.length > 1 && (
+            <div className="mt-3 w-full max-w-[240px]">
+              <Label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+                확인 중인 자녀
+              </Label>
+              <Select value={targetUid || linkedStudents[0]?.id || ''} onValueChange={handleParentStudentChange}>
+                <SelectTrigger className="h-11 rounded-2xl border bg-white/90 px-4 text-left font-black shadow-sm">
+                  <SelectValue placeholder={activeStudentLabel} />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border bg-white">
+                  {linkedStudents.map((item) => (
+                    <SelectItem key={item.id} value={item.id} className="font-bold">
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 bg-white/80 p-1.5 rounded-2xl border shadow-xl">
            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
