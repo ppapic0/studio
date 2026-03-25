@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, ShieldCheck, Smartphone, Users } from 'lucide-react';
 
 type ShowcaseItem = {
@@ -51,13 +51,79 @@ const items: ShowcaseItem[] = [
   },
 ];
 
+const INTERVAL_MS = 3500;
+
 export function HeroShowcase() {
   const [active, setActive] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const startTimeRef = useRef<number>(Date.now());
+  const rafRef = useRef<number | null>(null);
   const current = items[active] ?? items[0];
 
+  const advance = useCallback(() => {
+    setVisible(false);
+    setTimeout(() => {
+      setActive((prev) => (prev + 1) % items.length);
+      setProgress(0);
+      startTimeRef.current = Date.now();
+      setVisible(true);
+    }, 220);
+  }, []);
+
+  // Progress bar animation via rAF
+  useEffect(() => {
+    if (paused) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+
+    startTimeRef.current = Date.now() - progress * INTERVAL_MS;
+
+    const tick = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const pct = Math.min(elapsed / INTERVAL_MS, 1);
+      setProgress(pct);
+      if (pct >= 1) {
+        advance();
+      } else {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [paused, active, advance]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleManualSelect = (index: number) => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    setVisible(false);
+    setTimeout(() => {
+      setActive(index);
+      setProgress(0);
+      startTimeRef.current = Date.now();
+      setVisible(true);
+    }, 160);
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="overflow-hidden rounded-[1.7rem] border border-white/12 bg-white/8 p-5 shadow-[0_16px_32px_rgba(4,11,29,0.22)] backdrop-blur-sm">
+    <div
+      className="space-y-4"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* Main card */}
+      <div
+        className="overflow-hidden rounded-[1.7rem] border border-white/12 bg-white/8 p-5 shadow-[0_16px_32px_rgba(4,11,29,0.22)] backdrop-blur-sm"
+        style={{
+          transition: 'opacity 0.22s ease, transform 0.22s ease',
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'translateY(0)' : 'translateY(6px)',
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black tracking-[0.2em] text-white/80">WEB APP VALUE</p>
@@ -93,6 +159,7 @@ export function HeroShowcase() {
         </div>
       </div>
 
+      {/* Tab buttons */}
       <div className="grid gap-2 sm:grid-cols-3">
         {items.map((item, index) => {
           const Icon = item.icon;
@@ -102,13 +169,21 @@ export function HeroShowcase() {
             <button
               key={item.label}
               type="button"
-              onClick={() => setActive(index)}
-              className={`rounded-[1.15rem] border px-3 py-3 text-left transition-all duration-300 ${
+              onClick={() => handleManualSelect(index)}
+              className={`relative overflow-hidden rounded-[1.15rem] border px-3 py-3 text-left transition-all duration-300 ${
                 isActive
                   ? 'border-white/20 bg-white/10'
                   : 'border-white/10 bg-white/[0.04] opacity-85 hover:opacity-100'
               }`}
             >
+              {/* Progress bar on active tab */}
+              {isActive && (
+                <span
+                  className="pointer-events-none absolute bottom-0 left-0 h-[2.5px] rounded-full bg-[#FFB273]"
+                  style={{ width: `${progress * 100}%`, transition: 'none' }}
+                />
+              )}
+
               <div className="flex items-center gap-2">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-lg ${
