@@ -98,7 +98,7 @@ export function HeroShowcase() {
             <div className="min-w-0 flex-1">
               <p
                 className={`text-[10px] font-black tracking-[0.22em] uppercase transition-colors duration-400 ${
-                  isActive ? (item.color === 'orange' ? 'text-[#FF9848]' : 'text-white/55') : 'text-white/25'
+                  isActive ? 'text-white/72' : 'text-white/32'
                 }`}
               >
                 {item.label}
@@ -114,13 +114,13 @@ export function HeroShowcase() {
 
               <div className={`grid transition-all duration-500 ${isActive ? 'mt-2.5 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                 <div className="overflow-hidden">
-                  <p className="break-keep text-[13px] font-semibold leading-[1.65] text-blue-100/55">{item.desc}</p>
-                  <p className="mt-2.5 inline-block rounded-lg border border-white/10 bg-white/6 px-3 py-1.5 text-[12px] font-black text-white/70">
+                  <p className="break-keep text-[13px] font-semibold leading-[1.65] text-white/88">{item.desc}</p>
+                  <p className="mt-2.5 inline-block rounded-lg border border-white/10 bg-white/6 px-3 py-1.5 text-[12px] font-black text-white/92">
                     {item.stat}
                   </p>
 
                   {item.ctaHint ? (
-                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
+                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-black text-white">
                       {item.ctaHint}
                       <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
                     </p>
