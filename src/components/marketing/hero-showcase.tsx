@@ -68,13 +68,13 @@ export function HeroShowcase() {
           </div>
         </div>
 
-        <p className="mt-4 break-keep text-[13px] font-semibold leading-[1.72] text-white/72">{current.desc}</p>
+        <p className="mt-4 break-keep text-[13px] font-semibold leading-[1.72] text-white/90">{current.desc}</p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           {current.points.map((point) => (
             <div
               key={point}
-              className="rounded-[1rem] border border-white/10 bg-[#0f1d42] px-3 py-3 text-[12px] font-black text-white/84"
+              className="rounded-[1rem] border border-white/10 bg-[#0f1d42] px-3 py-3 text-[12px] font-black text-white"
             >
               {point}
             </div>
@@ -106,7 +106,7 @@ export function HeroShowcase() {
               className={`rounded-[1.15rem] border px-3 py-3 text-left transition-all duration-300 ${
                 isActive
                   ? 'border-white/20 bg-white/10'
-                  : 'border-white/6 bg-white/[0.04] opacity-70 hover:opacity-92'
+                  : 'border-white/10 bg-white/[0.04] opacity-85 hover:opacity-100'
               }`}
             >
               <div className="flex items-center gap-2">

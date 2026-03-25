@@ -61,7 +61,7 @@ export function HeroSection({ brand, stats }: HeroSectionProps) {
               성장의 길, <span className="text-[#FF7A16]">트랙</span>에서<br />
               시작됩니다.
             </h1>
-            <p className="max-w-[33rem] break-keep text-[16px] font-normal leading-[1.7] text-white/84 sm:text-[16.5px]">
+            <p className="max-w-[33rem] break-keep text-[16px] font-normal leading-[1.7] text-white sm:text-[16.5px]">
               {brand.heroDescription}
             </p>
           </div>
