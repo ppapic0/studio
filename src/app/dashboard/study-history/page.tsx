@@ -122,6 +122,13 @@ const SUBJECTS = [
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
+const STUDY_HISTORY_CALENDAR_LEGEND = [
+  { label: '기록 없음', swatch: 'from-slate-100 to-white ring-slate-200/80' },
+  { label: '짧은 몰입', swatch: 'from-emerald-50 via-white to-teal-100 ring-emerald-200/80' },
+  { label: '집중 흐름', swatch: 'from-emerald-200 to-teal-200 ring-emerald-300/80' },
+  { label: '깊은 몰입', swatch: 'from-emerald-500 to-teal-600 ring-emerald-400/30' },
+] as const;
+
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
@@ -420,15 +427,24 @@ export default function StudyHistoryPage() {
   };
 
   const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-gradient-to-br from-slate-50 to-white text-slate-500 ring-inset ring-1 ring-slate-100';
-    if (minutes < 60) return 'bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-800 ring-inset ring-1 ring-emerald-100';
-    if (minutes < 180) return 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-900 ring-inset ring-1 ring-emerald-200';
-    if (minutes < 300) return 'bg-gradient-to-br from-emerald-200 to-emerald-100 text-emerald-950 ring-inset ring-1 ring-emerald-300';
-    if (minutes < 480) return 'bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm';
-    return 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md';
+    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] text-slate-500 ring-1 ring-inset ring-slate-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_16px_30px_-26px_rgba(15,23,42,0.26)]';
+    if (minutes < 60) return 'bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.94)_0%,rgba(236,253,245,0.98)_42%,rgba(204,251,241,0.98)_100%)] text-emerald-900 ring-1 ring-inset ring-emerald-200/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_34px_-28px_rgba(16,185,129,0.34)]';
+    if (minutes < 180) return 'bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.88)_0%,rgba(209,250,229,0.98)_38%,rgba(167,243,208,0.98)_100%)] text-emerald-950 ring-1 ring-inset ring-emerald-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_38px_-30px_rgba(16,185,129,0.42)]';
+    if (minutes < 300) return 'bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.84)_0%,rgba(167,243,208,0.96)_30%,rgba(94,234,212,0.94)_100%)] text-emerald-950 ring-1 ring-inset ring-emerald-300/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_22px_42px_-30px_rgba(20,184,166,0.46)]';
+    if (minutes < 480) return 'bg-[linear-gradient(145deg,rgba(45,212,191,0.96)_0%,rgba(16,185,129,0.96)_55%,rgba(15,118,110,0.98)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_24px_46px_-28px_rgba(13,148,136,0.5)]';
+    return 'bg-[linear-gradient(145deg,rgba(13,148,136,0.98)_0%,rgba(5,150,105,0.98)_46%,rgba(15,23,42,0.98)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_28px_52px_-28px_rgba(15,23,42,0.56)]';
   };
 
   const getFocusProgress = (minutes: number) => Math.min(100, Math.round((minutes / 480) * 100));
+
+  const getFocusLabel = (minutes: number) => {
+    if (minutes === 0) return '기록 없음';
+    if (minutes < 60) return '워밍업';
+    if (minutes < 180) return '리듬';
+    if (minutes < 300) return '몰입';
+    if (minutes < 480) return '집중';
+    return '최고 집중';
+  };
 
   const monthTotalMinutes = useMemo(() => {
     if (!logs || !currentDate) return 0;
@@ -675,10 +691,13 @@ export default function StudyHistoryPage() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 bg-white/80 p-1.5 rounded-2xl border shadow-xl">
-           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
-           <span className="font-black text-sm min-w-[120px] text-center tracking-tight">{format(currentDate, 'yyyy년 M월')}</span>
-           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 transition-all" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
+        <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70">
+           <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
+           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+           <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-white/80 bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]">
+             <span className="font-black text-sm tracking-tight text-primary">{format(currentDate, 'yyyy년 M월')}</span>
+           </div>
+           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
         </div>
       </header>
 
@@ -723,15 +742,26 @@ export default function StudyHistoryPage() {
         )}
       </div>
 
-      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white mx-auto w-full border-2 border-primary/5 ring-1 ring-black/[0.03]">
-        <CardContent className="p-0">
-          <div className={cn("grid grid-cols-7 border-b-2 border-primary/10", isMobile ? "bg-slate-50" : "bg-gradient-to-r from-slate-50 via-white to-slate-50")}>
+      <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
+        <CardContent className="relative p-0">
+          <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
+            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/55">몰입 강도</span>
+            <div className="flex flex-wrap gap-1.5">
+              {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/70 bg-white/85 px-2.5 py-1 text-[9px] font-black text-slate-600 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.16)]">
+                  <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className={cn("grid grid-cols-7 gap-1.5 border-b border-primary/10", isMobile ? "px-2 py-2.5" : "px-4 py-3")}>
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
               <div
                 key={day}
                 className={cn(
-                  isMobile ? "py-3 text-[9px]" : "py-5 text-[11px]",
-                  "text-center font-black uppercase tracking-widest",
+                  isMobile ? "py-2 text-[9px]" : "py-3 text-[11px]",
+                  "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                   i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
                 )}
               >
@@ -739,7 +769,7 @@ export default function StudyHistoryPage() {
               </div>
             ))}
           </div>
-          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr" : "auto-rows-fr")}>
+          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1.5 p-2" : "auto-rows-fr gap-3 p-4")}>
             {logsLoading ? (
               <div className="col-span-7 h-[400px] flex items-center justify-center">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -751,6 +781,8 @@ export default function StudyHistoryPage() {
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
               const progressPercent = getFocusProgress(minutes);
+              const focusLabel = getFocusLabel(minutes);
+              const hasStatusCluster = hasPlans || minutes >= 180;
               const hour = Math.floor(minutes / 60);
               const minuteRemainder = minutes % 60;
 
@@ -760,71 +792,79 @@ export default function StudyHistoryPage() {
                   type="button"
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
-                    "relative text-left border-r-2 border-b-2 border-primary/5 transition-all cursor-pointer group overflow-hidden",
+                    "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                     isMobile ? "aspect-square p-1.5" : "min-h-[170px] p-4",
-                    !isCurrentMonth ? "opacity-[0.14] grayscale bg-slate-100" : getHeatmapColor(minutes),
-                    isTodayCalendar && "ring-4 ring-inset ring-primary/30 z-10 shadow-2xl scale-[1.02] rounded-xl"
+                    !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.24] grayscale-[0.08] ring-1 ring-slate-200/70" : getHeatmapColor(minutes),
+                    isCurrentMonth && "hover:-translate-y-[1.5px] hover:shadow-[0_20px_40px_-28px_rgba(15,23,42,0.38)] active:translate-y-0",
+                    isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/20 shadow-[0_22px_44px_-24px_rgba(37,99,235,0.46)]"
                   )}
                 >
+                  {isTodayCalendar && <div className="pointer-events-none absolute -inset-1 rounded-[1.45rem] bg-primary/12 blur-md opacity-80" />}
+                  <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/75" />
                   {!isMobile && isCurrentMonth && minutes > 0 && (
                     <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/30 to-transparent pointer-events-none" />
                   )}
 
-                  <div className={cn("flex justify-between items-start", isMobile ? "mb-1" : "mb-3")}>
+                  <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1.5" : "mb-3")}>
                     <span
                       className={cn(
-                        "font-black tracking-tighter tabular-nums rounded-full",
-                        isMobile ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1",
-                        idx % 7 === 5 && isCurrentMonth ? "text-blue-700 bg-blue-50/90" : idx % 7 === 6 && isCurrentMonth ? "text-rose-700 bg-rose-50/90" : "text-primary/80 bg-white/85",
+                        "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums backdrop-blur-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]",
+                        isMobile ? "min-w-[1.6rem] px-1.5 py-0.5 text-[10px]" : "min-w-[2rem] px-2.5 py-1 text-xs",
+                        idx % 7 === 5 && isCurrentMonth ? "border-blue-100/80 bg-blue-50/90 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100/80 bg-rose-50/90 text-rose-700" : "border-white/75 bg-white/85 text-primary/80",
                         isTodayCalendar && "text-primary scale-110"
                       )}
                     >
                       {format(day, 'd')}
                     </span>
-                    <div className="flex flex-col items-end gap-1">
-                      {minutes >= 180 && <Zap className={cn("text-amber-500 fill-amber-500 drop-shadow-sm", isMobile ? "h-2.5 w-2.5" : "h-4 w-4")} />}
-                      {hasPlans && <div className={cn("rounded-full bg-primary/35", isMobile ? "w-1.5 h-1.5" : "w-2 h-2")} />}
-                    </div>
+                    {hasStatusCluster ? (
+                      <div className={cn("inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/60 backdrop-blur-[8px] shadow-[0_12px_20px_-18px_rgba(15,23,42,0.4)]", isMobile ? "px-1.5 py-1" : "px-2 py-1.5")}>
+                        {hasPlans && <span className={cn("rounded-full bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.45)]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                        {minutes >= 180 && <Zap className={cn("text-amber-500 fill-amber-500 drop-shadow-sm", isMobile ? "h-2.5 w-2.5" : "h-4 w-4")} />}
+                      </div>
+                    ) : (
+                      <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                    )}
                   </div>
 
                   {isMobile ? (
-                    <div className="absolute inset-x-0.5 bottom-1">
+                    <div className="absolute inset-x-1 bottom-1.5">
                       <div
                         className={cn(
-                          "rounded-md text-center font-mono font-black tabular-nums py-0.5 leading-tight border text-[10px] tracking-tighter whitespace-nowrap",
-                          minutes > 0 ? "text-primary bg-white/90 border-white/80 shadow-sm" : "text-slate-500 bg-white/75 border-white/60"
+                          "rounded-[0.7rem] border text-center font-mono font-black tabular-nums py-1 leading-tight text-[10px] tracking-tight whitespace-nowrap backdrop-blur-[8px] shadow-[0_16px_28px_-22px_rgba(15,23,42,0.45)]",
+                          minutes > 0 ? "border-white/85 bg-white/92 text-primary" : "border-white/75 bg-white/82 text-slate-500"
                         )}
                       >
                         {isCurrentMonth ? formatMinutes(minutes) : '--'}
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-5 flex flex-col gap-2">
+                    <div className="mt-4 flex flex-col gap-2">
                       {isCurrentMonth && minutes > 0 ? (
                         <>
-                          <span className="font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none text-3xl">
+                          <span className="font-mono font-black tracking-tighter tabular-nums drop-shadow-sm leading-none text-[1.85rem]">
                             {formatMinutes(minutes)}
                           </span>
-                          <div className="h-1.5 w-full rounded-full bg-white/55 overflow-hidden">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/60 shadow-[inset_0_1px_2px_rgba(15,23,42,0.08)]">
                             <div className="h-full rounded-full bg-primary/80" style={{ width: `${progressPercent}%` }} />
                           </div>
-                          <div className="flex items-center justify-between text-[10px] font-black opacity-90">
-                            <span>{progressPercent}% 집중도</span>
+                          <div className="flex items-center justify-between gap-2 text-[10px] font-black opacity-90">
+                            <span className="inline-flex items-center rounded-full border border-white/65 bg-white/50 px-2 py-1 backdrop-blur-[6px]">
+                              {focusLabel}
+                            </span>
                             <span>{hour}시간 {minuteRemainder.toString().padStart(2, '0')}분</span>
                           </div>
-                          {minutes >= 360 && (
-                            <Badge className="w-fit bg-white/85 text-emerald-900 border-none font-black text-[8px] h-4 px-1.5 tracking-widest mt-1">집중 최고치</Badge>
-                          )}
                         </>
                       ) : (
-                        <span className="mt-auto text-[11px] font-bold text-slate-400">기록 없음</span>
+                        <div className="mt-auto rounded-[1rem] border border-white/75 bg-white/70 px-3 py-2.5 text-[11px] font-black text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                          기록 없음
+                        </div>
                       )}
                     </div>
                   )}
 
                   {isTodayCalendar && (
-                    <div className="absolute bottom-1 right-1">
-                      <div className="bg-primary text-white p-0.5 rounded-full shadow-lg"><Activity className="h-1.5 w-1.5" /></div>
+                    <div className="absolute bottom-1.5 right-1.5">
+                      <div className="rounded-full border border-white/50 bg-primary p-1 text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.6)]"><Activity className={cn(isMobile ? "h-2 w-2" : "h-2.5 w-2.5")} /></div>
                     </div>
                   )}
                 </button>
@@ -843,9 +883,14 @@ export default function StudyHistoryPage() {
 
       <Dialog open={!!selectedDateForPlan} onOpenChange={(open) => !open && setSelectedDateForPlan(null)}>
         <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px] rounded-[2.5rem]" : "sm:max-w-xl rounded-[3rem]")}>
-          <div className="bg-primary p-8 text-white relative">
-            <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
-            <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle><DialogDescription className="sr-only">선택한 날짜의 학습 기록 상세</DialogDescription></DialogHeader>
+          <div className="relative overflow-hidden bg-[linear-gradient(135deg,#0f172a_0%,#2563eb_42%,#10b981_100%)] p-8 text-white">
+            <div className="absolute inset-x-0 top-0 h-px bg-white/75" />
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/12 blur-2xl" />
+            <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-15" />
+            <div className="relative z-10 space-y-3">
+              <Badge className="w-fit border border-white/20 bg-white/12 text-white font-black text-[10px] uppercase tracking-[0.22em]">기록 상세</Badge>
+              <DialogHeader><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3"><ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 text-white/70" /> {selectedDateForPlan && format(selectedDateForPlan, 'M월 d일 (EEEE)', {locale: ko})}</DialogTitle><DialogDescription className="text-sm font-bold text-white/75">그날의 루틴과 학습 흐름을 한 번에 확인해요.</DialogDescription></DialogHeader>
+            </div>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[600px]")}>
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
