@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -99,7 +99,6 @@ import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -124,6 +123,410 @@ const SUBJECTS = [
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function timeToClockProgress(time?: string | null) {
+  if (!time || !time.includes(':')) return 0;
+  const [hour, minute] = time.split(':').map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
+  return clampPercent(((hour * 60) + minute) / (24 * 60) * 100);
+}
+
+function MissionRunnerCapsule({
+  progress,
+  completedCount,
+  totalCount,
+  isMobile,
+}: {
+  progress: number;
+  completedCount: number;
+  totalCount: number;
+  isMobile: boolean;
+}) {
+  const checkpoints = [14, 50, 86];
+  const displayProgress = totalCount > 0 ? Math.min(94, Math.max(10, progress)) : 10;
+  const displayLabel = totalCount > 0 ? `${completedCount}/${totalCount}` : '준비';
+  const completedNodes = totalCount > 0
+    ? checkpoints.filter((_, index) => progress >= ((index + 1) / checkpoints.length) * 100 - 6).length
+    : 0;
+
+  return (
+    <div className={cn(
+      "plan-mission-enter relative overflow-hidden rounded-[1.35rem] border border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(245,249,255,0.96)_100%)] shadow-[0_22px_50px_-34px_rgba(20,41,95,0.34)] ring-1 ring-white/80",
+      isMobile ? "w-[6.65rem] p-2.5" : "w-[8.15rem] p-3"
+    )}>
+      <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+      <div className="pointer-events-none absolute -right-4 -top-5 h-14 w-14 rounded-full bg-primary/10 blur-2xl" />
+      <p className="text-[8px] font-black uppercase tracking-[0.22em] text-primary/60">Mission Run</p>
+      <div className={cn("relative mt-2", isMobile ? "h-9" : "h-10")}>
+        <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-slate-100/90 ring-1 ring-slate-200/80" />
+        <div
+          className="plan-runner-track absolute left-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(255,122,22,0.92)_0%,rgba(20,41,95,0.88)_100%)]"
+          style={{ width: `${displayProgress}%` }}
+        />
+        {checkpoints.map((position, index) => (
+          <div
+            key={position}
+            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${position}%` }}
+          >
+            <div className={cn(
+              "h-3.5 w-3.5 rounded-full border border-white shadow-[0_6px_14px_-10px_rgba(20,41,95,0.45)]",
+              index < completedNodes ? "bg-[#10295f]" : "bg-white/88"
+            )} />
+          </div>
+        ))}
+        <div
+          className="plan-runner-token absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${displayProgress}%` }}
+        >
+          <div className={cn(
+            "flex items-center justify-center rounded-full border border-white/90 bg-[linear-gradient(135deg,#ff9f47_0%,#ff7a16_42%,#10295f_100%)] text-white shadow-[0_16px_28px_-18px_rgba(20,41,95,0.55)]",
+            isMobile ? "h-6 w-6" : "h-7 w-7"
+          )}>
+            {progress >= 100 ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleDot className="h-3.5 w-3.5 fill-current" />}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-400">
+          {progress >= 100 ? 'Clear' : totalCount > 0 ? 'Run' : 'Idle'}
+        </span>
+        <span className="text-[10px] font-black text-primary">{displayLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function MissionProgressRail({
+  progress,
+  completedCount,
+  totalCount,
+  isMobile,
+}: {
+  progress: number;
+  completedCount: number;
+  totalCount: number;
+  isMobile: boolean;
+}) {
+  const checkpoints = [12, 50, 88];
+  const displayProgress = totalCount > 0 ? Math.min(96, Math.max(8, progress)) : 8;
+  const progressLabel = totalCount === 0
+    ? '첫 미션을 등록하면 토큰이 바로 출발해요.'
+    : progress >= 100
+      ? '오늘 미션을 모두 클리어했어요.'
+      : `${Math.max(0, totalCount - completedCount)}개 남았어요. 가장 중요한 것부터 밀어주세요.`;
+
+  return (
+    <div className={cn(
+      "plan-mission-enter relative overflow-hidden rounded-[1.5rem] border border-primary/12 bg-white/82 shadow-[0_20px_48px_-34px_rgba(20,41,95,0.34)] ring-1 ring-white/90 backdrop-blur-sm",
+      isMobile ? "mt-4 p-4" : "mt-5 p-5"
+    )}>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.12),transparent_26%)]" />
+      <div className="relative flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/55">오늘 목표 진행률</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">{progressLabel}</p>
+        </div>
+        <span className={cn(
+          "rounded-full border border-primary/12 bg-primary/[0.06] px-3 py-1 font-black text-primary",
+          isMobile ? "text-xs" : "text-sm"
+        )}>
+          {Math.round(progress)}%
+        </span>
+      </div>
+      <div className={cn("relative", isMobile ? "mt-5 h-16" : "mt-6 h-[4.3rem]")}>
+        <div className="absolute inset-x-0 top-1/2 h-[0.48rem] -translate-y-1/2 rounded-full bg-slate-100/95 ring-1 ring-slate-200/90" />
+        <div
+          className="plan-runner-track absolute left-0 top-1/2 h-[0.48rem] -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(255,122,22,0.95)_0%,rgba(20,41,95,0.92)_100%)] shadow-[0_10px_22px_-16px_rgba(255,122,22,0.45)]"
+          style={{ width: `${displayProgress}%` }}
+        />
+        {checkpoints.map((position, index) => {
+          const isActive = displayProgress >= position - 2;
+          return (
+            <div
+              key={position}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${position}%` }}
+            >
+              <div className={cn(
+                "relative flex items-center justify-center rounded-full border border-white shadow-[0_10px_24px_-18px_rgba(20,41,95,0.4)]",
+                isActive ? "bg-[#10295f] text-white" : "bg-white/92 text-slate-400",
+                isMobile ? "h-5 w-5" : "h-6 w-6"
+              )}>
+                <span className="text-[9px] font-black">{index + 1}</span>
+                {isActive && <span className="plan-metric-pulse absolute inset-0 rounded-full bg-[#10295f]/20" />}
+              </div>
+            </div>
+          );
+        })}
+        <div
+          className="plan-runner-token absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${displayProgress}%` }}
+        >
+          <div className={cn(
+            "relative flex items-center justify-center rounded-full border border-white/90 bg-[linear-gradient(135deg,#ffb15f_0%,#ff7a16_48%,#10295f_100%)] text-white shadow-[0_20px_38px_-22px_rgba(20,41,95,0.6)]",
+            isMobile ? "h-9 w-9" : "h-10 w-10"
+          )}>
+            {progress >= 100 ? <CheckCircle2 className="h-5 w-5" /> : <CircleDot className="h-4 w-4 fill-current" />}
+            <span className="plan-metric-pulse absolute inset-0 rounded-full bg-[#ff7a16]/18" />
+          </div>
+        </div>
+      </div>
+      <div className="relative mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+        <span>Start</span>
+        <span>{progress >= 100 ? 'Finish' : 'Chase'}</span>
+      </div>
+    </div>
+  );
+}
+
+function MissionFocusStackCard({
+  task,
+  index,
+  isMobile,
+}: {
+  task: WithId<StudyPlanItem>;
+  index: number;
+  isMobile: boolean;
+}) {
+  const subjectLabel = task.subject ? SUBJECTS.find((subject) => subject.id === task.subject)?.label : null;
+  const metaChips = [
+    task.category === 'personal' ? '개인 미션' : '학습 미션',
+    subjectLabel,
+    task.targetMinutes ? `${task.targetMinutes}분` : null,
+  ].filter(Boolean).slice(0, 2) as string[];
+  const isPrimary = index === 0;
+
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden border backdrop-blur-sm",
+        isPrimary
+          ? "z-30 rounded-[1.4rem] border-primary/12 bg-[linear-gradient(140deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_28px_56px_-36px_rgba(20,41,95,0.42)]"
+          : index === 1
+            ? "z-20 -mt-3 ml-2 rounded-[1.25rem] border-slate-200/85 bg-white/92 shadow-[0_18px_34px_-28px_rgba(20,41,95,0.3)]"
+            : "z-10 -mt-3 ml-4 rounded-[1.2rem] border-slate-200/80 bg-slate-50/94 shadow-[0_14px_24px_-24px_rgba(20,41,95,0.18)]",
+        isPrimary ? (isMobile ? "px-4 py-4" : "px-5 py-5") : (isMobile ? "px-3.5 py-3" : "px-4 py-3.5")
+      )}
+    >
+      <div className={cn(
+        "pointer-events-none absolute inset-0",
+        isPrimary ? "bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,122,22,0.12),transparent_26%)]" : ""
+      )} />
+      <div className="relative flex items-start gap-3">
+        <div className={cn(
+          "flex shrink-0 items-center justify-center rounded-2xl font-black shadow-[0_12px_22px_-18px_rgba(20,41,95,0.4)]",
+          isPrimary ? "bg-primary text-white" : "bg-white text-primary ring-1 ring-slate-200/90",
+          isPrimary ? (isMobile ? "h-10 w-10" : "h-11 w-11") : "h-8 w-8"
+        )}>
+          {index + 1}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={cn(
+            "break-keep font-black text-slate-900",
+            isPrimary
+              ? (isMobile ? "text-base leading-6 line-clamp-1" : "text-lg leading-7 line-clamp-1")
+              : "text-sm leading-5 line-clamp-1"
+          )}>
+            {task.title}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {metaChips.map((chip) => (
+              <span
+                key={chip}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.08em]",
+                  isPrimary ? "border-primary/10 bg-primary/[0.06] text-primary" : "border-slate-200 bg-white/90 text-slate-500"
+                )}
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanMetricOrbit({
+  value,
+  strokeColor,
+  trackColor,
+  glowClassName,
+  isMobile,
+  children,
+}: {
+  value: number;
+  strokeColor: string;
+  trackColor: string;
+  glowClassName: string;
+  isMobile: boolean;
+  children: ReactNode;
+}) {
+  const size = isMobile ? 48 : 56;
+  const radius = isMobile ? 18 : 21;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (clampPercent(value) / 100) * circumference;
+
+  return (
+    <div className="relative">
+      <span className={cn("plan-metric-pulse absolute inset-1 rounded-full blur-md", glowClassName)} />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="relative">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={trackColor}
+          strokeWidth={isMobile ? 5 : 6}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={isMobile ? 5 : 6}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function RewardSparkVisual({ isMobile, active }: { isMobile: boolean; active: boolean }) {
+  return (
+    <div className={cn("relative", isMobile ? "h-12 w-12" : "h-14 w-14")}>
+      <div className={cn(
+        "absolute inset-0 rounded-[1.1rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,249,237,0.96)_100%)] shadow-[0_16px_30px_-20px_rgba(251,191,36,0.45)]",
+        active ? "ring-1 ring-amber-100" : "ring-1 ring-slate-100"
+      )} />
+      {active && (
+        <>
+          {[
+            { className: "left-1.5 top-2", delay: '0s' },
+            { className: "right-2 top-1.5", delay: '0.45s' },
+            { className: "right-1.5 bottom-2", delay: '0.95s' },
+          ].map((spark) => (
+            <span
+              key={spark.className}
+              className={cn("plan-reward-spark absolute h-1.5 w-1.5 rounded-full bg-amber-400", spark.className)}
+              style={{ animationDelay: spark.delay }}
+            />
+          ))}
+        </>
+      )}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Sparkles className={cn("h-5 w-5", active ? "text-amber-500" : "text-slate-300")} />
+      </div>
+    </div>
+  );
+}
+
+function CompetitionLadderVisual({ filledCount, isMobile }: { filledCount: number; isMobile: boolean }) {
+  const heights = isMobile ? ['h-3.5', 'h-5', 'h-[1.625rem]'] : ['h-4', 'h-[1.375rem]', 'h-7'];
+
+  return (
+    <div className="flex items-end gap-1 rounded-[1rem] border border-white/90 bg-white/88 px-2.5 py-2 shadow-[0_14px_28px_-22px_rgba(244,63,94,0.38)]">
+      {heights.map((height, index) => (
+        <span
+          key={height}
+          className={cn(
+            "w-2 rounded-full",
+            height,
+            index < filledCount
+              ? "bg-[linear-gradient(180deg,#fb7185_0%,#ef4444_100%)] shadow-[0_10px_18px_-12px_rgba(244,63,94,0.55)]"
+              : "bg-slate-200"
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PlanMetricCard({
+  title,
+  titleClassName,
+  icon,
+  iconShellClassName,
+  value,
+  description,
+  badge,
+  badgeClassName,
+  glowClassName,
+  visual,
+  isMobile,
+  className,
+}: {
+  title: string;
+  titleClassName: string;
+  icon: ReactNode;
+  iconShellClassName: string;
+  value: ReactNode;
+  description: string;
+  badge: string;
+  badgeClassName: string;
+  glowClassName: string;
+  visual?: ReactNode;
+  isMobile: boolean;
+  className?: string;
+}) {
+  return (
+    <Card className={cn(
+      "plan-mission-enter group relative overflow-hidden border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_20px_46px_-36px_rgba(20,41,95,0.38)] ring-1 ring-black/[0.05] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_56px_-32px_rgba(20,41,95,0.42)]",
+      isMobile ? "rounded-[1.45rem]" : "rounded-[1.7rem]",
+      className
+    )}>
+      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+      <div className={cn("pointer-events-none absolute -right-6 top-0 h-24 w-24 rounded-full blur-3xl", glowClassName)} />
+      <CardContent className={cn("relative flex h-full flex-col", isMobile ? "p-4" : "p-5")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className={cn("text-[10px] font-black uppercase tracking-[0.2em]", titleClassName)}>{title}</p>
+            <div className="mt-3">
+              <p className={cn(
+                "font-black tracking-tight text-slate-900 break-keep",
+                isMobile ? "text-[clamp(1.4rem,6vw,2rem)] leading-[1.02]" : "text-[clamp(1.55rem,2vw,2.25rem)] leading-[1.02]"
+              )}>
+                {value}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                {description}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 flex flex-col items-end gap-2">
+            <div className={cn(
+              "relative flex items-center justify-center rounded-2xl border border-white/90 bg-white/88 shadow-[0_16px_30px_-22px_rgba(20,41,95,0.3)]",
+              isMobile ? "h-10 w-10" : "h-11 w-11",
+              iconShellClassName
+            )}>
+              {icon}
+            </div>
+            {visual}
+          </div>
+        </div>
+        <div className="mt-auto pt-4">
+          <span className={cn("inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.14em]", badgeClassName)}>
+            {badge}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile }: any) {
   const [titlePart, timePart] = item.title.split(': ');
@@ -427,6 +830,113 @@ export default function StudyPlanPage() {
   const missionWrapupLabel = hasOutPlan && outTime
     ? `${outTime} 전까지 마무리 목표`
     : '하원 예정 시간을 정하면 마감 리듬이 생겨요';
+  const missionProgressPercent = clampPercent(missionCompletionRate);
+  const doneStudyMissionCount = useMemo(
+    () => Math.max(0, studyTasks.length - remainingStudyTasks.length),
+    [studyTasks.length, remainingStudyTasks.length]
+  );
+  const competitionLadderFilled = useMemo(() => {
+    if (studyTasks.length === 0) return 0;
+    if (doneStudyMissionCount === 0) return 0;
+    return Math.min(3, Math.ceil((doneStudyMissionCount / studyTasks.length) * 3));
+  }, [doneStudyMissionCount, studyTasks.length]);
+  const deadlineProgress = useMemo(
+    () => (hasOutPlan && outTime ? Math.max(10, timeToClockProgress(outTime)) : 0),
+    [hasOutPlan, outTime]
+  );
+  const missionMetricCards = useMemo(() => {
+    return [
+      {
+        key: 'pace',
+        title: '진행도',
+        titleClassName: 'text-sky-600',
+        glowClassName: 'bg-sky-100/70',
+        iconShellClassName: 'text-sky-600',
+        icon: <Activity className="h-4 w-4 text-sky-500" />,
+        value: <>{missionProgressPercent}<span className="ml-1 text-xs font-bold text-slate-400">%</span></>,
+        description: '오늘 미션 달성률이 토큰 진행과 함께 바로 반영돼요.',
+        badge: allMissionTasks.length > 0 ? `${completedMissionCount}개 체크` : '첫 미션 대기',
+        badgeClassName: 'border-sky-100 bg-sky-50/90 text-sky-700',
+        visual: (
+          <PlanMetricOrbit
+            value={missionProgressPercent}
+            strokeColor="#0EA5E9"
+            trackColor="rgba(191,219,254,0.72)"
+            glowClassName="bg-sky-200/50"
+            isMobile={isMobile}
+          >
+            <Activity className="h-4 w-4 text-sky-500" />
+          </PlanMetricOrbit>
+        ),
+      },
+      {
+        key: 'reward',
+        title: '예상 보상',
+        titleClassName: estimatedPlanReward > 0 ? 'text-amber-600' : 'text-slate-400',
+        glowClassName: estimatedPlanReward > 0 ? 'bg-amber-100/70' : 'bg-slate-100/70',
+        iconShellClassName: estimatedPlanReward > 0 ? 'text-amber-600' : 'text-slate-400',
+        icon: <Sparkles className={cn("h-4 w-4", estimatedPlanReward > 0 ? "text-amber-500" : "text-slate-300")} />,
+        value: estimatedPlanReward > 0
+          ? <>{`+${estimatedPlanReward}`}<span className="ml-1 text-xs font-bold text-slate-400">LP</span></>
+          : '보상 대기',
+        description: estimatedPlanReward > 0
+          ? '학습 미션 3개 완료 시 보상 루트가 열려요.'
+          : '오늘 계획 보너스를 이미 받았거나 아직 준비 중이에요.',
+        badge: estimatedPlanReward > 0 ? '보상 루트 활성' : '루트 잠금',
+        badgeClassName: estimatedPlanReward > 0 ? 'border-amber-100 bg-amber-50/90 text-amber-700' : 'border-slate-200 bg-slate-50/90 text-slate-500',
+        visual: <RewardSparkVisual isMobile={isMobile} active={estimatedPlanReward > 0} />,
+      },
+      {
+        key: 'race',
+        title: '자기 경쟁',
+        titleClassName: 'text-rose-500',
+        glowClassName: 'bg-rose-100/70',
+        iconShellClassName: 'text-rose-500',
+        icon: <Trophy className="h-4 w-4 text-rose-400" />,
+        value: <>{doneStudyMissionCount} <span className="mx-1 text-sm font-bold text-slate-300">/</span> {studyTasks.length || 0}</>,
+        description: '오늘 학습 미션 레이스에서 내가 어디까지 왔는지 보여줘요.',
+        badge: studyTasks.length > 0 ? `레이스 ${competitionLadderFilled}/3` : '미션 생성 필요',
+        badgeClassName: 'border-rose-100 bg-rose-50/90 text-rose-700',
+        visual: <CompetitionLadderVisual filledCount={competitionLadderFilled} isMobile={isMobile} />,
+      },
+      {
+        key: 'wrapup',
+        title: '마감 리듬',
+        titleClassName: hasOutPlan && outTime ? 'text-emerald-600' : 'text-slate-400',
+        glowClassName: hasOutPlan && outTime ? 'bg-emerald-100/70' : 'bg-slate-100/70',
+        iconShellClassName: hasOutPlan && outTime ? 'text-emerald-600' : 'text-slate-400',
+        icon: <CalendarCheck className={cn("h-4 w-4", hasOutPlan && outTime ? "text-emerald-500" : "text-slate-300")} />,
+        value: hasOutPlan && outTime ? outTime : '미정',
+        description: missionWrapupLabel,
+        badge: hasOutPlan && outTime ? `${outTime} 리듬 저장` : '시간 설정 필요',
+        badgeClassName: hasOutPlan && outTime ? 'border-emerald-100 bg-emerald-50/90 text-emerald-700' : 'border-slate-200 bg-slate-50/90 text-slate-500',
+        visual: (
+          <PlanMetricOrbit
+            value={deadlineProgress}
+            strokeColor={hasOutPlan && outTime ? '#10B981' : '#CBD5E1'}
+            trackColor={hasOutPlan && outTime ? 'rgba(167,243,208,0.72)' : 'rgba(226,232,240,0.82)'}
+            glowClassName={hasOutPlan && outTime ? 'bg-emerald-200/50' : 'bg-slate-200/45'}
+            isMobile={isMobile}
+          >
+            <CalendarCheck className={cn("h-4 w-4", hasOutPlan && outTime ? "text-emerald-500" : "text-slate-300")} />
+          </PlanMetricOrbit>
+        ),
+      },
+    ];
+  }, [
+    missionProgressPercent,
+    allMissionTasks.length,
+    completedMissionCount,
+    estimatedPlanReward,
+    doneStudyMissionCount,
+    studyTasks.length,
+    competitionLadderFilled,
+    isMobile,
+    hasOutPlan,
+    outTime,
+    missionWrapupLabel,
+    deadlineProgress,
+  ]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!firestore || !activeMembership || !user || !progressRef || !selectedDateKey) return false;
@@ -946,143 +1456,104 @@ export default function StudyPlanPage() {
         </Button>
       </div>
 
-      <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
+      <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2 max-[350px]:grid-cols-1" : "grid-cols-12")}>
         <Card className={cn(
-          "border-none bg-white shadow-xl ring-1 ring-black/[0.03] overflow-hidden",
-          isMobile ? "col-span-2 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
+          "plan-mission-enter relative overflow-hidden border-none bg-[linear-gradient(145deg,#fffef9_0%,#ffffff_42%,#f4f9ff_100%)] shadow-[0_30px_80px_-46px_rgba(20,41,95,0.42)] ring-1 ring-black/[0.04]",
+          isMobile ? "col-span-2 max-[350px]:col-span-1 rounded-[1.65rem]" : "col-span-7 rounded-[2.75rem]"
         )}>
           <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
-          <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.1),transparent_28%)]" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+          <CardContent className={cn("relative", isMobile ? "p-5" : "p-8")}>
             <div className="flex items-start justify-between gap-3">
-              <div className="space-y-2">
-                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+              <div className="min-w-0 space-y-2">
+                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase shadow-sm">
                   오늘의 미션 허브
                 </Badge>
-                <div>
-                  <h2 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl leading-8" : "text-[2.35rem] leading-[1.1]")}>
+                <div className="min-w-0">
+                  <h2 className={cn("font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-[clamp(1.95rem,9vw,2.45rem)] leading-[1.08]" : "text-[2.45rem] leading-[1.04]")}>
                     {missionBoardTitle}
                   </h2>
-                  <p className={cn("font-semibold text-slate-600 break-keep mt-2", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-2xl")}>
+                  <p className={cn("mt-2 line-clamp-2 font-semibold text-slate-600 break-keep", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-[38rem]")}>
                     {missionBoardDescription}
                   </p>
                 </div>
               </div>
-              <div className={cn("rounded-2xl bg-primary/5 text-primary shrink-0", isMobile ? "p-2" : "p-3")}>
-                <ListTodo className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />
+              <div className="shrink-0">
+                <MissionRunnerCapsule
+                  progress={missionProgressPercent}
+                  completedCount={completedMissionCount}
+                  totalCount={allMissionTasks.length}
+                  isMobile={isMobile}
+                />
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+            <MissionProgressRail
+              progress={missionProgressPercent}
+              completedCount={completedMissionCount}
+              totalCount={allMissionTasks.length}
+              isMobile={isMobile}
+            />
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-white/80 px-3 text-[10px] font-black text-primary shadow-sm">
                 완료 {completedMissionCount}/{allMissionTasks.length}
               </Badge>
-              <Badge variant="outline" className="h-7 rounded-full border-emerald-200 bg-emerald-50 px-3 text-[10px] font-black text-emerald-700">
+              <Badge variant="outline" className="h-7 rounded-full border-emerald-200/90 bg-emerald-50/90 px-3 text-[10px] font-black text-emerald-700 shadow-sm">
                 학습 {remainingStudyTasks.length}개 남음
               </Badge>
-              <Badge variant="outline" className="h-7 rounded-full border-amber-200 bg-amber-50 px-3 text-[10px] font-black text-amber-700">
+              <Badge variant="outline" className="h-7 rounded-full border-amber-200/90 bg-amber-50/90 px-3 text-[10px] font-black text-amber-700 shadow-sm">
                 개인 {remainingPersonalTasks.length}개 남음
               </Badge>
             </div>
 
-            <div className="mt-5 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-slate-900">오늘 목표 진행률</p>
-                  <p className="text-[11px] font-semibold text-slate-500">{missionCompletionRate}% 진행 중</p>
+            <div className="mt-5">
+              {missionFocusItems.length > 0 ? (
+                <div className="relative pb-1">
+                  {missionFocusItems.slice(0, 3).map((task, index) => (
+                    <MissionFocusStackCard
+                      key={task.id}
+                      task={task}
+                      index={index}
+                      isMobile={isMobile}
+                    />
+                  ))}
                 </div>
-                <span className="text-sm font-black text-primary">{missionCompletionRate}%</span>
-              </div>
-              <Progress value={missionCompletionRate} className="h-2.5 bg-slate-100" />
-            </div>
-
-            <div className="mt-5 grid gap-2">
-              {missionFocusItems.length > 0 ? missionFocusItems.map((task, index) => (
-                <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
-                  <div className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-black",
-                    index === 0 ? "bg-primary text-white" : "bg-white text-primary ring-1 ring-slate-200"
-                  )}>
-                    {index + 1}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-900">{task.title}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      {task.category === 'personal' ? '선택 미션' : task.targetMinutes ? `${task.targetMinutes}분 목표` : '학습 미션'}
+              ) : (
+                <div className="relative overflow-hidden rounded-[1.4rem] border border-dashed border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.96)_0%,rgba(247,250,255,0.92)_100%)] px-4 py-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.24)]">
+                  <div className="pointer-events-none absolute left-5 top-5 h-3 w-3 rounded-full bg-primary soft-glow" />
+                  <div className="pointer-events-none absolute left-[1.42rem] top-8 h-10 w-px bg-[linear-gradient(180deg,rgba(20,41,95,0.28),rgba(20,41,95,0.02))]" />
+                  <div className="relative pl-6">
+                    <p className="text-sm font-black text-slate-900 break-keep">첫 미션을 적으면 토큰이 바로 출발해요.</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                      작게라도 한 가지 목표를 추가하면 오늘 허브가 움직이기 시작합니다.
                     </p>
                   </div>
-                </div>
-              )) : (
-                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4">
-                  <p className="text-sm font-black text-slate-800">미션을 거의 정리했어요.</p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-500">남은 시간에는 복습이나 내일 계획을 가볍게 추가해 보세요.</p>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
-          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
-            <CardContent className={cn("p-4", !isMobile && "p-5")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">진행도</span>
-                <Activity className="h-4 w-4 text-sky-500" />
-              </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
-                  {missionCompletionRate}<span className="ml-1 text-xs font-bold text-slate-400">%</span>
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">오늘 미션 달성률</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
-            <CardContent className={cn("p-4", !isMobile && "p-5")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">예상 보상</span>
-                <Sparkles className="h-4 w-4 text-amber-500" />
-              </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
-                  {estimatedPlanReward > 0 ? `+${estimatedPlanReward} LP` : '보상 대기'}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                  {estimatedPlanReward > 0 ? '학습 미션 3개 완료 시 예상' : '오늘 계획 보너스를 이미 받았거나 준비 중'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
-            <CardContent className={cn("p-4", !isMobile && "p-5")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">자기 경쟁</span>
-                <Trophy className="h-4 w-4 text-rose-400" />
-              </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
-                  {Math.max(0, studyTasks.length - remainingStudyTasks.length)} / {studyTasks.length || 0}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">오늘 학습 미션 완료 수</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
-            <CardContent className={cn("p-4", !isMobile && "p-5")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">마감 리듬</span>
-                <CalendarCheck className="h-4 w-4 text-emerald-500" />
-              </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
-                  {hasOutPlan && outTime ? outTime : '미정'}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionWrapupLabel}</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className={cn("grid gap-3", isMobile ? "col-span-2 max-[350px]:col-span-1 grid-cols-2 max-[350px]:grid-cols-1" : "col-span-5 grid-cols-2")}>
+          {missionMetricCards.map((card, index) => (
+            <PlanMetricCard
+              key={card.key}
+              title={card.title}
+              titleClassName={card.titleClassName}
+              icon={card.icon}
+              iconShellClassName={card.iconShellClassName}
+              value={card.value}
+              description={card.description}
+              badge={card.badge}
+              badgeClassName={card.badgeClassName}
+              glowClassName={card.glowClassName}
+              visual={card.visual}
+              isMobile={isMobile}
+              className={cn(index === 0 && "plan-entry-delay-1", index === 1 && "plan-entry-delay-2", index === 2 && "plan-entry-delay-3", index === 3 && "plan-entry-delay-4")}
+            />
+          ))}
         </div>
       </section>
 

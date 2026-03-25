@@ -1228,6 +1228,25 @@
   }
 }
 
+@keyframes mission-token-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-2px) scale(1.04);
+  }
+}
+
+@keyframes mission-track-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
 @keyframes parent-enter-up {
   0% {
     opacity: 0;
@@ -1260,6 +1279,46 @@
 
 .float-spark {
   animation: float-spark 2.4s ease-in-out infinite;
+}
+
+.plan-mission-enter {
+  opacity: 0;
+  animation: fade-up-pop 0.46s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+}
+
+.plan-entry-delay-1 {
+  animation-delay: 0.05s;
+}
+
+.plan-entry-delay-2 {
+  animation-delay: 0.1s;
+}
+
+.plan-entry-delay-3 {
+  animation-delay: 0.16s;
+}
+
+.plan-entry-delay-4 {
+  animation-delay: 0.22s;
+}
+
+.plan-runner-token {
+  animation: mission-token-bob 1.7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.plan-runner-track {
+  background-size: 180% 100%;
+  animation: mission-track-flow 2.8s linear infinite;
+  will-change: background-position;
+}
+
+.plan-metric-pulse {
+  animation: soft-glow 2.5s ease-in-out infinite;
+}
+
+.plan-reward-spark {
+  animation: float-spark 2.2s ease-in-out infinite;
 }
 
 .parent-shell-enter,
@@ -1336,6 +1395,11 @@
   .fade-up-pop,
   .soft-glow,
   .float-spark,
+  .plan-mission-enter,
+  .plan-runner-token,
+  .plan-runner-track,
+  .plan-metric-pulse,
+  .plan-reward-spark,
   .parent-shell-enter,
   .parent-hero-enter,
   .parent-card-enter,
