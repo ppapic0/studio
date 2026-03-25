@@ -384,7 +384,7 @@ export const marketingContent: MarketingContent = {
     trustMetrics: [
       { label: '실시간 확인 항목', value: '5개', detail: '출결·상태·그래프·리포트·알림', tone: 'navy' },
       { label: '권한별 화면', value: '3개', detail: '학생·학부모·운영자 분리', tone: 'orange' },
-      { label: '합격 사례', value: '6건', detail: '2026 주요 대학 및 성장 사례', tone: 'green' },
+      { label: '주요 합격 사례', value: '6건', detail: '2026 주요 대학 및 성장 사례', tone: 'green' },
       { label: '공개 증빙 자산', value: '4개', detail: '성적표 3장 + 피드백 1장', tone: 'red' },
     ],
   },
