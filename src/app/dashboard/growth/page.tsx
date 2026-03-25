@@ -156,7 +156,7 @@ function SystemGuideDialog() {
           <Info className="mr-1.5 h-3.5 w-3.5" /> 시즌 티어 및 리셋 가이드
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-w-[90vw]">
+      <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden w-[min(94vw,31rem)] max-h-[86svh]">
         <div className="bg-primary p-8 text-primary-foreground relative">
           <Sparkles className="pointer-events-none absolute top-4 right-4 h-10 w-10 opacity-20" />
           <DialogHeader>
@@ -468,7 +468,7 @@ export default function GrowthPage() {
       {/* 시즌 메인 대시보드 - 현재 티어 그라디언트 적용 */}
       <Card
         className={cn(
-          "tier-hero-card border-none !text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
+          "student-hero-enter tier-hero-card border-none !text-white shadow-2xl overflow-hidden relative group transition-all duration-700",
           isMobile ? "rounded-[1.25rem] p-6" : "rounded-[3rem] p-12"
         )}
         style={{ backgroundImage: tierTheme.heroGradient }}
@@ -479,17 +479,17 @@ export default function GrowthPage() {
         <div className={cn("relative z-10 space-y-6", isMobile ? "space-y-4" : "space-y-10")}>
           <div className={cn("flex flex-col justify-between gap-4", isMobile ? "" : "md:flex-row md:items-end")}>
             <div className="space-y-1">
-              <Badge className="bg-white/20 text-white border-none font-black text-[8px] sm:text-[10px] px-2 py-0.5 mb-1 sm:mb-2 tracking-widest whitespace-nowrap">시즌 {format(new Date(), 'M월', { locale: ko })}</Badge>
-              <h2 className={cn("font-black tracking-tighter leading-none", isMobile ? "text-4xl" : "text-7xl")}>
-                {currentLp.toLocaleString()}<span className={cn("opacity-80 ml-1 font-bold whitespace-nowrap", isMobile ? "text-sm" : "text-2xl")}>점</span>
+              <Badge className="bg-white/20 text-white border-none font-black text-[8px] sm:text-[10px] px-2 py-0.5 mb-1 sm:mb-2 tracking-widest">시즌 {format(new Date(), 'M월', { locale: ko })}</Badge>
+              <h2 className={cn("font-black tracking-tighter leading-none break-keep", isMobile ? "text-[clamp(2.2rem,12vw,3.35rem)]" : "text-7xl")}>
+                {currentLp.toLocaleString()}<span className={cn("opacity-80 ml-1 font-bold", isMobile ? "text-sm" : "text-2xl")}>점</span>
               </h2>
               <p className={cn("font-bold opacity-90", isMobile ? "text-[10px]" : "text-sm")}>이번 시즌 누적 포인트</p>
             </div>
             
-            <div className={cn("p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-white/20 backdrop-blur-xl border border-white/20 flex flex-col items-center shadow-2xl", isMobile ? "w-fit" : "min-w-[180px]")}>
+            <div className={cn("p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-white/20 backdrop-blur-xl border border-white/20 flex flex-col items-center shadow-2xl", isMobile ? "w-full items-start" : "min-w-[180px]")}>
               <span className={cn("font-black uppercase tracking-widest opacity-80 mb-1", isMobile ? "text-[7px]" : "text-[10px]")}>현재 티어</span>
               <span className={cn("font-black tracking-tighter", isMobile ? "text-xl" : "text-3xl")}>{currentTier.name}</span>
-              {!isMobile && <span className="text-[10px] font-bold mt-1 opacity-80">다음: {(25000 - currentLp).toLocaleString()}점</span>}
+              <span className={cn("text-[10px] font-bold mt-1 opacity-80", isMobile ? "" : "")}>다음: {(25000 - currentLp).toLocaleString()}점</span>
             </div>
           </div>
 
@@ -595,7 +595,7 @@ export default function GrowthPage() {
           <Badge variant="outline" className="rounded-full font-black text-[9px] border-primary/20 px-2 h-5">평균: {avgStat.toFixed(1)}</Badge>
         </div>
 
-        <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
+        <div className={cn("grid gap-3", isMobile ? "grid-cols-1 sm:grid-cols-2" : "md:grid-cols-4")}>
           {Object.entries(STAT_CONFIG).map(([key, config]) => {
             const statKey = key as StatKey;
             const val = stats[statKey] || 0;
@@ -625,7 +625,7 @@ export default function GrowthPage() {
                     </Card>
                   </button>
                 </DialogTrigger>
-                <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "max-w-[92vw] rounded-[1.5rem]" : "sm:max-w-lg rounded-[2rem]")}>
+                <DialogContent className={cn("border-none shadow-2xl p-0 overflow-hidden", isMobile ? "w-[min(94vw,28rem)] max-h-[86svh] rounded-[1.5rem]" : "sm:max-w-lg rounded-[2rem]")}>
                   <div className={cn("text-white", config.bg, isMobile ? "p-5" : "p-7")}>
                     <DialogHeader>
                       <DialogTitle className={cn("font-black tracking-tight", isMobile ? "text-xl" : "text-2xl")}>{SKILL_LABEL[statKey]} 점수 획득 이력</DialogTitle>
@@ -634,7 +634,7 @@ export default function GrowthPage() {
                       </DialogDescription>
                     </DialogHeader>
                   </div>
-                  <div className={cn("bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[52vh] p-4" : "max-h-[60vh] p-6")}>
+                  <div className={cn("bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9.5rem)] p-4" : "max-h-[60vh] p-6")}>
                     {history.length === 0 ? (
                       <div className="py-10 text-center text-sm font-bold text-muted-foreground">이번 시즌 획득 기록이 없습니다.</div>
                     ) : (

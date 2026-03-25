@@ -24,7 +24,7 @@ export default function DashboardLayout({
       className={cn(
         'dashboard-shell min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
         isMobileView
-          ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-3 pb-6'
+          ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-2.5 pb-5 sm:px-3 sm:pb-6'
           : 'bg-[#f2f4f8] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
       )}
     >
@@ -59,7 +59,7 @@ export default function DashboardLayout({
         className={cn(
           'flex flex-col transition-all duration-700 relative z-10',
           isMobileView
-            ? 'dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-4'
+            ? 'dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-3 sm:mt-4'
             : 'w-full min-h-screen'
         )}
       >
@@ -83,7 +83,7 @@ export default function DashboardLayout({
         <ReportNotifier />
 
         {(isMobileView || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
-          <div className={isMobileView ? 'absolute bottom-0 left-0 right-0 z-50' : ''}>
+          <div className={isMobileView ? 'dashboard-mobile-nav-wrap absolute bottom-0 left-0 right-0 z-50' : ''}>
             <BottomNav />
           </div>
         )}
