@@ -69,7 +69,6 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard?parentTab=data', label: '데이터', icon: FileText },
     { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
     { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
-    { href: '/dashboard?parentTab=reports', label: '리포트', icon: FileText },
   ],
   centerAdmin: [...adminNavItems],
   owner: [...adminNavItems],

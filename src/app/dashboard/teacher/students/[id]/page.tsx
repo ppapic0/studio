@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatSeatLabel } from '@/lib/seat-layout';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1277,7 +1278,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-black tracking-tighter truncate text-3xl sm:text-4xl">{student?.name || '학생'}</h1>
-              <Badge className="bg-primary text-white px-2 py-0.5 rounded-full font-black text-[10px]">{student?.seatNo || '미배정'}번 좌석</Badge>
+              <Badge className="bg-primary text-white px-2 py-0.5 rounded-full font-black text-[10px]">{formatSeatLabel(student)}</Badge>
               {!isStudentSelfView && (
                 <Badge variant="outline" className="font-black text-[10px] rounded-full"><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
               )}

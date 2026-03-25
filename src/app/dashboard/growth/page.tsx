@@ -298,13 +298,19 @@ export default function GrowthPage() {
   const isRankContextLoading = activeMembersLoading || attendanceLoading;
 
   const currentRank = useMemo(() => {
-    const snapshotRank = rankEntries?.[0]?.rank || 0;
+    const snapshotEntry = rankEntries?.[0];
+    const snapshotRank = snapshotEntry?.rank || 0;
     if (!user || validRankEntries.length === 0) return snapshotRank;
 
-    const sorted = [...validRankEntries].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const sorted = [...validRankEntries].sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
     const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
     if (ownIndex >= 0) return ownIndex + 1;
-    return snapshotRank;
+
+    const snapshotValue = Number(snapshotEntry?.value);
+    if (!Number.isFinite(snapshotValue)) return snapshotRank;
+
+    const higherCount = sorted.filter((entry) => (Number(entry.value) || 0) > snapshotValue).length;
+    return Math.min(sorted.length, higherCount + 1);
   }, [rankEntries, validRankEntries, user?.uid]);
 
   const rankDisplay = useMemo(() => {
@@ -315,7 +321,8 @@ export default function GrowthPage() {
     if (totalCount <= 0) return `#${currentRank}`;
     if (totalCount < 10) return `#${currentRank} / ${totalCount}`;
 
-    const percent = Math.max(1, Math.ceil((currentRank / totalCount) * 100));
+    const safeRank = Math.min(currentRank, totalCount);
+    const percent = Math.max(1, Math.ceil((safeRank / totalCount) * 100));
     return `상위 ${percent}%`;
 
   }, [isRankContextLoading, currentRank, totalCount]);

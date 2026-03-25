@@ -140,13 +140,13 @@ export default function DashboardPage() {
   const studentProfileRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership?.id, activeMembership?.role, user?.uid]);
+  }, [firestore, activeMembership, user]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
 
   const studentGrowthRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-  }, [firestore, activeMembership?.id, activeMembership?.role, user?.uid]);
+  }, [firestore, activeMembership, user]);
   const { data: studentGrowth } = useDoc<any>(studentGrowthRef, { enabled: isStudentRole });
 
   const examCountdownSource = studentGrowth?.examCountdowns ?? studentProfile?.examCountdowns;
@@ -340,6 +340,14 @@ export default function DashboardPage() {
       return <TeacherDashboard isActive={true} />;
     }
 
+    if (userRole === 'parent') {
+      return (
+        <div className="flex flex-col gap-3">
+          <ParentDashboard isActive={true} />
+        </div>
+      );
+    }
+
     return (
       <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
         <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
@@ -437,11 +445,7 @@ export default function DashboardPage() {
         </div>
 
         <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
-          {userRole === 'student' ? (
-            <StudentDashboard isActive={true} />
-          ) : (
-            <ParentDashboard isActive={true} />
-          )}
+          <StudentDashboard isActive={userRole === 'student'} />
         </div>
       </div>
     );

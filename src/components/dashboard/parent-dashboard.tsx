@@ -19,6 +19,7 @@ import {
   BarChart3,
   Flame,
   Info,
+  Maximize2,
   FileText,
   Clock,
   Zap,
@@ -32,7 +33,7 @@ import {
   CalendarDays,
   Loader2,
   CreditCard,
-  Megaphone,
+  X,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -88,22 +89,13 @@ import {
   type StudentProfile,
 } from '@/lib/types';
 import { ROUTINE_MISSING_PENALTY_POINTS } from '@/lib/attendance-auto';
-import {
-  type ChartInsight,
-  buildAwayTimeInsight,
-  buildDailyStudyInsight,
-  buildRhythmInsight,
-  buildStartEndInsight,
-  buildSubjectInsight,
-  buildWeeklyStudyInsight,
-} from '@/lib/learning-insights';
 
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsContent } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -131,17 +123,6 @@ function toClockLabel(totalMinutes: number) {
   const hours = Math.floor(safe / 60).toString().padStart(2, '0');
   const minutes = (safe % 60).toString().padStart(2, '0');
   return `${hours}:${minutes}`;
-}
-
-function hourNumberToDate(dateKey: string, hourValue?: number | null): Date | null {
-  if (typeof hourValue !== 'number' || !Number.isFinite(hourValue)) return null;
-  const base = parse(dateKey, 'yyyy-MM-dd', new Date());
-  if (Number.isNaN(base.getTime())) return null;
-  const clamped = Math.max(0, Math.min(24, hourValue));
-  const hours = Math.floor(clamped);
-  const minutes = Math.max(0, Math.min(59, Math.round((clamped - hours) * 60)));
-  base.setHours(hours, minutes, 0, 0);
-  return base;
 }
 
 function calculateRhythmScore(minutes: number[]): number {
@@ -175,7 +156,6 @@ function toKoreanSubjectLabel(raw: string): string {
 type ParentCommunicationRecord = {
   id: string;
   studentId: string;
-  studentName?: string;
   parentUid?: string;
   parentName?: string;
   senderRole?: 'parent' | 'student';
@@ -187,11 +167,6 @@ type ParentCommunicationRecord = {
   body?: string;
   channel?: 'visit' | 'phone' | 'online' | null;
   status?: string;
-  statusUpdatedAt?: { toDate?: () => Date; toMillis?: () => number };
-  slaDueAt?: { toDate?: () => Date; toMillis?: () => number } | Date | string | null;
-  owner?: string;
-  nextAction?: string;
-  priority?: 'normal' | 'high' | 'critical';
   createdAt?: { toDate?: () => Date; toMillis?: () => number };
   updatedAt?: { toDate?: () => Date; toMillis?: () => number };
   replyBody?: string;
@@ -199,25 +174,314 @@ type ParentCommunicationRecord = {
   repliedByName?: string;
 };
 
-type ParentAnnouncementRecord = {
-  id: string;
-  title?: string;
-  body?: string;
-  audience?: 'parent' | 'student' | 'all';
-  status?: string;
-  createdAt?: { toDate?: () => Date; toMillis?: () => number };
-  updatedAt?: { toDate?: () => Date; toMillis?: () => number };
+type GrowthCelebrationState = {
+  increaseRate: number;
+  todayMinutes: number;
+  previous7DayAverage: number;
 };
 
-type ParentDataChartKey =
-  | 'weeklyStudy'
-  | 'dailyStudy'
-  | 'rhythmScore'
-  | 'startEnd'
-  | 'awayTime'
-  | 'subjectTime';
+type LinkedStudentOption = {
+  id: string;
+  name: string;
+};
 
-type ParentNotificationFilter = 'all' | 'important' | 'unread' | 'billing' | 'life' | 'reports';
+const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing', 'notifications'];
+
+function normalizeParentPortalTab(value: string | null): ParentPortalTab {
+  if (value === 'life') return 'data';
+  if (value === 'reports') return 'home';
+  if (value && PARENT_PORTAL_TABS.includes(value as ParentPortalTab)) {
+    return value as ParentPortalTab;
+  }
+  return 'home';
+}
+
+function ParentGrowthCelebration({
+  celebration,
+  studentName,
+  onClose,
+}: {
+  celebration: GrowthCelebrationState;
+  studentName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[70] flex justify-center px-4 sm:px-6">
+      <div className="fade-up-pop pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[1.85rem] border border-[#ffd5a7] bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(255,244,231,0.98)_55%,rgba(238,244,255,0.98)_100%)] p-4 shadow-[0_18px_36px_rgba(20,41,95,0.18)] backdrop-blur-xl">
+        <div className="soft-glow absolute -right-6 top-2 h-24 w-24 rounded-full bg-[#FFB46D]/40 blur-3xl" />
+        <div className="soft-glow absolute -left-8 bottom-0 h-20 w-20 rounded-full bg-[#9fc0ff]/35 blur-3xl" />
+        <Sparkles className="float-spark absolute right-5 top-5 h-4 w-4 text-[#FF7A16]" />
+
+        <div className="relative z-10 flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#14295F] text-white shadow-[0_10px_20px_rgba(20,41,95,0.22)]">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">Growth Update</p>
+                <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">
+                  {studentName} 학생의 오늘 흐름이 좋아졌어요
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-[#14295F]/10 bg-white/85 p-1.5 text-[#14295F] shadow-sm transition-colors hover:bg-white"
+                aria-label="성장 알림 닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-600">
+              우리 아이 공부가 최근 7일 평균보다{' '}
+              <span className="font-black text-[#FF7A16]">{celebration.increaseRate}%</span> 증가했어요.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className="h-7 rounded-full border border-[#ffd4aa] bg-white/90 px-3 text-[11px] font-black text-[#14295F]">
+                오늘 {toHm(celebration.todayMinutes)}
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border border-[#d5e3ff] bg-[#eef4ff] px-3 text-[11px] font-black text-[#14295F]">
+                최근 평균 {toHm(celebration.previous7DayAverage)}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RhythmTimeChartDialog({
+  trend,
+  hasTrend,
+  yAxisDomain,
+  rhythmScoreTrend,
+  rhythmScore,
+}: {
+  trend: Array<{ date: string; rhythmMinutes: number | null }>;
+  hasTrend: boolean;
+  yAxisDomain: [number, number];
+  rhythmScoreTrend: Array<{ date: string; score: number }>;
+  rhythmScore: number;
+}) {
+  const latestRhythm = trend.slice().reverse().find((item) => typeof item.rhythmMinutes === 'number');
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 cursor-pointer">
+          <div className="mb-3 flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
+              <TrendingUp className="h-4 w-4 text-[#FF7A16]" />
+              학습 리듬 시간
+            </CardTitle>
+            <Maximize2 className="h-4 w-4 text-slate-300" />
+          </div>
+          <div className="w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+            <p className="text-xs font-black text-[#14295F]">오늘 학습 리듬 점수</p>
+            <p className="mt-2 text-3xl font-black text-[#14295F]">{rhythmScore}점</p>
+            <p className="mt-3 text-[11px] font-bold text-slate-500">카드를 누르면 상세 그래프를 확인할 수 있어요.</p>
+          </div>
+        </Card>
+      </DialogTrigger>
+      <DialogContent className="max-w-[95vw] rounded-[2rem] border border-slate-200 p-0 overflow-hidden sm:max-w-3xl">
+        <div className="bg-[#14295F] p-6 text-white sm:p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tight">학습 리듬 시간</DialogTitle>
+            <DialogDescription className="text-white/70 font-bold">
+              최근 7일 기준 첫 공부 세션 시작 시각입니다.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="space-y-5 bg-white p-5 sm:p-8">
+          <div className="h-[320px] w-full">
+            {hasTrend ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsLineChart data={trend} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                  <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis
+                    fontSize={11}
+                    axisLine={false}
+                    tickLine={false}
+                    width={48}
+                    domain={yAxisDomain}
+                    tickFormatter={(value) => toClockLabel(Number(value))}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
+                    formatter={(value) =>
+                      typeof value === 'number'
+                        ? [toClockLabel(value), '학습 시작']
+                        : ['기록 없음', '학습 시작']
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="rhythmMinutes"
+                    stroke="#14295F"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 1 }}
+                    activeDot={{ r: 6, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 2 }}
+                    connectNulls={false}
+                  />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm font-bold text-slate-400">
+                최근 학습 시작 기록이 없습니다.
+              </div>
+            )}
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-[#14295F]">리듬 점수 그래프</h4>
+              <Badge variant="outline" className="font-black text-[10px]">
+                평균 {rhythmScore}점
+              </Badge>
+            </div>
+            <div className="h-[220px] w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsLineChart data={rhythmScoreTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                  <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis fontSize={11} axisLine={false} tickLine={false} width={30} domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
+                    formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#FF7A16"
+                    strokeWidth={3}
+                    dot={{ r: 3, fill: '#14295F' }}
+                    activeDot={{ r: 5, fill: '#14295F' }}
+                  />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {trend.map((point) => (
+              <div key={point.date} className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{point.date}</p>
+                <p className="mt-1 text-base font-black text-slate-800">
+                  {typeof point.rhythmMinutes === 'number' ? toClockLabel(point.rhythmMinutes) : '기록 없음'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SubjectStudyChartDialog({
+  subjects,
+  subjectTotalMinutes,
+}: {
+  subjects: Array<{ subject: string; minutes: number; color: string }>;
+  subjectTotalMinutes: number;
+}) {
+  const previewData = subjects.slice(0, 5);
+  const topSubject = subjects[0];
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 cursor-pointer">
+          <div className="mb-3 flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
+              <BarChart3 className="h-4 w-4 text-[#14295F]" />
+              과목별 학습시간
+            </CardTitle>
+            <Maximize2 className="h-4 w-4 text-slate-300" />
+          </div>
+          <div className="w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+            <p className="text-xs font-black text-[#14295F]">집중 KPI</p>
+            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-600">
+              카드를 누르면 과목별 학습 그래프를 확인할 수 있어요.
+            </p>
+            <p className="mt-3 text-[11px] font-black text-[#14295F]">
+              현재 1위 과목: {topSubject?.subject || '-'}
+            </p>
+          </div>
+        </Card>
+      </DialogTrigger>
+      <DialogContent className="max-w-[95vw] rounded-[2rem] border border-slate-200 p-0 overflow-hidden sm:max-w-3xl">
+        <div className="bg-[#FF7A16] p-6 text-white sm:p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tight">과목별 학습시간</DialogTitle>
+            <DialogDescription className="text-white/80 font-bold">
+              이번 주 계획 기준 과목별 학습 배분입니다.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="space-y-5 bg-white p-5 sm:p-8">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">총 공부시간</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{toHm(subjectTotalMinutes)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">과목 수</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{subjects.length}개</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">최다 비중</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{subjects[0]?.subject || '-'}</p>
+            </div>
+          </div>
+          <div className="h-[320px] w-full">
+            {previewData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={previewData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
+                  <XAxis dataKey="subject" fontSize={11} axisLine={false} tickLine={false} />
+                  <YAxis fontSize={11} axisLine={false} tickLine={false} width={36} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '1rem', border: '1px solid #e5e7eb' }}
+                    formatter={(value) => [`${Number(value || 0)}분`, '학습시간']}
+                  />
+                  <Bar dataKey="minutes" radius={[10, 10, 0, 0]} fill="#FF7A16" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm font-bold text-slate-400">
+                과목별 학습 계획이 없습니다.
+              </div>
+            )}
+          </div>
+          <div className="grid gap-2">
+            {subjects.map((item) => {
+              const ratio = Math.round((item.minutes / Math.max(subjectTotalMinutes, 1)) * 100);
+              return (
+                <div key={item.subject} className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm font-black text-slate-800">{item.subject}</span>
+                    </div>
+                    <span className="text-sm font-black text-slate-500">{item.minutes}분</span>
+                  </div>
+                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.max(6, ratio)}%`, backgroundColor: item.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function formatMinutes(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -232,17 +496,6 @@ function getFocusProgress(minutes: number) {
 function formatWon(value: number) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
   return `₩${safe.toLocaleString()}`;
-}
-
-function calcDeltaPercent(current: number, base: number) {
-  const safeCurrent = Number.isFinite(current) ? current : 0;
-  const safeBase = Number.isFinite(base) ? base : 0;
-  if (safeBase <= 0) return safeCurrent > 0 ? 100 : 0;
-  return Math.round(((safeCurrent - safeBase) / safeBase) * 100);
-}
-
-function formatSignedMetric(value: number, suffix = '') {
-  return `${value >= 0 ? '+' : ''}${value}${suffix}`;
 }
 
 type InvoiceStatusMeta = {
@@ -292,12 +545,6 @@ const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
 const SUBJECT_COLORS = ['#FF7A16', '#14295F', '#10B981', '#0EA5E9', '#A855F7'];
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = { late: 1, absence: 2 };
 const PENALTY_RECOVERY_INTERVAL_DAYS = 7;
-const PENALTY_SOURCE_LABEL: Record<string, string> = {
-  attendance_request: '지각/결석 신청 반영',
-  routine_missing: '루틴 미작성',
-  manual: '센터 수동 부여',
-  reset: '벌점 조정',
-};
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 
@@ -342,122 +589,6 @@ function formatDateLabel(dateText?: string, fallbackTimestamp?: TimestampLike) {
   }
   return '최근';
 }
-function getPaymentMethodSummary(method?: Invoice['paymentMethod'], customSummary?: string) {
-  if (customSummary?.trim()) return customSummary.trim();
-  if (method === 'card') return '등록 카드로 바로 결제 가능';
-  if (method === 'transfer') return '계좌이체 안내 예정';
-  if (method === 'cash') return '센터 수납 확인 필요';
-  return '결제 수단 확인 필요';
-}
-
-function getInvoiceDueLabel(invoice: Invoice) {
-  if (invoice.dueLabel?.trim()) return invoice.dueLabel.trim();
-  const dueDate = toDateSafe((invoice as any).cycleEndDate);
-  if (!dueDate) return '납부 일정을 확인해 주세요.';
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const normalizedDueDate = new Date(dueDate);
-  normalizedDueDate.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.round((normalizedDueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-  if (invoice.status === 'paid') {
-    return `납부 완료 · ${format(dueDate, 'M월 d일', { locale: ko })}`;
-  }
-  if (diffDays > 0) return `납부 예정 D-${diffDays}`;
-  if (diffDays === 0) return '오늘까지 납부 필요';
-  return `${Math.abs(diffDays)}일 연체`;
-}
-
-function getCommunicationStageMeta(item: ParentCommunicationRecord) {
-  const dueAt = toDateSafe(item.slaDueAt as TimestampLike);
-  const dueLabel = dueAt ? format(dueAt, 'M/d HH:mm', { locale: ko }) : null;
-
-  if (item.status === 'done') {
-    return {
-      tone: 'emerald' as const,
-      timelineLabel: '답변 완료',
-      etaLabel: '답변을 확인해 주세요.',
-      nextAction: item.nextAction?.trim() || '답변 내용을 확인하고 추가 문의가 있으면 이어서 남겨 주세요.',
-      owner: item.repliedByName || item.owner || '담당 선생님',
-    };
-  }
-  if (item.status === 'consultation_needed') {
-    return {
-      tone: 'rose' as const,
-      timelineLabel: '상담 예약 필요',
-      etaLabel: dueLabel ? `${dueLabel} 전 상담 일정 안내` : '상담 가능한 시간을 확인 중이에요.',
-      nextAction: item.nextAction?.trim() || '가능한 상담 시간을 남겨 주시면 빠르게 조율해 드릴게요.',
-      owner: item.owner || '상담 담당자',
-    };
-  }
-  if (item.status === 'needs_info') {
-    return {
-      tone: 'amber' as const,
-      timelineLabel: '추가 정보 필요',
-      etaLabel: dueLabel ? `${dueLabel} 전 추가 안내 예정` : '추가 확인이 필요한 상태예요.',
-      nextAction: item.nextAction?.trim() || '세부 상황을 한 줄 더 남겨 주시면 처리 속도가 빨라져요.',
-      owner: item.owner || '담당 선생님',
-    };
-  }
-  if (item.status === 'in_progress') {
-    return {
-      tone: 'blue' as const,
-      timelineLabel: '처리 중',
-      etaLabel: dueLabel ? `${dueLabel} 전 1차 답변 예정` : '영업일 기준 24시간 안에 1차 답변드려요.',
-      nextAction: item.nextAction?.trim() || '확인 중인 내용은 앱 알림으로 바로 전달드릴게요.',
-      owner: item.owner || '담당 선생님',
-    };
-  }
-  if (item.status === 'in_review') {
-    return {
-      tone: 'amber' as const,
-      timelineLabel: '검토 중',
-      etaLabel: dueLabel ? `${dueLabel} 전 안내 예정` : '센터 검토가 끝나는 대로 안내드려요.',
-      nextAction: item.nextAction?.trim() || '조금 더 정확한 답변을 위해 내부 확인 중이에요.',
-      owner: item.owner || '센터 관리자',
-    };
-  }
-  return {
-    tone: 'slate' as const,
-    timelineLabel: '접수됨',
-    etaLabel: dueLabel ? `${dueLabel} 전 1차 답변 예정` : '영업일 기준 24시간 안에 먼저 답변드려요.',
-    nextAction: item.nextAction?.trim() || '확인 후 앱에서 바로 안내드릴게요.',
-    owner: item.owner || '담당 선생님',
-  };
-}
-
-function getNotificationCategory(notification: ParentNotificationItem): Exclude<ParentNotificationFilter, 'all' | 'unread'> | 'general' {
-  if (notification.category) return notification.category;
-
-  const text = `${notification.title} ${notification.body} ${notification.nextAction || ''}`.toLowerCase();
-  if (notification.type === 'weekly_report' || notification.type === 'monthly_report') return 'reports';
-  if (
-    notification.type === 'check_in'
-    || notification.type === 'check_out'
-    || notification.type === 'late'
-    || notification.type === 'away_long'
-    || notification.type === 'unauthorized_exit'
-    || notification.type === 'penalty'
-    || text.includes('출결')
-    || text.includes('벌점')
-    || text.includes('외출')
-  ) {
-    return 'life';
-  }
-  if (
-    text.includes('결제')
-    || text.includes('청구')
-    || text.includes('납부')
-    || text.includes('미납')
-    || text.includes('영수증')
-  ) {
-    return 'billing';
-  }
-  if (notification.isImportant) return 'important';
-  return 'general';
-}
-
 export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -479,49 +610,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [submitting, setSubmitting] = useState(false);
 
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
-  const [notificationFilter, setNotificationFilter] = useState<ParentNotificationFilter>('all');
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
   const [isReportArchiveOpen, setIsReportArchiveOpen] = useState(false);
   const [selectedChildReport, setSelectedChildReport] = useState<DailyReport | null>(null);
-  const [selectedDataChart, setSelectedDataChart] = useState<ParentDataChartKey | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
-  const [selectedDatePlans, setSelectedDatePlans] = useState<StudyPlanItem[]>([]);
-  const [isSelectedDatePlansLoading, setIsSelectedDatePlansLoading] = useState(false);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
-  const [report, setReport] = useState<(DailyReport & { id: string }) | null>(null);
-  const [rawReportsArchive, setRawReportsArchive] = useState<DailyReport[]>([]);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
-  const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
-  const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
-  const [selectedChildIdx, setSelectedChildIdx] = useState(0);
-  const [linkedStudentNames, setLinkedStudentNames] = useState<Record<string, string>>({});
+  const [growthCelebration, setGrowthCelebration] = useState<GrowthCelebrationState | null>(null);
+  const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
   const visitLoggedRef = useRef(false);
   const reportReadLoggedRef = useRef<Record<string, boolean>>({});
+  const growthCelebrationTimerRef = useRef<number | null>(null);
 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => setToday(new Date()), []);
-
-  useEffect(() => {
-    const requestedTab = searchParams.get('parentTab');
-    if (!requestedTab) return;
-
-    if (requestedTab === 'life') {
-      setTab('data');
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('parentTab', 'data');
-      router.replace(`${pathname}?${params.toString()}`);
-      return;
-    }
-
-    const normalizedTab = requestedTab as ParentPortalTab;
-    if (normalizedTab) {
-      setTab(normalizedTab);
-    }
-  }, [searchParams, pathname, router]);
 
   const active센터Membership = useMemo(() => {
     if (activeMembership) {
@@ -532,34 +638,101 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = active센터Membership?.id;
   const linkedStudentIds = useMemo(
-    () => active센터Membership?.linkedStudentIds ?? [],
-    [active센터Membership]
+    () =>
+      (active센터Membership?.linkedStudentIds || []).filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0
+      ),
+    [active센터Membership?.linkedStudentIds]
   );
-  const studentId = linkedStudentIds[selectedChildIdx] ?? linkedStudentIds[0];
+  const linkedStudentIdsKey = linkedStudentIds.join(',');
+  const requestedStudentId = searchParams.get('parentStudentId');
+  const studentId = useMemo(() => {
+    if (linkedStudentIds.length === 0) return undefined;
+    if (requestedStudentId && linkedStudentIds.includes(requestedStudentId)) {
+      return requestedStudentId;
+    }
+    return linkedStudentIds[0];
+  }, [linkedStudentIds, requestedStudentId]);
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
-  const isHomeTab = tab === 'home';
-  const needsStudyData = isHomeTab || tab === 'studyDetail' || tab === 'data';
-  const needsStatusData = needsStudyData || tab === 'notifications';
-  const needsNotificationsData = isHomeTab || tab === 'notifications';
-  const needsCommunicationData = isHomeTab || tab === 'communication';
-  const needsAnnouncementsData = tab === 'communication';
-  const needsBillingData = isHomeTab || tab === 'billing' || tab === 'notifications';
-  const needsPenaltyData = isHomeTab || tab === 'data' || tab === 'notifications';
-  const needsGrowthData = isHomeTab || tab === 'studyDetail' || tab === 'data';
-  const needsLatestReportData = isHomeTab || tab === 'notifications' || isReportArchiveOpen;
-  const needsReportsArchiveData = isReportArchiveOpen;
-  const needsAttendanceRequestData = tab === 'studyDetail' || tab === 'data';
-  const notificationsLimit = isHomeTab ? 8 : 20;
-  const parentCommunicationsLimit = isHomeTab ? 8 : 30;
-  const penaltyLogsLimit = isHomeTab || tab === 'notifications' ? 40 : 120;
-  const invoiceLimit = isHomeTab ? 24 : 120;
 
   useEffect(() => {
-    setNotificationFilter('all');
-  }, [studentId]);
+    const requestedTab = searchParams.get('parentTab');
+    const normalizedTab = normalizeParentPortalTab(requestedTab);
+    if (tab !== normalizedTab) {
+      setTab(normalizedTab);
+    }
 
+    const params = new URLSearchParams(searchParams.toString());
+    let shouldReplace = false;
+
+    if (requestedTab !== normalizedTab) {
+      params.set('parentTab', normalizedTab);
+      shouldReplace = true;
+      if (requestedTab === 'reports') {
+        setIsReportArchiveOpen(true);
+      }
+    }
+
+    if (linkedStudentIds.length > 1 && studentId) {
+      if (requestedStudentId !== studentId) {
+        params.set('parentStudentId', studentId);
+        shouldReplace = true;
+      }
+    } else if (requestedStudentId) {
+      params.delete('parentStudentId');
+      shouldReplace = true;
+    }
+
+    if (shouldReplace) {
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [searchParams, pathname, router, linkedStudentIds.length, requestedStudentId, studentId, tab]);
+
+  useEffect(() => {
+    if (!isActive || !firestore || !centerId || linkedStudentIds.length === 0) {
+      setLinkedStudents([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLinkedStudents = async () => {
+      try {
+        const records = await Promise.all(
+          linkedStudentIds.map(async (id, index) => {
+            const snap = await getDoc(doc(firestore, 'centers', centerId, 'students', id));
+            const data = snap.data() as StudentProfile | undefined;
+            return {
+              id,
+              name: data?.name?.trim() || `자녀 ${index + 1}`,
+            };
+          })
+        );
+
+        if (!cancelled) {
+          setLinkedStudents(records);
+        }
+      } catch (error) {
+        console.warn('[parent-dashboard] failed to load linked students', error);
+        if (!cancelled) {
+          setLinkedStudents(
+            linkedStudentIds.map((id, index) => ({
+              id,
+              name: `자녀 ${index + 1}`,
+            }))
+          );
+        }
+      }
+    };
+
+    void loadLinkedStudents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, firestore, centerId, linkedStudentIdsKey]);
   const logParentActivity = async (
     eventType: ParentActivityEvent['eventType'],
     metadata?: Record<string, any>
@@ -575,8 +748,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAt: serverTimestamp(),
         metadata: metadata || {},
       });
-    } catch {
-      // Telemetry failures should never surface as parent-facing console noise.
+    } catch (error) {
+      console.warn('[parent-activity] failed to log event', eventType, error);
     }
   };
 
@@ -587,95 +760,88 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     void logParentActivity('app_visit', { source: 'dashboard_open', tab });
   }, [isActive, centerId, studentId, user, tab]);
 
-  // 다자녀인 경우 각 학생 이름 미리 로드
   useEffect(() => {
-    if (!firestore || !centerId || linkedStudentIds.length <= 1) return;
-    void (async () => {
-      const names: Record<string, string> = {};
-      await Promise.all(
-        linkedStudentIds.map(async (sid) => {
-          try {
-            const snap = await getDoc(doc(firestore, 'centers', centerId, 'students', sid));
-            if (snap.exists()) names[sid] = (snap.data() as { name?: string }).name || sid;
-          } catch {
-            names[sid] = sid;
-          }
-        })
-      );
-      setLinkedStudentNames(names);
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, centerId, linkedStudentIds.join(',')]);
+    visitLoggedRef.current = false;
+    reportReadLoggedRef.current = {};
+    setReadMap({});
+    setSelectedNotification(null);
+    setSelectedChildReport(null);
+    setSelectedCalendarDate(null);
+    setGrowthCelebration(null);
+  }, [studentId]);
 
   const studentRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'students', studentId)), [firestore, centerId, studentId]);
   const { data: student } = useDoc<StudentProfile>(studentRef, { enabled: isActive && !!studentId });
+  const activeStudentLabel = useMemo(
+    () =>
+      linkedStudents.find((item) => item.id === studentId)?.name ||
+      student?.name ||
+      (linkedStudentIds.length > 1 ? '자녀 선택' : '자녀'),
+    [linkedStudents, student?.name, studentId, linkedStudentIds.length]
+  );
+  const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
+  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && tab === 'home';
+  const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
+  const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
+  const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
 
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
-  const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId && needsStatusData });
+  const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
 
-  // 캘린더용 모든 로그 조회
-  const currentCalendarMonthRange = useMemo(() => {
-    const monthStart = startOfMonth(currentCalendarDate);
-    const monthEnd = endOfMonth(currentCalendarDate);
-    return {
-      startKey: format(monthStart, 'yyyy-MM-dd'),
-      endKey: format(monthEnd, 'yyyy-MM-dd'),
-    };
-  }, [currentCalendarDate]);
+  const recentAnalyticsStartKey = today ? format(subDays(today, 34), 'yyyy-MM-dd') : '';
+  const calendarRangeStartKey = format(startOfWeek(startOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const calendarRangeEndKey = format(endOfWeek(endOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-  const recentLogsQuery = useMemoFirebase(() => {
+  // 홈/학습/데이터용 최근 로그 또는 캘린더 범위만 조회
+  const allLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
-      orderBy('dateKey', 'desc'),
-      limit(120)
-    );
-  }, [firestore, centerId, studentId]);
-  const { data: recentLogs, isLoading: recentLogsLoading } = useCollection<StudyLogDay>(recentLogsQuery, {
-    enabled: isActive && !!studentId && needsStudyData,
-  });
 
-  const calendarLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentId) return null;
+    const baseRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
+    if (tab === 'studyDetail') {
+      return query(
+        baseRef,
+        where('dateKey', '>=', calendarRangeStartKey),
+        where('dateKey', '<=', calendarRangeEndKey),
+        orderBy('dateKey', 'desc')
+      );
+    }
+
+    if (!recentAnalyticsStartKey || !todayKey) return null;
+
     return query(
-      collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
-      where('dateKey', '>=', currentCalendarMonthRange.startKey),
-      where('dateKey', '<=', currentCalendarMonthRange.endKey),
+      baseRef,
+      where('dateKey', '>=', recentAnalyticsStartKey),
+      where('dateKey', '<=', todayKey),
       orderBy('dateKey', 'desc')
     );
-  }, [firestore, centerId, studentId, currentCalendarMonthRange.startKey, currentCalendarMonthRange.endKey]);
-  const { data: calendarLogs, isLoading: calendarLogsLoading } = useCollection<StudyLogDay>(calendarLogsQuery, {
-    enabled: isActive && !!studentId && needsStudyData,
-  });
-
-  const { allLogs, logsLoading } = useMemo(() => {
-    const mergedById = new Map<string, StudyLogDay>();
-    [...(recentLogs || []), ...(calendarLogs || [])].forEach((log) => {
-      if (log?.id) {
-        mergedById.set(log.id, log);
-      }
-    });
-
-    return {
-      allLogs: Array.from(mergedById.values()).sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
-      logsLoading: recentLogsLoading || calendarLogsLoading,
-    };
-  }, [recentLogs, calendarLogs, recentLogsLoading, calendarLogsLoading]);
+  }, [firestore, centerId, studentId, tab, calendarRangeStartKey, calendarRangeEndKey, recentAnalyticsStartKey, todayKey]);
+  const { data: allLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(allLogsQuery, { enabled: shouldLoadStudyAnalytics });
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !todayKey || !weekKey) return null;
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'), where('dateKey', '==', todayKey));
   }, [firestore, centerId, studentId, todayKey, weekKey]);
-  const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: isActive && !!studentId && needsStudyData });
+  const { data: todayPlans } = useCollection<StudyPlanItem>(plansQuery, { enabled: shouldLoadStudyAnalytics });
 
   const weeklyPlansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !weekKey) return null;
     return query(collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'));
   }, [firestore, centerId, studentId, weekKey]);
-  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: isActive && !!studentId && needsStudyData });
+  const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansQuery, { enabled: shouldLoadStudyAnalytics });
 
   const selectedDateKey = selectedCalendarDate ? format(selectedCalendarDate, 'yyyy-MM-dd') : '';
   const selectedDateWeekKey = selectedCalendarDate ? format(selectedCalendarDate, "yyyy-'W'II") : '';
+  const selectedDatePlansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !selectedDateKey || !selectedDateWeekKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', selectedDateWeekKey, 'items'),
+      where('dateKey', '==', selectedDateKey),
+    );
+  }, [firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
+  const { data: selectedDatePlans, isLoading: isSelectedDatePlansLoading } = useCollection<StudyPlanItem>(selectedDatePlansQuery, {
+    enabled: isActive && !!studentId && !!selectedDateKey,
+  });
+
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(
@@ -684,49 +850,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       limit(1)
     );
   }, [firestore, centerId, studentId]);
-  const { data: attendanceCurrentDocs } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive && !!studentId && needsStatusData });
+  const { data: attendanceCurrentDocs } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive && !!studentId });
   const attendanceCurrent = attendanceCurrentDocs?.[0];
 
   useEffect(() => {
-    if (!isActive || !needsStudyData || !firestore || !centerId || !studentId || !selectedDateKey || !selectedDateWeekKey) {
-      setSelectedDatePlans([]);
-      setIsSelectedDatePlansLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const loadSelectedDatePlans = async () => {
-      setIsSelectedDatePlansLoading(true);
-      try {
-        const snap = await getDocs(
-          query(
-            collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', selectedDateWeekKey, 'items'),
-            where('dateKey', '==', selectedDateKey),
-          )
-        );
-        if (cancelled) return;
-        setSelectedDatePlans(
-          snap.docs.map((docSnap) => ({ ...(docSnap.data() as StudyPlanItem), id: docSnap.id }))
-        );
-      } catch {
-        if (!cancelled) {
-          setSelectedDatePlans([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsSelectedDatePlansLoading(false);
-        }
-      }
-    };
-
-    void loadSelectedDatePlans();
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, needsStudyData, firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
-
-  useEffect(() => {
-    if (!isActive || !needsStudyData || !firestore || !centerId || !studentId || !today) {
+    if (!isActive || !firestore || !centerId || !studentId || !today) {
       setCheckInByDateKey({});
       return;
     }
@@ -743,21 +871,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           targetDateKeys.map(async (dateKey) => {
             const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
             const snap = await getDoc(recordRef);
-            if (!snap.exists()) {
-              const todayFallback =
-                dateKey === todayKey && attendanceCurrent?.lastCheckInAt
-                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
-                  : null;
-              return [dateKey, todayFallback] as const;
-            }
+            if (!snap.exists()) return [dateKey, null] as const;
             const payload = snap.data() as Record<string, unknown>;
-            const checkInAt = toDateSafe(
-              (payload?.checkInAt as TimestampLike)
-              || (payload?.firstCheckInAt as TimestampLike)
-              || (payload?.firstCheckIn as TimestampLike)
-              || (payload?.lastCheckInAt as TimestampLike)
-              || (payload?.updatedAt as TimestampLike)
-            );
+            const checkInAt = toDateSafe((payload?.checkInAt as TimestampLike) || (payload?.updatedAt as TimestampLike));
             return [dateKey, checkInAt] as const;
           })
         );
@@ -766,10 +882,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           const next = Object.fromEntries(pairs) as Record<string, Date | null>;
           setCheckInByDateKey(next);
         }
-      } catch (error: any) {
-        if (error?.code !== 'permission-denied') {
-          console.warn('[parent-dashboard] failed to load check-in trend', error);
-        }
+      } catch (error) {
+        console.warn('[parent-dashboard] failed to load check-in trend', error);
         if (!cancelled) setCheckInByDateKey({});
       }
     };
@@ -778,13 +892,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, needsStudyData, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt]);
+  }, [isActive, firestore, centerId, studentId, today]);
 
   useEffect(() => {
-    if (!isActive || !needsStudyData || !firestore || !centerId || !studentId || !today) {
+    if (!isActive || !firestore || !centerId || !studentId || !today) {
       setStudyStartByDateKey({});
-      setStudyEndByDateKey({});
-      setAwayMinutesByDateKey({});
       return;
     }
 
@@ -798,107 +910,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       try {
         const pairs = await Promise.all(
           targetDateKeys.map(async (dateKey) => {
-            try {
-              const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
-              const statSnap = await getDoc(statRef);
-              const statData = statSnap.exists() ? (statSnap.data() as Record<string, unknown>) : null;
-              const statStartHourRaw = statData?.startHour ?? statData?.firstStudyHour;
-              const statEndHourRaw = statData?.endHour ?? statData?.lastStudyHour;
-              const statAwayMinutesRaw = statData?.awayMinutes ?? statData?.breakMinutes;
-              const statStart = hourNumberToDate(dateKey, typeof statStartHourRaw === 'number' ? statStartHourRaw : null);
-              const statEnd = hourNumberToDate(dateKey, typeof statEndHourRaw === 'number' ? statEndHourRaw : null);
-              const hasAwayMinutesStat = typeof statAwayMinutesRaw === 'number' && Number.isFinite(statAwayMinutesRaw);
-              const statAwayMinutes = hasAwayMinutesStat
-                ? Math.max(0, Math.round(statAwayMinutesRaw))
-                : 0;
-
-              const todayFallback =
-                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
-                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
-                  : null;
-
-              if (statStart && statEnd && hasAwayMinutesStat) {
-                return [
-                  dateKey,
-                  {
-                    start: statStart,
-                    end: statEnd,
-                    awayMinutes: statAwayMinutes,
-                  },
-                ] as const;
-              }
-
-              const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
-              const snapshot = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
-              const sessions = snapshot.docs
-                .map((item) => item.data() as StudySession)
-                .filter((item) => !!item.startTime)
-                .map((item) => ({
-                  startTime: toDateSafe(item.startTime as TimestampLike),
-                  endTime: toDateSafe(item.endTime as TimestampLike),
-                }))
-                .filter((item) => item.startTime) as Array<{ startTime: Date; endTime: Date | null }>;
-
-              const firstSession = sessions[0] || null;
-              const lastSession = sessions[sessions.length - 1] || null;
-              const sessionStart = firstSession?.startTime || null;
-              const sessionEnd = lastSession?.endTime || lastSession?.startTime || null;
-              let sessionAwayMinutes = 0;
-              for (let i = 1; i < sessions.length; i += 1) {
-                const prevEnd = sessions[i - 1].endTime;
-                const currStart = sessions[i].startTime;
-                if (!prevEnd || !currStart) continue;
-                const gap = Math.round((currStart.getTime() - prevEnd.getTime()) / 60000);
-                if (gap > 0 && gap < 180) sessionAwayMinutes += gap;
-              }
-
-              return [
-                dateKey,
-                {
-                  start: sessionStart || statStart || todayFallback,
-                  end: sessionEnd || statEnd || todayFallback,
-                  awayMinutes: sessionAwayMinutes > 0 ? sessionAwayMinutes : statAwayMinutes,
-                },
-              ] as const;
-            } catch {
-              const todayFallback =
-                dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
-                  ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
-                  : null;
-              return [
-                dateKey,
-                {
-                  start: todayFallback,
-                  end: todayFallback,
-                  awayMinutes: 0,
-                },
-              ] as const;
-            }
+            const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions');
+            const firstSessionQuery = query(sessionsRef, orderBy('startTime', 'asc'), limit(1));
+            const snapshot = await getDocs(firstSessionQuery);
+            const firstSession = snapshot.docs[0]?.data() as StudySession | undefined;
+            const sessionStart = firstSession?.startTime ? toDateSafe(firstSession.startTime as TimestampLike) : null;
+            const todayFallback =
+              dateKey === todayKey && attendanceCurrent?.status === 'studying' && attendanceCurrent?.lastCheckInAt
+                ? toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike)
+                : null;
+            return [dateKey, sessionStart || todayFallback] as const;
           })
         );
 
         if (!cancelled) {
-          const nextStart: Record<string, Date | null> = {};
-          const nextEnd: Record<string, Date | null> = {};
-          const nextAway: Record<string, number> = {};
-          pairs.forEach(([dateKey, value]) => {
-            nextStart[dateKey] = value.start || null;
-            nextEnd[dateKey] = value.end || null;
-            nextAway[dateKey] = Math.max(0, Math.round(value.awayMinutes || 0));
-          });
-          setStudyStartByDateKey(nextStart);
-          setStudyEndByDateKey(nextEnd);
-          setAwayMinutesByDateKey(nextAway);
+          setStudyStartByDateKey(Object.fromEntries(pairs) as Record<string, Date | null>);
         }
-      } catch (error: any) {
-        if (error?.code !== 'permission-denied') {
-          console.warn('[parent-dashboard] failed to load study rhythm trend', error);
-        }
-        if (!cancelled) {
-          setStudyStartByDateKey({});
-          setStudyEndByDateKey({});
-          setAwayMinutesByDateKey({});
-        }
+      } catch (error) {
+        console.warn('[parent-dashboard] failed to load study rhythm trend', error);
+        if (!cancelled) setStudyStartByDateKey({});
       }
     };
 
@@ -906,39 +936,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, needsStudyData, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status]);
+  }, [isActive, firestore, centerId, studentId, today, todayKey, attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status]);
 
-  useEffect(() => {
-    if (!isActive || !needsLatestReportData || !firestore || !centerId || !studentId || !yesterdayKey) {
-      setReport(null);
-      return;
-    }
-
-    let cancelled = false;
-    const loadLatestReport = async () => {
-      try {
-        const reportDocId = `${yesterdayKey}_${studentId}`;
-        const snap = await getDoc(doc(firestore, 'centers', centerId, 'dailyReports', reportDocId));
-        if (cancelled) return;
-        if (!snap.exists()) {
-          setReport(null);
-          return;
-        }
-        setReport({ ...(snap.data() as DailyReport), id: snap.id });
-      } catch (error: any) {
-        if (error?.code !== 'permission-denied') {
-          console.warn('[parent-dashboard] failed to load latest report', error);
-        }
-        if (!cancelled) setReport(null);
-      }
-    };
-
-    void loadLatestReport();
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, needsLatestReportData, firestore, centerId, studentId, yesterdayKey]);
-
+  const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
+  const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !report?.content) return;
 
@@ -951,10 +952,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       updateDoc(targetRef, {
         viewedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      }).catch((error: any) => {
-        if (error?.code !== 'permission-denied') {
-          console.warn('[parent-report] viewedAt update failed', error);
-        }
+      }).catch((error) => {
+        console.warn('[parent-report] viewedAt update failed', error);
       });
     }
 
@@ -964,50 +963,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [isActive, firestore, centerId, studentId, report, yesterdayKey]);
 
-  useEffect(() => {
-    if (!isActive || !needsReportsArchiveData || !firestore || !centerId || !studentId) {
-      setRawReportsArchive([]);
-      return;
-    }
-
-    let cancelled = false;
-    const loadReportsArchive = async () => {
-      try {
-        const snap = await getDocs(
-          query(
-            collection(firestore, 'centers', centerId, 'dailyReports'),
-            where('studentId', '==', studentId),
-            where('status', '==', 'sent'),
-            limit(50),
-          )
-        );
-        if (cancelled) return;
-        setRawReportsArchive(snap.docs.map((docSnap) => ({ ...(docSnap.data() as DailyReport), id: docSnap.id })));
-      } catch (error: any) {
-        if (error?.code !== 'permission-denied') {
-          console.warn('[parent-dashboard] failed to load reports archive', error);
-        }
-        if (!cancelled) setRawReportsArchive([]);
-      }
-    };
-
-    void loadReportsArchive();
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, needsReportsArchiveData, firestore, centerId, studentId]);
+  const reportsArchiveQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'dailyReports'),
+      where('studentId', '==', studentId),
+      where('status', '==', 'sent'),
+      limit(50),
+    );
+  }, [firestore, centerId, studentId]);
+  const { data: rawReportsArchive } = useCollection<DailyReport>(reportsArchiveQuery, { enabled: shouldLoadReportArchive });
   const reportsArchive = useMemo(
     () => [...(rawReportsArchive || [])].sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || ''))),
     [rawReportsArchive]
   );
 
-  useEffect(() => {
-    if (!isReportArchiveOpen || selectedChildReport || reportsArchive.length === 0) return;
-    setSelectedChildReport(reportsArchive[0] || null);
-  }, [isReportArchiveOpen, selectedChildReport, reportsArchive]);
-
   const growthRef = useMemoFirebase(() => (!firestore || !centerId || !studentId ? null : doc(firestore, 'centers', centerId, 'growthProgress', studentId)), [firestore, centerId, studentId]);
-  const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId && needsGrowthData });
+  const { data: growth } = useDoc<GrowthProgress>(growthRef, { enabled: isActive && !!studentId });
 
   const remoteNotificationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !user) return null;
@@ -1015,78 +987,45 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       collection(firestore, 'centers', centerId, 'parentNotifications'),
       where('parentUid', '==', user.uid),
       where('studentId', '==', studentId),
-      limit(notificationsLimit)
+      orderBy('createdAt', 'desc'),
+      limit(20)
     );
-  }, [firestore, centerId, studentId, user?.uid, notificationsLimit]);
-  const { data: rawRemoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: isActive && !!studentId && !!user && needsNotificationsData });
-  const remoteNotifications = useMemo(() => {
-    if (!rawRemoteNotifications) return rawRemoteNotifications;
-    return [...rawRemoteNotifications].sort((a, b) => {
-      const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0;
-      const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0;
-      return bTime - aTime;
-    });
-  }, [rawRemoteNotifications]);
+  }, [firestore, centerId, studentId, user?.uid]);
+  const { data: remoteNotifications } = useCollection<any>(remoteNotificationsQuery, { enabled: shouldLoadNotifications });
 
   const attendance요청Query = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(collection(firestore, 'centers', centerId, 'attendance요청'), where('studentId', '==', studentId), limit(30));
   }, [firestore, centerId, studentId]);
-  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: isActive && !!studentId && needsAttendanceRequestData });
+  const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: shouldLoadStudyAnalytics });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !user) return null;
     return query(
       collection(firestore, 'centers', centerId, 'parentCommunications'),
       where('parentUid', '==', user.uid),
-      limit(parentCommunicationsLimit),
+      limit(30),
     );
-  }, [firestore, centerId, user?.uid, parentCommunicationsLimit]);
+  }, [firestore, centerId, user]);
   const { data: rawParentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
-    enabled: isActive && !!centerId && !!user && needsCommunicationData,
+    enabled: shouldLoadParentCommunications,
   });
-
-  const centerAnnouncementsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'centerAnnouncements'),
-      orderBy('createdAt', 'desc'),
-      limit(30),
-    );
-  }, [firestore, centerId]);
-  const { data: rawCenterAnnouncements, isLoading: centerAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
-    centerAnnouncementsQuery,
-    { enabled: isActive && !!centerId && needsAnnouncementsData }
-  );
-
-  const legacyParentAnnouncementsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'parentAnnouncements'),
-      orderBy('createdAt', 'desc'),
-      limit(30),
-    );
-  }, [firestore, centerId]);
-  const { data: rawLegacyParentAnnouncements, isLoading: legacyParentAnnouncementsLoading } = useCollection<ParentAnnouncementRecord>(
-    legacyParentAnnouncementsQuery,
-    { enabled: isActive && !!centerId && needsAnnouncementsData }
-  );
 
   const penaltyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(penaltyLogsLimit));
-  }, [firestore, centerId, studentId, penaltyLogsLimit]);
-  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: isActive && !!studentId && needsPenaltyData });
+    return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120));
+  }, [firestore, centerId, studentId]);
+  const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: shouldLoadStudyAnalytics });
 
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
       where('studentId', '==', studentId),
-      limit(invoiceLimit)
+      limit(120)
     );
-  }, [firestore, centerId, studentId, invoiceLimit]);
-  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: isActive && !!studentId && needsBillingData });
+  }, [firestore, centerId, studentId]);
+  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: shouldLoadInvoices });
 
   const sortedInvoices = useMemo(() => {
     return [...(studentInvoices || [])].sort((a, b) => {
@@ -1106,28 +1045,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     () => sortedInvoices.filter((invoice) => invoice.status !== 'void' && invoice.status !== 'refunded'),
     [sortedInvoices]
   );
-  const normalizedInvoices = useMemo(
-    () =>
-      displayInvoices.map((invoice) => ({
-        ...invoice,
-        isActionRequired: invoice.isActionRequired ?? (invoice.status === 'issued' || invoice.status === 'overdue'),
-        dueLabel: getInvoiceDueLabel(invoice),
-        paymentMethodSummary: getPaymentMethodSummary(invoice.paymentMethod, invoice.paymentMethodSummary),
-        nextAction:
-          invoice.nextAction
-          || (invoice.status === 'paid'
-            ? '영수증과 결제 내역을 확인해 주세요.'
-            : invoice.status === 'overdue'
-              ? '미납 금액을 바로 결제하거나 센터 상담으로 연결해 주세요.'
-              : '납부 예정일 전에 결제를 마무리해 주세요.'),
-      })),
-    [displayInvoices]
-  );
-  const latestInvoice = normalizedInvoices[0];
-  const actionRequiredInvoices = useMemo(
-    () => normalizedInvoices.filter((invoice) => invoice.isActionRequired),
-    [normalizedInvoices]
-  );
+  const latestInvoice = displayInvoices[0];
 
   const billingSummary = useMemo(() => {
     return displayInvoices.reduce(
@@ -1207,6 +1125,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [today, studyStartByDateKey]);
 
+  const hasRhythmTrend = useMemo(
+    () => dailyRhythmTrend.some((point) => typeof point.rhythmMinutes === 'number'),
+    [dailyRhythmTrend]
+  );
+
   const rhythmScoreTrend = useMemo(() => {
     const values = dailyRhythmTrend.map((point) => point.rhythmMinutes);
     return dailyRhythmTrend.map((point, index) => {
@@ -1245,66 +1168,46 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [dailyStudyTrend]
   );
 
-  const weeklyStudyTimeTrend = useMemo(() => {
-    if (!today) return [] as Array<{ label: string; totalMinutes: number }>;
-    return Array.from({ length: 6 }, (_, index) => {
-      const weekEnd = subDays(today, (5 - index) * 7);
-      const weekDays = Array.from({ length: 7 }, (_, d) => format(subDays(weekEnd, d), 'yyyy-MM-dd'));
-      const totalMinutes = weekDays.reduce((sum, dateKey) => sum + (logMinutesByDateKey.get(dateKey) || 0), 0);
-      return {
-        label: `${format(subDays(weekEnd, 6), 'M/d', { locale: ko })}~`,
-        totalMinutes,
-      };
+  const previous7DayMinutes = useMemo(() => {
+    if (!today) return [] as number[];
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, index + 1);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return logMinutesByDateKey.get(dateKey) || 0;
     });
   }, [today, logMinutesByDateKey]);
 
-  const startEndTrend = useMemo(() => {
-    if (!today) return [] as Array<{ date: string; startMinutes: number; endMinutes: number }>;
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
-      const dateKey = format(day, 'yyyy-MM-dd');
-      const start = studyStartByDateKey[dateKey];
-      const end = studyEndByDateKey[dateKey];
-      return {
-        date: format(day, 'MM/dd', { locale: ko }),
-        startMinutes: start ? start.getHours() * 60 + start.getMinutes() : 0,
-        endMinutes: end ? end.getHours() * 60 + end.getMinutes() : 0,
-      };
-    });
-  }, [today, studyStartByDateKey, studyEndByDateKey]);
+  const previous7DayStudyDaysCount = useMemo(
+    () => previous7DayMinutes.filter((minutes) => minutes > 0).length,
+    [previous7DayMinutes]
+  );
 
-  const awayTimeTrend = useMemo(() => {
-    if (!today) return [] as Array<{ date: string; awayMinutes: number }>;
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 6 - index);
-      const dateKey = format(day, 'yyyy-MM-dd');
-      return {
-        date: format(day, 'MM/dd', { locale: ko }),
-        awayMinutes: Math.max(0, awayMinutesByDateKey[dateKey] || 0),
-      };
-    });
-  }, [today, awayMinutesByDateKey]);
+  const previous7DayAverageMinutes = useMemo(() => {
+    if (previous7DayMinutes.length === 0) return 0;
+    return Math.round(
+      previous7DayMinutes.reduce((sum, minutes) => sum + minutes, 0) / previous7DayMinutes.length
+    );
+  }, [previous7DayMinutes]);
 
-  const hasWeeklyStudyTimeTrend = useMemo(
-    () => weeklyStudyTimeTrend.some((item) => item.totalMinutes > 0),
-    [weeklyStudyTimeTrend]
-  );
-  const hasDailyStudyTrend = useMemo(
-    () => dailyStudyTrend.some((item) => item.minutes > 0),
-    [dailyStudyTrend]
-  );
-  const hasRhythmScoreTrend = useMemo(
-    () => rhythmScoreTrend.some((item) => item.score > 0),
-    [rhythmScoreTrend]
-  );
-  const hasStartEndTrend = useMemo(
-    () => startEndTrend.some((item) => item.startMinutes > 0 || item.endMinutes > 0),
-    [startEndTrend]
-  );
-  const hasAwayTrend = useMemo(
-    () => awayTimeTrend.some((item) => item.awayMinutes > 0),
-    [awayTimeTrend]
-  );
+  const growthCelebrationCandidate = useMemo<GrowthCelebrationState | null>(() => {
+    if (totalMinutes <= 0) return null;
+    if (previous7DayAverageMinutes <= 0) return null;
+    if (previous7DayStudyDaysCount < 3) return null;
+    if (totalMinutes <= previous7DayAverageMinutes) return null;
+
+    const increaseRate = Math.round(
+      ((totalMinutes - previous7DayAverageMinutes) / previous7DayAverageMinutes) * 100
+    );
+
+    if (increaseRate <= 0) return null;
+
+    return {
+      increaseRate,
+      todayMinutes: totalMinutes,
+      previous7DayAverage: previous7DayAverageMinutes,
+    };
+  }, [totalMinutes, previous7DayAverageMinutes, previous7DayStudyDaysCount]);
 
   const weeklyStudyPlans = (weeklyPlans || []).filter((item) => item.category === 'study' || !item.category);
   const weeklyPlanTotal = weeklyStudyPlans.length;
@@ -1335,33 +1238,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [studyPlans, weeklyStudyPlans, weeklyTotalStudyMinutes]);
 
   const subjectTotalMinutes = subjectsData.reduce((sum, subject) => sum + subject.minutes, 0);
-  const latestWeeklyStudyMinutes = weeklyStudyTimeTrend[weeklyStudyTimeTrend.length - 1]?.totalMinutes || 0;
-  const previousWeeklyStudyMinutes = weeklyStudyTimeTrend[weeklyStudyTimeTrend.length - 2]?.totalMinutes || 0;
-  const weeklyStudyDelta = calcDeltaPercent(latestWeeklyStudyMinutes, previousWeeklyStudyMinutes);
-  const awayAverageMinutes = Math.round(
-    awayTimeTrend.reduce((sum, item) => sum + Math.max(0, item.awayMinutes || 0), 0) /
-      Math.max(1, awayTimeTrend.length)
-  );
-  const latestStartPoint = startEndTrend[startEndTrend.length - 1];
-  const recentStartLabel = latestStartPoint?.startMinutes ? toClockLabel(latestStartPoint.startMinutes) : '기록 없음';
-  const recentEndLabel = latestStartPoint?.endMinutes ? toClockLabel(latestStartPoint.endMinutes) : '기록 없음';
-  const leadSubject = subjectsData[0] || null;
-  const leadSubjectShare = leadSubject && subjectTotalMinutes > 0
-    ? Math.round((leadSubject.minutes / subjectTotalMinutes) * 100)
-    : 0;
-
-  const chartInsights = useMemo<Record<ParentDataChartKey, ChartInsight>>(
-    () => ({
-      weeklyStudy: buildWeeklyStudyInsight(weeklyStudyTimeTrend),
-      dailyStudy: buildDailyStudyInsight(dailyStudyTrend),
-      rhythmScore: buildRhythmInsight(rhythmScoreTrend),
-      startEnd: buildStartEndInsight(startEndTrend),
-      awayTime: buildAwayTimeInsight(awayTimeTrend),
-      subjectTime: buildSubjectInsight(subjectsData),
-    }),
-    [weeklyStudyTimeTrend, dailyStudyTrend, rhythmScoreTrend, startEndTrend, awayTimeTrend, subjectsData]
-  );
-  const selectedChartInsight = selectedDataChart ? chartInsights[selectedDataChart] : null;
 
   const recentPenaltyReasons = useMemo(() => {
     const sorted요청 = [...(attendance요청 || [])].sort((a, b) => {
@@ -1405,38 +1281,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       latestPositiveDateLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd', { locale: ko }) : '-',
     };
   }, [growth?.penaltyPoints, penaltyLogs]);
-
-  const penaltyHistoryRows = useMemo(() => {
-    const fromLogs = [...(penaltyLogs || [])]
-      .filter((log) => Number(log.pointsDelta || 0) > 0)
-      .map((log) => {
-        const createdAt = toDateSafe((log as any).createdAt);
-        const createdAtMs = createdAt?.getTime() || 0;
-        return {
-          id: `log-${log.id}`,
-          dateLabel: createdAt ? format(createdAt, 'yyyy.MM.dd', { locale: ko }) : '-',
-          reason: log.reason?.trim() || PENALTY_SOURCE_LABEL[String(log.source || '')] || '벌점 반영',
-          points: Math.max(0, Math.round(Number(log.pointsDelta || 0))),
-          createdAtMs,
-        };
-      });
-
-    const fromRequests = (recentPenaltyReasons || []).map((item) => {
-      const parsed = item.dateLabel ? parse(item.dateLabel, 'MM/dd', new Date()) : null;
-      return {
-        id: `req-${item.id}`,
-        dateLabel: item.dateLabel || '-',
-        reason: item.reason?.trim() || '지각/결석 신청 처리',
-        points: Math.max(0, Math.round(Number(item.points || 0))),
-        createdAtMs: parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0,
-      };
-    });
-
-    return [...fromLogs, ...fromRequests]
-      .filter((row) => row.points > 0)
-      .sort((a, b) => b.createdAtMs - a.createdAtMs)
-      .slice(0, 50);
-  }, [penaltyLogs, recentPenaltyReasons]);
 
   const aiInsights = useMemo(() => {
     const insights: string[] = [];
@@ -1512,261 +1356,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return { label: '미입실 (입실 전)', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
   }, [attendanceCurrent, todayLog, todayPlans]);
 
-  const heroMessage = useMemo(() => {
-    const name = student?.name ?? '';
-    const status = attendanceCurrent?.status || '';
-    const isStudying = ['studying', 'away', 'break'].includes(status);
-    const hasRecord = (todayLog?.totalMinutes || 0) > 0;
-
-    if (isStudying) return { text: `${name}이(가) 지금 집중하고 있어요`, tone: 'studying' as const };
-    if (hasRecord) return { text: `${name}이(가) 오늘 학습을 마쳤어요`, tone: 'done' as const };
-    return { text: `${name}의 오늘 트랙이 아직 시작되지 않았어요`, tone: 'idle' as const };
-  }, [student?.name, attendanceCurrent?.status, todayLog?.totalMinutes]);
-
-  const heroStyles = {
-    studying: {
-      bg: 'bg-[linear-gradient(135deg,#ecfdf5_0%,#f0fdf4_50%,#e8f1ff_100%)]',
-      border: 'border-emerald-200 ring-1 ring-emerald-100',
-      icon: 'bg-emerald-500',
-      textAccent: 'text-emerald-700',
-    },
-    done: {
-      bg: 'bg-[linear-gradient(135deg,#e8f1ff_0%,#f6f9ff_100%)]',
-      border: 'border-[#cfdcf8] ring-1 ring-[#cfdcf8]/60',
-      icon: 'bg-[#14295F]',
-      textAccent: 'text-[#14295F]',
-    },
-    idle: {
-      bg: 'bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)]',
-      border: 'border-slate-200 ring-1 ring-slate-100',
-      icon: 'bg-slate-400',
-      textAccent: 'text-slate-500',
-    },
-  } as const;
-
-  const todayFirstCheckInLabel = useMemo(() => {
-    if (!todayKey) return '입실 -';
-    const checkInAt = checkInByDateKey[todayKey] || studyStartByDateKey[todayKey] || null;
-    const checkOutByStudy = studyEndByDateKey[todayKey] || null;
-    const status = attendanceCurrent?.status || '';
-    const isStudying = ['studying', 'away', 'break'].includes(status);
-    const hasTodayStudyRecord = (todayLog?.totalMinutes || 0) > 0;
-    const checkOutFallback =
-      !isStudying && hasTodayStudyRecord
-        ? toDateSafe((attendanceCurrent as any)?.updatedAt as TimestampLike)
-        : null;
-    const checkOutAt = checkOutByStudy || checkOutFallback;
-
-    if (checkInAt && checkOutAt) {
-      return `입실 ${format(checkInAt, 'HH:mm', { locale: ko })} · 퇴실 ${format(checkOutAt, 'HH:mm', { locale: ko })}`;
-    }
-    if (checkInAt) return `입실 ${format(checkInAt, 'HH:mm', { locale: ko })}`;
-    if (checkOutAt) return `퇴실 ${format(checkOutAt, 'HH:mm', { locale: ko })}`;
-    return '입실 -';
-  }, [todayKey, checkInByDateKey, studyStartByDateKey, studyEndByDateKey, attendanceCurrent, todayLog?.totalMinutes]);
-
-  const todayRoutineSummary = useMemo(() => {
-    const routineItems = (todayPlans || []).filter((item) => item.category === 'schedule');
-    let arrivalTime: string | null = null;
-    let academyTime: string | null = null;
-
-    const pickTimes = (text: string) => text.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/g) || [];
-
-    routineItems.forEach((item) => {
-      const title = (item.title || '').trim();
-      if (!title) return;
-      const times = pickTimes(title);
-
-      if (!arrivalTime && /(등원|입실|출석)/.test(title) && times.length > 0) {
-        arrivalTime = times[0] || null;
-      }
-
-      if (!academyTime && /(학원|수업|강의|코칭|클리닉)/.test(title)) {
-        if (times.length >= 2) academyTime = `${times[0] || '-'}-${times[times.length - 1] || '-'}`;
-        else if (times.length === 1) academyTime = times[0] || null;
-      }
-    });
-
-    const fallbackCheckIn = checkInByDateKey[todayKey] || studyStartByDateKey[todayKey] || null;
-    if (!arrivalTime && fallbackCheckIn) {
-      arrivalTime = format(fallbackCheckIn, 'HH:mm', { locale: ko });
-    }
-
-    return {
-      arrivalTime: arrivalTime || '-',
-      academyTime: academyTime || '-',
-    };
-  }, [todayPlans, todayKey, checkInByDateKey, studyStartByDateKey]);
-
-  const webAppInsightMetrics = useMemo(() => {
-    const todayStudyMinutes = dailyStudyTrend[dailyStudyTrend.length - 1]?.minutes || 0;
-    const yesterdayStudyMinutes = dailyStudyTrend[dailyStudyTrend.length - 2]?.minutes || 0;
-    const avg7StudyMinutes = Math.round(
-      dailyStudyTrend.reduce((sum, item) => sum + Math.max(0, item.minutes || 0), 0) /
-      Math.max(1, dailyStudyTrend.length)
-    );
-    const todayAwayMinutes = awayTimeTrend[awayTimeTrend.length - 1]?.awayMinutes || 0;
-    const todayRhythmScore = rhythmScoreTrend[rhythmScoreTrend.length - 1]?.score || 0;
-    const yesterdayRhythmScore = rhythmScoreTrend[rhythmScoreTrend.length - 2]?.score || 0;
-
-    const studyVsYesterday = calcDeltaPercent(todayStudyMinutes, yesterdayStudyMinutes);
-    const studyVsAvg7 = calcDeltaPercent(todayStudyMinutes, avg7StudyMinutes);
-    const rhythmVsYesterday = todayRhythmScore - yesterdayRhythmScore;
-
-    const checklist: Array<{ title: string; done: boolean; detail: string }> = [
-      {
-        title: '등원/출결 상태 확인',
-        done: ['studying', 'away', 'break'].includes(attendanceCurrent?.status || ''),
-        detail: attendanceStatus.label,
-      },
-      {
-        title: '오늘 학습계획 완료율 확인',
-        done: planTotal > 0 && planRate >= 70,
-        detail: planTotal > 0 ? `${planDone}/${planTotal} 완료 (${planRate}%)` : '오늘 학습계획이 아직 없습니다.',
-      },
-      {
-        title: '루틴 시간 점검',
-        done: todayRoutineSummary.arrivalTime !== '-' && todayRoutineSummary.academyTime !== '-',
-        detail: `등원 ${todayRoutineSummary.arrivalTime} · 학원 ${todayRoutineSummary.academyTime}`,
-      },
-      {
-        title: '중간 외출/집중 흐름 점검',
-        done: todayAwayMinutes <= 25,
-        detail: `오늘 외출시간 ${todayAwayMinutes}분`,
-      },
-    ];
-
-    const changes: string[] = [
-      `오늘 공부시간은 어제 대비 ${studyVsYesterday >= 0 ? '+' : ''}${studyVsYesterday}% ${studyVsYesterday >= 0 ? '증가' : '감소'}했습니다.`,
-      `오늘 공부시간은 최근 7일 평균 대비 ${studyVsAvg7 >= 0 ? '+' : ''}${studyVsAvg7}% ${studyVsAvg7 >= 0 ? '높습니다' : '낮습니다'}.`,
-      `오늘 리듬 점수는 어제 대비 ${rhythmVsYesterday >= 0 ? '+' : ''}${rhythmVsYesterday}점 ${rhythmVsYesterday >= 0 ? '개선' : '하락'}했습니다.`,
-    ];
-
-    return {
-      todayStudyMinutes,
-      yesterdayStudyMinutes,
-      avg7StudyMinutes,
-      todayAwayMinutes,
-      studyVsYesterday,
-      studyVsAvg7,
-      checklist,
-      changes,
-    };
-  }, [
-    dailyStudyTrend,
-    awayTimeTrend,
-    rhythmScoreTrend,
-    attendanceCurrent?.status,
-    attendanceStatus.label,
-    planTotal,
-    planRate,
-    planDone,
-    todayRoutineSummary.arrivalTime,
-    todayRoutineSummary.academyTime,
-  ]);
-
-  const selectedChartDialogMeta = useMemo(() => {
-    if (!selectedDataChart) return null;
-
-    if (selectedDataChart === 'weeklyStudy') {
-      return {
-        eyebrow: '대표 흐름',
-        title: '이번 주 누적 학습',
-        metric: toHm(latestWeeklyStudyMinutes),
-        summary:
-          weeklyStudyDelta >= 0
-            ? '최근 6주 흐름에서 이번 주가 다시 올라오고 있어요.'
-            : '최근 6주 흐름에서 이번 주는 잠시 숨을 고르는 모습이에요.',
-        badge: '최근 6주',
-        accent: 'text-[#14295F]',
-        panel: 'border-[#dbe7ff] bg-[linear-gradient(145deg,#f7faff_0%,#ffffff_100%)]',
-      };
-    }
-
-    if (selectedDataChart === 'dailyStudy') {
-      return {
-        eyebrow: '오늘 상태',
-        title: '오늘 학습 흐름',
-        metric: toHm(webAppInsightMetrics.todayStudyMinutes),
-        summary:
-          webAppInsightMetrics.studyVsAvg7 >= 0
-            ? '오늘 학습량이 평소 흐름보다 조금 더 올라와 있어요.'
-            : '오늘 학습량이 평소보다 낮아 보여요. 시작 리듬만 잡히면 회복 가능해요.',
-        badge: '최근 7일',
-        accent: 'text-[#FF7A16]',
-        panel: 'border-[#ffe0c7] bg-[linear-gradient(145deg,#fff8f1_0%,#ffffff_100%)]',
-      };
-    }
-
-    if (selectedDataChart === 'rhythmScore') {
-      return {
-        eyebrow: '생활 리듬',
-        title: '학습 리듬',
-        metric: `${rhythmScore}점`,
-        summary:
-          rhythmScore >= 80
-            ? '공부 시작 흐름이 꽤 안정적이에요.'
-            : '시작 시간만 조금 더 일정해지면 리듬이 훨씬 좋아질 수 있어요.',
-        badge: '평균 점수',
-        accent: 'text-emerald-600',
-        panel: 'border-emerald-200 bg-[linear-gradient(145deg,#f4fff9_0%,#ffffff_100%)]',
-      };
-    }
-
-    if (selectedDataChart === 'startEnd') {
-      return {
-        eyebrow: '시간 패턴',
-        title: '공부 시간대',
-        metric: `${recentStartLabel} / ${recentEndLabel}`,
-        summary: '시작과 종료 시각이 일정할수록 하루 공부 리듬이 더 편안해져요.',
-        badge: '최근 7일',
-        accent: 'text-amber-600',
-        panel: 'border-amber-200 bg-[linear-gradient(145deg,#fff9ef_0%,#ffffff_100%)]',
-      };
-    }
-
-    if (selectedDataChart === 'awayTime') {
-      return {
-        eyebrow: '집중 관리',
-        title: '집중 이탈',
-        metric: `${awayAverageMinutes}분`,
-        summary:
-          awayAverageMinutes <= 20
-            ? '짧게 쉬고 다시 돌아오는 흐름이 안정적이에요.'
-            : '쉬는 흐름이 길어지는 날이 보여요. 휴식 리듬만 다듬어도 좋아질 수 있어요.',
-        badge: '7일 평균',
-        accent: 'text-sky-600',
-        panel: 'border-sky-200 bg-[linear-gradient(145deg,#f3fbff_0%,#ffffff_100%)]',
-      };
-    }
-
-    return {
-      eyebrow: '과목 분배',
-      title: '과목 밸런스',
-      metric: leadSubject ? `${leadSubject.subject} ${leadSubjectShare}%` : '데이터 대기',
-      summary:
-        leadSubject
-          ? `${leadSubject.subject}에 가장 많은 시간이 들어가 있어요. 밸런스 흐름도 함께 확인해 보세요.`
-          : '과목별 계획이 더 쌓이면 밸런스 흐름을 바로 읽을 수 있어요.',
-      badge: `${subjectsData.length}과목`,
-      accent: 'text-[#f97316]',
-      panel: 'border-[#ffd9c2] bg-[linear-gradient(145deg,#fff8f2_0%,#ffffff_100%)]',
-    };
-  }, [
-    selectedDataChart,
-    latestWeeklyStudyMinutes,
-    weeklyStudyDelta,
-    webAppInsightMetrics.todayStudyMinutes,
-    webAppInsightMetrics.studyVsAvg7,
-    rhythmScore,
-    recentStartLabel,
-    recentEndLabel,
-    awayAverageMinutes,
-    leadSubject,
-    leadSubjectShare,
-    subjectsData.length,
-  ]);
-
   // 캘린더 데이터 생성
   const calendarData = useMemo(() => {
     const start = startOfMonth(currentCalendarDate);
@@ -1796,10 +1385,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: toDateSafe(item.createdAt)?.getTime() || 0,
         isRead: !!item.isRead,
         isImportant: !!item.isImportant,
-        priority: item.priority || (item.isImportant ? 'high' : 'normal'),
-        deepLink: item.deepLink,
-        nextAction: item.nextAction,
-        readAt: item.readAt,
       }));
     }
 
@@ -1815,9 +1400,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: toDateSafe((attendanceCurrent as any).updatedAt)?.getTime() || 0,
         isRead: false,
         isImportant: attendanceCurrent.status !== 'studying',
-        category: 'life',
-        priority: attendanceCurrent.status === 'studying' ? 'normal' : 'high',
-        nextAction: attendanceCurrent.status === 'studying' ? '실시간 상태를 확인해 주세요.' : '출결 변동 사유가 있으면 문의 탭에서 바로 남겨 주세요.',
       });
     }
 
@@ -1831,9 +1413,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: toDateSafe((report as any).updatedAt || (report as any).createdAt)?.getTime() || 0,
         isRead: !!report.viewedAt,
         isImportant: true,
-        category: 'reports',
-        priority: 'high',
-        nextAction: '리포트를 열어 지난주 대비 변화와 부모가 도와줄 한 가지를 확인해 주세요.',
       });
     }
 
@@ -1848,65 +1427,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         createdAtMs: 0,
         isRead: false,
         isImportant: true,
-        category: 'life',
-        priority: 'critical',
-        nextAction: '생활 관리 포인트를 확인하고 필요한 경우 상담을 요청해 주세요.',
-      });
-    }
-
-    if (actionRequiredInvoices.length > 0) {
-      const invoice = actionRequiredInvoices[0];
-      fallback.push({
-        id: `invoice-${invoice.id}`,
-        type: 'monthly_report',
-        title: invoice.status === 'overdue' ? '미납 결제 확인이 필요해요.' : '청구서가 발행되었어요.',
-        body: `${invoice.studentName || student?.name || '학생'} · ${invoice.dueLabel}`,
-        createdAtLabel: toRelativeLabel((invoice as any).updatedAt || (invoice as any).issuedAt),
-        createdAtMs: toDateSafe((invoice as any).updatedAt || (invoice as any).issuedAt)?.getTime() || 0,
-        isRead: false,
-        isImportant: true,
-        category: 'billing',
-        priority: invoice.status === 'overdue' ? 'critical' : 'high',
-        nextAction: invoice.nextAction,
       });
     }
 
     return fallback;
-  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, actionRequiredInvoices, student?.name, studentId, yesterdayKey]);
+  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, studentId, yesterdayKey]);
 
   const sortedNotifications = useMemo(() => {
     return [...notifications].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
   }, [notifications]);
 
-  const unreadNotificationCount = useMemo(
-    () => sortedNotifications.filter((notification) => !(notification.isRead || !!readMap[notification.id])).length,
-    [sortedNotifications, readMap]
-  );
   const recentNotifications = useMemo(() => sortedNotifications.slice(0, 3), [sortedNotifications]);
   const unreadRecentCount = useMemo(
     () => recentNotifications.filter((notification) => !(notification.isRead || !!readMap[notification.id])).length,
     [recentNotifications, readMap]
   );
-  const notificationFilterOptions = useMemo(
-    () => [
-      { key: 'all' as const, label: '전체', count: sortedNotifications.length },
-      { key: 'important' as const, label: '중요', count: sortedNotifications.filter((notification) => notification.isImportant).length },
-      { key: 'unread' as const, label: '미읽음', count: unreadNotificationCount },
-      { key: 'billing' as const, label: '청구', count: sortedNotifications.filter((notification) => getNotificationCategory(notification) === 'billing').length },
-      { key: 'life' as const, label: '생활', count: sortedNotifications.filter((notification) => getNotificationCategory(notification) === 'life').length },
-      { key: 'reports' as const, label: '리포트', count: sortedNotifications.filter((notification) => getNotificationCategory(notification) === 'reports').length },
-    ],
-    [sortedNotifications, unreadNotificationCount]
-  );
-  const filteredNotifications = useMemo(() => {
-    return sortedNotifications.filter((notification) => {
-      const isUnread = !(notification.isRead || !!readMap[notification.id]);
-      if (notificationFilter === 'all') return true;
-      if (notificationFilter === 'important') return notification.isImportant;
-      if (notificationFilter === 'unread') return isUnread;
-      return getNotificationCategory(notification) === notificationFilter;
-    });
-  }, [sortedNotifications, notificationFilter, readMap]);
 
   const latestStudySnapshot = useMemo(() => {
     const sorted = [...(allLogs || [])]
@@ -1972,8 +1507,49 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (points >= 20) return { label: '퇴원', badge: 'bg-rose-200 text-rose-800 border-rose-300' };
     if (points >= 12) return { label: '학부모 상담', badge: 'bg-amber-100 text-amber-800 border-amber-300' };
     if (points >= 7) return { label: '선생님과 상담', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
-    return { label: '이슈 없음', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   }, [penaltyRecovery.effectivePoints]);
+
+  const heroTone = useMemo(() => {
+    if (growthCelebrationCandidate) {
+      return {
+        badgeLabel: '성장 상승',
+        badgeClassName: 'border-[#ffd2a2] bg-[#fff3e6] text-[#FF7A16]',
+        title: '평균보다 더 좋은 흐름을 보이고 있어요',
+        description: `오늘 공부 시간이 직전 7일 평균보다 ${growthCelebrationCandidate.increaseRate}% 높습니다. 학습 리듬이 점점 안정되고 있어요.`,
+      };
+    }
+
+    if (weeklyPlanCompletionRate >= 85 && penaltyRecovery.effectivePoints === 0) {
+      return {
+        badgeLabel: '안정 성장',
+        badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        title: '루틴이 안정적으로 유지되고 있어요',
+        description: '계획 이행과 생활 리듬이 모두 차분하게 이어지고 있습니다. 부모님이 보시기에도 안심되는 흐름이에요.',
+      };
+    }
+
+    if (attendanceStatus.label.includes('학습') || attendanceStatus.label.includes('귀가')) {
+      return {
+        badgeLabel: '실시간 확인',
+        badgeClassName: 'border-[#d8e5ff] bg-[#eef4ff] text-[#14295F]',
+        title: '오늘의 학습 흐름을 앱에서 바로 확인할 수 있어요',
+        description: '등원 상태, 공부 시간, 계획 달성률을 한 화면에서 빠르게 보실 수 있도록 정리했습니다.',
+      };
+    }
+
+    return {
+      badgeLabel: '안심 체크',
+      badgeClassName: 'border-slate-200 bg-white text-slate-600',
+      title: '자녀의 오늘 흐름을 차분하게 확인해 보세요',
+      description: '학습 리듬과 생활 상태를 복잡하지 않게, 앱 기준으로 보기 쉽게 모았습니다.',
+    };
+  }, [
+    growthCelebrationCandidate,
+    weeklyPlanCompletionRate,
+    penaltyRecovery.effectivePoints,
+    attendanceStatus.label,
+  ]);
 
   const selectedDateLog = useMemo(() => {
     if (!selectedDateKey) return null;
@@ -1982,179 +1558,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const parentCommunications = useMemo(() => {
     if (!rawParentCommunications) return [];
-    return [...rawParentCommunications]
-      .filter((item) => {
-        if (!studentId) return false;
-        if (item.studentId) return item.studentId === studentId;
-        return linkedStudentIds.length <= 1;
-      })
-      .sort((a, b) => {
-        const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
-        const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
-        return bMs - aMs;
-      });
-  }, [rawParentCommunications, studentId, linkedStudentIds.length]);
-
-  const parentAnnouncements = useMemo(() => {
-    const centerItems = (rawCenterAnnouncements || []).filter((item) => {
-      const audience = item.audience || 'parent';
-      return audience === 'parent' || audience === 'all';
+    return [...rawParentCommunications].sort((a, b) => {
+      const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+      const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+      return bMs - aMs;
     });
-    const legacyItems = rawLegacyParentAnnouncements || [];
-
-    const merged = [...centerItems, ...legacyItems];
-    const dedupedById = new Map<string, ParentAnnouncementRecord>();
-    merged.forEach((item) => {
-      if (item?.id) dedupedById.set(item.id, item);
-    });
-
-    return Array.from(dedupedById.values())
-      .filter((item) => (item.status || 'published') === 'published')
-      .sort((a, b) => {
-        const aMs = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
-        const bMs = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
-        return bMs - aMs;
-      });
-  }, [rawCenterAnnouncements, rawLegacyParentAnnouncements]);
-
-  const parentAnnouncementsLoading = centerAnnouncementsLoading || legacyParentAnnouncementsLoading;
-
-  const communicationOverview = useMemo(() => {
-    const activeItems = parentCommunications.filter((item) => item.status !== 'done');
-    const consultationNeededCount = parentCommunications.filter((item) => item.status === 'consultation_needed').length;
-    const latestItem = parentCommunications[0] || null;
-    const latestStage = latestItem ? getCommunicationStageMeta(latestItem) : null;
-
-    return {
-      total: parentCommunications.length,
-      activeCount: activeItems.length,
-      completedCount: parentCommunications.filter((item) => item.status === 'done').length,
-      consultationNeededCount,
-      latestItem,
-      latestEtaLabel: latestStage?.etaLabel || '영업일 기준 24시간 안에 1차 답변드려요.',
-    };
-  }, [parentCommunications]);
-
-  const billingHubSummary = useMemo(() => {
-    const latestActionInvoice = actionRequiredInvoices[0] || latestInvoice || null;
-    const nextAction =
-      latestActionInvoice?.nextAction
-      || (displayInvoices.length === 0
-        ? '발행 예정 청구서가 생기면 여기에서 바로 확인할 수 있어요.'
-        : '최근 결제 내역과 영수증을 확인해 주세요.');
-
-    return {
-      latestActionInvoice,
-      dueLabel: latestActionInvoice?.dueLabel || '청구서 없음',
-      paymentMethodSummary: latestActionInvoice?.paymentMethodSummary || '결제 수단 확인 필요',
-      nextAction,
-      badgeLabel:
-        latestActionInvoice?.status === 'overdue'
-          ? '미납'
-          : latestActionInvoice?.isActionRequired
-            ? '납부 필요'
-            : '정상',
-      badgeClassName:
-        latestActionInvoice?.status === 'overdue'
-          ? 'bg-rose-100 text-rose-700 border-rose-200'
-          : latestActionInvoice?.isActionRequired
-            ? 'bg-amber-100 text-amber-700 border-amber-200'
-            : 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    };
-  }, [actionRequiredInvoices, latestInvoice, displayInvoices.length]);
-
-  const parentOverviewSnapshot = useMemo(() => {
-    const statusTitle = ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '')
-      ? '실시간 상태'
-      : '오늘 상태';
-    const statusDescription = ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '')
-      ? `${attendanceStatus.label} · 오늘 ${toHm(totalMinutes)}`
-      : `${attendanceStatus.label} · 첫 기록 ${todayFirstCheckInLabel || '대기 중'}`;
-
-    let nextAction: {
-      title: string;
-      description: string;
-      cta: string;
-      targetTab: ParentPortalTab;
-      action: 'tab' | 'report';
-      tone: 'rose' | 'amber' | 'blue' | 'slate' | 'emerald';
-    } = {
-      title: '바로 해야 할 한 가지',
-      description: '오늘은 특별한 이슈가 없어요. 알림과 리포트만 가볍게 확인해 주세요.',
-      cta: '알림 보기',
-      targetTab: 'notifications' as ParentPortalTab,
-      action: 'tab' as const,
-      tone: 'emerald',
-    };
-
-    if (billingHubSummary.latestActionInvoice?.isActionRequired) {
-      nextAction = {
-        title: billingHubSummary.latestActionInvoice.status === 'overdue' ? '미납 결제를 먼저 확인해 주세요.' : '이번 청구서를 확인해 주세요.',
-        description: `${billingHubSummary.dueLabel} · ${billingHubSummary.nextAction}`,
-        cta: '결제 허브 보기',
-        targetTab: 'billing',
-        action: 'tab',
-        tone: billingHubSummary.latestActionInvoice.status === 'overdue' ? 'rose' : 'amber',
-      };
-    } else if (report?.content && !report.viewedAt) {
-      nextAction = {
-        title: '새 리포트를 확인해 주세요.',
-        description: '지난주 대비 변화와 부모가 도와줄 한 가지를 바로 볼 수 있어요.',
-        cta: '리포트 열기',
-        targetTab: 'studyDetail',
-        action: 'report',
-        tone: 'blue',
-      };
-    } else if (communicationOverview.activeCount > 0) {
-      nextAction = {
-        title: '진행 중 문의를 확인해 주세요.',
-        description: communicationOverview.latestEtaLabel,
-        cta: '문의 현황 보기',
-        targetTab: 'communication',
-        action: 'tab',
-        tone: 'slate',
-      };
-    } else if (unreadNotificationCount > 0) {
-      nextAction = {
-        title: '미확인 알림이 있어요.',
-        description: `${unreadNotificationCount}개의 알림이 아직 확인 전입니다.`,
-        cta: '알림 보기',
-        targetTab: 'notifications',
-        action: 'tab',
-        tone: 'blue',
-      };
-    }
-
-    return {
-      status: {
-        title: statusTitle,
-        description: statusDescription,
-        metric: totalMinutes > 0 ? toHm(totalMinutes) : attendanceStatus.label,
-        helper: todayFirstCheckInLabel || '출결 기록이 들어오면 여기에 반영돼요.',
-      },
-      weekly: {
-        title: '이번 주 변화',
-        description: `${toHm(weeklyTotalStudyMinutes)} · 계획 ${weeklyPlanCompletionRate}% · ${formatSignedMetric(weeklyStudyDelta, '%')}`,
-        metric: `${weeklyPlanCompletionRate}%`,
-        helper: leadSubject ? `가장 많이 공부한 과목은 ${leadSubject.subject} (${leadSubjectShare}%)` : '과목별 학습 비중이 집계되면 보여드릴게요.',
-      },
-      nextAction,
-    };
-  }, [
-    attendanceCurrent?.status,
-    attendanceStatus.label,
-    totalMinutes,
-    todayFirstCheckInLabel,
-    billingHubSummary,
-    report,
-    communicationOverview,
-    unreadNotificationCount,
-    weeklyTotalStudyMinutes,
-    weeklyPlanCompletionRate,
-    weeklyStudyDelta,
-    leadSubject,
-    leadSubjectShare,
-  ]);
+  }, [rawParentCommunications]);
 
   const selectedDateStudyPlans = useMemo(
     () => (selectedDatePlans || []).filter((item) => item.category === 'study' || !item.category),
@@ -2169,6 +1578,61 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [attendance요청, selectedDateKey]
   );
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (growthCelebrationTimerRef.current) {
+      window.clearTimeout(growthCelebrationTimerRef.current);
+      growthCelebrationTimerRef.current = null;
+    }
+
+    if (!isActive || tab !== 'home' || !centerId || !studentId || !todayKey || !growthCelebrationCandidate) {
+      setGrowthCelebration(null);
+      return;
+    }
+
+    const storageKey = `parent-growth-celebration:${centerId}:${studentId}:${todayKey}`;
+
+    try {
+      if (window.localStorage.getItem(storageKey)) {
+        setGrowthCelebration(null);
+        return;
+      }
+      window.localStorage.setItem(storageKey, 'shown');
+    } catch {
+      // Ignore storage issues and still show once during this render cycle.
+    }
+
+    setGrowthCelebration(growthCelebrationCandidate);
+    growthCelebrationTimerRef.current = window.setTimeout(() => {
+      setGrowthCelebration(null);
+      growthCelebrationTimerRef.current = null;
+    }, 3200);
+
+    return () => {
+      if (growthCelebrationTimerRef.current) {
+        window.clearTimeout(growthCelebrationTimerRef.current);
+        growthCelebrationTimerRef.current = null;
+      }
+    };
+  }, [isActive, tab, centerId, studentId, todayKey, growthCelebrationCandidate]);
+
+  useEffect(() => {
+    if (!isReportArchiveOpen) return;
+
+    if (selectedChildReport) {
+      const hasSelectedReport = reportsArchive.some((item) => item.id === selectedChildReport.id);
+      if (!hasSelectedReport) {
+        setSelectedChildReport(reportsArchive[0] || null);
+      }
+      return;
+    }
+
+    if (reportsArchive.length > 0) {
+      setSelectedChildReport(reportsArchive[0]);
+    }
+  }, [isReportArchiveOpen, reportsArchive, selectedChildReport]);
+
   const readNotification = async (notification: ParentNotificationItem) => {
     setReadMap((prev) => ({ ...prev, [notification.id]: true }));
     void logParentActivity('app_visit', { source: 'notification_read', notificationId: notification.id, notificationType: notification.type });
@@ -2179,22 +1643,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     setSelectedNotification(notification);
   };
 
-  const handleRecentNotificationClick = async () => {
-    const targetNotification = recentNotifications[0] || sortedNotifications[0] || null;
-    if (targetNotification) {
-      await openNotificationDetail(targetNotification);
-      return;
-    }
-    handleTabChange('notifications');
-  };
-
   const handleTabChange = (value: string) => {
-    const nextTab = (value === 'life' ? 'data' : value) as ParentPortalTab;
+    const nextTab = normalizeParentPortalTab(value);
     setTab(nextTab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('parentTab', nextTab);
     router.replace(`${pathname}?${params.toString()}`);
     void logParentActivity('app_visit', { source: 'tab_change', tab: nextTab });
+  };
+
+  const handleStudentChange = (nextStudentId: string) => {
+    if (nextStudentId === studentId) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('parentTab', tab);
+    if (linkedStudentIds.length > 1) {
+      params.set('parentStudentId', nextStudentId);
+    } else {
+      params.delete('parentStudentId');
+    }
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const handleOpenReportsArchive = () => {
@@ -2208,8 +1676,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     updateDoc(doc(firestore, 'centers', centerId, 'dailyReports', target.id), {
       viewedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }).catch(() => {
-      // Keep archive navigation quiet even if the parent cannot mark reports as viewed.
+    }).catch((error) => {
+      console.warn('[parent-dashboard] report viewed update failed', error);
     });
   };
 
@@ -2238,14 +1706,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         senderRole: 'parent', senderUid: user.uid, senderName: user.displayName || '학부모',
         type, title, body, channel: type === 'consultation' ? channel : null,
         requestCategory: type === 'suggestion' ? 'suggestion' : 'request',
-        status: 'received',
-        statusUpdatedAt: serverTimestamp(),
-        slaDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        owner: type === 'consultation' ? '상담 담당자' : '담당 선생님',
-        nextAction: type === 'consultation' ? '센터에서 상담 가능 시간을 확인한 뒤 연락드릴게요.' : '담당 선생님이 확인 후 앱에서 답변드릴게요.',
-        priority: type === 'consultation' ? 'high' : 'normal',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        status: 'requested', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
 
       const eventType: ParentActivityEvent['eventType'] =
@@ -2294,17 +1755,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         requestCategory: parentInquiryType,
         title: parentInquiryTitle.trim() || fallbackTitle,
         body,
-        status: 'received',
-        statusUpdatedAt: serverTimestamp(),
-        slaDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        owner: parentInquiryType === 'question' ? '담당 선생님' : '센터 관리자',
-        nextAction:
-          parentInquiryType === 'suggestion'
-            ? '센터에서 검토 후 반영 여부를 안내드릴게요.'
-            : parentInquiryType === 'request'
-              ? '요청 가능 여부를 확인한 뒤 앱에서 안내드릴게요.'
-              : '질문 내용을 확인한 뒤 순서대로 답변드릴게요.',
-        priority: parentInquiryType === 'request' ? 'high' : 'normal',
+        status: 'requested',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -2354,275 +1805,352 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <div className={cn("space-y-4 pb-24", isMobile ? "px-0" : "max-w-4xl mx-auto px-4")}>
-      <Card className="overflow-hidden rounded-[2.5rem] border-none bg-white shadow-2xl ring-1 ring-slate-200/60 transition-all duration-500">
-        <CardContent className={cn('p-6 space-y-6')}>
-          <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-            <TabsContent value="home" className="mt-0 space-y-6 animate-in fade-in duration-500">
-              {/* 다자녀 선택 */}
-              {linkedStudentIds.length > 1 && (
-                <div className="flex gap-2 flex-wrap">
-                  {linkedStudentIds.map((sid, idx) => (
-                    <button
-                      key={sid}
-                      type="button"
-                      onClick={() => setSelectedChildIdx(idx)}
-                      className={cn(
-                        'rounded-full px-4 py-1.5 text-[11px] font-black border transition-all',
-                        selectedChildIdx === idx
-                          ? 'bg-[#14295F] text-white border-[#14295F] shadow-sm'
-                          : 'bg-white text-slate-500 border-slate-200 hover:border-[#14295F]/40'
-                      )}
-                    >
-                      {linkedStudentNames[sid] || `자녀 ${idx + 1}`}
-                    </button>
-                  ))}
+    <div className={cn("relative space-y-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))]", isMobile ? "px-0" : "mx-auto max-w-5xl px-4")}>
+      {growthCelebration && (
+        <ParentGrowthCelebration
+          celebration={growthCelebration}
+          studentName={student?.name || '자녀'}
+          onClose={() => setGrowthCelebration(null)}
+        />
+      )}
+
+      {linkedStudents.length > 1 && (
+        <section className="rounded-[1.7rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Parent Profile</p>
+              <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">{activeStudentLabel} 학생 화면</h3>
+              <p className="mt-1 text-sm font-bold text-slate-500">여러 자녀가 연결된 경우, 확인할 학생을 빠르게 전환할 수 있어요.</p>
+            </div>
+            <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleStudentChange}>
+              <SelectTrigger className="h-12 w-full rounded-[1.1rem] border border-[#d7e4ff] bg-white px-4 text-left font-black text-[#14295F] shadow-sm sm:w-[220px]">
+                <SelectValue placeholder="자녀 선택" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border border-slate-200 bg-white">
+                {linkedStudents.map((item) => (
+                  <SelectItem key={item.id} value={item.id} className="font-bold">
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+      )}
+
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
+        <TabsContent value="home" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
+          <section className="relative overflow-hidden rounded-[2.35rem] border border-[#d7e5ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_54%,#fff4e7_100%)] p-5 shadow-[0_10px_24px_rgba(20,41,95,0.10)] sm:p-6">
+            <div className="soft-glow absolute -right-8 top-2 h-24 w-24 rounded-full bg-[#ffb979]/35 blur-3xl" />
+            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#9bbcff]/30 blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.10),transparent_32%)]" />
+
+            <div className="relative z-10 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Badge variant="outline" className="h-7 rounded-full border border-white/80 bg-white/85 px-3 text-[11px] font-black text-[#14295F] shadow-sm">
+                  {today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
+                </Badge>
+                <div className="flex items-center gap-2 rounded-full border border-[#d8e6ff] bg-white/85 px-3 py-1.5 shadow-sm">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">실시간 앱 모니터링</span>
                 </div>
-              )}
-              {/* 히어로 상태 카드 */}
-              {linkedStudentIds.length > 1 && (
-                <Card className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(145deg,#ffffff_0%,#f8fbff_58%,#fff7ef_100%)] p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#14295F]/55">Family Overview</p>
-                      <h3 className="text-lg font-black tracking-tight text-[#14295F]">연결된 자녀 상태를 빠르게 전환해 보세요.</h3>
-                      <p className="text-sm font-bold leading-relaxed text-slate-600">현재 선택한 자녀 기준으로 새 알림, 벌점, 결제 상태가 함께 반영됩니다.</p>
-                    </div>
-                    <Badge variant="outline" className="h-7 rounded-full border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600">
-                      {linkedStudentIds.length}명 연결
-                    </Badge>
-                  </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                    {linkedStudentIds.map((sid, idx) => {
-                      const isSelectedChild = selectedChildIdx === idx;
-                      return (
-                        <button
-                          key={`family-overview-${sid}`}
-                          type="button"
-                          onClick={() => setSelectedChildIdx(idx)}
-                          className={cn(
-                            'rounded-[1.4rem] border px-4 py-3 text-left transition-all',
-                            isSelectedChild
-                              ? 'border-[#14295F] bg-[#14295F] text-white shadow-lg shadow-[#14295F]/15'
-                              : 'border-slate-200 bg-white text-slate-700 hover:border-[#14295F]/30 hover:bg-[#f8fbff]'
-                          )}
-                        >
-                          <p className="text-sm font-black">{linkedStudentNames[sid] || `자녀 ${idx + 1}`}</p>
-                          <p className={cn('mt-1 text-[11px] font-bold', isSelectedChild ? 'text-white/75' : 'text-slate-500')}>
-                            {isSelectedChild
-                              ? `새 알림 ${unreadNotificationCount} · 미납 ${actionRequiredInvoices.length} · 벌점 ${penaltyRecovery.effectivePoints}`
-                              : '눌러서 현재 상태 보기'}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Card>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Card className="rounded-[2rem] border border-[#dbe7ff] bg-[linear-gradient(145deg,#f6f9ff_0%,#ffffff_100%)] p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1f4fbf]">{parentOverviewSnapshot.status.title}</p>
-                  <div className="mt-3 flex items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <p className="text-2xl font-black tracking-tight text-[#14295F]">{parentOverviewSnapshot.status.metric}</p>
-                      <p className="text-sm font-bold leading-relaxed text-slate-700">{parentOverviewSnapshot.status.description}</p>
-                    </div>
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#14295F] text-white shadow-sm">
-                      <Activity className="h-4 w-4" />
-                    </span>
-                  </div>
-                  <p className="mt-3 text-[11px] font-bold text-slate-500">{parentOverviewSnapshot.status.helper}</p>
-                </Card>
-                <Card className="rounded-[2rem] border border-emerald-200 bg-[linear-gradient(145deg,#f4fff9_0%,#ffffff_100%)] p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">{parentOverviewSnapshot.weekly.title}</p>
-                  <div className="mt-3 flex items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <p className="text-2xl font-black tracking-tight text-slate-900">{parentOverviewSnapshot.weekly.metric}</p>
-                      <p className="text-sm font-bold leading-relaxed text-slate-700">{parentOverviewSnapshot.weekly.description}</p>
-                    </div>
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
-                      <TrendingUp className="h-4 w-4" />
-                    </span>
-                  </div>
-                  <p className="mt-3 text-[11px] font-bold text-slate-500">{parentOverviewSnapshot.weekly.helper}</p>
-                </Card>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (parentOverviewSnapshot.nextAction.action === 'report') {
-                      handleOpenReportsArchive();
-                      return;
-                    }
-                    handleTabChange(parentOverviewSnapshot.nextAction.targetTab);
-                  }}
-                  className={cn(
-                    'rounded-[2rem] border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5',
-                    parentOverviewSnapshot.nextAction.tone === 'rose' && 'border-rose-200 bg-[linear-gradient(145deg,#fff5f6_0%,#ffffff_100%)]',
-                    parentOverviewSnapshot.nextAction.tone === 'amber' && 'border-amber-200 bg-[linear-gradient(145deg,#fff8ef_0%,#ffffff_100%)]',
-                    parentOverviewSnapshot.nextAction.tone === 'blue' && 'border-sky-200 bg-[linear-gradient(145deg,#f3faff_0%,#ffffff_100%)]',
-                    parentOverviewSnapshot.nextAction.tone === 'slate' && 'border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#ffffff_100%)]',
-                    parentOverviewSnapshot.nextAction.tone === 'emerald' && 'border-emerald-200 bg-[linear-gradient(145deg,#f3fff8_0%,#ffffff_100%)]'
-                  )}
-                >
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">다음 행동</p>
-                  <p className="mt-3 text-xl font-black tracking-tight text-[#14295F]">{parentOverviewSnapshot.nextAction.title}</p>
-                  <p className="mt-2 text-sm font-bold leading-relaxed text-slate-700">{parentOverviewSnapshot.nextAction.description}</p>
-                  <div className="mt-4 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-black text-[#14295F] shadow-sm">
-                    {parentOverviewSnapshot.nextAction.cta}
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </div>
-                </button>
               </div>
-              <Card className={cn(
-                "rounded-[2rem] p-5 shadow-sm transition-all",
-                heroStyles[heroMessage.tone].bg,
-                heroStyles[heroMessage.tone].border
-              )}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow", heroStyles[heroMessage.tone].icon)}>
-                    {heroMessage.tone === 'studying' ? <Zap className="h-4 w-4 text-white fill-current" /> :
-                     heroMessage.tone === 'done' ? <Home className="h-4 w-4 text-white" /> :
-                     <Clock className="h-4 w-4 text-white" />}
-                  </div>
-                  <p className={cn("text-sm font-black leading-tight", heroStyles[heroMessage.tone].textAccent)}>
-                    {heroMessage.text}
-                  </p>
-                  {heroMessage.tone === 'studying' && (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700 shrink-0">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                      실시간
-                    </span>
-                  )}
-                </div>
-                <div className="text-center py-2">
-                  <p className="dashboard-number text-4xl text-[#14295F] leading-tight">{toHm(totalMinutes)}</p>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1 inline-block">오늘 공부</span>
-                  <p className={cn(
-                    "text-xs font-black mt-1",
-                    webAppInsightMetrics.studyVsYesterday >= 0 ? "text-emerald-600" : "text-rose-500"
-                  )}>
-                    어제 대비 {webAppInsightMetrics.studyVsYesterday >= 0 ? '+' : ''}{webAppInsightMetrics.studyVsYesterday}%
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#6f82a3]">Parent App Summary</p>
+                <div className="space-y-1">
+                  <h2 className="font-aggro-display text-[1.9rem] leading-[1.08] tracking-[-0.03em] text-[#14295F] sm:text-[2.35rem]">
+                    <span className="block">{student?.name || '자녀'} 학생이</span>
+                    <span className="block">{heroTone.title}</span>
+                  </h2>
+                  <p className="max-w-2xl break-keep text-sm font-bold leading-relaxed text-slate-600">
+                    {heroTone.description}
                   </p>
                 </div>
-                {todayFirstCheckInLabel && (
-                  <p className="text-[10px] font-bold text-slate-400 text-center mt-1">{todayFirstCheckInLabel}</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[11px] font-black shadow-sm', heroTone.badgeClassName)}>
+                  {heroTone.badgeLabel}
+                </Badge>
+                {growthCelebrationCandidate && (
+                  <Badge variant="outline" className="h-7 rounded-full border border-[#ffd6ac] bg-[#fff6ec] px-3 text-[11px] font-black text-[#FF7A16] shadow-sm">
+                    평균 대비 +{growthCelebrationCandidate.increaseRate}%
+                  </Badge>
                 )}
-              </Card>
-
-              {/* 정보 카드 3칸 그리드 */}
-              <div className="grid grid-cols-3 gap-2.5">
-                <Card className="rounded-2xl border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff2e4_0%,#fff9f2_100%)] p-3 text-center space-y-1.5 shadow-sm">
-                  <span className="text-[9px] font-black text-[#FF7A16] uppercase tracking-widest">계획 달성</span>
-                  <p className="dashboard-number text-lg text-[#14295F] leading-tight">{planRate}%</p>
-                  <div className="w-full h-1.5 rounded-full bg-orange-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[#FF7A16] transition-all duration-700"
-                      style={{ width: `${Math.min(planRate, 100)}%` }}
-                    />
-                  </div>
-                </Card>
-                <Card className={cn(
-                  "rounded-2xl border p-3 text-center space-y-1 shadow-sm",
-                  attendanceStatus.color
-                )}>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">출결</span>
-                  <p className="text-base font-black leading-tight">{attendanceStatus.label.split(' ')[0]}</p>
-                </Card>
-                <Card
-                  className={cn(
-                    "rounded-2xl p-3 text-center space-y-1 shadow-sm cursor-pointer transition-all",
-                    penaltyRecovery.effectivePoints === 0
-                      ? "border border-emerald-200 bg-[linear-gradient(135deg,#f0fdf4_0%,#f7fffe_100%)] hover:ring-1 hover:ring-emerald-300"
-                      : "border border-[#ffcfa0] bg-[linear-gradient(135deg,#fff3e6_0%,#fff9f4_100%)] hover:ring-1 hover:ring-[#ffc593]"
-                  )}
-                  role="button"
-                  onClick={() => setIsPenaltyGuideOpen(true)}
-                >
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest", penaltyRecovery.effectivePoints === 0 ? "text-emerald-600" : "text-rose-600")}>벌점</span>
-                  <div className="flex items-center justify-center gap-0.5">
-                    <p className={cn("dashboard-number text-lg leading-tight", penaltyRecovery.effectivePoints === 0 ? "text-emerald-700" : "text-rose-700")}>{penaltyRecovery.effectivePoints}</p>
-                    <span className={cn("text-[9px] font-black", penaltyRecovery.effectivePoints === 0 ? "text-emerald-500/70" : "text-rose-500/70")}>점</span>
-                  </div>
-                </Card>
+                <Badge variant="outline" className="h-7 rounded-full border border-[#d8e6ff] bg-[#eef4ff] px-3 text-[11px] font-black text-[#14295F] shadow-sm">
+                  출결 {attendanceStatus.label.split('(')[0].trim()}
+                </Badge>
               </div>
 
-              <Card
-                role="button"
-                tabIndex={0}
-                onClick={handleOpenReportsArchive}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    handleOpenReportsArchive();
-                  }
-                }}
-                className="rounded-[2rem] border border-[#d7e3fb] bg-[linear-gradient(145deg,#eef4ff_0%,#f5f9ff_55%,#fff4e8_100%)] p-6 ring-1 ring-[#d7e3fb]/70 relative overflow-hidden group shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
-              >
-                <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:rotate-12 transition-transform duration-700">
-                  <MessageCircle className="h-20 w-20 text-[#14295F]" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="min-w-0 rounded-[1.55rem] border border-white/80 bg-white/82 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.08)] backdrop-blur-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">오늘 공부</p>
+                  <p className="mt-2 truncate text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {toHm(totalMinutes)}
+                  </p>
+                  <p className="mt-2 text-[11px] font-bold text-slate-500">
+                    최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#FF7A16] fill-current" />
-                    <span className="text-[10px] font-black text-[#14295F] uppercase tracking-widest">우리아이 리포트 확인하기</span>
-                  </div>
-                  {report?.viewedAt && <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] h-4 px-1.5">읽음</Badge>}
+                <div className="min-w-0 rounded-[1.55rem] border border-white/80 bg-white/82 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.08)] backdrop-blur-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">주간 요약</p>
+                  <p className="mt-2 text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {toHm(weeklyTotalStudyMinutes)}
+                  </p>
+                  <p className="mt-2 text-[11px] font-bold text-slate-500">
+                    계획 달성 {weeklyPlanCompletionRate > 0 ? `${weeklyPlanCompletionRate}%` : `${planRate}%`}
+                  </p>
                 </div>
-                <p className="text-sm font-bold text-slate-800 leading-relaxed break-keep relative z-10 line-clamp-2">
-                    {report?.content || '카드를 누르면, 우리 아이가 받은 리포트를 확인할 수 있습니다.'}
-                </p>
-              </Card>
+                <div className="min-w-0 rounded-[1.55rem] border border-white/80 bg-white/82 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.08)] backdrop-blur-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">학습 리듬</p>
+                  <p className="mt-2 text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {rhythmScore > 0 ? `${rhythmScore}점` : '대기 중'}
+                  </p>
+                  <p className="mt-2 text-[11px] font-bold text-slate-500">
+                    최근 기록일 {latestStudySnapshot?.studyDateLabel || '아직 없음'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
 
-              <button
-                type="button"
-                className="w-full flex items-center justify-between rounded-2xl border border-[#d7e3fb] bg-[#f7faff] px-4 py-3 text-left transition-all hover:bg-[#eef4ff] active:scale-[0.98]"
-                onClick={() => void handleRecentNotificationClick()}
-              >
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-[#14295F]" />
-                  <span className="text-sm font-black text-[#14295F]">알림</span>
-                  {unreadRecentCount > 0 ? (
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF7A16] px-1.5 text-[10px] font-black text-white animate-pulse">
-                      {unreadRecentCount}
-                    </span>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <Card className="min-w-0 rounded-[1.75rem] border border-[#d8e5ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_100%)] p-4 shadow-sm sm:p-5">
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">오늘 공부</span>
+                  <p className="min-w-0 break-words text-[1.45rem] font-black leading-[1.02] tracking-[-0.03em] text-[#14295F]">
+                    {toHm(totalMinutes)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  {growthCelebrationCandidate ? (
+                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd4a8] bg-[#fff4e9] px-2.5 text-[10px] font-black text-[#FF7A16]">
+                      평균 대비 +{growthCelebrationCandidate.increaseRate}%
+                    </Badge>
                   ) : (
-                    <span className="text-[10px] font-bold text-slate-400">{recentNotifications.length}건</span>
+                    <p className="text-[11px] font-bold text-slate-500">
+                      최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
+                    </p>
                   )}
                 </div>
-                <span className="flex items-center gap-0.5 text-[11px] font-black text-slate-400">소통 탭에서 보기 <ChevronRight className="h-3 w-3" /></span>
-              </button>
-              <div className="grid grid-cols-1 gap-3">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="w-full h-14 rounded-2xl bg-[#14295F] text-white hover:bg-[#14295F]/90 font-black gap-2 text-base shadow-xl active:scale-[0.98] transition-all">
-                      <TrendingUp className="h-5 w-5" /> 인공지능 학습 인사이트 보기 <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-md">
-                    <div className="bg-[#14295F] p-10 text-white relative">
-                      <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
-                      <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1 text-xs">자녀의 학습 패턴을 인공지능이 정밀 분석했습니다.</DialogDescription>
-                    </div>
-                    <div className="p-6 space-y-3 bg-[#fafafa]">
-                      {aiInsights.map((insight, i) => (
-                        <div key={i} className="flex items-start gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-orange-200">
-                          <div className="h-2 w-2 rounded-full bg-[#FF7A16] mt-2 shrink-0" />
-                          <p className="text-sm font-bold text-slate-700 leading-relaxed">{insight}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F] text-white">확인했습니다</Button></DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
               </div>
-            </TabsContent>
+            </Card>
 
-            <TabsContent value="studyDetail" className="mt-0 space-y-6 animate-in fade-in duration-500">
+            <Card className="min-w-0 rounded-[1.75rem] border border-[#ffd6ac] bg-[linear-gradient(145deg,#fff8f1_0%,#fff2e2_100%)] p-4 shadow-sm sm:p-5">
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d26d12]">계획 달성</span>
+                  <p className="text-[1.55rem] font-black leading-none tracking-[-0.03em] text-[#14295F]">
+                    {planRate}%
+                  </p>
+                </div>
+                <p className="text-[11px] font-bold text-slate-500">
+                  주간 평균 {weeklyPlanCompletionRate > 0 ? `${weeklyPlanCompletionRate}%` : '계획 대기'}
+                </p>
+              </div>
+            </Card>
+
+            <Card className={cn(
+              "min-w-0 rounded-[1.75rem] border p-4 shadow-sm sm:p-5",
+              attendanceStatus.color
+            )}>
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">출결 상태</span>
+                  <p className="break-keep text-[1.28rem] font-black leading-[1.12] tracking-[-0.02em]">
+                    {attendanceStatus.label}
+                  </p>
+                </div>
+                <p className="text-[11px] font-bold text-slate-500">앱에서 실시간으로 확인 중</p>
+              </div>
+            </Card>
+
+            <Card
+              className="min-w-0 cursor-pointer rounded-[1.75rem] border border-rose-200 bg-[linear-gradient(145deg,#fff8f8_0%,#fff0f0_100%)] p-4 shadow-sm transition-all hover:shadow-md sm:p-5"
+              role="button"
+              onClick={() => setIsPenaltyGuideOpen(true)}
+            >
+              <div className="flex min-h-[126px] flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">벌점 지수</span>
+                  <div className="flex items-end gap-1">
+                    <p className="text-[1.55rem] font-black leading-none tracking-[-0.03em] text-rose-700">
+                      {penaltyRecovery.effectivePoints}
+                    </p>
+                    <span className="pb-0.5 text-xs font-black text-rose-500/75">점</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', penaltyMeta.badge)}>
+                    {penaltyMeta.label}
+                  </Badge>
+                  {penaltyRecovery.recoveredPoints > 0 && (
+                    <p className="text-[11px] font-bold text-rose-500/85">
+                      자동 회복 -{penaltyRecovery.recoveredPoints}점
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={handleOpenReportsArchive}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleOpenReportsArchive();
+              }
+            }}
+            className="group relative overflow-hidden rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_60%,#fff4e8_100%)] p-5 shadow-sm ring-1 ring-[#d7e4ff]/70 transition-transform active:scale-[0.99] sm:p-6"
+          >
+            <div className="absolute right-0 top-0 p-4 opacity-[0.04] transition-transform duration-700 group-hover:rotate-12">
+              <MessageCircle className="h-20 w-20 text-[#14295F]" />
+            </div>
+            <div className="relative z-10 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-[#FF7A16]" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14295F]">우리 아이 리포트</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {report?.viewedAt ? (
+                    <Badge variant="outline" className="h-6 rounded-full border-none bg-emerald-100 px-2.5 text-[10px] font-black text-emerald-700">
+                      읽음
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/12 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                      새 리포트
+                    </Badge>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </div>
+              </div>
+              <div className="space-y-2 rounded-[1.6rem] border border-white/80 bg-white/78 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.06)]">
+                <p className="text-sm font-black tracking-tight text-[#14295F]">
+                  오늘 부모님이 가장 먼저 보셔야 할 내용
+                </p>
+                <p className="line-clamp-3 break-keep text-sm font-bold leading-relaxed text-slate-700">
+                  {report?.content || '카드를 누르면 자녀의 최근 학습 리포트와 선생님 피드백을 바로 확인할 수 있습니다.'}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-sm sm:p-6">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-[#14295F]" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">최근 알림 3개</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {unreadRecentCount > 0 && (
+                  <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                    미읽음 {unreadRecentCount}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-500">
+                  {recentNotifications.length}건
+                </Badge>
+              </div>
+            </div>
+            <p className="mb-3 text-[11px] font-bold text-slate-500">터치하면 상세 내용을 바로 확인할 수 있어요.</p>
+
+            {recentNotifications.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
+                최근 알림이 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {recentNotifications.map((notification) => {
+                  const isRead = notification.isRead || !!readMap[notification.id];
+
+                  return (
+                    <button
+                      type="button"
+                      key={notification.id}
+                      className={cn(
+                        'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-all',
+                        isRead
+                          ? 'border-[#dde6f9] bg-white'
+                          : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 hover:shadow-md'
+                      )}
+                      onClick={() => void openNotificationDetail(notification)}
+                    >
+                      {!isRead && (
+                        <>
+                          <div className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full bg-[#FF7A16]/20 blur-xl" />
+                          <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16]" />
+                        </>
+                      )}
+                      <div className="relative z-10 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {!isRead && (
+                            <span className="relative inline-flex h-2.5 w-2.5">
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-[#FF7A16] opacity-70 animate-ping" />
+                              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
+                            </span>
+                          )}
+                          {notification.isImportant && (
+                            <Badge variant="outline" className="h-5 rounded-full border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
+                              중요
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="h-14 w-full rounded-[1.7rem] bg-[#14295F] text-base font-black text-white shadow-[0_14px_28px_rgba(20,41,95,0.20)] transition-all hover:bg-[#10224f] active:scale-[0.98]">
+                <TrendingUp className="mr-2 h-5 w-5" />
+                인공지능 학습 인사이트 보기
+                <ChevronRight className="ml-auto h-4 w-4 opacity-40" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[3rem] border-none p-0 shadow-2xl overflow-hidden sm:max-w-md">
+              <div className="relative bg-[#14295F] p-10 text-white">
+                <Sparkles className="absolute right-0 top-0 h-32 w-32 p-8 opacity-20" />
+                <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
+                <DialogDescription className="mt-1 text-xs font-bold text-white/70">
+                  자녀의 학습 패턴을 차분하고 보기 쉽게 정리했습니다.
+                </DialogDescription>
+              </div>
+              <div className="space-y-3 bg-[#fafafa] p-6">
+                {aiInsights.map((insight, i) => (
+                  <div key={i} className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-orange-200">
+                    <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF7A16]" />
+                    <p className="text-sm font-bold leading-relaxed text-slate-700">{insight}</p>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter className="border-t bg-white p-6">
+                <DialogClose asChild>
+                  <Button className="h-14 w-full rounded-2xl bg-[#14295F] text-lg font-black text-white">확인했습니다</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+            <TabsContent value="studyDetail" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
               {/* 주간 성과 요약 (기존 리포트 내용 통합) */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border-none bg-white p-4 ring-1 ring-slate-100 text-center shadow-sm">
                   <span className="text-[10px] font-black text-slate-500 block mb-2 uppercase tracking-widest">주간 누적 트랙</span>
                   <div className="flex items-baseline justify-center gap-0.5 flex-wrap leading-tight">
@@ -2642,7 +2170,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </div>
 
-              <div className="flex items-center justify-between px-1">
+              <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col">
                   <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">학습 일관성 맵</p>
@@ -2755,7 +2283,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   })}
                 </div>
               </Card>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
                   <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-500 uppercase">
                     <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
@@ -2778,16 +2306,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2">
-                      <Clock3 className="h-6 w-6 text-[#FF7A16]" />
+                    <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
+                      <BarChart3 className="h-6 w-6 text-[#FF7A16]" />
                       <div className="grid gap-0.5 text-[#14295F]">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">오늘 루틴</span>
-                        <span className="text-xs font-black">등원 {todayRoutineSummary.arrivalTime} · 학원 {todayRoutineSummary.academyTime}</span>
-                        <span className="text-[10px] font-bold text-slate-500">오늘 기준</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">주간 상세</span>
+                        <span className="text-xs font-black">성과 상세 분석</span>
                       </div>
                     </Card>
                   </DialogTrigger>
-                  <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
+                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
                     <div className="bg-[#14295F] p-10 text-white relative">
                       <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
                       <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
@@ -2820,14 +2347,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </TabsContent>
 
-            <TabsContent value="data" className="mt-0 space-y-5 animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1.05fr_1fr]">
+            <TabsContent value="data" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
               <Card
-                className="rounded-[2.15rem] border border-rose-200/80 bg-[linear-gradient(145deg,rgba(255,247,248,0.98)_0%,rgba(255,255,255,0.98)_58%,rgba(255,240,243,0.98)_100%)] p-6 shadow-[0_22px_48px_rgba(244,63,94,0.12)] cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_rgba(244,63,94,0.18)]"
+                className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm cursor-pointer"
                 role="button"
                 onClick={() => setIsPenaltyGuideOpen(true)}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center justify-between">
                   <div className="grid gap-1">
                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">누적 벌점 지수</span>
                     <h3 className="dashboard-number text-4xl text-rose-900">
@@ -2838,569 +2364,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       원점수 {penaltyRecovery.basePoints}점 · 회복 {penaltyRecovery.recoveredPoints}점
                     </p>
                   </div>
-                  <Badge variant="outline" className={cn('h-9 rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
+                  <Badge variant="outline" className={cn('h-8 rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
                     {penaltyMeta.label}
                   </Badge>
                 </div>
               </Card>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Card className="h-full rounded-[2.15rem] border border-sky-200/80 bg-[linear-gradient(145deg,rgba(240,249,255,0.98)_0%,rgba(255,255,255,0.98)_55%,rgba(238,245,255,0.98)_100%)] p-5 shadow-[0_22px_48px_rgba(14,165,233,0.12)] cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_rgba(14,165,233,0.18)]">
-                    <div className="flex items-start gap-2.5">
-                      <Info className="mt-0.5 h-5 w-5 text-sky-600" />
-                      <div className="space-y-1">
-                        <p className="text-[11px] font-black uppercase tracking-widest text-sky-700">웹앱 인사이트 보기</p>
-                        <p className="text-xs font-bold leading-relaxed text-slate-700">
-                          오늘 앱에서 확인해야 할 체크포인트와 어제/7일 평균 대비 변화율을 확인할 수 있어요.
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl">
-                  <div className="bg-[#14295F] p-7 text-white">
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl font-black tracking-tight">웹앱 오늘 인사이트</DialogTitle>
-                      <DialogDescription className="text-white/75 font-bold text-xs">
-                        오늘 체크할 항목과 학습 변화 지표를 한 번에 확인하세요.
-                      </DialogDescription>
-                    </DialogHeader>
-                  </div>
-                  <div className="p-5 bg-white space-y-4 max-h-[68vh] overflow-y-auto custom-scrollbar">
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 공부시간</p>
-                        <p className="mt-1 text-lg font-black text-[#14295F]">{toHm(webAppInsightMetrics.todayStudyMinutes)}</p>
-                        <p className="text-[11px] font-bold text-slate-500">
-                          어제 대비 {webAppInsightMetrics.studyVsYesterday >= 0 ? '+' : ''}{webAppInsightMetrics.studyVsYesterday}%
-                        </p>
-                      </Card>
-                      <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 7일 평균</p>
-                        <p className="mt-1 text-lg font-black text-[#14295F]">{toHm(webAppInsightMetrics.avg7StudyMinutes)}</p>
-                        <p className="text-[11px] font-bold text-slate-500">
-                          평균 대비 {webAppInsightMetrics.studyVsAvg7 >= 0 ? '+' : ''}{webAppInsightMetrics.studyVsAvg7}%
-                        </p>
-                      </Card>
-                      <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 외출시간</p>
-                        <p className="mt-1 text-lg font-black text-[#14295F]">{webAppInsightMetrics.todayAwayMinutes}분</p>
-                        <p className="text-[11px] font-bold text-slate-500">
-                          {webAppInsightMetrics.todayAwayMinutes > 25 ? '집중관리 필요' : '양호'}
-                        </p>
-                      </Card>
-                    </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <RhythmTimeChartDialog
+                  trend={dailyRhythmTrend}
+                  hasTrend={hasRhythmTrend}
+                  yAxisDomain={rhythmYAxisDomain}
+                  rhythmScoreTrend={rhythmScoreTrend}
+                  rhythmScore={rhythmScore}
+                />
 
-                    <Card className="rounded-xl border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-4 shadow-none">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">오늘 앱에서 체크할 항목</p>
-                      <div className="mt-2.5 grid gap-2">
-                        {webAppInsightMetrics.checklist.map((item) => (
-                          <div key={item.title} className="rounded-lg border border-white/80 bg-white/80 px-3 py-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-xs font-black text-slate-800">{item.title}</p>
-                              <Badge className={cn('h-5 px-2 text-[10px] font-black border-none', item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                                {item.done ? '확인됨' : '확인 필요'}
-                              </Badge>
-                            </div>
-                            <p className="mt-1 text-[11px] font-bold text-slate-600">{item.detail}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
-
-                    <Card className="rounded-xl border border-slate-100 bg-white p-4 shadow-none">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">오늘 변화 포인트</p>
-                      <div className="mt-2 grid gap-1.5">
-                        {webAppInsightMetrics.changes.map((message) => (
-                          <p key={message} className="text-xs font-bold text-slate-700">{message}</p>
-                        ))}
-                      </div>
-                    </Card>
-                  </div>
-                  <DialogFooter className="border-t bg-white p-4">
-                    <DialogClose asChild>
-                      <Button className="h-11 rounded-xl font-black">확인 완료</Button>
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                <SubjectStudyChartDialog
+                  subjects={subjectsData}
+                  subjectTotalMinutes={subjectTotalMinutes}
+                />
               </div>
-
-              <div className="space-y-4">
-                <div className="relative overflow-hidden rounded-[2.4rem] border border-[#e4ecfb] bg-[linear-gradient(145deg,rgba(255,252,247,0.98)_0%,rgba(248,251,255,0.98)_55%,rgba(255,255,255,0.98)_100%)] px-5 py-5 shadow-[0_20px_50px_rgba(20,41,95,0.08)]">
-                  <div className="pointer-events-none absolute -right-12 top-0 h-28 w-28 rounded-full bg-[#ffedd5] blur-3xl" />
-                  <div className="pointer-events-none absolute left-0 top-10 h-24 w-24 rounded-full bg-[#dbeafe] blur-3xl" />
-                  <div className="relative flex items-start justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#1f4fbf] shadow-sm">
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        Learning Magazine
-                      </div>
-                      <div className="space-y-1">
-                        <h3 className="text-[1.45rem] font-black tracking-tight text-[#14295F]">이번 주와 오늘 흐름부터 먼저 읽도록 정리했어요.</h3>
-                        <p className="max-w-[260px] text-[12px] font-bold leading-relaxed text-slate-600">
-                          큰 카드 2개는 핵심 변화, 아래 미니 카드 4개는 리듬과 밸런스를 빠르게 훑는 순서예요.
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className="border-none bg-white/85 px-3 py-1.5 text-[10px] font-black text-slate-600 shadow-sm">
-                      앱모드 최적화
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <Card
-                    className="group relative overflow-hidden rounded-[2.35rem] border border-[#dbe7ff] bg-[linear-gradient(155deg,rgba(255,252,247,0.98)_0%,rgba(247,250,255,0.98)_58%,rgba(255,255,255,0.98)_100%)] p-5 shadow-[0_24px_54px_rgba(20,41,95,0.10)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_60px_rgba(20,41,95,0.15)] active:scale-[0.99]"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedDataChart('weeklyStudy')}
-                  >
-                    <div className="pointer-events-none absolute -right-8 top-2 h-24 w-24 rounded-full bg-[#dbeafe] blur-3xl" />
-                    <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 rounded-full bg-[#ffedd5] blur-3xl" />
-                    <div className="relative space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="inline-flex h-11 w-11 items-center justify-center rounded-[1.1rem] bg-[#14295F] text-white shadow-lg shadow-[#14295F]/20">
-                          <BarChart3 className="h-5 w-5" />
-                        </div>
-                        <Badge className="border-none bg-white/85 px-3 py-1.5 text-[10px] font-black text-slate-600 shadow-sm">
-                          최근 6주
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1f4fbf]">대표 흐름</p>
-                        <div className="flex items-end justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-black tracking-tight text-[#14295F]">이번 주 누적 학습</h3>
-                            <p className="mt-2 text-4xl font-black tracking-tight text-[#14295F]">{toHm(latestWeeklyStudyMinutes)}</p>
-                          </div>
-                          <div className="rounded-full bg-[#14295F]/6 px-3 py-2 text-right">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">직전 주 대비</p>
-                            <p className="mt-1 text-sm font-black text-[#14295F]">{formatSignedMetric(weeklyStudyDelta, '%')}</p>
-                          </div>
-                        </div>
-                        <p className="max-w-[260px] text-[13px] font-bold leading-relaxed text-slate-600">
-                          {weeklyStudyDelta >= 0
-                            ? '최근 6주 흐름에서 이번 주가 다시 올라오고 있어요.'
-                            : '최근 6주 흐름에서 이번 주는 잠시 숨을 고르는 모습이에요.'}
-                        </p>
-                        <p className="inline-flex items-center gap-1 text-[12px] font-black text-[#1f4fbf] transition-colors group-hover:text-[#14295F]">
-                          지난주와 비교해 자세히 보기
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </p>
-                      </div>
-                      <div className="relative h-[214px] overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/85 p-3 shadow-inner shadow-[#dbe7ff]/60">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={weeklyStudyTimeTrend} margin={{ top: 8, right: 0, left: -12, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={11} minTickGap={18} />
-                            <YAxis width={34} axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
-                            <Tooltip formatter={(value) => [toHm(Number(value || 0)), '주간 누적']} />
-                            <Bar dataKey="totalMinutes" fill="#14295F" radius={[10, 10, 0, 0]} maxBarSize={34} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                        {!hasWeeklyStudyTimeTrend && (
-                          <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl border border-dashed border-slate-200 bg-white/90 px-3 py-2 text-center text-[10px] font-bold text-slate-400">
-                            주간 데이터가 더 쌓이면 흐름이 또렷하게 보여요.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card
-                    className="group relative overflow-hidden rounded-[2.35rem] border border-[#ffe0c7] bg-[linear-gradient(155deg,rgba(255,250,244,0.98)_0%,rgba(255,255,255,0.98)_58%,rgba(255,247,239,0.98)_100%)] p-5 shadow-[0_24px_54px_rgba(255,122,22,0.12)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_60px_rgba(255,122,22,0.18)] active:scale-[0.99]"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedDataChart('dailyStudy')}
-                  >
-                    <div className="pointer-events-none absolute -right-10 top-1 h-24 w-24 rounded-full bg-[#fed7aa] blur-3xl" />
-                    <div className="pointer-events-none absolute bottom-0 left-4 h-20 w-20 rounded-full bg-[#ffedd5] blur-3xl" />
-                    <div className="relative space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="inline-flex h-11 w-11 items-center justify-center rounded-[1.1rem] bg-[#FF7A16] text-white shadow-lg shadow-[#FF7A16]/20">
-                          <Flame className="h-5 w-5" />
-                        </div>
-                        <Badge className="border-none bg-white/85 px-3 py-1.5 text-[10px] font-black text-slate-600 shadow-sm">
-                          최근 7일
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c25d10]">오늘 상태</p>
-                        <div className="flex items-end justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-black tracking-tight text-[#14295F]">오늘 학습 흐름</h3>
-                            <p className="mt-2 text-4xl font-black tracking-tight text-[#14295F]">{toHm(webAppInsightMetrics.todayStudyMinutes)}</p>
-                          </div>
-                          <div className="rounded-full bg-[#FF7A16]/8 px-3 py-2 text-right">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">7일 평균 대비</p>
-                            <p className="mt-1 text-sm font-black text-[#FF7A16]">{formatSignedMetric(webAppInsightMetrics.studyVsAvg7, '%')}</p>
-                          </div>
-                        </div>
-                        <p className="max-w-[260px] text-[13px] font-bold leading-relaxed text-slate-600">
-                          {webAppInsightMetrics.studyVsAvg7 >= 0
-                            ? '오늘 학습량이 평소 흐름보다 조금 더 올라와 있어요.'
-                            : '오늘 학습량이 평소보다 낮아 보여요. 시작 리듬만 잡히면 회복 가능해요.'}
-                        </p>
-                        <p className="inline-flex items-center gap-1 text-[12px] font-black text-[#FF7A16] transition-colors group-hover:text-[#d76609]">
-                          오늘 흐름 해석 보기
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </p>
-                      </div>
-                      <div className="relative h-[214px] overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/85 p-3 shadow-inner shadow-[#ffe0c7]/70">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsLineChart data={dailyStudyTrend} margin={{ top: 8, right: 0, left: -12, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3e8da" />
-                            <XAxis dataKey="date" axisLine={false} tickLine={false} fontSize={11} minTickGap={20} />
-                            <YAxis width={34} axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
-                            <Tooltip formatter={(value) => [toHm(Number(value || 0)), '일간 학습']} />
-                            <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={3.25} dot={{ r: 3.5, fill: '#FF7A16' }} activeDot={{ r: 5, fill: '#FF7A16' }} />
-                          </RechartsLineChart>
-                        </ResponsiveContainer>
-                        {!hasDailyStudyTrend && (
-                          <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl border border-dashed border-orange-200 bg-white/90 px-3 py-2 text-center text-[10px] font-bold text-slate-400">
-                            하루 흐름이 더 쌓이면 변화를 더 정확히 읽을 수 있어요.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Card
-                  className="group relative overflow-hidden rounded-[2rem] border border-[#dbe7ff] bg-[linear-gradient(155deg,rgba(255,255,255,0.98)_0%,rgba(243,248,255,0.98)_100%)] p-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_46px_rgba(20,41,95,0.12)] active:scale-[0.99]"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedDataChart('rhythmScore')}
-                >
-                  <div className="pointer-events-none absolute -right-6 top-0 h-20 w-20 rounded-full bg-emerald-100 blur-2xl" />
-                  <div className="relative space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-emerald-500 text-white shadow-md shadow-emerald-200">
-                        <Activity className="h-4.5 w-4.5" />
-                      </div>
-                      <Badge className="border-none bg-white/85 px-2.5 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                        평균 {rhythmScore}점
-                      </Badge>
-                    </div>
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="min-w-0 basis-[58%]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">생활 리듬</p>
-                        <h3 className="mt-1 text-[17px] font-black tracking-tight text-[#14295F]">학습 리듬</h3>
-                        <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{rhythmScore}점</p>
-                        <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-600">
-                          {rhythmScore >= 80 ? '공부 시작 흐름이 꽤 안정적이에요.' : '시작 시간만 일정해져도 리듬이 좋아질 수 있어요.'}
-                        </p>
-                      </div>
-                      <div className="relative h-[98px] min-w-[92px] basis-[42%] overflow-hidden rounded-[1.3rem] border border-white/80 bg-white/90 p-2 shadow-inner">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsLineChart data={rhythmScoreTrend}>
-                            <YAxis hide domain={[0, 100]} />
-                            <XAxis hide dataKey="date" />
-                            <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
-                            <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#10b981' }} />
-                          </RechartsLineChart>
-                        </ResponsiveContainer>
-                        {!hasRhythmScoreTrend && (
-                          <div className="pointer-events-none absolute inset-2 rounded-xl border border-dashed border-slate-200 bg-white/90 px-2 py-2 text-center text-[9px] font-bold text-slate-400">
-                            데이터 준비 중
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card
-                  className="group relative overflow-hidden rounded-[2rem] border border-[#ffe4bf] bg-[linear-gradient(155deg,rgba(255,255,255,0.98)_0%,rgba(255,250,242,0.98)_100%)] p-4 shadow-[0_18px_40px_rgba(245,158,11,0.10)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_46px_rgba(245,158,11,0.14)] active:scale-[0.99]"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedDataChart('startEnd')}
-                >
-                  <div className="pointer-events-none absolute -right-6 top-0 h-20 w-20 rounded-full bg-amber-100 blur-2xl" />
-                  <div className="relative space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-amber-500 text-white shadow-md shadow-amber-200">
-                        <Clock3 className="h-4.5 w-4.5" />
-                      </div>
-                      <Badge className="border-none bg-white/85 px-2.5 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                        최근 7일
-                      </Badge>
-                    </div>
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="min-w-0 basis-[58%]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">시간 패턴</p>
-                        <h3 className="mt-1 text-[17px] font-black tracking-tight text-[#14295F]">공부 시간대</h3>
-                        <p className="mt-2 text-sm font-black tracking-tight text-[#14295F]">{recentStartLabel}</p>
-                        <p className="text-[11px] font-bold text-slate-500">{recentEndLabel} 종료</p>
-                        <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-600">시작과 마무리가 비슷하면 하루 공부 리듬이 더 편안해져요.</p>
-                      </div>
-                      <div className="relative h-[98px] min-w-[92px] basis-[42%] overflow-hidden rounded-[1.3rem] border border-white/80 bg-white/90 p-2 shadow-inner">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsLineChart data={startEndTrend}>
-                            <YAxis hide domain={rhythmYAxisDomain} />
-                            <XAxis hide dataKey="date" />
-                            <Tooltip formatter={(value: number, name: string) => [toClockLabel(Number(value || 0)), name === 'startMinutes' ? '시작시간' : '종료시간']} />
-                            <Line type="monotone" dataKey="startMinutes" stroke="#0ea5e9" strokeWidth={2.25} dot={false} />
-                            <Line type="monotone" dataKey="endMinutes" stroke="#8b5cf6" strokeWidth={2.25} dot={false} />
-                          </RechartsLineChart>
-                        </ResponsiveContainer>
-                        {!hasStartEndTrend && (
-                          <div className="pointer-events-none absolute inset-2 rounded-xl border border-dashed border-slate-200 bg-white/90 px-2 py-2 text-center text-[9px] font-bold text-slate-400">
-                            데이터 준비 중
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card
-                  className="group relative overflow-hidden rounded-[2rem] border border-[#d8effb] bg-[linear-gradient(155deg,rgba(255,255,255,0.98)_0%,rgba(243,252,255,0.98)_100%)] p-4 shadow-[0_18px_40px_rgba(14,165,233,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_46px_rgba(14,165,233,0.12)] active:scale-[0.99]"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedDataChart('awayTime')}
-                >
-                  <div className="pointer-events-none absolute -right-6 top-0 h-20 w-20 rounded-full bg-sky-100 blur-2xl" />
-                  <div className="relative space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-sky-500 text-white shadow-md shadow-sky-200">
-                        <Coffee className="h-4.5 w-4.5" />
-                      </div>
-                      <Badge className="border-none bg-white/85 px-2.5 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                        7일 평균
-                      </Badge>
-                    </div>
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="min-w-0 basis-[58%]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-600">집중 관리</p>
-                        <h3 className="mt-1 text-[17px] font-black tracking-tight text-[#14295F]">집중 이탈</h3>
-                        <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{awayAverageMinutes}분</p>
-                        <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-600">
-                          {awayAverageMinutes <= 20 ? '짧게 쉬고 다시 돌아오는 흐름이 안정적이에요.' : '쉬는 흐름이 길어지는 날이 보여요.'}
-                        </p>
-                      </div>
-                      <div className="relative h-[98px] min-w-[92px] basis-[42%] overflow-hidden rounded-[1.3rem] border border-white/80 bg-white/90 p-2 shadow-inner">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={awayTimeTrend}>
-                            <YAxis hide />
-                            <XAxis hide dataKey="date" />
-                            <Tooltip formatter={(value) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
-                            <Bar dataKey="awayMinutes" fill="#38bdf8" radius={[6, 6, 0, 0]} maxBarSize={16} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                        {!hasAwayTrend && (
-                          <div className="pointer-events-none absolute inset-2 rounded-xl border border-dashed border-slate-200 bg-white/90 px-2 py-2 text-center text-[9px] font-bold text-slate-400">
-                            데이터 준비 중
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card
-                  className="group relative overflow-hidden rounded-[2rem] border border-[#ffd9c2] bg-[linear-gradient(155deg,rgba(255,255,255,0.98)_0%,rgba(255,249,244,0.98)_100%)] p-4 shadow-[0_18px_40px_rgba(249,115,22,0.10)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_46px_rgba(249,115,22,0.14)] active:scale-[0.99]"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedDataChart('subjectTime')}
-                >
-                  <div className="pointer-events-none absolute -right-6 top-0 h-20 w-20 rounded-full bg-orange-100 blur-2xl" />
-                  <div className="relative space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-[#f97316] text-white shadow-md shadow-orange-200">
-                        <BookOpen className="h-4.5 w-4.5" />
-                      </div>
-                      <Badge className="border-none bg-white/85 px-2.5 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                        {subjectsData.length}과목
-                      </Badge>
-                    </div>
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="min-w-0 basis-[58%]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#f97316]">과목 분배</p>
-                        <h3 className="mt-1 text-[17px] font-black tracking-tight text-[#14295F]">과목 밸런스</h3>
-                        <p className="mt-2 text-sm font-black tracking-tight text-[#14295F]">{leadSubject ? leadSubject.subject : '데이터 대기'}</p>
-                        <p className="text-[11px] font-bold text-slate-500">{leadSubject ? `${leadSubjectShare}% 비중` : '과목 기록 대기'}</p>
-                        <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-600">
-                          {leadSubject ? `${leadSubject.subject} 중심으로 학습 비중이 모여 있어요.` : '과목 기록이 더 쌓이면 밸런스를 읽을 수 있어요.'}
-                        </p>
-                      </div>
-                      <div className="relative h-[98px] min-w-[92px] basis-[42%] overflow-hidden rounded-[1.3rem] border border-white/80 bg-white/90 p-2 shadow-inner">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={subjectsData.slice(0, 4)}>
-                            <YAxis hide />
-                            <XAxis hide dataKey="subject" />
-                            <Tooltip formatter={(value) => [toHm(Number(value || 0)), '과목 학습시간']} />
-                            <Bar dataKey="minutes" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={16} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                        {subjectsData.length === 0 && (
-                          <div className="pointer-events-none absolute inset-2 rounded-xl border border-dashed border-slate-200 bg-white/90 px-2 py-2 text-center text-[9px] font-bold text-slate-400">
-                            데이터 준비 중
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              <Dialog open={selectedDataChart !== null} onOpenChange={(open) => { if (!open) setSelectedDataChart(null); }}>
-                <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-3xl">
-                  <div className="bg-[#14295F] p-6 text-white">
-                    <DialogHeader className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/65">
-                            {selectedChartDialogMeta?.eyebrow ?? '상세 분석'}
-                          </p>
-                          <DialogTitle className="text-2xl font-black tracking-tight">
-                            {selectedChartDialogMeta?.title ?? '학습 분석'}
-                          </DialogTitle>
-                        </div>
-                        {selectedChartDialogMeta && (
-                          <Badge className="border-none bg-white/15 px-3 py-1.5 text-[10px] font-black text-white">
-                            {selectedChartDialogMeta.badge}
-                          </Badge>
-                        )}
-                      </div>
-                      <DialogDescription className="max-w-md text-xs font-bold leading-relaxed text-white/75">
-                        {selectedChartDialogMeta?.summary ?? '선택한 그래프를 확대해서 상세 데이터를 확인할 수 있습니다.'}
-                      </DialogDescription>
-                    </DialogHeader>
-                  </div>
-
-                  <div className="max-h-[68vh] space-y-4 overflow-y-auto bg-[#fffdf9] p-5 custom-scrollbar">
-                    {selectedChartDialogMeta && (
-                      <div className="grid gap-3 sm:grid-cols-[1.05fr_0.95fr]">
-                        <Card className={cn('rounded-[1.8rem] border p-5 shadow-none', selectedChartDialogMeta.panel)}>
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                            {selectedChartDialogMeta.eyebrow}
-                          </p>
-                          <p className={cn('mt-3 text-3xl font-black tracking-tight', selectedChartDialogMeta.accent)}>
-                            {selectedChartDialogMeta.metric}
-                          </p>
-                          <p className="mt-3 text-sm font-bold leading-relaxed text-slate-700">
-                            {selectedChartDialogMeta.summary}
-                          </p>
-                        </Card>
-
-                        {selectedChartInsight && (
-                          <Card className="rounded-[1.8rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-5 shadow-none">
-                            <CardTitle className="flex items-center gap-2 text-sm font-black text-[#14295F]">
-                              <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
-                              AI 그래프 인사이트
-                            </CardTitle>
-                            <div className="mt-3 space-y-2 text-xs font-bold leading-relaxed text-slate-700">
-                              <p><span className="text-[#1f4fbf]">추세</span> {selectedChartInsight.trend}</p>
-                              <p><span className="text-[#1f4fbf]">성장 해석</span> {selectedChartInsight.growth}</p>
-                              <p><span className="text-[#1f4fbf]">부모가 도와줄 한 가지</span> {selectedChartInsight.improve}</p>
-                            </div>
-                          </Card>
-                        )}
-                      </div>
-                    )}
-
-                    <Card className="rounded-[1.9rem] border border-slate-100 bg-white p-4 shadow-none">
-                      {selectedDataChart === 'weeklyStudy' && (
-                        <div className="h-[320px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={weeklyStudyTimeTrend} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                              <YAxis width={40} tickLine={false} axisLine={false} fontSize={11} fontWeight={800} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
-                              <Tooltip formatter={(value) => [toHm(Number(value || 0)), '주간 누적']} />
-                              <Bar dataKey="totalMinutes" fill="#c7d2fe" radius={[8, 8, 0, 0]} barSize={24} />
-                              <Line type="monotone" dataKey="totalMinutes" stroke="#10b981" strokeWidth={3} dot={{ r: 3.5, fill: '#10b981' }} activeDot={{ r: 5 }} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-
-                      {selectedDataChart === 'dailyStudy' && (
-                        <div className="h-[320px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsLineChart data={dailyStudyTrend} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                              <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                              <YAxis width={40} tickLine={false} axisLine={false} fontSize={11} fontWeight={800} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
-                              <Tooltip formatter={(value) => [toHm(Number(value || 0)), '일간 학습']} />
-                              <Line type="monotone" dataKey="minutes" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3.5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 2 }} />
-                            </RechartsLineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-
-                      {selectedDataChart === 'rhythmScore' && (
-                        <div className="h-[320px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsLineChart data={rhythmScoreTrend}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" />
-                              <XAxis dataKey="date" fontSize={11} axisLine={false} tickLine={false} />
-                              <YAxis width={36} fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
-                              <Tooltip formatter={(value) => [`${Number(value || 0)}점`, '리듬 점수']} />
-                              <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={3} dot={{ r: 3, fill: '#0f172a' }} activeDot={{ r: 5, fill: '#0f172a' }} />
-                            </RechartsLineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-
-                      {selectedDataChart === 'startEnd' && (
-                        <div className="h-[320px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsLineChart data={startEndTrend} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                              <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                              <YAxis width={44} tickLine={false} axisLine={false} fontSize={11} fontWeight={800} domain={rhythmYAxisDomain} tickFormatter={(v) => toClockLabel(Number(v))} />
-                              <Tooltip formatter={(value: number, name: string) => [toClockLabel(Number(value || 0)), name === 'startMinutes' ? '시작시간' : '종료시간']} />
-                              <Line type="monotone" dataKey="startMinutes" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: '#0ea5e9' }} />
-                              <Line type="monotone" dataKey="endMinutes" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3, fill: '#8b5cf6' }} />
-                            </RechartsLineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-
-                      {selectedDataChart === 'awayTime' && (
-                        <div className="h-[320px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={awayTimeTrend} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                              <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                              <YAxis width={34} tickLine={false} axisLine={false} fontSize={11} fontWeight={800} tickFormatter={(v) => `${Math.round(Number(v || 0))}m`} />
-                              <Tooltip formatter={(value) => [`${Math.round(Number(value || 0))}분`, '외출시간']} />
-                              <Bar dataKey="awayMinutes" fill="#fecaca" radius={[8, 8, 0, 0]} barSize={18} />
-                              <Line type="monotone" dataKey="awayMinutes" stroke="#ef4444" strokeWidth={3} dot={{ r: 3, fill: '#ef4444' }} activeDot={{ r: 5 }} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-
-                      {selectedDataChart === 'subjectTime' && (
-                        <div className="h-[320px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={subjectsData.slice(0, 6)} margin={{ top: 12, right: 8, left: -8, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-                              <XAxis dataKey="subject" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                              <YAxis width={34} tickLine={false} axisLine={false} fontSize={11} fontWeight={800} tickFormatter={(v) => `${Math.round(Number(v) / 60)}h`} />
-                              <Tooltip formatter={(value) => [toHm(Number(value || 0)), '과목 학습']} />
-                              <Bar dataKey="minutes" fill="#bae6fd" radius={[8, 8, 0, 0]} barSize={20} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                    </Card>
-                  </div>
-
-                  <DialogFooter className="border-t bg-white p-4">
-                    <DialogClose asChild>
-                      <Button className="h-11 rounded-xl font-black">닫기</Button>
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
 
               <div className="space-y-3 px-1">
                 <div className="flex items-center gap-2">
@@ -3447,102 +2430,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </TabsContent>
 
-            <TabsContent value="communication" className="mt-0 space-y-4 animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Card className="rounded-[2rem] border border-[#dbe7ff] bg-[linear-gradient(145deg,#f6f9ff_0%,#ffffff_100%)] p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1f4fbf]">처리 중 문의</p>
-                  <p className="mt-3 text-3xl font-black tracking-tight text-[#14295F]">{communicationOverview.activeCount}</p>
-                  <p className="mt-2 text-sm font-bold text-slate-600">답변 대기, 확인 중, 추가 정보 요청 건을 한 번에 보여줘요.</p>
-                </Card>
-                <Card className="rounded-[2rem] border border-emerald-200 bg-[linear-gradient(145deg,#f3fff8_0%,#ffffff_100%)] p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">답변 완료</p>
-                  <p className="mt-3 text-3xl font-black tracking-tight text-emerald-700">{communicationOverview.completedCount}</p>
-                  <p className="mt-2 text-sm font-bold text-slate-600">확인된 답변은 기록으로 남고, 이후 추가 문의도 이어서 보낼 수 있어요.</p>
-                </Card>
-                <Card className="rounded-[2rem] border border-amber-200 bg-[linear-gradient(145deg,#fff8ef_0%,#ffffff_100%)] p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">다음 안내 예상</p>
-                  <p className="mt-3 text-xl font-black tracking-tight text-slate-900">{communicationOverview.latestEtaLabel}</p>
-                  <p className="mt-2 text-sm font-bold text-slate-600">상담 예약이 필요한 문의는 별도로 표시해 놓았어요.</p>
-                </Card>
-              </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Card
-                    className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100 cursor-pointer transition-all hover:shadow-2xl active:scale-[0.99]"
-                    role="button"
-                  >
-                    <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
-                      <Megaphone className="h-5 w-5 text-[#14295F]" />
-                      센터 공지사항
-                    </CardTitle>
-                    <CardDescription className="mb-4 font-bold text-sm text-slate-500">
-                      클릭하면 전체 공지사항을 팝업으로 확인할 수 있어요.
-                    </CardDescription>
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                      {parentAnnouncementsLoading ? (
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          불러오는 중...
-                        </div>
-                      ) : parentAnnouncements.length === 0 ? (
-                        <p className="text-xs font-bold text-slate-400">등록된 공지사항이 없습니다.</p>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-xs font-black text-[#14295F]">총 {parentAnnouncements.length}건</p>
-                          <p className="line-clamp-1 text-xs font-bold text-slate-600">
-                            최신 공지: {parentAnnouncements[0]?.title || '공지'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-3xl">
-                  <div className="bg-[#14295F] p-6 text-white">
-                    <DialogTitle className="text-xl font-black tracking-tight">센터 공지사항</DialogTitle>
-                    <DialogDescription className="mt-1 text-xs font-bold text-white/70">
-                      센터관리자가 등록한 공지를 시간순으로 확인할 수 있습니다.
-                    </DialogDescription>
-                  </div>
-                  <div className="max-h-[70vh] overflow-y-auto bg-white p-5 sm:p-6">
-                    {parentAnnouncementsLoading ? (
-                      <div className="flex items-center justify-center py-16">
-                        <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
-                      </div>
-                    ) : parentAnnouncements.length === 0 ? (
-                      <div className="rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50/60 py-16 text-center">
-                        <p className="text-sm font-black text-slate-400">등록된 공지사항이 없습니다.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {parentAnnouncements.map((item) => {
-                          const createdAt = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
-                          return (
-                            <div key={item.id} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/50 p-5 shadow-sm">
-                              <div className="flex items-center justify-between gap-2">
-                                <h3 className="text-base font-black text-[#14295F]">{item.title || '공지'}</h3>
-                                <Badge variant="outline" className="h-5 border-slate-200 bg-white px-2 text-[10px] font-black text-slate-600">
-                                  공지
-                                </Badge>
-                              </div>
-                              <p className="mt-1 text-[11px] font-bold text-slate-400">
-                                {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '시간 정보 없음'}
-                              </p>
-                              <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-4">
-                                <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
-                                  {item.body?.trim() || '내용이 없습니다.'}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100">
+            <TabsContent value="communication" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
                 <div className="space-y-4">
                   <div className="grid gap-2">
@@ -3564,7 +2453,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100">
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
                   <MessageCircle className="h-5 w-5 text-[#FF7A16]" />
                   건의사항 · 질의 · 요청사항
@@ -3628,158 +2517,72 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Card
-                    className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-slate-100 cursor-pointer transition-all hover:shadow-2xl active:scale-[0.99]"
-                    role="button"
-                  >
-                    <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
-                      <Bell className="h-5 w-5 text-[#14295F]" />
-                      문의 내역과 답변
-                    </CardTitle>
-                    <CardDescription className="mb-4 font-bold text-sm text-slate-500">
-                      클릭하면 지금까지 문의 내역과 답변을 팝업으로 확인할 수 있어요.
-                    </CardDescription>
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                      {parentCommunicationsLoading ? (
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          불러오는 중...
-                        </div>
-                      ) : parentCommunications.length === 0 ? (
-                        <p className="text-xs font-bold text-slate-400">등록된 문의 내역이 없습니다.</p>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-xs font-black text-[#14295F]">
-                            총 {parentCommunications.length}건
-                          </p>
-                          <p className="line-clamp-1 text-xs font-bold text-slate-600">
-                            최근 문의: {parentCommunications[0]?.title || '학부모 문의'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-3xl">
-                  <div className="bg-[#14295F] p-6 text-white">
-                    <DialogTitle className="text-xl font-black tracking-tight">문의 내역과 답변</DialogTitle>
-                    <DialogDescription className="mt-1 text-xs font-bold text-white/70">
-                      지금까지 등록된 문의와 답변 내역입니다.
-                    </DialogDescription>
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
+                <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
+                  <Bell className="h-5 w-5 text-[#14295F]" />
+                  문의 내역과 답변
+                </CardTitle>
+                <CardDescription className="mb-6 font-bold text-sm text-slate-500">
+                  최근 문의 내역과 선생님/센터관리자의 답변을 여기서 바로 확인할 수 있어요.
+                </CardDescription>
+
+                {parentCommunicationsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
                   </div>
-                  <div className="max-h-[70vh] overflow-y-auto bg-white p-5 sm:p-6">
-                    {parentCommunicationsLoading ? (
-                      <div className="flex items-center justify-center py-16">
-                        <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
-                      </div>
-                    ) : parentCommunications.length === 0 ? (
-                      <div className="rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50/60 py-16 text-center">
-                        <p className="text-sm font-black text-slate-400">등록된 문의 내역이 없습니다.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {parentCommunications.map((item) => {
-                          const createdAt = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
-                          const repliedAt = item.repliedAt?.toDate?.();
-                          const stageMeta = getCommunicationStageMeta(item);
-                          return (
-                            <div key={item.id} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/50 p-5 shadow-sm">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    {getParentCommunicationTypeBadge(item)}
-                                    {getParentCommunicationStatusBadge(item.status)}
-                                  </div>
-                                  <h3 className="text-base font-black text-[#14295F]">{item.title || '학부모 문의'}</h3>
-                                  <p className="text-[11px] font-bold text-slate-400">
-                                    {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '시간 정보 없음'}
-                                  </p>
-                                </div>
+                ) : parentCommunications.length === 0 ? (
+                  <div className="rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50/60 py-16 text-center">
+                    <p className="text-sm font-black text-slate-400">등록된 문의 내역이 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {parentCommunications.map((item) => {
+                      const createdAt = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
+                      const repliedAt = item.repliedAt?.toDate?.();
+                      return (
+                        <div key={item.id} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/50 p-5 shadow-sm">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {getParentCommunicationTypeBadge(item)}
+                                {getParentCommunicationStatusBadge(item.status)}
                               </div>
-
-                              <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
-                                <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
-                                  {item.body?.trim() || '내용이 없습니다.'}
-                                </p>
-                              </div>
-
-                              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">처리 단계</p>
-                                  <p className="mt-1 text-sm font-black text-slate-800">{stageMeta.timelineLabel}</p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">예상 안내</p>
-                                  <p className="mt-1 text-sm font-black text-slate-800">{stageMeta.etaLabel}</p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">다음 안내</p>
-                                  <p className="mt-1 text-sm font-black text-slate-800">{stageMeta.nextAction}</p>
-                                </div>
-                              </div>
-
-                              {item.replyBody ? (
-                                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-                                  <p className="mb-1 text-[10px] font-black text-emerald-700">
-                                    답변{item.repliedByName ? ` · ${item.repliedByName}` : ''}{repliedAt ? ` · ${format(repliedAt, 'yyyy.MM.dd HH:mm')}` : ''}
-                                  </p>
-                                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-emerald-900">
-                                    {item.replyBody}
-                                  </p>
-                                </div>
-                              ) : (
-                                <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-[11px] font-bold text-slate-400">
-                                  아직 답변이 등록되지 않았습니다.
-                                </div>
-                              )}
+                              <h3 className="text-base font-black text-[#14295F]">{item.title || '학부모 문의'}</h3>
+                              <p className="text-[11px] font-bold text-slate-400">
+                                {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '시간 정보 없음'}
+                              </p>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </TabsContent>
+                          </div>
 
-            <TabsContent value="billing" className="mt-0 space-y-4 animate-in fade-in duration-500">
-              <Card className="rounded-[2.4rem] border border-slate-200 bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_52%,#fff6ea_100%)] p-6 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#14295F]/55">Billing Hub</p>
-                    <h3 className="text-2xl font-black tracking-tight text-[#14295F]">납부 현황, 예정일, 영수증까지 한 번에 확인하세요.</h3>
-                    <p className="text-sm font-bold leading-relaxed text-slate-600">{billingHubSummary.nextAction}</p>
+                          <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+                            <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
+                              {item.body?.trim() || '내용이 없습니다.'}
+                            </p>
+                          </div>
+
+                          {item.replyBody ? (
+                            <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                              <p className="mb-1 text-[10px] font-black text-emerald-700">
+                                답변{item.repliedByName ? ` · ${item.repliedByName}` : ''}{repliedAt ? ` · ${format(repliedAt, 'yyyy.MM.dd HH:mm')}` : ''}
+                              </p>
+                              <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-emerald-900">
+                                {item.replyBody}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-[11px] font-bold text-slate-400">
+                              아직 답변이 등록되지 않았습니다.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <Badge variant="outline" className={cn('h-8 rounded-full border px-3 text-[11px] font-black', billingHubSummary.badgeClassName)}>
-                    {billingHubSummary.badgeLabel}
-                  </Badge>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">납부 일정</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{billingHubSummary.dueLabel}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">결제 수단</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{billingHubSummary.paymentMethodSummary}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">다음 행동</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{billingHubSummary.nextAction}</p>
-                  </div>
-                </div>
-                {billingHubSummary.latestActionInvoice?.isActionRequired && (
-                  <Link
-                    href={`/payment/checkout/${billingHubSummary.latestActionInvoice.id}`}
-                    className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#14295F] text-sm font-black text-white shadow-lg shadow-[#14295F]/15 transition-colors hover:bg-[#10224f]"
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    미납/청구 바로 확인하기
-                  </Link>
                 )}
               </Card>
+            </TabsContent>
+
+            <TabsContent value="billing" className="mt-0 space-y-4 animate-in fade-in duration-500 sm:space-y-5">
               <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="space-y-4">
                   <div className="flex items-start justify-between gap-2">
@@ -3834,7 +2637,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               {latestInvoice ? (
                 <div className="space-y-3">
-                  {normalizedInvoices.map((invoice) => {
+                  {displayInvoices.map((invoice) => {
                     const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
                     const statusMeta = getInvoiceStatusMeta(invoice.status);
 
@@ -3858,20 +2661,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <p className="text-[15px] font-bold text-slate-600">
                               결제 마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
                             </p>
-                            <div className="grid gap-2 sm:grid-cols-3">
-                              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">납부 상태</p>
-                                <p className="mt-1 text-sm font-black text-slate-800">{invoice.dueLabel}</p>
-                              </div>
-                              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">결제 수단</p>
-                                <p className="mt-1 text-sm font-black text-slate-800">{invoice.paymentMethodSummary}</p>
-                              </div>
-                              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">다음 행동</p>
-                                <p className="mt-1 text-sm font-black text-slate-800">{invoice.nextAction}</p>
-                              </div>
-                            </div>
                           </div>
                           <p className={cn("dashboard-number leading-none text-[#14295F] whitespace-nowrap shrink-0", isMobile ? "text-[1.9rem]" : "text-[2.05rem]")}>
                             {formatWon(Number(invoice.finalPrice || 0))}
@@ -3885,17 +2674,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           >
                             <CreditCard className="h-4 w-4" />
                             결제하기
-                          </Link>
-                        )}
-                        {invoice.status === 'paid' && invoice.receiptUrl && (
-                          <Link
-                            href={invoice.receiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-[15px] font-black text-slate-700 transition-colors hover:bg-slate-100"
-                          >
-                            <FileText className="h-4 w-4" />
-                            영수증 보기
                           </Link>
                         )}
                       </Card>
@@ -3914,32 +2692,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="notifications" className="mt-0 space-y-3 animate-in fade-in duration-500">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {notificationFilterOptions.map((filter) => (
-                  <button
-                    key={filter.key}
-                    type="button"
-                    onClick={() => setNotificationFilter(filter.key)}
-                    className={cn(
-                      'inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black transition-all',
-                      notificationFilter === filter.key
-                        ? 'border-[#14295F] bg-[#14295F] text-white shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600'
-                    )}
-                  >
-                    {filter.label}
-                    <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', notificationFilter === filter.key ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500')}>
-                      {filter.count}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {filteredNotifications.length === 0 ? (
+              {notifications.length === 0 ? (
                 <div className="py-32 text-center opacity-20 italic font-black text-slate-400 flex flex-col items-center gap-4">
                   <Bell className="h-16 w-16" /> <span className="text-sm uppercase tracking-widest">새로운 알림이 없습니다.</span>
                 </div>
               ) : (
-                filteredNotifications.map((n) => (
+                notifications.map((n) => (
                   <button
                     key={n.id}
                     type="button"
@@ -3950,35 +2708,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     onClick={() => void openNotificationDetail(n)}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
-                        <Badge variant="outline" className="h-5 border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-600">
-                          {getNotificationCategory(n) === 'billing'
-                            ? '청구'
-                            : getNotificationCategory(n) === 'reports'
-                              ? '리포트'
-                              : getNotificationCategory(n) === 'life'
-                                ? '생활'
-                                : '알림'}
-                        </Badge>
-                      </div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{n.createdAtLabel}</span>
                       {n.isImportant && <Badge variant="outline" className="bg-orange-100 text-[#FF7A16] border-none font-black text-[10px] h-5 px-2">중요</Badge>}
                     </div>
-                    <p className="mt-2 text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
-                    <p className="mt-1 line-clamp-2 text-sm font-bold leading-relaxed text-slate-600">{n.body || '알림 상세 내용은 눌러서 확인해 주세요.'}</p>
-                    {n.nextAction && (
-                      <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#1f4fbf]">
-                        {n.nextAction}
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </p>
-                    )}
+                    <p className="text-base font-black text-[#14295F] tracking-tight">{n.title}</p>
                   </button>
                 ))
               )}
             </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      </Tabs>
 
       <Dialog open={isReportArchiveOpen} onOpenChange={setIsReportArchiveOpen}>
         <DialogContent className={cn("overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl", isMobile ? "max-w-[95vw]" : "sm:max-w-4xl")}>
@@ -4031,7 +2769,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               )}
             </div>
-
           </div>
         </DialogContent>
       </Dialog>
@@ -4077,29 +2814,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">현재 조치 단계</p>
               <Badge variant="outline" className={cn('mt-2 h-7 rounded-full border px-3 text-xs font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
-            </div>
-
-            <div className="rounded-2xl border border-slate-100 bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">벌점 이력 (일자/사유)</p>
-              {penaltyHistoryRows.length === 0 ? (
-                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-center text-xs font-bold text-slate-400">
-                  현재까지 반영된 벌점 이력이 없습니다.
-                </div>
-              ) : (
-                <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
-                  {penaltyHistoryRows.map((row) => (
-                    <div key={row.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-slate-800 truncate">{row.reason}</p>
-                        <p className="text-[10px] font-bold text-slate-400">{row.dateLabel}</p>
-                      </div>
-                      <Badge variant="outline" className="border-none bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700">
-                        +{row.points}점
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 

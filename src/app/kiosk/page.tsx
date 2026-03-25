@@ -49,6 +49,7 @@ import { httpsCallable } from 'firebase/functions';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
+import { resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function KioskPage() {
   const firestore = useFirestore();
@@ -91,6 +92,27 @@ export default function KioskPage() {
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
+
+  const resolveSeatForStudent = (student: StudentProfile) => {
+    const liveSeat = attendanceList?.find((attendance) => attendance.studentId === student.id);
+    if (liveSeat) return liveSeat;
+
+    const identity = resolveSeatIdentity(student);
+    if (!identity.seatId || identity.seatNo <= 0) return null;
+
+    const fallbackSeat = attendanceList?.find((attendance) => attendance.id === identity.seatId);
+    if (fallbackSeat) return fallbackSeat;
+
+    return {
+      id: identity.seatId,
+      seatNo: identity.seatNo,
+      roomId: identity.roomId,
+      roomSeatNo: identity.roomSeatNo,
+      status: 'absent',
+      type: 'seat',
+      updatedAt: Timestamp.now(),
+    } as AttendanceCurrent;
+  };
 
   // QR 스캐너 초기화 및 정리
   useEffect(() => {
@@ -147,7 +169,7 @@ export default function KioskPage() {
         const studentData = { id: studentDoc.id, ...studentDoc.data() } as StudentProfile;
         
         // 해당 학생의 현재 좌석 상태 확인
-        const seat = attendanceList?.find(a => a.studentId === studentId);
+        const seat = resolveSeatForStudent(studentData);
         
         if (seat && (seat.status === 'absent' || !seat.status)) {
           // 미입실 상태면 즉시 자동 입실 처리 (있어보이는 원터치 경험)
@@ -215,7 +237,7 @@ export default function KioskPage() {
   const handleStatusUpdate = async (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
     if (!firestore || !centerId || !attendanceList) return;
     
-    const seat = attendanceList.find(a => a.studentId === student.id);
+    const seat = resolveSeatForStudent(student);
     if (!seat) {
       toast({ 
         variant: "destructive", 
@@ -277,6 +299,10 @@ export default function KioskPage() {
       }
 
       const updateData: any = {
+        seatNo: seat.seatNo,
+        roomId: seat.roomId,
+        roomSeatNo: seat.roomSeatNo,
+        type: seat.type || 'seat',
         status: nextStatus,
         updatedAt: serverTimestamp()
       };
@@ -285,7 +311,7 @@ export default function KioskPage() {
         updateData.lastCheckInAt = serverTimestamp();
       }
 
-      batch.update(seatRef, updateData);
+      batch.set(seatRef, updateData, { merge: true });
       await batch.commit();
 
       const autoCheckInAt =
@@ -466,7 +492,7 @@ export default function KioskPage() {
         ) : (
           <div className="grid gap-6 w-full animate-in zoom-in-95 duration-500">
             {matchedStudents.map(student => {
-              const seat = attendanceList?.find(a => a.studentId === student.id);
+              const seat = resolveSeatForStudent(student);
               const statusInfo = getStatusInfo(seat?.status);
               
               return (

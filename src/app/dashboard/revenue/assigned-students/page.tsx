@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { issueInvoice } from '@/lib/finance-actions';
 import { INVOICE_TRACK_META, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
 import { useToast } from '@/hooks/use-toast';
+import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function AssignedStudentsPage() {
   const firestore = useFirestore();
@@ -249,6 +250,8 @@ export default function AssignedStudentsPage() {
               {filteredAndSortedStudents.map(({ seat, student, latestInvoice, statusKey }: any) => {
                 const isOverdue = statusKey === 'overdue';
                 const overdueDays = isOverdue ? differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate()) : 0;
+                const seatIdentity = resolveSeatIdentity(seat);
+                const seatLabel = formatSeatLabel(seat);
 
                 return (
                   <div key={seat.id} className="p-8 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-8 hover:bg-muted/5 transition-all group animate-in fade-in duration-500">
@@ -259,7 +262,7 @@ export default function AssignedStudentsPage() {
                         isOverdue ? "bg-rose-50 text-rose-600 border-rose-100 animate-pulse" : 
                         "bg-primary/5 text-primary border-primary/10 group-hover:bg-primary group-hover:text-white"
                       )}>
-                        {seat.seatNo}
+                        {seatIdentity.roomSeatNo || seat.seatNo}
                       </div>
                       <div className="grid gap-1.5 min-w-0">
                         <div className="flex items-center gap-3">
@@ -271,9 +274,11 @@ export default function AssignedStudentsPage() {
                           {statusKey === 'none' && <Badge variant="secondary" className="bg-muted text-muted-foreground border-none font-black text-[10px]">인보이스 없음</Badge>}
                         </div>
                         <div className="flex items-center gap-4 text-sm font-bold text-muted-foreground/60">
+                          <span className="flex items-center gap-1.5 text-primary"><LayoutGrid className="h-4 w-4" /> {seatLabel}</span>
+                          <span className="opacity-30">|</span>
                           <span className="flex items-center gap-1.5"><Building2 className="h-4 w-4" /> {student?.schoolName || '학교 미정'}</span>
                           <span className="opacity-30">|</span>
-                          <span className="flex items-center gap-1.5"><LayoutGrid className="h-4 w-4" /> {student?.className || '반 미정'}</span>
+                          <span className="flex items-center gap-1.5"><Activity className="h-4 w-4" /> {student?.className || '반 미정'}</span>
                         </div>
                       </div>
                     </div>

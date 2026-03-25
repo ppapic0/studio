@@ -99,6 +99,9 @@ export interface StudentProfile {
   schoolName: string;
   className?: string;
   seatNo: number;
+  seatId?: string;
+  roomId?: string;
+  roomSeatNo?: number;
   seatZone?: string;
   targetDailyMinutes: number;
   parentUids: string[];
@@ -119,9 +122,26 @@ export interface StudentProfile {
   }>;
 }
 
+export interface LayoutRoomConfig {
+  id: string;
+  name: string;
+  rows: number;
+  cols: number;
+  order: number;
+}
+
+export interface LayoutSettings {
+  rooms?: LayoutRoomConfig[];
+  rows?: number;
+  cols?: number;
+  updatedAt?: Timestamp;
+}
+
 export interface AttendanceCurrent {
   id: string;
   seatNo: number;
+  roomId?: string;
+  roomSeatNo?: number;
   status: "studying" | "away" | "break" | "absent";
   type?: "seat" | "aisle";
   seatZone?: string;

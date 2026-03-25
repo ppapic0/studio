@@ -1,4 +1,4 @@
-export type ParentPortalTab = 'home' | 'studyDetail' | 'data' | 'communication' | 'reports' | 'billing' | 'notifications';
+export type ParentPortalTab = 'home' | 'studyDetail' | 'data' | 'communication' | 'billing' | 'notifications' | 'reports';
 
 export type ParentQuickRequestKey =
   | 'math_support'

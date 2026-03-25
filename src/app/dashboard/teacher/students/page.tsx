@@ -33,6 +33,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import {
   Dialog,
   DialogContent,
@@ -164,10 +165,14 @@ export default function StudentListPage() {
 
         // 검색어 필터링
         const profile = studentsProfiles?.find(p => p.id === member.id);
+        const seatLabel = formatSeatLabel(profile);
+        const seatIdentity = resolveSeatIdentity(profile || {});
         return (
           member.displayName?.toLowerCase().includes(search) || 
           profile?.schoolName?.toLowerCase().includes(search) ||
-          profile?.seatNo?.toString().includes(search)
+          seatLabel.toLowerCase().includes(search) ||
+          profile?.seatNo?.toString().includes(search) ||
+          (seatIdentity.roomSeatNo > 0 && seatIdentity.roomSeatNo.toString().includes(search))
         );
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
@@ -365,8 +370,11 @@ export default function StudentListPage() {
                       </div>
                     </Link>
                     
-                    <div className="mt-5 flex items-center justify-between p-3.5 bg-muted/20 rounded-2xl border border-border/50">
-                      <div className="flex items-center gap-2"><div className="p-1.5 rounded-lg bg-white shadow-sm"><Armchair className="h-3.5 w-3.5 text-primary/60" /></div><span className="text-xs font-black text-primary/80">{profile?.seatNo && profile.seatNo > 0 ? `${profile.seatNo}번 좌석` : '좌석 미지정'}</span></div>
+                    <div className="mt-5 flex items-center justify-between rounded-2xl border border-border/50 bg-muted/20 p-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-lg bg-white p-1.5 shadow-sm"><Armchair className="h-3.5 w-3.5 text-primary/60" /></div>
+                        <span className="text-xs font-black text-primary/80">{formatSeatLabel(profile)}</span>
+                      </div>
                     </div>
 
                     {statusTab === 'withdrawn' && (
