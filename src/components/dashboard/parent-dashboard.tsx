@@ -2825,9 +2825,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <p className="text-[11px] font-bold leading-5 text-slate-500">
                     최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
                   </p>
-                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#56739f]">전일 대비</p>
-                    <p className="mt-1 text-[12px] font-black text-[#14295F]">
+                  <div className="flex items-center justify-between gap-2 rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
+                    <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">전일 대비</p>
+                    <p className="whitespace-nowrap text-right text-[12px] font-black text-[#14295F]">
                       {studyTrendHasActivity ? formatSignedMinutes(studyDeltaFromYesterday) : '기록 대기'}
                     </p>
                   </div>
@@ -2866,9 +2866,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <p className="text-[11px] font-bold leading-5 text-slate-500">
                     주간 평균 {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
                   </p>
-                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#c66a13]">완료일</p>
-                    <p className="mt-1 text-[12px] font-black text-[#9b5910]">
+                  <div className="flex items-center justify-between gap-2 rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
+                    <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">완료일</p>
+                    <p className="whitespace-nowrap text-right text-[12px] font-black text-[#9b5910]">
                       {planTrendActiveDays > 0 ? `${planTrendCompletedDays}/${planTrendActiveDays}일` : '최근 7일 대기'}
                     </p>
                   </div>
@@ -4027,7 +4027,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">확인</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">확인</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -4059,7 +4059,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">닫기</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">닫기</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -4129,7 +4129,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">확인</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">확인</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
