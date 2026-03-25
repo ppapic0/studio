@@ -22,10 +22,10 @@ export default function HomePage() {
         <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
       </ScrollReveal>
       <ScrollReveal>
-        <DataAnalyticsPreviewSection />
+        <HomeGrowthProofSection />
       </ScrollReveal>
       <ScrollReveal>
-        <HomeGrowthProofSection />
+        <DataAnalyticsPreviewSection />
       </ScrollReveal>
       <ScrollReveal>
         <AppSystemSection appSystem={marketingContent.appSystem} />

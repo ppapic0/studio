@@ -1,170 +1,204 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, TrendingUp } from 'lucide-react';
+import { BarChart3, Clock3, Search, Sparkles } from 'lucide-react';
 
-const steps = [
+const caseTimeline = [
   {
-    step: '문제 발견',
-    title: '공부시간 하락과 미제출을 먼저 잡습니다',
-    summary: '감으로 추측하지 않고, 떨어지는 구간을 먼저 확인합니다.',
+    phase: '6월 모의평가',
+    score: '3등급',
+    percentile: '백분위 82',
+    tone: 'border-[#14295F]/10 bg-white text-[#14295F]',
   },
   {
-    step: '개입',
-    title: '루틴 조정과 피드백을 바로 연결합니다',
-    summary: '상담, 계획 조정, 과제 밀도 조절이 같은 흐름 안에서 이어집니다.',
+    phase: '9월 모의평가',
+    score: '1등급',
+    percentile: '백분위 96',
+    tone: 'border-[#FF7A16]/18 bg-[#FFF6EF] text-[#14295F]',
   },
   {
-    step: '변화',
-    title: '회복과 성적 상승을 다시 데이터로 봅니다',
-    summary: '백분위와 공부시간이 함께 올라가는지 전후로 확인합니다.',
+    phase: '수능 본시험',
+    score: '상승 완료',
+    percentile: '백분위 99',
+    tone: 'border-[#14295F] bg-[#14295F] text-white',
   },
 ];
 
-const proofImages = [
+const interventionHighlights = [
   {
-    label: '실제 성적표',
-    title: '6월 모의평가',
-    caption: '국어 백분위 82',
-    image: '/marketing/proof/june-mock-redacted.jpg',
+    icon: Search,
+    label: '진단',
+    title: '문제 상태를 먼저 진단합니다',
+    description: '국어 약점 유형과 공부시간 하락 구간을 먼저 확인하고, 루틴이 무너지는 지점을 찾습니다.',
+    emphasis: '6월 3등급 · 백분위 82',
   },
   {
-    label: '실제 성적표',
-    title: '9월 모의평가',
-    caption: '국어 백분위 96',
-    image: '/marketing/proof/september-mock-redacted.jpg',
+    icon: Clock3,
+    label: '개입',
+    title: '루틴과 개입을 바로 연결합니다',
+    description: '시작 시간 고정, 주간 계획 조정, 과제 밀도 재배치를 같은 흐름 안에서 반복 개입합니다.',
+    emphasis: '주간 학습시간 21h → 34h',
   },
   {
-    label: '실제 성적표',
-    title: '수능 본시험',
-    caption: '국어 백분위 99',
-    image: '/marketing/proof/csat-score-redacted.jpg',
+    icon: Sparkles,
+    label: '변화 확인',
+    title: '변화도 다시 숫자로 확인합니다',
+    description: '상승한 성적만 보는 것이 아니라, 학습 안정성과 루틴 회복이 함께 유지되는지 전후를 비교합니다.',
+    emphasis: '9월 백분위 96 → 수능 99',
   },
-];
+] as const;
+
+const caseMetrics = [
+  {
+    label: '백분위 변화',
+    value: '82 → 96 → 99',
+    detail: '6월 · 9월 · 수능',
+  },
+  {
+    label: '주간 학습시간',
+    value: '21h → 34h',
+    detail: '루틴 고정 이후 상승',
+  },
+  {
+    label: '개입 기록',
+    value: '14회',
+    detail: '점검 · 피드백 누적',
+  },
+] as const;
 
 export function HomeGrowthProofSection() {
   return (
     <section
       id="growth-proof"
       className="scroll-mt-24 py-16 sm:py-20"
-      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}
+      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-5 lg:grid-cols-[0.94fr_1.06fr]">
+        <div className="grid gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
           <article className="marketing-card p-6 sm:p-8">
             <span className="inline-flex items-center rounded-full bg-[#14295F]/7 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#14295F] uppercase">
               Growth Proof
             </span>
             <h2 className="mt-4 break-keep text-[clamp(1.45rem,3.1vw,2.15rem)] font-black leading-[1.22] text-[#14295F]">
-              문제를 먼저 찾고 개입하면
+              결과를 먼저 자랑하기보다
               <br />
-              변화도 같은 화면 언어로 남습니다
+              어떻게 끌어올렸는지를 남깁니다
             </h2>
-            <p className="mt-4 break-keep text-[14px] font-semibold leading-[1.8] text-[#425a75]">
-              홈에서는 한 학생의 전후 변화만 짧고 선명하게 보여줍니다. 더 많은 설명보다 무엇이 바뀌었는지가 먼저 읽히도록 정리했습니다.
+            <p className="mt-4 break-keep text-[14px] font-semibold leading-[1.82] text-[#425a75]">
+              한 학생의 변화 과정을 익명 사례로 정리했습니다. 트랙은 결과만 보여주지 않고, 어떤 문제를 먼저 찾았고
+              어떤 개입이 성적 상승으로 이어졌는지 같은 흐름 안에서 설명합니다.
             </p>
 
-            <div className="mt-6 grid gap-3">
-              {steps.map((item, index) => (
-                <article key={item.step} className="rounded-[1.2rem] border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4">
-                  <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">
-                    STEP 0{index + 1} · {item.step}
-                  </p>
-                  <p className="mt-1 text-[1rem] font-black leading-[1.42] text-[#14295F]">{item.title}</p>
-                  <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.68] text-[#3A5470]">{item.summary}</p>
-                </article>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {['익명 대표 사례', '국어 약점 진단', '루틴 고정 개입', '전후 데이터 확인'].map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-3 py-1.5 text-[12px] font-black text-[#14295F]/78"
+                >
+                  {chip}
+                </span>
               ))}
             </div>
 
-            <div className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white">
-              <p className="text-[10px] font-black tracking-[0.18em] text-white/60">BEFORE / AFTER</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[1rem] bg-white/8 px-4 py-4">
-                  <p className="text-[11px] font-black text-white/80">국어 백분위</p>
-                  <p className="mt-1 text-[1.35rem] font-black">82 → 96 → 99</p>
-                </div>
-                <div className="rounded-[1rem] bg-white/8 px-4 py-4">
-                  <p className="text-[11px] font-black text-white/80">주간 학습 시간</p>
-                  <p className="mt-1 text-[1.35rem] font-black">21h → 34h</p>
-                </div>
-                <div className="rounded-[1rem] bg-white/8 px-4 py-4">
-                  <p className="text-[11px] font-black text-white/80">개입 기록</p>
-                  <p className="mt-1 text-[1.35rem] font-black">14회 누적</p>
-                </div>
-              </div>
+            <div className="mt-7 rounded-[1.4rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white shadow-[0_18px_34px_rgba(20,41,95,0.16)]">
+              <p className="text-[10px] font-black tracking-[0.18em] text-white/62">CASE SNAPSHOT</p>
+              <p className="mt-2 break-keep text-[1.35rem] font-black leading-[1.3]">
+                6월 3등급에서 시작해
+                <br />
+                수능 백분위 99까지 올라간 사례
+              </p>
+              <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.72] text-white/78">
+                결과만이 아니라, 개입 전후의 루틴 변화와 공부시간 회복까지 함께 본 대표 사례입니다.
+              </p>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-7">
               <Link href="/class" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
                 국어 수업 자세히 보기
-              </Link>
-              <Link href="/experience?mode=admin" className="premium-cta premium-cta-muted h-11 px-6 text-sm">
-                운영 흐름 보기
               </Link>
             </div>
           </article>
 
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
-              {proofImages.map((item) => (
-                <article
-                  key={item.image}
-                  className="overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white shadow-[0_10px_26px_rgba(20,41,95,0.06)]"
-                >
-                  <div className="relative aspect-[3/4]">
-                    <Image
-                      src={item.image}
-                      alt={item.title}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 33vw"
-                      className="object-cover object-center"
-                    />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0d1732]/88 to-transparent" />
-                    <div className="absolute bottom-3 left-4 right-4">
-                      <p className="text-[10px] font-black tracking-[0.16em] text-white/80">{item.label}</p>
-                      <p className="mt-0.5 text-[14px] font-black text-white">{item.title}</p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-white/90">{item.caption}</p>
-                    </div>
+            <article className="overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
+              <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#F8FBFF_0%,#FFF4EB_100%)] px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black tracking-[0.18em] text-[#14295F]/45">대표 익명 사례 01</p>
+                    <h3 className="mt-1 break-keep text-[1.15rem] font-black leading-[1.35] text-[#14295F] sm:text-[1.28rem]">
+                      한 학생의 변화가 만들어진 흐름
+                    </h3>
                   </div>
-                </article>
-              ))}
-            </div>
-
-            <article className="overflow-hidden rounded-[1.35rem] border border-[#14295F]/10 bg-white shadow-[0_10px_26px_rgba(20,41,95,0.06)]">
-              <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
-                <div className="relative min-h-[260px]">
-                  <Image
-                    src="/marketing/reviews/kakao-feedback-1-redacted.jpg"
-                    alt="실제 피드백 캡처"
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover object-top"
-                  />
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#FF7A16] shadow-[0_8px_18px_rgba(255,122,22,0.10)]">
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    실수치 기반 정리
+                  </div>
                 </div>
-                <div className="flex flex-col justify-center px-6 py-6">
-                  <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">ACTUAL FEEDBACK</p>
-                  <p className="mt-2 break-keep text-[1.1rem] font-black leading-[1.45] text-[#14295F]">
-                    성적표만이 아니라 실제 피드백 흐름도 함께 남깁니다
-                  </p>
-                  <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.72] text-[#3A5470]">
-                    증빙 이미지는 이 섹션에만 모아서 보여주고, 다른 섹션에서는 같은 이미지를 반복하지 않습니다.
-                  </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {caseTimeline.map((item) => (
+                    <article
+                      key={item.phase}
+                      className={`rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_22px_rgba(20,41,95,0.04)] ${item.tone}`}
+                    >
+                      <p className="text-[10px] font-black tracking-[0.16em] opacity-70">{item.phase}</p>
+                      <p className="mt-2 text-[1.1rem] font-black leading-none">{item.score}</p>
+                      <p className="mt-2 text-[13px] font-semibold opacity-85">{item.percentile}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-5 py-5 sm:px-6 sm:py-6">
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {interventionHighlights.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <article
+                        key={item.label}
+                        className="rounded-[1.35rem] border border-[#14295F]/9 bg-[#F9FBFF] px-4 py-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">{item.label}</span>
+                          <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[#14295F]/7 text-[#14295F]">
+                            <Icon className="h-4 w-4" />
+                          </div>
+                        </div>
+                        <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{item.title}</p>
+                        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#425a75]">
+                          {item.description}
+                        </p>
+                        <p className="mt-4 rounded-[0.95rem] bg-white px-3 py-2 text-[12px] font-black text-[#14295F] shadow-[inset_0_0_0_1px_rgba(20,41,95,0.06)]">
+                          {item.emphasis}
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {caseMetrics.map((item) => (
+                    <article
+                      key={item.label}
+                      className="rounded-[1.2rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white"
+                    >
+                      <p className="text-[10px] font-black tracking-[0.16em] text-white/58">{item.label}</p>
+                      <p className="mt-2 break-keep text-[1.2rem] font-black leading-[1.22]">{item.value}</p>
+                      <p className="mt-1.5 text-[11px] font-semibold text-white/68">{item.detail}</p>
+                    </article>
+                  ))}
                 </div>
               </div>
             </article>
-          </div>
-        </div>
 
-        <div className="mt-6 rounded-[1.2rem] border border-[#14295F]/10 bg-white px-4 py-4 sm:px-5">
-          <p className="flex flex-col items-start gap-3 break-keep text-[12.5px] font-semibold text-[#425b78] sm:flex-row sm:items-center sm:justify-between">
-            <span className="inline-flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-[#FF7A16]" />
-              성장 증빙은 한 섹션에서만 보여주고, 홈 전체에서는 같은 그림을 반복하지 않습니다.
-            </span>
-            <Link href="/experience" className="inline-flex items-center gap-1 font-black text-[#14295F]">
-              체험 페이지로 이어보기
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </p>
+            <div className="rounded-[1.2rem] border border-[#14295F]/10 bg-white px-4 py-4 sm:px-5">
+              <p className="flex items-start gap-2 break-keep text-[12.5px] font-semibold leading-[1.72] text-[#425b78]">
+                <span className="inline-flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-[#FF7A16]" />
+                  결과 섹션이 성과를 보여준다면, 이 구간은 그 성과가 만들어진 과정을 설명합니다.
+                </span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
