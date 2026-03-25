@@ -1,4 +1,4 @@
-import { ArrowRight, ShieldCheck, Smartphone, Users } from 'lucide-react';
+import { ShieldCheck, Smartphone, Users } from 'lucide-react';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
@@ -49,22 +49,22 @@ const roleStyleMap: Record<string, RoleStyle> = {
 
 const connectionFlow = [
   {
-    step: '학생이 실행',
-    desc: '루틴 체크·공부시간 기록',
+    step: '학생은',
+    desc: '오늘 해야 할 행동과 누적 공부시간을 먼저 봅니다.',
     icon: Smartphone,
     iconBg: 'bg-[#EEF3FF] text-[#14295F]',
   },
   {
-    step: '데이터로 전환',
-    desc: '캘린더·그래프·알림 생성',
-    icon: ArrowRight,
-    iconBg: 'bg-[#F4F6FA] text-[#8099B8]',
-  },
-  {
-    step: '역할별로 읽음',
-    desc: '출결·리포트·위험 신호 확인',
+    step: '학부모는',
+    desc: '현재 상태와 흔들리는 구간을 빠르게 읽습니다.',
     icon: Users,
     iconBg: 'bg-[#FFF3E8] text-[#FF7A16]',
+  },
+  {
+    step: '운영자는',
+    desc: '하락 신호와 먼저 개입할 대상을 우선순위로 봅니다.',
+    icon: ShieldCheck,
+    iconBg: 'bg-emerald-50 text-emerald-600',
   },
 ];
 
@@ -95,19 +95,19 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                     <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${style.iconBg}`}>
                       <Icon className="h-4 w-4" />
                     </div>
-                    <p className={`text-[10px] font-black tracking-[0.18em] ${style.label}`}>{guide.mode}</p>
+                    <p className={`text-[12px] font-bold tracking-[0.08em] ${style.label}`}>{guide.mode}</p>
                   </div>
-                  <p className="mt-3 break-keep text-[1.05rem] font-black leading-[1.42] text-[#14295F]">
+                  <p className="mt-3 break-keep text-[1.1rem] font-black leading-[1.42] text-[#14295F]">
                     {guide.headline}
                   </p>
-                  <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#425a75]">
+                  <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.72] text-[#425a75]">
                     {guide.summary}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {guide.checkpoints.map((checkpoint) => (
                       <span
                         key={`${guide.mode}-${checkpoint}`}
-                        className={`rounded-full border px-3 py-1 text-[11px] font-black ${style.chipClass}`}
+                        className={`rounded-full border px-3 py-1 text-[12px] font-bold ${style.chipClass}`}
                       >
                         {checkpoint}
                       </span>
@@ -125,43 +125,41 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
         <div className="mt-6 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
           {/* 3-role connection flow card */}
           <article className="rounded-[1.6rem] border border-[#14295F]/10 bg-white p-6 shadow-[0_10px_28px_rgba(20,41,95,0.06)]">
-            <span className="eyebrow-badge">HOW IT CONNECTS</span>
+            <span className="eyebrow-badge">READING ORDER</span>
             <p className="mt-4 break-keep text-[1.2rem] font-black leading-[1.4] text-[#14295F]">
-              학생의 실행이 데이터가 되고,<br />
-              역할에 맞는 화면으로 연결됩니다.
+              같은 기록이 역할마다
+              <br />
+              다른 질문에 답하게 구성됩니다.
+            </p>
+            <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.72] text-[#425a75]">
+              누구에게 보여주느냐에 따라 첫 화면에서 먼저 읽어야 하는 정보와 다음 행동이 달라집니다.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              {connectionFlow.map((item, i) => {
+            <div className="mt-5 grid gap-3">
+              {connectionFlow.map((item) => {
                 const FlowIcon = item.icon;
-                const isArrow = item.icon === ArrowRight;
                 return (
                   <div
                     key={item.step}
-                    className={`relative rounded-[1.1rem] px-4 py-4 ${
-                      isArrow
-                        ? 'flex flex-col items-center justify-center border border-dashed border-[#14295F]/12 bg-[#F4F6FA]'
-                        : 'border border-[#14295F]/8 bg-[#F8FBFF]'
-                    }`}
+                    className="rounded-[1.1rem] border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-4"
                   >
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${item.iconBg}`}>
-                      <FlowIcon className="h-4 w-4" />
-                    </div>
-                    <p className="mt-2 text-[12px] font-black text-[#14295F]">{item.step}</p>
-                    <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-[#425a75]">{item.desc}</p>
-                    {i < connectionFlow.length - 1 && (
-                      <div className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 sm:block">
-                        <ArrowRight className="h-4 w-4 text-[#C5D2E8]" />
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${item.iconBg}`}>
+                        <FlowIcon className="h-4 w-4" />
                       </div>
-                    )}
+                      <div>
+                        <p className="text-[13px] font-black text-[#14295F]">{item.step}</p>
+                        <p className="mt-1 break-keep text-[13px] font-semibold leading-[1.65] text-[#425a75]">{item.desc}</p>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
             <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-3">
-              <p className="break-keep text-[12.5px] font-black leading-[1.6] text-white">
-                같은 데이터를, 역할에 맞는 언어로 동시에 전달합니다.
+              <p className="break-keep text-[13px] font-bold leading-[1.6] text-white">
+                바로 위에서 본 같은 데이터라도, 역할에 따라 먼저 읽는 기준과 화면 구조를 달리 잡았습니다.
               </p>
             </div>
           </article>
@@ -177,9 +175,9 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
                     metric.tone ? toneClassMap[metric.tone] : 'border-[#14295F]/10 bg-[#F8FBFF] text-[#14295F]'
                   }`}
                 >
-                  <p className="text-[11px] font-black">{metric.label}</p>
+                  <p className="text-[12px] font-bold">{metric.label}</p>
                   <p className="dashboard-number mt-2 text-[1.4rem]">{metric.value}</p>
-                  <p className="mt-1 text-[11px] font-semibold opacity-78">{metric.detail}</p>
+                  <p className="mt-1 text-[12px] font-semibold opacity-88">{metric.detail}</p>
                 </div>
               ))}
             </div>

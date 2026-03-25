@@ -1,184 +1,144 @@
 import Link from 'next/link';
-import { BarChart2, Calendar, LineChart, ShieldCheck, Smartphone, Users } from 'lucide-react';
-
-import { SectionHeading } from './section-heading';
+import { AlertTriangle, ArrowRight, LineChart } from 'lucide-react';
 
 const trendLabels = ['3/2', '3/4', '3/6', '3/8', '3/10', '3/12', '3/14', '3/16'];
+const studyHours = [6.1, 6.5, 7.2, 8.4, 9.8, 11.6, 13.1, 14.4];
+const goalRates = [52, 54, 57, 64, 69, 76, 80, 83];
 
-const weeklyRates = [71, 74, 68, 79, 83, 88, 83];
-const weekLabels = ['1주', '2주', '3주', '4주', '5주', '6주', '7주'];
-
-// 3월 1일 = 수요일 (offset 2: 월=0, 화=1, 수=2)
-const CALENDAR_START_OFFSET = 2;
-const WEEK_DAYS = ['월', '화', '수', '목', '금', '토', '일'];
-
-const dayData: { day: number; hours: number }[] = [
-  { day: 1, hours: 4 }, { day: 2, hours: 7 }, { day: 3, hours: 5 }, { day: 4, hours: 2 }, { day: 5, hours: 1 },
-  { day: 6, hours: 6 }, { day: 7, hours: 7 }, { day: 8, hours: 5 }, { day: 9, hours: 6 }, { day: 10, hours: 7 },
-  { day: 11, hours: 3 }, { day: 12, hours: 2 },
-  { day: 13, hours: 7 }, { day: 14, hours: 6 }, { day: 15, hours: 0 }, { day: 16, hours: 6 }, { day: 17, hours: 7 },
-  { day: 18, hours: 4 }, { day: 19, hours: 2 },
-  { day: 20, hours: 8 }, { day: 21, hours: 7 }, { day: 22, hours: 6 }, { day: 23, hours: 7 }, { day: 24, hours: 8 },
-  { day: 25, hours: 5 }, { day: 26, hours: 3 },
-  { day: 27, hours: 8 }, { day: 28, hours: 7 }, { day: 29, hours: 8 }, { day: 30, hours: 7 },
+const summaryMetrics = [
+  {
+    label: '주간 학습 시간',
+    value: '14시간 23분',
+    detail: '지난 7일 누적 기준으로 가장 먼저 보는 체류 시간입니다.',
+  },
+  {
+    label: '평균 목표 달성률',
+    value: '83%',
+    detail: '계획 대비 실행률이 함께 회복되는지 같은 기간으로 비교합니다.',
+  },
 ];
 
-function getHourLevel(hours: number) {
-  if (hours === 0) return 0;
-  if (hours <= 2) return 1;
-  if (hours <= 4) return 2;
-  if (hours <= 6) return 3;
-  return 4;
+const signalItems = ['미제출', '하락 추세', '생활 리듬'];
+
+const CHART = {
+  width: 620,
+  height: 264,
+  padLeft: 44,
+  padRight: 120,
+  padTop: 28,
+  padBottom: 42,
+  maxStudy: 16,
+  maxRate: 100,
+};
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+function getSeriesPoints(values: number[], maxValue: number): Point[] {
+  const plotWidth = CHART.width - CHART.padLeft - CHART.padRight;
+  const plotHeight = CHART.height - CHART.padTop - CHART.padBottom;
+  const lastIndex = Math.max(values.length - 1, 1);
+
+  return values.map((value, index) => ({
+    x: CHART.padLeft + (plotWidth / lastIndex) * index,
+    y: CHART.padTop + plotHeight - (value / maxValue) * plotHeight,
+  }));
 }
 
-const metrics = [
-  { label: '주간 학습 시간', value: '14h 23m', detail: '기록 캘린더 기준 누적' },
-  { label: '평균 목표 달성률', value: '83%', detail: '주간 계획 대비 실행' },
-  { label: '우선 확인 신호', value: '3건', detail: '미제출, 하락 추세, 생활 리듬' },
-];
-
-const roles = [
-  {
-    Icon: Smartphone,
-    label: '학생',
-    items: ['오늘의 루틴 확인', 'LP 누적 3,164', '주간 달성률 83%'],
-    href: '/go/experience?placement=data_preview_cta&mode=student',
-    cta: '학생 화면 체험',
-    primary: true,
-  },
-  {
-    Icon: Users,
-    label: '학부모',
-    items: ['실시간 출결 확인', '주간 그래프', '리포트 수신'],
-    href: '/go/experience?placement=data_preview_cta&mode=parent',
-    cta: '학부모 화면 보기',
-    primary: false,
-  },
-  {
-    Icon: ShieldCheck,
-    label: '운영자',
-    items: ['위험 신호 3건', '개입 우선순위', '피드백 발송'],
-    href: '/go/experience?placement=data_preview_cta&mode=admin',
-    cta: '운영자 화면 보기',
-    primary: false,
-  },
-];
+function toPolyline(points: Point[]) {
+  return points.map(({ x, y }) => `${x},${y}`).join(' ');
+}
 
 function TrendChart() {
-  return (
-    <svg viewBox="0 0 620 260" className="h-[200px] w-full min-w-[30rem]">
-      {[0, 1, 2, 3].map((i) => (
-        <line key={i} x1="0" y1={24 + i * 56} x2="620" y2={24 + i * 56}
-          stroke="rgba(20,41,95,0.08)" strokeDasharray="4 8" />
-      ))}
-      <polyline fill="rgba(20,41,95,0.05)" stroke="none"
-        points="16,220 90,208 162,196 236,170 312,150 388,118 464,82 540,62 604,56 604,244 16,244" />
-      <polyline fill="none" stroke="#14295F" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"
-        points="16,220 90,208 162,196 236,170 312,150 388,118 464,82 540,62 604,56" />
-      <polyline fill="none" stroke="#FF7A16" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"
-        points="16,232 90,226 162,220 236,194 312,172 388,140 464,108 540,92 604,78" />
-      {([16, 90, 162, 236, 312, 388, 464, 540, 604] as number[]).map((x, i) => (
-        <circle key={x} cx={x} cy={([220, 208, 196, 170, 150, 118, 82, 62, 56] as number[])[i]} r="5" fill="#14295F" />
-      ))}
-      {([16, 90, 162, 236, 312, 388, 464, 540, 604] as number[]).map((x, i) => (
-        <circle key={`${x}-o`} cx={x} cy={([232, 226, 220, 194, 172, 140, 108, 92, 78] as number[])[i]} r="5" fill="#FF7A16" />
-      ))}
-    </svg>
-  );
-}
-
-function WeeklyBarChart() {
-  const chartH = 130;
-  const barW = 34;
-  const gap = 18;
-  const totalW = weeklyRates.length * (barW + gap) - gap;
+  const studyPoints = getSeriesPoints(studyHours, CHART.maxStudy);
+  const goalPoints = getSeriesPoints(goalRates, CHART.maxRate);
+  const plotBottom = CHART.height - CHART.padBottom;
+  const studyLastPoint = studyPoints[studyPoints.length - 1]!;
+  const goalLastPoint = goalPoints[goalPoints.length - 1]!;
 
   return (
-    <svg viewBox={`0 0 ${totalW + 8} ${chartH + 28}`} className="h-[140px] w-full">
-      {weeklyRates.map((rate, i) => {
-        const x = i * (barW + gap);
-        const barH = (rate / 100) * chartH;
-        const y = chartH - barH;
-        const isHighlight = rate === Math.max(...weeklyRates);
+    <svg viewBox={`0 0 ${CHART.width} ${CHART.height}`} className="h-[248px] w-full" aria-hidden="true">
+      {[0, 1, 2, 3].map((index) => {
+        const y = CHART.padTop + index * ((plotBottom - CHART.padTop) / 3);
         return (
-          <g key={i}>
-            <rect x={x} y={chartH} width={barW} height={0} rx="7" ry="7"
-              fill={isHighlight ? '#FF7A16' : 'rgba(255,122,22,0.22)'} />
-            <rect x={x} y={y} width={barW} height={barH} rx="7" ry="7"
-              fill={isHighlight ? '#FF7A16' : 'rgba(255,122,22,0.22)'} />
-            <text x={x + barW / 2} y={y - 4} textAnchor="middle"
-              fontSize="9" fontWeight="800"
-              fill={isHighlight ? '#D96809' : 'rgba(20,41,95,0.45)'}>
-              {rate}%
-            </text>
-            <text x={x + barW / 2} y={chartH + 16} textAnchor="middle"
-              fontSize="9" fontWeight="800" fill="rgba(20,41,95,0.40)">
-              {weekLabels[i]}
-            </text>
-          </g>
+          <line
+            key={index}
+            x1={CHART.padLeft}
+            y1={y}
+            x2={CHART.width - CHART.padRight}
+            y2={y}
+            stroke="rgba(20,41,95,0.12)"
+            strokeDasharray="4 8"
+          />
         );
       })}
+
+      <text x={CHART.padLeft} y="16" fontSize="12" fontWeight="700" fill="#425A75">
+        공부시간 (h)
+      </text>
+      <text x={CHART.width - CHART.padRight} y="16" fontSize="12" fontWeight="700" fill="#8A4B0F">
+        목표 달성률 (%)
+      </text>
+
+      <polyline
+        fill="rgba(20,41,95,0.05)"
+        stroke="none"
+        points={`${toPolyline(studyPoints)} ${studyLastPoint.x},${plotBottom} ${CHART.padLeft},${plotBottom}`}
+      />
+      <polyline
+        fill="none"
+        stroke="#14295F"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(studyPoints)}
+      />
+      <polyline
+        fill="none"
+        stroke="#FF7A16"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={toPolyline(goalPoints)}
+      />
+
+      {studyPoints.map((point) => (
+        <circle key={`study-${point.x}`} cx={point.x} cy={point.y} r="4.5" fill="#14295F" />
+      ))}
+      {goalPoints.map((point) => (
+        <circle key={`goal-${point.x}`} cx={point.x} cy={point.y} r="4.5" fill="#FF7A16" />
+      ))}
+
+      <g transform={`translate(${studyLastPoint.x + 14} ${studyLastPoint.y - 12})`}>
+        <rect width="86" height="26" rx="13" fill="#EEF3FF" />
+        <text x="12" y="17" fontSize="12" fontWeight="700" fill="#14295F">
+          공부시간 14.4h
+        </text>
+      </g>
+
+      <g transform={`translate(${goalLastPoint.x + 14} ${goalLastPoint.y - 12})`}>
+        <rect width="88" height="26" rx="13" fill="#FFF3E8" />
+        <text x="12" y="17" fontSize="12" fontWeight="700" fill="#B55200">
+          달성률 83%
+        </text>
+      </g>
+
+      {trendLabels.map((label, index) => (
+        <text
+          key={label}
+          x={studyPoints[index]?.x ?? CHART.padLeft}
+          y={CHART.height - 10}
+          textAnchor="middle"
+          fontSize="12"
+          fontWeight="700"
+          fill="#5D7189"
+        >
+          {label}
+        </text>
+      ))}
     </svg>
-  );
-}
-
-const CELL_BG = [
-  'bg-[#14295F]/5 border border-[#14295F]/10',
-  'bg-[#14295F]/15',
-  'bg-[#14295F]/32',
-  'bg-[#14295F]/58',
-  'bg-[#14295F]',
-];
-const CELL_TEXT = [
-  'text-[#14295F]/65',
-  'text-[#14295F]/70',
-  'text-[#14295F]',
-  'text-white/90',
-  'text-white',
-];
-
-function ActivityHeatmap() {
-  const totalCells = 5 * 7;
-  const cells: ({ day: number; hours: number } | null)[] = [
-    ...Array(CALENDAR_START_OFFSET).fill(null),
-    ...dayData,
-  ];
-  while (cells.length < totalCells) cells.push(null);
-
-  return (
-    <div className="w-full">
-      <div className="grid grid-cols-7 gap-1 mb-1.5">
-        {WEEK_DAYS.map((d) => (
-          <div key={d} className="text-center text-[9px] font-black text-[#14295F]/45">{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((cell, i) => {
-          const level = cell ? getHourLevel(cell.hours) : -1;
-          return (
-            <div
-              key={i}
-              className={`rounded-[6px] aspect-square flex flex-col items-center justify-center gap-[1px] ${
-                cell ? CELL_BG[level] : ''
-              }`}
-            >
-              {cell && (
-                <>
-                  <span className={`text-[9px] font-black leading-none ${CELL_TEXT[level]}`}>
-                    {cell.day}
-                  </span>
-                  {cell.hours > 0 && (
-                    <span className={`text-[7.5px] font-semibold leading-none ${CELL_TEXT[level]} opacity-80`}>
-                      {cell.hours}h
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -186,131 +146,96 @@ export function DataAnalyticsPreviewSection() {
   return (
     <section id="data-approach" className="scroll-mt-28 bg-[#F7F9FD] py-16 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center [&_.eyebrow-badge]:mx-auto">
-          <SectionHeading
-            eyebrow="Data Driven"
-            title="많이 보여주기보다 바로 읽히는 데이터만 남겼습니다"
-            description="공부시간과 결과 지표를 같은 축으로 보고, 먼저 개입해야 할 신호만 짧고 선명하게 확인합니다."
-          />
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="eyebrow-badge">DATA DRIVEN</span>
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(2rem,4.6vw,3rem)] font-black leading-[1.06] text-[#14295F]">
+            많이 보여주기보다 바로 읽히는
+            <br />
+            데이터만 남겼습니다
+          </h2>
+          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.8] text-[#2F4662] sm:text-[15.5px]">
+            결과를 늘어놓기보다, 같은 기간의 공부시간과 목표 달성률을 먼저 보고 어디서 개입해야 하는지 바로 읽게
+            구성했습니다.
+          </p>
         </div>
 
-        {/* Row 1: 꺾은선 차트 + 메트릭 카드 */}
-        <div className="mt-8 grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
-          <article className="rounded-[1.8rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.08)] sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <LineChart className="h-4 w-4 text-[#14295F]" />
-                <h3 className="text-[1.05rem] font-black text-[#14295F]">공부시간 × 목표 달성률 추이</h3>
-              </div>
-              <div className="flex flex-wrap gap-2 text-[11px] font-black">
-                <span className="rounded-full bg-[#EEF3FF] px-3 py-1 text-[#14295F]">공부시간</span>
-                <span className="rounded-full bg-[#FFF2E5] px-3 py-1 text-[#D96809]">목표 달성률</span>
-              </div>
+        <div className="mt-8 grid gap-5 lg:grid-cols-[1.18fr_0.82fr]">
+          <article className="rounded-[1.6rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_30px_rgba(20,41,95,0.08)] sm:p-6">
+            <div className="flex items-center gap-2">
+              <LineChart className="h-4 w-4 text-[#14295F]" />
+              <p className="text-[1.05rem] font-black text-[#14295F]">같은 기간 흐름에서 먼저 읽는 신호</p>
             </div>
-            <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.7] text-[#48607B]">
-              공부시간이 늘수록 목표 달성률도 같이 올라가는 흐름을 보여줍니다.
+            <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.72] text-[#425A75]">
+              공부시간과 목표 달성률을 겹쳐 보면, 좋아지는 구간과 먼저 손봐야 할 구간이 한 번에 드러납니다.
             </p>
-            <div className="mt-4 overflow-x-auto pb-2 custom-scrollbar">
-              <div className="min-w-[30rem]">
-                <TrendChart />
-                <div className="mt-1 flex justify-between px-1 text-[10px] font-black text-[#14295F]/42">
-                  {trendLabels.map((label) => (
-                    <span key={label}>{label}</span>
-                  ))}
-                </div>
-              </div>
+
+            <div className="mt-4">
+              <TrendChart />
+            </div>
+
+            <div className="mt-4 rounded-[1.1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-4 py-4">
+              <p className="text-[12px] font-bold text-[#425A75]">읽는 포인트</p>
+              <p className="mt-1.5 break-keep text-[14px] font-semibold leading-[1.7] text-[#14295F]">
+                기록이 늘어난 주간부터 달성률도 함께 회복되는지를 먼저 확인하고, 꺾이는 시점에서 바로 개입합니다.
+              </p>
             </div>
           </article>
 
           <div className="space-y-4">
-            {metrics.map((metric) => (
+            {summaryMetrics.map((metric) => (
               <article
                 key={metric.label}
-                className="rounded-[1.45rem] border border-[#14295F]/10 bg-white px-5 py-4 shadow-[0_12px_28px_rgba(20,41,95,0.06)]"
+                className="rounded-[1.4rem] border border-[#14295F]/10 bg-white px-5 py-5 shadow-[0_10px_24px_rgba(20,41,95,0.06)]"
               >
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#14295F]/42">{metric.label}</p>
-                <p className="dashboard-number mt-1.5 text-[1.7rem] text-[#14295F]">{metric.value}</p>
-                <p className="mt-0.5 text-[12px] font-semibold text-[#50657D]">{metric.detail}</p>
+                <p className="text-[12px] font-bold text-[#425A75]">{metric.label}</p>
+                <p className="dashboard-number mt-2 text-[1.9rem] text-[#14295F]">{metric.value}</p>
+                <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.65] text-[#5A6E85]">{metric.detail}</p>
               </article>
             ))}
-          </div>
-        </div>
 
-        {/* Row 2: 주간 달성률 바차트 + 활동 히트맵 */}
-        <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
-          <article className="rounded-[1.8rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.08)] sm:p-6">
-            <div className="flex items-center gap-2">
-              <BarChart2 className="h-4 w-4 text-[#FF7A16]" />
-              <h3 className="text-[1.05rem] font-black text-[#14295F]">주간 목표 달성률 추이</h3>
-            </div>
-            <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.7] text-[#48607B]">
-              7주 연속 기록. 루틴이 안정될수록 달성률이 올라가는 흐름입니다.
-            </p>
-            <div className="mt-5 px-2">
-              <WeeklyBarChart />
-            </div>
-          </article>
-
-          <article className="rounded-[1.8rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_12px_34px_rgba(20,41,95,0.08)] sm:p-6">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#14295F]" />
-              <h3 className="text-[1.05rem] font-black text-[#14295F]">30일 학습 활동 기록</h3>
-            </div>
-            <p className="mt-2 break-keep text-[12.5px] font-semibold leading-[1.7] text-[#48607B]">
-              빠진 날 없이 쌓인 루틴이 데이터로 남습니다.
-            </p>
-            <div className="mt-4 flex justify-center">
-              <ActivityHeatmap />
-            </div>
-            <div className="mt-3 flex items-center justify-end gap-1.5">
-              <span className="text-[9px] font-black text-[#14295F]/40">공부시간</span>
-              {['0h', '1-2h', '3-4h', '5-6h', '7h+'].map((label, i) => (
-                <span key={label} className="flex items-center gap-0.5">
-                  <span className="inline-block h-3 w-3 rounded-[3px]"
-                    style={{ background: `rgba(20,41,95,${[0.06, 0.18, 0.35, 0.6, 1][i]})` }} />
-                  <span className="text-[8px] font-semibold text-[#14295F]/40">{label}</span>
-                </span>
-              ))}
-            </div>
-          </article>
-        </div>
-
-        {/* Row 3: 3역할 데이터 스트립 */}
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          {roles.map(({ Icon, label, items, href, cta, primary }) => (
-            <article
-              key={label}
-              className="rounded-[1.55rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_10px_24px_rgba(20,41,95,0.05)]"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF3FF]">
-                    <Icon className="h-4 w-4 text-[#14295F]" />
-                  </div>
-                  <p className="text-[13px] font-black text-[#14295F]">{label} 확인 데이터</p>
-                </div>
+            <article className="rounded-[1.4rem] border border-[#FF7A16]/18 bg-[#FFF6ED] px-5 py-5">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[#FF7A16]" />
+                <p className="text-[13px] font-black text-[#B55200]">먼저 개입할 신호</p>
               </div>
-              <ul className="mt-3 space-y-1.5">
-                {items.map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-[13px] font-semibold text-[#3A5470]">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FF7A16]" />
+              <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.7] text-[#6D5A48]">
+                점수 자체보다 먼저 행동이 필요한 신호만 따로 분리해 관리가 길어지지 않게 만듭니다.
+              </p>
+              <ul className="mt-4 space-y-2.5">
+                {signalItems.map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-[14px] font-bold text-[#7A5327]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />
                     {item}
                   </li>
                 ))}
               </ul>
-              <div className="mt-4">
-                <Link
-                  href={href}
-                  className={`premium-cta h-9 w-full justify-center px-4 text-[13px] ${
-                    primary ? 'premium-cta-primary' : 'premium-cta-muted'
-                  }`}
-                >
-                  {cta}
-                </Link>
-              </div>
             </article>
-          ))}
+          </div>
         </div>
+
+        <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-5 py-5 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[12px] font-bold text-[#FF7A16]">NEXT VIEW</p>
+              <p className="mt-1.5 break-keep text-[1.05rem] font-black leading-[1.42] text-[#14295F]">
+                같은 신호를 누가 어떻게 읽는지는 아래 역할별 화면에서 이어집니다.
+              </p>
+              <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#52667D]">
+                학생은 행동, 학부모는 상태, 운영자는 개입 우선순위를 먼저 보도록 화면 흐름을 나눴습니다.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link href="#app" className="premium-cta premium-cta-primary h-11 gap-1.5 px-5 text-sm">
+                역할별 화면 이어보기
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link href="/experience" className="premium-cta premium-cta-muted h-11 px-5 text-sm">
+                전체 체험 보기
+              </Link>
+            </div>
+          </div>
+        </article>
       </div>
     </section>
   );

@@ -305,9 +305,9 @@ export const marketingContent: MarketingContent = {
     ],
   },
   appSystem: {
-    heading: '학생·학부모·운영자가 같은 흐름을 읽는 전용 웹앱',
+    heading: '같은 데이터를, 역할마다 먼저 읽어야 할 화면으로 나눴습니다',
     description:
-      '홈에서는 역할별 핵심만 보여주고, 자세한 화면 흐름은 체험 페이지에서 이어서 확인할 수 있게 구성했습니다.',
+      '방금 본 신호를 학생은 행동으로, 학부모는 상태 확인으로, 운영자는 개입 우선순위로 읽게 구성했습니다.',
     modes: [
       {
         mode: '학부모 모드',
@@ -368,25 +368,25 @@ export const marketingContent: MarketingContent = {
     guides: [
       {
         mode: '학생 모드',
-        headline: '오늘 해야 할 행동을 바로 보는 학생 화면',
-        summary: '루틴, 공부시간, 피드백만 선명하게 확인하는 학생용 흐름입니다.',
-        checkpoints: ['오늘의 루틴', '주간 캘린더', '성장 지표', '피드백 알림'],
+        headline: '학생은 오늘 해야 할 행동부터 바로 확인합니다',
+        summary: '루틴, 누적 공부시간, 피드백을 한 화면에서 읽고 바로 다음 행동으로 이어가는 학생용 흐름입니다.',
+        checkpoints: ['오늘 루틴', '누적 공부시간', '피드백 반영', '다음 행동'],
         href: '/go/experience?placement=app_preview_student&mode=student',
         label: '학생 모드 체험',
       },
       {
         mode: '학부모 모드',
-        headline: '현재 상태와 변화 방향을 빠르게 읽는 화면',
-        summary: '출결, 주간 그래프, 리포트를 같은 문법으로 보는 학부모용 흐름입니다.',
-        checkpoints: ['실시간 상태', '주간 그래프', '날짜별 기록', '리포트 수신'],
+        headline: '학부모는 현재 상태와 흔들리는 구간을 먼저 읽습니다',
+        summary: '출결, 주간 흐름, 날짜별 기록, 리포트를 같은 문맥으로 확인하는 학부모용 흐름입니다.',
+        checkpoints: ['실시간 상태', '주간 흐름', '날짜별 기록', '리포트 확인'],
         href: '/go/experience?placement=app_preview_parent&mode=parent',
         label: '학부모 모드 체험',
       },
       {
         mode: '운영자 모드',
-        headline: '문제 발견부터 개입까지 우선순위로 보는 화면',
-        summary: '위험 신호, 상담, 전후 비교를 빠르게 연결하는 운영용 흐름입니다.',
-        checkpoints: ['위험 신호', '개입 우선순위', '피드백 발송', '전후 비교'],
+        headline: '운영자는 먼저 개입할 학생부터 우선순위로 봅니다',
+        summary: '하락 추세, 미제출, 상담과 전후 변화를 연결해 개입 순서를 빠르게 정하는 운영용 흐름입니다.',
+        checkpoints: ['하락 추세', '미제출 확인', '개입 우선순위', '전후 비교'],
         href: '/go/experience?placement=app_preview_admin&mode=admin',
         label: '운영자 화면 보기',
       },
