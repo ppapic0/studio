@@ -18,8 +18,8 @@ type ShowcaseItem = {
 const items: ShowcaseItem[] = [
   {
     label: 'STUDENT MODE',
-    title: '학생은 오늘 해야 할 행동을 바로 확인합니다',
-    desc: '루틴, 공부시간, 피드백을 한 흐름으로 읽게 만드는 학생 화면입니다.',
+    title: '루틴·학습시간·피드백을 한 흐름으로',
+    desc: '루틴, 학습시간, 피드백을 한 흐름으로 확인합니다.',
     points: ['오늘의 루틴', '주간 캘린더', '피드백 확인'],
     statLabel: '핵심 확인 항목',
     statValue: '3가지',
@@ -29,8 +29,8 @@ const items: ShowcaseItem[] = [
   },
   {
     label: 'PARENT MODE',
-    title: '학부모는 현재 상태와 변화 방향만 빠르게 읽습니다',
-    desc: '출결, 주간 그래프, 리포트를 같은 문법으로 확인하는 화면입니다.',
+    title: '출결·그래프·리포트 실시간 확인',
+    desc: '출결, 주간 그래프, 리포트를 실시간으로 읽습니다.',
     points: ['출결 상태', '주간 그래프', '리포트 수신'],
     statLabel: '핵심 확인 항목',
     statValue: '3가지',
@@ -40,8 +40,8 @@ const items: ShowcaseItem[] = [
   },
   {
     label: 'ADMIN MODE',
-    title: '운영자는 문제 발견부터 개입까지 우선순위로 봅니다',
-    desc: '하락 신호, 상담, 개입 결과를 빠르게 연결하는 운영 화면입니다.',
+    title: '위험 신호부터 개입 결과까지',
+    desc: '위험 신호, 상담, 개입 결과를 우선순위로 정리합니다.',
     points: ['위험 신호', '개입 우선순위', '전후 비교'],
     statLabel: '핵심 확인 항목',
     statValue: '3가지',
