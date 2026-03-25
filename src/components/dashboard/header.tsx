@@ -192,7 +192,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
 
     const raw = window.sessionStorage.getItem(PARENT_POST_LOGIN_ENTRY_MOTION_KEY);
     const timestamp = Number(raw);
-    if (!Number.isFinite(timestamp) || Date.now() - timestamp > PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS) {
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > DASHBOARD_POST_LOGIN_ENTRY_MAX_AGE_MS) {
       return;
     }
 
