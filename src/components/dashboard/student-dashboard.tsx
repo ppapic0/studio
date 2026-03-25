@@ -194,6 +194,15 @@ function formatMinutesToKorean(minutes: number): string {
   return `${hours}시간 ${remain}분`;
 }
 
+function formatMinutesMini(minutes: number): string {
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const remain = safe % 60;
+  if (hours <= 0) return `${remain}m`;
+  if (remain === 0) return `${hours}h`;
+  return `${hours}h ${remain}m`;
+}
+
 function toClockLabel(totalMinutes: number): string {
   const safe = Math.max(0, Math.min(24 * 60, Math.round(totalMinutes)));
   const h = Math.floor(safe / 60).toString().padStart(2, '0');
@@ -663,6 +672,88 @@ function MiniLpTrendSparkline({
         <path d={linePath} fill="none" stroke="#F59E0B" strokeWidth={isMobile ? 2.6 : 2.8} strokeLinecap="round" strokeLinejoin="round" />
         <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 3.2 : 3.6} fill="#F59E0B" />
         <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 1.4 : 1.6} fill="#FFF7ED" />
+      </svg>
+    </div>
+  );
+}
+
+function MiniBestStudySparkline({
+  data,
+  isMobile,
+  modeLabel,
+  peakMinutes,
+}: {
+  data: Array<{ date: string; minutes: number }>;
+  isMobile: boolean;
+  modeLabel: string;
+  peakMinutes: number;
+}) {
+  const width = isMobile ? 104 : 124;
+  const height = isMobile ? 66 : 76;
+  const chartHeight = isMobile ? 36 : 42;
+  const paddingX = 5;
+  const paddingY = 5;
+  const gradientId = isMobile ? 'best-study-fill-mobile' : 'best-study-fill-desktop';
+
+  const normalizedData = data.length > 1
+    ? data
+    : data.length === 1
+      ? [data[0], data[0]]
+      : [
+          { date: 'start', minutes: 0 },
+          { date: 'end', minutes: 0 },
+        ];
+
+  const values = normalizedData.map((item) => item.minutes);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = Math.max(1, maxValue - minValue);
+
+  const getX = (index: number) => {
+    if (normalizedData.length <= 1) return width / 2;
+    return paddingX + (index / (normalizedData.length - 1)) * (width - paddingX * 2);
+  };
+
+  const getY = (value: number) => {
+    const usableHeight = chartHeight - paddingY * 2;
+    return chartHeight - paddingY - ((value - minValue) / range) * usableHeight;
+  };
+
+  const linePath = normalizedData
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(point.minutes)}`)
+    .join(' ');
+  const areaPath = `${linePath} L ${getX(normalizedData.length - 1)} ${chartHeight} L ${getX(0)} ${chartHeight} Z`;
+  const peakIndex = normalizedData.reduce((bestIndex, point, index, arr) => (
+    point.minutes >= arr[bestIndex].minutes ? index : bestIndex
+  ), 0);
+  const peakPoint = normalizedData[peakIndex];
+  const peakPointX = getX(peakIndex);
+  const peakPointY = getY(peakPoint.minutes);
+
+  return (
+    <div className={cn(
+      "pointer-events-none w-full rounded-[1.1rem] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(248,252,255,0.96)_0%,rgba(255,255,255,0.9)_100%)] px-2.5 py-2 shadow-[0_16px_36px_-30px_rgba(14,165,233,0.5)]",
+      isMobile ? "min-h-[4.35rem]" : "min-h-[4.9rem]"
+    )}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-sky-600/60">{modeLabel}</span>
+        <span className="text-[9px] font-black text-sky-700">{formatMinutesMini(peakMinutes)}</span>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={cn("mt-1 w-full", isMobile ? "h-[2.8rem]" : "h-[3.15rem]")}
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.03" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke="#0EA5E9" strokeWidth={isMobile ? 2.4 : 2.6} strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 3.1 : 3.5} fill="#0EA5E9" />
+        <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 1.35 : 1.6} fill="#EFF6FF" />
       </svg>
     </div>
   );
@@ -1786,6 +1877,29 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => (recentLogs || []).reduce((max, item) => Math.max(max, Math.max(0, Number(item.totalMinutes || 0))), 0),
     [recentLogs]
   );
+  const personalBestMinutes = weeklyBestMinutes || monthlyBestMinutes;
+  const personalBestTrend = useMemo(() => {
+    const hasWeeklyFlow = studyTimeTrend.some((item) => item.minutes > 0);
+    if (hasWeeklyFlow) {
+      return {
+        modeLabel: '7일 흐름',
+        data: studyTimeTrend,
+      };
+    }
+
+    const recentLoggedDays = [...(recentLogs || [])]
+      .slice(0, 7)
+      .reverse()
+      .map((item) => ({
+        date: item.dateKey?.slice(5).replace('-', '/') || '',
+        minutes: Math.max(0, Number(item.totalMinutes || 0)),
+      }));
+
+    return {
+      modeLabel: recentLoggedDays.length > 0 ? '최근 로그' : '7일 흐름',
+      data: recentLoggedDays,
+    };
+  }, [studyTimeTrend, recentLogs]);
   const currentStreakDays = useMemo(() => {
     if (!today) return 0;
     let streak = 0;
@@ -2253,13 +2367,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">개인 최고</span>
                 <Trophy className="h-4 w-4 text-sky-500" />
               </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
-                  {formatMinutesToKorean(weeklyBestMinutes || monthlyBestMinutes)}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                  {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : '이번 달 최고 기록 준비 중'}
-                </p>
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                    {formatMinutesToKorean(personalBestMinutes)}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                    {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : monthlyBestMinutes > 0 ? '이번 달 최근 기록 기준' : '이번 달 최고 기록 준비 중'}
+                  </p>
+                </div>
+                <div className={cn("shrink-0", isMobile ? "w-[6.2rem]" : "w-[7rem]")}>
+                  <MiniBestStudySparkline
+                    data={personalBestTrend.data}
+                    isMobile={isMobile}
+                    modeLabel={personalBestTrend.modeLabel}
+                    peakMinutes={personalBestMinutes}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
