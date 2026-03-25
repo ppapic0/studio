@@ -175,7 +175,7 @@ export const marketingContent: MarketingContent = {
   heroStats: [
     {
       label: '2026 합격 실적',
-      value: '고려대 2 · 서강대 1 · 성균관대 1',
+      value: '고려대 2 · 서강대 1 · 성균관대 1 등',
     },
   ],
   valueCards: [
