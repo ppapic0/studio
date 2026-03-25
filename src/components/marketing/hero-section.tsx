@@ -2,8 +2,6 @@ import Image from 'next/image';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
-import { HeroShowcase } from './hero-showcase';
-
 type HeroSectionProps = {
   brand: MarketingContent['brand'];
 };
@@ -34,7 +32,8 @@ export function HeroSection({ brand }: HeroSectionProps) {
     >
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_15%_0%,rgba(25,65,170,0.52),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_85%_8%,rgba(255,122,22,0.16),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_42%_36%_at_70%_14%,rgba(255,122,22,0.18),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_34%_30%_at_48%_76%,rgba(255,255,255,0.08),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_50%_105%,rgba(8,18,52,0.65),transparent)]" />
       </div>
 
@@ -60,34 +59,34 @@ export function HeroSection({ brand }: HeroSectionProps) {
           />
         </div>
         <div
-          className="absolute inset-y-0 right-0 w-[75%] lg:w-[65%]"
+          className="absolute inset-y-0 right-0 w-full"
           style={{
             background:
-              'linear-gradient(to right, rgba(11,22,49,1) 0%, rgba(11,22,49,0.55) 28%, transparent 60%)',
+              'linear-gradient(to right, rgba(11,22,49,0.96) 0%, rgba(11,22,49,0.74) 24%, rgba(11,22,49,0.28) 62%, transparent 100%)',
           }}
         />
       </div>
 
-      <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-16 sm:px-6 md:gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.96fr)] lg:items-center lg:gap-16 lg:px-8 lg:py-24">
-        <div className="max-w-[35rem] space-y-7 sm:space-y-9">
+      <div className="relative mx-auto flex w-full max-w-7xl justify-center px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+        <div className="max-w-[53rem] space-y-7 text-center sm:space-y-9">
           <div className="space-y-5">
             <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
             <div className="space-y-5">
-              <h1 className="font-aggro-display text-[clamp(1.44rem,6.9vw,4.85rem)] font-black leading-[0.98] tracking-[-0.05em] text-white">
+              <h1 className="font-aggro-display text-[clamp(1.52rem,7.2vw,5.1rem)] font-black leading-[0.98] tracking-[-0.05em] text-white">
                 {heroTitleLines.map((line, index) => (
                   <span key={`${line}-${index}`} className="block whitespace-nowrap break-keep">
                     {renderTitleLine(line)}
                   </span>
                 ))}
               </h1>
-              <p className="max-w-[32rem] break-keep text-[15px] font-semibold leading-[1.8] text-white/[0.82] sm:text-[16.5px]">
+              <p className="mx-auto max-w-[38rem] break-keep text-[15px] font-semibold leading-[1.8] text-white/[0.82] sm:text-[16.5px]">
                 {brand.heroDescription}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
             <a
               href="#consult"
               className="premium-cta premium-cta-primary h-12 justify-center px-7 text-[14px] sm:w-auto"
@@ -102,13 +101,9 @@ export function HeroSection({ brand }: HeroSectionProps) {
             </a>
           </div>
 
-          <p className="break-keep text-[12px] font-semibold leading-[1.7] text-white/[0.58] sm:text-[12.5px]">
+          <p className="mx-auto max-w-[32rem] break-keep text-[12px] font-semibold leading-[1.7] text-white/[0.58] sm:text-[12.5px]">
             관리형 스터디센터 · 국어학원 · 학부모 앱 연동
           </p>
-        </div>
-
-        <div className="lg:justify-self-end">
-          <HeroShowcase />
         </div>
       </div>
     </section>
