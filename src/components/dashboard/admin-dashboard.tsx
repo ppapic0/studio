@@ -41,7 +41,7 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
-import { 
+import {
   Users, 
   TrendingUp, 
   Armchair, 
@@ -72,19 +72,29 @@ import {
   Phone,
   TrendingDown,
   Megaphone,
+  LayoutGrid,
+  ClipboardCheck,
 } from 'lucide-react';
-import { useFirestore, useCollection, useFunctions } from '@/firebase';
+import { useFirestore, useCollection, useFunctions, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog } from '@/lib/types';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { CenterAdminHeatmap } from '@/components/dashboard/center-admin-heatmap';
+import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
+import { CenterAdminHeatmapCharts } from '@/components/dashboard/center-admin-heatmap-charts';
+import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
+import {
+  buildSeatId,
+  getGlobalSeatNo,
+  normalizeLayoutRooms,
+  resolveSeatIdentity,
+} from '@/lib/seat-layout';
 
 const isLikelyUid = (value: string): boolean => {
   const normalized = value.trim();
@@ -115,6 +125,11 @@ const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
   return Math.max(0, Math.min(100, Math.round(100 - (standardDeviation / average) * 100)));
 };
 
+type ResolvedAttendanceSeat = AttendanceCurrent & {
+  roomId: string;
+  roomSeatNo: number;
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -130,6 +145,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
@@ -167,6 +183,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     isActive,
     selectedClass,
   });
+
+  const centerRef = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return doc(firestore, 'centers', centerId);
+  }, [firestore, centerId]);
+  const { data: centerData } = useDoc<any>(centerRef);
+
+  const roomConfigs = useMemo(
+    () => normalizeLayoutRooms(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
+
+  useEffect(() => {
+    if (selectedRoomView === 'all') return;
+    const hasSelectedRoom = roomConfigs.some((room) => room.id === selectedRoomView);
+    if (!hasSelectedRoom) {
+      setSelectedRoomView('all');
+    }
+  }, [roomConfigs, selectedRoomView]);
 
   // 1. 센터 모든 재원생
   const membersQuery = useMemoFirebase(() => {
@@ -217,6 +252,73 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', yesterdayKey, 'students');
   }, [firestore, centerId, yesterdayKey]);
   const { data: yesterdayStats } = useCollection<DailyStudentStat>(yesterdayStatsQuery, { enabled: isActive });
+
+  const studentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'students'), orderBy('name', 'asc'));
+  }, [firestore, centerId]);
+  const { data: students } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
+
+  const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(
+    () =>
+      (attendanceList || []).map((seat) => {
+        const identity = resolveSeatIdentity(seat);
+        return {
+          ...seat,
+          roomId: identity.roomId,
+          roomSeatNo: identity.roomSeatNo,
+          seatNo: identity.seatNo,
+          type: seat.type || 'seat',
+        };
+      }),
+    [attendanceList]
+  );
+
+  const studentsById = useMemo(
+    () => new Map((students || []).map((student) => [student.id, student])),
+    [students]
+  );
+
+  const studentMembersById = useMemo(
+    () => new Map((activeMembers || []).map((member) => [member.id, member])),
+    [activeMembers]
+  );
+
+  const seatById = useMemo(
+    () => new Map(resolvedAttendanceList.map((seat) => [seat.id, seat])),
+    [resolvedAttendanceList]
+  );
+
+  const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
+    const seatId = buildSeatId(room.id, roomSeatNo);
+    const existingSeat = seatById.get(seatId);
+    if (existingSeat) return existingSeat;
+
+    return {
+      id: seatId,
+      roomId: room.id,
+      roomSeatNo,
+      seatNo: getGlobalSeatNo(room.id, roomSeatNo),
+      status: 'absent',
+      type: 'seat',
+      updatedAt: Timestamp.now(),
+    };
+  };
+
+  const {
+    seatSignalsBySeatId: attendanceSeatSignalsBySeatId,
+    summary: attendanceBoardSummary,
+    isLoading: attendanceBoardLoading,
+  } = useCenterAdminAttendanceBoard({
+    centerId,
+    isActive,
+    selectedClass,
+    students,
+    studentMembers: activeMembers,
+    attendanceList: resolvedAttendanceList,
+    todayStats,
+    nowMs: now,
+  });
 
   const [focusStudentTrendRaw, setFocusStudentTrendRaw] = useState<DailyStudentStat[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
@@ -915,6 +1017,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         risks: focusRisks.slice(0, 2),
         actions: focusActions.slice(0, 2),
       },
+      focusRows,
       focusTop10,
       focusBottom10,
     };
@@ -923,7 +1026,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const selectedFocusStudent = useMemo(() => {
     if (!selectedFocusStudentId || !metrics) return null;
     return (
-      metrics.focusTop10.find((row) => row.studentId === selectedFocusStudentId)
+      metrics.focusRows.find((row) => row.studentId === selectedFocusStudentId)
       || metrics.focusBottom10.find((row) => row.studentId === selectedFocusStudentId)
       || null
     );
@@ -1339,13 +1442,72 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       {metrics ? (
         <>
+          <section className="space-y-4 px-1">
+            <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
+              <div className="grid gap-1">
+                <div className="flex items-center gap-2 text-primary/65">
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.28em]">Dashboard Priority View</span>
+                </div>
+                <p className="text-xs font-bold text-muted-foreground">
+                  등하원 관제는 먼저 보고, 누적 운영 건강도는 바로 아래 그래프로 이어서 확인합니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={selectedRoomView === 'all' ? 'default' : 'outline'}
+                  onClick={() => setSelectedRoomView('all')}
+                  className={cn(
+                    'h-10 rounded-xl font-black',
+                    selectedRoomView === 'all' ? 'bg-primary text-white' : 'border-2'
+                  )}
+                >
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  전체보기
+                </Button>
+                {roomConfigs.map((room) => (
+                  <Button
+                    key={room.id}
+                    type="button"
+                    variant={selectedRoomView === room.id ? 'default' : 'outline'}
+                    onClick={() => setSelectedRoomView(room.id)}
+                    className={cn(
+                      'h-10 rounded-xl font-black',
+                      selectedRoomView === room.id ? 'bg-primary text-white' : 'border-2'
+                    )}
+                  >
+                    {room.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <CenterAdminAttendanceBoard
+              roomConfigs={roomConfigs}
+              selectedRoomView={selectedRoomView}
+              selectedClass={selectedClass}
+              isMobile={isMobile}
+              isLoading={attendanceBoardLoading}
+              summary={attendanceBoardSummary}
+              seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
+              studentsById={studentsById}
+              studentMembersById={studentMembersById}
+              getSeatForRoom={getSeatForRoom}
+              onSeatClick={(seat) => {
+                if (seat.studentId) {
+                  setSelectedFocusStudentId(seat.studentId);
+                }
+              }}
+            />
+          </section>
+
           <section className="px-1">
-            <CenterAdminHeatmap
-              title="운영 히트맵"
-              description="운영 KPI, 학부모 반응, 위험 인텔리전스, 수납, 운영 효율을 같은 건강도 체계로 보고, 같은 점수가 실시간 교실 좌석에도 바로 반영됩니다."
+            <CenterAdminHeatmapCharts
+              title="운영 히트맵 그래프"
+              description="등하원 도면 아래에서 운영 KPI, 학부모 반응, 위험, 수납, 효율을 그래프 중심으로 읽고 바로 우선순위를 정할 수 있습니다."
               rows={adminHeatmapRows}
               isLoading={adminHeatmapLoading}
-              variant="full"
               actionHref="/dashboard/teacher"
               actionLabel="실시간 교실 이동"
             />
