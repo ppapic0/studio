@@ -60,9 +60,9 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                   background: 'rgba(255,255,255,0.06)',
                 }}
               >
-                <p className="text-[10px] font-black tracking-[0.16em] text-white/56">{metric.label}</p>
+                <p className="text-[10px] font-black tracking-[0.16em] text-white">{metric.label}</p>
                 <p className="mt-2 text-[1.15rem] font-black text-white">{metric.value}</p>
-                <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white/66">{metric.detail}</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">{metric.detail}</p>
               </article>
             ))}
             <article
@@ -74,7 +74,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
             >
               <p className="text-[10px] font-black tracking-[0.16em] text-[#FFB273]">현재 대기 인원</p>
               <p className="mt-2 text-[1.15rem] font-black text-white">{waitlistCount}명</p>
-              <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white/66">
+              <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">
                 상담 요청 후 순차적으로 안내 중입니다.
               </p>
             </article>
