@@ -1856,7 +1856,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
 
     if (!isStudying && hasRecord) {
-      return { label: '하원 (귀가 완료)', color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Home };
+      return { label: '하원', color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Home };
     }
 
     const routineItems = todayPlans?.filter(p => p.category === 'schedule') || [];
