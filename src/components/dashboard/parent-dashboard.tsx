@@ -256,8 +256,6 @@ const PARENT_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentMetricToneStyle>
   },
 };
 
-const PARENT_PENALTY_STAGE_LABELS = ['정상', '주의', '상담', '강화'] as const;
-
 const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
 const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
 const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
@@ -1808,6 +1806,33 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       latestPositiveDateLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd', { locale: ko }) : '-',
     };
   }, [growth?.penaltyPoints, penaltyLogs]);
+  const latestPenaltyHighlight = useMemo(() => {
+    const latestPenaltyLog = [...(penaltyLogs || [])]
+      .filter((log) => Number(log.pointsDelta || 0) > 0)
+      .sort((a, b) => {
+        const aMs = toDateSafe((a as any).createdAt)?.getTime() || 0;
+        const bMs = toDateSafe((b as any).createdAt)?.getTime() || 0;
+        return bMs - aMs;
+      })[0];
+
+    if (latestPenaltyLog) {
+      const createdAt = toDateSafe((latestPenaltyLog as any).createdAt);
+      return {
+        reason: latestPenaltyLog.reason || '생활 기록',
+        points: Math.max(0, Number(latestPenaltyLog.pointsDelta || 0)),
+        dateLabel: createdAt ? format(createdAt, 'yyyy.MM.dd', { locale: ko }) : '-',
+      };
+    }
+
+    const recentPenalty = recentPenaltyReasons[0];
+    if (!recentPenalty) return null;
+
+    return {
+      reason: recentPenalty.reason,
+      points: recentPenalty.points,
+      dateLabel: recentPenalty.dateLabel,
+    };
+  }, [penaltyLogs, recentPenaltyReasons]);
 
   const aiInsights = useMemo(() => {
     const insights: string[] = [];
@@ -2036,14 +2061,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (points >= 7) return { label: '선생님과 상담', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
     return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   }, [penaltyRecovery.effectivePoints]);
-  const penaltyStageLevel = useMemo(() => {
-    const points = penaltyRecovery.effectivePoints;
-    if (points >= 20) return 4;
-    if (points >= 12) return 3;
-    if (points >= 7) return 2;
-    return 1;
-  }, [penaltyRecovery.effectivePoints]);
-
   const heroTone = useMemo(() => {
     if (growthCelebrationCandidate) {
       return {
@@ -2595,30 +2612,30 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_16px_-16px_rgba(210,70,100,0.22)]">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#d24664]">위험도 단계</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#d24664]">최근 벌점 사유</p>
                     <p className="text-[11px] font-black text-rose-500">
-                      {penaltyRecovery.recoveredPoints > 0 ? `회복 -${penaltyRecovery.recoveredPoints}점` : '회복 대기'}
+                      {latestPenaltyHighlight ? `+${latestPenaltyHighlight.points}점` : '기록 없음'}
                     </p>
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {PARENT_PENALTY_STAGE_LABELS.map((label, index) => {
-                      const isActiveStage = index < penaltyStageLevel;
-                      return (
-                        <div
-                          key={label}
-                          className={cn(
-                            'rounded-full px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-[0.14em] transition-colors',
-                            isActiveStage ? 'bg-rose-500 text-white shadow-[0_8px_16px_-12px_rgba(225,29,72,0.52)]' : 'bg-rose-100/75 text-rose-300'
-                          )}
-                        >
-                          {label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
-                    원점수 {penaltyRecovery.basePoints}점 · 최근 기록 {penaltyRecovery.latestPositiveDateLabel}
-                  </p>
+                  {latestPenaltyHighlight ? (
+                    <>
+                      <p className="line-clamp-2 break-keep text-[12px] font-black leading-5 text-[#7a1d35]">
+                        {latestPenaltyHighlight.reason}
+                      </p>
+                      <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
+                        {latestPenaltyHighlight.dateLabel} · 원점수 {penaltyRecovery.basePoints}점
+                        {penaltyRecovery.recoveredPoints > 0 ? ` · 회복 -${penaltyRecovery.recoveredPoints}점` : ''}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[12px] font-black text-[#7a1d35]">최근 벌점 기록 없음</p>
+                      <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
+                        원점수 {penaltyRecovery.basePoints}점
+                        {penaltyRecovery.recoveredPoints > 0 ? ` · 회복 -${penaltyRecovery.recoveredPoints}점` : ' · 회복 기록 대기'}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </ParentMetricCardShell>
