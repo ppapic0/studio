@@ -50,12 +50,20 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
           ))}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <a href="/go/login?placement=header" className="premium-cta premium-cta-ghost hidden h-9 px-4 text-xs sm:inline-flex">
-            웹앱 로그인
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <a
+            href="/go/login?placement=header"
+            className="premium-cta premium-cta-ghost h-8 whitespace-nowrap px-3 text-[11px] font-extrabold tracking-[-0.01em] sm:h-9 sm:px-4 sm:text-xs"
+          >
+            <span className="sm:hidden">로그인</span>
+            <span className="hidden sm:inline">웹앱 로그인</span>
           </a>
-          <a href="/go/experience?placement=header" className="premium-cta premium-cta-primary h-9 whitespace-nowrap px-3.5 text-[12.5px] font-extrabold tracking-[-0.005em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)] sm:h-10 sm:px-5 sm:text-[13.5px]">
-            웹앱 체험
+          <a
+            href="/go/experience?placement=header"
+            className="premium-cta premium-cta-primary h-8 whitespace-nowrap px-3 text-[11px] font-extrabold tracking-[-0.01em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)] sm:h-10 sm:px-5 sm:text-[13.5px]"
+          >
+            <span className="sm:hidden">체험</span>
+            <span className="hidden sm:inline">웹앱 체험</span>
           </a>
         </div>
       </div>
