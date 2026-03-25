@@ -100,8 +100,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { httpsCallable } from 'firebase/functions';
-import { CenterAdminHeatmap } from '@/components/dashboard/center-admin-heatmap';
+import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
+import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
+import type { CenterAdminAttendanceSeatSignal } from '@/lib/center-admin-attendance-board';
 import {
   getCenterAdminDomainSummary,
   getCenterAdminSeatOverlayPresentation,
@@ -232,8 +234,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = activeMembership?.id;
   const {
-    rows: classroomHeatmapRows,
-    isLoading: classroomHeatmapLoading,
     seatSignalsBySeatId,
     studentSignalsByStudentId,
     seatOverlayLegend,
@@ -455,6 +455,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
+
+  const {
+    seatSignalsBySeatId: attendanceSeatSignalsBySeatId,
+    seatSignalsByStudentId: attendanceSeatSignalsByStudentId,
+    summary: attendanceBoardSummary,
+    isLoading: attendanceBoardLoading,
+  } = useCenterAdminAttendanceBoard({
+    centerId,
+    isActive,
+    selectedClass,
+    students,
+    studentMembers,
+    attendanceList: resolvedAttendanceList,
+    todayStats,
+    nowMs: now,
+  });
 
   useEffect(() => {
     let disposed = false;
@@ -778,6 +794,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => getCenterAdminDomainSummary(selectedSeatSignal),
     [selectedSeatSignal]
   );
+
+  const selectedAttendanceSignal = useMemo<CenterAdminAttendanceSeatSignal | null>(() => {
+    if (!selectedSeat) return null;
+    return (
+      attendanceSeatSignalsBySeatId.get(selectedSeat.id) ||
+      (selectedSeat.studentId ? attendanceSeatSignalsByStudentId.get(selectedSeat.studentId) || null : null)
+    );
+  }, [attendanceSeatSignalsBySeatId, attendanceSeatSignalsByStudentId, selectedSeat]);
 
   const selectedPenaltyRecovery = useMemo(() => {
     const basePoints = Math.max(0, Math.round(Number(selectedStudentPenaltyPoints || 0)));
@@ -1766,17 +1790,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </section>
 
-      <section className="px-4">
-        <CenterAdminHeatmap
-          title="운영 히트맵 스냅샷"
-          description="실시간 교실에서도 운영 건강도와 최근 7일 추이를 압축해서 함께 확인합니다."
-          rows={classroomHeatmapRows}
-          isLoading={classroomHeatmapLoading}
-          variant="compact"
-          actionHref="/dashboard"
-          actionLabel="운영실 상세 보기"
-        />
-      </section>
+      <CenterAdminAttendanceBoard
+        roomConfigs={roomConfigs}
+        selectedRoomView={selectedRoomView}
+        selectedClass={selectedClass}
+        isMobile={isMobile}
+        isLoading={attendanceBoardLoading}
+        summary={attendanceBoardSummary}
+        seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
+        studentsById={studentsById}
+        studentMembersById={studentMembersById}
+        getSeatForRoom={getSeatForRoom}
+        onSeatClick={handleSeatClick}
+      />
 
       <section className="px-4">
         <Card className="overflow-hidden rounded-[2.5rem] border-none bg-white shadow-sm ring-1 ring-black/5">
@@ -2164,6 +2190,44 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.total}</p>
                               </div>
                             </div>
+
+                            {selectedAttendanceSignal && (
+                              <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 판정</p>
+                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.boardLabel}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">루틴 예정</p>
+                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.routineExpectedArrivalTime || '미설정'}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</p>
+                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.todayStudyLabel}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">최근 7일</p>
+                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.attendanceRiskLabel}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">복귀/퇴실</p>
+                                    <p className="mt-2 text-sm font-black text-white">
+                                      {selectedAttendanceSignal.isReturned
+                                        ? '복귀'
+                                        : selectedAttendanceSignal.isCheckedOut
+                                          ? '퇴실'
+                                          : selectedAttendanceSignal.seatStatus === 'away' || selectedAttendanceSignal.seatStatus === 'break'
+                                            ? '외출 중'
+                                            : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <p className="mt-3 text-xs font-bold leading-relaxed text-white/90">
+                                  {selectedAttendanceSignal.note}
+                                </p>
+                              </div>
+                            )}
 
                             {selectedSeatSignal && (
                               <>
