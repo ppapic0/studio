@@ -41,7 +41,7 @@ import {
 import { eachDayOfInterval, format, subDays } from 'date-fns';
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
-type LeadRecord = { createdAt?: TimestampLike };
+type LeadRecord = { createdAt?: TimestampLike; linkedLeadId?: string | null };
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -402,7 +402,8 @@ export function OperationalIntelligence() {
 
     const leadHourBuckets = createEmptyHourBuckets();
     const leadWeekdayBuckets = createEmptyWeekdayBuckets();
-    const leadEvents = [...(consultingLeads || []), ...(websiteConsultRequests || [])];
+    const unlinkedWebsiteRequests = (websiteConsultRequests || []).filter((lead) => !lead.linkedLeadId);
+    const leadEvents = [...(consultingLeads || []), ...unlinkedWebsiteRequests];
     leadEvents.forEach((lead) => {
       const when = toDateSafe(lead.createdAt as TimestampLike);
       if (!when || when < recentPatternStart) return;

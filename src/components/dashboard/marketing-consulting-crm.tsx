@@ -88,6 +88,8 @@ interface LeadFormState {
   parentName: string;
   parentPhone: string;
   studentPhone: string;
+  school: string;
+  grade: string;
   referralRoute: ReferralRoute;
   referrerName: string;
   consultationDate: string;
@@ -189,6 +191,8 @@ const INITIAL_FORM = (): LeadFormState => ({
   parentName: '',
   parentPhone: '',
   studentPhone: '',
+  school: '',
+  grade: '',
   referralRoute: '기타',
   referrerName: '',
   consultationDate: format(new Date(), 'yyyy-MM-dd'),
@@ -234,6 +238,15 @@ function formatDateTimeLabel(value: any): string {
   const ms = toDateMs(value);
   if (!ms) return '-';
   return format(new Date(ms), 'yyyy.MM.dd HH:mm');
+}
+
+function formatSchoolGradeLabel(school?: string, grade?: string) {
+  const schoolLabel = school?.trim();
+  const gradeLabel = grade?.trim();
+  if (schoolLabel && gradeLabel) return `${schoolLabel} · ${gradeLabel}`;
+  if (schoolLabel) return schoolLabel;
+  if (gradeLabel) return gradeLabel;
+  return '';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -471,6 +484,8 @@ export function MarketingConsultingCRM({
       parentName: lead.parentName || '',
       parentPhone: lead.parentPhone || '',
       studentPhone: lead.studentPhone || '',
+      school: lead.school || '',
+      grade: lead.grade || '',
       referralRoute: (lead.referralRoute as ReferralRoute) || '기타',
       referrerName: lead.referrerName || '',
       consultationDate: lead.consultationDate || format(new Date(), 'yyyy-MM-dd'),
@@ -497,6 +512,8 @@ export function MarketingConsultingCRM({
         parentName: form.parentName.trim(),
         parentPhone: form.parentPhone.trim(),
         studentPhone: form.studentPhone.trim(),
+        school: form.school.trim(),
+        grade: form.grade.trim(),
         marketingChannel: form.referralRoute,
         referralRoute: form.referralRoute,
         referrerName: form.referralRoute === '추천' ? form.referrerName.trim() : '',
@@ -774,13 +791,15 @@ export function MarketingConsultingCRM({
   };
 
   const exportToCsv = () => {
-    const headers = ['상담일', '상태', '유입경로', '추천인', '학생명', '학생전화번호', '학부모명', '학부모전화번호', '메모'];
+    const headers = ['상담일', '상태', '유입경로', '추천인', '학생명', '학교', '학년', '학생전화번호', '학부모명', '학부모전화번호', '메모'];
     const rows = filteredLeads.map((lead) => [
       lead.consultationDate || '',
       STATUS_META[lead.status || 'new']?.label || '',
       lead.referralRoute || lead.marketingChannel || '',
       lead.referrerName || '',
       lead.studentName || '',
+      lead.school || '',
+      lead.grade || '',
       lead.studentPhone || '',
       lead.parentName || '',
       lead.parentPhone || '',
@@ -885,7 +904,7 @@ export function MarketingConsultingCRM({
                     <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
                   </div>
                   <p className="text-xs font-semibold text-slate-600">
-                    랜딩페이지 방문 상담·입학 문의가 이 영역에 따로 쌓입니다. 필요하면 일반 리드 DB로 옮겨 후속 상담을 이어갈 수 있습니다.
+                    랜딩페이지 상담 문의는 여기서 확인 후 리드 DB로 옮길 수 있고, 웹 입학 대기 신청은 리드 DB와 대기 DB에 동시에 바로 반영됩니다.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -939,6 +958,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
                               {STATUS_META[request.status || 'new'].label}
                             </Badge>
+                            {request.grade && (
+                              <Badge variant="outline" className="text-[10px] font-black text-slate-700">
+                                {request.grade}
+                              </Badge>
+                            )}
                             {request.serviceType && (
                               <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[request.serviceType].color)}>
                                 {request.requestTypeLabel || SERVICE_TYPE_META[request.serviceType].label}
@@ -1067,6 +1091,24 @@ export function MarketingConsultingCRM({
                     value={form.studentPhone}
                     onChange={(e) => setForm((p) => ({ ...p, studentPhone: e.target.value }))}
                     placeholder="010-0000-0000"
+                    className="h-10 rounded-lg"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-black">학교 (선택)</Label>
+                  <Input
+                    value={form.school}
+                    onChange={(e) => setForm((p) => ({ ...p, school: e.target.value }))}
+                    placeholder="예: 대치중"
+                    className="h-10 rounded-lg"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-black">학년 (선택)</Label>
+                  <Input
+                    value={form.grade}
+                    onChange={(e) => setForm((p) => ({ ...p, grade: e.target.value }))}
+                    placeholder="예: 중2"
                     className="h-10 rounded-lg"
                   />
                 </div>
@@ -1238,6 +1280,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[lead.status || 'new'].className)}>
                               {STATUS_META[lead.status || 'new'].label}
                             </Badge>
+                            {lead.grade && (
+                              <Badge variant="outline" className="text-[10px] font-black text-slate-700">
+                                {lead.grade}
+                              </Badge>
+                            )}
                             {lead.serviceType && leadServiceLabel && (
                               <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[lead.serviceType].color)}>
                                 {leadServiceLabel}
@@ -1266,12 +1313,7 @@ export function MarketingConsultingCRM({
                               {lead.parentPhone || '-'}
                             </span>
                             {lead.studentPhone && <span>학생 연락처: {lead.studentPhone}</span>}
-                            {(lead.school || lead.grade) && (
-                              <span>
-                                {lead.school || '학교 미입력'}
-                                {lead.grade ? ` · ${lead.grade}` : ''}
-                              </span>
-                            )}
+                            {formatSchoolGradeLabel(lead.school, lead.grade) && <span>{formatSchoolGradeLabel(lead.school, lead.grade)}</span>}
                             <span>상담일: {lead.consultationDate || '-'}</span>
                           </div>
                           {lead.memo && <p className="text-xs font-medium text-slate-500">{lead.memo}</p>}
