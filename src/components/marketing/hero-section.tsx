@@ -31,13 +31,39 @@ export function HeroSection({ brand }: HeroSectionProps) {
       className="on-dark relative flex min-h-[100svh] items-center overflow-hidden bg-[#0b1631]"
     >
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_15%_0%,rgba(25,65,170,0.52),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_42%_36%_at_70%_14%,rgba(255,122,22,0.18),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_15%_0%,rgba(25,65,170,0.54),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_48%_40%_at_74%_10%,rgba(255,122,22,0.16),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_36%_28%_at_72%_18%,rgba(255,184,122,0.10),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_34%_30%_at_48%_76%,rgba(255,255,255,0.08),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_50%_105%,rgba(8,18,52,0.65),transparent)]" />
       </div>
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute left-[12%] top-[16%] h-28 w-28 rounded-full bg-[#FF7A16]/10 blur-3xl sm:h-36 sm:w-36" />
+        <div className="absolute right-[16%] top-[10%] h-36 w-36 rounded-full bg-[#FF9A47]/12 blur-3xl sm:h-44 sm:w-44 lg:h-56 lg:w-56" />
+        <div className="absolute right-[10%] top-[8%] h-40 w-40 rounded-full bg-[#FF7A16]/8 blur-[90px] sm:h-52 sm:w-52 lg:h-72 lg:w-72" />
+        <div
+          className="absolute right-[12%] top-[8%] h-44 w-44 opacity-35 sm:h-56 sm:w-56 lg:h-72 lg:w-72"
+          style={{
+            background:
+              'repeating-conic-gradient(from 0deg, rgba(255,188,126,0.28) 0deg 4deg, transparent 4deg 18deg)',
+            WebkitMaskImage:
+              'radial-gradient(circle, transparent 0%, transparent 30%, black 42%, transparent 70%)',
+            maskImage:
+              'radial-gradient(circle, transparent 0%, transparent 30%, black 42%, transparent 70%)',
+          }}
+        />
+        <div
+          className="absolute left-[18%] top-[28%] h-24 w-24 opacity-22 sm:h-28 sm:w-28"
+          style={{
+            background:
+              'repeating-conic-gradient(from 0deg, rgba(255,170,102,0.3) 0deg 5deg, transparent 5deg 20deg)',
+            WebkitMaskImage:
+              'radial-gradient(circle, transparent 0%, transparent 24%, black 40%, transparent 72%)',
+            maskImage:
+              'radial-gradient(circle, transparent 0%, transparent 24%, black 40%, transparent 72%)',
+          }}
+        />
         <div
           className="absolute bottom-[-6%] right-[-12%] h-[320px] w-[320px] sm:bottom-[-8%] sm:right-[-8%] sm:h-[420px] sm:w-[420px] md:bottom-[-10%] md:right-[-5%] md:h-[520px] md:w-[520px] lg:bottom-[-12%] lg:right-[-3%] lg:h-[680px] lg:w-[680px]"
           style={{ opacity: 0.11 }}
@@ -62,7 +88,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
           className="absolute inset-y-0 right-0 w-full"
           style={{
             background:
-              'linear-gradient(to right, rgba(11,22,49,0.96) 0%, rgba(11,22,49,0.74) 24%, rgba(11,22,49,0.28) 62%, transparent 100%)',
+              'linear-gradient(to right, rgba(11,22,49,0.98) 0%, rgba(11,22,49,0.76) 24%, rgba(11,22,49,0.34) 60%, transparent 100%)',
           }}
         />
       </div>
