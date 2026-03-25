@@ -60,7 +60,7 @@ export function HeroShowcase() {
       <div className="overflow-hidden rounded-[1.7rem] border border-white/12 bg-white/8 p-5 shadow-[0_16px_32px_rgba(4,11,29,0.22)] backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black tracking-[0.2em] text-white/52">WEB APP VALUE</p>
+            <p className="text-[10px] font-black tracking-[0.2em] text-white/80">WEB APP VALUE</p>
             <p className="mt-1 text-[1.15rem] font-black leading-[1.32] text-white">{current.title}</p>
           </div>
           <div className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[10px] font-black text-[#FFB273]">
@@ -83,7 +83,7 @@ export function HeroShowcase() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-white/10 bg-[#09152F] px-4 py-3">
           <div>
-            <p className="text-[10px] font-black tracking-[0.16em] text-white/42">{current.statLabel}</p>
+            <p className="text-[10px] font-black tracking-[0.16em] text-white/80">{current.statLabel}</p>
             <p className="mt-1 text-[1rem] font-black text-white">{current.statValue}</p>
           </div>
           <a href={current.href} className="inline-flex items-center gap-1.5 text-[12px] font-black text-[#FFB273]">
@@ -112,12 +112,12 @@ export function HeroShowcase() {
               <div className="flex items-center gap-2">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                    isActive ? 'bg-white/14 text-[#FFB273]' : 'bg-white/8 text-white/46'
+                    isActive ? 'bg-white/14 text-[#FFB273]' : 'bg-white/8 text-white'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
                 </div>
-                <p className="text-[10px] font-black tracking-[0.16em] text-white/56">{item.label}</p>
+                <p className="text-[10px] font-black tracking-[0.16em] text-white">{item.label}</p>
               </div>
               <p className="mt-2 break-keep text-[13px] font-black leading-[1.4] text-white">{item.title}</p>
             </button>
