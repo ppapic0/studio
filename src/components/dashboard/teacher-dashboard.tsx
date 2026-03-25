@@ -116,6 +116,7 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import {
   PRIMARY_ROOM_ID,
   buildSeatId,
@@ -1209,6 +1210,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
       const prevStatus = selectedSeat.status;
+      const nowDate = new Date();
+      const todayDateKey = format(nowDate, 'yyyy-MM-dd');
 
       // 퇴실 처리 시 공부 시간 강제 저장 로직
       if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedSeat.lastCheckInAt) {
@@ -1265,6 +1268,88 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       };
 
       batch.update(seatRef, updateData);
+
+      appendAttendanceEventToBatch(batch, firestore, centerId, {
+        studentId,
+        dateKey: todayDateKey,
+        eventType: 'status_override',
+        occurredAt: nowDate,
+        source: 'teacher_dashboard',
+        seatId: selectedSeat.id,
+        statusBefore: prevStatus,
+        statusAfter: nextStatus,
+      });
+
+      if (prevStatus === 'absent' && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_in',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkInAt: nowDate,
+          source: 'teacher_dashboard',
+        });
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_end',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'teacher_dashboard',
+        });
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_start',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'teacher_dashboard',
+        });
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_out',
+          occurredAt: nowDate,
+          source: 'teacher_dashboard',
+          seatId: selectedSeat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkOutAt: nowDate,
+          hasCheckOutRecord: true,
+          source: 'teacher_dashboard',
+        });
+      } else {
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'teacher_dashboard',
+        });
+      }
+
       await batch.commit();
       // 카카오 알림톡 발송 (선생님 수동 조작)
       const studentName = studentsById.get(studentId)?.name || '학생';
@@ -2180,7 +2265,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+        <DialogContent
+          className={cn(
+            "flex min-h-0 flex-col overflow-hidden border-none p-0 shadow-2xl",
+            isMobile
+              ? "fixed inset-0 h-full w-full max-w-none rounded-none"
+              : "h-[min(960px,calc(100dvh-1rem))] w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-1rem)] max-w-[1180px] rounded-[2.5rem]"
+          )}
+        >
           {selectedSeat && (
             <>
               {(() => {
@@ -2194,10 +2286,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                 return (
                   <>
-                    <div className={cn("p-10 text-white relative shrink-0", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
-                      <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><Sparkles className="h-32 w-32" /></div>
+                    <div className={cn("relative shrink-0 p-6 text-white sm:p-7 lg:p-8", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
+                      <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 sm:p-8"><Sparkles className="h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28" /></div>
                       <DialogHeader className="relative z-10">
-                        <DialogTitle className="text-3xl sm:text-4xl font-black tracking-tighter">{studentsById.get(selectedSeat.studentId || '')?.name || '학생'}</DialogTitle>
+                        <DialogTitle className="text-2xl font-black tracking-tighter sm:text-3xl lg:text-[2rem]">{studentsById.get(selectedSeat.studentId || '')?.name || '학생'}</DialogTitle>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">{selectedSeatLabel}</Badge>
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] whitespace-nowrap">{formatAttendanceStatus(selectedSeat.status)}</Badge>
@@ -2335,16 +2427,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </DialogHeader>
                     </div>
                     
-                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#fafafa]">
-                      <Tabs defaultValue="status" className="w-full">
-                        <TabsList className="w-full rounded-none h-14 bg-muted/20 border-b p-0">
+                    <div className="flex min-h-0 flex-1 flex-col bg-[#fafafa]">
+                      <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
+                        <TabsList className="h-14 w-full shrink-0 rounded-none border-b bg-muted/20 p-0">
                           <TabsTrigger value="status" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-primary transition-all">실시간 상태</TabsTrigger>
                           <TabsTrigger value="history" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-emerald-500 transition-all">학습 히스토리</TabsTrigger>
                           <TabsTrigger value="penalty" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-rose-500 transition-all">벌점 관리</TabsTrigger>
                           <TabsTrigger value="reports" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-amber-500 transition-all">리포트 내역</TabsTrigger>
                         </TabsList>
 
-                        <div className={cn("p-6 sm:p-8 space-y-8")}>
+                        <div className={cn("min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-8 space-y-8")}>
                           <TabsContent value="status" className="mt-0 space-y-8">
                             {isEditMode ? (
                               <div className="grid gap-4">

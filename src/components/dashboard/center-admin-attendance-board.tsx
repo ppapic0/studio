@@ -105,9 +105,21 @@ export function CenterAdminAttendanceBoard({
                 const member = studentId ? studentMembersById.get(studentId) : undefined;
                 const signal = studentId ? seatSignalsBySeatId.get(seat.id) || null : null;
                 const presentation = signal ? getAttendanceBoardPresentation(signal) : null;
+                const resolvedPresentation = presentation || {
+                  surfaceClass: 'border-primary/20 bg-white text-slate-700',
+                  chipClass: 'bg-slate-100 text-slate-700',
+                  chipLabel: '확인중',
+                  flagClass: 'bg-slate-100 text-slate-600',
+                  isDark: false,
+                };
                 const isAisle = seat.type === 'aisle';
                 const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
                 const visibleFlags = (signal?.flags || []).slice(0, compact || isMobile ? 1 : 2);
+                const displayName =
+                  signal?.studentName ||
+                  student?.name ||
+                  member?.displayName ||
+                  '학생';
 
                 return (
                   <button
@@ -127,7 +139,7 @@ export function CenterAdminAttendanceBoard({
                         : seat.studentId
                           ? 'cursor-pointer'
                           : 'cursor-default border-primary/30 bg-white',
-                      seat.studentId && presentation ? presentation.surfaceClass : '',
+                      seat.studentId ? resolvedPresentation.surfaceClass : '',
                       isFilteredOut && 'border-transparent bg-muted/10 opacity-20 grayscale'
                     )}
                   >
@@ -142,34 +154,43 @@ export function CenterAdminAttendanceBoard({
                       </span>
                     )}
 
-                    {isAisle ? null : seat.studentId && signal ? (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-0.5 text-center">
+                    {isAisle ? null : seat.studentId ? (
+                      <div
+                        className={cn(
+                          'flex h-full w-full flex-col text-center',
+                          compact
+                            ? 'justify-between px-0.5 pb-0.5 pt-3'
+                            : 'items-center justify-center gap-1 px-0.5'
+                        )}
+                      >
                         <span
                           className={cn(
-                            'w-full truncate font-black leading-none tracking-tighter',
-                            compact ? 'text-[8px]' : 'text-[10px]'
+                            'w-full font-black tracking-tight text-center whitespace-normal break-keep',
+                            compact ? 'min-h-[18px] text-[9px] leading-[1.08]' : 'truncate leading-none text-[10px]'
                           )}
                         >
-                          {student?.name || member?.displayName || '학생'}
+                          {displayName}
                         </span>
                         <span
                           className={cn(
                             'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black shadow-sm',
                             compact ? 'text-[5px]' : 'text-[7px]',
-                            presentation.chipClass
+                            resolvedPresentation.chipClass
                           )}
                         >
-                          {signal.boardLabel}
+                          {resolvedPresentation.chipLabel}
                         </span>
-                        <span
-                          className={cn(
-                            'font-black opacity-80',
-                            compact ? 'text-[5px]' : 'text-[7px]'
-                          )}
-                        >
-                          공부 {signal.todayStudyLabel}
-                        </span>
-                        {visibleFlags.length > 0 && (
+                        {!compact && (
+                          <span
+                            className={cn(
+                              'font-black opacity-80',
+                              compact ? 'text-[5px]' : 'text-[7px]'
+                            )}
+                          >
+                            공부 {signal?.todayStudyLabel || '확인중'}
+                          </span>
+                        )}
+                        {!compact && visibleFlags.length > 0 && (
                           <div className="flex flex-wrap items-center justify-center gap-1">
                             {visibleFlags.map((flag) => (
                               <span
@@ -177,12 +198,33 @@ export function CenterAdminAttendanceBoard({
                                 className={cn(
                                   'inline-flex items-center rounded-full px-1 py-0.5 font-black shadow-sm',
                                   compact ? 'text-[4px]' : 'text-[5px]',
-                                  presentation.flagClass
+                                  resolvedPresentation.flagClass
                                 )}
                               >
                                 {flag}
                               </span>
                             ))}
+                          </div>
+                        )}
+                        {compact && (
+                          <div className="flex min-h-[10px] items-center justify-center gap-1">
+                            {visibleFlags.length > 0 ? (
+                              visibleFlags.map((flag) => (
+                                <span
+                                  key={`${seat.id}_${flag}`}
+                                  className={cn(
+                                    'inline-flex items-center rounded-full px-1 py-0.5 font-black text-[4px] shadow-sm',
+                                    resolvedPresentation.flagClass
+                                  )}
+                                >
+                                  {flag}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[5px] font-black opacity-80">
+                                {signal?.todayStudyLabel || '확인중'}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

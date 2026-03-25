@@ -26,11 +26,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { format, isSameDay } from 'date-fns';
+import { differenceInMinutes, format, isSameDay } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, setDoc, query, where, updateDoc, orderBy, Timestamp } from 'firebase/firestore';
-import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck } from 'lucide-react';
+import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch } from 'firebase/firestore';
+import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3 } from 'lucide-react';
 import { CenterMembership, AttendanceRequest, AttendanceCurrent } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -42,10 +42,14 @@ import {
   AttendanceRoutineInfo,
   DisplayAttendanceStatus,
   buildAttendanceRoutineInfo,
+  combineDateWithTime,
   deriveAttendanceDisplayState,
   syncAutoAttendanceRecord,
   toDateSafe,
 } from '@/lib/attendance-auto';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
+import { deriveRequestOperationsSummary } from '@/lib/attendance-kpi';
+import { AttendanceKpiBoard } from '@/components/dashboard/attendance-kpi-board';
 import {
   isActiveMembershipStatus,
   isTeacherOrAdminRole,
@@ -257,43 +261,128 @@ export default function AttendancePage() {
   };
 
   const handleStatusChange = async (studentId: string, status: AttendanceRecord['status'], checkedAt?: Date | null) => {
-      if (!firestore || !user || !centerId || !dateKey) return;
-      
-      const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
-      const studentData = students?.find(s => s.id === studentId);
+      if (!firestore || !user || !centerId || !dateKey || !selectedDate) return;
 
-      const recordData: Partial<AttendanceRecord> = {
-          status,
-          updatedAt: serverTimestamp() as any,
-          confirmedByUserId: user.uid,
-          centerId: centerId,
-          studentId: studentId,
-          dateKey: dateKey,
-          statusSource: 'manual',
-      };
-      (recordData as any).routineMissingAtCheckIn = deleteField();
-      (recordData as any).routineMissingPenaltyApplied = deleteField();
+      setIsProcessing(true);
+      try {
+        const batch = writeBatch(firestore);
+        const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
+        const studentData = students?.find(s => s.id === studentId);
+        const routine = attendanceRoutineMap[studentId];
+        const expectedArrivalAtFromRoutine =
+          selectedDate && routine?.expectedArrivalTime
+            ? combineDateWithTime(selectedDate, routine.expectedArrivalTime)
+            : null;
+        const fallbackCheckedAt =
+          status === 'confirmed_present'
+            ? expectedArrivalAtFromRoutine || selectedDate
+            : status === 'confirmed_late'
+              ? expectedArrivalAtFromRoutine
+                ? new Date(expectedArrivalAtFromRoutine.getTime() + 10 * 60 * 1000)
+                : selectedDate
+              : null;
+        const normalizedCheckedAt =
+          status === 'confirmed_present' || status === 'confirmed_late'
+            ? checkedAt || fallbackCheckedAt
+            : null;
 
-      if ((status === 'confirmed_present' || status === 'confirmed_late') && checkedAt) {
-        recordData.checkInAt = Timestamp.fromDate(checkedAt);
-      } else if (status === 'confirmed_present' || status === 'confirmed_late') {
-        recordData.checkInAt = serverTimestamp() as any;
-      } else {
-        (recordData as any).checkInAt = deleteField();
+        const recordData: Partial<AttendanceRecord> = {
+            status,
+            updatedAt: serverTimestamp() as any,
+            confirmedByUserId: user.uid,
+            centerId: centerId,
+            studentId: studentId,
+            dateKey: dateKey,
+            statusSource: 'manual',
+        };
+        (recordData as any).routineMissingAtCheckIn = deleteField();
+        (recordData as any).routineMissingPenaltyApplied = deleteField();
+
+        if (normalizedCheckedAt) {
+          recordData.checkInAt = Timestamp.fromDate(normalizedCheckedAt);
+        } else {
+          (recordData as any).checkInAt = deleteField();
+        }
+
+        if (studentData) recordData.studentName = studentData.displayName;
+        batch.set(recordRef, recordData, { merge: true });
+
+        const expectedArrivalAt =
+          normalizedCheckedAt && routine?.expectedArrivalTime
+            ? combineDateWithTime(selectedDate, routine.expectedArrivalTime)
+            : null;
+        const lateMinutes =
+          status === 'confirmed_late'
+            ? normalizedCheckedAt && expectedArrivalAt
+              ? Math.max(0, differenceInMinutes(normalizedCheckedAt, expectedArrivalAt))
+              : 10
+            : 0;
+
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey,
+          eventType: 'status_override',
+          occurredAt: normalizedCheckedAt || new Date(),
+          source: 'attendance_page',
+          statusAfter: status,
+          meta: {
+            manual: true,
+          },
+        });
+
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
+          attendanceStatus: status,
+          checkInAt: normalizedCheckedAt ?? null,
+          lateMinutes,
+          expectedArrivalTime: routine?.expectedArrivalTime ?? null,
+          source: 'attendance_page',
+        });
+
+        await batch.commit();
+        toast({ title: '출결 상태를 저장했습니다.' });
+      } catch (error) {
+        console.error('[attendance] manual status update failed', error);
+        toast({ variant: 'destructive', title: '출결 저장 실패' });
+      } finally {
+        setIsProcessing(false);
       }
-
-      if (studentData) recordData.studentName = studentData.displayName;
-      await setDoc(recordRef, recordData, { merge: true });
   }
 
   const handleRequestAction = async (requestId: string, status: 'approved' | 'rejected') => {
     if (!firestore || !centerId) return;
     setIsProcessing(true);
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'attendanceRequests', requestId), {
+      const batch = writeBatch(firestore);
+      const targetRequest = requests?.find((request) => request.id === requestId) || null;
+      batch.update(doc(firestore, 'centers', centerId, 'attendanceRequests', requestId), {
         status,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        statusUpdatedAt: serverTimestamp(),
+        updatedByUserId: user?.uid || null,
       });
+
+      if (targetRequest?.studentId) {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: targetRequest.studentId,
+          dateKey: targetRequest.date,
+          requestId: targetRequest.id,
+          eventType: status === 'approved' ? 'request_approved' : 'request_rejected',
+          occurredAt: new Date(),
+          source: 'attendance_page',
+          statusAfter: status,
+          meta: {
+            requestType: targetRequest.type,
+          },
+        });
+
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, targetRequest.studentId, targetRequest.date, {
+          requestType: targetRequest.type,
+          requestStatus: status,
+          source: 'attendance_page',
+        });
+      }
+
+      await batch.commit();
       toast({ title: status === 'approved' ? "신청을 승인했습니다." : "신청을 반려했습니다." });
     } catch (e) {
       toast({ variant: "destructive", title: "처리 실패" });
@@ -377,6 +466,10 @@ export default function AttendancePage() {
   const missingRoutineStudents = useMemo(
     () => (students || []).filter((student) => attendanceRoutineMap[student.id]?.hasRoutine === false),
     [students, attendanceRoutineMap]
+  );
+  const requestOpsSummary = useMemo(
+    () => deriveRequestOperationsSummary(requests || [], new Date()),
+    [requests]
   );
 
   useEffect(() => {
@@ -463,8 +556,9 @@ export default function AttendancePage() {
       </header>
 
       <Tabs defaultValue="attendance" className="w-full">
-        <TabsList className="grid grid-cols-2 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-md">
+        <TabsList className="grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-2xl">
           <TabsTrigger value="attendance" className="rounded-xl font-black gap-2"><UserCheck className="h-4 w-4" /> 일일 출석체크</TabsTrigger>
+          <TabsTrigger value="kpi" className="rounded-xl font-black gap-2"><BarChart3 className="h-4 w-4" /> 출결 KPI</TabsTrigger>
           <TabsTrigger value="requests" className="rounded-xl font-black gap-2"><ClipboardCheck className="h-4 w-4" /> 신청 내역 관리</TabsTrigger>
         </TabsList>
 
@@ -592,6 +686,16 @@ export default function AttendancePage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="kpi" className="animate-in fade-in duration-500">
+          <AttendanceKpiBoard
+            firestore={firestore}
+            centerId={centerId}
+            students={students || undefined}
+            requests={requests || undefined}
+            attendanceCurrentDocs={attendanceCurrentDocs || undefined}
+          />
+        </TabsContent>
+
         <TabsContent value="requests" className="animate-in fade-in duration-500">
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-muted/5 border-b p-8">
@@ -601,6 +705,24 @@ export default function AttendancePage() {
             <CardContent className="p-0">
               {requestsLoading ? <div className='flex justify-center py-20'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
               <div className="divide-y divide-muted/10">
+                <div className="grid gap-3 border-b border-muted/10 bg-slate-50/40 p-6 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 대기 건수</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{requestOpsSummary.pendingTodayCount}</p>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">24시간 초과</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{requestOpsSummary.overduePendingCount}</p>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">평균 처리시간</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{requestOpsSummary.averageProcessingHours}h</p>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">반복 신청 학생</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{requestOpsSummary.repeatRequesterCount}</p>
+                  </div>
+                </div>
                 {requests?.length === 0 ? (
                   <div className="py-20 text-center opacity-20 italic font-black text-sm">접수된 신청 내역이 없습니다.</div>
                 ) : requests?.map((req) => (
