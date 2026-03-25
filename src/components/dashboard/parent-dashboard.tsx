@@ -4027,7 +4027,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">확인</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">확인</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -4059,7 +4059,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">닫기</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">닫기</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -4129,7 +4129,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
-              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black">확인</Button>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">확인</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
