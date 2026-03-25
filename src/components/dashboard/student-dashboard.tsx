@@ -2245,10 +2245,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
         <Card className={cn(
           "relative overflow-hidden border-none bg-white shadow-xl ring-1 ring-black/[0.04]",
-          isMobile ? "col-span-2 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
+          isMobile ? "col-span-2 mt-1.5 rounded-[1.5rem]" : "col-span-7 rounded-[2.5rem]"
         )}>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r" style={{ backgroundImage: tierTheme.heroGradient }} />
-          <CardContent className={cn("relative", isMobile ? "p-5 pt-6" : "p-8 pt-9")}>
+          <CardContent className={cn("relative", isMobile ? "p-5 pt-7" : "p-8 pt-9")}>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
                 <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
