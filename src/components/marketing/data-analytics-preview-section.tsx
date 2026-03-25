@@ -130,7 +130,7 @@ const CELL_BG = [
   'bg-[#14295F]',
 ];
 const CELL_TEXT = [
-  'text-[#14295F]/40',
+  'text-[#14295F]/65',
   'text-[#14295F]/70',
   'text-[#14295F]',
   'text-white/90',
