@@ -103,6 +103,12 @@ import { httpsCallable } from 'firebase/functions';
 import { CenterAdminHeatmap } from '@/components/dashboard/center-admin-heatmap';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import {
+  getCenterAdminDomainSummary,
+  getCenterAdminSeatOverlayPresentation,
+  type CenterAdminSeatOverlayMode,
+  type CenterAdminStudentSeatSignal,
+} from '@/lib/center-admin-seat-heatmap';
+import {
   ROUTINE_MISSING_PENALTY_POINTS,
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
@@ -168,6 +174,17 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomSeatNo: number;
 };
 
+const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: string }> = [
+  { value: 'composite', label: '종합' },
+  { value: 'risk', label: '리스크' },
+  { value: 'penalty', label: '벌점' },
+  { value: 'minutes', label: '학습' },
+  { value: 'parent', label: '학부모' },
+  { value: 'billing', label: '수납' },
+  { value: 'efficiency', label: '효율' },
+  { value: 'status', label: '상태' },
+];
+
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -204,6 +221,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
+  const [seatOverlayMode, setSeatOverlayMode] = useState<CenterAdminSeatOverlayMode>('composite');
 
   useEffect(() => {
     setMounted(true);
@@ -213,7 +231,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const centerId = activeMembership?.id;
-  const { rows: classroomHeatmapRows, isLoading: classroomHeatmapLoading } = useCenterAdminHeatmap({
+  const {
+    rows: classroomHeatmapRows,
+    isLoading: classroomHeatmapLoading,
+    seatSignalsBySeatId,
+    studentSignalsByStudentId,
+    seatOverlayLegend,
+    seatOverlaySummary,
+  } = useCenterAdminHeatmap({
     centerId,
     isActive,
     selectedClass,
@@ -737,6 +762,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const selectedSeatLabel = useMemo(
     () => formatSeatLabel(selectedSeat, roomConfigs),
     [selectedSeat, roomConfigs]
+  );
+
+  const activeSeatOverlayMode: CenterAdminSeatOverlayMode = isEditMode ? 'status' : seatOverlayMode;
+
+  const selectedSeatSignal = useMemo<CenterAdminStudentSeatSignal | null>(() => {
+    if (!selectedSeat) return null;
+    return (
+      seatSignalsBySeatId.get(selectedSeat.id) ||
+      (selectedSeat.studentId ? studentSignalsByStudentId.get(selectedSeat.studentId) || null : null)
+    );
+  }, [selectedSeat, seatSignalsBySeatId, studentSignalsByStudentId]);
+
+  const selectedSeatDomainSummary = useMemo(
+    () => getCenterAdminDomainSummary(selectedSeatSignal),
+    [selectedSeatSignal]
   );
 
   const selectedPenaltyRecovery = useMemo(() => {
@@ -1408,10 +1448,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 const occupantId = typeof seat.studentId === 'string' ? seat.studentId : '';
                 const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
                 const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
-                const timeInfo = occupantId ? getStudentStudyTimes(occupantId, seat.status, seat.lastCheckInAt) : null;
+                const seatSignal =
+                  (occupantId ? seatSignalsBySeatId.get(seat.id) : null) ||
+                  (occupantId ? studentSignalsByStudentId.get(occupantId) || null : null);
+                const overlayPresentation = getCenterAdminSeatOverlayPresentation({
+                  signal: seatSignal,
+                  mode: activeSeatOverlayMode,
+                  status: seat.status,
+                  isEditMode,
+                });
+                const secondaryFlags = (seatSignal?.secondaryFlags || []).slice(0, compact ? 1 : 2);
                 const isAisle = seat.type === 'aisle';
-                const isStudying = timeInfo?.isStudying;
-                const isAway = !isEditMode && (seat.status === 'away' || seat.status === 'break');
 
                 return (
                   <div
@@ -1423,9 +1470,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       'flex flex-col items-center justify-center',
                       isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
                       isAisle ? 'border-transparent bg-transparent text-transparent hover:bg-muted/10' :
-                      isStudying ? 'z-10 scale-[1.03] border-blue-700 bg-blue-600 text-white shadow-xl' :
-                      isAway ? 'border-amber-600 bg-amber-50 text-white' :
-                      occupantId ? 'border-primary/30 bg-white text-primary' :
+                      occupantId ? overlayPresentation.surfaceClass :
                       'border-primary/40 bg-white text-primary/5 hover:border-primary/60',
                       isEditMode && isAisle && 'border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20'
                     )}
@@ -1435,7 +1480,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         className={cn(
                           'absolute left-1.5 top-1 font-black',
                           compact ? 'text-[6px]' : 'text-[7px]',
-                          isStudying || isAway ? 'opacity-60' : 'opacity-40'
+                          occupantId && overlayPresentation.isDark ? 'opacity-70' : 'opacity-40'
                         )}
                       >
                         {roomSeatNo}
@@ -1447,7 +1492,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         className={cn(
                           'absolute right-1 top-1 border-none px-1 font-black',
                           compact ? 'h-3 text-[5px]' : 'h-3.5 text-[6px]',
-                          isStudying || isAway ? 'bg-white/20 text-white' : 'bg-primary/5 text-primary/40'
+                          occupantId ? overlayPresentation.flagClass : 'bg-primary/5 text-primary/40'
                         )}
                       >
                         {seat.seatZone.charAt(0)}
@@ -1456,36 +1501,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     {isAisle ? (
                       isEditMode && <MapIcon className={cn(compact ? 'h-2.5 w-2.5' : 'h-3 w-3', 'opacity-40')} />
                     ) : occupantId ? (
-                      <div className="flex w-full flex-col items-center gap-0.5 px-0.5">
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-0.5">
                         <span
                           className={cn(
-                            'mb-0.5 w-full truncate text-center font-black leading-none tracking-tighter',
+                            'w-full truncate text-center font-black leading-none tracking-tighter',
                             compact ? 'text-[8px]' : 'text-[10px]'
                           )}
                         >
                           {occupantName}
                         </span>
-                        <div className="flex flex-col items-center leading-[1.1]">
-                          <span
-                            className={cn(
-                              'whitespace-nowrap font-black tracking-tighter',
-                              compact ? 'text-[6px]' : 'text-[8px]',
-                              isStudying || isAway ? 'text-white' : 'text-primary'
-                            )}
-                          >
-                            세션 {timeInfo?.session}
-                          </span>
-                          <span
-                            className={cn(
-                              'whitespace-nowrap font-black tracking-tighter',
-                              compact ? 'text-[6px]' : 'text-[8px]',
-                              isStudying || isAway ? 'text-white/90' : 'text-primary/80'
-                            )}
-                          >
-                            누적 {timeInfo?.total}
-                          </span>
-                        </div>
-                        {isStudying && <Zap className={cn(compact ? 'h-1.5 w-1.5' : 'h-2 w-2', 'mt-0.5 animate-pulse fill-current text-white/50')} />}
+                        <span
+                          className={cn(
+                            'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black tracking-tight shadow-sm',
+                            compact ? 'text-[5px]' : 'text-[7px]',
+                            overlayPresentation.chipClass
+                          )}
+                        >
+                          {overlayPresentation.chipLabel}
+                        </span>
+                        {secondaryFlags.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-center gap-1">
+                            {secondaryFlags.map((flag) => (
+                              <span
+                                key={`${seat.id}_${flag}`}
+                                className={cn(
+                                  'inline-flex max-w-full items-center rounded-full px-1 py-0.5 font-black tracking-tight shadow-sm',
+                                  compact ? 'text-[4px]' : 'text-[5px]',
+                                  overlayPresentation.flagClass
+                                )}
+                              >
+                                {flag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center">
@@ -1729,6 +1778,78 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         />
       </section>
 
+      <section className="px-4">
+        <Card className="overflow-hidden rounded-[2.5rem] border-none bg-white shadow-sm ring-1 ring-black/5">
+          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
+            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+              <div className="grid gap-1">
+                <div className="flex items-center gap-2">
+                  <Badge className="h-6 border-none bg-primary/10 px-2.5 text-[10px] font-black text-primary">
+                    도면 학생 히트맵
+                  </Badge>
+                  {isEditMode && (
+                    <Badge className="h-6 border-none bg-amber-100 px-2.5 text-[10px] font-black text-amber-700">
+                      편집 중에는 상태 보기만 표시
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-muted-foreground">
+                  좌석마다 학생 운영 건강도를 바로 보고, 클릭하면 5개 도메인 상세와 개입 이유를 확인합니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '안정', value: seatOverlaySummary.healthyCount, tone: 'bg-emerald-100 text-emerald-700' },
+                  { label: '주의', value: seatOverlaySummary.warningCount, tone: 'bg-amber-100 text-amber-700' },
+                  { label: '위험', value: seatOverlaySummary.riskCount, tone: 'bg-rose-100 text-rose-700' },
+                  { label: '미열람', value: seatOverlaySummary.unreadCount, tone: 'bg-sky-100 text-sky-700' },
+                  { label: '상담', value: seatOverlaySummary.counselingCount, tone: 'bg-violet-100 text-violet-700' },
+                  { label: '연체', value: seatOverlaySummary.overdueCount, tone: 'bg-orange-100 text-orange-700' },
+                  { label: '장기외출', value: seatOverlaySummary.awayCount, tone: 'bg-amber-100 text-amber-700' },
+                ].map((item) => (
+                  <span
+                    key={item.label}
+                    className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", item.tone)}
+                  >
+                    {item.label} {item.value}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {SEAT_OVERLAY_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
+                  disabled={isEditMode && option.value !== 'status'}
+                  onClick={() => setSeatOverlayMode(option.value)}
+                  className={cn(
+                    "rounded-2xl px-4 font-black",
+                    isMobile ? "h-10" : "h-11",
+                    activeSeatOverlayMode === option.value ? "bg-primary text-white" : "border-2"
+                  )}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(seatOverlayLegend[activeSeatOverlayMode] || []).map((legend) => (
+                <span
+                  key={`${activeSeatOverlayMode}_${legend.key}`}
+                  className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", legend.tone)}
+                >
+                  {legend.label}
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       {selectedRoomView === 'all' ? (
         <Card className="mx-4 overflow-hidden rounded-[3rem] border-none bg-white shadow-xl">
           <CardHeader className="border-b bg-muted/5 px-6 py-5 sm:px-10 sm:py-6">
@@ -1739,7 +1860,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   전체보기 실시간 교실
                 </CardTitle>
                 <CardDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  두 호실을 반반으로 동시에 보고, 좌석 상태 확인은 그대로 유지합니다.
+                  두 호실을 반반으로 동시에 보고, 학생별 {SEAT_OVERLAY_OPTIONS.find((item) => item.value === activeSeatOverlayMode)?.label || '종합'} 신호를 한눈에 확인합니다.
                 </CardDescription>
               </div>
               <Badge variant="outline" className="h-6 border-primary/40 px-3 text-[10px] font-black uppercase">
@@ -1756,7 +1877,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-[10px] font-black uppercase tracking-[0.28em] text-primary/50">Room Live Board</p>
                       <h3 className="text-2xl font-black tracking-tight text-primary">{room.name}</h3>
                       <p className="text-xs font-bold text-muted-foreground">
-                        좌석 클릭으로 학생 상태를 확인하고, 편집은 상세 화면에서 진행합니다.
+                        좌석 클릭으로 학생 건강도와 상태를 확인하고, 편집은 상세 화면에서 진행합니다.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -2014,6 +2135,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               {(() => {
                 const studentId = selectedSeat.studentId;
                 const timeInfo = studentId ? getStudentStudyTimes(studentId, selectedSeat.status, selectedSeat.lastCheckInAt) : null;
+                const selectedSeatPresentation = getCenterAdminSeatOverlayPresentation({
+                  signal: selectedSeatSignal,
+                  mode: 'composite',
+                  status: selectedSeat.status,
+                });
 
                 return (
                   <>
@@ -2026,6 +2152,51 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] whitespace-nowrap">{formatAttendanceStatus(selectedSeat.status)}</Badge>
                           {selectedSeat.seatZone && <Badge className="bg-white text-primary border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.seatZone}</Badge>}
                         </div>
+                        {selectedSeat.studentId && (
+                          <div className="mt-4 grid gap-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60">실시간 세션</p>
+                                <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.session}</p>
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 누적</p>
+                                <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.total}</p>
+                              </div>
+                            </div>
+
+                            {selectedSeatSignal && (
+                              <>
+                                <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
+                                      {selectedSeatSignal.primaryChip}
+                                    </Badge>
+                                    {selectedSeatSignal.secondaryFlags.map((flag) => (
+                                      <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
+                                        {flag}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                  <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
+                                    {selectedSeatSignal.topReason}
+                                  </p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                  {selectedSeatDomainSummary.map((domain) => (
+                                    <div key={domain.key} className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{domain.label}</p>
+                                      <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
+                                        {domain.score}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </DialogHeader>
                     </div>
                     
@@ -2040,20 +2211,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                         <div className={cn("p-6 sm:p-8 space-y-8")}>
                           <TabsContent value="status" className="mt-0 space-y-8">
-                            {selectedSeat.studentId && (
-                              <div className="flex gap-4 p-5 bg-white rounded-3xl border-2 border-primary/5 shadow-sm">
-                                <div className="flex-1 text-center">
-                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">실시간 세션</p>
-                                  <p className="text-xl sm:text-2xl font-black text-blue-600 tabular-nums">{timeInfo?.session}</p>
-                                </div>
-                                <div className="w-px h-10 bg-border/50 self-center" />
-                                <div className="flex-1 text-center">
-                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">오늘 누적</p>
-                                  <p className="text-xl sm:text-2xl font-black text-primary tabular-nums">{timeInfo?.total}</p>
-                                </div>
-                              </div>
-                            )}
-
                             {isEditMode ? (
                               <div className="grid gap-4">
                                 <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">

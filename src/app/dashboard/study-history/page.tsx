@@ -830,8 +830,12 @@ export default function StudyHistoryPage() {
                     <div className="absolute inset-x-1 bottom-1.5">
                       <div
                         className={cn(
-                          "rounded-[0.7rem] border text-center font-mono font-black tabular-nums py-1 leading-tight text-[10px] tracking-tight whitespace-nowrap backdrop-blur-[8px] shadow-[0_16px_28px_-22px_rgba(15,23,42,0.45)]",
-                          minutes > 0 ? "border-white/85 bg-white/92 text-primary" : "border-white/75 bg-white/82 text-slate-500"
+                          "rounded-[0.7rem] border text-center font-mono font-black tabular-nums py-1 leading-tight text-[10px] tracking-tight whitespace-nowrap backdrop-blur-[10px] shadow-[0_18px_30px_-22px_rgba(15,23,42,0.5)]",
+                          minutes >= 300
+                            ? "border-white/95 bg-white text-[#0f214d] shadow-[0_20px_34px_-22px_rgba(15,23,42,0.58)]"
+                            : minutes > 0
+                              ? "border-white/90 bg-white/96 text-[#16315f]"
+                              : "border-white/75 bg-white/84 text-slate-500"
                         )}
                       >
                         {isCurrentMonth ? formatMinutes(minutes) : '--'}
