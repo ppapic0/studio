@@ -123,6 +123,7 @@ export function CenterAdminAttendanceBoard({
                   member?.displayName ||
                   '학생';
                 const isNameOnly = seatDetailLevel === 'nameOnly';
+                const studyTimeLabel = signal?.todayStudyLabel || '0h 0m';
 
                 return (
                   <button
@@ -164,7 +165,7 @@ export function CenterAdminAttendanceBoard({
                           isNameOnly
                             ? compact
                               ? 'items-center justify-center px-1 pb-1 pt-3'
-                              : 'items-center justify-center px-1.5'
+                              : 'items-center justify-center px-1.5 py-1'
                             : compact
                               ? 'justify-between px-0.5 pb-0.5 pt-3'
                               : 'items-center justify-center gap-1 px-0.5'
@@ -172,11 +173,11 @@ export function CenterAdminAttendanceBoard({
                       >
                         <span
                           className={cn(
-                            'w-full font-black tracking-tight text-center whitespace-normal break-keep',
+                            'w-full text-center font-black tracking-tight whitespace-normal break-keep',
                             isNameOnly
                               ? compact
-                                ? 'text-[10px] leading-[1.15] text-slate-950'
-                                : 'text-[11px] leading-[1.2] text-slate-950'
+                                ? 'line-clamp-2 text-[10px] leading-[1.15] text-slate-950'
+                                : 'line-clamp-2 text-[11px] leading-[1.2] text-slate-950'
                               : compact
                                 ? 'min-h-[18px] text-[9px] leading-[1.08]'
                                 : 'truncate leading-none text-[10px]'
@@ -184,6 +185,16 @@ export function CenterAdminAttendanceBoard({
                         >
                           {displayName}
                         </span>
+                        {isNameOnly && (
+                          <span
+                            className={cn(
+                              'inline-flex items-center justify-center rounded-full border border-black/5 bg-white/78 px-1.5 py-0.5 font-black tracking-tight text-slate-700 shadow-sm',
+                              compact ? 'mt-1 text-[7px] leading-none' : 'mt-1.5 text-[8px] leading-none'
+                            )}
+                          >
+                            공부 {studyTimeLabel}
+                          </span>
+                        )}
                         {!isNameOnly && (
                           <span
                             className={cn(
