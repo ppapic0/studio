@@ -2367,16 +2367,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">개인 최고</span>
                 <Trophy className="h-4 w-4 text-sky-500" />
               </div>
-              <div className="mt-3 flex items-end justify-between gap-3">
+              <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                  <p className={cn("font-black tracking-tight text-slate-900 whitespace-normal break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
                     {formatMinutesToKorean(personalBestMinutes)}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-slate-500">
                     {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : monthlyBestMinutes > 0 ? '이번 달 최근 기록 기준' : '이번 달 최고 기록 준비 중'}
                   </p>
                 </div>
-                <div className={cn("shrink-0", isMobile ? "w-[6.2rem]" : "w-[7rem]")}>
+                <div className={cn("shrink-0", isMobile ? "w-full max-w-[6.2rem] self-end" : "w-[7rem]")}>
                   <MiniBestStudySparkline
                     data={personalBestTrend.data}
                     isMobile={isMobile}
@@ -2392,16 +2392,29 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
               <CardContent className={cn("p-4", !isMobile && "p-5")}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">시즌 구간</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+                      <Trophy className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">시즌 구간</span>
+                  </div>
                   <ChevronRight className="h-4 w-4 text-slate-300" />
                 </div>
-                <div className="mt-3">
-                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
+                <div className="mt-3 min-w-0">
+                  <p className={cn("font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
                     {seasonPercentile ? `상위 ${seasonPercentile}%` : '기록 준비중'}
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
                     {nextTierInfo.remainingLp > 0 ? `${nextTierInfo.name}까지 ${nextTierInfo.remainingLp.toLocaleString()}점` : '지금 티어를 멋지게 유지 중'}
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700 ring-1 ring-amber-100">
+                      현재 {currentTier.name}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                      학생 기준 랭킹
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -2412,12 +2425,27 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
                 <CardContent className={cn("p-4", !isMobile && "p-5")}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">놓치면 아쉬운 것</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
+                        <FileText className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">놓치면 아쉬운 것</span>
+                    </div>
                     <Badge className="h-5 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
                   </div>
-                  <div className="mt-3">
-                    <p className="text-sm font-black leading-6 text-slate-900">{latestUnreadReport.dateKey} 코칭 도착</p>
-                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 line-clamp-3">{coachSummary}</p>
+                  <div className="mt-3 min-w-0">
+                    <p className="text-sm font-black leading-6 text-slate-900 break-keep line-clamp-2">{latestUnreadReport.dateKey} 코칭 도착</p>
+                    <div className="mt-2 rounded-[1rem] bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-primary ring-1 ring-slate-200">
+                          코칭 한마디
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">
+                          미확인
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-600 line-clamp-3 break-keep">{coachSummary}</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
