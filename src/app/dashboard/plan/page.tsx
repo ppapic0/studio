@@ -559,6 +559,9 @@ export default function StudyPlanPage() {
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
+  const [awayStartTime, setAwayStartTime] = useState('');
+  const [awayEndTime, setAwayEndTime] = useState('');
+  const [awayReason, setAwayReason] = useState('');
 
   useEffect(() => {
     const requestedDate = searchParams.get('date');
@@ -653,7 +656,30 @@ export default function StudyPlanPage() {
 
   const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
   const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
+  const awayScheduleItem = useMemo(() => scheduleItems.find((item) => item.title.includes('외출 예정')), [scheduleItems]);
+  const hasAwayPlan = Boolean(awayScheduleItem);
   const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
+
+  useEffect(() => {
+    const arrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
+    const dismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
+    const awayItem = scheduleItems.find((item) => item.title.startsWith('외출 예정'));
+
+    setInTime(arrival?.title.split(': ')[1] || '09:00');
+    setOutTime(dismissal?.title.split(': ')[1] || '22:00');
+
+    if (awayItem) {
+      const [baseTitle, rangeText = ''] = awayItem.title.split(': ');
+      const [startText = '', endText = ''] = rangeText.split(' ~ ');
+      setAwayStartTime(startText);
+      setAwayEndTime(endText);
+      setAwayReason(baseTitle.replace('외출 예정', '').replace(/^ · /, '').trim());
+    } else {
+      setAwayStartTime('');
+      setAwayEndTime('');
+      setAwayReason('');
+    }
+  }, [scheduleItems]);
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -953,11 +979,14 @@ export default function StudyPlanPage() {
     const colRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
 
     try {
-      scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원')).forEach(i => {
+      scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('외출 예정')).forEach(i => {
         batch.delete(doc(colRef, i.id));
       });
 
       if (type === 'attend') {
+        const trimmedAwayReason = awayReason.trim();
+        const shouldSaveAwayPlan = trimmedAwayReason.length > 0 && awayStartTime && awayEndTime;
+
         batch.set(doc(colRef), {
           title: `등원 예정: ${inTime}`,
           done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
@@ -970,6 +999,14 @@ export default function StudyPlanPage() {
           studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
+        if (shouldSaveAwayPlan) {
+          batch.set(doc(colRef), {
+            title: `외출 예정 · ${trimmedAwayReason}: ${awayStartTime} ~ ${awayEndTime}`,
+            done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
+            studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+          });
+        }
       } else {
         batch.set(doc(colRef), {
           title: `이날 등원하지 않습니다`,
@@ -1576,17 +1613,41 @@ export default function StudyPlanPage() {
                       <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>등원 계획</Label>
                     </div>
                     <div className={cn("gap-2 sm:gap-3", isMobile ? "flex flex-col" : "flex flex-col xl:flex-row xl:items-end")}>
-                      <div className={cn("grid w-full min-w-0", isMobile ? "grid-cols-2 gap-1 sm:gap-2" : "grid-cols-2 gap-2 sm:gap-3 xl:flex-1")}>
-                        <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
+                        <div className={cn("grid w-full min-w-0", isMobile ? "grid-cols-2 gap-1 sm:gap-2" : "grid-cols-2 gap-2 sm:gap-3 xl:flex-1")}>
+                          <div className="space-y-1">
+                            <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
                           <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
                         </div>
                         <div className="space-y-1">
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>하원 예정</span>
                           <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
+                          </div>
+                        </div>
+                        <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("touch-manipulation rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-10 text-xs" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
+                    </div>
+                    <div className={cn("rounded-[1.2rem] border border-primary/10 bg-primary/[0.03]", isMobile ? "p-3 space-y-2" : "p-4 space-y-3")}>
+                      <div className="flex items-center gap-2 ml-1">
+                        <Clock className={cn("text-primary", isMobile ? "h-3 w-3" : "h-4 w-4")} />
+                        <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>외출 일정</Label>
+                        <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>학원/병원/식사 등</span>
+                      </div>
+                      <div className={cn("grid", isMobile ? "grid-cols-2 gap-2" : "grid-cols-[minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,1fr)] gap-3")}>
+                        <div className="space-y-1">
+                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>외출 시작</span>
+                          <Input type="time" value={awayStartTime} onChange={e => setAwayStartTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-lg")} />
+                        </div>
+                        <div className="space-y-1">
+                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>복귀 예정</span>
+                          <Input type="time" value={awayEndTime} onChange={e => setAwayEndTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-lg")} />
+                        </div>
+                        <div className={cn("space-y-1", isMobile ? "col-span-2" : "")}>
+                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>사유</span>
+                          <Input value={awayReason} onChange={e => setAwayReason(e.target.value)} placeholder="예: 영어학원, 병원, 저녁 식사" className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-sm")} />
                         </div>
                       </div>
-                        <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("touch-manipulation rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-10 text-xs" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
+                      <p className={cn("font-semibold text-muted-foreground", isMobile ? "text-[9px]" : "text-[11px]")}>
+                        사유와 시간이 모두 있으면 등원 계획과 함께 외출 일정도 저장됩니다.
+                      </p>
                     </div>
                   </div>
                   
@@ -1608,13 +1669,18 @@ export default function StudyPlanPage() {
                   <div className="grid">
                     <span className={cn("font-black tracking-tighter text-primary", isMobile ? "text-sm" : "text-2xl")}>{isAbsentMode ? '오늘 휴무' : '출석 설정 완료'}</span>
                     {!isAbsentMode && <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>{inTime} ~ {outTime}</span>}
+                    {!isAbsentMode && hasAwayPlan && awayStartTime && awayEndTime && (
+                      <span className={cn("font-bold text-primary/70 break-keep", isMobile ? "text-[9px]" : "text-xs")}>
+                        외출 {awayStartTime} ~ {awayEndTime}{awayReason.trim() ? ` · ${awayReason.trim()}` : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {!isPast && (
                   <button onClick={() => {
                     const batch = writeBatch(firestore!);
                     const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
-                    scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다')).forEach(i => batch.delete(doc(colRef, i.id)));
+                    scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다') || i.title.includes('외출 예정')).forEach(i => batch.delete(doc(colRef, i.id)));
                     batch.commit().then(async () => {
                       if (isToday) {
                         await applySameDayRoutinePenalty('당일 출석 루틴 초기화');
