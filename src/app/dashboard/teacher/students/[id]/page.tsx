@@ -1472,6 +1472,105 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
     isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
   );
+  const focusKpiCards = [
+    {
+      key: 'growth',
+      label: '오늘 학습 성장률',
+      value: formatSignedPercent(focusKpi.todayGrowthPercent),
+      helper: '최근 7일 평균 대비',
+      note: focusKpi.todayGrowthPercent >= 0 ? '상승 흐름 유지' : '리듬 회복 필요',
+      Icon: focusKpi.todayGrowthPercent >= 0 ? TrendingUp : Activity,
+      iconClass: focusKpi.todayGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500',
+      panelClass: 'border-emerald-100/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96)_0%,rgba(255,255,255,0.88)_100%)]',
+      chipClass: 'text-emerald-700 bg-emerald-100/80',
+      meterClass: focusKpi.todayGrowthPercent >= 0 ? 'from-emerald-400 via-emerald-500 to-teal-500' : 'from-rose-300 via-rose-400 to-rose-500',
+      meterValue: Math.max(14, Math.min(100, 50 + focusKpi.todayGrowthPercent)),
+    },
+    {
+      key: 'recent',
+      label: '최근 7일 평균',
+      value: minutesToLabel(focusKpi.recent7AvgMinutes),
+      helper: '일 평균 공부시간',
+      note: '기준 페이스',
+      Icon: Clock3,
+      iconClass: 'text-[#2554d4]',
+      panelClass: 'border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(241,246,255,0.98)_0%,rgba(255,255,255,0.9)_100%)]',
+      chipClass: 'text-[#2554d4] bg-[#e8f0ff]',
+      meterClass: 'from-[#8fb6ff] via-[#4f7cff] to-[#2554d4]',
+      meterValue: Math.max(12, Math.min(100, Math.round((focusKpi.recent7AvgMinutes / 240) * 100))),
+    },
+    {
+      key: 'completion',
+      label: '계획 완수율',
+      value: `${focusKpi.completionRate}%`,
+      helper: '최근 기간 평균',
+      note: focusKpi.completionRate >= 70 ? '실행 안정권' : '실행 루틴 점검',
+      Icon: CheckCircle2,
+      iconClass: 'text-amber-500',
+      panelClass: 'border-amber-100/80 bg-[linear-gradient(180deg,rgba(255,247,237,0.98)_0%,rgba(255,255,255,0.92)_100%)]',
+      chipClass: 'text-amber-700 bg-amber-100/80',
+      meterClass: 'from-amber-300 via-amber-400 to-[#ff7a16]',
+      meterValue: Math.max(12, Math.min(100, focusKpi.completionRate)),
+    },
+    {
+      key: 'rhythm',
+      label: '학습 리듬 점수',
+      value: `${focusKpi.rhythmScore}점`,
+      helper: '공부시간 분산 기반',
+      note: focusKpi.rhythmScore >= 70 ? '리듬 안정적' : '흔들림 관리 필요',
+      Icon: Activity,
+      iconClass: 'text-violet-600',
+      panelClass: 'border-violet-100/80 bg-[linear-gradient(180deg,rgba(247,245,255,0.98)_0%,rgba(255,255,255,0.92)_100%)]',
+      chipClass: 'text-violet-700 bg-violet-100/80',
+      meterClass: 'from-violet-300 via-violet-400 to-violet-500',
+      meterValue: Math.max(12, Math.min(100, focusKpi.rhythmScore)),
+    },
+  ] as const;
+  const chartInsightHeadline = chartInsights.weekly.trend;
+  const chartInsightSummary = chartInsights.daily.improve;
+  const insightHighlights = [
+    {
+      key: 'weekly',
+      label: '주간 학습시간 성장률',
+      badge: '대표 인사이트',
+      value: chartInsights.weekly.trend,
+      detail: chartInsights.weekly.improve,
+      accentClass: 'from-[#2f65ff] via-[#4f7cff] to-[#7c9dff]',
+      badgeClass: 'border-[#dbe7ff] bg-white/90 text-[#2554d4]',
+    },
+    {
+      key: 'daily',
+      label: '일자별 학습시간',
+      badge: '오늘 코칭',
+      value: chartInsights.daily.trend,
+      detail: chartInsights.daily.improve,
+      accentClass: 'from-[#ffb36a] via-[#ff9b24] to-[#ff7a16]',
+      badgeClass: 'border-[#ffe1c5] bg-white/90 text-[#d86a11]',
+    },
+  ] as const;
+  const insightSupportCards = [
+    {
+      key: 'rhythm',
+      label: '리듬 점수',
+      value: chartInsights.rhythm.trend,
+      toneClass: 'text-emerald-700',
+      bgClass: 'border-emerald-100/80 bg-white/85',
+    },
+    {
+      key: 'startEnd',
+      label: '시작/종료 시각',
+      value: chartInsights.startEnd.trend,
+      toneClass: 'text-[#2554d4]',
+      bgClass: 'border-[#dbe7ff] bg-white/85',
+    },
+    {
+      key: 'away',
+      label: '외출시간',
+      value: chartInsights.away.trend,
+      toneClass: 'text-rose-600',
+      bgClass: 'border-rose-100/80 bg-white/85',
+    },
+  ] as const;
 
   return (
     <div className={cn(
@@ -1580,77 +1679,178 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
-          <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-black tracking-tight">개인 집중도 KPI</CardTitle>
-              <CardDescription className="font-bold text-[11px]">학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.</CardDescription>
-            </CardHeader>
-            <CardContent className={cn("grid gap-2", isMobile ? "grid-cols-1 min-[360px]:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 학습 성장률</p>
-                <p className={cn('mt-1 text-xl font-black tabular-nums', focusKpi.todayGrowthPercent >= 0 ? 'text-emerald-700' : 'text-rose-600')}>
-                  {focusKpi.todayGrowthPercent >= 0 ? '+' : ''}{focusKpi.todayGrowthPercent}%
-                </p>
-                <p className="text-[10px] font-semibold text-emerald-700/80">최근 7일 평균 대비</p>
-              </div>
+          {isAnalysisPresentation ? (
+            <>
+              <Card className="analysis-chart-stage overflow-hidden border-none rounded-[1.85rem] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] shadow-[0_24px_60px_-44px_rgba(20,41,95,0.42)]">
+                <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Badge className="rounded-full border-[#dbe7ff] bg-white/88 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">
+                        Focus Board
+                      </Badge>
+                      <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight text-[#14295F]">개인 집중도 KPI</CardTitle>
+                      <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                        학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.
+                      </CardDescription>
+                    </div>
+                    <div className="rounded-[1.15rem] border border-[#e6eeff] bg-white/86 px-3 py-2 text-right shadow-[0_18px_40px_-32px_rgba(20,41,95,0.45)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6a7da6]">오늘 포커스</p>
+                      <p className="mt-1 text-sm font-black text-[#14295F]">{focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className={cn("relative z-10 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
+                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1 min-[360px]:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
+                    {focusKpiCards.map(({ key, label, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => (
+                      <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-3.5 py-3.5 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.34)]", panelClass)}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", chipClass)}>
+                              {label}
+                            </span>
+                            <p className="mt-3 break-keep text-[clamp(1.25rem,3.2vw,1.8rem)] font-black tracking-tight text-[#14295F]">
+                              {value}
+                            </p>
+                          </div>
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-white/70 bg-white/88 shadow-[0_16px_34px_-28px_rgba(20,41,95,0.4)]">
+                            <Icon className={cn("h-5 w-5", iconClass)} />
+                          </div>
+                        </div>
+                        <p className="mt-2 text-[11px] font-semibold leading-5 text-[#52678f]">{helper}</p>
+                        <p className="mt-1 text-[11px] font-black text-[#14295F]">{note}</p>
+                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/70">
+                          <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-              <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">최근 7일 평균</p>
-                <p className="mt-1 text-xl font-black text-blue-700">{minutesToLabel(focusKpi.recent7AvgMinutes)}</p>
-                <p className="text-[10px] font-semibold text-blue-700/80">일 평균 공부시간</p>
-              </div>
+              <Card className="analysis-signal-band overflow-hidden border-none rounded-[1.85rem]">
+                <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">AI 그래프 인사이트 요약</p>
+                    </div>
+                    <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.25fr)_auto] items-start")}>
+                      <div className="min-w-0">
+                        <CardTitle className="break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight text-[#14295F]">
+                          {chartInsightHeadline}
+                        </CardTitle>
+                        <CardDescription className="mt-2 text-[11px] font-semibold leading-5 text-[#51678f]">
+                          {chartInsightSummary}
+                        </CardDescription>
+                      </div>
+                      <Badge className="w-fit rounded-full border-[#dbe7ff] bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">
+                        Coach Board
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className={cn("relative z-10 space-y-3 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
+                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "lg:grid-cols-2")}>
+                    {insightHighlights.map(({ key, label, badge, value, detail, accentClass, badgeClass }) => (
+                      <div key={key} className="overflow-hidden rounded-[1.35rem] border border-[#dbe7ff]/85 bg-white/88 p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.34)]">
+                        <div className="flex items-center justify-between gap-3">
+                          <Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", badgeClass)}>
+                            {badge}
+                          </Badge>
+                          <div className={cn("h-2 w-14 rounded-full bg-gradient-to-r", accentClass)} />
+                        </div>
+                        <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">{label}</p>
+                        <p className="mt-2 break-keep text-sm font-black leading-6 text-[#14295F]">{value}</p>
+                        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5c6e97]">{detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                    {insightSupportCards.map(({ key, label, value, toneClass, bgClass }) => (
+                      <div key={key} className={cn("rounded-[1.2rem] border px-3.5 py-3 shadow-[0_16px_34px_-34px_rgba(20,41,95,0.3)]", bgClass)}>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">{label}</p>
+                        <p className={cn("mt-2 break-keep text-[12px] font-black leading-5", toneClass)}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-black tracking-tight">개인 집중도 KPI</CardTitle>
+                  <CardDescription className="font-bold text-[11px]">학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.</CardDescription>
+                </CardHeader>
+                <CardContent className={cn("grid gap-2", isMobile ? "grid-cols-1 min-[360px]:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 학습 성장률</p>
+                    <p className={cn('mt-1 text-xl font-black tabular-nums', focusKpi.todayGrowthPercent >= 0 ? 'text-emerald-700' : 'text-rose-600')}>
+                      {focusKpi.todayGrowthPercent >= 0 ? '+' : ''}{focusKpi.todayGrowthPercent}%
+                    </p>
+                    <p className="text-[10px] font-semibold text-emerald-700/80">최근 7일 평균 대비</p>
+                  </div>
 
-              <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">계획 완수율</p>
-                <p className="mt-1 text-xl font-black text-amber-700 tabular-nums">{focusKpi.completionRate}%</p>
-                <p className="text-[10px] font-semibold text-amber-700/80">최근 기간 평균</p>
-              </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">최근 7일 평균</p>
+                    <p className="mt-1 text-xl font-black text-blue-700">{minutesToLabel(focusKpi.recent7AvgMinutes)}</p>
+                    <p className="text-[10px] font-semibold text-blue-700/80">일 평균 공부시간</p>
+                  </div>
 
-              <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">학습 리듬 점수</p>
-                <p className="mt-1 text-xl font-black text-violet-700 tabular-nums">{focusKpi.rhythmScore}점</p>
-                <p className="text-[10px] font-semibold text-violet-700/80">공부시간 분산 기반</p>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">계획 완수율</p>
+                    <p className="mt-1 text-xl font-black text-amber-700 tabular-nums">{focusKpi.completionRate}%</p>
+                    <p className="text-[10px] font-semibold text-amber-700/80">최근 기간 평균</p>
+                  </div>
 
-          <Card className={cn("rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]", isAnalysisPresentation && "analysis-signal-band border-none")}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-black tracking-tight flex items-center gap-2 text-[#14295F]">
-                <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
-                AI 그래프 인사이트 요약
-              </CardTitle>
-              <CardDescription className="font-bold text-[11px] text-[#31456f]">
-                최근 그래프를 기반으로 성장 흐름과 보완 포인트를 자동 분석했습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2.5 pt-0">
-              <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">주간 학습시간 성장률</p>
-                <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.weekly.trend}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.weekly.improve}</p>
-              </div>
-              <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">일자별 학습시간</p>
-                <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.daily.trend}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.daily.improve}</p>
-              </div>
-              <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">리듬 점수</p>
-                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.rhythm.trend}</p>
-                </div>
-                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">시작/종료 시각</p>
-                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.startEnd.trend}</p>
-                </div>
-                <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">외출시간</p>
-                  <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.away.trend}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">학습 리듬 점수</p>
+                    <p className="mt-1 text-xl font-black text-violet-700 tabular-nums">{focusKpi.rhythmScore}점</p>
+                    <p className="text-[10px] font-semibold text-violet-700/80">공부시간 분산 기반</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-black tracking-tight flex items-center gap-2 text-[#14295F]">
+                    <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
+                    AI 그래프 인사이트 요약
+                  </CardTitle>
+                  <CardDescription className="font-bold text-[11px] text-[#31456f]">
+                    최근 그래프를 기반으로 성장 흐름과 보완 포인트를 자동 분석했습니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2.5 pt-0">
+                  <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">주간 학습시간 성장률</p>
+                    <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.weekly.trend}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.weekly.improve}</p>
+                  </div>
+                  <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">일자별 학습시간</p>
+                    <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.daily.trend}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-600">{chartInsights.daily.improve}</p>
+                  </div>
+                  <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+                    <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">리듬 점수</p>
+                      <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.rhythm.trend}</p>
+                    </div>
+                    <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">시작/종료 시각</p>
+                      <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.startEnd.trend}</p>
+                    </div>
+                    <div className="rounded-xl border border-[#dbe7ff] bg-white/80 px-3 py-2.5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#1f4fbf]">외출시간</p>
+                      <p className="mt-1 text-xs font-bold text-slate-700">{chartInsights.away.trend}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
 
           {!isMobile && (
           <div className="grid gap-4">
