@@ -200,7 +200,7 @@ export const marketingContent: MarketingContent = {
     slogan: '학생의 성장 궤적을 함께 그립니다',
     heroTitle: '공부는 방향이 중요합니다.\n성장의 길, 트랙에서\n시작됩니다.',
     heroDescription:
-      '관리형 스터디센터와 국어학원이 같은 방향으로 연결됩니다. 학생은 루틴을 만들고, 학부모는 변화를 확인합니다.',
+      '빈틈없는 관리 시스템으로 스스로 공부하는 습관을 형성합니다.',
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
     heroBackground: '',
