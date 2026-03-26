@@ -583,7 +583,7 @@
   }
 
   .track-pace-vehicle--bike {
-    animation-duration: 1.3s;
+    animation: track-pace-bike-glide 1.2s ease-in-out infinite;
   }
 
   .track-pace-vehicle--car {
@@ -1644,6 +1644,19 @@
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes track-pace-bike-glide {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  35% {
+    transform: translate(1px, -1px) rotate(-0.6deg);
+  }
+  65% {
+    transform: translate(-1px, 0.4px) rotate(0.5deg);
   }
 }
 

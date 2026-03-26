@@ -336,13 +336,21 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
         );
       case 'bike':
         return (
-          <g className="track-pace-vehicle track-pace-vehicle--bike" transform="translate(56 44)">
-            <circle className="track-pace-wheel" cx="16" cy="26" r="10.5" stroke="#DDEBFF" strokeWidth="4.2" fill="rgba(255,255,255,0.12)" />
-            <circle className="track-pace-wheel" cx="50" cy="26" r="10.5" stroke="#DDEBFF" strokeWidth="4.2" fill="rgba(255,255,255,0.12)" />
-            <path d="M16 26L29 12L40 26L29 26L22 18" stroke="#FFF9F3" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M40 26L50 26L56 12" stroke="#FFF9F3" strokeWidth="4.5" strokeLinecap="round" />
-            <circle cx="33" cy="6" r="6.5" fill="#FFE0BC" />
-            <path d="M32 12L39 20L29 27" stroke="#FFE0BC" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+          <g className="track-pace-vehicle track-pace-vehicle--bike" transform="translate(42 34)">
+            <circle className="track-pace-wheel" cx="24" cy="42" r="11.5" stroke="#E4EFFF" strokeWidth="4" fill="rgba(255,255,255,0.08)" />
+            <circle className="track-pace-wheel" cx="64" cy="42" r="11.5" stroke="#E4EFFF" strokeWidth="4" fill="rgba(255,255,255,0.08)" />
+            <circle cx="24" cy="42" r="2.8" fill="#FFF9F3" opacity="0.9" />
+            <circle cx="64" cy="42" r="2.8" fill="#FFF9F3" opacity="0.9" />
+            <path d="M24 42L41 23L54 42H40L32 31" stroke="#FFF9F3" strokeWidth="4.6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M54 42L64 42L70 28" stroke="#FFF9F3" strokeWidth="4.6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M38 21H47" stroke="#FFF9F3" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="47" cy="8" r="6.1" fill="#FFE0BC" />
+            <path d="M45 14L53 24L44 29L37 24" stroke="#FFF9F3" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M44 16L35 23" stroke="#FFE0BC" strokeWidth="4.1" strokeLinecap="round" />
+            <path d="M44 29L52 41" stroke="#FFCF8C" strokeWidth="4.2" strokeLinecap="round" />
+            <path d="M38 27L30 42" stroke="#FFCF8C" strokeWidth="4.2" strokeLinecap="round" />
+            <path className="track-pace-streak" d="M-10 34H6" stroke="rgba(255,255,255,0.2)" strokeWidth="3" strokeLinecap="round" />
+            <path className="track-pace-streak delay-1" d="M-4 27H10" stroke="rgba(255,255,255,0.14)" strokeWidth="2.2" strokeLinecap="round" />
           </g>
         );
       case 'car':
