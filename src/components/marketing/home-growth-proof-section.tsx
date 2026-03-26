@@ -78,9 +78,9 @@ export function HomeGrowthProofSection() {
               Growth Proof
             </span>
             <h2 className="mt-4 break-keep text-[clamp(1.45rem,3.1vw,2.15rem)] font-black leading-[1.22] text-[#14295F]">
-              결과를 먼저 자랑하기보다
+              관리와 코칭을 함께 설계했을때,
               <br />
-              어떻게 끌어올렸는지를 남깁니다
+              성적은 데이터로 올라옵니다
             </h2>
             <p className="mt-4 break-keep text-[14px] font-semibold leading-[1.82] text-[#425a75]">
               한 학생의 변화 과정을 익명 사례로 정리했습니다. 트랙은 결과만 보여주지 않고, 어떤 문제를 먼저 찾았고
