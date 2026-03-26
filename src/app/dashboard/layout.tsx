@@ -149,6 +149,17 @@ export default function DashboardLayout({
                 {children}
               </div>
             )}
+            {isMobileView ? (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none shrink-0"
+                style={
+                  isParentMode
+                    ? { height: 'calc(var(--parent-app-scroll-tail, 0px) + 1rem)' }
+                    : { height: 'calc(var(--dashboard-mobile-scroll-tail, 0px) + 1.1rem)' }
+                }
+              />
+            ) : null}
           </main>
 
           <FeedbackNotifier />
