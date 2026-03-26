@@ -3364,25 +3364,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               <div className="flex flex-col gap-3 px-1 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-col">
-                  <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">학습 일관성 맵</p>
+                  <h3 className="text-xl font-black tracking-tighter text-primary">기록트랙</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">학습 일관성 맵</p>
                 </div>
-                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.15rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f5f8ff_100%)] p-1.5 shadow-[0_18px_36px_-28px_rgba(20,41,95,0.24)] ring-1 ring-white/70">
-                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/85" />
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[0.9rem] bg-white/75 text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-[#14295F]/5" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-                  <div className="flex min-w-[86px] items-center justify-center rounded-[0.95rem] border border-white/80 bg-white/92 px-4 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_28px_-24px_rgba(20,41,95,0.24)]">
-                    <span className="text-[11px] font-black text-[#14295F]">{format(currentCalendarDate, 'yyyy년 M월')}</span>
+                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70">
+                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+                  <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-white/80 bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]">
+                    <span className="text-sm font-black tracking-tight text-primary">{format(currentCalendarDate, 'yyyy년 M월')}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[0.9rem] bg-white/75 text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-[#14295F]/5" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
                 </div>
               </div>
 
-              <Card className="relative overflow-hidden rounded-[2.5rem] border border-[#14295F]/8 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.06),transparent_26%),linear-gradient(180deg,#ffffff_0%,#f7f9ff_100%)] shadow-[0_28px_70px_-52px_rgba(20,41,95,0.28)] ring-1 ring-white/70">
-                <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-[#14295F]/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                  <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#14295F]/50">학습 흐름</span>
+              <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
+                <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
+                  <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">학습 흐름</span>
                   <div className="flex flex-wrap gap-1.5">
                     {PARENT_CALENDAR_LEGEND.map((item) => (
-                      <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(20,41,95,0.14)] sm:text-[9px]">
+                      <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)] sm:text-[9px]">
                         <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                         {item.label}
                       </span>
@@ -3390,20 +3390,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
                 <div className={cn(
-                  "grid grid-cols-7 border-b border-[#14295F]/10",
+                  "grid grid-cols-7 border-b border-primary/10",
                   isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3"
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
                       isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
                       "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
-                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
+                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-2.5 p-3")}>
+                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.04),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-3 p-4")}>
                   {logsLoading ? (
-                    <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
+                    <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
                     const dateKey = format(day, 'yyyy-MM-dd');
                     const log = allLogs?.find(l => l.dateKey === dateKey);
@@ -3421,14 +3421,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={dateKey}
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
-                          "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
+                          "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                           isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
-                          isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
-                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
+                          isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
+                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
                         )}
                       >
-                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
+                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
                         <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
                         {isCurrentMonth && (
                           <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
@@ -3441,15 +3441,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
                               isMobile ? "text-[9px] min-w-[1.35rem] px-1 py-[0.2rem]" : "text-xs min-w-[2rem] px-2 py-1",
                               idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                              isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
+                              isTodayCalendar && "border-primary/20 text-primary"
                             )}
                           >
                             {format(day, 'd')}
                           </span>
                           {hasStatusCluster ? (
-                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1 py-[0.2rem]" : "px-2 py-1")}>
-                              {hasPlans && <span className={cn("rounded-full bg-[#14295F]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
+                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]", isMobile ? "px-1 py-[0.2rem]" : "px-2 py-1")}>
+                              {hasPlans && <span className={cn("rounded-full bg-primary", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                              {hasDeepFocus && <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
                             </div>
                           ) : (
                             <span className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} aria-hidden="true" />
