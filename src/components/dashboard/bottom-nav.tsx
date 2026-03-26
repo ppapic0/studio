@@ -195,7 +195,13 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                 className={cn(
                   'font-black tracking-tight transition-all duration-300 whitespace-nowrap leading-none',
                   isParent ? 'px-0.5 text-center text-[10.4px] sm:text-[10.9px]' : useBrandNav ? 'text-[10.8px]' : 'text-[10px]',
-                  isActive ? 'opacity-100' : useBrandNav ? 'opacity-80' : 'opacity-45'
+                  useBrandNav
+                    ? isActive
+                      ? 'text-white opacity-100'
+                      : 'text-white opacity-90'
+                    : isActive
+                      ? 'opacity-100'
+                      : 'opacity-45'
                 )}
               >
                 {item.label}
