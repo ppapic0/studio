@@ -28,6 +28,7 @@ import {
   buildCenterAdminSeatLegend,
   buildCenterAdminSeatOverlaySummary,
   buildCenterAdminTopReason,
+  formatCenterAdminWeeklyStudyLabel,
   scoreStudentInvoiceHealth,
   type CenterAdminSeatOverlayLegend,
   type CenterAdminSeatOverlaySummary,
@@ -366,6 +367,20 @@ export function useCenterAdminHeatmap({
     () => new Map(((statsByDate[todayKey] || []) as DailyStudentStat[]).map((item) => [item.studentId, item])),
     [statsByDate, todayKey]
   );
+
+  const weeklyStudyMinutesByStudentId = useMemo(() => {
+    const nextMap = new Map<string, number>();
+
+    displayKeys.forEach((dateKey) => {
+      ((statsByDate[dateKey] || []) as DailyStudentStat[]).forEach((item) => {
+        if (!allActiveMemberIds.has(item.studentId)) return;
+        const current = nextMap.get(item.studentId) || 0;
+        nextMap.set(item.studentId, current + Math.max(0, Math.round(Number(item.totalStudyMinutes || 0))));
+      });
+    });
+
+    return nextMap;
+  }, [allActiveMemberIds, displayKeys, statsByDate]);
 
   const parentEvents30dByStudentId = useMemo(() => {
     const nextMap = new Map<string, ParentActivityEvent[]>();
@@ -866,6 +881,8 @@ export function useCenterAdminHeatmap({
             ? Math.max(0, Math.floor((nowMs - seat.lastCheckInAt.toMillis()) / 60000))
             : 0;
         const todayMinutes = Math.round(Number(stat?.totalStudyMinutes || 0)) + liveStudyMinutes;
+        const weeklyStudyMinutes =
+          Math.max(0, weeklyStudyMinutesByStudentId.get(member.id) || 0) + liveStudyMinutes;
         const penaltyPoints = Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)));
 
         const operationalScore = averageHealth([
@@ -925,6 +942,8 @@ export function useCenterAdminHeatmap({
           compositeHealth,
           domainScores,
           todayMinutes,
+          weeklyStudyMinutes,
+          weeklyStudyLabel: formatCenterAdminWeeklyStudyLabel(weeklyStudyMinutes),
           effectivePenaltyPoints: penaltyPoints,
           hasUnreadReport,
           hasCounselingToday,
@@ -950,6 +969,7 @@ export function useCenterAdminHeatmap({
     progressById,
     reportsByStudentId,
     todayStatsByStudentId,
+    weeklyStudyMinutesByStudentId,
   ]);
 
   const seatSignalsBySeatId = useMemo(

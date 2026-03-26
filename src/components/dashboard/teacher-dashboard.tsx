@@ -1591,8 +1591,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   status: seat.status,
                   isEditMode,
                 });
-                const secondaryFlags = (seatSignal?.secondaryFlags || []).slice(0, compact ? 1 : 2);
                 const isAisle = seat.type === 'aisle';
+                const weeklyStudyLabel = seatSignal?.weeklyStudyLabel || '주간 확인중';
+                const nameTextClass =
+                  occupantId && overlayPresentation.isDark ? 'text-white' : 'text-slate-950';
+                const weeklyTextClass =
+                  occupantId && overlayPresentation.isDark ? 'text-white/88' : 'text-slate-600';
 
                 return (
                   <div
@@ -1620,7 +1624,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         {roomSeatNo}
                       </span>
                     )}
-                    {seat.seatZone && !isAisle && (
+                    {seat.seatZone && !isAisle && isEditMode && (
                       <Badge
                         variant="outline"
                         className={cn(
@@ -1635,39 +1639,33 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     {isAisle ? (
                       isEditMode && <MapIcon className={cn(compact ? 'h-2.5 w-2.5' : 'h-3 w-3', 'opacity-40')} />
                     ) : occupantId ? (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-0.5">
+                      <div
+                        className={cn(
+                          'flex h-full w-full flex-col items-center justify-center px-1 text-center',
+                          compact ? 'gap-0.5 pt-2' : 'gap-1.5 px-1.5'
+                        )}
+                      >
                         <span
                           className={cn(
-                            'w-full truncate text-center font-black leading-none tracking-tighter',
-                            compact ? 'text-[8px]' : 'text-[10px]'
+                            'w-full font-black tracking-tight whitespace-normal break-keep',
+                            nameTextClass,
+                            compact
+                              ? 'text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                              : 'text-[12px] leading-[1.18] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
                           )}
                         >
                           {occupantName}
                         </span>
-                        <span
-                          className={cn(
-                            'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black tracking-tight shadow-sm',
-                            compact ? 'text-[5px]' : 'text-[7px]',
-                            overlayPresentation.chipClass
-                          )}
-                        >
-                          {overlayPresentation.chipLabel}
-                        </span>
-                        {secondaryFlags.length > 0 && (
-                          <div className="flex flex-wrap items-center justify-center gap-1">
-                            {secondaryFlags.map((flag) => (
-                              <span
-                                key={`${seat.id}_${flag}`}
-                                className={cn(
-                                  'inline-flex max-w-full items-center rounded-full px-1 py-0.5 font-black tracking-tight shadow-sm',
-                                  compact ? 'text-[4px]' : 'text-[5px]',
-                                  overlayPresentation.flagClass
-                                )}
-                              >
-                                {flag}
-                              </span>
-                            ))}
-                          </div>
+                        {!isEditMode && (
+                          <span
+                            className={cn(
+                              'w-full font-black tracking-tight',
+                              weeklyTextClass,
+                              compact ? 'text-[6px] leading-none' : 'text-[8px] leading-none'
+                            )}
+                          >
+                            {weeklyStudyLabel}
+                          </span>
                         )}
                       </div>
                     ) : (
