@@ -99,7 +99,11 @@ import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { ROUTINE_TEMPLATE_OPTIONS } from '@/components/dashboard/student-planner/planner-constants';
+import {
+  ROUTINE_TEMPLATE_OPTIONS,
+  type StudyAmountUnit,
+  type StudyPlanMode,
+} from '@/components/dashboard/student-planner/planner-constants';
 import { RoutineComposerCard } from '@/components/dashboard/student-planner/routine-composer-card';
 import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
 import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
@@ -129,6 +133,27 @@ const SUBJECTS = [
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
   { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
+
+function resolveStudyPlanMode(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetAmount' | 'targetMinutes'>): StudyPlanMode {
+  if (task.studyPlanMode) return task.studyPlanMode;
+  return typeof task.targetAmount === 'number' && task.targetAmount > 0 ? 'volume' : 'time';
+}
+
+function resolveAmountUnitLabel(task: Pick<StudyPlanItem, 'amountUnit' | 'amountUnitLabel'>) {
+  if (task.amountUnit === '직접입력') return task.amountUnitLabel?.trim() || '단위';
+  return task.amountUnit || '문제';
+}
+
+function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'amountUnit' | 'amountUnitLabel'>) {
+  if (resolveStudyPlanMode(task) === 'volume') {
+    const unitLabel = resolveAmountUnitLabel(task);
+    const targetAmount = Math.max(0, task.targetAmount || 0);
+    const actualAmount = Math.max(0, task.actualAmount || 0);
+    const progressRate = targetAmount > 0 ? Math.round((actualAmount / targetAmount) * 100) : 0;
+    return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
+  }
+  return task.targetMinutes ? `${task.targetMinutes}분 목표` : '시간 자유';
+}
 
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -304,7 +329,7 @@ function MissionFocusStackCard({
   const metaChips = [
     task.category === 'personal' ? '개인 미션' : '학습 미션',
     subjectLabel,
-    task.targetMinutes ? `${task.targetMinutes}분` : null,
+    task.category === 'personal' ? null : buildStudyTaskMeta(task),
   ].filter(Boolean).slice(0, 2) as string[];
   const isPrimary = index === 0;
 
@@ -512,7 +537,12 @@ export default function StudyPlanPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newStudySubject, setNewStudySubject] = useState('math');
+  const [newStudyMode, setNewStudyMode] = useState<StudyPlanMode>('volume');
   const [newStudyMinutes, setNewStudyMinutes] = useState('60');
+  const [newStudyTargetAmount, setNewStudyTargetAmount] = useState('');
+  const [newStudyAmountUnit, setNewStudyAmountUnit] = useState<StudyAmountUnit>('문제');
+  const [newStudyCustomAmountUnit, setNewStudyCustomAmountUnit] = useState('');
+  const [enableVolumeStudyMinutes, setEnableVolumeStudyMinutes] = useState(false);
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
   const [selectedRoutineTemplateKey, setSelectedRoutineTemplateKey] = useState('arrival');
@@ -636,6 +666,20 @@ export default function StudyPlanPage() {
     });
     return { breakdown: summary, total };
   }, [studyTasks]);
+  const volumeStudyTasks = useMemo(
+    () => studyTasks.filter((task) => resolveStudyPlanMode(task) === 'volume'),
+    [studyTasks]
+  );
+  const studyGoalSummaryLabel = useMemo(() => {
+    const timeTaskCount = studyTasks.length - volumeStudyTasks.length;
+    if (volumeStudyTasks.length > 0 && studyTimeSummary.total > 0) {
+      return `시간형 ${timeTaskCount}개 · 분량형 ${volumeStudyTasks.length}개`;
+    }
+    if (volumeStudyTasks.length > 0) {
+      return `분량형 목표 ${volumeStudyTasks.length}개`;
+    }
+    return `목표 ${Math.floor(studyTimeSummary.total / 60)}시간 ${studyTimeSummary.total % 60}분`;
+  }, [studyTasks.length, volumeStudyTasks.length, studyTimeSummary.total]);
   const allMissionTasks = useMemo(() => [...studyTasks, ...personalTasks], [studyTasks, personalTasks]);
   const completedMissionCount = useMemo(
     () => allMissionTasks.filter((task) => task.done).length,
@@ -713,12 +757,12 @@ export default function StudyPlanPage() {
     copyableTaskItems.map((item) => {
       const subject = SUBJECTS.find((entry) => entry.id === (item.subject || 'etc'));
       const isStudyItem = item.category === 'study' || !item.category;
-      const minutesLabel = item.targetMinutes ? `${item.targetMinutes}분 목표` : '시간 자유';
+      const planMetaLabel = buildStudyTaskMeta(item);
       return {
         id: item.id,
         title: item.title,
         meta: isStudyItem
-          ? `${subject?.label ?? '기타'} · ${minutesLabel}`
+          ? `${subject?.label ?? '기타'} · ${planMetaLabel}`
           : '기타 일정',
         badgeLabel: isStudyItem ? '학습' : '기타',
         badgeClassName: isStudyItem
@@ -852,7 +896,20 @@ export default function StudyPlanPage() {
         data.title = `${title.trim()}: 09:00 ~ 10:00`;
       } else if (category === 'study') {
         data.subject = newStudySubject;
-        data.targetMinutes = Number(newStudyMinutes) || 0;
+        data.studyPlanMode = newStudyMode;
+        if (newStudyMode === 'time') {
+          data.targetMinutes = Number(newStudyMinutes) || 0;
+        } else {
+          data.targetAmount = Number(newStudyTargetAmount) || 0;
+          data.actualAmount = 0;
+          data.amountUnit = newStudyAmountUnit;
+          if (newStudyAmountUnit === '직접입력') {
+            data.amountUnitLabel = newStudyCustomAmountUnit.trim() || '단위';
+          }
+          if (enableVolumeStudyMinutes && Number(newStudyMinutes) > 0) {
+            data.targetMinutes = Number(newStudyMinutes) || 0;
+          }
+        }
       }
 
       await addDoc(itemsCollectionRef, data);
@@ -867,6 +924,10 @@ export default function StudyPlanPage() {
       
       if (category === 'study') {
         setNewStudyTask('');
+        setNewStudyTargetAmount('');
+        setNewStudyAmountUnit('문제');
+        setNewStudyCustomAmountUnit('');
+        setEnableVolumeStudyMinutes(false);
       } else if (category === 'personal') {
         setNewPersonalTask('');
       } else {
@@ -956,6 +1017,7 @@ export default function StudyPlanPage() {
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
+    if (resolveStudyPlanMode(item) === 'volume') return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
     
@@ -982,6 +1044,18 @@ export default function StudyPlanPage() {
       batch.set(progressRef!, progressUpdate, { merge: true });
       await batch.commit();
     }
+  };
+
+  const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
+    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
+    const targetAmount = Math.max(0, item.targetAmount || 0);
+    await updateDoc(itemRef, {
+      actualAmount: safeActualAmount,
+      done: targetAmount > 0 && safeActualAmount >= targetAmount,
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
@@ -1159,6 +1233,11 @@ export default function StudyPlanPage() {
             category: kind === 'routine' ? 'schedule' : (plan.category || 'study'),
             subject: kind === 'task' ? (plan.subject || null) : null,
             targetMinutes: kind === 'task' ? (plan.targetMinutes || 0) : 0,
+            studyPlanMode: kind === 'task' ? (plan.studyPlanMode || resolveStudyPlanMode(plan)) : undefined,
+            targetAmount: kind === 'task' ? (plan.targetAmount || 0) : 0,
+            actualAmount: kind === 'task' ? 0 : 0,
+            amountUnit: kind === 'task' ? (plan.amountUnit || null) : null,
+            amountUnitLabel: kind === 'task' ? (plan.amountUnitLabel || null) : null,
             studyPlanWeekId: targetWeekKey,
             centerId: activeMembership.id,
             studentId: user.uid,
@@ -1755,7 +1834,7 @@ export default function StudyPlanPage() {
                     완료 {completedStudyCount}/{studyTasks.length}
                   </Badge>
                   <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                    목표 {Math.floor(studyTimeSummary.total / 60)}시간 {studyTimeSummary.total % 60}분
+                    {studyGoalSummaryLabel}
                   </Badge>
                 </div>
               </div>
@@ -1763,12 +1842,22 @@ export default function StudyPlanPage() {
               {!isPast ? (
                 <StudyComposerCard
                   title="학습 계획 추가"
-                  description="과목과 시간을 먼저 고르면 학생이 무엇부터 해야 하는지 더 빨리 이해할 수 있어요."
+                  description="시간을 먼저 못 정해도 괜찮아요. 시간형과 분량형 중 편한 방식으로 바로 적어보세요."
                   subjectOptions={SUBJECTS}
                   subjectValue={newStudySubject}
                   onSubjectChange={setNewStudySubject}
+                  studyModeValue={newStudyMode}
+                  onStudyModeChange={setNewStudyMode}
                   minuteValue={newStudyMinutes}
                   onMinuteChange={setNewStudyMinutes}
+                  amountValue={newStudyTargetAmount}
+                  onAmountChange={setNewStudyTargetAmount}
+                  amountUnitValue={newStudyAmountUnit}
+                  onAmountUnitChange={setNewStudyAmountUnit}
+                  customAmountUnitValue={newStudyCustomAmountUnit}
+                  onCustomAmountUnitChange={setNewStudyCustomAmountUnit}
+                  enableVolumeMinutes={enableVolumeStudyMinutes}
+                  onEnableVolumeMinutesChange={setEnableVolumeStudyMinutes}
                   taskValue={newStudyTask}
                   onTaskChange={setNewStudyTask}
                   onSubmit={() => handleAddTask(newStudyTask, 'study')}
@@ -1781,13 +1870,15 @@ export default function StudyPlanPage() {
                 <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/80 p-6 text-center">
                   <p className="text-sm font-black text-emerald-700">첫 학습 계획을 추가해보세요</p>
                   <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                    과목과 시간 프리셋만 먼저 고르면 학생이 바로 시작하기 좋은 계획 카드가 만들어집니다.
+                    시간을 먼저 정하지 않아도 괜찮아요. 오늘 끝낼 분량부터 적어도 바로 시작할 수 있어요.
                   </p>
                 </div>
               ) : (
                 <div className="grid gap-3">
                   {studyTasks.map((task) => {
                     const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
+                    const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                    const unitLabel = resolveAmountUnitLabel(task);
                     return (
                       <PlanItemCard
                         key={task.id}
@@ -1799,8 +1890,14 @@ export default function StudyPlanPage() {
                         disabled={isPast}
                         isMobile={isMobile}
                         tone="emerald"
-                        badgeLabel={subject?.label || '기타'}
-                        metaLabel={task.targetMinutes ? `${task.targetMinutes}분 목표` : null}
+                        badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? '분량형' : '시간형'}`}
+                        metaLabel={buildStudyTaskMeta(task)}
+                        volumeMeta={isVolumeTask ? {
+                          targetAmount: Math.max(0, task.targetAmount || 0),
+                          actualAmount: Math.max(0, task.actualAmount || 0),
+                          unitLabel,
+                          onCommitActual: (value) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, value),
+                        } : null}
                       />
                     );
                   })}
@@ -1990,15 +2087,41 @@ export default function StudyPlanPage() {
                   <div className="grid gap-3">
                     {studyTasks.map((task) => {
                       const subj = SUBJECTS.find(s => s.id === (task.subject || 'etc'));
+                      const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                      const unitLabel = resolveAmountUnitLabel(task);
                       return (
                         <div key={task.id} className={cn("flex items-start gap-4 p-4 rounded-[1.5rem] border-2 transition-all group", task.done ? "bg-emerald-50/30 border-emerald-100/50" : "bg-white border-transparent shadow-sm hover:shadow-md", isMobile ? "p-4" : "p-6 rounded-[2rem]")}>
-                          <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className={cn("rounded-xl border-2 mt-1", isMobile ? "h-6 w-6" : "h-7 w-7")} />
+                          {!isVolumeTask ? (
+                            <Checkbox id={task.id} checked={task.done} onCheckedChange={() => handleToggleTask(task as WithId<StudyPlanItem>)} disabled={isPast} className={cn("rounded-xl border-2 mt-1", isMobile ? "h-6 w-6" : "h-7 w-7")} />
+                          ) : (
+                            <Badge className="mt-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700 shadow-none">
+                              {Math.min(999, Math.round(((task.actualAmount || 0) / Math.max(1, task.targetAmount || 1)) * 100))}%
+                            </Badge>
+                          )}
                           <div className="flex-1 grid gap-1">
                             <div className="flex items-center gap-2">
                               <Badge className={cn("rounded-md font-black text-[8px] px-1.5 py-0 border-none shadow-sm", subj?.color, "text-white")}>{subj?.label}</Badge>
-                              {task.targetMinutes && <span className={cn("font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1", isMobile ? "text-[8px]" : "text-[10px]")}><Clock className="h-2.5 w-2.5" /> {task.targetMinutes}분 목표</span>}
+                              <span className={cn("font-black text-muted-foreground/40 uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>{isVolumeTask ? '분량형' : '시간형'}</span>
                             </div>
                             <Label htmlFor={task.id} className={cn("font-black tracking-tight transition-all leading-snug break-keep", isMobile ? "text-sm" : "text-lg", task.done && "line-through text-muted-foreground/40 italic")}>{task.title}</Label>
+                            <p className="text-[10px] font-black text-slate-400">{buildStudyTaskMeta(task)}</p>
+                            {isVolumeTask ? (
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <Button type="button" variant="outline" className="h-7 rounded-full px-2.5 text-[10px] font-black" onClick={() => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, 0)} disabled={isPast}>0</Button>
+                                <Button type="button" variant="outline" className="h-7 rounded-full px-2.5 text-[10px] font-black" onClick={() => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, Math.max(1, Math.round((task.targetAmount || 0) / 2)))} disabled={isPast}>절반</Button>
+                                <Button type="button" variant="outline" className="h-7 rounded-full px-2.5 text-[10px] font-black" onClick={() => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, task.targetAmount || 0)} disabled={isPast}>완료</Button>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    defaultValue={String(task.actualAmount || 0)}
+                                    onBlur={(e) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, Number(e.target.value))}
+                                    className="h-7 w-16 rounded-lg border-slate-200 px-2 text-center text-[10px] font-black"
+                                  />
+                                  <span className="text-[10px] font-semibold text-slate-400">{unitLabel}</span>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                           {!isPast && (
                             <Button 
