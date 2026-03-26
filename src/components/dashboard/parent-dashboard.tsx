@@ -127,6 +127,15 @@ function toHm(minutes: number) {
   return `${h}시간\u00A0${m}분`;
 }
 
+function toCompactHm(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const h = Math.floor(safeMinutes / 60);
+  const m = safeMinutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 function toClockLabel(totalMinutes: number) {
   const safe = Math.max(0, Math.min(24 * 60, Math.round(totalMinutes)));
   const hours = Math.floor(safe / 60).toString().padStart(2, '0');
@@ -531,6 +540,7 @@ function ParentMetricSparkline({
   points,
   label,
   valueLabel,
+  compactValueLabel,
   className,
   showArea = true,
 }: {
@@ -538,6 +548,7 @@ function ParentMetricSparkline({
   points: ParentSparklinePoint[];
   label: string;
   valueLabel: string;
+  compactValueLabel?: string;
   className?: string;
   showArea?: boolean;
 }) {
@@ -569,9 +580,12 @@ function ParentMetricSparkline({
 
   return (
     <div className={cn('rounded-[1.15rem] border p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)] sm:p-2.5', toneStyle.panel, className)}>
-      <div className="mb-1.5 flex flex-col items-start gap-0.5 sm:mb-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+      <div className="mb-1.5 grid gap-0.5 sm:mb-2 sm:flex sm:items-center sm:justify-between sm:gap-2">
         <span className={cn('text-[8px] font-black uppercase tracking-[0.16em] sm:text-[9px] sm:tracking-[0.18em]', toneStyle.eyebrow)}>{label}</span>
-        <span className="text-[9px] font-black text-slate-500 sm:text-[10px]">{valueLabel}</span>
+        <span className="w-full truncate text-right text-[8px] font-black text-slate-500 sm:w-auto sm:text-[10px]">
+          <span className="sm:hidden">{compactValueLabel || valueLabel}</span>
+          <span className="hidden sm:inline">{valueLabel}</span>
+        </span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="block h-[3.6rem] w-full overflow-visible sm:h-[4.25rem]">
         <defs>
@@ -3036,12 +3050,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       points={dailyStudyTrend.map((point) => ({
                         label: point.date,
                         value: studyTrendHasActivity ? point.minutes : null,
-                      }))}
-                      label="7일 흐름"
-                      valueLabel={studyTrendHasActivity ? `최고 ${toHm(studyTrendPeakMinutes)}` : '기록 대기'}
-                      className="w-full"
-                    />
-                  </div>
+                    }))}
+                    label="7일 흐름"
+                    valueLabel={studyTrendHasActivity ? `최고 ${toHm(studyTrendPeakMinutes)}` : '기록 대기'}
+                    compactValueLabel={studyTrendHasActivity ? `최고 ${toCompactHm(studyTrendPeakMinutes)}` : '대기'}
+                    className="w-full"
+                  />
+                </div>
                 </div>
                 <div className="flex items-center justify-between gap-2 rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
                   <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">전일 대비</p>
@@ -3079,12 +3094,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       points={dailyPlanTrend.map((point) => ({
                         label: point.date,
                         value: point.rate,
-                      }))}
-                      label="7일 달성률"
-                      valueLabel={planTrendActiveDays > 0 ? `평균 ${planTrendAverageRate}%` : '계획 대기'}
-                      className="w-full"
-                    />
-                  </div>
+                    }))}
+                    label="7일 달성률"
+                    valueLabel={planTrendActiveDays > 0 ? `평균 ${planTrendAverageRate}%` : '계획 대기'}
+                    compactValueLabel={planTrendActiveDays > 0 ? `평균 ${planTrendAverageRate}%` : '대기'}
+                    className="w-full"
+                  />
+                </div>
                 </div>
                 <div className="flex items-center justify-between gap-2 rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
                   <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">완료일</p>
