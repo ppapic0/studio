@@ -138,6 +138,7 @@ interface WaitlistEntry {
   referralRoute?: ReferralRoute;
   referrerName?: string;
   status: WaitlistStatus;
+  queueNumber?: number;
   memo?: string;
   waitlistDate: string;
   sourceLeadId?: string;
@@ -240,13 +241,13 @@ function formatDateTimeLabel(value: any): string {
   return format(new Date(ms), 'yyyy.MM.dd HH:mm');
 }
 
-function formatSchoolGradeLabel(school?: string, grade?: string) {
-  const schoolLabel = school?.trim();
-  const gradeLabel = grade?.trim();
-  if (schoolLabel && gradeLabel) return `${schoolLabel} · ${gradeLabel}`;
-  if (schoolLabel) return schoolLabel;
-  if (gradeLabel) return gradeLabel;
-  return '';
+function getNextWaitlistQueueNumber(entries: WaitlistEntry[]) {
+  const maxAssigned = entries.reduce((best, entry) => {
+    if (typeof entry.queueNumber !== 'number' || !Number.isFinite(entry.queueNumber)) return best;
+    return Math.max(best, entry.queueNumber);
+  }, 0);
+
+  return Math.max(entries.length, maxAssigned) + 1;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -338,7 +339,18 @@ export function MarketingConsultingCRM({
   );
 
   const waitlist = useMemo(
-    () => [...(waitlistRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
+    () =>
+      [...(waitlistRaw || [])].sort((a, b) => {
+        const statusOrder = { waiting: 0, admitted: 1, cancelled: 2 } as const;
+        const statusGap = statusOrder[a.status || 'waiting'] - statusOrder[b.status || 'waiting'];
+        if (statusGap !== 0) return statusGap;
+
+        const aQueue = typeof a.queueNumber === 'number' ? a.queueNumber : Number.MAX_SAFE_INTEGER;
+        const bQueue = typeof b.queueNumber === 'number' ? b.queueNumber : Number.MAX_SAFE_INTEGER;
+        if (aQueue !== bQueue) return aQueue - bQueue;
+
+        return toDateMs(a.createdAt) - toDateMs(b.createdAt);
+      }),
     [waitlistRaw]
   );
 
@@ -581,6 +593,17 @@ export function MarketingConsultingCRM({
     }
   };
 
+  const handleWebsiteDelete = async (requestId: string) => {
+    if (!firestore || !centerId) return;
+    try {
+      await deleteDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', requestId));
+      toast({ title: '웹 상담 접수가 삭제되었습니다.' });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: '삭제 실패', description: '웹 상담 접수 삭제 중 오류가 발생했습니다.' });
+    }
+  };
+
   const handlePromoteWebsiteRequest = async (request: WebsiteConsultRequest) => {
     if (!firestore || !centerId) return;
     setPromotingWebsiteId(request.id);
@@ -712,7 +735,7 @@ export function MarketingConsultingCRM({
       }
 
       const createdWaitlistRefs = await Promise.all(
-        serviceTypesToCreate.map((serviceType) =>
+        serviceTypesToCreate.map((serviceType, index) =>
           addDoc(collection(firestore, 'centers', centerId, 'admissionWaitlist'), {
         studentName: waitlistModal.studentName.trim(),
         parentPhone: waitlistModal.parentPhone.trim(),
@@ -723,6 +746,7 @@ export function MarketingConsultingCRM({
         referralRoute: waitlistModal.referralRoute,
         referrerName: waitlistModal.referralRoute === '추천' ? waitlistModal.referrerName.trim() : '',
         status: 'waiting' as WaitlistStatus,
+        queueNumber: getNextWaitlistQueueNumber(waitlist) + index,
         memo: waitlistModal.memo.trim(),
         waitlistDate: format(new Date(), 'yyyy-MM-dd'),
         sourceLeadId: waitlistModal.sourceLeadId || null,
@@ -1002,6 +1026,15 @@ export function MarketingConsultingCRM({
                           >
                             {promotingWebsiteId === request.id && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                             {request.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
+                            onClick={() => void handleWebsiteDelete(request.id)}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" />
+                            삭제
                           </Button>
                         </div>
                       </div>
@@ -1313,7 +1346,8 @@ export function MarketingConsultingCRM({
                               {lead.parentPhone || '-'}
                             </span>
                             {lead.studentPhone && <span>학생 연락처: {lead.studentPhone}</span>}
-                            {formatSchoolGradeLabel(lead.school, lead.grade) && <span>{formatSchoolGradeLabel(lead.school, lead.grade)}</span>}
+                            {lead.school && <span>학교: {lead.school}</span>}
+                            {lead.grade && <span>학년: {lead.grade}</span>}
                             <span>상담일: {lead.consultationDate || '-'}</span>
                           </div>
                           {lead.memo && <p className="text-xs font-medium text-slate-500">{lead.memo}</p>}
@@ -1566,6 +1600,11 @@ export function MarketingConsultingCRM({
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-black text-slate-800">{entry.studentName}</p>
+                            {typeof entry.queueNumber === 'number' && (
+                              <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                                대기번호 {entry.queueNumber}
+                              </Badge>
+                            )}
                             <Badge className={cn('border text-[10px] font-black', WAITLIST_STATUS_META[entry.status || 'waiting'].className)}>
                               {WAITLIST_STATUS_META[entry.status || 'waiting'].label}
                             </Badge>

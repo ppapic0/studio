@@ -35,6 +35,22 @@ function getKoreaDateKey() {
   }).format(new Date());
 }
 
+async function getNextWaitlistQueueNumber(centerId: string) {
+  const waitlistCollection = adminDb.collection("centers").doc(centerId).collection("admissionWaitlist");
+  const [countSnap, latestQueueSnap] = await Promise.all([
+    waitlistCollection.count().get(),
+    waitlistCollection.orderBy("queueNumber", "desc").limit(1).get().catch(() => null),
+  ]);
+
+  const totalCount = countSnap.data().count ?? 0;
+  const latestQueueNumber =
+    latestQueueSnap?.docs[0]?.data()?.queueNumber && Number.isFinite(latestQueueSnap.docs[0].data().queueNumber)
+      ? Number(latestQueueSnap.docs[0].data().queueNumber)
+      : 0;
+
+  return Math.max(totalCount, latestQueueNumber) + 1;
+}
+
 function resolveRequestType(
   serviceType: "korean_academy" | "study_center",
   studyCenterRequestType?: "consult" | "waitlist",
@@ -78,6 +94,8 @@ export async function POST(request: Request) {
     const autoWaitlistId = shouldAutoCreateLead
       ? adminDb.collection("centers").doc(centerId!).collection("admissionWaitlist").doc().id
       : null;
+    const autoWaitlistQueueNumber =
+      shouldAutoCreateLead && centerId ? await getNextWaitlistQueueNumber(centerId) : null;
 
     const payload = {
       ...fields,
@@ -158,6 +176,7 @@ export async function POST(request: Request) {
           grade: fields.grade,
           serviceType,
           status: "waiting",
+          queueNumber: autoWaitlistQueueNumber,
           memo: WEBSITE_CONSULT_LABEL,
           waitlistDate: consultationDate,
           sourceLeadId: autoLeadId,
