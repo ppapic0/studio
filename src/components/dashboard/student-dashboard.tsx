@@ -18,7 +18,6 @@ import {
   AlertCircle,
   Check,
   CircleDot,
-  ListTodo,
   Sparkles,
   Target,
   RefreshCw,
@@ -39,7 +38,6 @@ import {
   BellRing,
   Info,
   ShieldAlert,
-  ArrowRight,
   ClipboardCheck,
   UserCheck,
   CalendarX,
@@ -2005,236 +2003,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
     || latestCoachReport?.nextAction?.trim()
     || summarizeReportLine(latestCoachReport?.content);
-  const missionAction = useMemo(() => {
-    if (isTimerActive) {
-      return {
-        title: '집중 흐름을 이어갈 시간',
-        description: `${formatTimer(localSeconds)} 동안 몰입 중이에요. 지금 리듬을 유지하면 오늘 목표에 가장 빨리 도달할 수 있어요.`,
-        cta: '집중 종료',
-        meta: '공부 중',
-        accent: `${todayDoneTaskCount}/${todayTaskCount || 0}개 완료`,
-        mode: 'timer' as const,
-      };
-    }
-    if (todayRemainingTasks.length > 0 && totalMinutesCount === 0) {
-      return {
-        title: '오늘의 첫 몰입을 시작해요',
-        description: `남은 미션 ${todayRemainingTasks.length}개가 기다리고 있어요. 첫 세션을 열면 오늘의 흐름이 바로 시작됩니다.`,
-        cta: '공부 시작',
-        meta: '공부 전',
-        accent: todayPotentialPlanBonus > 0 ? `완료 시 +${todayPotentialPlanBonus} LP 예상` : '오늘 목표부터 가볍게 시작',
-        mode: 'start' as const,
-      };
-    }
-    if (todayRemainingTasks.length > 0) {
-      return {
-        title: '남은 미션을 정리할 차례예요',
-        description: `지금 ${todayRemainingTasks.length}개만 더 끝내면 오늘 계획이 한층 선명해져요.`,
-        cta: '계획 보기',
-        meta: '공부 후반',
-        accent: todayPotentialPlanBonus > 0 ? `완료 시 +${todayPotentialPlanBonus} LP 예상` : '남은 목표를 마무리해요',
-        mode: 'plan' as const,
-      };
-    }
-    if (unreadReportCount > 0) {
-      return {
-        title: '오늘 성과를 선생님 코칭으로 마무리해요',
-        description: `읽지 않은 리포트 ${unreadReportCount}건이 있어요. 지금 보면 오늘의 흐름을 더 잘 정리할 수 있어요.`,
-        cta: '리포트 보기',
-        meta: '공부 후',
-        accent: coachSummary,
-        mode: 'report' as const,
-      };
-    }
-    return {
-      title: '오늘의 루틴을 잘 마무리했어요',
-      description: '이제 성과를 가볍게 돌아보고, 내일 목표를 준비해 두면 다음 집중이 더 쉬워집니다.',
-      cta: '계획트랙 열기',
-      meta: '마무리',
-      accent: `이번 주 ${formatMinutesToKorean(weeklyStudyMinutes)} 공부`,
-      mode: 'review' as const,
-    };
-  }, [
-    isTimerActive,
-    localSeconds,
-    todayDoneTaskCount,
-    todayTaskCount,
-    todayRemainingTasks.length,
-    totalMinutesCount,
-    todayPotentialPlanBonus,
-    unreadReportCount,
-    coachSummary,
-    weeklyStudyMinutes,
-  ]);
-
-  const compactMissionTitle = useMemo(() => {
-    switch (missionAction.mode) {
-      case 'timer':
-        return '집중 유지';
-      case 'start':
-        return '첫 세션 시작';
-      case 'plan':
-        return '미션 정리';
-      case 'report':
-        return '코칭 확인';
-      default:
-        return '루틴 마감';
-    }
-  }, [missionAction.mode]);
-
-  const missionFocusCard = useMemo(() => {
-    if (todayMissionList.length > 0) {
-      const firstTask = todayMissionList[0];
-      return {
-        label: '남은 미션',
-        value: `${todayRemainingTasks.length}개`,
-        detail: firstTask.targetMinutes
-          ? `${firstTask.title} · ${firstTask.targetMinutes}분`
-          : firstTask.title,
-      };
-    }
-
-    if (unreadReportCount > 0) {
-      return {
-        label: '코칭',
-        value: `${unreadReportCount}개`,
-        detail: coachSummary || '도착한 리포트를 확인해 보세요.',
-      };
-    }
-
-    if (latestAnnouncement) {
-      return {
-        label: '센터 공지',
-        value: '새 소식',
-        detail: latestAnnouncement.title || '센터 공지를 확인해 보세요.',
-      };
-    }
-
-    return {
-      label: '오늘 상태',
-      value: '완료',
-      detail: '오늘 흐름을 잘 마무리했어요.',
-    };
-  }, [
-    todayMissionList,
-    todayRemainingTasks.length,
-    unreadReportCount,
-    coachSummary,
-    latestAnnouncement,
-  ]);
-
-  const handleMissionAction = useCallback(async () => {
-    if (missionAction.mode === 'timer' || missionAction.mode === 'start') {
-      await handleStudyStartStop();
-      return;
-    }
-    if (missionAction.mode === 'report') {
-      router.push('/dashboard/student-reports');
-      return;
-    }
-    router.push('/dashboard/plan');
-  }, [handleStudyStartStop, missionAction.mode, router]);
-
-  const missionActionIcon = missionAction.mode === 'report'
-    ? <FileText className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
-    : missionAction.mode === 'plan' || missionAction.mode === 'review'
-      ? <ListTodo className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
-      : <Sparkles className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />;
-
-  const todayDashboardSummary = (
-    <Card className={cn(
-      "relative overflow-hidden border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.42)] ring-1 ring-slate-100/80",
-      isMobile ? "rounded-[1.5rem]" : "rounded-[2.25rem]"
-    )}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,rgba(255,255,255,0),rgba(59,130,246,0.28),rgba(255,255,255,0))]" />
-      <div className="pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full bg-sky-100/60 blur-3xl" />
-      <CardContent className={cn("relative", isMobile ? "p-5" : "p-7")}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Badge className="border-none bg-primary/8 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
-              오늘 요약
-            </Badge>
-            <p className={cn("mt-3 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base" : "text-xl")}>
-              오늘 흐름을 한눈에 정리했어요
-            </p>
-          </div>
-          <div className={cn(
-            "shrink-0 rounded-2xl border border-white/80 bg-white/85 text-primary shadow-[0_12px_24px_-20px_rgba(59,130,246,0.55)]",
-            isMobile ? "p-2.5" : "p-3"
-          )}>
-            {missionActionIcon}
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3">
-          <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]")}>
-            <div className="rounded-[1.25rem] border border-slate-200/80 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">지금</p>
-              <p className={cn("mt-2 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base leading-6" : "text-xl")}>
-                {compactMissionTitle}
-              </p>
-              <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionAction.meta}</p>
-            </div>
-
-            <div className="rounded-[1.25rem] border border-primary/10 bg-primary/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <p className="text-[10px] font-black uppercase tracking-widest text-primary/55">오늘 목표</p>
-              <p className={cn("dashboard-number mt-2 text-primary leading-none", isMobile ? "text-[1.55rem]" : "text-[2.1rem]")}>
-                {todayDoneTaskCount}<span className="ml-1 text-sm font-bold opacity-40">/ {todayTaskCount || 0}</span>
-              </p>
-              <p className="mt-1 text-[11px] font-semibold text-primary/70">{todayPlanRate}% 완료</p>
-            </div>
-
-            <div className={cn(
-              "rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
-              isMobile ? "col-span-2" : ""
-            )}>
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{missionFocusCard.label}</p>
-              <p className={cn("mt-2 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base" : "text-xl")}>
-                {missionFocusCard.value}
-              </p>
-              <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500">
-                {missionFocusCard.detail}
-              </p>
-            </div>
-          </div>
-
-          <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-stretch")}>
-            <div className="rounded-[1.25rem] border border-slate-200/80 bg-white/92 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
-                  {missionAction.meta}
-                </Badge>
-                {weeklyStudyDelta !== 0 && (
-                  <Badge variant="outline" className={cn(
-                    "h-7 rounded-full px-3 text-[10px] font-black",
-                    weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
-                  )}>
-                    {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
-                  </Badge>
-                )}
-              </div>
-              <p className="mt-3 line-clamp-2 text-sm font-black leading-6 text-slate-900">
-                {missionAction.accent}
-              </p>
-            </div>
-
-            <Button
-              type="button"
-              onClick={() => void handleMissionAction()}
-              disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
-              className={cn(
-                "student-cta rounded-2xl border border-primary/12 bg-white font-black text-primary shadow-[0_20px_40px_-28px_rgba(59,130,246,0.45)] transition-all hover:bg-primary/5",
-                isMobile ? "h-12 w-full text-sm" : "min-w-[10rem] px-8 text-base"
-              )}
-            >
-              {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
       <section className={cn(
@@ -2924,9 +2692,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       {isJacob && !isMobile && progressRef && activeMembership && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership.className} schoolName={studentProfile?.schoolName} />}
 
-      <section>
-        {todayDashboardSummary}
-      </section>
     </div>
   );
 }
