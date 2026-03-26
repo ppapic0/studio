@@ -320,6 +320,16 @@ function getTrackTravelState(totalMinutes: number): {
 
 function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean; totalMinutes: number }) {
   const travelState = getTrackTravelState(totalMinutes);
+  const vehicleTransform =
+    travelState.mode === 'walk'
+      ? 'translate(26 34)'
+      : travelState.mode === 'run'
+        ? 'translate(42 28)'
+        : travelState.mode === 'bike'
+          ? 'translate(34 24)'
+          : travelState.mode === 'car'
+            ? 'translate(34 24)'
+            : 'translate(28 18)';
 
   return (
     <div
@@ -358,24 +368,25 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
           </linearGradient>
         </defs>
 
-        <path d="M20 92C30 74 48 64 78 64H136C152 64 162 54 162 42" stroke="rgba(255,255,255,0.15)" strokeWidth="18" strokeLinecap="round" />
-        <path d="M20 92C30 74 48 64 78 64H136C152 64 162 54 162 42" stroke="url(#trackMotionLane)" strokeWidth="14" strokeLinecap="round" />
-        <path className="track-motion-path" d="M20 92C30 74 48 64 78 64H136C152 64 162 54 162 42" stroke="rgba(255,255,255,0.42)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="8 8" />
+        <path d="M18 90C30 78 46 70 70 69H132C148 69 160 58 163 44" stroke="rgba(255,255,255,0.15)" strokeWidth="18" strokeLinecap="round" />
+        <path d="M18 90C30 78 46 70 70 69H132C148 69 160 58 163 44" stroke="url(#trackMotionLane)" strokeWidth="14" strokeLinecap="round" />
+        <path className="track-motion-path" d="M18 90C30 78 46 70 70 69H132C148 69 160 58 163 44" stroke="rgba(255,255,255,0.42)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="8 8" />
         <path d="M104 64H132" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
         <path d="M82 64H96" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
-        <path d="M34 82L46 72" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="22" cy="92" r="4.5" fill="#FFF3DE" />
-        <circle cx="161" cy="42" r="5.5" fill="url(#trackMotionMark)" />
+        <path d="M28 84L40 74" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
+        <circle cx="20" cy="90" r="4.5" fill="#FFF3DE" />
+        <circle cx="162" cy="44" r="5.5" fill="url(#trackMotionMark)" />
 
-        <g className={cn("track-motion-vehicle", `track-motion-vehicle--${travelState.mode}`)} transform="translate(52 32)">
+        <g className={cn("track-motion-vehicle", `track-motion-vehicle--${travelState.mode}`)} transform={vehicleTransform}>
           {travelState.mode === 'walk' && (
             <>
-              <circle cx="18" cy="12" r="8" fill="#FFD7AE" />
-              <path d="M18 21L24 39L17 52L32 68" stroke="#FFF8F0" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M24 38L38 32" stroke="#FFF8F0" strokeWidth="6.5" strokeLinecap="round" />
-              <path className="track-motion-limb-a" d="M22 34L10 44" stroke="#FFD7AE" strokeWidth="5.5" strokeLinecap="round" />
-              <path className="track-motion-limb-b" d="M18 53L5 68" stroke="#FFB870" strokeWidth="6" strokeLinecap="round" />
-              <path className="track-motion-limb-a" d="M18 53L34 66" stroke="#FFB870" strokeWidth="6" strokeLinecap="round" />
+              <circle cx="22" cy="10" r="7.5" fill="#FFD7AE" />
+              <path d="M22 18L24 34L33 47" stroke="#FFF8F0" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M24 25L13 33" stroke="#FFD7AE" strokeWidth="5" strokeLinecap="round" />
+              <path className="track-motion-limb-a" d="M26 26L38 22" stroke="#FFD7AE" strokeWidth="5" strokeLinecap="round" />
+              <path className="track-motion-limb-b" d="M24 34L14 48" stroke="#FFB870" strokeWidth="5.5" strokeLinecap="round" />
+              <path className="track-motion-limb-a" d="M26 34L37 48" stroke="#FFB870" strokeWidth="5.5" strokeLinecap="round" />
+              <path d="M8 48H42" stroke="rgba(255,255,255,0.16)" strokeWidth="2.5" strokeLinecap="round" />
             </>
           )}
 
