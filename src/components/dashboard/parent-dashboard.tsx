@@ -2983,7 +2983,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             >
               <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2.5 pr-[5.15rem] sm:pr-0">
+                <div className="min-w-0 space-y-2.5 pr-[5.7rem] sm:pr-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
                     {growthCelebrationCandidate ? (
@@ -3007,7 +3007,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </p>
                   </div>
                 </div>
-                <div className="absolute right-0 top-0 w-[4.7rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
+                <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
                   <ParentMetricSparkline
                     tone="study"
                     points={dailyStudyTrend.map((point) => ({
@@ -3030,7 +3030,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             >
               <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2.5 pr-[5.15rem] sm:pr-0">
+                <div className="min-w-0 space-y-2.5 pr-[5.7rem] sm:pr-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
                     <Badge variant="outline" className="h-6 rounded-full border border-[#ffd8ab] bg-white/90 px-2.5 text-[10px] font-black text-[#b45f0d]">
@@ -3048,7 +3048,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </p>
                   </div>
                 </div>
-                <div className="absolute right-0 top-0 w-[4.7rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
+                <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
                   <ParentMetricSparkline
                     tone="plan"
                     points={dailyPlanTrend.map((point) => ({
