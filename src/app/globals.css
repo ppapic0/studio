@@ -1185,6 +1185,7 @@
   --dashboard-mobile-nav-base-clearance: calc(8.2rem + env(safe-area-inset-bottom, 0px));
   --dashboard-mobile-nav-extra-clearance: 1.4rem;
   --dashboard-mobile-nav-clearance: calc(var(--dashboard-mobile-nav-base-clearance) + var(--dashboard-mobile-nav-extra-clearance));
+  --dashboard-mobile-scroll-tail: 2.2rem;
   width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
   max-width: calc(100vw - 0.75rem);
   height: min(53.25rem, calc(100svh - 0.75rem));
@@ -1194,18 +1195,18 @@
 
 .dashboard-mobile-shell .dashboard-mobile-main {
   min-height: 0;
-  padding: 1rem 0.95rem var(--dashboard-mobile-nav-clearance);
+  padding: 1rem 0.95rem calc(var(--dashboard-mobile-nav-clearance) + var(--dashboard-mobile-scroll-tail));
   gap: 0.95rem;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
-  scroll-padding-bottom: var(--dashboard-mobile-nav-clearance);
+  scroll-padding-bottom: calc(var(--dashboard-mobile-nav-clearance) + var(--dashboard-mobile-scroll-tail));
 }
 
 .dashboard-mobile-shell .dashboard-mobile-main::after {
   content: '';
   display: block;
-  min-height: 1.35rem;
+  min-height: var(--dashboard-mobile-scroll-tail);
   flex-shrink: 0;
 }
 
@@ -1299,6 +1300,7 @@
   --parent-app-nav-base-clearance: calc(7.2rem + env(safe-area-inset-bottom, 0px));
   --parent-app-nav-extra-clearance: 1.2rem;
   --parent-app-nav-clearance: calc(var(--parent-app-nav-base-clearance) + var(--parent-app-nav-extra-clearance));
+  --parent-app-scroll-tail: 1.9rem;
   width: min(100%, calc(100vw - 0.5rem));
   max-width: calc(100vw - 0.5rem);
   height: min(54.5rem, calc(100svh - 0.5rem));
@@ -1308,18 +1310,18 @@
 
 .parent-app-shell .parent-app-main {
   min-height: 0;
-  padding: 1rem 0.92rem var(--parent-app-nav-clearance);
+  padding: 1rem 0.92rem calc(var(--parent-app-nav-clearance) + var(--parent-app-scroll-tail));
   gap: 0.95rem;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
-  scroll-padding-bottom: var(--parent-app-nav-clearance);
+  scroll-padding-bottom: calc(var(--parent-app-nav-clearance) + var(--parent-app-scroll-tail));
 }
 
 .parent-app-shell .parent-app-main::after {
   content: '';
   display: block;
-  min-height: 1.2rem;
+  min-height: var(--parent-app-scroll-tail);
   flex-shrink: 0;
 }
 
@@ -1399,6 +1401,7 @@
   .dashboard-mobile-shell {
     --dashboard-mobile-nav-base-clearance: calc(7.8rem + env(safe-area-inset-bottom, 0px));
     --dashboard-mobile-nav-extra-clearance: 1.15rem;
+    --dashboard-mobile-scroll-tail: 2rem;
     max-width: calc(100vw - 0.4rem);
     border-width: 7px;
     border-radius: 2.25rem;
@@ -1407,6 +1410,7 @@
   .parent-app-shell {
     --parent-app-nav-base-clearance: calc(6.85rem + env(safe-area-inset-bottom, 0px));
     --parent-app-nav-extra-clearance: 1rem;
+    --parent-app-scroll-tail: 1.75rem;
     max-width: calc(100vw - 0.18rem);
     border-width: 6px;
     border-radius: 2rem;
@@ -1455,6 +1459,7 @@
   .dashboard-mobile-shell {
     --dashboard-mobile-nav-base-clearance: calc(7.35rem + env(safe-area-inset-bottom, 0px));
     --dashboard-mobile-nav-extra-clearance: 1.05rem;
+    --dashboard-mobile-scroll-tail: 1.85rem;
     height: min(100svh - 0.35rem, 49rem);
     margin-top: 0.15rem;
   }
@@ -1462,16 +1467,17 @@
   .parent-app-shell {
     --parent-app-nav-base-clearance: calc(6.45rem + env(safe-area-inset-bottom, 0px));
     --parent-app-nav-extra-clearance: 0.92rem;
+    --parent-app-scroll-tail: 1.55rem;
   }
 
   .dashboard-mobile-main {
     padding-top: 0.85rem;
-    padding-bottom: var(--dashboard-mobile-nav-clearance);
+    padding-bottom: calc(var(--dashboard-mobile-nav-clearance) + var(--dashboard-mobile-scroll-tail));
   }
 
   .parent-app-main {
     padding-top: 0.84rem;
-    padding-bottom: var(--parent-app-nav-clearance);
+    padding-bottom: calc(var(--parent-app-nav-clearance) + var(--parent-app-scroll-tail));
   }
 }
 
