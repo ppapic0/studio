@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -247,6 +247,54 @@ function normalizeSmsEventType(eventType) {
         return "study_end";
     return eventType;
 }
+function getDefaultSmsEventToggles() {
+    return {
+        study_start: true,
+        away_start: true,
+        study_end: true,
+        late_alert: true,
+        weekly_report: true,
+    };
+}
+function normalizeSmsEventToggles(value) {
+    const defaults = getDefaultSmsEventToggles();
+    if (!value || typeof value !== "object")
+        return defaults;
+    const source = value;
+    return {
+        study_start: source.study_start !== false,
+        away_start: source.away_start !== false,
+        study_end: source.study_end !== false,
+        late_alert: source.late_alert !== false,
+        weekly_report: source.weekly_report !== false,
+    };
+}
+function buildSmsRecipientPreferenceId(studentId, parentUid) {
+    return `${studentId}_${parentUid}`;
+}
+function toTimestampDate(value) {
+    if (!value)
+        return null;
+    if (value instanceof Date)
+        return Number.isNaN(value.getTime()) ? null : value;
+    if (typeof value === "string") {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value.toDate === "function") {
+        return value.toDate();
+    }
+    return null;
+}
+function getNextRetryDelayMinutes(attemptCount) {
+    if (attemptCount <= 1)
+        return 1;
+    if (attemptCount === 2)
+        return 5;
+    if (attemptCount === 3)
+        return 15;
+    return null;
+}
 function calculateSmsBytes(message) {
     return Array.from(message || "").reduce((sum, char) => {
         const code = char.charCodeAt(0);
@@ -300,6 +348,46 @@ function buildSmsDedupeKey(params) {
     }
     return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
 }
+function buildSmsQueueInitialStatus(settings) {
+    const provider = settings.smsProvider || "none";
+    if (settings.smsEnabled === false || provider === "none") {
+        return {
+            status: "pending_provider",
+            providerStatus: "pending_provider",
+        };
+    }
+    return {
+        status: "queued",
+        providerStatus: "queued",
+    };
+}
+async function appendSmsDeliveryLog(db, params) {
+    const createdAt = params.createdAt || admin.firestore.Timestamp.now();
+    const logRef = db.collection(`centers/${params.centerId}/smsDeliveryLogs`).doc();
+    await logRef.set({
+        centerId: params.centerId,
+        queueId: params.queueId || null,
+        studentId: params.studentId || null,
+        studentName: params.studentName || null,
+        parentUid: params.parentUid || null,
+        parentName: params.parentName || null,
+        phoneNumber: params.phoneNumber || null,
+        eventType: params.eventType,
+        renderedMessage: params.renderedMessage,
+        messageBytes: params.messageBytes,
+        provider: params.provider || null,
+        attemptNo: params.attemptNo || 0,
+        status: params.status,
+        dateKey: toDateKey(createdAt.toDate()),
+        createdAt,
+        sentAt: params.sentAt || null,
+        failedAt: params.failedAt || null,
+        errorCode: params.errorCode || null,
+        errorMessage: params.errorMessage || null,
+        suppressedReason: params.suppressedReason || null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+}
 async function loadNotificationSettings(db, centerId) {
     const settingsSnap = await db.doc(`centers/${centerId}/settings/notifications`).get();
     if (!settingsSnap.exists)
@@ -348,6 +436,54 @@ async function collectParentRecipients(db, centerId, studentId) {
     }
     return recipients;
 }
+async function splitRecipientsBySmsPreference(db, centerId, studentId, studentName, eventType, recipients) {
+    if (recipients.length === 0) {
+        return { allowedRecipients: [], suppressedRecipients: [] };
+    }
+    const prefRefs = recipients.map((recipient) => db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, recipient.parentUid)}`));
+    const prefSnaps = prefRefs.length > 0 ? await db.getAll(...prefRefs) : [];
+    const prefMap = new Map();
+    prefSnaps.forEach((snap) => {
+        if (snap.exists) {
+            prefMap.set(snap.id, (snap.data() || {}));
+        }
+    });
+    const allowedRecipients = [];
+    const suppressedRecipients = [];
+    for (const recipient of recipients) {
+        const prefId = buildSmsRecipientPreferenceId(studentId, recipient.parentUid);
+        const pref = prefMap.get(prefId);
+        const enabled = (pref === null || pref === void 0 ? void 0 : pref.enabled) !== false;
+        const toggles = normalizeSmsEventToggles(pref === null || pref === void 0 ? void 0 : pref.eventToggles);
+        const eventEnabled = toggles[eventType] !== false;
+        if (!enabled) {
+            suppressedRecipients.push(Object.assign(Object.assign({}, recipient), { suppressedReason: "recipient_disabled" }));
+            continue;
+        }
+        if (!eventEnabled) {
+            suppressedRecipients.push(Object.assign(Object.assign({}, recipient), { suppressedReason: `event_${eventType}_disabled` }));
+            continue;
+        }
+        allowedRecipients.push(recipient);
+        if (!pref) {
+            continue;
+        }
+        const needsRefresh = pref.studentName !== studentName ||
+            pref.parentName !== recipient.parentName ||
+            pref.phoneNumber !== recipient.phoneNumber;
+        if (needsRefresh) {
+            await db.doc(`centers/${centerId}/smsRecipientPreferences/${prefId}`).set({
+                studentId,
+                studentName,
+                parentUid: recipient.parentUid,
+                parentName: recipient.parentName,
+                phoneNumber: recipient.phoneNumber,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
+    }
+    return { allowedRecipients, suppressedRecipients };
+}
 async function queueParentSmsNotification(db, params) {
     const { centerId, studentId, studentName, eventType: rawEventType, eventAt, expectedTime, } = params;
     const eventType = normalizeSmsEventType(rawEventType);
@@ -378,9 +514,11 @@ async function queueParentSmsNotification(db, params) {
     if (dedupeSnap.exists) {
         return { queuedCount: 0, recipientCount: recipients.length, message };
     }
+    const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(db, centerId, studentId, studentName, eventType, recipients);
     const provider = settings.smsProvider || "none";
     const ts = admin.firestore.Timestamp.now();
     const batch = db.batch();
+    const initialStatus = buildSmsQueueInitialStatus(settings);
     batch.set(dedupeRef, {
         centerId,
         studentId,
@@ -390,13 +528,15 @@ async function queueParentSmsNotification(db, params) {
         renderedMessage: message,
         messageBytes,
     }, { merge: true });
-    recipients.forEach((recipient) => {
+    allowedRecipients.forEach((recipient) => {
         const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
         batch.set(queueRef, {
             centerId,
             studentId,
+            studentName,
             parentUid: recipient.parentUid,
             parentName: recipient.parentName,
+            phoneNumber: recipient.phoneNumber,
             to: recipient.phoneNumber,
             provider,
             sender: settings.smsSender || null,
@@ -406,8 +546,16 @@ async function queueParentSmsNotification(db, params) {
             messageBytes,
             dedupeKey,
             eventType,
-            status: settings.smsEnabled === false || provider === "none" ? "pending_provider" : "queued",
-            providerStatus: settings.smsEnabled === false || provider === "none" ? "pending_provider" : "queued",
+            dateKey: toDateKey(eventAt),
+            status: initialStatus.status,
+            providerStatus: initialStatus.providerStatus,
+            attemptCount: 0,
+            manualRetryCount: 0,
+            nextAttemptAt: initialStatus.status === "queued" ? ts : null,
+            sentAt: null,
+            failedAt: null,
+            lastErrorCode: null,
+            lastErrorMessage: null,
             createdAt: ts,
             updatedAt: ts,
             metadata: {
@@ -436,22 +584,24 @@ async function queueParentSmsNotification(db, params) {
             updatedAt: ts,
         });
     });
-    const logRef = db.collection(`centers/${centerId}/smsLogs`).doc();
-    batch.set(logRef, {
+    await batch.commit();
+    await Promise.all(suppressedRecipients.map((recipient) => appendSmsDeliveryLog(db, {
         centerId,
         studentId,
+        studentName,
+        parentUid: recipient.parentUid,
+        parentName: recipient.parentName,
+        phoneNumber: recipient.phoneNumber,
         eventType,
-        provider,
-        recipientCount: recipients.length,
-        message,
         renderedMessage: message,
         messageBytes,
-        dedupeKey,
+        provider,
+        attemptNo: 0,
+        status: "suppressed_opt_out",
         createdAt: ts,
-        updatedAt: ts,
-    });
-    await batch.commit();
-    return { queuedCount: recipients.length, recipientCount: recipients.length, message };
+        suppressedReason: recipient.suppressedReason,
+    })));
+    return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
 }
 async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap) {
     const settings = await loadNotificationSettings(db, centerId);
@@ -529,6 +679,316 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap
         alertsTriggered += 1;
     }
     return alertsTriggered;
+}
+function summarizeProviderResponse(value) {
+    if (value == null)
+        return null;
+    if (typeof value === "string") {
+        return value.slice(0, 300);
+    }
+    try {
+        return JSON.stringify(value).slice(0, 300);
+    }
+    catch (_a) {
+        return String(value).slice(0, 300);
+    }
+}
+async function sendSmsViaAligo(params) {
+    var _a;
+    try {
+        const formData = new FormData();
+        formData.append("key", params.apiKey);
+        formData.append("userid", params.userId);
+        formData.append("sender", params.sender);
+        formData.append("receiver", params.receiver);
+        formData.append("msg", params.message);
+        formData.append("testmode_yn", "N");
+        const response = await fetch("https://apis.aligo.in/send/", {
+            method: "POST",
+            body: formData,
+        });
+        const text = await response.text();
+        let parsed = null;
+        try {
+            parsed = text ? JSON.parse(text) : null;
+        }
+        catch (_b) {
+            parsed = text;
+        }
+        const responseSummary = summarizeProviderResponse(parsed !== null && parsed !== void 0 ? parsed : text);
+        const resultCode = String((_a = parsed === null || parsed === void 0 ? void 0 : parsed.result_code) !== null && _a !== void 0 ? _a : "");
+        if (response.ok && resultCode === "1") {
+            return {
+                ok: true,
+                providerMessageId: (parsed === null || parsed === void 0 ? void 0 : parsed.msg_id) ? String(parsed.msg_id) : null,
+                responseSummary,
+            };
+        }
+        return {
+            ok: false,
+            code: resultCode || `HTTP_${response.status}`,
+            message: String((parsed === null || parsed === void 0 ? void 0 : parsed.message) || (parsed === null || parsed === void 0 ? void 0 : parsed.msg) || "알리고 발송 실패"),
+            responseSummary,
+        };
+    }
+    catch (error) {
+        return {
+            ok: false,
+            code: "ALIGO_FETCH_ERROR",
+            message: (error === null || error === void 0 ? void 0 : error.message) || "알리고 요청 중 오류가 발생했습니다.",
+        };
+    }
+}
+async function sendSmsViaCustomEndpoint(params) {
+    try {
+        const response = await fetch(params.endpointUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-SMS-API-KEY": params.apiKey,
+            },
+            body: JSON.stringify({
+                to: params.receiver,
+                sender: params.sender,
+                message: params.message,
+                centerId: params.centerId,
+                studentId: params.studentId || null,
+                eventType: params.eventType || null,
+            }),
+        });
+        const text = await response.text();
+        let parsed = null;
+        try {
+            parsed = text ? JSON.parse(text) : null;
+        }
+        catch (_a) {
+            parsed = text;
+        }
+        const responseSummary = summarizeProviderResponse(parsed !== null && parsed !== void 0 ? parsed : text);
+        const isOk = response.ok && (parsed === null || parsed === void 0 ? void 0 : parsed.ok) !== false;
+        if (isOk) {
+            return {
+                ok: true,
+                providerMessageId: (parsed === null || parsed === void 0 ? void 0 : parsed.providerMessageId) ? String(parsed.providerMessageId) : null,
+                responseSummary,
+            };
+        }
+        return {
+            ok: false,
+            code: String((parsed === null || parsed === void 0 ? void 0 : parsed.code) || `HTTP_${response.status}`),
+            message: String((parsed === null || parsed === void 0 ? void 0 : parsed.message) || "사용자 엔드포인트 발송 실패"),
+            responseSummary,
+        };
+    }
+    catch (error) {
+        return {
+            ok: false,
+            code: "CUSTOM_FETCH_ERROR",
+            message: (error === null || error === void 0 ? void 0 : error.message) || "사용자 엔드포인트 요청 중 오류가 발생했습니다.",
+        };
+    }
+}
+async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCount) {
+    var _a;
+    const nowTs = admin.firestore.Timestamp.now();
+    const settings = await loadNotificationSettings(db, centerId);
+    const provider = (settings.smsProvider || queueData.provider || "none");
+    const sender = asTrimmedString(settings.smsSender || queueData.sender || "");
+    const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
+    const message = asTrimmedString(queueData.renderedMessage || queueData.message || "");
+    const queueId = queueRef.id;
+    const studentId = asTrimmedString(queueData.studentId);
+    const studentName = asTrimmedString(queueData.studentName || ((_a = queueData === null || queueData === void 0 ? void 0 : queueData.metadata) === null || _a === void 0 ? void 0 : _a.studentName), "학생");
+    const parentUid = asTrimmedString(queueData.parentUid);
+    const parentName = asTrimmedString(queueData.parentName);
+    const eventType = String(queueData.eventType || "study_start");
+    if (!message || !receiver) {
+        await queueRef.set({
+            status: "failed",
+            providerStatus: "failed",
+            failedAt: nowTs,
+            updatedAt: nowTs,
+            lastErrorCode: "INVALID_QUEUE_ITEM",
+            lastErrorMessage: "수신번호 또는 문자 본문이 비어 있습니다.",
+            processingStartedAt: admin.firestore.FieldValue.delete(),
+            processingLeaseUntil: admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        await appendSmsDeliveryLog(db, {
+            centerId,
+            queueId,
+            studentId,
+            studentName,
+            parentUid,
+            parentName,
+            phoneNumber: receiver || queueData.phoneNumber || queueData.to || null,
+            eventType,
+            renderedMessage: message || "",
+            messageBytes: Number(queueData.messageBytes || calculateSmsBytes(message || "")),
+            provider,
+            attemptNo: attemptCount,
+            status: "failed",
+            createdAt: nowTs,
+            failedAt: nowTs,
+            errorCode: "INVALID_QUEUE_ITEM",
+            errorMessage: "수신번호 또는 문자 본문이 비어 있습니다.",
+        });
+        return;
+    }
+    if (settings.smsEnabled === false || provider === "none") {
+        await queueRef.set({
+            status: "pending_provider",
+            providerStatus: "pending_provider",
+            updatedAt: nowTs,
+            nextAttemptAt: admin.firestore.FieldValue.delete(),
+            processingStartedAt: admin.firestore.FieldValue.delete(),
+            processingLeaseUntil: admin.firestore.FieldValue.delete(),
+            lastErrorCode: "PROVIDER_NOT_READY",
+            lastErrorMessage: "문자 전송 설정이 꺼져 있거나 제공사가 연결되지 않았습니다.",
+        }, { merge: true });
+        return;
+    }
+    let dispatchResult;
+    if (provider === "aligo") {
+        const apiKey = asTrimmedString(settings.smsApiKey);
+        const userId = asTrimmedString(settings.smsUserId);
+        if (!apiKey || !userId || !sender) {
+            await queueRef.set({
+                status: "pending_provider",
+                providerStatus: "pending_provider",
+                updatedAt: nowTs,
+                nextAttemptAt: admin.firestore.FieldValue.delete(),
+                processingStartedAt: admin.firestore.FieldValue.delete(),
+                processingLeaseUntil: admin.firestore.FieldValue.delete(),
+                lastErrorCode: "ALIGO_CONFIG_MISSING",
+                lastErrorMessage: "알리고 설정(API 키, 사용자 ID, 발신번호)이 부족합니다.",
+            }, { merge: true });
+            return;
+        }
+        dispatchResult = await sendSmsViaAligo({
+            apiKey,
+            userId,
+            sender,
+            receiver,
+            message,
+        });
+    }
+    else {
+        const endpointUrl = asTrimmedString(settings.smsEndpointUrl || queueData.endpointUrl || "");
+        const apiKey = asTrimmedString(settings.smsApiKey);
+        if (!endpointUrl || !apiKey) {
+            await queueRef.set({
+                status: "pending_provider",
+                providerStatus: "pending_provider",
+                updatedAt: nowTs,
+                nextAttemptAt: admin.firestore.FieldValue.delete(),
+                processingStartedAt: admin.firestore.FieldValue.delete(),
+                processingLeaseUntil: admin.firestore.FieldValue.delete(),
+                lastErrorCode: "CUSTOM_CONFIG_MISSING",
+                lastErrorMessage: "사용자 엔드포인트 또는 연동 키가 비어 있습니다.",
+            }, { merge: true });
+            return;
+        }
+        dispatchResult = await sendSmsViaCustomEndpoint({
+            endpointUrl,
+            apiKey,
+            sender: sender || null,
+            receiver,
+            message,
+            centerId,
+            studentId: studentId || null,
+            eventType,
+        });
+    }
+    const messageBytes = Number(queueData.messageBytes || calculateSmsBytes(message));
+    if (dispatchResult.ok) {
+        await queueRef.set({
+            provider,
+            sender: sender || null,
+            status: "sent",
+            providerStatus: "sent",
+            sentAt: nowTs,
+            updatedAt: nowTs,
+            providerMessageId: dispatchResult.providerMessageId || null,
+            lastErrorCode: admin.firestore.FieldValue.delete(),
+            lastErrorMessage: admin.firestore.FieldValue.delete(),
+            failedAt: admin.firestore.FieldValue.delete(),
+            failedReason: admin.firestore.FieldValue.delete(),
+            nextAttemptAt: admin.firestore.FieldValue.delete(),
+            processingStartedAt: admin.firestore.FieldValue.delete(),
+            processingLeaseUntil: admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        await appendSmsDeliveryLog(db, {
+            centerId,
+            queueId,
+            studentId,
+            studentName,
+            parentUid,
+            parentName,
+            phoneNumber: receiver,
+            eventType,
+            renderedMessage: message,
+            messageBytes,
+            provider,
+            attemptNo: attemptCount,
+            status: "sent",
+            createdAt: nowTs,
+            sentAt: nowTs,
+        });
+        return;
+    }
+    const nextRetryDelay = getNextRetryDelayMinutes(attemptCount);
+    const lastErrorCode = dispatchResult.code || "SMS_SEND_FAILED";
+    const lastErrorMessage = dispatchResult.message || "문자 발송 실패";
+    if (nextRetryDelay !== null) {
+        await queueRef.set({
+            provider,
+            sender: sender || null,
+            status: "queued",
+            providerStatus: "retry_scheduled",
+            updatedAt: nowTs,
+            nextAttemptAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + nextRetryDelay * 60 * 1000)),
+            failedReason: lastErrorMessage,
+            lastErrorCode,
+            lastErrorMessage,
+            processingStartedAt: admin.firestore.FieldValue.delete(),
+            processingLeaseUntil: admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+    }
+    else {
+        await queueRef.set({
+            provider,
+            sender: sender || null,
+            status: "failed",
+            providerStatus: "failed",
+            failedAt: nowTs,
+            updatedAt: nowTs,
+            failedReason: lastErrorMessage,
+            lastErrorCode,
+            lastErrorMessage,
+            nextAttemptAt: admin.firestore.FieldValue.delete(),
+            processingStartedAt: admin.firestore.FieldValue.delete(),
+            processingLeaseUntil: admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+    }
+    await appendSmsDeliveryLog(db, {
+        centerId,
+        queueId,
+        studentId,
+        studentName,
+        parentUid,
+        parentName,
+        phoneNumber: receiver,
+        eventType,
+        renderedMessage: message,
+        messageBytes,
+        provider,
+        attemptNo: attemptCount,
+        status: "failed",
+        createdAt: nowTs,
+        failedAt: nowTs,
+        errorCode: lastErrorCode,
+        errorMessage: lastErrorMessage,
+    });
 }
 function isAdminRole(role) {
     return typeof role === "string" && adminRoles.has(role);
@@ -2151,6 +2611,194 @@ exports.saveNotificationSettingsSecure = functions.region(region).https.onCall(a
         smsApiKeyConfigured: rawApiKey.length > 0 ? true : (data === null || data === void 0 ? void 0 : data.clearSmsApiKey) === true ? false : undefined,
     };
 });
+exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const queueId = asTrimmedString(data === null || data === void 0 ? void 0 : data.queueId);
+    if (!centerId || !queueId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId와 queueId가 필요합니다.");
+    }
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    if (!isAdminRole(callerRole)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 재시도할 수 있습니다.");
+    }
+    const queueRef = db.doc(`centers/${centerId}/smsQueue/${queueId}`);
+    const queueSnap = await queueRef.get();
+    if (!queueSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "큐 문서를 찾을 수 없습니다.");
+    }
+    const queueData = queueSnap.data() || {};
+    const currentStatus = String(queueData.status || "");
+    if (!["failed", "pending_provider", "cancelled"].includes(currentStatus)) {
+        throw new functions.https.HttpsError("failed-precondition", "재시도 가능한 상태가 아닙니다.");
+    }
+    const settings = await loadNotificationSettings(db, centerId);
+    const initialStatus = buildSmsQueueInitialStatus(settings);
+    const manualRetryCount = Math.max(0, Number(queueData.manualRetryCount || 0)) + 1;
+    const nowTs = admin.firestore.Timestamp.now();
+    await queueRef.set({
+        status: initialStatus.status,
+        providerStatus: initialStatus.providerStatus,
+        manualRetryCount,
+        nextAttemptAt: initialStatus.status === "queued" ? nowTs : null,
+        failedReason: admin.firestore.FieldValue.delete(),
+        lastErrorCode: admin.firestore.FieldValue.delete(),
+        lastErrorMessage: admin.firestore.FieldValue.delete(),
+        failedAt: admin.firestore.FieldValue.delete(),
+        processingStartedAt: admin.firestore.FieldValue.delete(),
+        processingLeaseUntil: admin.firestore.FieldValue.delete(),
+        updatedAt: nowTs,
+    }, { merge: true });
+    return { ok: true, status: initialStatus.status };
+});
+exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const queueId = asTrimmedString(data === null || data === void 0 ? void 0 : data.queueId);
+    if (!centerId || !queueId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId와 queueId가 필요합니다.");
+    }
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    if (!isAdminRole(callerRole)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 취소할 수 있습니다.");
+    }
+    const queueRef = db.doc(`centers/${centerId}/smsQueue/${queueId}`);
+    const queueSnap = await queueRef.get();
+    if (!queueSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "큐 문서를 찾을 수 없습니다.");
+    }
+    const currentStatus = String(((_b = queueSnap.data()) === null || _b === void 0 ? void 0 : _b.status) || "");
+    if (!["queued", "pending_provider", "failed"].includes(currentStatus)) {
+        throw new functions.https.HttpsError("failed-precondition", "취소 가능한 상태가 아닙니다.");
+    }
+    await queueRef.set({
+        status: "cancelled",
+        providerStatus: "cancelled",
+        updatedAt: admin.firestore.Timestamp.now(),
+        nextAttemptAt: admin.firestore.FieldValue.delete(),
+        processingStartedAt: admin.firestore.FieldValue.delete(),
+        processingLeaseUntil: admin.firestore.FieldValue.delete(),
+    }, { merge: true });
+    return { ok: true };
+});
+exports.updateSmsRecipientPreference = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const parentUid = asTrimmedString(data === null || data === void 0 ? void 0 : data.parentUid);
+    if (!centerId || !studentId || !parentUid) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
+    }
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    if (!isAdminRole(callerRole)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수신 설정을 수정할 수 있습니다.");
+    }
+    const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+    if (!studentSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
+    }
+    const parentUids = normalizeStringArray((_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.parentUids);
+    if (!parentUids.includes(parentUid)) {
+        throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
+    }
+    const [userSnap, memberSnap] = await Promise.all([
+        db.doc(`users/${parentUid}`).get(),
+        db.doc(`centers/${centerId}/members/${parentUid}`).get(),
+    ]);
+    const studentName = asTrimmedString((_c = studentSnap.data()) === null || _c === void 0 ? void 0 : _c.name, "학생");
+    const parentName = asTrimmedString(((_d = memberSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || ((_e = userSnap.data()) === null || _e === void 0 ? void 0 : _e.displayName) || "학부모");
+    const phoneNumber = normalizePhoneNumber(((_f = userSnap.data()) === null || _f === void 0 ? void 0 : _f.phoneNumber) || ((_g = memberSnap.data()) === null || _g === void 0 ? void 0 : _g.phoneNumber));
+    const enabled = (data === null || data === void 0 ? void 0 : data.enabled) !== false;
+    const eventToggles = normalizeSmsEventToggles(data === null || data === void 0 ? void 0 : data.eventToggles);
+    await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+        studentId,
+        studentName,
+        parentUid,
+        parentName,
+        phoneNumber,
+        enabled,
+        eventToggles,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth.uid,
+    }, { merge: true });
+    return { ok: true };
+});
+exports.scheduledSmsQueueDispatcher = functions
+    .region(region)
+    .pubsub.schedule("every 1 minutes")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const nowTs = admin.firestore.Timestamp.fromDate(now);
+    const processingLeaseUntil = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 60 * 1000));
+    const centersSnap = await db.collection("centers").get();
+    let processed = 0;
+    for (const centerDoc of centersSnap.docs) {
+        const centerId = centerDoc.id;
+        const queueCol = db.collection(`centers/${centerId}/smsQueue`);
+        const [queuedSnap, processingSnap] = await Promise.all([
+            queueCol.where("status", "==", "queued").limit(30).get(),
+            queueCol.where("status", "==", "processing").limit(30).get(),
+        ]);
+        const candidateDocs = [...queuedSnap.docs, ...processingSnap.docs];
+        for (const queueDoc of candidateDocs) {
+            const claimed = await db.runTransaction(async (tx) => {
+                const freshSnap = await tx.get(queueDoc.ref);
+                if (!freshSnap.exists)
+                    return null;
+                const freshData = freshSnap.data() || {};
+                const status = String(freshData.status || "");
+                const nextAttemptAt = toTimestampDate(freshData.nextAttemptAt);
+                const leaseExpiresAt = toTimestampDate(freshData.processingLeaseUntil);
+                if (status === "queued") {
+                    if (nextAttemptAt && nextAttemptAt.getTime() > now.getTime()) {
+                        return null;
+                    }
+                }
+                else if (status === "processing") {
+                    if (leaseExpiresAt && leaseExpiresAt.getTime() > now.getTime()) {
+                        return null;
+                    }
+                }
+                else {
+                    return null;
+                }
+                const nextAttemptCount = Math.max(0, Number(freshData.attemptCount || 0)) + 1;
+                tx.set(queueDoc.ref, {
+                    status: "processing",
+                    providerStatus: "processing",
+                    attemptCount: nextAttemptCount,
+                    processingStartedAt: nowTs,
+                    processingLeaseUntil,
+                    updatedAt: nowTs,
+                }, { merge: true });
+                return Object.assign(Object.assign({}, freshData), { id: queueDoc.id, attemptCount: nextAttemptCount });
+            });
+            if (!claimed)
+                continue;
+            await dispatchSmsQueueItem(db, centerId, queueDoc.ref, claimed, Number(claimed.attemptCount || 1));
+            processed += 1;
+        }
+    }
+    console.log("[sms-dispatcher] run complete", { centerCount: centersSnap.size, processed });
+    return null;
+});
 exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data, context) => {
     var _a, _b;
     const db = admin.firestore();
@@ -2332,6 +2980,7 @@ exports.cleanupOldDocuments = functions
     const db = admin.firestore();
     const now = Date.now();
     const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(now - 7 * 24 * 60 * 60 * 1000);
+    const threeDaysAgo = admin.firestore.Timestamp.fromMillis(now - 3 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = admin.firestore.Timestamp.fromMillis(now - 30 * 24 * 60 * 60 * 1000);
     const centersSnap = await db.collection("centers").get();
     let totalDeleted = 0;
@@ -2350,15 +2999,17 @@ exports.cleanupOldDocuments = functions
     };
     for (const centerDoc of centersSnap.docs) {
         const cid = centerDoc.id;
-        const [sq, sl, la, pn] = await Promise.all([
-            deleteOldDocs(`centers/${cid}/smsQueue`, sevenDaysAgo),
-            deleteOldDocs(`centers/${cid}/smsLogs`, sevenDaysAgo),
+        const [sq, sdl, sl, sd, la, pn] = await Promise.all([
+            deleteOldDocs(`centers/${cid}/smsQueue`, thirtyDaysAgo),
+            deleteOldDocs(`centers/${cid}/smsDeliveryLogs`, thirtyDaysAgo),
+            deleteOldDocs(`centers/${cid}/smsLogs`, thirtyDaysAgo),
+            deleteOldDocs(`centers/${cid}/smsDedupes`, threeDaysAgo),
             deleteOldDocs(`centers/${cid}/lateAlerts`, sevenDaysAgo),
             deleteOldDocs(`centers/${cid}/parentNotifications`, thirtyDaysAgo),
         ]);
-        const centerTotal = sq + sl + la + pn;
+        const centerTotal = sq + sdl + sl + sd + la + pn;
         if (centerTotal > 0) {
-            console.log(`[cleanup] center=${cid} deleted=${centerTotal} (smsQueue=${sq} smsLogs=${sl} lateAlerts=${la} parentNotifications=${pn})`);
+            console.log(`[cleanup] center=${cid} deleted=${centerTotal} (smsQueue=${sq} smsDeliveryLogs=${sdl} smsLogs=${sl} smsDedupes=${sd} lateAlerts=${la} parentNotifications=${pn})`);
         }
         totalDeleted += centerTotal;
     }
@@ -2422,28 +3073,60 @@ exports.scheduledWeeklyReport = functions
             const recipients = await collectParentRecipients(db, centerId, studentId);
             if (recipients.length === 0)
                 continue;
+            const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(db, centerId, studentId, studentName, "weekly_report", recipients);
             const ts = admin.firestore.Timestamp.now();
             const batch = db.batch();
             const provider = settings.smsProvider || "none";
-            recipients.forEach((recipient) => {
+            const initialStatus = buildSmsQueueInitialStatus(settings);
+            allowedRecipients.forEach((recipient) => {
                 const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
                 batch.set(queueRef, {
                     centerId,
                     studentId,
+                    studentName,
                     parentUid: recipient.parentUid,
+                    parentName: recipient.parentName,
+                    phoneNumber: recipient.phoneNumber,
                     to: recipient.phoneNumber,
                     provider,
                     sender: settings.smsSender || null,
                     endpointUrl: settings.smsEndpointUrl || null,
                     message,
+                    renderedMessage: message,
+                    messageBytes: calculateSmsBytes(message),
                     eventType: "weekly_report",
-                    status: "queued",
+                    dateKey: toDateKey(nowKst),
+                    status: initialStatus.status,
+                    providerStatus: initialStatus.providerStatus,
+                    attemptCount: 0,
+                    manualRetryCount: 0,
+                    nextAttemptAt: initialStatus.status === "queued" ? ts : null,
+                    sentAt: null,
+                    failedAt: null,
+                    lastErrorCode: null,
+                    lastErrorMessage: null,
                     createdAt: ts,
                     updatedAt: ts,
                 });
             });
             await batch.commit();
-            totalSent += recipients.length;
+            await Promise.all(suppressedRecipients.map((recipient) => appendSmsDeliveryLog(db, {
+                centerId,
+                studentId,
+                studentName,
+                parentUid: recipient.parentUid,
+                parentName: recipient.parentName,
+                phoneNumber: recipient.phoneNumber,
+                eventType: "weekly_report",
+                renderedMessage: message,
+                messageBytes: calculateSmsBytes(message),
+                provider,
+                attemptNo: 0,
+                status: "suppressed_opt_out",
+                createdAt: ts,
+                suppressedReason: recipient.suppressedReason,
+            })));
+            totalSent += allowedRecipients.length;
         }
     }
     console.log("[weekly-report] run complete", { centerCount: centersSnap.size, totalSent });
@@ -2578,13 +3261,24 @@ exports.scheduledDailyRiskAlert = functions
                     const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
                     batch.set(queueRef, {
                         centerId,
+                        studentId: null,
+                        studentName: null,
+                        parentUid: adminDoc.id,
+                        parentName: asTrimmedString((adminData === null || adminData === void 0 ? void 0 : adminData.displayName) || (adminData === null || adminData === void 0 ? void 0 : adminData.name) || "관리자"),
+                        phoneNumber: phone,
                         to: phone,
                         provider: settings.smsProvider,
                         sender: settings.smsSender || null,
                         endpointUrl: settings.smsEndpointUrl || null,
                         message,
+                        renderedMessage: message,
+                        messageBytes: calculateSmsBytes(message),
                         eventType: "risk_alert",
                         status: "queued",
+                        providerStatus: "queued",
+                        attemptCount: 0,
+                        manualRetryCount: 0,
+                        nextAttemptAt: ts,
                         createdAt: ts,
                         updatedAt: ts,
                     });
