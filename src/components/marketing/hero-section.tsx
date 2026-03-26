@@ -37,28 +37,56 @@ export function HeroSection({ brand }: HeroSectionProps) {
   const heroTitleLines = brand.heroTitle.split('\n');
   const heroFireworks = [
     {
-      className: 'right-[10%] top-[7%] h-44 w-44 sm:h-56 sm:w-56 lg:h-72 lg:w-72',
+      className: 'right-[8%] top-[6%] h-48 w-48 sm:h-60 sm:w-60 lg:h-[21rem] lg:w-[21rem]',
       ringColor: 'rgba(255,188,126,0.34)',
       coreColor: 'rgba(255,136,48,0.28)',
       delay: '0.2s',
       duration: '7.8s',
-      opacity: 0.28,
+      opacity: 0.34,
     },
     {
-      className: 'left-[16%] top-[26%] h-20 w-20 sm:h-28 sm:w-28 lg:h-32 lg:w-32',
+      className: 'left-[12%] top-[22%] h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36',
       ringColor: 'rgba(255,170,102,0.3)',
       coreColor: 'rgba(255,214,168,0.18)',
       delay: '1.8s',
       duration: '6.3s',
-      opacity: 0.22,
+      opacity: 0.28,
     },
     {
-      className: 'left-[9%] bottom-[18%] h-16 w-16 sm:h-24 sm:w-24 lg:h-28 lg:w-28',
+      className: 'left-[8%] bottom-[14%] h-20 w-20 sm:h-28 sm:w-28 lg:h-32 lg:w-32',
       ringColor: 'rgba(112,162,255,0.2)',
       coreColor: 'rgba(255,160,84,0.16)',
       delay: '3.1s',
       duration: '8.6s',
-      opacity: 0.14,
+      opacity: 0.18,
+    },
+    {
+      className: 'right-[18%] bottom-[18%] h-24 w-24 sm:h-36 sm:w-36 lg:h-40 lg:w-40',
+      ringColor: 'rgba(255,168,88,0.22)',
+      coreColor: 'rgba(255,228,188,0.14)',
+      delay: '4.2s',
+      duration: '7.1s',
+      opacity: 0.16,
+    },
+  ];
+  const heroBursts = [
+    {
+      className: 'left-[6%] top-[14%] h-36 w-36 sm:h-44 sm:w-44 lg:h-56 lg:w-56',
+      color: 'rgba(255,151,62,0.24)',
+      delay: '0.6s',
+      duration: '5.4s',
+    },
+    {
+      className: 'right-[14%] top-[18%] h-28 w-28 sm:h-36 sm:w-36 lg:h-44 lg:w-44',
+      color: 'rgba(255,214,168,0.18)',
+      delay: '1.6s',
+      duration: '6.2s',
+    },
+    {
+      className: 'left-[18%] bottom-[16%] h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36',
+      color: 'rgba(120,171,255,0.14)',
+      delay: '2.6s',
+      duration: '5.8s',
     },
   ];
   const heroParticles = [
@@ -93,6 +121,32 @@ export function HeroSection({ brand }: HeroSectionProps) {
       duration: '4.9s',
     },
   ];
+  const heroEmbers = [
+    {
+      className: 'left-[11%] top-[30%] h-2 w-2 sm:h-2.5 sm:w-2.5',
+      color: 'rgba(255,173,98,0.82)',
+      delay: '0.5s',
+      duration: '4.4s',
+    },
+    {
+      className: 'right-[20%] top-[28%] h-1.5 w-1.5 sm:h-2 sm:w-2',
+      color: 'rgba(255,255,255,0.76)',
+      delay: '1.1s',
+      duration: '4.8s',
+    },
+    {
+      className: 'left-[24%] bottom-[22%] h-1.5 w-1.5 sm:h-2 sm:w-2',
+      color: 'rgba(255,193,126,0.8)',
+      delay: '1.9s',
+      duration: '5.1s',
+    },
+    {
+      className: 'right-[11%] bottom-[20%] h-2 w-2 sm:h-2.5 sm:w-2.5',
+      color: 'rgba(255,148,59,0.72)',
+      delay: '2.8s',
+      duration: '5.5s',
+    },
+  ];
 
   return (
     <section
@@ -103,6 +157,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_15%_0%,rgba(25,65,170,0.54),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_48%_40%_at_74%_10%,rgba(255,122,22,0.16),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_36%_28%_at_72%_18%,rgba(255,184,122,0.10),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_32%_24%_at_50%_33%,rgba(255,122,22,0.12),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_34%_30%_at_48%_76%,rgba(255,255,255,0.08),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_50%_105%,rgba(8,18,52,0.65),transparent)]" />
       </div>
@@ -120,6 +175,20 @@ export function HeroSection({ brand }: HeroSectionProps) {
           className="hero-orb-drift absolute right-[10%] top-[8%] h-40 w-40 rounded-full bg-[#FF7A16]/8 blur-[90px] sm:h-52 sm:w-52 lg:h-72 lg:w-72"
           style={{ animationDelay: '-2.2s', animationDuration: '12.4s' }}
         />
+        {heroBursts.map((burst) => (
+          <div
+            key={burst.className}
+            className={`hero-burst absolute ${burst.className}`}
+            style={{
+              ['--hero-burst-color' as string]: burst.color,
+              animationDelay: burst.delay,
+              animationDuration: burst.duration,
+            }}
+          >
+            <span className="hero-burst-ring absolute inset-0 rounded-full" />
+            <span className="hero-burst-core absolute inset-[34%] rounded-full" />
+          </div>
+        ))}
         {heroFireworks.map((firework) => (
           <div
             key={firework.className}
@@ -157,6 +226,18 @@ export function HeroSection({ brand }: HeroSectionProps) {
             }}
           />
         ))}
+        {heroEmbers.map((ember) => (
+          <span
+            key={ember.className}
+            className={`hero-ember-float absolute rounded-full ${ember.className}`}
+            style={{
+              background: ember.color,
+              boxShadow: `0 0 20px ${ember.color}`,
+              animationDelay: ember.delay,
+              animationDuration: ember.duration,
+            }}
+          />
+        ))}
         <div
           className="absolute bottom-[-6%] right-[-12%] h-[320px] w-[320px] sm:bottom-[-8%] sm:right-[-8%] sm:h-[420px] sm:w-[420px] md:bottom-[-10%] md:right-[-5%] md:h-[520px] md:w-[520px] lg:bottom-[-12%] lg:right-[-3%] lg:h-[680px] lg:w-[680px]"
           style={{ opacity: 0.11 }}
@@ -186,20 +267,21 @@ export function HeroSection({ brand }: HeroSectionProps) {
         />
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-7xl justify-center px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-        <div className="max-w-[53rem] space-y-7 text-center sm:space-y-9">
-          <div className="space-y-5">
+      <div className="relative mx-auto flex w-full max-w-7xl justify-center px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+        <div className="max-w-[58rem] space-y-8 text-center sm:space-y-10">
+          <div className="space-y-5 sm:space-y-6">
             <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
-            <div className="space-y-5">
+            <div className="space-y-5 sm:space-y-6">
               <div className="hero-headline-shell relative mx-auto inline-flex max-w-full justify-center">
-                <div className="hero-headline-aura absolute inset-x-[14%] top-[14%] h-[58%] rounded-full bg-[radial-gradient(circle,rgba(255,122,22,0.22)_0%,rgba(255,184,122,0.12)_28%,transparent_72%)] blur-3xl" />
-                <h1 className="font-aggro-display relative text-[clamp(1.52rem,7vw,4.95rem)] font-black tracking-[-0.038em] text-white">
-                  <span className="flex flex-col items-center gap-[0.06em] sm:gap-[0.065em]">
+                <div className="hero-headline-aura absolute inset-x-[10%] top-[10%] h-[64%] rounded-full bg-[radial-gradient(circle,rgba(255,122,22,0.26)_0%,rgba(255,184,122,0.14)_30%,transparent_74%)] blur-3xl" />
+                <div className="hero-headline-flare absolute left-1/2 top-[18%] h-20 w-20 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,201,154,0.55)_0%,rgba(255,122,22,0.18)_40%,transparent_72%)] blur-2xl sm:h-28 sm:w-28" />
+                <h1 className="font-aggro-display relative text-[clamp(2.25rem,10.4vw,5.35rem)] font-black tracking-[-0.04em] text-white">
+                  <span className="flex flex-col items-center gap-[0.085em] sm:gap-[0.07em]">
                     {heroTitleLines.map((line, lineIndex) => (
                       <span
                         key={`${line}-${lineIndex}`}
-                        className="hero-headline-line block whitespace-nowrap break-keep leading-[0.93]"
+                        className="hero-headline-line flex max-w-full flex-wrap items-end justify-center gap-x-[0.04em] gap-y-[0.02em] break-keep leading-[0.92] sm:flex-nowrap"
                         style={{ ['--hero-line-delay' as string]: `${0.06 + lineIndex * 0.1}s` }}
                       >
                         {getHeroTokens(line, lineIndex).map((token, tokenIndex) => (
@@ -224,25 +306,25 @@ export function HeroSection({ brand }: HeroSectionProps) {
                   </span>
                 </h1>
               </div>
-              <p className="hero-copy-enter mx-auto max-w-[38rem] break-keep text-[15px] font-semibold leading-[1.8] text-white/[0.82] sm:text-[16.5px]">
+              <p className="hero-copy-enter mx-auto max-w-[40rem] break-keep px-2 text-[14.5px] font-semibold leading-[1.82] text-white/[0.82] sm:text-[16.5px]">
                 {brand.heroDescription}
               </p>
             </div>
           </div>
 
           <div
-            className="hero-cta-enter flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center"
+            className="hero-cta-enter flex flex-col gap-3 px-1 sm:flex-row sm:flex-wrap sm:justify-center"
             style={{ ['--hero-cta-delay' as string]: '0.48s' }}
           >
             <a
               href="#consult"
-              className="premium-cta premium-cta-primary h-12 justify-center px-7 text-[14px] sm:w-auto"
+              className="premium-cta premium-cta-primary h-12 w-full justify-center px-7 text-[14px] sm:w-auto sm:min-w-[11rem]"
             >
               상담 문의하기
             </a>
             <a
               href="/go/experience?placement=hero_experience"
-              className="premium-cta premium-cta-ghost h-12 justify-center px-7 text-[14px] sm:w-auto"
+              className="premium-cta premium-cta-ghost h-12 w-full justify-center px-7 text-[14px] sm:w-auto sm:min-w-[11rem]"
             >
               웹앱 체험하기
             </a>
