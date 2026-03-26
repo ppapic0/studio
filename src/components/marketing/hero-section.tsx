@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import type { CSSProperties } from 'react';
 
 import type { MarketingContent } from '@/lib/marketing-content';
 
@@ -6,20 +7,30 @@ type HeroSectionProps = {
   brand: MarketingContent['brand'];
 };
 
-function renderTitleLine(line: string) {
-  if (!line.includes('트랙')) {
-    return line;
-  }
+type HeroToken = {
+  text: string;
+  highlight?: boolean;
+  x: string;
+  y: string;
+  rotate: string;
+  scale: string;
+  delay: string;
+};
 
-  const [before, after] = line.split('트랙');
+function getHeroTokens(line: string, lineIndex: number): HeroToken[] {
+  const motionByLine: HeroToken[][] = [
+    [{ text: line, x: '-58px', y: '-22px', rotate: '-8deg', scale: '0.88', delay: '0s' }],
+    line.includes('트랙')
+      ? [
+          { text: '성장의 길, ', x: '-34px', y: '30px', rotate: '8deg', scale: '0.92', delay: '0s' },
+          { text: '트랙', highlight: true, x: '0px', y: '-52px', rotate: '-10deg', scale: '1.24', delay: '0.04s' },
+          { text: '에서', x: '42px', y: '18px', rotate: '7deg', scale: '0.9', delay: '0.1s' },
+        ]
+      : [{ text: line, x: '-18px', y: '28px', rotate: '6deg', scale: '0.94', delay: '0s' }],
+    [{ text: line, x: '46px', y: '42px', rotate: '-7deg', scale: '0.86', delay: '0s' }],
+  ];
 
-  return (
-    <>
-      {before}
-      <span className="text-[#FF7A16]">트랙</span>
-      {after}
-    </>
-  );
+  return motionByLine[lineIndex] ?? [{ text: line, x: '0px', y: '20px', rotate: '0deg', scale: '0.94', delay: '0s' }];
 }
 
 export function HeroSection({ brand }: HeroSectionProps) {
@@ -31,7 +42,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
       coreColor: 'rgba(255,136,48,0.28)',
       delay: '0.2s',
       duration: '7.8s',
-      opacity: 0.44,
+      opacity: 0.28,
     },
     {
       className: 'left-[16%] top-[26%] h-20 w-20 sm:h-28 sm:w-28 lg:h-32 lg:w-32',
@@ -39,7 +50,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
       coreColor: 'rgba(255,214,168,0.18)',
       delay: '1.8s',
       duration: '6.3s',
-      opacity: 0.3,
+      opacity: 0.22,
     },
     {
       className: 'left-[9%] bottom-[18%] h-16 w-16 sm:h-24 sm:w-24 lg:h-28 lg:w-28',
@@ -47,7 +58,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
       coreColor: 'rgba(255,160,84,0.16)',
       delay: '3.1s',
       duration: '8.6s',
-      opacity: 0.2,
+      opacity: 0.14,
     },
   ];
   const heroParticles = [
@@ -181,22 +192,48 @@ export function HeroSection({ brand }: HeroSectionProps) {
             <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
             <div className="space-y-5">
-              <h1 className="font-aggro-display text-[clamp(1.52rem,7vw,4.95rem)] font-black tracking-[-0.038em] text-white">
-                <span className="flex flex-col items-center gap-[0.06em] sm:gap-[0.065em]">
-                  {heroTitleLines.map((line, index) => (
-                    <span key={`${line}-${index}`} className="block whitespace-nowrap break-keep leading-[0.93]">
-                      {renderTitleLine(line)}
-                    </span>
-                  ))}
-                </span>
-              </h1>
-              <p className="mx-auto max-w-[38rem] break-keep text-[15px] font-semibold leading-[1.8] text-white/[0.82] sm:text-[16.5px]">
+              <div className="hero-headline-shell relative mx-auto inline-flex max-w-full justify-center">
+                <div className="hero-headline-aura absolute inset-x-[14%] top-[14%] h-[58%] rounded-full bg-[radial-gradient(circle,rgba(255,122,22,0.22)_0%,rgba(255,184,122,0.12)_28%,transparent_72%)] blur-3xl" />
+                <h1 className="font-aggro-display relative text-[clamp(1.52rem,7vw,4.95rem)] font-black tracking-[-0.038em] text-white">
+                  <span className="flex flex-col items-center gap-[0.06em] sm:gap-[0.065em]">
+                    {heroTitleLines.map((line, lineIndex) => (
+                      <span
+                        key={`${line}-${lineIndex}`}
+                        className="hero-headline-line block whitespace-nowrap break-keep leading-[0.93]"
+                        style={{ ['--hero-line-delay' as string]: `${0.06 + lineIndex * 0.1}s` }}
+                      >
+                        {getHeroTokens(line, lineIndex).map((token, tokenIndex) => (
+                          <span
+                            key={`${token.text}-${tokenIndex}`}
+                            className={`hero-headline-token ${token.highlight ? 'hero-headline-token-highlight text-[#FF7A16]' : ''}`}
+                            style={
+                              {
+                                ['--hero-token-delay' as string]: token.delay,
+                                ['--hero-from-x' as string]: token.x,
+                                ['--hero-from-y' as string]: token.y,
+                                ['--hero-from-rotate' as string]: token.rotate,
+                                ['--hero-from-scale' as string]: token.scale,
+                              } as CSSProperties
+                            }
+                          >
+                            {token.text}
+                          </span>
+                        ))}
+                      </span>
+                    ))}
+                  </span>
+                </h1>
+              </div>
+              <p className="hero-copy-enter mx-auto max-w-[38rem] break-keep text-[15px] font-semibold leading-[1.8] text-white/[0.82] sm:text-[16.5px]">
                 {brand.heroDescription}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+          <div
+            className="hero-cta-enter flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center"
+            style={{ ['--hero-cta-delay' as string]: '0.48s' }}
+          >
             <a
               href="#consult"
               className="premium-cta premium-cta-primary h-12 justify-center px-7 text-[14px] sm:w-auto"
@@ -211,7 +248,10 @@ export function HeroSection({ brand }: HeroSectionProps) {
             </a>
           </div>
 
-          <p className="mx-auto max-w-[32rem] break-keep text-[12px] font-semibold leading-[1.7] text-white/[0.58] sm:text-[12.5px]">
+          <p
+            className="hero-meta-enter mx-auto max-w-[32rem] break-keep text-[12px] font-semibold leading-[1.7] text-white/[0.58] sm:text-[12.5px]"
+            style={{ ['--hero-meta-delay' as string]: '0.58s' }}
+          >
             관리형 스터디센터 · 국어학원 · 학부모 앱 연동
           </p>
         </div>
