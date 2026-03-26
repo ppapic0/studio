@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Check,
   CircleDot,
+  ListTodo,
   Sparkles,
   Target,
   RefreshCw,
@@ -38,6 +39,7 @@ import {
   BellRing,
   Info,
   ShieldAlert,
+  ArrowRight,
   ClipboardCheck,
   UserCheck,
   CalendarX,
@@ -752,80 +754,6 @@ function MiniBestStudySparkline({
         <path d={linePath} fill="none" stroke="#0EA5E9" strokeWidth={isMobile ? 2.4 : 2.6} strokeLinecap="round" strokeLinejoin="round" />
         <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 3.1 : 3.5} fill="#0EA5E9" />
         <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 1.35 : 1.6} fill="#EFF6FF" />
-      </svg>
-    </div>
-  );
-}
-
-function MiniStreakSparkline({
-  data,
-  isMobile,
-  currentStreakDays,
-}: {
-  data: Array<{ date: string; value: number }>;
-  isMobile: boolean;
-  currentStreakDays: number;
-}) {
-  const width = isMobile ? 104 : 124;
-  const height = isMobile ? 62 : 72;
-  const chartHeight = isMobile ? 34 : 40;
-  const paddingX = 5;
-  const paddingY = 5;
-  const gradientId = isMobile ? 'streak-fill-mobile' : 'streak-fill-desktop';
-
-  const normalizedData = data.length > 1
-    ? data
-    : data.length === 1
-      ? [data[0], data[0]]
-      : [
-          { date: 'start', value: 0 },
-          { date: 'end', value: 0 },
-        ];
-
-  const maxValue = Math.max(1, ...normalizedData.map((item) => item.value));
-
-  const getX = (index: number) => {
-    if (normalizedData.length <= 1) return width / 2;
-    return paddingX + (index / (normalizedData.length - 1)) * (width - paddingX * 2);
-  };
-
-  const getY = (value: number) => {
-    const usableHeight = chartHeight - paddingY * 2;
-    return chartHeight - paddingY - (value / maxValue) * usableHeight;
-  };
-
-  const linePath = normalizedData
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(point.value)}`)
-    .join(' ');
-  const areaPath = `${linePath} L ${getX(normalizedData.length - 1)} ${chartHeight} L ${getX(0)} ${chartHeight} Z`;
-  const lastPoint = normalizedData[normalizedData.length - 1];
-  const lastPointX = getX(normalizedData.length - 1);
-  const lastPointY = getY(lastPoint.value);
-
-  return (
-    <div className={cn(
-      "pointer-events-none w-full rounded-[1.05rem] border border-rose-100/90 bg-[linear-gradient(180deg,rgba(255,246,248,0.97)_0%,rgba(255,255,255,0.9)_100%)] px-2.5 py-2 shadow-[0_16px_36px_-30px_rgba(244,63,94,0.42)]",
-      isMobile ? "min-h-[4.15rem]" : "min-h-[4.7rem]"
-    )}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-rose-500/65">7일 흐름</span>
-        <span className="text-[9px] font-black text-rose-600">{currentStreakDays}일</span>
-      </div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className={cn("mt-1 w-full", isMobile ? "h-[2.7rem]" : "h-[3rem]")}
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#FB7185" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#FB7185" stopOpacity="0.04" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill={`url(#${gradientId})`} />
-        <path d={linePath} fill="none" stroke="#F43F5E" strokeWidth={isMobile ? 2.35 : 2.55} strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 3.1 : 3.5} fill="#F43F5E" />
-        <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 1.35 : 1.6} fill="#FFF1F2" />
       </svg>
     </div>
   );
@@ -1928,6 +1856,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const latestUnreadReport = teacherReports.find((report) => !report.viewedAt) || null;
   const latestCoachReport = teacherReports[0] || null;
 
+  const weeklyStudyMinutes = useMemo(
+    () => studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0),
+    [studyTimeTrend]
+  );
+  const previousWeekStudyMinutes = useMemo(() => {
+    if (!today) return 0;
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = subDays(today, 13 - index);
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return logMinutesByDateKey.get(dateKey) || 0;
+    }).reduce((sum, minutes) => sum + minutes, 0);
+  }, [today, logMinutesByDateKey]);
+  const weeklyStudyDelta = weeklyStudyMinutes - previousWeekStudyMinutes;
   const weeklyBestMinutes = useMemo(
     () => studyTimeTrend.reduce((max, item) => Math.max(max, item.minutes), 0),
     [studyTimeTrend]
@@ -1980,20 +1921,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return progress?.dailyLpStatus?.[dateKey]?.plan ? 1 : 0;
     }).reduce<number>((sum, count) => sum + count, 0);
   }, [today, progress?.dailyLpStatus]);
-  const streakTrend = useMemo(() => {
-    if (!today) return [];
-    let runningStreak = 0;
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = subDays(today, 6 - index);
-      const dateKey = format(date, 'yyyy-MM-dd');
-      const studiedMinutes = logMinutesByDateKey.get(dateKey) || 0;
-      runningStreak = studiedMinutes > 0 ? runningStreak + 1 : 0;
-      return {
-        date: format(date, 'M/d'),
-        value: runningStreak,
-      };
-    });
-  }, [today, logMinutesByDateKey]);
+  const todayRemainingTasks = useMemo(
+    () => todayStudyTasks.filter((item) => !item.done),
+    [todayStudyTasks]
+  );
+  const todayMissionList = useMemo(
+    () => todayRemainingTasks.slice(0, 3),
+    [todayRemainingTasks]
+  );
+  const todayPotentialPlanBonus = useMemo(() => {
+    const alreadyEarnedPlanBonus = !!progress?.dailyLpStatus?.[todayKey]?.plan;
+    if (alreadyEarnedPlanBonus || todayStudyTasks.length < 3 || todayRemainingTasks.length === 0) return 0;
+    return Math.round(100 * finalMultiplier);
+  }, [progress?.dailyLpStatus, todayKey, todayStudyTasks.length, todayRemainingTasks.length, finalMultiplier]);
+
   const activeStudentIds = useMemo(() => {
     if (!activeStudentMembers) return null;
     return new Set(
@@ -2064,6 +2005,236 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
     || latestCoachReport?.nextAction?.trim()
     || summarizeReportLine(latestCoachReport?.content);
+  const missionAction = useMemo(() => {
+    if (isTimerActive) {
+      return {
+        title: '집중 흐름을 이어갈 시간',
+        description: `${formatTimer(localSeconds)} 동안 몰입 중이에요. 지금 리듬을 유지하면 오늘 목표에 가장 빨리 도달할 수 있어요.`,
+        cta: '집중 종료',
+        meta: '공부 중',
+        accent: `${todayDoneTaskCount}/${todayTaskCount || 0}개 완료`,
+        mode: 'timer' as const,
+      };
+    }
+    if (todayRemainingTasks.length > 0 && totalMinutesCount === 0) {
+      return {
+        title: '오늘의 첫 몰입을 시작해요',
+        description: `남은 미션 ${todayRemainingTasks.length}개가 기다리고 있어요. 첫 세션을 열면 오늘의 흐름이 바로 시작됩니다.`,
+        cta: '공부 시작',
+        meta: '공부 전',
+        accent: todayPotentialPlanBonus > 0 ? `완료 시 +${todayPotentialPlanBonus} LP 예상` : '오늘 목표부터 가볍게 시작',
+        mode: 'start' as const,
+      };
+    }
+    if (todayRemainingTasks.length > 0) {
+      return {
+        title: '남은 미션을 정리할 차례예요',
+        description: `지금 ${todayRemainingTasks.length}개만 더 끝내면 오늘 계획이 한층 선명해져요.`,
+        cta: '계획 보기',
+        meta: '공부 후반',
+        accent: todayPotentialPlanBonus > 0 ? `완료 시 +${todayPotentialPlanBonus} LP 예상` : '남은 목표를 마무리해요',
+        mode: 'plan' as const,
+      };
+    }
+    if (unreadReportCount > 0) {
+      return {
+        title: '오늘 성과를 선생님 코칭으로 마무리해요',
+        description: `읽지 않은 리포트 ${unreadReportCount}건이 있어요. 지금 보면 오늘의 흐름을 더 잘 정리할 수 있어요.`,
+        cta: '리포트 보기',
+        meta: '공부 후',
+        accent: coachSummary,
+        mode: 'report' as const,
+      };
+    }
+    return {
+      title: '오늘의 루틴을 잘 마무리했어요',
+      description: '이제 성과를 가볍게 돌아보고, 내일 목표를 준비해 두면 다음 집중이 더 쉬워집니다.',
+      cta: '계획트랙 열기',
+      meta: '마무리',
+      accent: `이번 주 ${formatMinutesToKorean(weeklyStudyMinutes)} 공부`,
+      mode: 'review' as const,
+    };
+  }, [
+    isTimerActive,
+    localSeconds,
+    todayDoneTaskCount,
+    todayTaskCount,
+    todayRemainingTasks.length,
+    totalMinutesCount,
+    todayPotentialPlanBonus,
+    unreadReportCount,
+    coachSummary,
+    weeklyStudyMinutes,
+  ]);
+
+  const compactMissionTitle = useMemo(() => {
+    switch (missionAction.mode) {
+      case 'timer':
+        return '집중 유지';
+      case 'start':
+        return '첫 세션 시작';
+      case 'plan':
+        return '미션 정리';
+      case 'report':
+        return '코칭 확인';
+      default:
+        return '루틴 마감';
+    }
+  }, [missionAction.mode]);
+
+  const missionFocusCard = useMemo(() => {
+    if (todayMissionList.length > 0) {
+      const firstTask = todayMissionList[0];
+      return {
+        label: '남은 미션',
+        value: `${todayRemainingTasks.length}개`,
+        detail: firstTask.targetMinutes
+          ? `${firstTask.title} · ${firstTask.targetMinutes}분`
+          : firstTask.title,
+      };
+    }
+
+    if (unreadReportCount > 0) {
+      return {
+        label: '코칭',
+        value: `${unreadReportCount}개`,
+        detail: coachSummary || '도착한 리포트를 확인해 보세요.',
+      };
+    }
+
+    if (latestAnnouncement) {
+      return {
+        label: '센터 공지',
+        value: '새 소식',
+        detail: latestAnnouncement.title || '센터 공지를 확인해 보세요.',
+      };
+    }
+
+    return {
+      label: '오늘 상태',
+      value: '완료',
+      detail: '오늘 흐름을 잘 마무리했어요.',
+    };
+  }, [
+    todayMissionList,
+    todayRemainingTasks.length,
+    unreadReportCount,
+    coachSummary,
+    latestAnnouncement,
+  ]);
+
+  const handleMissionAction = useCallback(async () => {
+    if (missionAction.mode === 'timer' || missionAction.mode === 'start') {
+      await handleStudyStartStop();
+      return;
+    }
+    if (missionAction.mode === 'report') {
+      router.push('/dashboard/student-reports');
+      return;
+    }
+    router.push('/dashboard/plan');
+  }, [handleStudyStartStop, missionAction.mode, router]);
+
+  const missionActionIcon = missionAction.mode === 'report'
+    ? <FileText className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+    : missionAction.mode === 'plan' || missionAction.mode === 'review'
+      ? <ListTodo className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
+      : <Sparkles className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />;
+
+  const todayDashboardSummary = (
+    <Card className={cn(
+      "relative overflow-hidden border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.42)] ring-1 ring-slate-100/80",
+      isMobile ? "rounded-[1.5rem]" : "rounded-[2.25rem]"
+    )}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,rgba(255,255,255,0),rgba(59,130,246,0.28),rgba(255,255,255,0))]" />
+      <div className="pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full bg-sky-100/60 blur-3xl" />
+      <CardContent className={cn("relative", isMobile ? "p-5" : "p-7")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Badge className="border-none bg-primary/8 text-primary font-black text-[10px] tracking-[0.18em] uppercase">
+              오늘 요약
+            </Badge>
+            <p className={cn("mt-3 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base" : "text-xl")}>
+              오늘 흐름을 한눈에 정리했어요
+            </p>
+          </div>
+          <div className={cn(
+            "shrink-0 rounded-2xl border border-white/80 bg-white/85 text-primary shadow-[0_12px_24px_-20px_rgba(59,130,246,0.55)]",
+            isMobile ? "p-2.5" : "p-3"
+          )}>
+            {missionActionIcon}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]")}>
+            <div className="rounded-[1.25rem] border border-slate-200/80 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">지금</p>
+              <p className={cn("mt-2 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base leading-6" : "text-xl")}>
+                {compactMissionTitle}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">{missionAction.meta}</p>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-primary/10 bg-primary/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary/55">오늘 목표</p>
+              <p className={cn("dashboard-number mt-2 text-primary leading-none", isMobile ? "text-[1.55rem]" : "text-[2.1rem]")}>
+                {todayDoneTaskCount}<span className="ml-1 text-sm font-bold opacity-40">/ {todayTaskCount || 0}</span>
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-primary/70">{todayPlanRate}% 완료</p>
+            </div>
+
+            <div className={cn(
+              "rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+              isMobile ? "col-span-2" : ""
+            )}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{missionFocusCard.label}</p>
+              <p className={cn("mt-2 font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-base" : "text-xl")}>
+                {missionFocusCard.value}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500">
+                {missionFocusCard.detail}
+              </p>
+            </div>
+          </div>
+
+          <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-stretch")}>
+            <div className="rounded-[1.25rem] border border-slate-200/80 bg-white/92 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-primary/5 px-3 text-[10px] font-black text-primary">
+                  {missionAction.meta}
+                </Badge>
+                {weeklyStudyDelta !== 0 && (
+                  <Badge variant="outline" className={cn(
+                    "h-7 rounded-full px-3 text-[10px] font-black",
+                    weeklyStudyDelta > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-600"
+                  )}>
+                    {weeklyStudyDelta > 0 ? '▲' : '▼'} {formatMinutesToKorean(Math.abs(weeklyStudyDelta))}
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm font-black leading-6 text-slate-900">
+                {missionAction.accent}
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => void handleMissionAction()}
+              disabled={isProcessingAction && (missionAction.mode === 'timer' || missionAction.mode === 'start')}
+              className={cn(
+                "student-cta rounded-2xl border border-primary/12 bg-white font-black text-primary shadow-[0_20px_40px_-28px_rgba(59,130,246,0.45)] transition-all hover:bg-primary/5",
+                isMobile ? "h-12 w-full text-sm" : "min-w-[10rem] px-8 text-base"
+              )}
+            >
+              {missionAction.cta} <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
       <section className={cn(
@@ -2181,20 +2352,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">연속 성장</span>
                 <RefreshCw className="h-4 w-4 text-rose-400" />
               </div>
-              <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
-                <div className="min-w-0 flex-1">
-                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
-                    {currentStreakDays}<span className="ml-1 text-xs font-bold text-slate-400">일</span>
-                  </p>
-                  <p className="mt-1 break-keep text-[11px] font-semibold text-slate-500">최근 5일 목표 달성 {recentFivePlanWins}/5일</p>
-                </div>
-                <div className={cn("shrink-0", isMobile ? "w-full max-w-[7rem] self-end" : "w-[6.8rem]")}>
-                  <MiniStreakSparkline
-                    data={streakTrend}
-                    isMobile={isMobile}
-                    currentStreakDays={currentStreakDays}
-                  />
-                </div>
+              <div className="mt-3">
+                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
+                  {currentStreakDays}<span className="ml-1 text-xs font-bold text-slate-400">일</span>
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">최근 5일 목표 달성 {recentFivePlanWins}/5일</p>
               </div>
             </CardContent>
           </Card>
@@ -2205,16 +2367,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">개인 최고</span>
                 <Trophy className="h-4 w-4 text-sky-500" />
               </div>
-              <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
+              <div className="mt-3 flex items-end justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className={cn("font-black tracking-tight text-slate-900 break-keep whitespace-nowrap", isMobile ? "text-[clamp(1.25rem,6vw,1.55rem)] leading-7" : "text-2xl leading-8")}>
+                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
                     {formatMinutesToKorean(personalBestMinutes)}
                   </p>
-                  <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
                     {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : monthlyBestMinutes > 0 ? '이번 달 최근 기록 기준' : '이번 달 최고 기록 준비 중'}
                   </p>
                 </div>
-                <div className={cn("shrink-0", isMobile ? "w-full max-w-[7.2rem] self-end" : "w-[7rem]")}>
+                <div className={cn("shrink-0", isMobile ? "w-[6.2rem]" : "w-[7rem]")}>
                   <MiniBestStudySparkline
                     data={personalBestTrend.data}
                     isMobile={isMobile}
@@ -2533,7 +2695,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn("flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4" : "")}>
                 {selectedTeacherReport ? (
                   <div className="bg-white rounded-2xl border border-border/50 p-4">
-                    <VisualReportViewer content={selectedTeacherReport.content} />
+                    <VisualReportViewer
+                      content={selectedTeacherReport.content}
+                      aiMeta={selectedTeacherReport.aiMeta}
+                      dateKey={selectedTeacherReport.dateKey}
+                      studentName={selectedTeacherReport.studentName}
+                    />
                   </div>
                 ) : isTeacherReportsLoading ? (
                   <div className="py-16 flex justify-center">
@@ -2728,6 +2895,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       {isJacob && !isMobile && progressRef && activeMembership && <JacobTierController progressRef={progressRef} currentStats={stats} currentLp={progress?.seasonLp || 0} userId={user.uid} centerId={activeMembership.id} periodKey={periodKey} displayName={user.displayName || 'Jacob'} className={activeMembership.className} schoolName={studentProfile?.schoolName} />}
+
+      <section>
+        {todayDashboardSummary}
+      </section>
     </div>
   );
 }

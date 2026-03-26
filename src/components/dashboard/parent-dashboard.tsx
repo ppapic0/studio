@@ -117,6 +117,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { VisualReportViewer } from './visual-report-viewer';
 
 function toHm(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -1085,18 +1086,6 @@ function formatMinutes(minutes: number) {
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
   if (!value || Number.isNaN(value.getTime())) return emptyLabel;
   return format(value, 'HH:mm');
-}
-
-function formatCompactCalendarTime(minutes: number, isCurrentMonth: boolean) {
-  if (!isCurrentMonth || minutes <= 0) return '--';
-  if (minutes < 60) return `${minutes}m`;
-
-  const roundedHalfHour = Math.round((minutes / 60) * 2) / 2;
-  const label = Number.isInteger(roundedHalfHour)
-    ? roundedHalfHour.toFixed(0)
-    : roundedHalfHour.toFixed(1);
-
-  return `${label}h`;
 }
 
 const PARENT_CALENDAR_LEGEND = [
@@ -3402,17 +3391,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className={cn(
                   "grid grid-cols-7 gap-1.5 border-b border-[#14295F]/10",
-                  isMobile ? "gap-[2px] px-1 py-1.5" : "px-4 py-3"
+                  isMobile ? "px-2 py-2.5" : "px-4 py-3"
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
-                      isMobile ? "py-1 text-[8px] md:py-1.5 md:text-[9px]" : "py-3 text-[11px]",
+                      isMobile ? "py-2 text-[10px] md:py-2.5 md:text-[11px]" : "py-3 text-[11px]",
                       "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                       i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-[2px] p-1" : "gap-2.5 p-3")}>
+                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1.5 p-2" : "gap-2.5 p-3")}>
                   {logsLoading ? (
                     <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
@@ -3423,9 +3412,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     const isTodayCalendar = isSameDay(day, new Date());
                     const hasPlans = (weeklyPlans || []).some((plan) => plan.dateKey === dateKey);
                     const hasDeepFocus = isCurrentMonth && minutes >= 180;
+                    const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
                     const timeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
-                    const compactTimeLabel = formatCompactCalendarTime(minutes, isCurrentMonth);
-                    const compactStatusTone = hasDeepFocus ? 'bg-orange-400' : hasPlans ? 'bg-[#14295F]/68' : 'bg-transparent';
 
                     return (
                       <button
@@ -3434,93 +3422,63 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
                           "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
-                          isMobile ? "aspect-square min-h-[3.45rem] p-[0.38rem] md:min-h-[4.4rem] md:p-[0.5rem]" : "min-h-[150px] p-3",
+                          isMobile ? "aspect-[0.94] min-h-[4.8rem] p-1.5 md:min-h-[7.2rem] md:p-2.5" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                           isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
-                          isTodayCalendar && (isMobile ? "z-10 ring-[1.5px] ring-inset ring-[#FF7A16]/28 shadow-[0_10px_18px_-16px_rgba(20,41,95,0.18)]" : "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]")
+                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
                         )}
                       >
-                        {isTodayCalendar && <div className={cn("pointer-events-none absolute border border-[#FF7A16]/20", isMobile ? "-inset-px rounded-[0.98rem]" : "-inset-0.5 rounded-[1.3rem]")} />}
-                        <div className={cn("pointer-events-none absolute top-0 h-px bg-white/90", isMobile ? "inset-x-1.5" : "inset-x-3")} />
-                        {isMobile ? (
-                          <div className="relative z-10 flex h-full flex-col justify-between">
-                            <div className="flex items-start justify-between gap-1">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                                  "min-w-[1.14rem] px-[0.36rem] py-[0.18rem] text-[8px] md:min-w-[1.26rem] md:text-[8.5px]",
-                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white/94 text-slate-700",
-                                  isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
-                                )}
-                              >
-                                {format(day, 'd')}
-                              </span>
-                              <span
-                                className={cn(
-                                  "mt-[0.22rem] h-1.5 w-1.5 rounded-full transition-opacity",
-                                  compactStatusTone,
-                                  !(hasPlans || hasDeepFocus) && "opacity-0"
-                                )}
-                                aria-hidden="true"
-                              />
-                            </div>
-
-                            <div className="flex flex-1 items-end justify-center pb-[0.04rem]">
-                              <span
-                                className={cn(
-                                  "dashboard-number inline-flex max-w-full items-center justify-center rounded-full border bg-white/92 px-1.5 py-[0.24rem] text-[0.64rem] leading-none tracking-[-0.04em] shadow-[0_8px_14px_-12px_rgba(20,41,95,0.18)] md:text-[0.7rem]",
-                                  getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                                )}
-                              >
-                                {compactTimeLabel}
-                              </span>
-                            </div>
+                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
+                        <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
+                        {isCurrentMonth && (
+                          <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
+                            <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                           </div>
-                        ) : (
-                          <>
-                            {isCurrentMonth && (
-                              <div className="pointer-events-none absolute inset-x-3 bottom-[4.1rem]">
-                                <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
+                        )}
+                        <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
+                          <span
+                            className={cn(
+                              "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                              isMobile ? "text-[10px] min-w-[1.6rem] px-1.5 py-0.5 md:text-[11px] md:px-2 md:py-0.75" : "text-xs min-w-[2rem] px-2 py-1",
+                              idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                              isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
+                            )}
+                          >
+                            {format(day, 'd')}
+                          </span>
+                          {hasStatusCluster ? (
+                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1.5 py-[0.3rem]" : "px-2 py-1")}>
+                              {hasPlans && <span className={cn("rounded-full bg-[#14295F]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
+                            </div>
+                          ) : (
+                            <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
+                          <div
+                            className={cn(
+                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                              isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
+                              getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                            )}
+                          >
+                            {isMobile ? (
+                              <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
+                                {timeLabel}
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                  공부시간
+                                </span>
+                                <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
+                                  {timeLabel}
+                                </span>
                               </div>
                             )}
-                            <div className="relative z-10 flex justify-between items-start gap-2 mb-2.5">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] text-xs min-w-[2rem] px-2 py-1",
-                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                                  isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
-                                )}
-                              >
-                                {format(day, 'd')}
-                              </span>
-                              {(hasPlans || hasDeepFocus) ? (
-                                <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]">
-                                  {hasPlans && <span className="h-2 w-2 rounded-full bg-[#14295F]" />}
-                                  {hasDeepFocus && <Zap className="h-3 w-3 fill-orange-500 text-orange-500" />}
-                                </div>
-                              ) : (
-                                <span className="h-6 w-6" aria-hidden="true" />
-                              )}
-                            </div>
-                            <div className="absolute left-0 right-0 bottom-3 px-3">
-                              <div
-                                className={cn(
-                                  "rounded-[0.95rem] border bg-white text-center whitespace-nowrap px-3 py-2.5 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                                  getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                                )}
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                                    공부시간
-                                  </span>
-                                  <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
-                                    {timeLabel}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                          </div>
+                        </div>
                         {!isMobile && isCurrentMonth && (
                           <div className="pointer-events-none absolute inset-x-3 bottom-12">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
@@ -4291,9 +4249,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       {selectedChildReport.viewedAt ? '읽음' : '새 리포트'}
                     </Badge>
                   </div>
-                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
-                    {selectedChildReport.content || '리포트 내용이 없습니다.'}
-                  </p>
+                  {selectedChildReport.content ? (
+                    <VisualReportViewer
+                      content={selectedChildReport.content}
+                      aiMeta={selectedChildReport.aiMeta}
+                      dateKey={selectedChildReport.dateKey}
+                      studentName={selectedChildReport.studentName}
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
+                      리포트 내용이 없습니다.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="flex h-full min-h-[180px] items-center justify-center text-center text-sm font-bold text-slate-400">
