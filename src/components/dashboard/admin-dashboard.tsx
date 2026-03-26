@@ -1447,6 +1447,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         selectedRoomView={selectedRoomView}
         selectedClass={selectedClass}
         isMobile={isMobile}
+        seatDetailLevel="nameOnly"
         isLoading={attendanceBoardLoading}
         summary={attendanceBoardSummary}
         seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
@@ -1489,6 +1490,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               selectedRoomView="all"
               selectedClass={selectedClass}
               isMobile={isMobile}
+              seatDetailLevel="nameOnly"
               isLoading={attendanceBoardLoading}
               summary={attendanceBoardSummary}
               seatSignalsBySeatId={attendanceSeatSignalsBySeatId}

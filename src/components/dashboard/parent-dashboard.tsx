@@ -759,22 +759,73 @@ function RhythmTimeChartDialog({
   rhythmScore: number;
 }) {
   const latestRhythm = trend.slice().reverse().find((item) => typeof item.rhythmMinutes === 'number');
+  const rhythmPreviewBars = rhythmScoreTrend.slice(-6);
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 cursor-pointer">
-          <div className="mb-3 flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
-              <TrendingUp className="h-4 w-4 text-[#FF7A16]" />
-              학습 리듬 시간
-            </CardTitle>
-            <Maximize2 className="h-4 w-4 text-slate-300" />
-          </div>
-          <div className="w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-            <p className="text-xs font-black text-[#14295F]">오늘 학습 리듬 점수</p>
-            <p className="mt-2 text-3xl font-black text-[#14295F]">{rhythmScore}점</p>
-            <p className="mt-3 text-[11px] font-bold text-slate-500">카드를 누르면 상세 그래프를 확인할 수 있어요.</p>
+        <Card className="group relative overflow-hidden rounded-[1.9rem] border border-[#dce6f8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_46%,#eef4ff_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.24)] transition-[transform,box-shadow] duration-200 cursor-pointer active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_28px_60px_-34px_rgba(20,41,95,0.28)] sm:p-6">
+          <div className="pointer-events-none absolute -right-10 top-0 h-28 w-28 rounded-full bg-[#ffd3a8]/35 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(255,255,255,0)_42%)]" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#e4edff] bg-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-20px_rgba(20,41,95,0.18)]">
+                  <TrendingUp className="h-4.5 w-4.5 text-[#FF7A16]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Rhythm Insight</p>
+                  <CardTitle className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">학습 리듬 시간</CardTitle>
+                  <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
+                    시작 흐름과 리듬 점수를 리포트처럼 정리해 빠르게 읽을 수 있어요.
+                  </p>
+                </div>
+              </div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d9e4fb] bg-white/92 text-[#7c8fb6] shadow-sm">
+                <Maximize2 className="h-3.5 w-3.5" />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[1.35rem] border border-[#dfe9fb] bg-white/88 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">오늘 학습 리듬 점수</p>
+                  <div className="mt-2 flex items-end gap-1.5">
+                    <span className="dashboard-number text-[2.25rem] leading-none tracking-[-0.05em] text-[#14295F]">
+                      {rhythmScore}
+                    </span>
+                    <span className="pb-1 text-[12px] font-black text-[#6d7fa5]">점</span>
+                  </div>
+                </div>
+                <Badge variant="outline" className="h-7 rounded-full border border-[#d8e5ff] bg-[#eef4ff] px-3 text-[10px] font-black text-[#14295F]">
+                  최근 시작 {latestRhythm?.rhythmMinutes ? toClockLabel(latestRhythm.rhythmMinutes) : '기록 대기'}
+                </Badge>
+              </div>
+
+              <div className="mt-4 flex items-end gap-1.5">
+                {(rhythmPreviewBars.length > 0 ? rhythmPreviewBars : [{ date: '대기', score: 0 }]).map((point, index, array) => {
+                  const safeScore = Math.max(6, Math.round((Number(point.score || 0) / 100) * 44));
+                  const isLatest = index === array.length - 1;
+                  return (
+                    <div key={`${point.date}-${index}`} className="flex-1">
+                      <div
+                        className={cn(
+                          'w-full rounded-full transition-all duration-200',
+                          isLatest
+                            ? 'bg-[linear-gradient(180deg,#14295F_0%,#FF7A16_100%)] shadow-[0_14px_20px_-16px_rgba(20,41,95,0.4)]'
+                            : 'bg-[linear-gradient(180deg,#d8e5ff_0%,#b8c9ef_100%)]'
+                        )}
+                        style={{ height: `${safeScore}px` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mt-4 text-[11px] font-bold leading-5 text-slate-500">
+                카드를 누르면 최근 14일 리듬 그래프와 점수 추이를 자세히 볼 수 있어요.
+              </p>
+            </div>
           </div>
         </Card>
       </DialogTrigger>
@@ -881,26 +932,75 @@ function SubjectStudyChartDialog({
 }) {
   const previewData = subjects.slice(0, 5);
   const topSubject = subjects[0];
+  const topSubjectRatio = topSubject ? Math.round((topSubject.minutes / Math.max(subjectTotalMinutes, 1)) * 100) : 0;
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 cursor-pointer">
-          <div className="mb-3 flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
-              <BarChart3 className="h-4 w-4 text-[#14295F]" />
-              과목별 학습시간
-            </CardTitle>
-            <Maximize2 className="h-4 w-4 text-slate-300" />
-          </div>
-          <div className="w-full rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-            <p className="text-xs font-black text-[#14295F]">집중 KPI</p>
-            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-600">
-              카드를 누르면 과목별 학습 그래프를 확인할 수 있어요.
-            </p>
-            <p className="mt-3 text-[11px] font-black text-[#14295F]">
-              현재 1위 과목: {topSubject?.subject || '-'}
-            </p>
+        <Card className="group relative overflow-hidden rounded-[1.9rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_46%,#eef4ff_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.22)] transition-[transform,box-shadow] duration-200 cursor-pointer active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_28px_60px_-34px_rgba(20,41,95,0.28)] sm:p-6">
+          <div className="pointer-events-none absolute -right-10 top-0 h-28 w-28 rounded-full bg-[#bad3ff]/30 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(255,255,255,0)_42%)]" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#dfe9ff] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-20px_rgba(20,41,95,0.18)]">
+                  <BarChart3 className="h-4.5 w-4.5 text-[#14295F]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Subject Insight</p>
+                  <CardTitle className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">과목별 학습시간</CardTitle>
+                  <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
+                    어떤 과목에 시간이 가장 많이 배분됐는지 핵심 KPI 중심으로 보여드립니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d9e4fb] bg-white/92 text-[#7c8fb6] shadow-sm">
+                <Maximize2 className="h-3.5 w-3.5" />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[1.35rem] border border-[#dfe8fb] bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">현재 1위 과목</p>
+                  <p className="mt-2 break-keep text-[1.3rem] font-black tracking-tight text-[#14295F]">
+                    {topSubject?.subject || '기록 대기'}
+                  </p>
+                </div>
+                <Badge variant="outline" className="h-7 rounded-full border border-[#d8e5ff] bg-[#eef4ff] px-3 text-[10px] font-black text-[#14295F]">
+                  총 {toHm(subjectTotalMinutes)}
+                </Badge>
+              </div>
+
+              <div className="mt-4 grid gap-2.5">
+                {previewData.slice(0, 3).map((item) => {
+                  const ratio = Math.round((item.minutes / Math.max(subjectTotalMinutes, 1)) * 100);
+                  return (
+                    <div key={item.subject} className="grid gap-1">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-black text-slate-500">
+                        <span className="flex min-w-0 items-center gap-2 text-[#14295F]">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="truncate">{item.subject}</span>
+                        </span>
+                        <span>{ratio}%</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-[#e8eefb]">
+                        <div
+                          className="h-full rounded-full bg-[linear-gradient(90deg,#14295F_0%,#7ba7ff_100%)]"
+                          style={{ width: `${Math.max(8, ratio)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mt-4 text-[11px] font-bold leading-5 text-slate-500">
+                {topSubject
+                  ? `${topSubject.subject} 비중이 현재 ${topSubjectRatio}%로 가장 높습니다.`
+                  : '카드를 누르면 과목별 학습 그래프를 확인할 수 있어요.'}
+              </p>
+            </div>
           </div>
         </Card>
       </DialogTrigger>
@@ -985,6 +1085,18 @@ function formatMinutes(minutes: number) {
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
   if (!value || Number.isNaN(value.getTime())) return emptyLabel;
   return format(value, 'HH:mm');
+}
+
+function formatCompactCalendarTime(minutes: number, isCurrentMonth: boolean) {
+  if (!isCurrentMonth || minutes <= 0) return '--';
+  if (minutes < 60) return `${minutes}m`;
+
+  const roundedHalfHour = Math.round((minutes / 60) * 2) / 2;
+  const label = Number.isInteger(roundedHalfHour)
+    ? roundedHalfHour.toFixed(0)
+    : roundedHalfHour.toFixed(1);
+
+  return `${label}h`;
 }
 
 const PARENT_CALENDAR_LEGEND = [
@@ -2471,6 +2583,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     if (points >= 7) return { label: '선생님과 상담', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
     return { label: '정상', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   }, [penaltyRecovery.effectivePoints]);
+  const latestPenaltyReason = recentPenaltyReasons[0] || null;
+  const penaltySeverityPercent = useMemo(
+    () => Math.max(10, Math.min(100, Math.round((penaltyRecovery.effectivePoints / 20) * 100))),
+    [penaltyRecovery.effectivePoints]
+  );
   const heroTone = useMemo(() => {
     if (growthCelebrationCandidate) {
       return {
@@ -3285,17 +3402,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className={cn(
                   "grid grid-cols-7 gap-1.5 border-b border-[#14295F]/10",
-                  isMobile ? "px-2 py-2.5" : "px-4 py-3"
+                  isMobile ? "gap-[2px] px-1 py-1.5" : "px-4 py-3"
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
-                      isMobile ? "py-2 text-[10px] md:py-2.5 md:text-[11px]" : "py-3 text-[11px]",
+                      isMobile ? "py-1 text-[8px] md:py-1.5 md:text-[9px]" : "py-3 text-[11px]",
                       "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                       i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1.5 p-2" : "gap-2.5 p-3")}>
+                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-[2px] p-1" : "gap-2.5 p-3")}>
                   {logsLoading ? (
                     <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
@@ -3306,8 +3423,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     const isTodayCalendar = isSameDay(day, new Date());
                     const hasPlans = (weeklyPlans || []).some((plan) => plan.dateKey === dateKey);
                     const hasDeepFocus = isCurrentMonth && minutes >= 180;
-                    const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
                     const timeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+                    const compactTimeLabel = formatCompactCalendarTime(minutes, isCurrentMonth);
+                    const compactStatusTone = hasDeepFocus ? 'bg-orange-400' : hasPlans ? 'bg-[#14295F]/68' : 'bg-transparent';
 
                     return (
                       <button
@@ -3316,63 +3434,93 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
                           "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
-                          isMobile ? "aspect-[0.94] min-h-[4.8rem] p-1.5 md:min-h-[7.2rem] md:p-2.5" : "min-h-[150px] p-3",
+                          isMobile ? "aspect-square min-h-[3.45rem] p-[0.38rem] md:min-h-[4.4rem] md:p-[0.5rem]" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                           isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
-                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
+                          isTodayCalendar && (isMobile ? "z-10 ring-[1.5px] ring-inset ring-[#FF7A16]/28 shadow-[0_10px_18px_-16px_rgba(20,41,95,0.18)]" : "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]")
                         )}
                       >
-                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
-                        <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                        {isCurrentMonth && (
-                          <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
-                            <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
-                          </div>
-                        )}
-                        <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
-                          <span
-                            className={cn(
-                              "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                              isMobile ? "text-[10px] min-w-[1.6rem] px-1.5 py-0.5 md:text-[11px] md:px-2 md:py-0.75" : "text-xs min-w-[2rem] px-2 py-1",
-                              idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                              isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
-                            )}
-                          >
-                            {format(day, 'd')}
-                          </span>
-                          {hasStatusCluster ? (
-                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1.5 py-[0.3rem]" : "px-2 py-1")}>
-                              {hasPlans && <span className={cn("rounded-full bg-[#14295F]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
-                            </div>
-                          ) : (
-                            <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
-                          )}
-                        </div>
-                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
-                          <div
-                            className={cn(
-                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
-                              getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                            )}
-                          >
-                            {isMobile ? (
-                              <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
-                                {timeLabel}
+                        {isTodayCalendar && <div className={cn("pointer-events-none absolute border border-[#FF7A16]/20", isMobile ? "-inset-px rounded-[0.98rem]" : "-inset-0.5 rounded-[1.3rem]")} />}
+                        <div className={cn("pointer-events-none absolute top-0 h-px bg-white/90", isMobile ? "inset-x-1.5" : "inset-x-3")} />
+                        {isMobile ? (
+                          <div className="relative z-10 flex h-full flex-col justify-between">
+                            <div className="flex items-start justify-between gap-1">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                                  "min-w-[1.14rem] px-[0.36rem] py-[0.18rem] text-[8px] md:min-w-[1.26rem] md:text-[8.5px]",
+                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white/94 text-slate-700",
+                                  isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
+                                )}
+                              >
+                                {format(day, 'd')}
                               </span>
-                            ) : (
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                                  공부시간
-                                </span>
-                                <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
-                                  {timeLabel}
-                                </span>
+                              <span
+                                className={cn(
+                                  "mt-[0.22rem] h-1.5 w-1.5 rounded-full transition-opacity",
+                                  compactStatusTone,
+                                  !(hasPlans || hasDeepFocus) && "opacity-0"
+                                )}
+                                aria-hidden="true"
+                              />
+                            </div>
+
+                            <div className="flex flex-1 items-end justify-center pb-[0.04rem]">
+                              <span
+                                className={cn(
+                                  "dashboard-number inline-flex max-w-full items-center justify-center rounded-full border bg-white/92 px-1.5 py-[0.24rem] text-[0.64rem] leading-none tracking-[-0.04em] shadow-[0_8px_14px_-12px_rgba(20,41,95,0.18)] md:text-[0.7rem]",
+                                  getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                                )}
+                              >
+                                {compactTimeLabel}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {isCurrentMonth && (
+                              <div className="pointer-events-none absolute inset-x-3 bottom-[4.1rem]">
+                                <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                               </div>
                             )}
-                          </div>
-                        </div>
+                            <div className="relative z-10 flex justify-between items-start gap-2 mb-2.5">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] text-xs min-w-[2rem] px-2 py-1",
+                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                                  isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
+                                )}
+                              >
+                                {format(day, 'd')}
+                              </span>
+                              {(hasPlans || hasDeepFocus) ? (
+                                <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]">
+                                  {hasPlans && <span className="h-2 w-2 rounded-full bg-[#14295F]" />}
+                                  {hasDeepFocus && <Zap className="h-3 w-3 fill-orange-500 text-orange-500" />}
+                                </div>
+                              ) : (
+                                <span className="h-6 w-6" aria-hidden="true" />
+                              )}
+                            </div>
+                            <div className="absolute left-0 right-0 bottom-3 px-3">
+                              <div
+                                className={cn(
+                                  "rounded-[0.95rem] border bg-white text-center whitespace-nowrap px-3 py-2.5 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                                  getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    공부시간
+                                  </span>
+                                  <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
+                                    {timeLabel}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
                         {!isMobile && isCurrentMonth && (
                           <div className="pointer-events-none absolute inset-x-3 bottom-12">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
@@ -3631,36 +3779,104 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </ParentAnalyticsCard>
               </div>
 
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center gap-2 px-1">
-                  <Sparkles className="h-4 w-4 text-slate-400" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">추가 데이터</span>
-                </div>
-              </div>
-
-              <Card
-                className="rounded-[2rem] border border-rose-100 bg-rose-50/30 p-6 shadow-sm cursor-pointer"
-                role="button"
-                onClick={() => setIsPenaltyGuideOpen(true)}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="grid gap-1 min-w-0">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">누적 벌점 지수</span>
-                    <h3 className="dashboard-number text-4xl text-rose-900">
-                      {penaltyRecovery.effectivePoints}
-                      <span className="ml-1 text-lg opacity-40">점</span>
-                    </h3>
-                    <p className="text-[11px] font-bold text-rose-700/80">
-                      원점수 {penaltyRecovery.basePoints}점 · 회복 {penaltyRecovery.recoveredPoints}점
-                    </p>
+              <section className="space-y-4 pt-2">
+                <div className="rounded-[1.8rem] border border-[#dce6f8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_48%,#f0f5ff_100%)] px-4 py-4 shadow-[0_22px_44px_-34px_rgba(20,41,95,0.18)] sm:px-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.05rem] border border-[#e1e9fb] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_10px_20px_-18px_rgba(20,41,95,0.18)]">
+                      <Sparkles className="h-4 w-4 text-[#14295F]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Supplement Report</p>
+                      <h3 className="mt-1 text-[1.05rem] font-black tracking-tight text-[#14295F]">추가 데이터</h3>
+                      <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
+                        학습 분석 외에 벌점, 리듬, 과목, 생활 흐름을 리포트형 카드로 한 번에 확인할 수 있어요.
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="outline" className={cn('h-8 w-fit rounded-full border px-4 text-xs font-black shadow-sm', penaltyMeta.badge)}>
-                    {penaltyMeta.label}
-                  </Badge>
                 </div>
-              </Card>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ParentMetricCardShell
+                  tone="penalty"
+                  interactive
+                  role="button"
+                  onClick={() => setIsPenaltyGuideOpen(true)}
+                  className="overflow-hidden rounded-[2rem] p-5 sm:p-6"
+                >
+                  <div className="flex h-full flex-col gap-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d24664]">Penalty Report</p>
+                        <h3 className="mt-1 text-[1.12rem] font-black tracking-tight text-[#14295F]">누적 벌점 지수</h3>
+                        <p className="mt-1 text-[12px] font-bold leading-[1.6] text-slate-500">
+                          생활·출결 기록을 기준으로 회복 반영 후 현재 상태를 리포트처럼 보여드립니다.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={cn('h-8 rounded-full border px-4 text-[11px] font-black shadow-sm', penaltyMeta.badge)}>
+                          {penaltyMeta.label}
+                        </Badge>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#ffd9df] bg-white/90 text-[#d24664] shadow-sm">
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.15fr)]">
+                      <div className="rounded-[1.4rem] border border-[#ffd8df] bg-white/92 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#d24664]">회복 반영 점수</p>
+                        <div className="mt-3 flex items-end gap-2">
+                          <span className="dashboard-number text-[2.6rem] leading-none tracking-[-0.06em] text-[#8f1534]">
+                            {penaltyRecovery.effectivePoints}
+                          </span>
+                          <span className="pb-1.5 text-[14px] font-black text-[#d24664]">점</span>
+                        </div>
+                        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[#ffe7ec]">
+                          <div
+                            className="h-full rounded-full bg-[linear-gradient(90deg,#ff9bb0_0%,#d24664_55%,#8f1534_100%)]"
+                            style={{ width: `${penaltySeverityPercent}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-[1.15rem] border border-[#ffdbe3] bg-white/88 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#b95a71]">원점수</p>
+                            <p className="mt-2 text-[1.15rem] font-black tracking-tight text-[#14295F]">
+                              {penaltyRecovery.basePoints}점
+                            </p>
+                          </div>
+                          <div className="rounded-[1.15rem] border border-[#ffdbe3] bg-white/88 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#b95a71]">회복 반영</p>
+                            <p className="mt-2 text-[1.15rem] font-black tracking-tight text-[#14295F]">
+                              -{penaltyRecovery.recoveredPoints}점
+                            </p>
+                          </div>
+                        </div>
+                        <div className="rounded-[1.15rem] border border-[#ffdbe3] bg-white/88 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#b95a71]">최근 생활 기록</p>
+                          <p className="mt-2 text-[13px] font-black leading-5 text-[#14295F]">
+                            {latestPenaltyReason ? latestPenaltyReason.reason : '최근 벌점 기록 없음'}
+                          </p>
+                          <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">
+                            {latestPenaltyReason ? `${latestPenaltyReason.dateLabel} · +${latestPenaltyReason.points}점` : '카드를 눌러 벌점 기준을 자세히 확인할 수 있어요.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border border-[#ffd7df] bg-white/82 px-4 py-3">
+                      <p className="text-[11px] font-bold leading-5 text-[#a04a63]">
+                        최근 벌점 흐름과 현재 상태를 함께 보고, 필요하면 기준 안내를 바로 열어볼 수 있어요.
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-[#fff1f4] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#d24664]">
+                        기준 보기
+                      </span>
+                    </div>
+                  </div>
+                </ParentMetricCardShell>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <RhythmTimeChartDialog
                   trend={dailyRhythmTrend}
                   hasTrend={hasRhythmTrend}
@@ -3673,51 +3889,85 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   subjects={subjectsData}
                   subjectTotalMinutes={subjectTotalMinutes}
                 />
-              </div>
+                </div>
 
-              <div className="space-y-3 px-1">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-slate-400" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">최근 생활/출결 이슈</span>
-                </div>
-                <div className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:grid-cols-2">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">최근 공부일자</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.recentStudyDate}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">공부 시작 시각</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.recentStudyStart}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">외출 여부</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.awayStatus}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">퇴실 여부</p>
-                    <p className="mt-1 text-sm font-black text-slate-800">{recentLifeAttendanceSummary.checkOutStatus}</p>
-                  </div>
-                </div>
-                {recentPenaltyReasons.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-center text-xs font-bold text-slate-400">
-                    기록된 특이사항이 없습니다.
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    {recentPenaltyReasons.map((r) => (
-                      <div key={r.id} className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-rose-200 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="grid gap-1 min-w-0">
-                          <span className="text-sm font-bold text-slate-800">{r.reason}</span>
-                          <span className="text-[10px] font-black text-slate-400">{r.dateLabel} · 규정 준수 안내</span>
+                <Card className="relative overflow-hidden rounded-[2rem] border border-[#dbe5f2] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_48%,#f2f6fd_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.18)] sm:p-6">
+                  <div className="pointer-events-none absolute -right-12 top-0 h-28 w-28 rounded-full bg-[#d6e7ff]/35 blur-3xl" />
+                  <div className="relative z-10 space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#e1e8f5] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_10px_20px_-18px_rgba(20,41,95,0.18)]">
+                          <Activity className="h-4.5 w-4.5 text-[#14295F]" />
                         </div>
-                        <Badge variant="outline" className="w-fit border-none bg-rose-100 px-3 py-1 text-xs font-black text-rose-700">
-                          <span className="font-numeric">+{r.points}</span>점
-                        </Badge>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Life Report</p>
+                          <h3 className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">최근 생활/출결 이슈</h3>
+                          <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
+                            최근 학습일, 출결 흐름, 생활 기록을 한 보드에서 차분하게 정리했습니다.
+                          </p>
+                        </div>
                       </div>
-                    ))}
+                      <Badge variant="outline" className="h-7 w-fit rounded-full border border-[#d7e2f1] bg-white/92 px-3 text-[10px] font-black text-[#14295F]">
+                        최근 {recentPenaltyReasons.length}건
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">최근 공부일자</p>
+                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.recentStudyDate}</p>
+                      </div>
+                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">공부 시작 시각</p>
+                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.recentStudyStart}</p>
+                      </div>
+                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">외출 여부</p>
+                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.awayStatus}</p>
+                      </div>
+                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">퇴실 여부</p>
+                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.checkOutStatus}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7385a8]">최근 생활 기록</p>
+                        {latestPenaltyReason ? (
+                          <Badge variant="outline" className="h-6 rounded-full border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-black text-rose-700">
+                            최신 {latestPenaltyReason.dateLabel}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      {recentPenaltyReasons.length === 0 ? (
+                        <div className="rounded-[1.25rem] border border-[#dde7f4] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-22px_rgba(20,41,95,0.16)]">
+                          <p className="text-sm font-black text-[#14295F]">기록된 특이사항이 없습니다.</p>
+                          <p className="mt-1 text-[11px] font-bold text-slate-500">현재는 안정적인 생활 흐름을 유지하고 있어요.</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2.5">
+                          {recentPenaltyReasons.map((r) => (
+                            <div key={r.id} className="flex flex-col gap-3 rounded-[1.25rem] border border-white/90 bg-white/92 px-4 py-3 shadow-[0_14px_28px_-24px_rgba(20,41,95,0.18)] sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex min-w-0 items-start gap-3">
+                                <div className="mt-0.5 h-9 w-1.5 shrink-0 rounded-full bg-[linear-gradient(180deg,#ffafbf_0%,#d24664_100%)]" />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-black leading-5 text-[#14295F]">{r.reason}</p>
+                                  <p className="mt-1 text-[10px] font-black text-slate-400">{r.dateLabel} · 규정 준수 안내</p>
+                                </div>
+                              </div>
+                              <Badge variant="outline" className="w-fit rounded-full border-none bg-rose-100 px-3 py-1 text-[11px] font-black text-rose-700">
+                                <span className="font-numeric">+{r.points}</span>점
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </Card>
+              </section>
             </TabsContent>
 
             <TabsContent value="communication" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
