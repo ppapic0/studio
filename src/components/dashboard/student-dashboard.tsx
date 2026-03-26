@@ -2004,7 +2004,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     || latestCoachReport?.nextAction?.trim()
     || summarizeReportLine(latestCoachReport?.content);
   return (
-    <div className={cn("flex flex-col relative z-10", isMobile ? "gap-3" : "gap-6")}>
+    <div
+      className={cn(
+        "flex flex-col relative z-10",
+        isMobile ? "gap-3 pb-[calc(env(safe-area-inset-bottom)+8.5rem)]" : "gap-6"
+      )}
+    >
       <section className={cn(
         "student-hero-enter relative overflow-hidden text-white border transition-colors duration-200",
         isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-10"
