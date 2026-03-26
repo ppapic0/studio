@@ -2367,16 +2367,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">개인 최고</span>
                 <Trophy className="h-4 w-4 text-sky-500" />
               </div>
-              <div className="mt-3 flex items-end justify-between gap-3">
+              <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                  <p className={cn("font-black tracking-tight text-slate-900 whitespace-normal break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
                     {formatMinutesToKorean(personalBestMinutes)}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-slate-500">
                     {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : monthlyBestMinutes > 0 ? '이번 달 최근 기록 기준' : '이번 달 최고 기록 준비 중'}
                   </p>
                 </div>
-                <div className={cn("shrink-0", isMobile ? "w-[6.2rem]" : "w-[7rem]")}>
+                <div className={cn("shrink-0", isMobile ? "w-full max-w-[6.2rem] self-end" : "w-[7rem]")}>
                   <MiniBestStudySparkline
                     data={personalBestTrend.data}
                     isMobile={isMobile}
