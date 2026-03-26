@@ -352,7 +352,7 @@ export default function DashboardPage() {
       <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
         <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
           <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-xl' : 'text-4xl')}>
-            {userRole === 'parent' ? `${user?.displayName}\uB2D8, \uD559\uBD80\uBAA8` : `${user?.displayName}\uB2D8, \uBC18\uAC00\uC6CC\uC694!`}
+            {`${user?.displayName}\uB2D8, \uBC18\uAC00\uC6CC\uC694!`}
           </h1>
           <Badge
             variant="secondary"
@@ -361,7 +361,7 @@ export default function DashboardPage() {
               isMobile ? 'h-5 px-2 text-[9px]' : 'h-7 px-3 text-[11px]',
             )}
           >
-            {userRole === 'parent' ? '\uD559\uBD80\uBAA8' : '\uD559\uC0DD'}
+            {'\uD559\uC0DD'}
           </Badge>
 
           {userRole === 'student' && (
@@ -445,7 +445,7 @@ export default function DashboardPage() {
         </div>
 
         <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
-          <StudentDashboard isActive={userRole === 'student'} />
+          <StudentDashboard isActive={true} />
         </div>
       </div>
     );

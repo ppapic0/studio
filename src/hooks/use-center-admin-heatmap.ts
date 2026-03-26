@@ -261,9 +261,9 @@ export function useCenterAdminHeatmap({
           historyKeys.map(async (dateKey) => {
             try {
               const snap = await getDocs(collection(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students'));
-              return [dateKey, snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as DailyStudentStat))] as const;
+              return [dateKey, snap.docs.map((docSnap) => docSnap.data() as DailyStudentStat)] as const;
             } catch {
-              return [dateKey, []] as const;
+              return [dateKey, [] as DailyStudentStat[]] as const;
             }
           })
         );
@@ -846,7 +846,7 @@ export function useCenterAdminHeatmap({
         const progress = progressById.get(member.id);
         const studentReports = (reportsByStudentId.get(member.id) || []).filter((report) => report.status === 'sent');
         const latestInvoice = currentMonthInvoiceByStudentId.get(member.id);
-        const invoiceStatus = latestInvoice?.status || 'none';
+        const invoiceStatus: Invoice['status'] | 'none' = latestInvoice?.status ?? 'none';
         const parentEvents = parentEvents30dByStudentId.get(member.id) || [];
         const parentCommunicationsByStudent = parentCommunications30dByStudentId.get(member.id) || [];
         const appVisits = parentEvents.filter((event) => event.eventType === 'app_visit').length;

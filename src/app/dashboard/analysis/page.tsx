@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StudentDetailPage from '../teacher/students/[id]/page';
+import { StudentDetailPresentationProvider } from '@/components/dashboard/student-detail-presentation-mode';
 
 type ToneKey = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose';
 
@@ -341,6 +342,8 @@ export default function AnalysisTrackPage() {
   useEffect(() => {
     if (!firestore || !user?.uid || !activeMembership) return;
     let cancelled = false;
+    const centerId = activeMembership.id;
+    const userId = user.uid;
 
     async function loadSessions() {
       const today = new Date();
@@ -351,8 +354,8 @@ export default function AnalysisTrackPage() {
           getDocs(
             collection(
               firestore,
-              'centers', activeMembership.id,
-              'studyLogs', user.uid,
+              'centers', centerId,
+              'studyLogs', userId,
               'days', dateKey,
               'sessions'
             )
@@ -651,7 +654,9 @@ export default function AnalysisTrackPage() {
 
         <TabsContent value="full" className="mt-0">
           <div className="analysis-shell">
-            <StudentDetailPage params={selfParams} presentationMode="student-analysis" />
+            <StudentDetailPresentationProvider value="student-analysis">
+              <StudentDetailPage params={selfParams} />
+            </StudentDetailPresentationProvider>
           </div>
         </TabsContent>
       </Tabs>

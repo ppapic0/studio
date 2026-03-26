@@ -2096,6 +2096,7 @@ export default function StudyPlanPage() {
       />
 
       {false && (
+      <>
       <div className={cn("grid gap-4 sm:gap-6 items-start", isMobile ? "grid-cols-1 px-0" : "md:grid-cols-12")}>
         {/* 학습 계획 카드 */}
         <div className={cn("w-full mx-auto order-1 md:order-2", isMobile ? "md:col-span-12" : "md:col-span-7")}>
@@ -2199,7 +2200,7 @@ export default function StudyPlanPage() {
               <div className={cn("bg-muted/10 border-t flex flex-col sm:flex-row items-center justify-between gap-4", isMobile ? "p-4" : "p-8")}>
                 <div className="flex items-center gap-2 bg-white/80 px-4 py-2 rounded-xl border shadow-sm w-full sm:w-auto justify-center">
                   <CalendarCheck className="h-3.5 w-3.5 text-primary" />
-                  <p className={cn("font-black text-primary/70 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-[11px]")}>{format(selectedDate, 'yyyy. MM. dd', { locale: ko })}</p>
+                  <p className={cn("font-black text-primary/70 uppercase tracking-widest", isMobile ? "text-[9px]" : "text-[11px]")}>{selectedDate ? format(selectedDate!, 'yyyy. MM. dd', { locale: ko }) : ''}</p>
                 </div>
                 {!isPast && (
                   <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -2369,6 +2370,7 @@ export default function StudyPlanPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
       )}
       
       <footer className={cn("py-8 text-center opacity-30", isMobile ? "hidden" : "px-4 py-12")}>

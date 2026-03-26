@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 
 const HOURS = Array.from({ length: 12 }, (_, index) => (index + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, index) => (index * 5).toString().padStart(2, '0'));
+type Meridiem = '오전' | '오후';
 
 type ScheduleItemCardProps = {
   item: { id: string; title: string };
@@ -43,11 +44,11 @@ export function ScheduleItemCard({
 }: ScheduleItemCardProps) {
   const [titlePart, timePart] = item.title.split(': ');
 
-  const from24h = (value: string) => {
+  const from24h = (value: string): { hour: string; minute: string; period: Meridiem } => {
     if (!value || !value.includes(':')) return { hour: '09', minute: '00', period: '오전' as const };
     let [hour, minute] = value.split(':').map(Number);
     if (Number.isNaN(hour) || Number.isNaN(minute)) return { hour: '09', minute: '00', period: '오전' as const };
-    const period = hour >= 12 ? '오후' : '오전';
+    const period: Meridiem = hour >= 12 ? '오후' : '오전';
     hour = hour % 12 || 12;
     return {
       hour: hour.toString().padStart(2, '0'),
@@ -67,19 +68,19 @@ export function ScheduleItemCard({
   const initialRange = parseRange(timePart);
   const [sHour, setSHour] = useState(initialRange.start.hour);
   const [sMin, setSMin] = useState(initialRange.start.minute);
-  const [sPer, setSPer] = useState(initialRange.start.period);
+  const [sPer, setSPer] = useState<Meridiem>(initialRange.start.period);
   const [eHour, setEHour] = useState(initialRange.end.hour);
   const [eMin, setEMin] = useState(initialRange.end.minute);
-  const [ePer, setEPer] = useState(initialRange.end.period);
+  const [ePer, setEPer] = useState<Meridiem>(initialRange.end.period);
 
   useEffect(() => {
     const remote = parseRange(timePart);
     setSHour(remote.start.hour);
     setSMin(remote.start.minute);
-    setSPer(remote.start.period);
+    setSPer(remote.start.period as Meridiem);
     setEHour(remote.end.hour);
     setEMin(remote.end.minute);
-    setEPer(remote.end.period);
+    setEPer(remote.end.period as Meridiem);
   }, [timePart]);
 
   const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', value: string) => {
@@ -87,10 +88,10 @@ export function ScheduleItemCard({
 
     let nextSH = sHour;
     let nextSM = sMin;
-    let nextSP = sPer;
+    let nextSP: Meridiem = sPer;
     let nextEH = eHour;
     let nextEM = eMin;
-    let nextEP = ePer;
+    let nextEP: Meridiem = ePer;
 
     if (type === 's') {
       if (field === 'h') { nextSH = value; setSHour(value); }
